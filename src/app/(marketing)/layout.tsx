@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MarketingHeader } from "@/components/marketing-header";
+
 
 export default function MarketingLayout({
   children,
@@ -8,7 +8,7 @@ export default function MarketingLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <MarketingHeader />
+
       <main className="flex-1">{children}</main>
       <footer className="border-t py-12 md:py-16">
         <div className="container max-w-screen-xl mx-auto flex flex-col items-center justify-center gap-4 text-center px-4">
