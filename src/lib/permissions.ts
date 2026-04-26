@@ -27,5 +27,5 @@ export function hasPermission(
   role: UserRole,
   permission: keyof typeof permissions
 ) {
-  return permissions[permission].includes(role);
+  return (permissions[permission] as readonly UserRole[]).includes(role);
 }
