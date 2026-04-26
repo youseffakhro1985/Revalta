@@ -22,12 +22,8 @@ export default function MarketingLayout({
             </Link>
           </nav>
           <div className="flex items-center space-x-4">
-            <Link href="/login">
-              <Button variant="ghost">Logga in</Button>
-            </Link>
-            <Link href="/register">
-              <Button>Kom igång</Button>
-            </Link>
+            <Button variant="ghost" href="/login">Logga in</Button>
+            <Button href="/register">Kom igång</Button>
           </div>
         </div>
       </header>
