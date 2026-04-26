@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { MarketingHeader } from "@/components/marketing-header";
 
 export default function MarketingLayout({
   children,
@@ -8,25 +8,7 @@ export default function MarketingLayout({
 }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 max-w-screen-xl mx-auto items-center justify-between px-4">
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="font-extrabold tracking-tight text-xl text-primary">Revalta</span>
-          </Link>
-          <nav className="flex items-center space-x-4">
-            <Link href="/funktioner" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-              Funktioner
-            </Link>
-            <Link href="/priser" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-              Priser
-            </Link>
-          </nav>
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" href="/login">Logga in</Button>
-            <Button href="/register">Kom igång</Button>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader />
       <main className="flex-1">{children}</main>
       <footer className="border-t py-12 md:py-16">
         <div className="container max-w-screen-xl mx-auto flex flex-col items-center justify-center gap-4 text-center px-4">
