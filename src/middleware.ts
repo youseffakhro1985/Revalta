@@ -1,27 +1,60 @@
-import NextAuth from "next-auth";
-import { authConfig } from "./auth.config";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { decrypt } from "@/lib/session";
 
-const { auth } = NextAuth(authConfig);
+export async function middleware(request: NextRequest) {
+  const token = request.cookies.get("revalta_session")?.value;
+  const pathname = request.nextUrl.pathname;
 
-const publicPaths = ["/", "/login", "/register"];
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isAdmin = pathname.startsWith("/admin");
+  const isAuthPage = pathname === "/login" || pathname === "/register";
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
-  const path = req.nextUrl.pathname;
-  
-  const isPublicPath = publicPaths.includes(path);
-
-  if (!isLoggedIn && !isPublicPath) {
-    return NextResponse.redirect(new URL("/login", req.url));
+  let session = null;
+  if (token) {
+    session = await decrypt(token);
   }
 
-  if (isLoggedIn && (path === "/login" || path === "/register")) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  // Om inloggad, blockera från att besöka login/register
+  if (session && isAuthPage) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Oskyddade rutter eller icke inloggad
+  if (!isDashboard && !isAdmin) {
+    return NextResponse.next();
+  }
+
+  // Skyddade rutter utan giltig session
+  if (!session) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // Blockera konton/företag som är spärrade (snabb koll i edge via JWT)
+  if (session.status === "blocked" || session.status === "deleted") {
+    return NextResponse.redirect(new URL("/login?error=blocked", request.url));
+  }
+  
+  if (session.companyStatus === "blocked" || session.companyStatus === "deleted") {
+    return NextResponse.redirect(new URL("/login?error=company_blocked", request.url));
+  }
+
+  // RBAC: Endast super_owner / internal_admin får nå /admin
+  if (isAdmin) {
+    if (session.role !== "super_owner" && session.role !== "internal_admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
+  // Dashboard kräver företag (förutom för system admins)
+  if (isDashboard) {
+    if (session.role !== "super_owner" && session.role !== "internal_admin" && !session.companyId) {
+      // De har inget aktivt företag, styr till onboarding
+      return NextResponse.redirect(new URL("/onboarding", request.url));
+    }
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
