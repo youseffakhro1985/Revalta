@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
-import { hash, compare } from 'bcryptjs'
+import { hashPassword, verifyPassword } from '@/lib/password'
 import { createSession, deleteSession } from '@/lib/session'
 import { redirect } from 'next/navigation'
 
@@ -19,7 +19,7 @@ export async function register(prevState: unknown, formData: FormData) {
     return { error: 'Användaren finns redan.' }
   }
 
-  const hashedPassword = await hash(password, 12)
+  const hashedPassword = await hashPassword(password)
   
   const firstName = name.split(' ')[0] || 'Okänd'
   const lastName = name.split(' ').slice(1).join(' ') || 'Användare'
@@ -72,7 +72,7 @@ export async function login(prevState: unknown, formData: FormData) {
     return { error: 'Ditt företag är spärrat från plattformen.' }
   }
 
-  const isPasswordValid = await compare(password, user.passwordHash)
+  const isPasswordValid = await verifyPassword(password, user.passwordHash)
   if (!isPasswordValid) {
     return { error: 'Ogiltiga inloggningsuppgifter.' }
   }
