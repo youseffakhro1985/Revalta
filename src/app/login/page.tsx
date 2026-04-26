@@ -33,7 +33,12 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-foreground block mb-1.5">Lösenord</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-foreground block">Lösenord</label>
+                <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
+                  Glömt lösenord?
+                </Link>
+              </div>
               <input
                 type="password"
                 name="password"
