@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, BarChart3, Clock, ShieldCheck, ArrowRight, LayoutDashboard, Search, Bell } from "lucide-react";
+import { Sparkles, BarChart3, ShieldCheck, ArrowRight, Search, Bell } from "lucide-react";
 
 export default function HomePage() {
   return (

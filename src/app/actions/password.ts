@@ -1,8 +1,6 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
-import { hashPassword } from '@/lib/password'
-import { randomBytes } from 'crypto'
 
 export async function forgotPassword(prevState: unknown, formData: FormData) {
   const email = formData.get('email') as string
@@ -28,7 +26,7 @@ export async function forgotPassword(prevState: unknown, formData: FormData) {
 
 export async function resetPassword(prevState: unknown, formData: FormData) {
   const password = formData.get('password') as string
-  const token = formData.get('token') as string
+  const _token = formData.get('token') as string
 
   if (!password || password.length < 8) {
     return { error: 'Lösenordet måste vara minst 8 tecken långt.' }
