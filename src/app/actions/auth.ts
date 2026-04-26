@@ -40,7 +40,7 @@ export async function register(prevState: unknown, formData: FormData) {
     email: user.email,
     role: user.role,
     status: user.status,
-    companyId: user.companyId,
+    companyId: null,
     companyStatus: null
   })
 
@@ -57,7 +57,7 @@ export async function login(prevState: unknown, formData: FormData) {
 
   const user = await prisma.user.findUnique({ 
     where: { email },
-    include: { company: true }
+    include: { memberships: { include: { company: true } } }
   })
 
   if (!user) {
@@ -68,7 +68,10 @@ export async function login(prevState: unknown, formData: FormData) {
     return { error: 'Ditt konto är spärrat. Kontakta support.' }
   }
 
-  if (user.company && (user.company.status === 'blocked' || user.company.status === 'deleted')) {
+  const primaryMembership = user.memberships[0]
+  const company = primaryMembership?.company
+
+  if (company && (company.status === 'blocked' || company.status === 'deleted')) {
     return { error: 'Ditt företag är spärrat från plattformen.' }
   }
 
@@ -82,8 +85,8 @@ export async function login(prevState: unknown, formData: FormData) {
     email: user.email,
     role: user.role,
     status: user.status,
-    companyId: user.companyId,
-    companyStatus: user.company?.status || null
+    companyId: company?.id || null,
+    companyStatus: company?.status || null
   })
 
   redirect('/dashboard')

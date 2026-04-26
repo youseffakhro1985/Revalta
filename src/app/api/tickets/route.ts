@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getSession } from "@/lib/session";
 import { getAllTickets, createTicket } from "@/lib/tickets";
 
 export async function GET() {
-  const session = await auth();
+  const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Ej autentiserad" }, { status: 401 });
   }
@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
+  const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Ej autentiserad" }, { status: 401 });
   }
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     description,
     propertyAddress,
     status: "open",
-    createdBy: session.user?.name || "Okänd",
+    createdBy: session.email || "Okänd",
   });
 
   return NextResponse.json(ticket, { status: 201 });
