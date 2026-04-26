@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "next-auth/react";
 import { Ticket, User } from "@/types";
 
 interface Props {
@@ -68,12 +67,12 @@ export default function DashboardClient({ user, initialTickets }: Props) {
                 {user.role === "admin" ? "🔑 Admin" : "🏠 Fastighetsägare"}
               </p>
             </div>
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+            <a
+              href="/logout"
               className="text-sm text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-1.5 transition-colors"
             >
               Logga ut
-            </button>
+            </a>
           </div>
         </div>
       </header>
