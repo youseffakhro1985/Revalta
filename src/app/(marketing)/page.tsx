@@ -16,16 +16,12 @@ export default function MarketingPage() {
               En komplett SaaS-plattform för fastighetsägare, förvaltare och hyresgäster. Hantera felanmälningar med AI och spara tid.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/register">
-                <Button size="lg" className="gap-2">
-                  Prova gratis <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/boka-demo">
-                <Button variant="outline" size="lg">
-                  Boka demo
-                </Button>
-              </Link>
+              <Button href="/register" className="gap-2 px-8 py-3 text-base">
+                Prova gratis <ArrowRight className="h-4 w-4" />
+              </Button>
+              <Button href="/boka-demo" variant="secondary" className="px-8 py-3 text-base">
+                Boka demo
+              </Button>
             </div>
           </div>
         </div>
