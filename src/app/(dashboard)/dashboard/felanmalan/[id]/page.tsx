@@ -4,6 +4,8 @@ import db from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 
+export const dynamic = "force-dynamic";
+
 const statusLabels: Record<string, string> = {
   new: "Ny",
   received: "Mottagen",

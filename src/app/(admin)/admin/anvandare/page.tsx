@@ -1,6 +1,8 @@
 import db from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminUsersPage() {
   const users = await db.user.findMany({
     where: { deletedAt: null },

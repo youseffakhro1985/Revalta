@@ -3,6 +3,7 @@ import { ModulePlaceholder } from "@/components/module-placeholder";
 export default function FastigheterPage() {
   return (
     <ModulePlaceholder
+      eyebrow="Fastigheter"
       title="Fastighetsregister"
       description="Här byggs fastighetsregistret vidare med fastighetsbeteckning, adress, ansvarig förvaltare, status, taggar och kopplade ärenden."
       items={[

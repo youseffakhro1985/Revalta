@@ -3,6 +3,8 @@ import db from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 
+export const dynamic = "force-dynamic";
+
 const priorityLabels: Record<string, string> = {
   low: "Låg",
   normal: "Normal",

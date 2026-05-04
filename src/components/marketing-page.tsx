@@ -4,10 +4,13 @@ type MarketingPageProps = {
   eyebrow: string;
   title: string;
   description: string;
-  bullets: string[];
+  bullets?: string[];
+  items?: string[];
 };
 
-export function MarketingPage({ eyebrow, title, description, bullets }: MarketingPageProps) {
+export function MarketingPage({ eyebrow, title, description, bullets, items }: MarketingPageProps) {
+  const points = bullets ?? items ?? [];
+
   return (
     <main className="min-h-screen bg-[#f7f6f2] px-6 py-10 text-slate-950">
       <div className="mx-auto max-w-5xl">
@@ -24,7 +27,7 @@ export function MarketingPage({ eyebrow, title, description, bullets }: Marketin
           <h1 className="mt-5 max-w-3xl text-5xl font-bold tracking-tight">{title}</h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">{description}</p>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
-            {bullets.map((bullet) => (
+            {points.map((bullet) => (
               <div key={bullet} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-card">
                 <p className="font-semibold text-slate-950">{bullet}</p>
               </div>

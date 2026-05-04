@@ -23,7 +23,7 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
   try {
     const { payload } = await jwtVerify(token, secretKey);
     return payload as SessionPayload;
-  } catch (err) {
+  } catch {
     return null;
   }
 }

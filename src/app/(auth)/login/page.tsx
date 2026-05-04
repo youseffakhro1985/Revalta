@@ -27,7 +27,7 @@ export default function LoginPage() {
         const data = await res.json();
         setError(data.error || "Inloggningen misslyckades");
       }
-    } catch (err) {
+    } catch {
       setError("Något gick fel");
     } finally {
       setLoading(false);

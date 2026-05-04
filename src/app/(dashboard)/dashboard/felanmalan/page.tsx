@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { TicketCreateForm } from "./ticket-create-form";
 
+export const dynamic = "force-dynamic";
+
 const statusLabels: Record<string, string> = {
   new: "Ny",
   received: "Mottagen",

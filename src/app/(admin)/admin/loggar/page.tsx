@@ -1,6 +1,8 @@
 import db from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLoggarPage() {
   await requireUser();
   const logs = await db.auditLog.findMany({

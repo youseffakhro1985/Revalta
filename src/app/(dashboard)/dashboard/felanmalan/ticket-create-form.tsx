@@ -36,7 +36,7 @@ export function TicketCreateForm() {
       setForm({ title: "", description: "", propertyText: "" });
       router.push(`/dashboard/felanmalan/${data.ticket.id}`);
       router.refresh();
-    } catch (err) {
+    } catch {
       setError("Något gick fel. Försök igen.");
     } finally {
       setLoading(false);
