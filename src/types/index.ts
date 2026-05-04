@@ -1,20 +1,15 @@
-export type UserRole = "admin" | "customer";
-
 export interface User {
   id: string;
-  name: string;
   email: string;
-  role: UserRole;
+  name?: string | null;
+  created_at: string;
 }
-
-export type TicketStatus = "open" | "in_progress" | "closed";
 
 export interface Ticket {
   id: string;
   title: string;
   description: string;
-  status: TicketStatus;
-  createdAt: string;
-  createdBy: string;
-  propertyAddress: string;
+  status: 'ÖPPEN' | 'PÅGÅENDE' | 'STÄNGD';
+  user_id: string;
+  created_at: string;
 }
