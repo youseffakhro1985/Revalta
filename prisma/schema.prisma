@@ -8,21 +8,281 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum UserRole {
+  super_owner
+  internal_admin
+  company_owner
+  company_admin
+  property_manager
+  operations_user
+  read_only
+}
+
+enum UserStatus {
+  invited
+  pending_verification
+  active
+  blocked
+  deleted
+}
+
+enum CompanyStatus {
+  pending_review
+  active
+  rejected
+  blocked
+  archived
+  deleted
+}
+
+enum RegistrationStatus {
+  pending_review
+  approved
+  rejected
+  needs_more_info
+  blocked
+}
+
+enum TicketStatus {
+  new
+  received
+  under_review
+  planned
+  in_progress
+  waiting_material
+  waiting_external
+  completed
+  closed
+  rejected
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum TicketCategory {
+  vvs
+  el
+  ventilation
+  locks_access
+  damage
+  cleaning
+  outdoor
+  laundry
+  elevator
+  security
+  other
+}
+
 model User {
-  id         String   @id @default(uuid())
-  email      String   @unique
-  password   String
-  name       String?
-  created_at DateTime @default(now())
-  tickets    Ticket[]
+  id              String          @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String          @unique
+  phone           String?
+  passwordHash    String
+  role            UserRole        @default(company_owner)
+  status          UserStatus      @default(pending_verification)
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+  memberships     CompanyMember[]
+  createdTickets  Ticket[]        @relation("TicketCreatedBy")
+  assignedTickets Ticket[]        @relation("TicketAssignedTo")
+  auditLogs       AuditLog[]
+}
+
+model Company {
+  id             String          @id @default(uuid())
+  companyName    String
+  orgNumber      String?
+  companyType    String?
+  email          String?
+  phone          String?
+  address        String?
+  postalCode     String?
+  city           String?
+  country        String          @default("SE")
+  website        String?
+  plan           String          @default("start")
+  status         CompanyStatus   @default(pending_review)
+  approvedAt     DateTime?
+  blockedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  members        CompanyMember[]
+  properties     Property[]
+  tickets        Ticket[]
+  documents      Document[]
+  auditLogs      AuditLog[]
+}
+
+model CompanyMember {
+  id        String     @id @default(uuid())
+  companyId String
+  userId    String
+  role      UserRole
+  status    UserStatus @default(active)
+  invitedAt DateTime?
+  joinedAt  DateTime?
+  createdAt DateTime   @default(now())
+  company   Company    @relation(fields: [companyId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
+}
+
+model Registration {
+  id             String             @id @default(uuid())
+  companyName    String
+  orgNumber      String?
+  companyType    String
+  contactName    String
+  email          String
+  phone          String
+  requestedPlan  String?
+  propertyCount  Int?
+  unitCount      Int?
+  notes          String?
+  smsVerified    Boolean            @default(false)
+  emailVerified  Boolean            @default(false)
+  status         RegistrationStatus @default(pending_review)
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  internalNote   String?
+  createdAt      DateTime           @default(now())
+}
+
+model Property {
+  id                  String     @id @default(uuid())
+  companyId           String
+  name                String
+  internalName        String?
+  propertyDesignation String?
+  address             String
+  postalCode          String?
+  city                String
+  municipality        String?
+  country             String     @default("SE")
+  constructionYear    Int?
+  buildingCount       Int?
+  apartmentCount      Int?
+  commercialUnitCount Int?
+  totalArea           Float?
+  managerUserId       String?
+  status              String     @default("active")
+  notes               String?
+  tags                String[]
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  deletedAt           DateTime?
+  company             Company    @relation(fields: [companyId], references: [id])
+  tickets             Ticket[]
+  documents           Document[]
 }
 
 model Ticket {
+  id                  String          @id @default(uuid())
+  companyId           String
+  propertyId          String?
+  propertyText        String?
+  title               String
+  description         String
+  category            TicketCategory  @default(other)
+  priority            TicketPriority  @default(normal)
+  status              TicketStatus    @default(new)
+  createdById         String?
+  assignedToId        String?
+  internalNote        String?
+  aiCategory          String?
+  aiPriority          String?
+  aiSummary           String?
+  aiRiskScore         Int?
+  aiRiskLevel         String?
+  aiRecommendedAction String?
+  aiReplyDraft        String?
+  aiConfidence        Float?
+  aiLastProcessedAt   DateTime?
+  aiNeedsReview       Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  closedAt            DateTime?
+  deletedAt           DateTime?
+  company             Company         @relation(fields: [companyId], references: [id])
+  property            Property?       @relation(fields: [propertyId], references: [id])
+  createdBy           User?           @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  assignedTo          User?           @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  comments            TicketComment[]
+  history             TicketHistory[]
+}
+
+model TicketComment {
+  id           String   @id @default(uuid())
+  ticketId     String
+  authorUserId String?
+  body         String
+  isInternal   Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  ticket       Ticket   @relation(fields: [ticketId], references: [id])
+}
+
+model TicketHistory {
   id          String   @id @default(uuid())
-  title       String
-  description String
-  status      String   @default("ÖPPEN")
-  user_id     String
-  created_at  DateTime @default(now())
-  user        User     @relation(fields: [user_id], references: [id])
+  ticketId    String
+  actorUserId String?
+  action      String
+  fieldName   String?
+  oldValue    String?
+  newValue    String?
+  createdAt   DateTime @default(now())
+  ticket      Ticket   @relation(fields: [ticketId], references: [id])
+}
+
+model Document {
+  id         String   @id @default(uuid())
+  companyId  String
+  propertyId String?
+  title      String
+  type       String
+  fileUrl    String?
+  fileName   String?
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id])
+  property   Property? @relation(fields: [propertyId], references: [id])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?
+  companyId   String?
+  entityType  String
+  entityId    String?
+  action      String
+  oldValues   String?
+  newValues   String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorUserId], references: [id])
+  company     Company? @relation(fields: [companyId], references: [id])
+}
+
+model SmsOtpCode {
+  id         String    @id @default(uuid())
+  phone      String
+  codeHash   String
+  purpose    String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
 }

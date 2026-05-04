@@ -17,8 +17,8 @@ export function MarketingHeader() {
         </nav>
 
         <div className="flex items-center gap-3">
-          <Button href="/login" variant="ghost">Logga in</Button>
-          <Button href="/register">Kom igång</Button>
+          <Button href="/logga-in" variant="ghost">Logga in</Button>
+          <Button href="/registrera">Kom igång</Button>
         </div>
       </div>
     </header>

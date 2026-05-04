@@ -6,6 +6,8 @@ import Link from "next/link";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,10 +22,10 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, companyName, phone, email, password }),
       });
       if (res.ok) {
-        router.push("/login");
+        router.push("/logga-in");
       } else {
         const data = await res.json();
         setError(data.error || "Kunde inte skapa konto");
@@ -39,8 +41,8 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 animate-fade-in p-4">
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-card-lg border border-slate-100 animate-slide-up">
         <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-slate-900 mb-2">Skapa konto</h2>
-          <p className="text-slate-500 text-sm">Bli medlem för att skapa felanmälningar</p>
+          <h2 className="text-3xl font-bold text-slate-900 mb-2">Registrera företag</h2>
+          <p className="text-slate-500 text-sm">Skapa Revaltas första workspace för din organisation</p>
         </div>
         {error && (
           <div className="mb-6 p-3 bg-danger-50 border border-danger-500 text-danger-600 rounded-lg text-sm text-center animate-pulse-soft">
@@ -50,12 +52,23 @@ export default function RegisterPage() {
         <form onSubmit={handleRegister} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Namn</label>
-            <input 
-              type="text" 
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+            <input
+              type="text"
+              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Förnamn Efternamn"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Företagsnamn</label>
+            <input
+              type="text"
+              required
+              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="Ex. Brf Solgården"
             />
           </div>
           <div>
@@ -67,6 +80,16 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="namn@exempel.se"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Mobilnummer</label>
+            <input
+              type="tel"
+              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+46 70 123 45 67"
             />
           </div>
           <div>
@@ -89,7 +112,7 @@ export default function RegisterPage() {
           </button>
         </form>
         <p className="mt-8 text-center text-sm text-slate-500">
-          Har du redan ett konto? <Link href="/login" className="text-brand-600 font-medium hover:text-brand-700 hover:underline transition-colors">Logga in</Link>
+          Har du redan ett konto? <Link href="/logga-in" className="text-brand-600 font-medium hover:text-brand-700 hover:underline transition-colors">Logga in</Link>
         </p>
       </div>
     </div>

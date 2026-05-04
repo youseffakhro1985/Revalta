@@ -78,7 +78,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="mt-8 text-center text-sm text-slate-500">
-          Har du inget konto? <Link href="/register" className="text-brand-600 font-medium hover:text-brand-700 hover:underline transition-colors">Skapa ett här</Link>
+          Har du inget konto? <Link href="/registrera" className="text-brand-600 font-medium hover:text-brand-700 hover:underline transition-colors">Skapa ett här</Link>
         </p>
       </div>
     </div>
