@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import db from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
-import { v4 as uuidv4 } from "uuid";
 
 async function getUserFromRequest() {
   const token = cookies().get("token")?.value;
@@ -15,7 +14,10 @@ export async function GET() {
     const user = await getUserFromRequest();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-    const tickets = db.prepare("SELECT * FROM tickets WHERE user_id = ? ORDER BY created_at DESC").all(user.sub);
+    const tickets = await db.ticket.findMany({
+      where: { user_id: user.sub },
+      orderBy: { created_at: 'desc' }
+    });
     return NextResponse.json({ tickets });
   } catch (error) {
     console.error("Get tickets error:", error);
@@ -33,12 +35,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Titel och beskrivning krävs" }, { status: 400 });
     }
 
-    const id = uuidv4();
-    db.prepare("INSERT INTO tickets (id, title, description, user_id) VALUES (?, ?, ?, ?)").run(
-      id, title, description, user.sub
-    );
+    const ticket = await db.ticket.create({
+      data: { title, description, user_id: user.sub }
+    });
 
-    return NextResponse.json({ success: true, id }, { status: 201 });
+    return NextResponse.json({ success: true, id: ticket.id }, { status: 201 });
   } catch (error) {
     console.error("Create ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

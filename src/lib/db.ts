@@ -1,9 +1,11 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { PrismaClient } from "@prisma/client";
 
-// Initierar en anslutning till dev.db
-const dbPath = path.join(process.cwd(), 'dev.db');
-const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+const db = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
 export default db;

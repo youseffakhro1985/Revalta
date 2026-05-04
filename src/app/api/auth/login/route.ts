@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "E-post och lösenord krävs" }, { status: 400 });
     }
 
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as any;
+    const user = await db.user.findUnique({ where: { email } });
     
     if (!user) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
