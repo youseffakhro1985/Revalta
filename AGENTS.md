@@ -15,15 +15,15 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ### Starting services
 1. Start Docker daemon: `dockerd &>/var/log/dockerd.log &` (wait ~3s)
 2. Start PostgreSQL: `docker compose up -d` (from repo root)
-3. Sync DB schema: `npx prisma db push` (use this instead of `prisma migrate deploy` — the migration SQL is out of sync with `schema.prisma`)
+3. Run migrations: `npx prisma migrate deploy`
 4. Start dev server: `npm run dev` (port 3000)
 
 ### Key caveats
-- The `.env` file is git-ignored and must exist with `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`. Defaults: `postgresql://postgres:postgres@localhost:5432/revalta` and `revalta_super_secret_key_2026`.
-- **Migration vs schema mismatch**: `prisma/migrations/20260426171352_init/migration.sql` creates a much more complex schema (with enums, many tables) than `schema.prisma` defines. Always use `npx prisma db push` to sync the DB to match the Prisma schema the app code expects.
-- The README mentions SQLite/better-sqlite3 but the actual codebase uses PostgreSQL — README is outdated.
-- ESLint is not pre-configured; the `.eslintrc.json` with `"extends": "next/core-web-vitals"` plus `eslint@8` and `eslint-config-next@14.2.3` as devDependencies are needed for `npm run lint` to work.
-- No test framework is configured (no Jest/Vitest/Playwright in dependencies).
+- The `.env` file is git-ignored and must exist with `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`. Copy from `.env.example`.
+- After cleaning the DB or on first setup, use `npx prisma migrate deploy` to apply schema.
+- `npx prisma db push` is also available for quick schema sync during development.
+- ESLint requires `eslint@8` and `eslint-config-next@14.2.3` (already in devDependencies).
+- Integration tests in `__tests__/api.test.ts` require the dev server running on port 3000.
 
 ### Commands
 | Task | Command |
@@ -32,4 +32,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | Lint | `npm run lint` |
 | Build | `npm run build` |
 | Dev server | `npm run dev` |
+| Tests | `npm test` (watch) / `npm run test:ci` (single run) |
+| Migrations | `npx prisma migrate deploy` |
 | DB push | `npx prisma db push` |
