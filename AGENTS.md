@@ -24,6 +24,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - `npx prisma db push` is also available for quick schema sync during development.
 - ESLint requires `eslint@8` and `eslint-config-next@14.2.3` (already in devDependencies).
 - Integration tests in `__tests__/api.test.ts` require the dev server running on port 3000.
+- **Do not run `npm run build` while the dev server is running.** The build writes to `.next/` and corrupts the dev server's webpack runtime. Stop the dev server first, or restart it after building (`rm -rf .next && npm run dev`).
 
 ### Commands
 | Task | Command |

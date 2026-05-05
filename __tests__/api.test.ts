@@ -9,7 +9,19 @@ describe('API integration tests', () => {
 
   beforeAll(async () => {
     await db.$connect();
-  });
+    // Warm up the dev server (first request triggers route compilation)
+    await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'warmup@test.se', password: 'x' }),
+    }).catch(() => {});
+    await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'warmup@test.se', password: 'x' }),
+    }).catch(() => {});
+    await fetch(`${baseUrl}/api/tickets`).catch(() => {});
+  }, 30000);
 
   afterAll(async () => {
     await db.ticket.deleteMany({ where: { user: { email: testEmail } } });
