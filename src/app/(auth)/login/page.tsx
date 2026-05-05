@@ -27,7 +27,7 @@ export default function LoginPage() {
         const data = await res.json();
         setError(data.error || "Inloggningen misslyckades");
       }
-    } catch (err) {
+    } catch {
       setError("Något gick fel");
     } finally {
       setLoading(false);
@@ -42,35 +42,39 @@ export default function LoginPage() {
           <p className="text-slate-500 text-sm">Logga in för att hantera dina ärenden</p>
         </div>
         {error && (
-          <div className="mb-6 p-3 bg-danger-50 border border-danger-500 text-danger-600 rounded-lg text-sm text-center animate-pulse-soft">
+          <div role="alert" aria-live="polite" className="mb-6 p-3 bg-danger-50 border border-danger-500 text-danger-600 rounded-lg text-sm text-center animate-pulse-soft">
             {error}
           </div>
         )}
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">E-post</label>
-            <input 
-              type="email" 
+            <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-1">E-post</label>
+            <input
+              id="login-email"
+              type="email"
               required
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+              autoComplete="email"
+              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="namn@exempel.se"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Lösenord</label>
-            <input 
-              type="password" 
+            <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-1">Lösenord</label>
+            <input
+              id="login-password"
+              type="password"
               required
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+              autoComplete="current-password"
+              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
           </div>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
             className="w-full py-3 px-4 bg-brand-600 text-white font-medium rounded-xl hover:bg-brand-700 transition-all shadow-card hover:shadow-card-md active:scale-[0.98] disabled:opacity-70"
           >

@@ -13,12 +13,12 @@ describe('API integration tests', () => {
     await fetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'warmup@test.se', password: 'x' }),
+      body: JSON.stringify({ email: 'warmup@test.se', password: 'whatever1' }),
     }).catch(() => {});
     await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'warmup@test.se', password: 'x' }),
+      body: JSON.stringify({ email: 'warmup@test.se', password: 'whatever1' }),
     }).catch(() => {});
     await fetch(`${baseUrl}/api/tickets`).catch(() => {});
   }, 30000);
@@ -58,10 +58,48 @@ describe('API integration tests', () => {
       const res = await fetch(`${baseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: 'something' }),
+        body: JSON.stringify({ password: 'something123' }),
       });
 
       expect(res.status).toBe(400);
+    });
+
+    it('rejects short password', async () => {
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'short@test.se', password: '1234567' }),
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain('8 tecken');
+    });
+
+    it('rejects invalid email format', async () => {
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'not-an-email', password: 'Password123' }),
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error).toContain('Ogiltig');
+    });
+
+    it('normalizes email to lowercase', async () => {
+      const upperEmail = `UPPER-${Date.now()}@REVALTA.SE`;
+      const res = await fetch(`${baseUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Upper', email: upperEmail, password: 'Password123' }),
+      });
+
+      expect(res.status).toBe(201);
+
+      // Clean up
+      await db.user.deleteMany({ where: { email: upperEmail.trim().toLowerCase() } });
     });
   });
 
@@ -87,7 +125,7 @@ describe('API integration tests', () => {
       const res = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: testEmail, password: 'WrongPassword' }),
+        body: JSON.stringify({ email: testEmail, password: 'WrongPassword1' }),
       });
 
       expect(res.status).toBe(401);
@@ -97,10 +135,37 @@ describe('API integration tests', () => {
       const res = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'nobody@revalta.se', password: 'whatever' }),
+        body: JSON.stringify({ email: 'nobody@revalta.se', password: 'whatever1' }),
       });
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /api/auth/logout', () => {
+    it('clears the auth cookie', async () => {
+      const res = await fetch(`${baseUrl}/api/auth/logout`, {
+        method: 'POST',
+        headers: { Cookie: authCookie },
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+
+      const setCookie = res.headers.get('set-cookie');
+      expect(setCookie).toContain('token=');
+    });
+
+    it('still works after logout (re-login for subsequent tests)', async () => {
+      const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmail, password: testPassword }),
+      });
+      expect(res.status).toBe(200);
+      const setCookie = res.headers.get('set-cookie');
+      authCookie = setCookie!.split(';')[0];
     });
   });
 
@@ -109,7 +174,7 @@ describe('API integration tests', () => {
       const res = await fetch(`${baseUrl}/api/tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Test', description: 'Test' }),
+        body: JSON.stringify({ title: 'Test', description: 'Test description' }),
       });
 
       expect(res.status).toBe(401);
@@ -153,10 +218,32 @@ describe('API integration tests', () => {
           'Content-Type': 'application/json',
           Cookie: authCookie,
         },
-        body: JSON.stringify({ description: 'Missing title' }),
+        body: JSON.stringify({ description: 'Missing title here' }),
       });
 
       expect(res.status).toBe(400);
+    });
+
+    it('trims and limits title/description length', async () => {
+      const longTitle = 'A'.repeat(300);
+      const res = await fetch(`${baseUrl}/api/tickets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: authCookie,
+        },
+        body: JSON.stringify({ title: longTitle, description: 'Test' }),
+      });
+
+      expect(res.status).toBe(201);
+      const data = await res.json();
+
+      // Verify it was truncated
+      const ticketRes = await fetch(`${baseUrl}/api/tickets/${data.id}`, {
+        headers: { Cookie: authCookie },
+      });
+      const ticketData = await ticketRes.json();
+      expect(ticketData.ticket.title.length).toBeLessThanOrEqual(200);
     });
   });
 });

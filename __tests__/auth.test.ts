@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { hashPassword, comparePassword, signToken, verifyToken } from '@/lib/auth';
+
+beforeAll(() => {
+  process.env.JWT_SECRET = 'test_secret_key_for_vitest_12345';
+});
 
 describe('auth utilities', () => {
   describe('hashPassword / comparePassword', () => {
@@ -35,8 +39,8 @@ describe('auth utilities', () => {
 
       const decoded = await verifyToken(token);
       expect(decoded).not.toBeNull();
-      expect(decoded.sub).toBe('user-123');
-      expect(decoded.email).toBe('test@revalta.se');
+      expect(decoded!.sub).toBe('user-123');
+      expect(decoded!.email).toBe('test@revalta.se');
     });
 
     it('returns null for an invalid token', async () => {
@@ -45,18 +49,25 @@ describe('auth utilities', () => {
     });
 
     it('returns null for a tampered token', async () => {
-      const token = await signToken({ sub: 'user-1' });
+      const token = await signToken({ sub: 'user-1', email: 'x@x.se' });
       const tampered = token.slice(0, -5) + 'XXXXX';
       const result = await verifyToken(tampered);
       expect(result).toBeNull();
     });
 
     it('includes iat and exp claims', async () => {
-      const token = await signToken({ sub: 'user-1' });
+      const token = await signToken({ sub: 'user-1', email: 'x@x.se' });
       const decoded = await verifyToken(token);
-      expect(decoded.iat).toBeDefined();
-      expect(decoded.exp).toBeDefined();
-      expect(decoded.exp - decoded.iat).toBe(86400); // 24h
+      expect(decoded!.iat).toBeDefined();
+      expect(decoded!.exp).toBeDefined();
+      expect(decoded!.exp! - decoded!.iat!).toBe(86400);
+    });
+
+    it('throws if JWT_SECRET is not set', async () => {
+      const original = process.env.JWT_SECRET;
+      delete process.env.JWT_SECRET;
+      await expect(signToken({ sub: 'x', email: 'x@x.se' })).rejects.toThrow('JWT_SECRET');
+      process.env.JWT_SECRET = original;
     });
   });
 });
