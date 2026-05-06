@@ -249,7 +249,7 @@ export default function FelanmalanPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <h3 className="truncate text-lg font-bold text-slate-950">{ticket.title}</h3>
-                      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-brand-600">
+                      <p className="mt-2 text-xs font-semibold tracking-wide text-brand-600">
                         {ticket.property ? `${ticket.property.name} · ${ticket.property.address}` : "Ingen fastighet vald"}
                       </p>
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{ticket.description}</p>
