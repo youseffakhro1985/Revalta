@@ -63,7 +63,7 @@ model Ticket {
   assigned_to_id String?
   due_date       DateTime?
   created_at     DateTime        @default(now())
-  updated_at     DateTime        @updatedAt
+  updated_at     DateTime        @default(now()) @updatedAt
   closed_at      DateTime?
   company        Company?        @relation(fields: [company_id], references: [id])
   user           User            @relation(fields: [user_id], references: [id])
