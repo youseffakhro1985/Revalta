@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Ticket = {
   id: string;
@@ -27,34 +27,43 @@ export default function FelanmalanPage() {
   const [success, setSuccess] = useState("");
   const router = useRouter();
 
-  const loadTickets = useCallback(async () => {
-    setLoadingTickets(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/tickets", { cache: "no-store" });
-      if (response.status === 401) {
-        router.push("/login");
-        return;
-      }
-
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || "Kunde inte hämta ärenden");
-        return;
-      }
-
-      setTickets(data.tickets || []);
-    } catch {
-      setError("Kunde inte kontakta servern");
-    } finally {
-      setLoadingTickets(false);
-    }
-  }, [router]);
-
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadTickets() {
+      try {
+        const response = await fetch("/api/tickets", { cache: "no-store" });
+        if (response.status === 401) {
+          router.push("/login");
+          return;
+        }
+
+        const data = await response.json();
+        if (!isMounted) return;
+
+        if (!response.ok) {
+          setError(data.error || "Kunde inte hämta ärenden");
+          return;
+        }
+
+        setTickets(data.tickets || []);
+      } catch {
+        if (isMounted) {
+          setError("Kunde inte kontakta servern");
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingTickets(false);
+        }
+      }
+    }
+
     loadTickets();
-  }, [loadTickets]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const openTickets = useMemo(
     () => tickets.filter((ticket) => ticket.status === "ÖPPEN").length,
