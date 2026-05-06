@@ -16,7 +16,14 @@ export async function GET() {
 
     const tickets = await db.ticket.findMany({
       where: { user_id: user.sub },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: "desc" },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        created_at: true,
+      },
     });
     return NextResponse.json({ tickets });
   } catch (error) {
@@ -31,15 +38,29 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const { title, description } = await request.json();
-    if (!title || !description) {
+    const normalizedTitle = typeof title === "string" ? title.trim() : "";
+    const normalizedDescription = typeof description === "string" ? description.trim() : "";
+
+    if (!normalizedTitle || !normalizedDescription) {
       return NextResponse.json({ error: "Titel och beskrivning krävs" }, { status: 400 });
     }
 
     const ticket = await db.ticket.create({
-      data: { title, description, user_id: user.sub }
+      data: {
+        title: normalizedTitle,
+        description: normalizedDescription,
+        user_id: user.sub,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        created_at: true,
+      },
     });
 
-    return NextResponse.json({ success: true, id: ticket.id }, { status: 201 });
+    return NextResponse.json({ success: true, ticket }, { status: 201 });
   } catch (error) {
     console.error("Create ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

@@ -22,7 +22,9 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
-        router.push("/dashboard");
+        const params = new URLSearchParams(window.location.search);
+        const nextPath = params.get("next");
+        router.push(nextPath?.startsWith("/") ? nextPath : "/dashboard");
       } else {
         const data = await res.json();
         setError(data.error || "Inloggningen misslyckades");

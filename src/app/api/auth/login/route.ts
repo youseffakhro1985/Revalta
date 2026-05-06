@@ -6,12 +6,13 @@ import { comparePassword, signToken } from "@/lib/auth";
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
     
-    if (!email || !password) {
+    if (!normalizedEmail || typeof password !== "string" || !password) {
       return NextResponse.json({ error: "E-post och lösenord krävs" }, { status: 400 });
     }
 
-    const user = await db.user.findUnique({ where: { email } });
+    const user = await db.user.findUnique({ where: { email: normalizedEmail } });
     
     if (!user) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
     }
 
-    const token = await signToken({ sub: user.id, email: user.email });
+    const token = await signToken({ sub: user.id, email: user.email, name: user.name });
     
     cookies().set("token", token, {
       httpOnly: true,

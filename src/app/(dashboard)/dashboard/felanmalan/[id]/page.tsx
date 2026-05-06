@@ -1,31 +1,74 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import db from "@/lib/db";
+import { verifyToken } from "@/lib/session";
 
-export default function TicketDetailPage({ params }: { params: { id: string } }) {
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(date);
+}
+
+export default async function TicketDetailPage({ params }: { params: { id: string } }) {
+  const token = cookies().get("token")?.value;
+  const session = token ? await verifyToken(token) : null;
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  const ticket = await db.ticket.findFirst({
+    where: {
+      id: params.id,
+      user_id: session.sub,
+    },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+      created_at: true,
+    },
+  });
+
+  if (!ticket) {
+    notFound();
+  }
+
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto">
-      <div className="mb-6">
-        <Link href="/dashboard/felanmalan" className="text-brand-600 hover:text-brand-700 font-medium text-sm flex items-center transition-colors">
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-          Tillbaka till alla ärenden
-        </Link>
-      </div>
-      
-      <div className="bg-white p-10 rounded-2xl shadow-card border border-slate-100 animate-slide-up">
-        <div className="flex justify-between items-start mb-8 pb-6 border-b border-slate-100">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">Ärende #{params.id}</h1>
-            <p className="text-slate-500 font-medium">Skapad den: {new Date().toLocaleDateString('sv-SE')}</p>
+    <div className="mx-auto max-w-4xl animate-fade-in space-y-6">
+      <Link href="/dashboard/felanmalan" className="inline-flex items-center text-sm font-semibold text-brand-600 transition-colors hover:text-brand-700">
+        <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Tillbaka till alla ärenden
+      </Link>
+
+      <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-card">
+        <div className="border-b border-slate-100 bg-slate-50/70 p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">Ärendedetaljer</p>
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-950">{ticket.title}</h1>
+              <p className="mt-3 text-sm font-medium text-slate-500">
+                Ärende #{ticket.id.slice(0, 8)} · Skapad {formatDate(ticket.created_at)}
+              </p>
+            </div>
+            <span className="w-fit rounded-full border border-warning-100 bg-warning-50 px-4 py-1.5 text-sm font-bold text-warning-600">
+              {ticket.status}
+            </span>
           </div>
-          <span className="px-4 py-1.5 bg-warning-50 text-warning-600 rounded-full text-sm font-bold tracking-wide border border-warning-100 shadow-sm">ÖPPEN</span>
         </div>
-        
-        <div className="prose prose-slate max-w-none">
-          <h3 className="text-xl font-bold mb-4 text-slate-900">Beskrivning</h3>
-          <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 text-slate-700 leading-relaxed">
-            Detta är en platshållare för ärendebeskrivningen. När databasen är fullt integrerad kommer detaljerna för detta ärende att visas här, komplett med formatering och eventuella bifogade bilder.
+
+        <div className="p-8">
+          <h2 className="text-xl font-bold text-slate-950">Beskrivning</h2>
+          <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-slate-100 bg-slate-50 p-6 leading-7 text-slate-700">
+            {ticket.description}
           </div>
         </div>
-      </div>
+      </article>
     </div>
   );
 }
