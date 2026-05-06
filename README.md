@@ -10,19 +10,22 @@ Revalta är en modern plattform för fastighetsförvaltning och felanmälan, byg
 Plattformen är organiserad med Next.js App Router:
 - **`/(auth)`**: Sidor för inloggning och registrering (`/login`, `/register`).
 - **`/(dashboard)`**: Skyddad huvudpanel för inloggade användare.
+  - **`/dashboard/team`**: Hantera organisation, roller och teammedlemmar.
   - **`/dashboard/fastigheter`**: Skapa och lista fastigheter i beståndet.
-  - **`/dashboard/felanmalan`**: Skapa, lista och öppna detaljer för felanmälningar kopplade till fastighet.
+  - **`/dashboard/felanmalan`**: Skapa, lista, tilldela och kommentera felanmälningar kopplade till fastighet.
 - **`/api`**: REST API-rutter för autentisering och datahantering (`/api/auth`, `/api/tickets`).
 - **`/components`**: UI-komponenter, layout-element och specifika vyer.
 - **`/lib`**: Centraliserad logik för databas (`db.ts`), sessioner (`session.ts`) och autentisering (`auth.ts`).
 
 ## 🗄 Databas & Backend
 Backend använder Prisma mot PostgreSQL:
-- **`prisma/schema.prisma`**: Datamodeller för användare, fastigheter och felanmälningar.
+- **`prisma/schema.prisma`**: Datamodeller för företag, användare, roller, fastigheter, felanmälningar och kommentarer.
 - **`src/app/api/auth/*`**: Registrering, inloggning och utloggning.
+- **`src/app/api/team`**: Lista och skapa teammedlemmar inom organisationen.
 - **`src/app/api/properties`**: Lista och skapa fastigheter för inloggad användare.
-- **`src/app/api/tickets`**: Lista och skapa ärenden för inloggad användare.
-- **`src/app/api/tickets/[id]`**: Hämta ett specifikt ärende.
+- **`src/app/api/tickets`**: Lista och skapa ärenden med kategori, prioritet, ansvarig och fastighet.
+- **`src/app/api/tickets/[id]`**: Hämta och uppdatera ett specifikt ärende.
+- **`src/app/api/tickets/[id]/comments`**: Lägg till kommentarer på ärenden.
 
 ## 🔑 Autentisering
 - Egenbyggd och säker autentisering med JWT.

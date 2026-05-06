@@ -1,36 +1,45 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import db from "@/lib/db";
-import { verifyToken } from "@/lib/auth";
-
-async function getUserFromRequest() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  if (!token) return null;
-  return verifyToken(token);
-}
+import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const user = await getUserFromRequest();
+    const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const tickets = await db.ticket.findMany({
-      where: { user_id: user.sub },
+      where: tenantWhere(user),
       orderBy: { created_at: "desc" },
       select: {
         id: true,
         title: true,
         description: true,
         status: true,
+        category: true,
+        priority: true,
         property_id: true,
+        assigned_to_id: true,
         created_at: true,
+        updated_at: true,
+        due_date: true,
         property: {
           select: {
             id: true,
             name: true,
             address: true,
             city: true,
+          },
+        },
+        assigned_to: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
           },
         },
       },
@@ -44,13 +53,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getUserFromRequest();
+    const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-    const { title, description, propertyId } = await request.json();
+    const { title, description, propertyId, category, priority, assignedToId } = await request.json();
     const normalizedTitle = typeof title === "string" ? title.trim() : "";
     const normalizedDescription = typeof description === "string" ? description.trim() : "";
     const normalizedPropertyId = typeof propertyId === "string" && propertyId.trim() ? propertyId.trim() : null;
+    const normalizedCategory = typeof category === "string" && category.trim() ? category.trim() : "other";
+    const normalizedPriority = typeof priority === "string" && priority.trim() ? priority.trim() : "normal";
+    const normalizedAssignedToId = typeof assignedToId === "string" && assignedToId.trim() ? assignedToId.trim() : null;
 
     if (!normalizedTitle || !normalizedDescription) {
       return NextResponse.json({ error: "Titel och beskrivning krävs" }, { status: 400 });
@@ -60,7 +72,7 @@ export async function POST(request: Request) {
       const property = await db.property.findFirst({
         where: {
           id: normalizedPropertyId,
-          user_id: user.sub,
+          ...tenantWhere(user),
         },
         select: { id: true },
       });
@@ -70,26 +82,60 @@ export async function POST(request: Request) {
       }
     }
 
+    if (normalizedAssignedToId) {
+      const assignee = await db.user.findFirst({
+        where: {
+          id: normalizedAssignedToId,
+          company_id: user.company_id ?? undefined,
+        },
+        select: { id: true },
+      });
+
+      if (!assignee) {
+        return NextResponse.json({ error: "Vald ansvarig hittades inte" }, { status: 400 });
+      }
+    }
+
     const ticket = await db.ticket.create({
       data: {
         title: normalizedTitle,
         description: normalizedDescription,
+        category: normalizedCategory,
+        priority: normalizedPriority,
         property_id: normalizedPropertyId,
-        user_id: user.sub,
+        assigned_to_id: normalizedAssignedToId,
+        company_id: user.company_id,
+        user_id: user.id,
       },
       select: {
         id: true,
         title: true,
         description: true,
         status: true,
+        category: true,
+        priority: true,
         property_id: true,
+        assigned_to_id: true,
         created_at: true,
+        updated_at: true,
         property: {
           select: {
             id: true,
             name: true,
             address: true,
             city: true,
+          },
+        },
+        assigned_to: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
           },
         },
       },

@@ -1,34 +1,30 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import db from "@/lib/db";
-import { verifyToken } from "@/lib/session";
+import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 
 async function getDashboardData() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  const session = token ? await verifyToken(token) : null;
+  const user = await getCurrentUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
-  const [user, totalTickets, openTickets, totalProperties, latestTickets] = await Promise.all([
-    db.user.findUnique({
-      where: { id: session.sub },
-      select: { name: true, email: true, created_at: true },
-    }),
-    db.ticket.count({ where: { user_id: session.sub } }),
-    db.ticket.count({ where: { user_id: session.sub, status: "ÖPPEN" } }),
-    db.property.count({ where: { user_id: session.sub } }),
+  const scope = tenantWhere(user);
+  const [totalTickets, openTickets, totalProperties, totalMembers, latestTickets] = await Promise.all([
+    db.ticket.count({ where: scope }),
+    db.ticket.count({ where: { ...scope, status: { not: "closed" } } }),
+    db.property.count({ where: scope }),
+    db.user.count({ where: user.company_id ? { company_id: user.company_id } : { id: user.id } }),
     db.ticket.findMany({
-      where: { user_id: session.sub },
+      where: scope,
       orderBy: { created_at: "desc" },
       take: 3,
       select: {
         id: true,
         title: true,
         status: true,
+        priority: true,
         created_at: true,
         property: {
           select: {
@@ -39,11 +35,7 @@ async function getDashboardData() {
     }),
   ]);
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  return { user, totalTickets, openTickets, totalProperties, latestTickets };
+  return { user, totalTickets, openTickets, totalProperties, totalMembers, latestTickets };
 }
 
 function formatDate(date: Date) {
@@ -53,7 +45,7 @@ function formatDate(date: Date) {
 }
 
 export default async function Dashboard() {
-  const { user, totalTickets, openTickets, totalProperties, latestTickets } = await getDashboardData();
+  const { user, totalTickets, openTickets, totalProperties, totalMembers, latestTickets } = await getDashboardData();
 
   return (
     <div className="animate-slide-up space-y-8">
@@ -66,13 +58,13 @@ export default async function Dashboard() {
               Välkommen{user.name ? `, ${user.name}` : ""}
             </h1>
             <p className="mt-3 text-lg leading-8 text-slate-600">
-              Här ser du dina aktiva ärenden, senaste status och nästa tydliga åtgärd.
+              {user.company?.name || "Din organisation"} samlar fastigheter, team och ärenden i en professionell arbetsyta.
             </p>
           </div>
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
           <p className="text-sm font-medium text-slate-500">Totalt antal ärenden</p>
           <p className="mt-3 text-4xl font-extrabold text-slate-950">{totalTickets}</p>
@@ -84,6 +76,10 @@ export default async function Dashboard() {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
           <p className="text-sm font-medium text-slate-500">Fastigheter</p>
           <p className="mt-3 text-4xl font-extrabold text-brand-600">{totalProperties}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+          <p className="text-sm font-medium text-slate-500">Team</p>
+          <p className="mt-3 text-4xl font-extrabold text-slate-950">{totalMembers}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
           <p className="text-sm font-medium text-slate-500">Inloggad som</p>
@@ -120,7 +116,7 @@ export default async function Dashboard() {
                       </p>
                     </div>
                     <span className="rounded-full border border-warning-100 bg-warning-50 px-3 py-1 text-xs font-bold text-warning-600">
-                      {ticket.status}
+                      {ticket.priority}
                     </span>
                   </div>
                 </Link>

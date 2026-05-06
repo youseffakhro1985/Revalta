@@ -1,42 +1,61 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import db from "@/lib/db";
-import { verifyToken } from "@/lib/session";
-
-async function getUserFromRequest() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  if (!token) return null;
-  return verifyToken(token);
-}
+import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { NextResponse } from "next/server";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getUserFromRequest();
+    const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     const { id } = await params;
 
     const ticket = await db.ticket.findFirst({
       where: {
         id,
-        user_id: user.sub,
+        ...tenantWhere(user),
       },
       select: {
         id: true,
         title: true,
         description: true,
         status: true,
+        category: true,
+        priority: true,
         property_id: true,
+        assigned_to_id: true,
         created_at: true,
+        updated_at: true,
+        due_date: true,
         property: {
           select: {
             id: true,
             name: true,
             address: true,
             city: true,
+          },
+        },
+        assigned_to: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        comments: {
+          orderBy: { created_at: "asc" },
+          select: {
+            id: true,
+            body: true,
+            is_internal: true,
+            created_at: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
           },
         },
       },
@@ -49,6 +68,76 @@ export async function GET(
     return NextResponse.json({ ticket });
   } catch (error) {
     console.error("Get ticket error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const { id } = await params;
+    const { status, priority, assignedToId } = await request.json();
+
+    const existing = await db.ticket.findFirst({
+      where: { id, ...tenantWhere(user) },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    }
+
+    const shouldUpdateAssignee = typeof assignedToId === "string";
+    const normalizedAssignedToId =
+      shouldUpdateAssignee && assignedToId.trim() ? assignedToId.trim() : null;
+
+    if (normalizedAssignedToId) {
+      const assignee = await db.user.findFirst({
+        where: {
+          id: normalizedAssignedToId,
+          company_id: user.company_id ?? undefined,
+        },
+        select: { id: true },
+      });
+
+      if (!assignee) {
+        return NextResponse.json({ error: "Vald ansvarig hittades inte" }, { status: 400 });
+      }
+    }
+
+    const normalizedStatus = typeof status === "string" && status.trim() ? status.trim() : undefined;
+    const normalizedPriority = typeof priority === "string" && priority.trim() ? priority.trim() : undefined;
+
+    const ticket = await db.ticket.update({
+      where: { id },
+      data: {
+        status: normalizedStatus,
+        priority: normalizedPriority,
+        assigned_to_id: shouldUpdateAssignee ? normalizedAssignedToId : undefined,
+        closed_at: normalizedStatus === "closed" ? new Date() : undefined,
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        assigned_to: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ success: true, ticket });
+  } catch (error) {
+    console.error("Update ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

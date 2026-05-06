@@ -1,0 +1,39 @@
+import { cookies } from "next/headers";
+import db from "@/lib/db";
+import { verifyToken } from "@/lib/session";
+
+export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  const session = token ? await verifyToken(token) : null;
+
+  if (!session) return null;
+
+  return db.user.findUnique({
+    where: { id: session.sub },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      status: true,
+      company_id: true,
+      company: {
+        select: {
+          id: true,
+          name: true,
+          plan: true,
+          status: true,
+        },
+      },
+    },
+  });
+}
+
+export function tenantWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+  return user.company_id ? { company_id: user.company_id } : { user_id: user.id };
+}
+
+export function canManageTeam(role: string) {
+  return role === "owner" || role === "admin";
+}

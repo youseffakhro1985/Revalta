@@ -19,6 +19,7 @@ export default function DashboardLayout({
                 <Link href="/dashboard" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Översikt</Link>
                 <Link href="/dashboard/fastigheter" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Fastigheter</Link>
                 <Link href="/dashboard/felanmalan" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Mina Ärenden</Link>
+                <Link href="/dashboard/team" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Team</Link>
               </nav>
             </div>
             <LogoutButton />

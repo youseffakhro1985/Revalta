@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import db from "@/lib/db";
-import { verifyToken } from "@/lib/session";
-
-async function getUserFromRequest() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  if (!token) return null;
-  return verifyToken(token);
-}
+import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 
 export async function GET() {
   try {
-    const user = await getUserFromRequest();
+    const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const properties = await db.property.findMany({
-      where: { user_id: user.sub },
+      where: tenantWhere(user),
       orderBy: { created_at: "desc" },
       include: {
         _count: {
@@ -34,7 +26,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getUserFromRequest();
+    const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const { name, address, postalCode, city } = await request.json();
@@ -53,7 +45,8 @@ export async function POST(request: Request) {
         address: normalizedAddress,
         postal_code: normalizedPostalCode,
         city: normalizedCity,
-        user_id: user.sub,
+        company_id: user.company_id,
+        user_id: user.id,
       },
       include: {
         _count: {

@@ -9,13 +9,31 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  email      String   @unique
-  password   String
-  name       String?
-  created_at DateTime @default(now())
-  tickets    Ticket[]
+  id               String          @id @default(uuid())
+  email            String          @unique
+  password         String
+  name             String?
+  role             String          @default("owner")
+  status           String          @default("active")
+  company_id       String?
+  created_at       DateTime        @default(now())
+  company          Company?        @relation(fields: [company_id], references: [id])
+  tickets          Ticket[]
+  assigned_tickets Ticket[]        @relation("AssignedTickets")
+  properties       Property[]
+  comments         TicketComment[]
+}
+
+model Company {
+  id         String     @id @default(uuid())
+  name       String
+  org_number String?
+  plan       String     @default("professional")
+  status     String     @default("active")
+  created_at DateTime   @default(now())
+  users      User[]
   properties Property[]
+  tickets    Ticket[]
 }
 
 model Property {
@@ -24,20 +42,43 @@ model Property {
   address     String
   postal_code String?
   city        String
+  company_id  String?
   user_id     String
   created_at  DateTime @default(now())
+  company     Company? @relation(fields: [company_id], references: [id])
   user        User     @relation(fields: [user_id], references: [id])
   tickets     Ticket[]
 }
 
 model Ticket {
+  id             String          @id @default(uuid())
+  title          String
+  description    String
+  status         String          @default("new")
+  category       String          @default("other")
+  priority       String          @default("normal")
+  company_id     String?
+  user_id        String
+  property_id    String?
+  assigned_to_id String?
+  due_date       DateTime?
+  created_at     DateTime        @default(now())
+  updated_at     DateTime        @updatedAt
+  closed_at      DateTime?
+  company        Company?        @relation(fields: [company_id], references: [id])
+  user           User            @relation(fields: [user_id], references: [id])
+  property       Property?       @relation(fields: [property_id], references: [id])
+  assigned_to    User?           @relation("AssignedTickets", fields: [assigned_to_id], references: [id])
+  comments       TicketComment[]
+}
+
+model TicketComment {
   id          String   @id @default(uuid())
-  title       String
-  description String
-  status      String   @default("ÖPPEN")
+  ticket_id   String
   user_id     String
-  property_id String?
+  body        String
+  is_internal Boolean  @default(false)
   created_at  DateTime @default(now())
+  ticket      Ticket   @relation(fields: [ticket_id], references: [id])
   user        User     @relation(fields: [user_id], references: [id])
-  property    Property? @relation(fields: [property_id], references: [id])
 }

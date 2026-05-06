@@ -11,14 +11,28 @@ type Property = {
   city: string;
 };
 
+type TeamMember = {
+  id: string;
+  name: string | null;
+  email: string;
+};
+
 type Ticket = {
   id: string;
   title: string;
   description: string;
   status: string;
+  category: string;
+  priority: string;
   property_id: string | null;
+  assigned_to_id: string | null;
   created_at: string;
+  updated_at: string;
   property: Property | null;
+  assigned_to: TeamMember | null;
+  _count: {
+    comments: number;
+  };
 };
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
@@ -26,12 +40,32 @@ const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
   timeStyle: "short",
 });
 
+const statusLabels: Record<string, string> = {
+  new: "Ny",
+  received: "Mottagen",
+  in_progress: "Pågår",
+  waiting: "Väntar",
+  completed: "Klar",
+  closed: "Stängd",
+};
+
+const priorityLabels: Record<string, string> = {
+  low: "Låg",
+  normal: "Normal",
+  high: "Hög",
+  urgent: "Akut",
+};
+
 export default function FelanmalanPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [propertyId, setPropertyId] = useState("");
+  const [category, setCategory] = useState("other");
+  const [priority, setPriority] = useState("normal");
+  const [assignedToId, setAssignedToId] = useState("");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -43,19 +77,21 @@ export default function FelanmalanPage() {
 
     async function loadData() {
       try {
-        const [ticketsResponse, propertiesResponse] = await Promise.all([
+        const [ticketsResponse, propertiesResponse, teamResponse] = await Promise.all([
           fetch("/api/tickets", { cache: "no-store" }),
           fetch("/api/properties", { cache: "no-store" }),
+          fetch("/api/team", { cache: "no-store" }),
         ]);
 
-        if (ticketsResponse.status === 401 || propertiesResponse.status === 401) {
+        if (ticketsResponse.status === 401 || propertiesResponse.status === 401 || teamResponse.status === 401) {
           router.push("/login");
           return;
         }
 
-        const [ticketsData, propertiesData] = await Promise.all([
+        const [ticketsData, propertiesData, teamData] = await Promise.all([
           ticketsResponse.json(),
           propertiesResponse.json(),
+          teamResponse.json(),
         ]);
 
         if (!isMounted) return;
@@ -70,8 +106,14 @@ export default function FelanmalanPage() {
           return;
         }
 
+        if (!teamResponse.ok) {
+          setError(teamData.error || "Kunde inte hämta teamet");
+          return;
+        }
+
         setTickets(ticketsData.tickets || []);
         setProperties(propertiesData.properties || []);
+        setMembers(teamData.members || []);
       } catch {
         if (isMounted) {
           setError("Kunde inte kontakta servern");
@@ -91,7 +133,7 @@ export default function FelanmalanPage() {
   }, [router]);
 
   const openTickets = useMemo(
-    () => tickets.filter((ticket) => ticket.status === "ÖPPEN").length,
+    () => tickets.filter((ticket) => ticket.status !== "closed").length,
     [tickets]
   );
 
@@ -105,7 +147,7 @@ export default function FelanmalanPage() {
       const response = await fetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, propertyId }),
+        body: JSON.stringify({ title, description, propertyId, category, priority, assignedToId }),
       });
       const data = await response.json();
 
@@ -123,6 +165,9 @@ export default function FelanmalanPage() {
       setTitle("");
       setDescription("");
       setPropertyId("");
+      setCategory("other");
+      setPriority("normal");
+      setAssignedToId("");
       setSuccess("Felanmälan är skapad och kopplad till rätt fastighet.");
     } catch {
       setError("Kunde inte kontakta servern");
@@ -192,6 +237,39 @@ export default function FelanmalanPage() {
                 </p>
               )}
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Kategori</label>
+                <select className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500" value={category} onChange={(event) => setCategory(event.target.value)}>
+                  <option value="other">Övrigt</option>
+                  <option value="vvs">VVS</option>
+                  <option value="electricity">El</option>
+                  <option value="elevator">Hiss</option>
+                  <option value="security">Säkerhet</option>
+                  <option value="cleaning">Städning</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Prioritet</label>
+                <select className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500" value={priority} onChange={(event) => setPriority(event.target.value)}>
+                  <option value="low">Låg</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">Hög</option>
+                  <option value="urgent">Akut</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Ansvarig</label>
+                <select className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500" value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)}>
+                  <option value="">Ej tilldelad</option>
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name || member.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Titel</label>
               <input
@@ -252,13 +330,27 @@ export default function FelanmalanPage() {
                       <p className="mt-2 text-xs font-semibold tracking-wide text-brand-600">
                         {ticket.property ? `${ticket.property.name} · ${ticket.property.address}` : "Ingen fastighet vald"}
                       </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
+                          {statusLabels[ticket.status] || ticket.status}
+                        </span>
+                        <span className="rounded-full border border-brand-100 bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-600">
+                          {priorityLabels[ticket.priority] || ticket.priority}
+                        </span>
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-500">
+                          {ticket.assigned_to ? `Ansvarig: ${ticket.assigned_to.name || ticket.assigned_to.email}` : "Ej tilldelad"}
+                        </span>
+                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-500">
+                          {ticket._count.comments} kommentarer
+                        </span>
+                      </div>
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{ticket.description}</p>
                       <p className="mt-3 text-xs font-medium text-slate-400">
                         Skapad {dateFormatter.format(new Date(ticket.created_at))}
                       </p>
                     </div>
                     <span className="shrink-0 rounded-full border border-warning-100 bg-warning-50 px-3 py-1 text-xs font-bold text-warning-600">
-                      {ticket.status}
+                      {statusLabels[ticket.status] || ticket.status}
                     </span>
                   </div>
                 </Link>
