@@ -23,7 +23,16 @@ export async function GET() {
         title: true,
         description: true,
         status: true,
+        property_id: true,
         created_at: true,
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+          },
+        },
       },
     });
     return NextResponse.json({ tickets });
@@ -38,18 +47,34 @@ export async function POST(request: Request) {
     const user = await getUserFromRequest();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-    const { title, description } = await request.json();
+    const { title, description, propertyId } = await request.json();
     const normalizedTitle = typeof title === "string" ? title.trim() : "";
     const normalizedDescription = typeof description === "string" ? description.trim() : "";
+    const normalizedPropertyId = typeof propertyId === "string" && propertyId.trim() ? propertyId.trim() : null;
 
     if (!normalizedTitle || !normalizedDescription) {
       return NextResponse.json({ error: "Titel och beskrivning krävs" }, { status: 400 });
+    }
+
+    if (normalizedPropertyId) {
+      const property = await db.property.findFirst({
+        where: {
+          id: normalizedPropertyId,
+          user_id: user.sub,
+        },
+        select: { id: true },
+      });
+
+      if (!property) {
+        return NextResponse.json({ error: "Vald fastighet hittades inte" }, { status: 400 });
+      }
     }
 
     const ticket = await db.ticket.create({
       data: {
         title: normalizedTitle,
         description: normalizedDescription,
+        property_id: normalizedPropertyId,
         user_id: user.sub,
       },
       select: {
@@ -57,7 +82,16 @@ export async function POST(request: Request) {
         title: true,
         description: true,
         status: true,
+        property_id: true,
         created_at: true,
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+          },
+        },
       },
     });
 

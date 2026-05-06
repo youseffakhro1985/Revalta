@@ -31,6 +31,14 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
       title: true,
       description: true,
       status: true,
+      property: {
+        select: {
+          name: true,
+          address: true,
+          postal_code: true,
+          city: true,
+        },
+      },
       created_at: true,
     },
   });
@@ -65,6 +73,17 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
         </div>
 
         <div className="p-8">
+          {ticket.property && (
+            <div className="mb-8 rounded-2xl border border-brand-100 bg-brand-50 p-5">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">Fastighet</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-950">{ticket.property.name}</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {ticket.property.address}
+                {ticket.property.postal_code ? `, ${ticket.property.postal_code}` : ""} {ticket.property.city}
+              </p>
+            </div>
+          )}
+
           <h2 className="text-xl font-bold text-slate-950">Beskrivning</h2>
           <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-slate-100 bg-slate-50 p-6 leading-7 text-slate-700">
             {ticket.description}

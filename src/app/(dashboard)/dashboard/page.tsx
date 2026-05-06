@@ -13,18 +13,29 @@ async function getDashboardData() {
     redirect("/login");
   }
 
-  const [user, totalTickets, openTickets, latestTickets] = await Promise.all([
+  const [user, totalTickets, openTickets, totalProperties, latestTickets] = await Promise.all([
     db.user.findUnique({
       where: { id: session.sub },
       select: { name: true, email: true, created_at: true },
     }),
     db.ticket.count({ where: { user_id: session.sub } }),
     db.ticket.count({ where: { user_id: session.sub, status: "ÖPPEN" } }),
+    db.property.count({ where: { user_id: session.sub } }),
     db.ticket.findMany({
       where: { user_id: session.sub },
       orderBy: { created_at: "desc" },
       take: 3,
-      select: { id: true, title: true, status: true, created_at: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        created_at: true,
+        property: {
+          select: {
+            name: true,
+          },
+        },
+      },
     }),
   ]);
 
@@ -32,7 +43,7 @@ async function getDashboardData() {
     redirect("/login");
   }
 
-  return { user, totalTickets, openTickets, latestTickets };
+  return { user, totalTickets, openTickets, totalProperties, latestTickets };
 }
 
 function formatDate(date: Date) {
@@ -42,7 +53,7 @@ function formatDate(date: Date) {
 }
 
 export default async function Dashboard() {
-  const { user, totalTickets, openTickets, latestTickets } = await getDashboardData();
+  const { user, totalTickets, openTickets, totalProperties, latestTickets } = await getDashboardData();
 
   return (
     <div className="animate-slide-up space-y-8">
@@ -61,7 +72,7 @@ export default async function Dashboard() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
           <p className="text-sm font-medium text-slate-500">Totalt antal ärenden</p>
           <p className="mt-3 text-4xl font-extrabold text-slate-950">{totalTickets}</p>
@@ -69,6 +80,10 @@ export default async function Dashboard() {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
           <p className="text-sm font-medium text-slate-500">Öppna ärenden</p>
           <p className="mt-3 text-4xl font-extrabold text-warning-600">{openTickets}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+          <p className="text-sm font-medium text-slate-500">Fastigheter</p>
+          <p className="mt-3 text-4xl font-extrabold text-brand-600">{totalProperties}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
           <p className="text-sm font-medium text-slate-500">Inloggad som</p>
@@ -99,7 +114,10 @@ export default async function Dashboard() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="font-semibold text-slate-950">{ticket.title}</h3>
-                      <p className="mt-1 text-sm text-slate-500">{formatDate(ticket.created_at)}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {ticket.property?.name ? `${ticket.property.name} · ` : ""}
+                        {formatDate(ticket.created_at)}
+                      </p>
                     </div>
                     <span className="rounded-full border border-warning-100 bg-warning-50 px-3 py-1 text-xs font-bold text-warning-600">
                       {ticket.status}

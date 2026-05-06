@@ -17,6 +17,7 @@ export default function DashboardLayout({
               </Link>
               <nav className="hidden md:flex space-x-2">
                 <Link href="/dashboard" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Översikt</Link>
+                <Link href="/dashboard/fastigheter" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Fastigheter</Link>
                 <Link href="/dashboard/felanmalan" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Mina Ärenden</Link>
               </nav>
             </div>

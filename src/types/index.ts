@@ -11,5 +11,17 @@ export interface Ticket {
   description: string;
   status: 'ÖPPEN' | 'PÅGÅENDE' | 'STÄNGD';
   user_id: string;
+  property_id?: string | null;
+  created_at: string;
+  property?: Property | null;
+}
+
+export interface Property {
+  id: string;
+  name: string;
+  address: string;
+  postal_code?: string | null;
+  city: string;
+  user_id: string;
   created_at: string;
 }

@@ -29,7 +29,16 @@ export async function GET(
         title: true,
         description: true,
         status: true,
+        property_id: true,
         created_at: true,
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+          },
+        },
       },
     });
 
