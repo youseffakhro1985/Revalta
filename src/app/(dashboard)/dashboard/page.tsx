@@ -5,7 +5,8 @@ import db from "@/lib/db";
 import { verifyToken } from "@/lib/session";
 
 async function getDashboardData() {
-  const token = cookies().get("token")?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
   const session = token ? await verifyToken(token) : null;
 
   if (!session) {

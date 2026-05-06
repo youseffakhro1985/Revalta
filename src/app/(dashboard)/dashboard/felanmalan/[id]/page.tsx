@@ -11,8 +11,10 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
-export default async function TicketDetailPage({ params }: { params: { id: string } }) {
-  const token = cookies().get("token")?.value;
+export default async function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
   const session = token ? await verifyToken(token) : null;
 
   if (!session) {
@@ -21,7 +23,7 @@ export default async function TicketDetailPage({ params }: { params: { id: strin
 
   const ticket = await db.ticket.findFirst({
     where: {
-      id: params.id,
+      id,
       user_id: session.sub,
     },
     select: {

@@ -4,7 +4,8 @@ import db from "@/lib/db";
 import { verifyToken } from "@/lib/auth";
 
 async function getUserFromRequest() {
-  const token = cookies().get("token")?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
   if (!token) return null;
   return verifyToken(token);
 }

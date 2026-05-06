@@ -4,22 +4,24 @@ import db from "@/lib/db";
 import { verifyToken } from "@/lib/session";
 
 async function getUserFromRequest() {
-  const token = cookies().get("token")?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
   if (!token) return null;
   return verifyToken(token);
 }
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getUserFromRequest();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const { id } = await params;
 
     const ticket = await db.ticket.findFirst({
       where: {
-        id: params.id,
+        id,
         user_id: user.sub,
       },
       select: {
