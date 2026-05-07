@@ -38,3 +38,15 @@ export function tenantWhere(user: NonNullable<Awaited<ReturnType<typeof getCurre
 export function canManageTeam(role: string) {
   return role === "owner" || role === "admin";
 }
+
+export function canManageTickets(role: string) {
+  return role === "owner" || role === "admin" || role === "manager" || role === "technician";
+}
+
+export function canCreateProperties(role: string) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
+export function canViewAudit(role: string) {
+  return role === "owner" || role === "admin";
+}

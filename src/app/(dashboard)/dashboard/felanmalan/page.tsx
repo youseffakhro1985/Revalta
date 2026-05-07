@@ -63,6 +63,10 @@ export default function FelanmalanPage() {
   const [category, setCategory] = useState("other");
   const [priority, setPriority] = useState("normal");
   const [assignedToId, setAssignedToId] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [propertyFilter, setPropertyFilter] = useState("");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -76,9 +80,16 @@ export default function FelanmalanPage() {
     let isMounted = true;
 
     async function loadData() {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("q", search.trim());
+      if (statusFilter) params.set("status", statusFilter);
+      if (priorityFilter) params.set("priority", priorityFilter);
+      if (propertyFilter) params.set("propertyId", propertyFilter);
+      const query = params.toString();
+
       try {
         const [ticketsResponse, propertiesResponse, teamResponse] = await Promise.all([
-          fetch("/api/tickets", { cache: "no-store" }),
+          fetch(`/api/tickets${query ? `?${query}` : ""}`, { cache: "no-store" }),
           fetch("/api/properties", { cache: "no-store" }),
           fetch("/api/team", { cache: "no-store" }),
         ]);
@@ -130,7 +141,7 @@ export default function FelanmalanPage() {
     return () => {
       isMounted = false;
     };
-  }, [router]);
+  }, [priorityFilter, propertyFilter, router, search, statusFilter]);
 
   const openTickets = useMemo(
     () => tickets.filter((ticket) => ticket.status !== "closed").length,
@@ -308,6 +319,36 @@ export default function FelanmalanPage() {
           <div className="border-b border-slate-100 bg-slate-50/70 p-6">
             <h2 className="text-lg font-bold text-slate-950">Dina pågående ärenden</h2>
             <p className="mt-1 text-sm text-slate-500">Klicka på ett ärende för att se detaljer.</p>
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-4">
+              <input
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Sök titel eller beskrivning"
+              />
+              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <option value="">Alla statusar</option>
+                <option value="new">Ny</option>
+                <option value="received">Mottagen</option>
+                <option value="in_progress">Pågår</option>
+                <option value="waiting">Väntar</option>
+                <option value="completed">Klar</option>
+                <option value="closed">Stängd</option>
+              </select>
+              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+                <option value="">Alla prioriteter</option>
+                <option value="low">Låg</option>
+                <option value="normal">Normal</option>
+                <option value="high">Hög</option>
+                <option value="urgent">Akut</option>
+              </select>
+              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)}>
+                <option value="">Alla fastigheter</option>
+                {properties.map((property) => (
+                  <option key={property.id} value={property.id}>{property.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {loading ? (

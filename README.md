@@ -26,6 +26,8 @@ Backend använder Prisma mot PostgreSQL:
 - **`src/app/api/tickets`**: Lista och skapa ärenden med kategori, prioritet, ansvarig och fastighet.
 - **`src/app/api/tickets/[id]`**: Hämta och uppdatera ett specifikt ärende.
 - **`src/app/api/tickets/[id]/comments`**: Lägg till kommentarer på ärenden.
+- **`src/app/api/audit`**: Audit log för viktiga händelser.
+- **`src/app/api/integrations`**: Konfigurationsstatus och dev-mockade händelser för e-post, SMS, Stripe, storage och AI.
 
 ## 🔑 Autentisering
 - Egenbyggd och säker autentisering med JWT.
@@ -34,8 +36,13 @@ Backend använder Prisma mot PostgreSQL:
 
 ## 🔒 Sessioner
 - JWT lagras som httpOnly-cookie.
-- `/dashboard` skyddas via `middleware.ts`.
+- `/dashboard` skyddas via `proxy.ts`.
 - `JWT_SECRET` ska alltid sättas i produktionsmiljö.
+
+## 🔌 Externa integrationer
+- E-post, SMS, Stripe, storage och AI körs som fullt spårbara dev-mockar om leverantörsnycklar saknas.
+- Sätt nycklarna i `.env` enligt `.env.example` för att koppla riktiga leverantörer.
+- Alla mockade/queue:ade integrationshändelser sparas i `IntegrationEvent`.
 
 ---
 
@@ -46,9 +53,9 @@ Backend använder Prisma mot PostgreSQL:
    npm install
    ```
 3. Skapa `.env` från `.env.example` och fyll i PostgreSQL-URL:er samt `JWT_SECRET`.
-4. Synka Prisma-modellen till databasen:
+4. Kör Prisma-migrationer:
    ```bash
-   npx prisma db push
+   npm run db:dev
    ```
 5. Starta utvecklingsservern:
    ```bash

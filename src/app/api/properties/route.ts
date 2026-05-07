@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canCreateProperties(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att skapa fastigheter" }, { status: 403 });
+    }
 
     const properties = await db.property.findMany({
       where: tenantWhere(user),
@@ -53,6 +57,13 @@ export async function POST(request: Request) {
           select: { tickets: true },
         },
       },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "property",
+      entityId: property.id,
+      action: "property.created",
+      metadata: { name: property.name, address: property.address, city: property.city },
     });
 
     return NextResponse.json({ success: true, property }, { status: 201 });

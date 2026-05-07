@@ -22,6 +22,7 @@ model User {
   assigned_tickets Ticket[]        @relation("AssignedTickets")
   properties       Property[]
   comments         TicketComment[]
+  audit_logs       AuditLog[]
 }
 
 model Company {
@@ -34,6 +35,8 @@ model Company {
   users      User[]
   properties Property[]
   tickets    Ticket[]
+  audit_logs AuditLog[]
+  integration_events IntegrationEvent[]
 }
 
 model Property {
@@ -81,4 +84,28 @@ model TicketComment {
   created_at  DateTime @default(now())
   ticket      Ticket   @relation(fields: [ticket_id], references: [id])
   user        User     @relation(fields: [user_id], references: [id])
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  company_id    String?
+  actor_user_id String?
+  entity_type   String
+  entity_id     String?
+  action        String
+  metadata      Json?
+  created_at    DateTime @default(now())
+  company       Company? @relation(fields: [company_id], references: [id])
+  actor         User?    @relation(fields: [actor_user_id], references: [id])
+}
+
+model IntegrationEvent {
+  id         String   @id @default(uuid())
+  company_id String?
+  type       String
+  status     String   @default("mocked")
+  recipient  String?
+  payload    Json?
+  created_at DateTime @default(now())
+  company    Company? @relation(fields: [company_id], references: [id])
 }

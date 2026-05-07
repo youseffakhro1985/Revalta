@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { canManageTeam, getCurrentUser } from "@/lib/current-user";
 import { hashPassword } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
 const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer"]);
@@ -82,6 +83,13 @@ export async function POST(request: Request) {
           },
         },
       },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "user",
+      entityId: member.id,
+      action: "team.member_created",
+      metadata: { email: member.email, role: member.role },
     });
 
     return NextResponse.json({ success: true, member }, { status: 201 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
+import { writeAuditLog } from "@/lib/audit";
 
 export async function POST(request: Request) {
   try {
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
 
     const hashedPassword = await hashPassword(password);
 
-    await db.company.create({
+    const company = await db.company.create({
       data: {
         name: normalizedCompanyName,
         users: {
@@ -41,7 +42,22 @@ export async function POST(request: Request) {
           },
         },
       },
+      include: {
+        users: {
+          select: { id: true, company_id: true },
+        },
+      },
     });
+
+    const owner = company.users[0];
+    if (owner) {
+      await writeAuditLog(owner, {
+        entityType: "company",
+        entityId: company.id,
+        action: "company.created",
+        metadata: { companyName: normalizedCompanyName },
+      });
+    }
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {

@@ -1,14 +1,37 @@
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { writeAuditLog } from "@/lib/audit";
+import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const { searchParams } = new URL(request.url);
+    const q = searchParams.get("q")?.trim();
+    const status = searchParams.get("status")?.trim();
+    const priority = searchParams.get("priority")?.trim();
+    const propertyId = searchParams.get("propertyId")?.trim();
+    const assignedToId = searchParams.get("assignedToId")?.trim();
+    const where = {
+      ...tenantWhere(user),
+      ...(status ? { status } : {}),
+      ...(priority ? { priority } : {}),
+      ...(propertyId ? { property_id: propertyId } : {}),
+      ...(assignedToId ? { assigned_to_id: assignedToId } : {}),
+      ...(q
+        ? {
+            OR: [
+              { title: { contains: q, mode: "insensitive" as const } },
+              { description: { contains: q, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
 
     const tickets = await db.ticket.findMany({
-      where: tenantWhere(user),
+      where,
       orderBy: { created_at: "desc" },
       select: {
         id: true,
@@ -55,6 +78,9 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att skapa ärenden" }, { status: 403 });
+    }
 
     const { title, description, propertyId, category, priority, assignedToId } = await request.json();
     const normalizedTitle = typeof title === "string" ? title.trim() : "";
@@ -139,6 +165,30 @@ export async function POST(request: Request) {
           },
         },
       },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "ticket",
+      entityId: ticket.id,
+      action: "ticket.created",
+      metadata: {
+        title: ticket.title,
+        priority: ticket.priority,
+        category: ticket.category,
+        assignedToId: ticket.assigned_to_id,
+      },
+    });
+    await queueTicketNotification(user, {
+      ticketId: ticket.id,
+      title: ticket.title,
+      recipient: user.email,
+      event: "created",
+    });
+    await recordAiEvent(user, {
+      ticketId: ticket.id,
+      action: "classification.requested",
+      category: ticket.category,
+      priority: ticket.priority,
     });
 
     return NextResponse.json({ success: true, ticket }, { status: 201 });

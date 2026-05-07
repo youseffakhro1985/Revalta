@@ -1,5 +1,7 @@
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { writeAuditLog } from "@/lib/audit";
+import { queueTicketNotification } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -9,6 +11,9 @@ export async function GET(
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att uppdatera ärenden" }, { status: 403 });
+    }
     const { id } = await params;
 
     const ticket = await db.ticket.findFirst({
@@ -133,6 +138,23 @@ export async function PATCH(
           },
         },
       },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "ticket",
+      entityId: ticket.id,
+      action: "ticket.updated",
+      metadata: {
+        status: ticket.status,
+        priority: ticket.priority,
+        assignedToId: ticket.assigned_to?.id ?? null,
+      },
+    });
+    await queueTicketNotification(user, {
+      ticketId: ticket.id,
+      title: ticket.title,
+      recipient: user.email,
+      event: "updated",
     });
 
     return NextResponse.json({ success: true, ticket });

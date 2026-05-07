@@ -20,6 +20,8 @@ export default function DashboardLayout({
                 <Link href="/dashboard/fastigheter" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Fastigheter</Link>
                 <Link href="/dashboard/felanmalan" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Mina Ärenden</Link>
                 <Link href="/dashboard/team" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Team</Link>
+                <Link href="/dashboard/audit" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Audit</Link>
+                <Link href="/dashboard/integrationer" className="text-slate-600 hover:text-brand-600 hover:bg-brand-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Integrationer</Link>
               </nav>
             </div>
             <LogoutButton />
