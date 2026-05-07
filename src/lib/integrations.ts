@@ -1,4 +1,5 @@
 import db from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 type IntegrationUser = {
   company_id: string | null;
@@ -26,7 +27,7 @@ async function recordIntegrationEvent(
       type,
       recipient,
       status: isConfigured ? "queued" : "mocked",
-      payload,
+      payload: payload as Prisma.InputJsonValue,
     },
   });
 }

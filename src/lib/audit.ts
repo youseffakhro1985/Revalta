@@ -1,4 +1,5 @@
 import db from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 type AuditUser = {
   id: string;
@@ -21,7 +22,7 @@ export async function writeAuditLog(
       entity_type: input.entityType,
       entity_id: input.entityId ?? null,
       action: input.action,
-      metadata: input.metadata,
+      metadata: input.metadata as Prisma.InputJsonValue | undefined,
     },
   });
 }
