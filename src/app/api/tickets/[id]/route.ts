@@ -33,6 +33,10 @@ export async function GET(
         created_at: true,
         updated_at: true,
         due_date: true,
+        ai_summary: true,
+        ai_recommended_action: true,
+        ai_confidence: true,
+        ai_processed_at: true,
         property: {
           select: {
             id: true,
@@ -61,6 +65,17 @@ export async function GET(
                 email: true,
               },
             },
+          },
+        },
+        attachments: {
+          orderBy: { created_at: "desc" },
+          select: {
+            id: true,
+            file_name: true,
+            content_type: true,
+            size_bytes: true,
+            data_url: true,
+            created_at: true,
           },
         },
       },
