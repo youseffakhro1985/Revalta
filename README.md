@@ -26,6 +26,9 @@ Backend använder Prisma mot PostgreSQL:
 - **`src/app/api/tickets`**: Lista och skapa ärenden med kategori, prioritet, ansvarig och fastighet.
 - **`src/app/api/tickets/[id]`**: Hämta och uppdatera ett specifikt ärende.
 - **`src/app/api/tickets/[id]/comments`**: Lägg till kommentarer på ärenden.
+- **`src/app/api/tickets/[id]/attachments`**: Ladda upp små dev-bilagor på ärenden.
+- **`src/app/api/tickets/[id]/ai`**: AI-analysera och uppdatera kategori/prioritet/sammanfattning.
+- **`src/app/api/billing`**: Visa och ändra plan i Stripe-ready mockläge.
 - **`src/app/api/audit`**: Audit log för viktiga händelser.
 - **`src/app/api/integrations`**: Konfigurationsstatus och dev-mockade händelser för e-post, SMS, Stripe, storage och AI.
 

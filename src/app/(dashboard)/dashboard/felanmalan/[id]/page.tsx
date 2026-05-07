@@ -18,6 +18,10 @@ type Ticket = {
   category: string;
   priority: string;
   assigned_to_id: string | null;
+  ai_summary: string | null;
+  ai_recommended_action: string | null;
+  ai_confidence: number | null;
+  ai_processed_at: string | null;
   created_at: string;
   updated_at: string;
   property: {
@@ -35,6 +39,14 @@ type Ticket = {
       name: string | null;
       email: string;
     };
+  }>;
+  attachments: Array<{
+    id: string;
+    file_name: string;
+    content_type: string;
+    size_bytes: number;
+    data_url: string;
+    created_at: string;
   }>;
 };
 
@@ -68,8 +80,10 @@ export default function TicketDetailPage() {
   const [priority, setPriority] = useState("normal");
   const [assignedToId, setAssignedToId] = useState("");
   const [comment, setComment] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -188,6 +202,75 @@ export default function TicketDetailPage() {
     }
   }
 
+  async function uploadAttachment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!file) return;
+    setError("");
+    setSuccess("");
+    setSaving(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`/api/tickets/${params.id}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Kunde inte ladda upp bilagan");
+        return;
+      }
+
+      setTicket((current) =>
+        current ? { ...current, attachments: [data.attachment, ...current.attachments] } : current
+      );
+      setFile(null);
+      setSuccess("Bilagan är uppladdad och storage-händelsen är loggad.");
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runAiAnalysis() {
+    setError("");
+    setSuccess("");
+    setAnalyzing(true);
+
+    try {
+      const response = await fetch(`/api/tickets/${params.id}/ai`, { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Kunde inte AI-analysera ärendet");
+        return;
+      }
+
+      setTicket((current) =>
+        current
+          ? {
+              ...current,
+              category: data.ticket.category,
+              priority: data.ticket.priority,
+              ai_summary: data.ticket.ai_summary,
+              ai_recommended_action: data.ticket.ai_recommended_action,
+              ai_confidence: data.ticket.ai_confidence,
+              ai_processed_at: data.ticket.ai_processed_at,
+            }
+          : current
+      );
+      setPriority(data.ticket.priority);
+      setSuccess("AI-analysen är klar och ärendet är uppdaterat.");
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   if (loading) {
     return <div className="h-64 animate-pulse rounded-3xl bg-slate-100" />;
   }
@@ -236,6 +319,69 @@ export default function TicketDetailPage() {
               <h2 className="text-xl font-bold text-slate-950">Beskrivning</h2>
               <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-slate-100 bg-slate-50 p-6 leading-7 text-slate-700">
                 {ticket.description}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-brand-100 bg-brand-50 p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-950">AI-insikt</h2>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Kör en deterministisk dev-analys nu, och koppla riktig AI med `AI_PROVIDER_API_KEY` senare.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={runAiAnalysis}
+                  disabled={analyzing}
+                  className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-70"
+                >
+                  {analyzing ? "Analyserar..." : "AI-analysera"}
+                </button>
+              </div>
+              {ticket.ai_summary ? (
+                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="rounded-2xl bg-white p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-brand-600">Sammanfattning</p>
+                    <p className="mt-2 text-sm text-slate-700">{ticket.ai_summary}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-brand-600">Rekommenderad åtgärd</p>
+                    <p className="mt-2 text-sm text-slate-700">{ticket.ai_recommended_action}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-brand-600">Konfidens</p>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-950">
+                      {Math.round((ticket.ai_confidence || 0) * 100)}%
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-slate-950">Bilagor</h2>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {ticket.attachments.length > 0 ? (
+                  ticket.attachments.map((attachment) => (
+                    <a
+                      key={attachment.id}
+                      href={attachment.data_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card transition-colors hover:bg-slate-50"
+                    >
+                      <p className="font-bold text-slate-950">{attachment.file_name}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {attachment.content_type} · {Math.ceil(attachment.size_bytes / 1024)} KB
+                      </p>
+                    </a>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                    Inga bilagor ännu.
+                  </p>
+                )}
               </div>
             </section>
 
@@ -303,6 +449,20 @@ export default function TicketDetailPage() {
             <textarea required rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className="mt-4 w-full rounded-xl border border-slate-200 p-3" placeholder="Skriv nästa åtgärd eller uppdatering..." />
             <button disabled={saving} className="mt-4 w-full rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-70">
               {saving ? "Sparar..." : "Lägg till kommentar"}
+            </button>
+          </form>
+
+          <form onSubmit={uploadAttachment} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+            <h2 className="text-xl font-bold text-slate-950">Ladda upp bilaga</h2>
+            <p className="mt-2 text-sm text-slate-500">PNG, JPG, WebP, PDF eller TXT upp till 1 MB i dev-läge.</p>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,application/pdf,text/plain"
+              onChange={(event) => setFile(event.target.files?.[0] || null)}
+              className="mt-4 block w-full rounded-xl border border-slate-200 p-3 text-sm"
+            />
+            <button disabled={saving || !file} className="mt-4 w-full rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-70">
+              {saving ? "Laddar upp..." : "Ladda upp"}
             </button>
           </form>
         </aside>

@@ -68,11 +68,16 @@ model Ticket {
   created_at     DateTime        @default(now())
   updated_at     DateTime        @default(now()) @updatedAt
   closed_at      DateTime?
+  ai_summary     String?
+  ai_recommended_action String?
+  ai_confidence  Float?
+  ai_processed_at DateTime?
   company        Company?        @relation(fields: [company_id], references: [id])
   user           User            @relation(fields: [user_id], references: [id])
   property       Property?       @relation(fields: [property_id], references: [id])
   assigned_to    User?           @relation("AssignedTickets", fields: [assigned_to_id], references: [id])
   comments       TicketComment[]
+  attachments    TicketAttachment[]
 }
 
 model TicketComment {
@@ -84,6 +89,17 @@ model TicketComment {
   created_at  DateTime @default(now())
   ticket      Ticket   @relation(fields: [ticket_id], references: [id])
   user        User     @relation(fields: [user_id], references: [id])
+}
+
+model TicketAttachment {
+  id           String   @id @default(uuid())
+  ticket_id    String
+  file_name    String
+  content_type String
+  size_bytes   Int
+  data_url     String
+  created_at   DateTime @default(now())
+  ticket       Ticket   @relation(fields: [ticket_id], references: [id])
 }
 
 model AuditLog {
