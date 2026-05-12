@@ -29,6 +29,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
     console.error("Register error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    return NextResponse.json({ error: "Serverfel" }, { status: 500 });
   }
 }
