@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
     }
 
-    const isValid = await comparePassword(password, user.password);
+    const isValid = await comparePassword(password, user.passwordHash);
     if (!isValid) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
     }
@@ -28,11 +28,11 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 24, // 24 timmar
+      maxAge: 60 * 60 * 24,
       path: "/",
     });
 
-    return NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name } });
+    return NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.firstName } });
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
