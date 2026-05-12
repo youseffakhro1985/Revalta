@@ -1,4 +1,4 @@
-{
+"build": "prisma generate && next build",
   "name": "revalta",
   "version": "0.1.0",
   "private": true,
