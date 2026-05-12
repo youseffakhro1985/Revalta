@@ -44,4 +44,5 @@ För maximal snabbhet och minimerat krångel använder vi en lokal SQLite-databa
    ```bash
    npm run dev
    ```
-5. Öppna [http://localhost:3000](http://localhost:3000) i din webbläsare.
+5. Öppna [http://localhost:3000](http://localhost:3000) i din webbläsare. 
+
