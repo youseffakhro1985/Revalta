@@ -4,7 +4,7 @@ import { hashPassword } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    const { firstName, lastName, email, password } = await request.json();
+    const { name, email, password } = await request.json();
     
     if (!email || !password) {
       return NextResponse.json({ error: "E-post och lösenord krävs" }, { status: 400 });
@@ -18,17 +18,12 @@ export async function POST(request: Request) {
     const hashedPassword = await hashPassword(password);
 
     await db.user.create({
-      data: { 
-        email, 
-        passwordHash: hashedPassword, 
-        firstName: firstName || "", 
-        lastName: lastName || ""
-      }
+      data: { email, password: hashedPassword, name }
     });
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
     console.error("Register error:", error);
-    return NextResponse.json({ error: "Serverfel" }, { status: 500 });
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
