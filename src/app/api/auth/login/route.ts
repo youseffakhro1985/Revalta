@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
     }
 
-    const isValid = await comparePassword(password, user.passwordHash);
+    const isValid = await comparePassword(password, user.password);
     if (!isValid) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
     }
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       path: "/",
     });
 
-    return NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.firstName } });
+    return NextResponse.json({ success: true, user: { id: user.id, email: user.email, name: user.name } });
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
