@@ -15,8 +15,8 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const tickets = await db.ticket.findMany({
-      where: { createdById: user.sub },
-      orderBy: { createdAt: 'desc' }
+      where: { user_id: user.sub },
+      orderBy: { created_at: 'desc' }
     });
     return NextResponse.json({ tickets });
   } catch (error) {
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     }
 
     const ticket = await db.ticket.create({
-      data: { title, description, createdById: user.sub }
+      data: { title, description, user_id: user.sub }
     });
 
     return NextResponse.json({ success: true, id: ticket.id }, { status: 201 });
