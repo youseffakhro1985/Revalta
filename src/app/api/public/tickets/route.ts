@@ -4,6 +4,7 @@ import { queueTicketNotification, queueSmsNotification } from "@/lib/integration
 import { analyzeTicket } from "@/lib/ai";
 import { getPublicPortalCompany, generatePublicReference } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { calculateDueDate } from "@/lib/sla";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
         status: "new",
         category: analysis.category,
         priority: analysis.priority,
+        due_date: calculateDueDate(analysis.priority),
         company_id: portal.company.id,
         user_id: portal.owner.id,
         property_id: property?.id ?? null,

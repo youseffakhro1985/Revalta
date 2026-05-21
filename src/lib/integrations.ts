@@ -38,7 +38,7 @@ export async function queueTicketNotification(
     ticketId: string;
     title: string;
     recipient?: string;
-    event: "created" | "updated" | "commented" | "password_reset";
+    event: "created" | "updated" | "commented" | "password_reset" | "email_verification";
   }
 ) {
   return recordIntegrationEvent(user, "email", payload, payload.recipient);

@@ -18,6 +18,7 @@ export async function getCurrentUser() {
       role: true,
       status: true,
       company_id: true,
+      email_verified_at: true,
       created_at: true,
       company: {
         select: {

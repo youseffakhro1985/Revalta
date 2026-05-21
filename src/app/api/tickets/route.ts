@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
+import { calculateDueDate } from "@/lib/sla";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -128,6 +129,7 @@ export async function POST(request: Request) {
         description: normalizedDescription,
         category: normalizedCategory,
         priority: normalizedPriority,
+        due_date: calculateDueDate(normalizedPriority),
         property_id: normalizedPropertyId,
         assigned_to_id: normalizedAssignedToId,
         company_id: user.company_id,
@@ -144,6 +146,7 @@ export async function POST(request: Request) {
         assigned_to_id: true,
         created_at: true,
         updated_at: true,
+        due_date: true,
         property: {
           select: {
             id: true,

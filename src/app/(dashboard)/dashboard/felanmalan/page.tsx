@@ -26,6 +26,7 @@ type Ticket = {
   priority: string;
   property_id: string | null;
   assigned_to_id: string | null;
+  due_date: string | null;
   created_at: string;
   updated_at: string;
   property: Property | null;
@@ -317,8 +318,15 @@ export default function FelanmalanPage() {
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
           <div className="border-b border-slate-100 bg-slate-50/70 p-6">
-            <h2 className="text-lg font-bold text-slate-950">Dina pågående ärenden</h2>
-            <p className="mt-1 text-sm text-slate-500">Klicka på ett ärende för att se detaljer.</p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Dina pågående ärenden</h2>
+                <p className="mt-1 text-sm text-slate-500">Klicka på ett ärende för att se detaljer.</p>
+              </div>
+              <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
+                Exportera CSV
+              </button>
+            </div>
             <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-4">
               <input
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
@@ -388,6 +396,7 @@ export default function FelanmalanPage() {
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{ticket.description}</p>
                       <p className="mt-3 text-xs font-medium text-slate-400">
                         Skapad {dateFormatter.format(new Date(ticket.created_at))}
+                        {ticket.due_date ? ` · SLA ${dateFormatter.format(new Date(ticket.due_date))}` : ""}
                       </p>
                     </div>
                     <span className="shrink-0 rounded-full border border-warning-100 bg-warning-50 px-3 py-1 text-xs font-bold text-warning-600">

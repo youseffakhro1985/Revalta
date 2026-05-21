@@ -64,6 +64,13 @@ export default async function Dashboard() {
         </div>
       </header>
 
+      {!user.email_verified_at && (
+        <div className="rounded-2xl border border-warning-100 bg-warning-50 p-5 text-warning-600">
+          <p className="font-bold">E-postadressen är inte verifierad ännu.</p>
+          <p className="mt-1 text-sm">I mockläge visas verifieringslänken när kontot skapas. Med e-postleverantör skickas länken automatiskt.</p>
+        </div>
+      )}
+
       <section className="grid grid-cols-1 gap-4 md:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
           <p className="text-sm font-medium text-slate-500">Totalt antal ärenden</p>

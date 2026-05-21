@@ -70,6 +70,7 @@ export default function PortalPage() {
   const [trackEmail, setTrackEmail] = useState("");
   const [trackedTicket, setTrackedTicket] = useState<PublicTicket | null>(null);
   const [createdReference, setCreatedReference] = useState("");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -144,6 +145,35 @@ export default function PortalPage() {
 
       setTrackedTicket(data.ticket);
       setSuccess("Ärendet hittades.");
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function uploadAttachment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!attachmentFile || !reference || !trackEmail) return;
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", attachmentFile);
+      formData.append("email", trackEmail);
+      const response = await fetch(`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Kunde inte ladda upp bilagan");
+        return;
+      }
+      setAttachmentFile(null);
+      setSuccess("Bilagan är mottagen och kopplad till ärendet.");
     } catch {
       setError("Kunde inte kontakta servern");
     } finally {
@@ -260,6 +290,19 @@ export default function PortalPage() {
                       ))}
                     </div>
                   )}
+                  <form onSubmit={uploadAttachment} className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <p className="font-bold text-slate-950">Lägg till bilaga</p>
+                    <p className="mt-1 text-sm text-slate-500">PNG, JPG, WebP, PDF eller TXT upp till 1 MB.</p>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,application/pdf,text/plain"
+                      onChange={(event) => setAttachmentFile(event.target.files?.[0] || null)}
+                      className="mt-3 block w-full rounded-xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                    <button disabled={loading || !attachmentFile} className="mt-3 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white disabled:opacity-70">
+                      Ladda upp bilaga
+                    </button>
+                  </form>
                 </div>
               )}
             </div>

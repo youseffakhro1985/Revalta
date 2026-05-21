@@ -16,6 +16,7 @@ model User {
   role             String          @default("owner")
   status           String          @default("active")
   company_id       String?
+  email_verified_at DateTime?
   created_at       DateTime        @default(now())
   company          Company?        @relation(fields: [company_id], references: [id])
   tickets          Ticket[]
@@ -24,6 +25,7 @@ model User {
   comments         TicketComment[]
   audit_logs       AuditLog[]
   password_reset_tokens PasswordResetToken[]
+  email_verification_tokens EmailVerificationToken[]
 }
 
 model Company {
@@ -105,6 +107,7 @@ model TicketAttachment {
   content_type String
   size_bytes   Int
   data_url     String
+  visibility    String   @default("internal")
   created_at   DateTime @default(now())
   ticket       Ticket   @relation(fields: [ticket_id], references: [id])
 }
@@ -134,6 +137,16 @@ model IntegrationEvent {
 }
 
 model PasswordResetToken {
+  id         String   @id @default(uuid())
+  user_id    String
+  token_hash String   @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
+}
+
+model EmailVerificationToken {
   id         String   @id @default(uuid())
   user_id    String
   token_hash String   @unique

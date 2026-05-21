@@ -28,6 +28,7 @@ type Ticket = {
   ai_recommended_action: string | null;
   ai_confidence: number | null;
   ai_processed_at: string | null;
+  due_date: string | null;
   created_at: string;
   updated_at: string;
   property: {
@@ -304,6 +305,7 @@ export default function TicketDetailPage() {
             <h1 className="text-3xl font-extrabold tracking-tight">{ticket.title}</h1>
             <p className="mt-3 text-sm text-slate-300">
               #{ticket.id.slice(0, 8)} · Skapad {dateFormatter.format(new Date(ticket.created_at))}
+              {ticket.due_date ? ` · SLA ${dateFormatter.format(new Date(ticket.due_date))}` : ""}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">{statusLabels[ticket.status] || ticket.status}</span>

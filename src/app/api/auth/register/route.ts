@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
+import { createResetToken, hashPassword, hashResetToken } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { queueTicketNotification } from "@/lib/integrations";
 
 export async function POST(request: Request) {
   try {
@@ -51,19 +52,39 @@ export async function POST(request: Request) {
       },
       include: {
         users: {
-          select: { id: true, company_id: true },
+          select: { id: true, email: true, company_id: true },
         },
       },
     });
 
     const owner = company.users[0];
     if (owner) {
+      const verifyToken = createResetToken();
+      await db.emailVerificationToken.create({
+        data: {
+          user_id: owner.id,
+          token_hash: hashResetToken(verifyToken),
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
       await writeAuditLog(owner, {
         entityType: "company",
         entityId: company.id,
         action: "company.created",
         metadata: { companyName: normalizedCompanyName },
       });
+      await queueTicketNotification(owner, {
+        ticketId: owner.id,
+        title: "Verifiera e-postadress",
+        recipient: owner.email,
+        event: "email_verification",
+      });
+
+      const verifyUrl = `${new URL(request.url).origin}/verify-email?token=${verifyToken}`;
+      return NextResponse.json({
+        success: true,
+        verifyUrl: process.env.EMAIL_PROVIDER_API_KEY ? undefined : verifyUrl,
+      }, { status: 201 });
     }
 
     return NextResponse.json({ success: true }, { status: 201 });

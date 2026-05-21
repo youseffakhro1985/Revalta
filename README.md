@@ -15,6 +15,7 @@ Plattformen är organiserad med Next.js App Router:
   - **`/dashboard/felanmalan`**: Skapa, lista, tilldela och kommentera felanmälningar kopplade till fastighet.
 - **`/portal`**: Publik boendeportal där boende kan skapa och följa ärenden utan konto.
 - **`/forgot-password`** och **`/reset-password`**: Lösenordsåterställning med spårbar mock/e-post-händelse.
+- **`/verify-email`**: E-postverifiering med mock/e-post-händelse.
 - **`/juridik/*`**: Integritet, cookies, villkor och GDPR-information på svenska.
 - **`/api`**: REST API-rutter för autentisering och datahantering (`/api/auth`, `/api/tickets`).
 - **`/components`**: UI-komponenter, layout-element och specifika vyer.
@@ -25,6 +26,7 @@ Backend använder Prisma mot PostgreSQL:
 - **`prisma/schema.prisma`**: Datamodeller för företag, användare, roller, fastigheter, felanmälningar och kommentarer.
 - **`src/app/api/auth/*`**: Registrering, inloggning och utloggning.
 - **`src/app/api/auth/password-reset/*`**: Skapa och bekräfta lösenordsåterställning.
+- **`src/app/api/auth/email-verification/*`**: Bekräfta e-postadress.
 - **`src/app/api/team`**: Lista och skapa teammedlemmar inom organisationen.
 - **`src/app/api/properties`**: Lista och skapa fastigheter för inloggad användare.
 - **`src/app/api/tickets`**: Lista och skapa ärenden med kategori, prioritet, ansvarig och fastighet.
@@ -34,6 +36,8 @@ Backend använder Prisma mot PostgreSQL:
 - **`src/app/api/tickets/[id]/ai`**: AI-analysera och uppdatera kategori/prioritet/sammanfattning.
 - **`src/app/api/billing`**: Visa och ändra plan i Stripe-ready mockläge.
 - **`src/app/api/public/*`**: Publika API:er för boendeportal och ärendespårning.
+- **`src/app/api/tickets/export`**: CSV-export av ärenden.
+- **`src/app/api/health`**: Driftstatus för databas och miljö.
 - **`src/app/api/audit`**: Audit log för viktiga händelser.
 - **`src/app/api/integrations`**: Konfigurationsstatus och dev-mockade händelser för e-post, SMS, Stripe, storage och AI.
 
