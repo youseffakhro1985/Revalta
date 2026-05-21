@@ -6,6 +6,7 @@ import Link from "next/link";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +21,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, companyName, email, password }),
       });
       if (res.ok) {
         router.push("/login");
@@ -28,7 +29,7 @@ export default function RegisterPage() {
         const data = await res.json();
         setError(data.error || "Kunde inte skapa konto");
       }
-    } catch (err) {
+    } catch {
       setError("Något gick fel");
     } finally {
       setLoading(false);
@@ -59,6 +60,18 @@ export default function RegisterPage() {
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Företag</label>
+            <input
+              type="text"
+              required
+              minLength={2}
+              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="Ex. Revalta Förvaltning AB"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">E-post</label>
             <input 
               type="email" 
@@ -74,6 +87,7 @@ export default function RegisterPage() {
             <input 
               type="password" 
               required
+              minLength={6}
               className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}

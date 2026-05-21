@@ -1,0 +1,70 @@
+import db from "@/lib/db";
+import { writeAuditLog } from "@/lib/audit";
+import { canViewAudit, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { recordPaymentEvent } from "@/lib/integrations";
+import { NextResponse } from "next/server";
+
+const plans = {
+  start: { label: "Start", price: 990, propertyLimit: 10, teamLimit: 3 },
+  professional: { label: "Professional", price: 2490, propertyLimit: 75, teamLimit: 15 },
+  enterprise: { label: "Enterprise", price: 6990, propertyLimit: 999, teamLimit: 100 },
+};
+
+export async function GET() {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user.company_id) return NextResponse.json({ error: "Företag saknas" }, { status: 400 });
+
+    const [properties, teamMembers, openTickets] = await Promise.all([
+      db.property.count({ where: tenantWhere(user) }),
+      db.user.count({ where: { company_id: user.company_id } }),
+      db.ticket.count({ where: { ...tenantWhere(user), status: { not: "closed" } } }),
+    ]);
+
+    return NextResponse.json({
+      currentPlan: user.company?.plan || "professional",
+      plans,
+      usage: { properties, teamMembers, openTickets },
+      canManage: canViewAudit(user.role),
+      stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
+    });
+  } catch (error) {
+    console.error("Get billing error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user.company_id || !canViewAudit(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att ändra plan" }, { status: 403 });
+    }
+
+    const { plan } = await request.json();
+    if (typeof plan !== "string" || !(plan in plans)) {
+      return NextResponse.json({ error: "Ogiltig plan" }, { status: 400 });
+    }
+
+    const company = await db.company.update({
+      where: { id: user.company_id },
+      data: { plan },
+      select: { id: true, name: true, plan: true },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "company",
+      entityId: company.id,
+      action: "billing.plan_changed",
+      metadata: { plan },
+    });
+    await recordPaymentEvent(user, { companyId: company.id, plan, mode: "plan_change" });
+
+    return NextResponse.json({ success: true, company });
+  } catch (error) {
+    console.error("Update billing error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

@@ -9,20 +9,119 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  email      String   @unique
-  password   String
-  name       String?
-  created_at DateTime @default(now())
+  id               String          @id @default(uuid())
+  email            String          @unique
+  password         String
+  name             String?
+  role             String          @default("owner")
+  status           String          @default("active")
+  company_id       String?
+  created_at       DateTime        @default(now())
+  company          Company?        @relation(fields: [company_id], references: [id])
+  tickets          Ticket[]
+  assigned_tickets Ticket[]        @relation("AssignedTickets")
+  properties       Property[]
+  comments         TicketComment[]
+  audit_logs       AuditLog[]
+}
+
+model Company {
+  id         String     @id @default(uuid())
+  name       String
+  org_number String?
+  plan       String     @default("professional")
+  status     String     @default("active")
+  created_at DateTime   @default(now())
+  users      User[]
+  properties Property[]
   tickets    Ticket[]
+  audit_logs AuditLog[]
+  integration_events IntegrationEvent[]
+}
+
+model Property {
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  postal_code String?
+  city        String
+  company_id  String?
+  user_id     String
+  created_at  DateTime @default(now())
+  company     Company? @relation(fields: [company_id], references: [id])
+  user        User     @relation(fields: [user_id], references: [id])
+  tickets     Ticket[]
 }
 
 model Ticket {
+  id             String          @id @default(uuid())
+  title          String
+  description    String
+  status         String          @default("new")
+  category       String          @default("other")
+  priority       String          @default("normal")
+  company_id     String?
+  user_id        String
+  property_id    String?
+  assigned_to_id String?
+  due_date       DateTime?
+  created_at     DateTime        @default(now())
+  updated_at     DateTime        @default(now()) @updatedAt
+  closed_at      DateTime?
+  ai_summary     String?
+  ai_recommended_action String?
+  ai_confidence  Float?
+  ai_processed_at DateTime?
+  company        Company?        @relation(fields: [company_id], references: [id])
+  user           User            @relation(fields: [user_id], references: [id])
+  property       Property?       @relation(fields: [property_id], references: [id])
+  assigned_to    User?           @relation("AssignedTickets", fields: [assigned_to_id], references: [id])
+  comments       TicketComment[]
+  attachments    TicketAttachment[]
+}
+
+model TicketComment {
   id          String   @id @default(uuid())
-  title       String
-  description String
-  status      String   @default("ÖPPEN")
+  ticket_id   String
   user_id     String
+  body        String
+  is_internal Boolean  @default(false)
   created_at  DateTime @default(now())
+  ticket      Ticket   @relation(fields: [ticket_id], references: [id])
   user        User     @relation(fields: [user_id], references: [id])
+}
+
+model TicketAttachment {
+  id           String   @id @default(uuid())
+  ticket_id    String
+  file_name    String
+  content_type String
+  size_bytes   Int
+  data_url     String
+  created_at   DateTime @default(now())
+  ticket       Ticket   @relation(fields: [ticket_id], references: [id])
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  company_id    String?
+  actor_user_id String?
+  entity_type   String
+  entity_id     String?
+  action        String
+  metadata      Json?
+  created_at    DateTime @default(now())
+  company       Company? @relation(fields: [company_id], references: [id])
+  actor         User?    @relation(fields: [actor_user_id], references: [id])
+}
+
+model IntegrationEvent {
+  id         String   @id @default(uuid())
+  company_id String?
+  type       String
+  status     String   @default("mocked")
+  recipient  String?
+  payload    Json?
+  created_at DateTime @default(now())
+  company    Company? @relation(fields: [company_id], references: [id])
 }
