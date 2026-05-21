@@ -54,6 +54,7 @@ async function main() {
     comments: await db.ticketComment.deleteMany({
       where: { OR: [{ ticket_id: { in: testTicketIds } }, { user_id: { in: testUserIds } }] },
     }),
+    emailVerificationTokens: await db.emailVerificationToken.deleteMany({ where: { user_id: { in: testUserIds } } }),
     passwordTokens: await db.passwordResetToken.deleteMany({ where: { user_id: { in: testUserIds } } }),
     auditLogs: await db.auditLog.deleteMany({
       where: {
