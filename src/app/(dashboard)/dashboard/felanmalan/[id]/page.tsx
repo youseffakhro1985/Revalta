@@ -17,6 +17,12 @@ type Ticket = {
   status: string;
   category: string;
   priority: string;
+  public_reference: string | null;
+  source: string;
+  reporter_name: string | null;
+  reporter_email: string | null;
+  reporter_phone: string | null;
+  reporter_unit: string | null;
   assigned_to_id: string | null;
   ai_summary: string | null;
   ai_recommended_action: string | null;
@@ -312,6 +318,30 @@ export default function TicketDetailPage() {
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">Fastighet</p>
                 <h2 className="mt-2 text-xl font-bold text-slate-950">{ticket.property.name}</h2>
                 <p className="mt-1 text-sm text-slate-600">{ticket.property.address}, {ticket.property.city}</p>
+              </div>
+            )}
+
+            {ticket.source === "public_portal" && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Boendeportal</p>
+                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Referens</p>
+                    <p className="mt-1 font-bold text-slate-950">{ticket.public_reference}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Rapportör</p>
+                    <p className="mt-1 font-bold text-slate-950">{ticket.reporter_name || "Ej angivet"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">E-post</p>
+                    <p className="mt-1 text-sm text-slate-700">{ticket.reporter_email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Telefon / lägenhet</p>
+                    <p className="mt-1 text-sm text-slate-700">{ticket.reporter_phone || "Ej angivet"} · {ticket.reporter_unit || "Ej angivet"}</p>
+                  </div>
+                </div>
               </div>
             )}
 

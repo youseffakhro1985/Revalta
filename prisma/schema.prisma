@@ -64,6 +64,12 @@ model Ticket {
   user_id        String
   property_id    String?
   assigned_to_id String?
+  public_reference String?       @unique
+  source         String          @default("internal")
+  reporter_name  String?
+  reporter_email String?
+  reporter_phone String?
+  reporter_unit  String?
   due_date       DateTime?
   created_at     DateTime        @default(now())
   updated_at     DateTime        @default(now()) @updatedAt

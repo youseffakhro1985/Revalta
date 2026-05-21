@@ -13,6 +13,7 @@ Plattformen är organiserad med Next.js App Router:
   - **`/dashboard/team`**: Hantera organisation, roller och teammedlemmar.
   - **`/dashboard/fastigheter`**: Skapa och lista fastigheter i beståndet.
   - **`/dashboard/felanmalan`**: Skapa, lista, tilldela och kommentera felanmälningar kopplade till fastighet.
+- **`/portal`**: Publik boendeportal där boende kan skapa och följa ärenden utan konto.
 - **`/api`**: REST API-rutter för autentisering och datahantering (`/api/auth`, `/api/tickets`).
 - **`/components`**: UI-komponenter, layout-element och specifika vyer.
 - **`/lib`**: Centraliserad logik för databas (`db.ts`), sessioner (`session.ts`) och autentisering (`auth.ts`).
@@ -29,6 +30,7 @@ Backend använder Prisma mot PostgreSQL:
 - **`src/app/api/tickets/[id]/attachments`**: Ladda upp små dev-bilagor på ärenden.
 - **`src/app/api/tickets/[id]/ai`**: AI-analysera och uppdatera kategori/prioritet/sammanfattning.
 - **`src/app/api/billing`**: Visa och ändra plan i Stripe-ready mockläge.
+- **`src/app/api/public/*`**: Publika API:er för boendeportal och ärendespårning.
 - **`src/app/api/audit`**: Audit log för viktiga händelser.
 - **`src/app/api/integrations`**: Konfigurationsstatus och dev-mockade händelser för e-post, SMS, Stripe, storage och AI.
 
