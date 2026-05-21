@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rateLimit = checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: "För många registreringar. Vänta en stund och prova igen." }, { status: 429 });
+    }
+
     const { name, email, password, companyName } = await request.json();
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
     const normalizedName = typeof name === "string" ? name.trim() : null;

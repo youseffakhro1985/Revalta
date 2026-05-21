@@ -14,6 +14,8 @@ Plattformen är organiserad med Next.js App Router:
   - **`/dashboard/fastigheter`**: Skapa och lista fastigheter i beståndet.
   - **`/dashboard/felanmalan`**: Skapa, lista, tilldela och kommentera felanmälningar kopplade till fastighet.
 - **`/portal`**: Publik boendeportal där boende kan skapa och följa ärenden utan konto.
+- **`/forgot-password`** och **`/reset-password`**: Lösenordsåterställning med spårbar mock/e-post-händelse.
+- **`/juridik/*`**: Integritet, cookies, villkor och GDPR-information på svenska.
 - **`/api`**: REST API-rutter för autentisering och datahantering (`/api/auth`, `/api/tickets`).
 - **`/components`**: UI-komponenter, layout-element och specifika vyer.
 - **`/lib`**: Centraliserad logik för databas (`db.ts`), sessioner (`session.ts`) och autentisering (`auth.ts`).
@@ -22,6 +24,7 @@ Plattformen är organiserad med Next.js App Router:
 Backend använder Prisma mot PostgreSQL:
 - **`prisma/schema.prisma`**: Datamodeller för företag, användare, roller, fastigheter, felanmälningar och kommentarer.
 - **`src/app/api/auth/*`**: Registrering, inloggning och utloggning.
+- **`src/app/api/auth/password-reset/*`**: Skapa och bekräfta lösenordsåterställning.
 - **`src/app/api/team`**: Lista och skapa teammedlemmar inom organisationen.
 - **`src/app/api/properties`**: Lista och skapa fastigheter för inloggad användare.
 - **`src/app/api/tickets`**: Lista och skapa ärenden med kategori, prioritet, ansvarig och fastighet.

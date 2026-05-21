@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { SiteFooter } from "@/components/site-footer";
 
 type Property = {
   id: string;
@@ -151,6 +152,7 @@ export default function PortalPage() {
   }
 
   return (
+    <>
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
         <Link href="/" className="text-2xl font-extrabold tracking-tight text-white">Revalta</Link>
@@ -265,5 +267,7 @@ export default function PortalPage() {
         </div>
       </section>
     </main>
+    <SiteFooter />
+    </>
   );
 }

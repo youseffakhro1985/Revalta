@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Revalta",
-  description: "Revalta Fastighetssystem och Felanmälan",
+  title: "Revalta | Modern fastighetsservice",
+  description: "Professionell SaaS för fastigheter, team, felanmälan och boendeportal.",
 };
 
 export default function RootLayout({

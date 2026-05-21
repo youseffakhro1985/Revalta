@@ -23,6 +23,7 @@ model User {
   properties       Property[]
   comments         TicketComment[]
   audit_logs       AuditLog[]
+  password_reset_tokens PasswordResetToken[]
 }
 
 model Company {
@@ -130,4 +131,14 @@ model IntegrationEvent {
   payload    Json?
   created_at DateTime @default(now())
   company    Company? @relation(fields: [company_id], references: [id])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  user_id    String
+  token_hash String   @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
 }

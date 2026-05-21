@@ -1,19 +1,21 @@
 import Link from 'next/link';
+import { SiteFooter } from '@/components/site-footer';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
-        <Link href="/" className="text-2xl font-extrabold tracking-tight">Revalta</Link>
-        <nav className="flex items-center gap-3">
-          <Link href="/portal" className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950 transition-colors hover:bg-slate-100">
-            Boendeportal
-          </Link>
-          <Link href="/login" className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20">
-            Logga in
-          </Link>
-        </nav>
-      </div>
+    <>
+      <main className="min-h-screen bg-slate-950 text-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
+          <Link href="/" className="text-2xl font-extrabold tracking-tight">Revalta</Link>
+          <nav className="flex items-center gap-3">
+            <Link href="/portal" className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950 transition-colors hover:bg-slate-100">
+              Boendeportal
+            </Link>
+            <Link href="/login" className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20">
+              Logga in
+            </Link>
+          </nav>
+        </div>
 
       <section className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-6 py-20 lg:grid-cols-[1fr_420px] lg:items-center">
         <div>
@@ -51,6 +53,8 @@ export default function Home() {
           </div>
         </div>
       </section>
-    </main>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
