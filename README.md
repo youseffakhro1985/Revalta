@@ -64,4 +64,9 @@ Backend använder Prisma mot PostgreSQL:
    ```bash
    npm run dev
    ```
+cursor/professional-mvp-6157
 6. Öppna [http://localhost:3000](http://localhost:3000) i din webbläsare.
+
+5. Öppna [http://localhost:3000](http://localhost:3000) i din webbläsare. 
+
+main
