@@ -82,6 +82,9 @@ export default function LoginPage() {
         <p className="mt-8 text-center text-sm text-slate-500">
           Har du inget konto? <Link href="/register" className="text-brand-600 font-medium hover:text-brand-700 hover:underline transition-colors">Skapa ett här</Link>
         </p>
+        <p className="mt-3 text-center text-sm text-slate-500">
+          <Link href="/forgot-password" className="font-medium text-brand-600 hover:text-brand-700 hover:underline">Glömt lösenord?</Link>
+        </p>
       </div>
     </div>
   );
