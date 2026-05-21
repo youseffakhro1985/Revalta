@@ -7,17 +7,11 @@
   },
   "scripts": {
     "dev": "next dev",
-cursor/professional-mvp-6157
     "build": "prisma generate && prisma migrate deploy && next build --webpack",
     "db:migrate": "prisma migrate deploy",
     "db:dev": "prisma migrate dev",
     "start": "next start",
     "lint": "eslint .",
-
-    "build": "npx prisma generate && next build",
-    "start": "next start",
-    "lint": "next lint",
- main
     "postinstall": "prisma generate"
   },
   "dependencies": {
