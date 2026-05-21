@@ -14,11 +14,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
     }
 
-    const portal = await getPublicPortalCompany();
-    if (!portal) {
-      return NextResponse.json({ error: "Boendeportalen är inte konfigurerad ännu" }, { status: 503 });
-    }
-
     const { reporterName, reporterEmail, reporterPhone, reporterUnit, propertyId, title, description } = await request.json();
     const normalizedReporterName = typeof reporterName === "string" ? reporterName.trim() : "";
     const normalizedReporterEmail = typeof reporterEmail === "string" ? reporterEmail.trim().toLowerCase() : "";
@@ -28,6 +23,11 @@ export async function POST(request: Request) {
     const normalizedDescription = typeof description === "string" ? description.trim() : "";
     const normalizedPropertyId = typeof propertyId === "string" && propertyId.trim() ? propertyId.trim() : null;
 
+    const portal = await getPublicPortalCompany(normalizedPropertyId);
+    if (!portal) {
+      return NextResponse.json({ error: "Boendeportalen är inte konfigurerad ännu" }, { status: 503 });
+    }
+
     if (!normalizedReporterName || !normalizedReporterEmail.includes("@") || !normalizedTitle || normalizedDescription.length < 10) {
       return NextResponse.json({ error: "Namn, e-post, titel och tydlig beskrivning krävs" }, { status: 400 });
     }
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     let property = null;
     if (normalizedPropertyId) {
       property = await db.property.findFirst({
-        where: { id: normalizedPropertyId, company_id: portal.company.id },
+        where: { id: normalizedPropertyId },
         select: { id: true, name: true, address: true, city: true },
       });
       if (!property) {

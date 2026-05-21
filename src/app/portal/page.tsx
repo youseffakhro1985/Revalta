@@ -9,6 +9,7 @@ type Property = {
   address: string;
   postal_code: string | null;
   city: string;
+  company?: { name: string };
 };
 
 type PublicTicket = {
@@ -210,6 +211,7 @@ export default function PortalPage() {
                   {properties.map((property) => (
                     <option key={property.id} value={property.id}>
                       {property.name} - {property.address}, {property.city}
+                      {property.company?.name ? ` (${property.company.name})` : ""}
                     </option>
                   ))}
                 </select>

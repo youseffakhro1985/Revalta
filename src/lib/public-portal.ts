@@ -1,6 +1,30 @@
 import db from "@/lib/db";
 
-export async function getPublicPortalCompany() {
+export async function getPublicPortalCompany(propertyId?: string | null) {
+  if (propertyId) {
+    const property = await db.property.findUnique({
+      where: { id: propertyId },
+      select: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            users: {
+              where: { status: "active" },
+              orderBy: { created_at: "asc" },
+              take: 1,
+              select: { id: true, email: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (property?.company?.users[0]) {
+      return { company: property.company, owner: property.company.users[0] };
+    }
+  }
+
   const configuredCompanyId = process.env.PUBLIC_PORTAL_COMPANY_ID;
 
   if (configuredCompanyId) {
