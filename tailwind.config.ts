@@ -9,6 +9,45 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        petroleum: {
+          50:  "#f2f6f5",
+          100: "#e0edea",
+          200: "#c2dcd6",
+          300: "#99c3ba",
+          400: "#6ba398",
+          500: "#4b877b",
+          600: "#386b61",
+          700: "#2f5750",
+          800: "#274641",
+          900: "#223b37",
+          950: "#11221f",
+        },
+        sand: {
+          50:  "#fafaf8",
+          100: "#f4f4f0",
+          200: "#ebe8e0",
+          300: "#e0dcd0",
+          400: "#c7c1b1",
+          500: "#afaa99",
+          600: "#999382",
+          700: "#807b6c",
+          800: "#696459",
+          900: "#57534a",
+          950: "#302e29",
+        },
+        ink: {
+          50:  "#f6f6f6",
+          100: "#e7e7e7",
+          200: "#d1d1d1",
+          300: "#b0b0b0",
+          400: "#888888",
+          500: "#6d6d6d",
+          600: "#5d5d5d",
+          700: "#4f4f4f",
+          800: "#454545",
+          900: "#3d3d3d",
+          950: "#1a1a1a",
+        },
         brand: {
           50:  "#f0f4ff",
           100: "#e0eaff",
@@ -62,6 +101,9 @@ const config: Config = {
         "card-md":  "0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05)",
         "card-lg":  "0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.06)",
         "inner-sm": "inset 0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "premium-sm": "0 2px 8px -2px rgba(26, 26, 26, 0.04), 0 1px 2px -1px rgba(26, 26, 26, 0.02)",
+        "premium-md": "0 4px 16px -4px rgba(26, 26, 26, 0.06), 0 2px 4px -2px rgba(26, 26, 26, 0.03)",
+        "premium-lg": "0 12px 32px -4px rgba(26, 26, 26, 0.08), 0 4px 12px -4px rgba(26, 26, 26, 0.04)",
       },
       borderRadius: {
         "4xl": "2rem",
@@ -71,6 +113,8 @@ const config: Config = {
         "slide-up":    "slideUp 0.3s ease-out",
         "slide-right": "slideRight 0.3s ease-out",
         "pulse-soft":  "pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "fade-in-soft": "fadeInSoft 0.5s ease-out",
+        "slide-up-soft": "slideUpSoft 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
       },
       keyframes: {
         fadeIn: {
@@ -88,6 +132,14 @@ const config: Config = {
         pulseSoft: {
           "0%, 100%": { opacity: "1" },
           "50%":      { opacity: "0.6" },
+        },
+        fadeInSoft: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        slideUpSoft: {
+          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
       },
     },
