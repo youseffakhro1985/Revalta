@@ -32,9 +32,9 @@ export function SiteFooter() {
           </div>
         </div>
       </div>
-      <div className="mx-auto mt-16 max-w-7xl border-t border-sand-200 pt-8 flex justify-between items-center text-xs text-ink-400">
-        <p>&copy; {new Date().getFullYear()} Revalta AB. Alla rättigheter reserverade.</p>
-        <p>Svensk Proptech</p>
+      <div className="mx-auto mt-16 max-w-7xl border-t border-sand-200 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-ink-400">
+        <p className="text-center sm:text-left">&copy; {new Date().getFullYear()} Revalta AB. Alla rättigheter reserverade.</p>
+        <p className="font-medium">Svensk Proptech</p>
       </div>
     </footer>
   );
