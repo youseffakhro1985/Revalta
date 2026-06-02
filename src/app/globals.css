@@ -4,13 +4,11 @@
 
 @layer base {
   :root {
-    /* Background: #FAF7F2 */
-    --background: 40 33% 97%;
-    /* Foreground: #2E372F */
-    --foreground: 128 9% 20%;
+    --background: 60 20% 98%;
+    --foreground: 0 0% 10%;
   }
 }
 body {
-  background-color: #FAF7F2;
-  color: #2E372F;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
