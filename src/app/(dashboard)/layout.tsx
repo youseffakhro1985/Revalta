@@ -24,6 +24,7 @@ export default function DashboardLayout({
                 <Link href="/dashboard/integrationer" className="text-ink-600 hover:text-petroleum-600 px-3 py-2 text-sm font-medium transition-colors duration-300">Integrationer</Link>
                 <Link href="/dashboard/drift" className="text-ink-600 hover:text-petroleum-600 px-3 py-2 text-sm font-medium transition-colors duration-300">Drift</Link>
                 <Link href="/dashboard/billing" className="text-ink-600 hover:text-petroleum-600 px-3 py-2 text-sm font-medium transition-colors duration-300">Billing</Link>
+                <Link href="/dashboard/installningar" className="text-ink-600 hover:text-petroleum-600 px-3 py-2 text-sm font-medium transition-colors duration-300">Inställningar</Link>
               </nav>
             </div>
             <LogoutButton />

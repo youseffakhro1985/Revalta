@@ -57,6 +57,14 @@ type Ticket = {
   }>;
 };
 
+type TimelineItem = {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  created_at: string;
+};
+
 const statusLabels: Record<string, string> = {
   new: "Ny",
   received: "Mottagen",
@@ -82,6 +90,7 @@ export default function TicketDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [status, setStatus] = useState("new");
   const [priority, setPriority] = useState("normal");
@@ -99,19 +108,21 @@ export default function TicketDetailPage() {
 
     async function loadData() {
       try {
-        const [ticketResponse, teamResponse] = await Promise.all([
+        const [ticketResponse, teamResponse, timelineResponse] = await Promise.all([
           fetch(`/api/tickets/${params.id}`, { cache: "no-store" }),
           fetch("/api/team", { cache: "no-store" }),
+          fetch(`/api/tickets/${params.id}/timeline`, { cache: "no-store" }),
         ]);
 
-        if (ticketResponse.status === 401 || teamResponse.status === 401) {
+        if (ticketResponse.status === 401 || teamResponse.status === 401 || timelineResponse.status === 401) {
           router.push("/login");
           return;
         }
 
-        const [ticketData, teamData] = await Promise.all([
+        const [ticketData, teamData, timelineData] = await Promise.all([
           ticketResponse.json(),
           teamResponse.json(),
+          timelineResponse.json(),
         ]);
 
         if (!isMounted) return;
@@ -126,6 +137,7 @@ export default function TicketDetailPage() {
         setPriority(ticketData.ticket.priority);
         setAssignedToId(ticketData.ticket.assigned_to_id || "");
         setMembers(teamData.members || []);
+        setTimeline(timelineData.timeline || []);
       } catch {
         if (isMounted) setError("Kunde inte kontakta servern");
       } finally {
@@ -200,6 +212,16 @@ export default function TicketDetailPage() {
       setTicket((current) =>
         current ? { ...current, comments: [...current.comments, data.comment] } : current
       );
+      setTimeline((current) => [
+        {
+          id: data.comment.id,
+          type: "comment",
+          title: "Kommentar",
+          description: data.comment.body,
+          created_at: data.comment.created_at,
+        },
+        ...current,
+      ]);
       setComment("");
       setSuccess("Kommentaren är tillagd.");
     } catch {
@@ -233,6 +255,16 @@ export default function TicketDetailPage() {
       setTicket((current) =>
         current ? { ...current, attachments: [data.attachment, ...current.attachments] } : current
       );
+      setTimeline((current) => [
+        {
+          id: data.attachment.id,
+          type: "attachment",
+          title: "Bilaga uppladdad",
+          description: data.attachment.file_name,
+          created_at: data.attachment.created_at,
+        },
+        ...current,
+      ]);
       setFile(null);
       setSuccess("Bilagan är uppladdad och storage-händelsen är loggad.");
     } catch {
@@ -431,6 +463,29 @@ export default function TicketDetailPage() {
                   ))
                 ) : (
                   <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">Inga kommentarer ännu.</p>
+                )}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-slate-950">Timeline</h2>
+              <div className="mt-4 space-y-3">
+                {timeline.length > 0 ? (
+                  timeline.map((item) => (
+                    <div key={`${item.type}-${item.id}`} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-card">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-bold text-slate-950">{item.title}</p>
+                          <p className="mt-1 text-sm text-slate-600">{item.description}</p>
+                        </div>
+                        <span className="text-xs font-medium text-slate-400">
+                          {dateFormatter.format(new Date(item.created_at))}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">Ingen timeline ännu.</p>
                 )}
               </div>
             </section>

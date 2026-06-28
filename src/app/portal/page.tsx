@@ -71,6 +71,7 @@ export default function PortalPage() {
   const [trackedTicket, setTrackedTicket] = useState<PublicTicket | null>(null);
   const [createdReference, setCreatedReference] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [residentComment, setResidentComment] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -174,6 +175,36 @@ export default function PortalPage() {
       }
       setAttachmentFile(null);
       setSuccess("Bilagan är mottagen och kopplad till ärendet.");
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function addResidentComment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!reference || !trackEmail || !residentComment.trim()) return;
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trackEmail, body: residentComment }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Kunde inte lägga till kommentaren");
+        return;
+      }
+      setTrackedTicket((current) =>
+        current ? { ...current, comments: [...current.comments, data.comment] } : current
+      );
+      setResidentComment("");
+      setSuccess("Kommentaren är skickad till förvaltningen.");
     } catch {
       setError("Kunde inte kontakta servern");
     } finally {
@@ -308,6 +339,21 @@ export default function PortalPage() {
                     </div>
                   )}
                   
+                  <form onSubmit={addResidentComment} className="mt-6 border-t border-sand-100 pt-5">
+                    <p className="text-sm font-semibold text-ink-900">Skicka kommentar</p>
+                    <textarea
+                      required
+                      rows={3}
+                      value={residentComment}
+                      onChange={(event) => setResidentComment(event.target.value)}
+                      className="mt-3 w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-900 outline-none transition-all focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500"
+                      placeholder="Skriv en komplettering eller fråga till förvaltningen..."
+                    />
+                    <button disabled={loading || !residentComment.trim()} className="mt-3 rounded-lg bg-petroleum-600 px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-petroleum-700 transition-colors">
+                      Skicka kommentar
+                    </button>
+                  </form>
+
                   <form onSubmit={uploadAttachment} className="mt-6 border-t border-sand-100 pt-5">
                     <p className="text-sm font-semibold text-ink-900">Lägg till bilaga</p>
                     <p className="mt-1 text-xs text-ink-500">Bifoga bild eller dokument (PNG, JPG, PDF) upp till 1 MB.</p>

@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canExportTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { NextResponse } from "next/server";
 
 function csvCell(value: unknown) {
@@ -11,6 +11,9 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canExportTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att exportera ärenden" }, { status: 403 });
+    }
 
     const tickets = await db.ticket.findMany({
       where: tenantWhere(user),

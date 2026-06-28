@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canViewAudit, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canManageBilling, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 
@@ -26,7 +26,7 @@ export async function GET() {
       currentPlan: user.company?.plan || "professional",
       plans,
       usage: { properties, teamMembers, openTickets },
-      canManage: canViewAudit(user.role),
+      canManage: canManageBilling(user.role),
       stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
     });
   } catch (error) {
@@ -39,7 +39,7 @@ export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id || !canViewAudit(user.role)) {
+    if (!user.company_id || !canManageBilling(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att ändra plan" }, { status: 403 });
     }
 

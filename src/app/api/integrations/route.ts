@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canViewAudit, getCurrentUser } from "@/lib/current-user";
+import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
 import { NextResponse } from "next/server";
 
 const requiredEnv: Record<string, string[]> = {
@@ -14,7 +14,7 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canViewAudit(user.role)) {
+    if (!canManageIntegrations(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa integrationer" }, { status: 403 });
     }
 

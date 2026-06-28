@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && prisma migrate deploy && next build --webpack",
+    "build:ci": "prisma generate && next build --webpack",
     "db:migrate": "prisma migrate deploy",
     "db:dev": "prisma migrate dev",
     "start": "next start",

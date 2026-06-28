@@ -51,3 +51,23 @@ export function canCreateProperties(role: string) {
 export function canViewAudit(role: string) {
   return role === "owner" || role === "admin";
 }
+
+export function canManageCompany(role: string) {
+  return role === "owner" || role === "admin";
+}
+
+export function canManageBilling(role: string) {
+  return role === "owner" || role === "admin";
+}
+
+export function canManageIntegrations(role: string) {
+  return role === "owner" || role === "admin";
+}
+
+export function canExportTickets(role: string) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
+export function canViewOperations(role: string) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
