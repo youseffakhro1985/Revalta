@@ -56,6 +56,9 @@ async function main() {
     }),
     emailVerificationTokens: await db.emailVerificationToken.deleteMany({ where: { user_id: { in: testUserIds } } }),
     passwordTokens: await db.passwordResetToken.deleteMany({ where: { user_id: { in: testUserIds } } }),
+    teamInvites: await db.teamInvite.deleteMany({
+      where: { OR: [{ invited_by_id: { in: testUserIds } }, { company_id: { in: testCompanyIds } }, { email: { endsWith: "@example.se", mode: "insensitive" } }, { email: { endsWith: "@example.com", mode: "insensitive" } }] },
+    }),
     auditLogs: await db.auditLog.deleteMany({
       where: {
         OR: [
