@@ -26,6 +26,7 @@ model User {
   audit_logs       AuditLog[]
   password_reset_tokens PasswordResetToken[]
   email_verification_tokens EmailVerificationToken[]
+  team_invites_sent TeamInvite[]
 }
 
 model Company {
@@ -40,6 +41,7 @@ model Company {
   tickets    Ticket[]
   audit_logs AuditLog[]
   integration_events IntegrationEvent[]
+  team_invites TeamInvite[]
 }
 
 model Property {
@@ -154,4 +156,19 @@ model EmailVerificationToken {
   used_at    DateTime?
   created_at DateTime @default(now())
   user       User     @relation(fields: [user_id], references: [id])
+}
+
+model TeamInvite {
+  id             String   @id @default(uuid())
+  company_id     String
+  invited_by_id  String
+  email          String
+  name           String?
+  role           String   @default("viewer")
+  token_hash     String   @unique
+  expires_at     DateTime
+  accepted_at    DateTime?
+  created_at     DateTime @default(now())
+  company        Company  @relation(fields: [company_id], references: [id])
+  invited_by     User     @relation(fields: [invited_by_id], references: [id])
 }

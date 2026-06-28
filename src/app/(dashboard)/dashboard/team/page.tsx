@@ -13,6 +13,16 @@ type TeamMember = {
   _count: { assigned_tickets: number };
 };
 
+type TeamInvite = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
+};
+
 const roleLabels: Record<string, string> = {
   owner: "Ägare",
   admin: "Admin",
@@ -23,12 +33,13 @@ const roleLabels: Record<string, string> = {
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [invites, setInvites] = useState<TeamInvite[]>([]);
   const [companyName, setCompanyName] = useState("Organisation");
   const [canManage, setCanManage] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("technician");
-  const [password, setPassword] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -40,13 +51,16 @@ export default function TeamPage() {
 
     async function loadTeam() {
       try {
-        const response = await fetch("/api/team", { cache: "no-store" });
-        if (response.status === 401) {
+        const [response, invitesResponse] = await Promise.all([
+          fetch("/api/team", { cache: "no-store" }),
+          fetch("/api/team/invites", { cache: "no-store" }),
+        ]);
+        if (response.status === 401 || invitesResponse.status === 401) {
           router.push("/login");
           return;
         }
 
-        const data = await response.json();
+        const [data, invitesData] = await Promise.all([response.json(), invitesResponse.json()]);
         if (!isMounted) return;
 
         if (!response.ok) {
@@ -57,6 +71,7 @@ export default function TeamPage() {
         setMembers(data.members || []);
         setCompanyName(data.company?.name || "Organisation");
         setCanManage(Boolean(data.canManage));
+        if (invitesResponse.ok) setInvites(invitesData.invites || []);
       } catch {
         if (isMounted) setError("Kunde inte kontakta servern");
       } finally {
@@ -78,10 +93,10 @@ export default function TeamPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch("/api/team", {
+      const response = await fetch("/api/team/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, role, password }),
+        body: JSON.stringify({ name, email, role }),
       });
       const data = await response.json();
 
@@ -90,12 +105,12 @@ export default function TeamPage() {
         return;
       }
 
-      setMembers((current) => [...current, data.member]);
+      setInvites((current) => [data.invite, ...current]);
+      setInviteUrl(data.inviteUrl || "");
       setName("");
       setEmail("");
       setRole("technician");
-      setPassword("");
-      setSuccess("Teammedlemmen är skapad och kan nu tilldelas ärenden.");
+      setSuccess("Inbjudan är skapad och redo att skickas.");
     } catch {
       setError("Kunde inte kontakta servern");
     } finally {
@@ -124,7 +139,7 @@ export default function TeamPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.85fr_1.15fr]">
         <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
           <h2 className="text-2xl font-bold text-slate-950">Bjud in teammedlem</h2>
-          <p className="mt-2 text-sm text-slate-500">Skapa en användare med roll och lösenord för testbar åtkomst direkt.</p>
+          <p className="mt-2 text-sm text-slate-500">Skapa en säker inbjudningslänk. Med e-postleverantör skickas länken automatiskt.</p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
             <fieldset disabled={!canManage} className="space-y-5 disabled:opacity-60">
@@ -145,15 +160,17 @@ export default function TeamPage() {
                   <option value="viewer">Läsbehörig</option>
                 </select>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Tillfälligt lösenord</label>
-                <input type="password" required minLength={6} className="block w-full rounded-xl border border-slate-200 p-3 shadow-inner-sm outline-none focus:border-brand-500" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Minst 6 tecken" />
-              </div>
               <button disabled={submitting || !canManage} className="w-full rounded-xl bg-brand-600 px-8 py-3 font-semibold text-white shadow-card transition-all hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70">
-                {submitting ? "Skapar..." : "Skapa teammedlem"}
+                {submitting ? "Skapar..." : "Skapa inbjudan"}
               </button>
             </fieldset>
           </form>
+          {inviteUrl && (
+            <div className="mt-5 rounded-2xl border border-brand-100 bg-brand-50 p-4">
+              <p className="text-sm font-bold text-brand-700">Inbjudningslänk</p>
+              <p className="mt-2 break-all text-sm text-brand-700">{inviteUrl}</p>
+            </div>
+          )}
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
@@ -185,6 +202,33 @@ export default function TeamPage() {
           )}
         </section>
       </div>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+        <div className="border-b border-slate-100 bg-slate-50/70 p-6">
+          <h2 className="text-lg font-bold text-slate-950">Senaste inbjudningar</h2>
+          <p className="mt-1 text-sm text-slate-500">Säkra länkar som kan accepteras av nya teammedlemmar.</p>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {invites.length > 0 ? invites.map((invite) => (
+            <article key={invite.id} className="p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-950">{invite.name || invite.email}</h3>
+                  <p className="mt-1 text-sm text-slate-500">{invite.email}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-bold text-brand-600">{roleLabels[invite.role] || invite.role}</span>
+                  <span className={`rounded-full border px-3 py-1 text-xs font-bold ${invite.accepted_at ? "border-success-500 bg-success-50 text-success-600" : "border-warning-500 bg-warning-50 text-warning-600"}`}>
+                    {invite.accepted_at ? "Accepterad" : "Väntar"}
+                  </span>
+                </div>
+              </div>
+            </article>
+          )) : (
+            <div className="p-8 text-sm text-slate-500">Inga inbjudningar ännu.</div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

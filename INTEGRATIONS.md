@@ -43,8 +43,11 @@ Miljövariabler:
 
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_START`
+- `STRIPE_PRICE_PROFESSIONAL`
+- `STRIPE_PRICE_ENTERPRISE`
 
-I nuvarande version loggas planändringar och Stripe-läge i integration events. Nästa steg är att koppla Stripe Checkout/Customer Portal med riktiga price IDs.
+När dessa finns kan Revalta starta Stripe Checkout för planerna. Customer Portal kan öppnas när ett Stripe customer-id finns tillgängligt. Utan nycklar loggas checkout och customer portal i mockläge.
 
 ## Filstorage
 

@@ -25,6 +25,8 @@ type BillingData = {
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingData | null>(null);
   const [savingPlan, setSavingPlan] = useState("");
+  const [checkoutPlan, setCheckoutPlan] = useState("");
+  const [openingPortal, setOpeningPortal] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const router = useRouter();
@@ -85,6 +87,62 @@ export default function BillingPage() {
     }
   }
 
+  async function startCheckout(plan: string) {
+    setError("");
+    setSuccess("");
+    setCheckoutPlan(plan);
+
+    try {
+      const response = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Kunde inte starta checkout");
+        return;
+      }
+      if (data.mode === "mock") {
+        setSuccess("Stripe är inte livekopplat ännu. Checkout-händelsen är loggad i mockläge.");
+        return;
+      }
+      window.location.assign(data.url);
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setCheckoutPlan("");
+    }
+  }
+
+  async function openCustomerPortal() {
+    setError("");
+    setSuccess("");
+    setOpeningPortal(true);
+
+    try {
+      const response = await fetch("/api/billing/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || "Kunde inte öppna kundportal");
+        return;
+      }
+      if (data.mode === "mock") {
+        setSuccess("Stripe Customer Portal är inte livekopplad ännu. Händelsen är loggad i mockläge.");
+        return;
+      }
+      window.location.assign(data.url);
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setOpeningPortal(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl animate-fade-in space-y-8">
       <header className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 text-white shadow-card-lg">
@@ -123,6 +181,14 @@ export default function BillingPage() {
               <p className={`mt-3 text-lg font-bold ${billing.stripeConfigured ? "text-success-600" : "text-warning-600"}`}>
                 {billing.stripeConfigured ? "Live redo" : "Mockläge"}
               </p>
+              <button
+                type="button"
+                onClick={openCustomerPortal}
+                disabled={openingPortal || !billing.canManage}
+                className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {openingPortal ? "Öppnar..." : "Kundportal"}
+              </button>
             </div>
           </section>
 
@@ -146,6 +212,16 @@ export default function BillingPage() {
                 >
                   {billing.currentPlan === key ? "Aktiv plan" : savingPlan === key ? "Uppdaterar..." : "Byt plan"}
                 </button>
+                {billing.currentPlan !== key && (
+                  <button
+                    type="button"
+                    disabled={!billing.canManage || checkoutPlan === key}
+                    onClick={() => startCheckout(key)}
+                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {checkoutPlan === key ? "Startar..." : "Starta Stripe Checkout"}
+                  </button>
+                )}
               </article>
             ))}
           </section>
