@@ -6,18 +6,75 @@ type IntegrationUser = {
 };
 
 const configured = {
-  email: Boolean(process.env.EMAIL_PROVIDER_API_KEY),
-  sms: Boolean(process.env.SMS_PROVIDER_API_KEY),
+  email: Boolean(process.env.EMAIL_PROVIDER_API_KEY && process.env.EMAIL_FROM),
+  sms: Boolean(process.env.SMS_PROVIDER_API_KEY && process.env.SMS_PROVIDER_WEBHOOK_URL),
   stripe: Boolean(process.env.STRIPE_SECRET_KEY),
   storage: Boolean(process.env.STORAGE_PROVIDER_KEY),
   ai: Boolean(process.env.AI_PROVIDER_API_KEY),
 };
 
+async function sendEmail(payload: {
+  recipient?: string;
+  subject: string;
+  text: string;
+}) {
+  if (!configured.email || !payload.recipient) {
+    return { status: "mocked", providerId: null };
+  }
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.EMAIL_PROVIDER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: process.env.EMAIL_FROM,
+      to: payload.recipient,
+      subject: payload.subject,
+      text: payload.text,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    return { status: "failed", providerId: null, providerResponse: data };
+  }
+
+  return { status: "sent", providerId: typeof data.id === "string" ? data.id : null, providerResponse: data };
+}
+
+async function sendSms(payload: { recipient?: string; message: string }) {
+  if (!configured.sms || !payload.recipient) {
+    return { status: "mocked", providerId: null };
+  }
+
+  const response = await fetch(process.env.SMS_PROVIDER_WEBHOOK_URL as string, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.SMS_PROVIDER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      to: payload.recipient,
+      message: payload.message,
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    return { status: "failed", providerId: null, providerResponse: data };
+  }
+
+  return { status: "sent", providerId: typeof data.id === "string" ? data.id : null, providerResponse: data };
+}
+
 async function recordIntegrationEvent(
   user: IntegrationUser,
   type: string,
   payload: Record<string, unknown>,
-  recipient?: string
+  recipient?: string,
+  statusOverride?: string
 ) {
   const isConfigured = configured[type as keyof typeof configured] ?? false;
 
@@ -26,7 +83,7 @@ async function recordIntegrationEvent(
       company_id: user.company_id,
       type,
       recipient,
-      status: isConfigured ? "queued" : "mocked",
+      status: statusOverride ?? (isConfigured ? "queued" : "mocked"),
       payload: payload as Prisma.InputJsonValue,
     },
   });
@@ -41,7 +98,26 @@ export async function queueTicketNotification(
     event: "created" | "updated" | "commented" | "password_reset" | "email_verification";
   }
 ) {
-  return recordIntegrationEvent(user, "email", payload, payload.recipient);
+  const subjectByEvent = {
+    created: `Ärende mottaget: ${payload.title}`,
+    updated: `Ärende uppdaterat: ${payload.title}`,
+    commented: `Ny kommentar: ${payload.title}`,
+    password_reset: "Återställ ditt lösenord i Revalta",
+    email_verification: "Verifiera din e-postadress i Revalta",
+  };
+  const delivery = await sendEmail({
+    recipient: payload.recipient,
+    subject: subjectByEvent[payload.event],
+    text: `Hej!\n\n${subjectByEvent[payload.event]}\n\nLogga in i Revalta eller följ ärendet via boendeportalen för mer information.\n\nVänliga hälsningar,\nRevalta`,
+  });
+
+  return recordIntegrationEvent(
+    user,
+    "email",
+    { ...payload, delivery },
+    payload.recipient,
+    delivery.status
+  );
 }
 
 export async function queueSmsNotification(
@@ -52,7 +128,8 @@ export async function queueSmsNotification(
     recipient?: string;
   }
 ) {
-  return recordIntegrationEvent(user, "sms", payload, payload.recipient);
+  const delivery = await sendSms({ recipient: payload.recipient, message: payload.message });
+  return recordIntegrationEvent(user, "sms", { ...payload, delivery }, payload.recipient, delivery.status);
 }
 
 export async function recordPaymentEvent(user: IntegrationUser, payload: Record<string, unknown>) {

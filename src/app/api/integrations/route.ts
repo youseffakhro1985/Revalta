@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 const requiredEnv: Record<string, string[]> = {
   email: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM"],
-  sms: ["SMS_PROVIDER_API_KEY"],
+  sms: ["SMS_PROVIDER_API_KEY", "SMS_PROVIDER_WEBHOOK_URL"],
   stripe: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
   storage: ["STORAGE_PROVIDER_KEY"],
   ai: ["AI_PROVIDER_API_KEY"],
