@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const session = await createCheckoutSession({
       plan,
       customerEmail: user.email,
+      companyId: user.company_id,
       successUrl: `${origin}/dashboard/billing?checkout=success&plan=${plan}`,
       cancelUrl: `${origin}/dashboard/billing?checkout=cancelled`,
     });

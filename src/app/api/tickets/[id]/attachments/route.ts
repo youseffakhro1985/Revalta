@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { recordStorageEvent } from "@/lib/integrations";
+import { storeAttachment } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 const maxFileSize = 1024 * 1024;
@@ -43,14 +44,19 @@ export async function POST(
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const dataUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
+    const storedFile = await storeAttachment({
+      fileName: file.name,
+      contentType: file.type,
+      buffer,
+      prefix: `tickets/${ticket.id}`,
+    });
     const attachment = await db.ticketAttachment.create({
       data: {
         ticket_id: ticket.id,
         file_name: file.name,
         content_type: file.type,
         size_bytes: file.size,
-        data_url: dataUrl,
+        data_url: storedFile.url,
       },
       select: {
         id: true,
@@ -73,6 +79,7 @@ export async function POST(
       fileName: attachment.file_name,
       contentType: attachment.content_type,
       sizeBytes: attachment.size_bytes,
+      provider: storedFile.provider,
     });
 
     return NextResponse.json({ success: true, attachment }, { status: 201 });

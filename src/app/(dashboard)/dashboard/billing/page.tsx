@@ -20,6 +20,9 @@ type BillingData = {
   };
   canManage: boolean;
   stripeConfigured: boolean;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  subscriptionStatus: string | null;
 };
 
 export default function BillingPage() {
@@ -181,6 +184,9 @@ export default function BillingPage() {
               <p className={`mt-3 text-lg font-bold ${billing.stripeConfigured ? "text-success-600" : "text-warning-600"}`}>
                 {billing.stripeConfigured ? "Live redo" : "Mockläge"}
               </p>
+              {billing.subscriptionStatus && (
+                <p className="mt-2 text-xs font-medium text-slate-500">Subscription: {billing.subscriptionStatus}</p>
+              )}
               <button
                 type="button"
                 onClick={openCustomerPortal}

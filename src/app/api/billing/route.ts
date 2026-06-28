@@ -21,6 +21,14 @@ export async function GET() {
       db.user.count({ where: { company_id: user.company_id } }),
       db.ticket.count({ where: { ...tenantWhere(user), status: { not: "closed" } } }),
     ]);
+    const company = await db.company.findUnique({
+      where: { id: user.company_id },
+      select: {
+        stripe_customer_id: true,
+        stripe_subscription_id: true,
+        subscription_status: true,
+      },
+    });
 
     return NextResponse.json({
       currentPlan: user.company?.plan || "professional",
@@ -28,6 +36,9 @@ export async function GET() {
       usage: { properties, teamMembers, openTickets },
       canManage: canManageBilling(user.role),
       stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
+      stripeCustomerId: company?.stripe_customer_id || null,
+      stripeSubscriptionId: company?.stripe_subscription_id || null,
+      subscriptionStatus: company?.subscription_status || null,
     });
   } catch (error) {
     console.error("Get billing error:", error);

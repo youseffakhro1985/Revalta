@@ -35,6 +35,9 @@ model Company {
   org_number String?
   plan       String     @default("professional")
   status     String     @default("active")
+  stripe_customer_id String?
+  stripe_subscription_id String?
+  subscription_status String?
   created_at DateTime   @default(now())
   users      User[]
   properties Property[]

@@ -1,3 +1,5 @@
+import { createHmac, timingSafeEqual } from "crypto";
+
 const stripeApi = "https://api.stripe.com/v1";
 
 export const stripePriceEnv: Record<string, string | undefined> = {
@@ -36,6 +38,7 @@ async function stripePost(path: string, params: Record<string, string>) {
 export async function createCheckoutSession(input: {
   plan: string;
   customerEmail: string;
+  companyId: string;
   successUrl: string;
   cancelUrl: string;
 }) {
@@ -49,6 +52,10 @@ export async function createCheckoutSession(input: {
     customer_email: input.customerEmail,
     success_url: input.successUrl,
     cancel_url: input.cancelUrl,
+    "metadata[companyId]": input.companyId,
+    "metadata[plan]": input.plan,
+    "subscription_data[metadata][companyId]": input.companyId,
+    "subscription_data[metadata][plan]": input.plan,
   });
 }
 
@@ -60,4 +67,29 @@ export async function createCustomerPortalSession(input: {
     customer: input.customerId,
     return_url: input.returnUrl,
   });
+}
+
+export function verifyStripeSignature(payload: string, signatureHeader: string | null) {
+  if (!process.env.STRIPE_WEBHOOK_SECRET || !signatureHeader) return false;
+
+  const parts = Object.fromEntries(
+    signatureHeader.split(",").map((part) => {
+      const [key, value] = part.split("=");
+      return [key, value];
+    })
+  );
+  const timestamp = parts.t;
+  const signature = parts.v1;
+  if (!timestamp || !signature) return false;
+
+  const signedPayload = `${timestamp}.${payload}`;
+  const expected = createHmac("sha256", process.env.STRIPE_WEBHOOK_SECRET)
+    .update(signedPayload)
+    .digest("hex");
+
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(signature);
+  if (expectedBuffer.length !== signatureBuffer.length) return false;
+
+  return timingSafeEqual(expectedBuffer, signatureBuffer);
 }
