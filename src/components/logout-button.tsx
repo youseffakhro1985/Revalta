@@ -19,7 +19,7 @@ export function LogoutButton() {
       type="button"
       onClick={handleLogout}
       disabled={loading}
-      className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-60"
+      className="rounded-lg px-3 py-2 text-sm font-medium text-ink-500 transition-colors hover:bg-sand-100 hover:text-petroleum-700 disabled:opacity-60"
     >
       {loading ? "Loggar ut..." : "Logga ut"}
     </button>

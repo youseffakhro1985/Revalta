@@ -3,17 +3,17 @@ import { Button } from "@/components/ui/button";
 
 export function MarketingHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-sand-200/70 bg-[#FDFCFB]/95">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-xl font-semibold tracking-tight">
+        <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-tight text-petroleum-700">
+          <span className="h-5 w-5 rounded bg-petroleum-600" />
           Revalta
         </Link>
 
-        <nav className="hidden items-center gap-8 text-sm text-gray-600 md:flex">
-          <Link href="/funktioner" className="text-gray-600 hover:text-gray-900 transition-colors">Funktioner</Link>
-          <Link href="/priser" className="text-gray-600 hover:text-gray-900 transition-colors">Priser</Link>
-          <Link href="/om-oss" className="text-gray-600 hover:text-gray-900 transition-colors">Om oss</Link>
-          <Link href="/kontakt" className="text-gray-600 hover:text-gray-900 transition-colors">Kontakt</Link>
+        <nav className="hidden items-center gap-8 text-sm text-ink-600 md:flex">
+          <Link href="/#funktioner" className="transition-colors hover:text-petroleum-700">Funktioner</Link>
+          <Link href="/portal" className="transition-colors hover:text-petroleum-700">Boendeportal</Link>
+          <Link href="/juridik/integritet" className="transition-colors hover:text-petroleum-700">Juridik</Link>
         </nav>
 
         <div className="flex items-center gap-3">

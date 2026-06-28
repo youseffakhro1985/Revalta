@@ -344,8 +344,8 @@ export default function Home() {
                        </div>
                        <span className="text-[10px] text-ink-400">Idag 08:14</span>
                      </div>
-                     <p className="text-xs text-ink-800 leading-relaxed italic mb-4">
-                       "30% högre frekvens av värmerelaterade felanmälningar i hus B. Underlag för debitering av extern VVS-firma är redo."
+                      <p className="text-xs text-ink-800 leading-relaxed italic mb-4">
+                       &ldquo;30% högre frekvens av värmerelaterade felanmälningar i hus B. Underlag för debitering av extern VVS-firma är redo.&rdquo;
                      </p>
                      <div className="flex gap-2">
                        <div className="flex-1 h-1.5 bg-petroleum-600 rounded-full"></div>

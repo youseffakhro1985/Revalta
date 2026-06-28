@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-gray-200/60 bg-white/80 backdrop-blur-xl p-6 shadow-sm ring-1 ring-gray-900/5 flex flex-col gap-4 transition-all hover:shadow-md ${className}`}>
+    <div className={`flex flex-col gap-4 rounded-2xl border border-sand-200/80 bg-white p-6 shadow-premium-sm transition-all hover:shadow-premium-md ${className}`}>
       {children}
     </div>
   );
@@ -13,7 +13,7 @@ export function CardHeader({ children, className = "" }: { children: ReactNode; 
 }
 
 export function CardTitle({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <h3 className={`font-semibold leading-none tracking-tight ${className}`}>{children}</h3>;
+  return <h3 className={`font-semibold leading-none tracking-tight text-ink-950 ${className}`}>{children}</h3>;
 }
 
 export function CardContent({ children, className = "" }: { children: ReactNode; className?: string }) {
