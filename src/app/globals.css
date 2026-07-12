@@ -43,3 +43,18 @@
     }
   }
 }
+
+@layer components {
+  .dashboard-surface h1,
+  .dashboard-surface h2,
+  .dashboard-surface h3 {
+    font-family: var(--font-display), Manrope, Inter, system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  .dashboard-surface input,
+  .dashboard-surface select,
+  .dashboard-surface textarea {
+    background-color: #ffffff;
+  }
+}
