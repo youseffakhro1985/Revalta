@@ -134,7 +134,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-6xl animate-fade-in-soft space-y-8">
-      <header className="rounded-3xl border border-sand-200/80 bg-white p-8 shadow-premium-sm">
+      <header className="rounded-2xl border border-sand-200/80 bg-white p-8 shadow-premium-sm">
         <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Inställningar</p>
         <h1 className="text-4xl font-semibold tracking-tight text-ink-950">Organisation och konto</h1>
         <p className="mt-3 max-w-2xl text-ink-600">Hantera grunduppgifter, behörigheter och lösenord med spårbar audit log.</p>
