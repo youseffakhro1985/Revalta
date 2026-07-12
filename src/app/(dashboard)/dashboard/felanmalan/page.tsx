@@ -190,21 +190,21 @@ export default function FelanmalanPage() {
 
   return (
     <div className="mx-auto max-w-6xl animate-fade-in space-y-8">
-      <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-8 shadow-card sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-sand-200 bg-white p-8 shadow-card sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">Felanmälan</p>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-950">Mina ärenden</h1>
-          <p className="mt-3 max-w-2xl text-slate-600">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Felanmälan</p>
+          <h1 className="text-4xl font-semibold tracking-tight text-ink-950">Mina ärenden</h1>
+          <p className="mt-3 max-w-2xl text-ink-600">
             Skapa, följ upp och koppla felanmälningar till rätt fastighet.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-2xl bg-slate-50 px-5 py-4">
-            <p className="text-3xl font-extrabold text-slate-950">{tickets.length}</p>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Totalt</p>
+          <div className="rounded-2xl bg-sand-50 px-5 py-4">
+            <p className="text-3xl font-semibold text-ink-950">{tickets.length}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Totalt</p>
           </div>
           <div className="rounded-2xl bg-warning-50 px-5 py-4">
-            <p className="text-3xl font-extrabold text-warning-600">{openTickets}</p>
+            <p className="text-3xl font-semibold text-warning-600">{openTickets}</p>
             <p className="text-xs font-semibold uppercase tracking-wide text-warning-600">Öppna</p>
           </div>
         </div>
@@ -217,22 +217,22 @@ export default function FelanmalanPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
+        <section className="rounded-2xl border border-sand-200 bg-white p-8 shadow-card">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-slate-950">Skapa ny felanmälan</h2>
-              <p className="mt-2 text-sm text-slate-500">Välj fastighet och beskriv problemet tydligt.</p>
+              <h2 className="text-2xl font-bold text-ink-950">Skapa ny felanmälan</h2>
+              <p className="mt-2 text-sm text-ink-500">Välj fastighet och beskriv problemet tydligt.</p>
             </div>
-            <Link href="/dashboard/fastigheter" className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+            <Link href="/dashboard/fastigheter" className="rounded-xl border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-50">
               Fastigheter
             </Link>
           </div>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-6">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Fastighet</label>
+              <label className="mb-1 block text-sm font-medium text-ink-700">Fastighet</label>
               <select
-                className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500 focus:ring-brand-500"
+                className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
                 value={propertyId}
                 onChange={(event) => setPropertyId(event.target.value)}
               >
@@ -244,15 +244,15 @@ export default function FelanmalanPage() {
                 ))}
               </select>
               {properties.length === 0 && !loading && (
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-ink-500">
                   Lägg gärna till en fastighet först för bättre struktur i ärenden.
                 </p>
               )}
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Kategori</label>
-                <select className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500" value={category} onChange={(event) => setCategory(event.target.value)}>
+                <label className="mb-1 block text-sm font-medium text-ink-700">Kategori</label>
+                <select className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={category} onChange={(event) => setCategory(event.target.value)}>
                   <option value="other">Övrigt</option>
                   <option value="vvs">VVS</option>
                   <option value="electricity">El</option>
@@ -262,8 +262,8 @@ export default function FelanmalanPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Prioritet</label>
-                <select className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500" value={priority} onChange={(event) => setPriority(event.target.value)}>
+                <label className="mb-1 block text-sm font-medium text-ink-700">Prioritet</label>
+                <select className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={priority} onChange={(event) => setPriority(event.target.value)}>
                   <option value="low">Låg</option>
                   <option value="normal">Normal</option>
                   <option value="high">Hög</option>
@@ -271,8 +271,8 @@ export default function FelanmalanPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Ansvarig</label>
-                <select className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500" value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)}>
+                <label className="mb-1 block text-sm font-medium text-ink-700">Ansvarig</label>
+                <select className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)}>
                   <option value="">Ej tilldelad</option>
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
@@ -283,24 +283,24 @@ export default function FelanmalanPage() {
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Titel</label>
+              <label className="mb-1 block text-sm font-medium text-ink-700">Titel</label>
               <input
                 type="text"
                 required
                 minLength={3}
-                className="block w-full rounded-xl border border-slate-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500 focus:ring-brand-500"
+                className="block w-full rounded-xl border border-sand-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Ex. Läckande kran i köket"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Beskrivning</label>
+              <label className="mb-1 block text-sm font-medium text-ink-700">Beskrivning</label>
               <textarea
                 required
                 minLength={10}
                 rows={4}
-                className="block w-full resize-y rounded-xl border border-slate-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-brand-500 focus:ring-brand-500"
+                className="block w-full resize-y rounded-xl border border-sand-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="Beskriv problemet mer ingående..."
@@ -309,32 +309,32 @@ export default function FelanmalanPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-xl bg-brand-600 px-8 py-3 font-semibold text-white shadow-card transition-all hover:bg-brand-700 hover:shadow-card-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full rounded-xl bg-petroleum-600 px-8 py-3 font-semibold text-white shadow-card transition-all hover:bg-petroleum-700 hover:shadow-card-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
             >
               {submitting ? "Skapar ärende..." : "Skicka in ärende"}
             </button>
           </form>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
-          <div className="border-b border-slate-100 bg-slate-50/70 p-6">
+        <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-card">
+          <div className="border-b border-sand-100 bg-sand-50/70 p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-slate-950">Dina pågående ärenden</h2>
-                <p className="mt-1 text-sm text-slate-500">Klicka på ett ärende för att se detaljer.</p>
+                <h2 className="text-lg font-bold text-ink-950">Dina pågående ärenden</h2>
+                <p className="mt-1 text-sm text-ink-500">Klicka på ett ärende för att se detaljer.</p>
               </div>
-              <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800">
+              <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="rounded-xl bg-ink-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-800">
                 Exportera CSV
               </button>
             </div>
             <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-4">
               <input
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+                className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Sök titel eller beskrivning"
               />
-              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <select className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                 <option value="">Alla statusar</option>
                 <option value="new">Ny</option>
                 <option value="received">Mottagen</option>
@@ -343,14 +343,14 @@ export default function FelanmalanPage() {
                 <option value="completed">Klar</option>
                 <option value="closed">Stängd</option>
               </select>
-              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+              <select className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
                 <option value="">Alla prioriteter</option>
                 <option value="low">Låg</option>
                 <option value="normal">Normal</option>
                 <option value="high">Hög</option>
                 <option value="urgent">Akut</option>
               </select>
-              <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)}>
+              <select className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)}>
                 <option value="">Alla fastigheter</option>
                 {properties.map((property) => (
                   <option key={property.id} value={property.id}>{property.name}</option>
@@ -362,39 +362,39 @@ export default function FelanmalanPage() {
           {loading ? (
             <div className="space-y-4 p-6">
               {[1, 2, 3].map((item) => (
-                <div key={item} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+                <div key={item} className="h-24 animate-pulse rounded-2xl bg-sand-100" />
               ))}
             </div>
           ) : tickets.length > 0 ? (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-sand-100">
               {tickets.map((ticket) => (
                 <Link
                   key={ticket.id}
                   href={`/dashboard/felanmalan/${ticket.id}`}
-                  className="block p-6 transition-colors hover:bg-slate-50"
+                  className="block p-6 transition-colors hover:bg-sand-50"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <h3 className="truncate text-lg font-bold text-slate-950">{ticket.title}</h3>
-                      <p className="mt-2 text-xs font-semibold tracking-wide text-brand-600">
+                      <h3 className="truncate text-lg font-bold text-ink-950">{ticket.title}</h3>
+                      <p className="mt-2 text-xs font-semibold tracking-wide text-petroleum-600">
                         {ticket.property ? `${ticket.property.name} · ${ticket.property.address}` : "Ingen fastighet vald"}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
+                        <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-xs font-bold text-ink-600">
                           {statusLabels[ticket.status] || ticket.status}
                         </span>
-                        <span className="rounded-full border border-brand-100 bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-600">
+                        <span className="rounded-full border border-petroleum-100 bg-petroleum-50 px-2.5 py-1 text-xs font-bold text-petroleum-600">
                           {priorityLabels[ticket.priority] || ticket.priority}
                         </span>
-                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-500">
+                        <span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-bold text-ink-500">
                           {ticket.assigned_to ? `Ansvarig: ${ticket.assigned_to.name || ticket.assigned_to.email}` : "Ej tilldelad"}
                         </span>
-                        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-500">
+                        <span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-bold text-ink-500">
                           {ticket._count.comments} kommentarer
                         </span>
                       </div>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{ticket.description}</p>
-                      <p className="mt-3 text-xs font-medium text-slate-400">
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-600">{ticket.description}</p>
+                      <p className="mt-3 text-xs font-medium text-ink-400">
                         Skapad {dateFormatter.format(new Date(ticket.created_at))}
                         {ticket.due_date ? ` · SLA ${dateFormatter.format(new Date(ticket.due_date))}` : ""}
                       </p>
@@ -408,13 +408,13 @@ export default function FelanmalanPage() {
             </div>
           ) : (
             <div className="p-12 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-50">
-                <svg className="h-8 w-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sand-50">
+                <svg className="h-8 w-8 text-ink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <p className="font-semibold text-slate-800">Du har inga aktiva felanmälningar just nu.</p>
-              <p className="mt-2 text-sm text-slate-500">När du skapar ett ärende visas det här direkt.</p>
+              <p className="font-semibold text-ink-800">Du har inga aktiva felanmälningar just nu.</p>
+              <p className="mt-2 text-sm text-ink-500">När du skapar ett ärende visas det här direkt.</p>
             </div>
           )}
         </section>
