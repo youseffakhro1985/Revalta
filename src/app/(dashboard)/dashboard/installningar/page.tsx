@@ -133,10 +133,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl animate-fade-in-soft space-y-8">
-      <header className="rounded-2xl border border-sand-200/80 bg-white p-8 shadow-premium-sm">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Inställningar</p>
-        <h1 className="text-4xl font-semibold tracking-tight text-ink-950">Organisation och konto</h1>
+    <div className="mx-auto max-w-6xl animate-fade-in-soft space-y-6">
+      <header className="rounded-2xl border border-sand-200/80 bg-white p-7 shadow-premium-sm sm:p-8">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Inställningar</p>
+        <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px] text-ink-950">Organisation och konto</h1>
         <p className="mt-3 max-w-2xl text-ink-600">Hantera grunduppgifter, behörigheter och lösenord med spårbar audit log.</p>
       </header>
 
@@ -151,13 +151,13 @@ export default function SettingsPage() {
           <h2 className="text-xl font-semibold text-ink-950">Profil</h2>
           <p className="mt-2 text-sm text-ink-500">Dina personliga uppgifter i Revalta.</p>
           <label className="mt-6 block text-sm font-medium text-ink-700">Namn</label>
-          <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-xl border border-sand-200 p-3" />
-          <div className="mt-4 rounded-xl bg-sand-50 p-4 text-sm text-ink-600">
+          <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+          <div className="mt-4 rounded-lg bg-sand-50 p-4 text-sm text-ink-600">
             <p>{profile?.email}</p>
             <p className="mt-1">Roll: {profile?.role}</p>
             <p className="mt-1">{profile?.email_verified_at ? "E-post verifierad" : "E-post ej verifierad"}</p>
           </div>
-          <button disabled={loading} className="mt-6 w-full rounded-xl bg-petroleum-600 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70">Spara profil</button>
+          <button disabled={loading} className="mt-6 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70">Spara profil</button>
         </form>
 
         <form onSubmit={saveCompany} className="rounded-2xl border border-sand-200/80 bg-white p-6 shadow-premium-sm">
@@ -166,14 +166,14 @@ export default function SettingsPage() {
           <fieldset disabled={!canManageCompany || loading} className="mt-6 space-y-4 disabled:opacity-60">
             <div>
               <label className="block text-sm font-medium text-ink-700">Namn</label>
-              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className="mt-1 w-full rounded-xl border border-sand-200 p-3" />
+              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Organisationsnummer</label>
-              <input value={orgNumber} onChange={(event) => setOrgNumber(event.target.value)} className="mt-1 w-full rounded-xl border border-sand-200 p-3" placeholder="556000-0000" />
+              <input value={orgNumber} onChange={(event) => setOrgNumber(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" placeholder="556000-0000" />
             </div>
-            <div className="rounded-xl bg-sand-50 p-4 text-sm text-ink-600">Plan: {company?.plan}</div>
-            <button className="w-full rounded-xl bg-petroleum-600 px-5 py-3 font-semibold text-white hover:bg-petroleum-700">Spara organisation</button>
+            <div className="rounded-lg bg-sand-50 p-4 text-sm text-ink-600">Plan: {company?.plan}</div>
+            <button className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-700">Spara organisation</button>
           </fieldset>
         </form>
 
@@ -183,13 +183,13 @@ export default function SettingsPage() {
           <div className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-ink-700">Nuvarande lösenord</label>
-              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="mt-1 w-full rounded-xl border border-sand-200 p-3" />
+              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Nytt lösenord</label>
-              <input type="password" minLength={6} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-xl border border-sand-200 p-3" />
+              <input type="password" minLength={6} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
             </div>
-            <button disabled={loading} className="w-full rounded-xl bg-ink-950 px-5 py-3 font-semibold text-white hover:bg-ink-800 disabled:opacity-70">Byt lösenord</button>
+            <button disabled={loading} className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">Byt lösenord</button>
           </div>
         </form>
       </div>
