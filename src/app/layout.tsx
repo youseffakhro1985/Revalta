@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Manrope } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Revalta | Modern fastighetsservice",
-  description: "Professionell SaaS för fastigheter, team, felanmälan och boendeportal.",
+  title: "Revalta | Fastighetssystem för svensk förvaltning",
+  description:
+    "Revalta samlar fastigheter, ärenden, avtal och ekonomi i ett modernt system för svenska fastighetsägare, BRF:er och förvaltare.",
 };
 
 export default function RootLayout({
@@ -16,7 +27,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="sv">
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.variable} ${manrope.variable} font-sans antialiased`}>
+        {children}
+      </body>
     </html>
   );
 }
