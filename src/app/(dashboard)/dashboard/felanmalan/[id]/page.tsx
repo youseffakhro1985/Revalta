@@ -331,48 +331,48 @@ export default function TicketDetailPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
-        <article className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-card">
-          <div className="border-b border-sand-100 bg-ink-950 p-8 text-white">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-700">Ärendedetaljer</p>
-            <h1 className="text-3xl font-semibold tracking-tight">{ticket.title}</h1>
+        <article className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+          <div className="border-b border-sand-200 bg-white p-7 sm:p-8">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Ärendedetaljer</p>
+            <h1 className="text-[30px] font-semibold leading-tight tracking-[-0.035em] text-ink-950 sm:text-[34px]">{ticket.title}</h1>
             <p className="mt-3 text-sm text-ink-500">
               #{ticket.id.slice(0, 8)} · Skapad {dateFormatter.format(new Date(ticket.created_at))}
               {ticket.due_date ? ` · SLA ${dateFormatter.format(new Date(ticket.due_date))}` : ""}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">{statusLabels[ticket.status] || ticket.status}</span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">{priorityLabels[ticket.priority] || ticket.priority}</span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">{ticket.assigned_to ? `Ansvarig: ${ticket.assigned_to.name || ticket.assigned_to.email}` : "Ej tilldelad"}</span>
+              <span className="rounded-full border border-petroleum-200 bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-700">{statusLabels[ticket.status] || ticket.status}</span>
+              <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{priorityLabels[ticket.priority] || ticket.priority}</span>
+              <span className="rounded-full border border-sand-200 bg-white px-3 py-1 text-xs font-semibold text-ink-500">{ticket.assigned_to ? `Ansvarig: ${ticket.assigned_to.name || ticket.assigned_to.email}` : "Ej tilldelad"}</span>
             </div>
           </div>
 
           <div className="space-y-8 p-8">
             {ticket.property && (
               <div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-petroleum-600">Fastighet</p>
-                <h2 className="mt-2 text-xl font-bold text-ink-950">{ticket.property.name}</h2>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Fastighet</p>
+                <h2 className="mt-2 text-xl font-semibold text-ink-950">{ticket.property.name}</h2>
                 <p className="mt-1 text-sm text-ink-600">{ticket.property.address}, {ticket.property.city}</p>
               </div>
             )}
 
             {ticket.source === "public_portal" && (
-              <div className="rounded-2xl border border-sand-200 bg-white p-5 shadow-card">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-ink-400">Boendeportal</p>
+              <div className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-400">Boendeportal</p>
                 <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-ink-400">Referens</p>
-                    <p className="mt-1 font-bold text-ink-950">{ticket.public_reference}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Referens</p>
+                    <p className="mt-1 font-semibold text-ink-950">{ticket.public_reference}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-ink-400">Rapportör</p>
-                    <p className="mt-1 font-bold text-ink-950">{ticket.reporter_name || "Ej angivet"}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Rapportör</p>
+                    <p className="mt-1 font-semibold text-ink-950">{ticket.reporter_name || "Ej angivet"}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-ink-400">E-post</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">E-post</p>
                     <p className="mt-1 text-sm text-ink-700">{ticket.reporter_email}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wide text-ink-400">Telefon / lägenhet</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Telefon / lägenhet</p>
                     <p className="mt-1 text-sm text-ink-700">{ticket.reporter_phone || "Ej angivet"} · {ticket.reporter_unit || "Ej angivet"}</p>
                   </div>
                 </div>
@@ -380,7 +380,7 @@ export default function TicketDetailPage() {
             )}
 
             <section>
-              <h2 className="text-xl font-bold text-ink-950">Beskrivning</h2>
+              <h2 className="text-xl font-semibold text-ink-950">Beskrivning</h2>
               <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-sand-100 bg-sand-50 p-6 leading-7 text-ink-700">
                 {ticket.description}
               </div>
@@ -389,7 +389,7 @@ export default function TicketDetailPage() {
             <section className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-ink-950">AI-insikt</h2>
+                  <h2 className="text-xl font-semibold text-ink-950">AI-insikt</h2>
                   <p className="mt-2 text-sm text-ink-600">
                     Kör en deterministisk dev-analys nu, och koppla riktig AI med `AI_PROVIDER_API_KEY` senare.
                   </p>
@@ -398,7 +398,7 @@ export default function TicketDetailPage() {
                   type="button"
                   onClick={runAiAnalysis}
                   disabled={analyzing}
-                  className="rounded-xl bg-petroleum-600 px-4 py-2 text-sm font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70"
+                  className="rounded-lg bg-petroleum-700 px-4 py-2 text-sm font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70"
                 >
                   {analyzing ? "Analyserar..." : "AI-analysera"}
                 </button>
@@ -406,16 +406,16 @@ export default function TicketDetailPage() {
               {ticket.ai_summary ? (
                 <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div className="rounded-2xl bg-white p-4">
-                    <p className="text-xs font-bold uppercase tracking-wide text-petroleum-600">Sammanfattning</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Sammanfattning</p>
                     <p className="mt-2 text-sm text-ink-700">{ticket.ai_summary}</p>
                   </div>
                   <div className="rounded-2xl bg-white p-4">
-                    <p className="text-xs font-bold uppercase tracking-wide text-petroleum-600">Rekommenderad åtgärd</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Rekommenderad åtgärd</p>
                     <p className="mt-2 text-sm text-ink-700">{ticket.ai_recommended_action}</p>
                   </div>
                   <div className="rounded-2xl bg-white p-4">
-                    <p className="text-xs font-bold uppercase tracking-wide text-petroleum-600">Konfidens</p>
-                    <p className="mt-2 text-2xl font-semibold text-ink-950">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Konfidens</p>
+                    <p className="mt-2 text-[22px] font-semibold text-ink-950">
                       {Math.round((ticket.ai_confidence || 0) * 100)}%
                     </p>
                   </div>
@@ -424,7 +424,7 @@ export default function TicketDetailPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-ink-950">Bilagor</h2>
+              <h2 className="text-xl font-semibold text-ink-950">Bilagor</h2>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {ticket.attachments.length > 0 ? (
                   ticket.attachments.map((attachment) => (
@@ -433,9 +433,9 @@ export default function TicketDetailPage() {
                       href={attachment.data_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-2xl border border-sand-100 bg-white p-4 shadow-card transition-colors hover:bg-sand-50"
+                      className="rounded-2xl border border-sand-100 bg-white p-4 shadow-premium-sm transition-colors hover:bg-sand-50"
                     >
-                      <p className="font-bold text-ink-950">{attachment.file_name}</p>
+                      <p className="font-semibold text-ink-950">{attachment.file_name}</p>
                       <p className="mt-1 text-xs text-ink-500">
                         {attachment.content_type} · {Math.ceil(attachment.size_bytes / 1024)} KB
                       </p>
@@ -450,11 +450,11 @@ export default function TicketDetailPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-ink-950">Kommentarer</h2>
+              <h2 className="text-xl font-semibold text-ink-950">Kommentarer</h2>
               <div className="mt-4 space-y-3">
                 {ticket.comments.length > 0 ? (
                   ticket.comments.map((item) => (
-                    <div key={item.id} className="rounded-2xl border border-sand-100 bg-white p-4 shadow-card">
+                    <div key={item.id} className="rounded-2xl border border-sand-100 bg-white p-4 shadow-premium-sm">
                       <p className="text-sm leading-6 text-ink-700">{item.body}</p>
                       <p className="mt-3 text-xs font-medium text-ink-400">
                         {item.user.name || item.user.email} · {dateFormatter.format(new Date(item.created_at))}
@@ -468,14 +468,14 @@ export default function TicketDetailPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-bold text-ink-950">Tidslinje</h2>
+              <h2 className="text-xl font-semibold text-ink-950">Tidslinje</h2>
               <div className="mt-4 space-y-3">
                 {timeline.length > 0 ? (
                   timeline.map((item) => (
-                    <div key={`${item.type}-${item.id}`} className="rounded-2xl border border-sand-100 bg-white p-4 shadow-card">
+                    <div key={`${item.type}-${item.id}`} className="rounded-2xl border border-sand-100 bg-white p-4 shadow-premium-sm">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <p className="font-bold text-ink-950">{item.title}</p>
+                          <p className="font-semibold text-ink-950">{item.title}</p>
                           <p className="mt-1 text-sm text-ink-600">{item.description}</p>
                         </div>
                         <span className="text-xs font-medium text-ink-400">
@@ -493,12 +493,12 @@ export default function TicketDetailPage() {
         </article>
 
         <aside className="space-y-6">
-          <form onSubmit={updateTicket} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-card">
-            <h2 className="text-xl font-bold text-ink-950">Styr ärendet</h2>
+          <form onSubmit={updateTicket} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+            <h2 className="text-xl font-semibold text-ink-950">Styr ärendet</h2>
             <div className="mt-5 space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink-700">Status</label>
-                <select value={status} onChange={(event) => setStatus(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3">
+                <select value={status} onChange={(event) => setStatus(event.target.value)} className="w-full rounded-lg border border-sand-200 bg-white p-3">
                   <option value="new">Ny</option>
                   <option value="received">Mottagen</option>
                   <option value="in_progress">Pågår</option>
@@ -509,7 +509,7 @@ export default function TicketDetailPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink-700">Prioritet</label>
-                <select value={priority} onChange={(event) => setPriority(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3">
+                <select value={priority} onChange={(event) => setPriority(event.target.value)} className="w-full rounded-lg border border-sand-200 bg-white p-3">
                   <option value="low">Låg</option>
                   <option value="normal">Normal</option>
                   <option value="high">Hög</option>
@@ -518,37 +518,37 @@ export default function TicketDetailPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink-700">Ansvarig</label>
-                <select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3">
+                <select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className="w-full rounded-lg border border-sand-200 bg-white p-3">
                   <option value="">Ej tilldelad</option>
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>{member.name || member.email}</option>
                   ))}
                 </select>
               </div>
-              <button disabled={saving} className="w-full rounded-xl bg-petroleum-600 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70">
+              <button disabled={saving} className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70">
                 {saving ? "Sparar..." : "Spara ändringar"}
               </button>
             </div>
           </form>
 
-          <form onSubmit={addComment} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-card">
-            <h2 className="text-xl font-bold text-ink-950">Lägg kommentar</h2>
-            <textarea required rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className="mt-4 w-full rounded-xl border border-sand-200 p-3" placeholder="Skriv nästa åtgärd eller uppdatering..." />
-            <button disabled={saving} className="mt-4 w-full rounded-xl bg-ink-950 px-5 py-3 font-semibold text-white hover:bg-ink-800 disabled:opacity-70">
+          <form onSubmit={addComment} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+            <h2 className="text-xl font-semibold text-ink-950">Lägg kommentar</h2>
+            <textarea required rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className="mt-4 w-full rounded-lg border border-sand-200 p-3" placeholder="Skriv nästa åtgärd eller uppdatering..." />
+            <button disabled={saving} className="mt-4 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">
               {saving ? "Sparar..." : "Lägg till kommentar"}
             </button>
           </form>
 
-          <form onSubmit={uploadAttachment} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-card">
-            <h2 className="text-xl font-bold text-ink-950">Ladda upp bilaga</h2>
+          <form onSubmit={uploadAttachment} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+            <h2 className="text-xl font-semibold text-ink-950">Ladda upp bilaga</h2>
             <p className="mt-2 text-sm text-ink-500">PNG, JPG, WebP, PDF eller TXT upp till 1 MB i dev-läge.</p>
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,application/pdf,text/plain"
               onChange={(event) => setFile(event.target.files?.[0] || null)}
-              className="mt-4 block w-full rounded-xl border border-sand-200 p-3 text-sm"
+              className="mt-4 block w-full rounded-lg border border-sand-200 p-3 text-sm"
             />
-            <button disabled={saving || !file} className="mt-4 w-full rounded-xl bg-ink-950 px-5 py-3 font-semibold text-white hover:bg-ink-800 disabled:opacity-70">
+            <button disabled={saving || !file} className="mt-4 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">
               {saving ? "Laddar upp..." : "Ladda upp"}
             </button>
           </form>
