@@ -189,11 +189,11 @@ export default function FelanmalanPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl animate-fade-in space-y-8">
-      <div className="flex flex-col gap-4 rounded-2xl border border-sand-200 bg-white p-8 shadow-card sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-6xl animate-fade-in space-y-6">
+      <div className="flex flex-col gap-4 rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm sm:p-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Felanmälan</p>
-          <h1 className="text-4xl font-semibold tracking-tight text-ink-950">Mina ärenden</h1>
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Felanmälan</p>
+          <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px] text-ink-950">Mina ärenden</h1>
           <p className="mt-3 max-w-2xl text-ink-600">
             Skapa, följ upp och koppla felanmälningar till rätt fastighet.
           </p>
@@ -217,13 +217,13 @@ export default function FelanmalanPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-        <section className="rounded-2xl border border-sand-200 bg-white p-8 shadow-card">
+        <section className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm sm:p-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-ink-950">Skapa ny felanmälan</h2>
+              <h2 className="text-[22px] font-semibold text-ink-950">Skapa ny felanmälan</h2>
               <p className="mt-2 text-sm text-ink-500">Välj fastighet och beskriv problemet tydligt.</p>
             </div>
-            <Link href="/dashboard/fastigheter" className="rounded-xl border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-50">
+            <Link href="/dashboard/fastigheter" className="rounded-lg border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-700 transition-colors hover:bg-sand-50">
               Fastigheter
             </Link>
           </div>
@@ -232,7 +232,7 @@ export default function FelanmalanPage() {
             <div>
               <label className="mb-1 block text-sm font-medium text-ink-700">Fastighet</label>
               <select
-                className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
+                className="block w-full rounded-lg border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
                 value={propertyId}
                 onChange={(event) => setPropertyId(event.target.value)}
               >
@@ -252,7 +252,7 @@ export default function FelanmalanPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink-700">Kategori</label>
-                <select className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={category} onChange={(event) => setCategory(event.target.value)}>
+                <select className="block w-full rounded-lg border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={category} onChange={(event) => setCategory(event.target.value)}>
                   <option value="other">Övrigt</option>
                   <option value="vvs">VVS</option>
                   <option value="electricity">El</option>
@@ -263,7 +263,7 @@ export default function FelanmalanPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink-700">Prioritet</label>
-                <select className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={priority} onChange={(event) => setPriority(event.target.value)}>
+                <select className="block w-full rounded-lg border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={priority} onChange={(event) => setPriority(event.target.value)}>
                   <option value="low">Låg</option>
                   <option value="normal">Normal</option>
                   <option value="high">Hög</option>
@@ -272,7 +272,7 @@ export default function FelanmalanPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink-700">Ansvarig</label>
-                <select className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)}>
+                <select className="block w-full rounded-lg border border-sand-200 bg-white p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500" value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)}>
                   <option value="">Ej tilldelad</option>
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
@@ -288,7 +288,7 @@ export default function FelanmalanPage() {
                 type="text"
                 required
                 minLength={3}
-                className="block w-full rounded-xl border border-sand-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
+                className="block w-full rounded-lg border border-sand-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Ex. Läckande kran i köket"
@@ -300,7 +300,7 @@ export default function FelanmalanPage() {
                 required
                 minLength={10}
                 rows={4}
-                className="block w-full resize-y rounded-xl border border-sand-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
+                className="block w-full resize-y rounded-lg border border-sand-200 p-3 shadow-inner-sm outline-none transition-colors focus:border-petroleum-500 focus:ring-petroleum-500"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="Beskriv problemet mer ingående..."
@@ -309,32 +309,32 @@ export default function FelanmalanPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-xl bg-petroleum-600 px-8 py-3 font-semibold text-white shadow-card transition-all hover:bg-petroleum-700 hover:shadow-card-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full rounded-lg bg-petroleum-700 px-8 py-3 font-semibold text-white shadow-premium-sm transition-all hover:bg-petroleum-700 hover:shadow-premium-sm disabled:cursor-not-allowed disabled:opacity-70"
             >
               {submitting ? "Skapar ärende..." : "Skicka in ärende"}
             </button>
           </form>
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-card">
+        <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
           <div className="border-b border-sand-100 bg-sand-50/70 p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-ink-950">Dina pågående ärenden</h2>
+                <h2 className="text-lg font-semibold text-ink-950">Dina pågående ärenden</h2>
                 <p className="mt-1 text-sm text-ink-500">Klicka på ett ärende för att se detaljer.</p>
               </div>
-              <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="rounded-xl bg-ink-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink-800">
+              <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="rounded-lg bg-petroleum-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-petroleum-800">
                 Exportera CSV
               </button>
             </div>
             <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-4">
               <input
-                className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500"
+                className="rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Sök titel eller beskrivning"
               />
-              <select className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <select className="rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                 <option value="">Alla statusar</option>
                 <option value="new">Ny</option>
                 <option value="received">Mottagen</option>
@@ -343,14 +343,14 @@ export default function FelanmalanPage() {
                 <option value="completed">Klar</option>
                 <option value="closed">Stängd</option>
               </select>
-              <select className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
+              <select className="rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}>
                 <option value="">Alla prioriteter</option>
                 <option value="low">Låg</option>
                 <option value="normal">Normal</option>
                 <option value="high">Hög</option>
                 <option value="urgent">Akut</option>
               </select>
-              <select className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)}>
+              <select className="rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)}>
                 <option value="">Alla fastigheter</option>
                 {properties.map((property) => (
                   <option key={property.id} value={property.id}>{property.name}</option>
@@ -375,21 +375,21 @@ export default function FelanmalanPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <h3 className="truncate text-lg font-bold text-ink-950">{ticket.title}</h3>
+                      <h3 className="truncate text-lg font-semibold text-ink-950">{ticket.title}</h3>
                       <p className="mt-2 text-xs font-semibold tracking-wide text-petroleum-600">
                         {ticket.property ? `${ticket.property.name} · ${ticket.property.address}` : "Ingen fastighet vald"}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-xs font-bold text-ink-600">
+                        <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-xs font-semibold text-ink-600">
                           {statusLabels[ticket.status] || ticket.status}
                         </span>
-                        <span className="rounded-full border border-petroleum-100 bg-petroleum-50 px-2.5 py-1 text-xs font-bold text-petroleum-600">
+                        <span className="rounded-full border border-petroleum-100 bg-petroleum-50 px-2.5 py-1 text-xs font-semibold text-petroleum-600">
                           {priorityLabels[ticket.priority] || ticket.priority}
                         </span>
-                        <span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-bold text-ink-500">
+                        <span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500">
                           {ticket.assigned_to ? `Ansvarig: ${ticket.assigned_to.name || ticket.assigned_to.email}` : "Ej tilldelad"}
                         </span>
-                        <span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-bold text-ink-500">
+                        <span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500">
                           {ticket._count.comments} kommentarer
                         </span>
                       </div>
@@ -399,7 +399,7 @@ export default function FelanmalanPage() {
                         {ticket.due_date ? ` · SLA ${dateFormatter.format(new Date(ticket.due_date))}` : ""}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full border border-warning-100 bg-warning-50 px-3 py-1 text-xs font-bold text-warning-600">
+                    <span className="shrink-0 rounded-full border border-warning-100 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-600">
                       {statusLabels[ticket.status] || ticket.status}
                     </span>
                   </div>
