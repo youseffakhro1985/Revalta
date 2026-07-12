@@ -48,13 +48,13 @@ export default async function Dashboard() {
   const { user, totalTickets, openTickets, totalProperties, totalMembers, latestTickets } = await getDashboardData();
 
   return (
-    <div className="animate-fade-in-soft space-y-8">
+    <div className="animate-fade-in-soft space-y-6">
       <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
-        <div className="relative p-8 sm:p-10">
+        <div className="relative p-7 sm:p-8">
           <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-sand-50/70 lg:block" />
           <div className="relative max-w-2xl">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Kontrollpanel</p>
-            <h1 className="text-4xl font-semibold tracking-tight text-ink-950">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Kontrollpanel</p>
+            <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px] text-ink-950">
               Välkommen{user.name ? `, ${user.name}` : ""}
             </h1>
             <p className="mt-3 text-lg leading-8 text-ink-600">
@@ -79,7 +79,7 @@ export default async function Dashboard() {
           { label: 'Fastigheter', value: totalProperties, icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
           { label: 'Team', value: totalMembers, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
         ].map((kpi, i) => (
-          <div key={i} className="bg-white p-6 rounded-xl border border-sand-200 shadow-premium-sm flex items-center space-x-4">
+          <div key={i} className="bg-white p-6 rounded-lg border border-sand-200 shadow-premium-sm flex items-center space-x-4">
             <div className="p-3 bg-sand-50 rounded-lg">
               <svg className="w-6 h-6 text-petroleum-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={kpi.icon} />
@@ -87,7 +87,7 @@ export default async function Dashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-ink-600">{kpi.label}</p>
-              <p className="text-2xl font-semibold text-ink-950 mt-1">{kpi.value}</p>
+              <p className="text-[22px] font-semibold text-ink-950 mt-1">{kpi.value}</p>
             </div>
           </div>
         ))}
@@ -103,7 +103,7 @@ export default async function Dashboard() {
               <h2 className="text-xl font-semibold text-ink-950">Senaste ärenden</h2>
               <p className="mt-1 text-sm text-ink-500">Snabb överblick över vad som hänt senast.</p>
             </div>
-            <Link href="/dashboard/felanmalan" className="rounded-xl bg-petroleum-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-petroleum-700">
+            <Link href="/dashboard/felanmalan" className="rounded-lg bg-petroleum-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-petroleum-700">
               Ny felanmälan
             </Link>
           </div>
@@ -141,8 +141,8 @@ export default async function Dashboard() {
         </div>
 
         {/* Mina uppgifter / Genvägar */}
-        <div className="bg-white p-8 rounded-2xl border border-sand-200 shadow-premium-sm">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-sand-100 text-petroleum-600">
+        <div className="bg-white p-7 rounded-2xl sm:p-8 border border-sand-200 shadow-premium-sm">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-sand-100 text-petroleum-600">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
@@ -164,7 +164,7 @@ export default async function Dashboard() {
           </dl>
           <div className="mt-8 pt-6 border-t border-sand-200">
             <p className="text-xs text-ink-400 uppercase tracking-widest font-semibold mb-4">Snabbåtgärder</p>
-            <Link href="/dashboard/fastigheter" className="w-full flex justify-center items-center px-4 py-2 border border-sand-200 bg-sand-50 text-ink-800 text-sm font-semibold rounded-xl hover:bg-sand-100 transition-colors">
+            <Link href="/dashboard/fastigheter" className="w-full flex justify-center items-center px-4 py-2 border border-sand-200 bg-sand-50 text-ink-800 text-sm font-semibold rounded-lg hover:bg-sand-100 transition-colors">
               Gå till fastighetsregister
             </Link>
           </div>
