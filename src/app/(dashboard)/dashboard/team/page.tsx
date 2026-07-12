@@ -120,11 +120,11 @@ export default function TeamPage() {
 
   return (
     <div className="mx-auto max-w-6xl animate-fade-in space-y-8">
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 text-white shadow-card-lg">
-        <div className="bg-[radial-gradient(circle_at_top_right,_rgba(97,114,243,0.35),_transparent_35%)] p-8 sm:p-10">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">Team & behörigheter</p>
-          <h1 className="text-4xl font-extrabold tracking-tight">{companyName}</h1>
-          <p className="mt-3 max-w-2xl text-slate-300">
+      <div className="overflow-hidden rounded-2xl border border-sand-200 bg-white text-ink-950 shadow-card-lg">
+        <div className="p-8 sm:p-10">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-700">Team & behörigheter</p>
+          <h1 className="text-4xl font-semibold tracking-tight">{companyName}</h1>
+          <p className="mt-3 max-w-2xl text-ink-500">
             Hantera roller, ansvar och åtkomst för hela förvaltningsorganisationen.
           </p>
         </div>
@@ -137,63 +137,63 @@ export default function TeamPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
-          <h2 className="text-2xl font-bold text-slate-950">Bjud in teammedlem</h2>
-          <p className="mt-2 text-sm text-slate-500">Skapa en säker inbjudningslänk. Med e-postleverantör skickas länken automatiskt.</p>
+        <section className="rounded-2xl border border-sand-200 bg-white p-8 shadow-card">
+          <h2 className="text-2xl font-bold text-ink-950">Bjud in teammedlem</h2>
+          <p className="mt-2 text-sm text-ink-500">Skapa en säker inbjudningslänk. Med e-postleverantör skickas länken automatiskt.</p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-5">
             <fieldset disabled={!canManage} className="space-y-5 disabled:opacity-60">
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Namn</label>
-                <input className="block w-full rounded-xl border border-slate-200 p-3 shadow-inner-sm outline-none focus:border-brand-500" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex. Sara Tekniker" />
+                <label className="mb-1 block text-sm font-medium text-ink-700">Namn</label>
+                <input className="block w-full rounded-xl border border-sand-200 p-3 shadow-inner-sm outline-none focus:border-petroleum-500" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex. Sara Tekniker" />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">E-post</label>
-                <input type="email" required className="block w-full rounded-xl border border-slate-200 p-3 shadow-inner-sm outline-none focus:border-brand-500" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="sara@exempel.se" />
+                <label className="mb-1 block text-sm font-medium text-ink-700">E-post</label>
+                <input type="email" required className="block w-full rounded-xl border border-sand-200 p-3 shadow-inner-sm outline-none focus:border-petroleum-500" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="sara@exempel.se" />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Roll</label>
-                <select className="block w-full rounded-xl border border-slate-200 bg-white p-3 shadow-inner-sm outline-none focus:border-brand-500" value={role} onChange={(event) => setRole(event.target.value)}>
+                <label className="mb-1 block text-sm font-medium text-ink-700">Roll</label>
+                <select className="block w-full rounded-xl border border-sand-200 bg-white p-3 shadow-inner-sm outline-none focus:border-petroleum-500" value={role} onChange={(event) => setRole(event.target.value)}>
                   <option value="admin">Admin</option>
                   <option value="manager">Förvaltare</option>
                   <option value="technician">Tekniker</option>
                   <option value="viewer">Läsbehörig</option>
                 </select>
               </div>
-              <button disabled={submitting || !canManage} className="w-full rounded-xl bg-brand-600 px-8 py-3 font-semibold text-white shadow-card transition-all hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70">
+              <button disabled={submitting || !canManage} className="w-full rounded-xl bg-petroleum-600 px-8 py-3 font-semibold text-white shadow-card transition-all hover:bg-petroleum-700 disabled:cursor-not-allowed disabled:opacity-70">
                 {submitting ? "Skapar..." : "Skapa inbjudan"}
               </button>
             </fieldset>
           </form>
           {inviteUrl && (
-            <div className="mt-5 rounded-2xl border border-brand-100 bg-brand-50 p-4">
-              <p className="text-sm font-bold text-brand-700">Inbjudningslänk</p>
-              <p className="mt-2 break-all text-sm text-brand-700">{inviteUrl}</p>
+            <div className="mt-5 rounded-2xl border border-petroleum-100 bg-petroleum-50 p-4">
+              <p className="text-sm font-bold text-petroleum-700">Inbjudningslänk</p>
+              <p className="mt-2 break-all text-sm text-petroleum-700">{inviteUrl}</p>
             </div>
           )}
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
-          <div className="border-b border-slate-100 bg-slate-50/70 p-6">
-            <h2 className="text-lg font-bold text-slate-950">Team</h2>
-            <p className="mt-1 text-sm text-slate-500">Roller och antal tilldelade ärenden.</p>
+        <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-card">
+          <div className="border-b border-sand-100 bg-sand-50/70 p-6">
+            <h2 className="text-lg font-bold text-ink-950">Team</h2>
+            <p className="mt-1 text-sm text-ink-500">Roller och antal tilldelade ärenden.</p>
           </div>
           {loading ? (
             <div className="space-y-4 p-6">
-              {[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-slate-100" />)}
+              {[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-sand-100" />)}
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-sand-100">
               {members.map((member) => (
                 <article key={member.id} className="p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-950">{member.name || member.email}</h3>
-                      <p className="mt-1 text-sm text-slate-500">{member.email}</p>
+                      <h3 className="text-lg font-bold text-ink-950">{member.name || member.email}</h3>
+                      <p className="mt-1 text-sm text-ink-500">{member.email}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-bold text-brand-600">{roleLabels[member.role] || member.role}</span>
-                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600">{member._count.assigned_tickets} tilldelade</span>
+                      <span className="rounded-full border border-petroleum-100 bg-petroleum-50 px-3 py-1 text-xs font-bold text-petroleum-600">{roleLabels[member.role] || member.role}</span>
+                      <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-bold text-ink-600">{member._count.assigned_tickets} tilldelade</span>
                     </div>
                   </div>
                 </article>
@@ -203,21 +203,21 @@ export default function TeamPage() {
         </section>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
-        <div className="border-b border-slate-100 bg-slate-50/70 p-6">
-          <h2 className="text-lg font-bold text-slate-950">Senaste inbjudningar</h2>
-          <p className="mt-1 text-sm text-slate-500">Säkra länkar som kan accepteras av nya teammedlemmar.</p>
+      <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-card">
+        <div className="border-b border-sand-100 bg-sand-50/70 p-6">
+          <h2 className="text-lg font-bold text-ink-950">Senaste inbjudningar</h2>
+          <p className="mt-1 text-sm text-ink-500">Säkra länkar som kan accepteras av nya teammedlemmar.</p>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-sand-100">
           {invites.length > 0 ? invites.map((invite) => (
             <article key={invite.id} className="p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h3 className="font-bold text-slate-950">{invite.name || invite.email}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{invite.email}</p>
+                  <h3 className="font-bold text-ink-950">{invite.name || invite.email}</h3>
+                  <p className="mt-1 text-sm text-ink-500">{invite.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1 text-xs font-bold text-brand-600">{roleLabels[invite.role] || invite.role}</span>
+                  <span className="rounded-full border border-petroleum-100 bg-petroleum-50 px-3 py-1 text-xs font-bold text-petroleum-600">{roleLabels[invite.role] || invite.role}</span>
                   <span className={`rounded-full border px-3 py-1 text-xs font-bold ${invite.accepted_at ? "border-success-500 bg-success-50 text-success-600" : "border-warning-500 bg-warning-50 text-warning-600"}`}>
                     {invite.accepted_at ? "Accepterad" : "Väntar"}
                   </span>
@@ -225,7 +225,7 @@ export default function TeamPage() {
               </div>
             </article>
           )) : (
-            <div className="p-8 text-sm text-slate-500">Inga inbjudningar ännu.</div>
+            <div className="p-8 text-sm text-ink-500">Inga inbjudningar ännu.</div>
           )}
         </div>
       </section>
