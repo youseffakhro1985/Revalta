@@ -49,9 +49,9 @@ export default async function Dashboard() {
 
   return (
     <div className="animate-fade-in-soft space-y-8">
-      <header className="overflow-hidden rounded-3xl border border-sand-200 bg-white shadow-premium-sm">
+      <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
         <div className="relative p-8 sm:p-10">
-          <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-gradient-to-l from-sand-100 to-transparent lg:block" />
+          <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-sand-50/70 lg:block" />
           <div className="relative max-w-2xl">
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Kontrollpanel</p>
             <h1 className="text-4xl font-semibold tracking-tight text-ink-950">
