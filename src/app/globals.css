@@ -7,8 +7,54 @@
     --background: 60 20% 98%;
     --foreground: 0 0% 10%;
   }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+  }
+
+  * {
+    border-color: theme("colors.sand.200");
+  }
+
+  body {
+    min-width: 320px;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    text-rendering: optimizeLegibility;
+  }
+
+  :focus-visible {
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
 }
-body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+
+@layer components {
+  .dashboard-surface h1,
+  .dashboard-surface h2,
+  .dashboard-surface h3 {
+    font-family: var(--font-display), Manrope, Inter, system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  .dashboard-surface input,
+  .dashboard-surface select,
+  .dashboard-surface textarea {
+    background-color: #ffffff;
+  }
 }

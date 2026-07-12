@@ -76,22 +76,32 @@ const config: Config = {
         },
         success: {
           50:  "#f0fdf4",
+          100: "#dcfce7",
+          200: "#bbf7d0",
           500: "#22c55e",
           600: "#16a34a",
+          700: "#15803d",
         },
         warning: {
           50:  "#fffbeb",
+          100: "#fef3c7",
+          200: "#fde68a",
           500: "#f59e0b",
           600: "#d97706",
+          700: "#b45309",
         },
         danger: {
           50:  "#fef2f2",
+          100: "#fee2e2",
+          200: "#fecaca",
           500: "#ef4444",
           600: "#dc2626",
+          700: "#b91c1c",
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["var(--font-sans)", "Inter", "system-ui", "-apple-system", "sans-serif"],
+        display: ["var(--font-display)", "Manrope", "Inter", "system-ui", "sans-serif"],
       },
       fontSize: {
         "2xs": ["0.625rem", { lineHeight: "0.875rem" }],

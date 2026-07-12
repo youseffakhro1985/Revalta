@@ -147,12 +147,12 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl animate-fade-in space-y-8">
-      <header className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 text-white shadow-card-lg">
-        <div className="bg-[radial-gradient(circle_at_top_right,_rgba(97,114,243,0.35),_transparent_35%)] p-8 sm:p-10">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">Billing</p>
-          <h1 className="text-4xl font-extrabold tracking-tight">Planer och kapacitet</h1>
-          <p className="mt-3 max-w-2xl text-slate-300">
+    <div className="mx-auto max-w-6xl animate-fade-in space-y-6">
+      <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white text-ink-950 shadow-premium-md">
+        <div className="p-7 sm:p-8">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Abonnemang</p>
+          <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px]">Planer och kapacitet</h1>
+          <p className="mt-3 max-w-2xl text-ink-500">
             Hantera abonnemangsplaner i Revalta. I utvecklingsläge loggas planbyten som Stripe-mockar.
           </p>
         </div>
@@ -167,31 +167,31 @@ export default function BillingPage() {
       {billing ? (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-              <p className="text-sm font-medium text-slate-500">Aktiv plan</p>
-              <p className="mt-3 text-2xl font-extrabold text-slate-950">{billing.plans[billing.currentPlan]?.label || billing.currentPlan}</p>
+            <div className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+              <p className="text-sm font-medium text-ink-500">Aktiv plan</p>
+              <p className="mt-3 text-[22px] font-semibold text-ink-950">{billing.plans[billing.currentPlan]?.label || billing.currentPlan}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-              <p className="text-sm font-medium text-slate-500">Fastigheter</p>
-              <p className="mt-3 text-2xl font-extrabold text-brand-600">{billing.usage.properties}</p>
+            <div className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+              <p className="text-sm font-medium text-ink-500">Fastigheter</p>
+              <p className="mt-3 text-[22px] font-semibold text-petroleum-600">{billing.usage.properties}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-              <p className="text-sm font-medium text-slate-500">Team</p>
-              <p className="mt-3 text-2xl font-extrabold text-slate-950">{billing.usage.teamMembers}</p>
+            <div className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+              <p className="text-sm font-medium text-ink-500">Team</p>
+              <p className="mt-3 text-[22px] font-semibold text-ink-950">{billing.usage.teamMembers}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-              <p className="text-sm font-medium text-slate-500">Stripe</p>
-              <p className={`mt-3 text-lg font-bold ${billing.stripeConfigured ? "text-success-600" : "text-warning-600"}`}>
+            <div className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+              <p className="text-sm font-medium text-ink-500">Stripe</p>
+              <p className={`mt-3 text-lg font-semibold ${billing.stripeConfigured ? "text-success-600" : "text-warning-600"}`}>
                 {billing.stripeConfigured ? "Live redo" : "Mockläge"}
               </p>
               {billing.subscriptionStatus && (
-                <p className="mt-2 text-xs font-medium text-slate-500">Subscription: {billing.subscriptionStatus}</p>
+                <p className="mt-2 text-xs font-medium text-ink-500">Status: {billing.subscriptionStatus}</p>
               )}
               <button
                 type="button"
                 onClick={openCustomerPortal}
                 disabled={openingPortal || !billing.canManage}
-                className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                className="mt-4 rounded-lg border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-60"
               >
                 {openingPortal ? "Öppnar..." : "Kundportal"}
               </button>
@@ -200,11 +200,11 @@ export default function BillingPage() {
 
           <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             {Object.entries(billing.plans).map(([key, plan]) => (
-              <article key={key} className={`rounded-3xl border bg-white p-7 shadow-card ${billing.currentPlan === key ? "border-brand-300 ring-4 ring-brand-50" : "border-slate-200"}`}>
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">{plan.label}</p>
-                <p className="mt-4 text-4xl font-extrabold text-slate-950">{plan.price} kr</p>
-                <p className="mt-1 text-sm text-slate-500">per månad</p>
-                <ul className="mt-6 space-y-3 text-sm text-slate-600">
+              <article key={key} className={`rounded-2xl border bg-white p-7 shadow-premium-sm ${billing.currentPlan === key ? "border-petroleum-300 ring-4 ring-petroleum-50" : "border-sand-200"}`}>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">{plan.label}</p>
+                <p className="mt-4 text-[30px] font-semibold tracking-[-0.03em] text-ink-950">{plan.price} kr</p>
+                <p className="mt-1 text-sm text-ink-500">per månad</p>
+                <ul className="mt-6 space-y-3 text-sm text-ink-600">
                   <li>{plan.propertyLimit} fastigheter</li>
                   <li>{plan.teamLimit} teammedlemmar</li>
                   <li>Audit log och integration events</li>
@@ -214,7 +214,7 @@ export default function BillingPage() {
                   type="button"
                   disabled={!billing.canManage || savingPlan === key || billing.currentPlan === key}
                   onClick={() => changePlan(key)}
-                  className="mt-7 w-full rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-7 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white transition-colors hover:bg-petroleum-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {billing.currentPlan === key ? "Aktiv plan" : savingPlan === key ? "Uppdaterar..." : "Byt plan"}
                 </button>
@@ -223,7 +223,7 @@ export default function BillingPage() {
                     type="button"
                     disabled={!billing.canManage || checkoutPlan === key}
                     onClick={() => startCheckout(key)}
-                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-800 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                    className="mt-3 w-full rounded-lg border border-sand-200 bg-white px-5 py-3 font-semibold text-ink-800 transition-colors hover:bg-sand-50 disabled:opacity-60"
                   >
                     {checkoutPlan === key ? "Startar..." : "Starta Stripe Checkout"}
                   </button>
@@ -233,7 +233,7 @@ export default function BillingPage() {
           </section>
         </>
       ) : (
-        <div className="h-64 animate-pulse rounded-3xl bg-slate-100" />
+        <div className="h-64 animate-pulse rounded-2xl bg-sand-100" />
       )}
     </div>
   );
