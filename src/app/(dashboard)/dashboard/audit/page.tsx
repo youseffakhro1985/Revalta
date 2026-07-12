@@ -59,10 +59,10 @@ export default function AuditPage() {
   }, [router]);
 
   return (
-    <div className="mx-auto max-w-6xl animate-fade-in space-y-8">
-      <header className="rounded-2xl border border-sand-200 bg-white p-8 shadow-card">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Händelselogg</p>
-        <h1 className="text-4xl font-semibold tracking-tight text-ink-950">Spårbarhet och kontroll</h1>
+    <div className="mx-auto max-w-6xl animate-fade-in space-y-6">
+      <header className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm sm:p-8">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Händelselogg</p>
+        <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px] text-ink-950">Spårbarhet och kontroll</h1>
         <p className="mt-3 max-w-2xl text-ink-600">
           Följ teamets viktigaste händelser: skapade fastigheter, ärenden, statusändringar, kommentarer och teamförändringar.
         </p>
@@ -70,9 +70,9 @@ export default function AuditPage() {
 
       {error && <div className="rounded-2xl border border-danger-500 bg-danger-50 p-4 text-sm font-medium text-danger-600">{error}</div>}
 
-      <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-card">
+      <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
         <div className="border-b border-sand-100 bg-sand-50/70 p-6">
-          <h2 className="text-lg font-bold text-ink-950">Senaste händelser</h2>
+          <h2 className="text-lg font-semibold text-ink-950">Senaste händelser</h2>
         </div>
         {loading ? (
           <div className="space-y-4 p-6">
@@ -84,18 +84,18 @@ export default function AuditPage() {
               <article key={log.id} className="p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="text-lg font-bold text-ink-950">{log.action}</h3>
+                    <h3 className="text-lg font-semibold text-ink-950">{log.action}</h3>
                     <p className="mt-1 text-sm text-ink-500">
                       {log.entity_type}
                       {log.entity_id ? ` #${log.entity_id.slice(0, 8)}` : ""} · {log.actor?.name || log.actor?.email || "System"}
                     </p>
                     {log.metadata && (
-                      <p className="mt-3 max-w-3xl rounded-xl bg-sand-50 p-3 text-xs leading-5 text-ink-500">
+                      <p className="mt-3 max-w-3xl rounded-lg bg-sand-50 p-3 text-xs leading-5 text-ink-500">
                         {JSON.stringify(log.metadata)}
                       </p>
                     )}
                   </div>
-                  <span className="shrink-0 rounded-full border border-sand-200 bg-white px-3 py-1 text-xs font-bold text-ink-500">
+                  <span className="shrink-0 rounded-full border border-sand-200 bg-white px-3 py-1 text-xs font-semibold text-ink-500">
                     {dateFormatter.format(new Date(log.created_at))}
                   </span>
                 </div>
