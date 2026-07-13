@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BarChart3,
   BellRing,
   BriefcaseBusiness,
   Building2,
@@ -51,6 +52,7 @@ const navigation = [
   {
     label: "Administration",
     items: [
+      { href: "/dashboard/rapporter", label: "Rapporter", icon: BarChart3 },
       { href: "/dashboard/notiser", label: "Notiser", icon: BellRing },
       { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock },
       { href: "/dashboard/drift", label: "Driftstatus", icon: Activity },
