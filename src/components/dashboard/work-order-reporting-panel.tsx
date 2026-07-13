@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CheckCircle2, FileCheck2, FileText, ReceiptText, Signature } from "lucide-react";
+import { BadgeCheck, CheckCircle2, ExternalLink, FileCheck2, FileText, ReceiptText, Signature } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type SignatureItem = {
@@ -40,6 +41,12 @@ const roleLabels: Record<string, string> = {
   executor: "Utförare",
   contractor: "Entreprenör",
   customer: "Beställare",
+};
+
+const statusLabels: Record<string, string> = {
+  draft: "Utkast",
+  approved: "Godkänd",
+  exported: "Exporterad",
 };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
@@ -98,6 +105,9 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
 
   if (loading) return <div className="h-80 animate-pulse rounded-2xl bg-sand-100" />;
 
+  const approvedReports = reports.filter((item) => item.status === "approved").length;
+  const approvedInvoices = invoiceBases.filter((item) => item.status === "approved" || item.status === "exported").length;
+
   return (
     <div className="space-y-6">
       {(error || success) ? <div aria-live="polite"><InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert></div> : null}
@@ -107,10 +117,10 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
           <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Signaturer</p><p className="mt-2 text-2xl font-semibold text-ink-950">{signatures.length}/3</p><p className="mt-1 text-xs text-ink-400">Utförare, entreprenör och beställare</p></div><Signature className="h-5 w-5 text-petroleum-700" /></div>
         </article>
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Rapportversioner</p><p className="mt-2 text-2xl font-semibold text-ink-950">{reports.length}</p><p className="mt-1 text-xs text-ink-400">Frysta och spårbara underlag</p></div><FileCheck2 className="h-5 w-5 text-petroleum-700" /></div>
+          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Godkända rapporter</p><p className="mt-2 text-2xl font-semibold text-ink-950">{approvedReports}/{reports.length}</p><p className="mt-1 text-xs text-ink-400">Frysta och spårbara underlag</p></div><FileCheck2 className="h-5 w-5 text-petroleum-700" /></div>
         </article>
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Fakturaunderlag</p><p className="mt-2 text-2xl font-semibold text-ink-950">{invoiceBases.length}</p><p className="mt-1 text-xs text-ink-400">Automatisk moms och totalsumma</p></div><ReceiptText className="h-5 w-5 text-petroleum-700" /></div>
+          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Klara för fakturering</p><p className="mt-2 text-2xl font-semibold text-ink-950">{approvedInvoices}/{invoiceBases.length}</p><p className="mt-1 text-xs text-ink-400">Godkända ekonomiska underlag</p></div><ReceiptText className="h-5 w-5 text-petroleum-700" /></div>
         </article>
       </section>
 
@@ -148,7 +158,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
         <Panel title="Rapport och fakturering" description="Skapa frysta underlag från arbetsorderns aktuella innehåll.">
           <div className="space-y-4">
             <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
-              <div className="flex items-start gap-3"><FileText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Arbetsrapport</h3><p className="mt-1 text-sm leading-6 text-ink-500">Fryser arbetsorder, checklista, registreringar, dokument och kostnadsuppgifter i en ny version.</p></div></div>
+              <div className="flex items-start gap-3"><FileText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Arbetsrapport</h3><p className="mt-1 text-sm leading-6 text-ink-500">Fryser arbetsorder, checklista, registreringar, dokument, signaturer och kostnadsuppgifter i en ny version.</p></div></div>
               <button type="button" disabled={saving} onClick={() => void post({ action: "report.create" }, "En ny arbetsrapport har skapats.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa arbetsrapport"}</button>
             </div>
             <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
@@ -160,12 +170,12 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="Rapportversioner" description="Historik över frysta arbetsrapporter." bodyClassName="p-0">
-          {reports.length === 0 ? <EmptyState title="Ingen arbetsrapport skapad" description="Skapa en rapport när arbetsordern är redo för granskning." /> : <div className="divide-y divide-sand-100">{reports.map((report) => <article key={report.id} className="flex items-center justify-between gap-4 p-5"><div><p className="font-semibold text-ink-900">{report.title}</p><p className="mt-1 text-xs text-ink-400">Version {report.version} · {dateTime.format(new Date(report.created_at))}</p></div><span className="rounded-full bg-sand-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{report.status}</span></article>)}</div>}
+        <Panel title="Rapportversioner" description="Granska, skriv ut och godkänn frysta arbetsrapporter." bodyClassName="p-0">
+          {reports.length === 0 ? <EmptyState title="Ingen arbetsrapport skapad" description="Skapa en rapport när arbetsordern är redo för granskning." /> : <div className="divide-y divide-sand-100">{reports.map((report) => <article key={report.id} className="p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-ink-900">{report.title}</p><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${report.status === "approved" ? "bg-petroleum-50 text-petroleum-800" : "bg-sand-100 text-ink-600"}`}>{statusLabels[report.status] || report.status}</span></div><p className="mt-1 text-xs text-ink-400">Version {report.version} · {dateTime.format(new Date(report.created_at))}</p>{report.approved_at ? <p className="mt-1 text-xs font-medium text-petroleum-700">Godkänd {dateTime.format(new Date(report.approved_at))}</p> : null}</div><div className="flex flex-wrap gap-2"><Link href={`/arbetsrapport/${report.id}`} target="_blank" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-3 text-xs font-semibold text-ink-700 hover:border-petroleum-300 hover:text-petroleum-800"><ExternalLink className="h-3.5 w-3.5" />Öppna rapport</Link>{report.status !== "approved" ? <button type="button" disabled={saving} onClick={() => void post({ action: "report.approve", reportId: report.id }, "Arbetsrapporten har godkänts.")} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-3 text-xs font-semibold text-white hover:bg-petroleum-900 disabled:opacity-60"><BadgeCheck className="h-3.5 w-3.5" />Godkänn</button> : null}</div></div></article>)}</div>}
         </Panel>
 
-        <Panel title="Fakturaunderlag" description="Ekonomiska underlag med referens och moms." bodyClassName="p-0">
-          {invoiceBases.length === 0 ? <EmptyState title="Inget fakturaunderlag skapat" description="Skapa underlag när tid och kostnader är färdigregistrerade." /> : <div className="divide-y divide-sand-100">{invoiceBases.map((invoice) => <article key={invoice.id} className="p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-semibold text-ink-900">{invoice.reference}</p><p className="mt-1 text-xs text-ink-400">{dateTime.format(new Date(invoice.created_at))} · Moms {invoice.vat_rate}%</p></div><p className="text-lg font-semibold text-petroleum-800">{money.format(invoice.total)}</p></div><div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-sand-50 p-3 text-xs"><div><p className="text-ink-400">Exkl. moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.subtotal)}</p></div><div><p className="text-ink-400">Moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.vat_amount)}</p></div><div><p className="text-ink-400">Status</p><p className="mt-1 font-semibold text-ink-800">{invoice.status}</p></div></div></article>)}</div>}
+        <Panel title="Fakturaunderlag" description="Granska och godkänn ekonomiska underlag för fakturering." bodyClassName="p-0">
+          {invoiceBases.length === 0 ? <EmptyState title="Inget fakturaunderlag skapat" description="Skapa underlag när tid och kostnader är färdigregistrerade." /> : <div className="divide-y divide-sand-100">{invoiceBases.map((invoice) => <article key={invoice.id} className="p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-ink-900">{invoice.reference}</p><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${invoice.status === "approved" || invoice.status === "exported" ? "bg-petroleum-50 text-petroleum-800" : "bg-sand-100 text-ink-600"}`}>{statusLabels[invoice.status] || invoice.status}</span></div><p className="mt-1 text-xs text-ink-400">{dateTime.format(new Date(invoice.created_at))} · Moms {invoice.vat_rate}%</p>{invoice.approved_at ? <p className="mt-1 text-xs font-medium text-petroleum-700">Godkänt {dateTime.format(new Date(invoice.approved_at))}</p> : null}</div><p className="text-lg font-semibold text-petroleum-800">{money.format(invoice.total)}</p></div><div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-sand-50 p-3 text-xs"><div><p className="text-ink-400">Exkl. moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.subtotal)}</p></div><div><p className="text-ink-400">Moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.vat_amount)}</p></div><div><p className="text-ink-400">Totalt</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.total)}</p></div></div>{invoice.status === "draft" ? <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.approve", invoiceId: invoice.id }, "Fakturaunderlaget är godkänt för fakturering.")} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 text-xs font-semibold text-white hover:bg-petroleum-900 disabled:opacity-60"><BadgeCheck className="h-3.5 w-3.5" />Godkänn för fakturering</button> : null}</article>)}</div>}
         </Panel>
       </div>
     </div>
