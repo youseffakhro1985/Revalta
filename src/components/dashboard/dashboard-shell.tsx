@@ -14,6 +14,7 @@ import {
   FileArchive,
   FileClock,
   Hammer,
+  MessageSquareText,
   Plug,
   Settings,
   ShieldCheck,
@@ -39,6 +40,7 @@ const navigation = [
   {
     label: "Organisation",
     items: [
+      { href: "/dashboard/boendeportal", label: "Boendeportal", icon: MessageSquareText },
       { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness },
       { href: "/dashboard/team", label: "Team", icon: Users },
       { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck },
