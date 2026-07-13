@@ -28,6 +28,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  WalletCards,
   Wrench,
 } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
@@ -67,6 +68,7 @@ const navigation = [
   {
     label: "Administration",
     items: [
+      { href: "/dashboard/budget", label: "Budget & prognos", icon: WalletCards },
       { href: "/dashboard/rapporter", label: "Rapporter", icon: BarChart3 },
       { href: "/dashboard/notiser", label: "Notiser", icon: BellRing },
       { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock },
