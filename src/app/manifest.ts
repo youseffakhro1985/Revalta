@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
         src: "/icons/revalta-icon.svg",
         sizes: "any",
         type: "image/svg+xml",
-        purpose: "any maskable",
+        purpose: "any",
       },
     ],
   };
