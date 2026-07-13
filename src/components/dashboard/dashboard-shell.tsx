@@ -11,6 +11,7 @@ import {
   FileClock,
   Plug,
   Settings,
+  ShieldCheck,
   Users,
   Wrench,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const navigation = [
     label: "Organisation",
     items: [
       { href: "/dashboard/team", label: "Team", icon: Users },
+      { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck },
       { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug },
     ],
   },
