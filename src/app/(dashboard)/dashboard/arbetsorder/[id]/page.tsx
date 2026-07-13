@@ -7,6 +7,7 @@ import { ArrowLeft, Banknote, CalendarClock, FolderKanban, MapPin, UserRound } f
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
+import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
 
 type WorkOrder = {
   id: string; title: string; description: string; status: string; priority: string;
@@ -100,6 +101,7 @@ export default function WorkOrderDetailPage() {
       <OperationalActivityPanel entityType="work_order" entityId={workOrder.id} />
     </section>
 
+    <WorkOrderExecutionPanel workOrderId={workOrder.id} />
     <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
   </div>;
 }
