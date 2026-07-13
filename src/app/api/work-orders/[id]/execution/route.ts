@@ -48,6 +48,12 @@ type SlaRow = {
   sla_status: string;
 };
 
+type CompletionRow = {
+  required_incomplete: number;
+  before_photos: number;
+  after_photos: number;
+};
+
 function optionalDate(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   const parsed = new Date(String(value));
@@ -67,6 +73,29 @@ async function resolveWorkOrder(id: string, companyId: string) {
   });
 }
 
+async function getCompletionState(id: string, companyId: string) {
+  const rows = await db.$queryRaw<CompletionRow[]>(Prisma.sql`
+    SELECT
+      (SELECT COUNT(*)::integer
+       FROM "WorkOrderChecklistItem"
+       WHERE "company_id" = ${companyId}
+         AND "work_order_id" = ${id}
+         AND "is_required" = true
+         AND "completed_at" IS NULL) AS "required_incomplete",
+      (SELECT COUNT(*)::integer
+       FROM "OperationalDocument"
+       WHERE "company_id" = ${companyId}
+         AND "work_order_id" = ${id}
+         AND "category" = 'before_photo') AS "before_photos",
+      (SELECT COUNT(*)::integer
+       FROM "OperationalDocument"
+       WHERE "company_id" = ${companyId}
+         AND "work_order_id" = ${id}
+         AND "category" = 'after_photo') AS "after_photos"
+  `);
+  return rows[0] ?? { required_incomplete: 0, before_photos: 0, after_photos: 0 };
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -79,7 +108,7 @@ export async function GET(
   const workOrder = await resolveWorkOrder(id, user.company_id);
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const [checklist, entries, summaries, slaRows] = await Promise.all([
+  const [checklist, entries, summaries, slaRows, completion] = await Promise.all([
     db.$queryRaw<ChecklistRow[]>(Prisma.sql`
       SELECT "id", "title", "description", "is_required", "sort_order", "completed_at", "completed_by_id", "created_at"
       FROM "WorkOrderChecklistItem"
@@ -114,6 +143,7 @@ export async function GET(
       WHERE "id" = ${id} AND "company_id" = ${user.company_id}
       LIMIT 1
     `),
+    getCompletionState(id, user.company_id),
   ]);
 
   return NextResponse.json({
@@ -122,6 +152,7 @@ export async function GET(
     entries,
     summary: summaries[0] ?? { total_minutes: 0, material_cost: 0, travel_cost: 0, external_cost: 0, total_cost: 0 },
     sla: slaRows[0] ?? { response_due_at: null, completion_due_at: null, responded_at: null, sla_status: "not_set" },
+    completion,
   });
 }
 
@@ -254,6 +285,60 @@ export async function POST(
       metadata: { responseDueAt, completionDueAt, respondedAt, slaStatus },
     });
     return NextResponse.json({ success: true });
+  }
+
+  if (action === "completion.finalize") {
+    if (workOrder.status === "completed") {
+      return NextResponse.json({ error: "Arbetsordern är redan slutförd" }, { status: 409 });
+    }
+
+    const completion = await getCompletionState(id, user.company_id);
+    if (completion.required_incomplete > 0) {
+      return NextResponse.json({ error: `${completion.required_incomplete} obligatoriska kontrollpunkter återstår` }, { status: 400 });
+    }
+    if (completion.after_photos < 1) {
+      return NextResponse.json({ error: "Ladda upp minst en efterbild innan arbetsordern slutförs" }, { status: 400 });
+    }
+
+    const totals = await db.$queryRaw<{ total_cost: number }[]>(Prisma.sql`
+      SELECT COALESCE(SUM("total_amount"), 0)::double precision AS "total_cost"
+      FROM "WorkOrderExecutionEntry"
+      WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+    `);
+    const actualCost = totals[0]?.total_cost ?? 0;
+    const completedAt = new Date();
+    const slaRows = await db.$queryRaw<{ completion_due_at: Date | null }[]>(Prisma.sql`
+      SELECT "completion_due_at"
+      FROM "WorkOrder"
+      WHERE "id" = ${id} AND "company_id" = ${user.company_id}
+      LIMIT 1
+    `);
+    const completionDueAt = slaRows[0]?.completion_due_at ?? null;
+    const finalSlaStatus = completionDueAt && completedAt > completionDueAt ? "breached" : completionDueAt ? "met" : "not_set";
+
+    await db.$executeRaw(Prisma.sql`
+      UPDATE "WorkOrder"
+      SET "status" = 'completed',
+          "completed_at" = ${completedAt},
+          "actual_cost" = ${actualCost},
+          "sla_status" = ${finalSlaStatus},
+          "updated_at" = CURRENT_TIMESTAMP
+      WHERE "id" = ${id} AND "company_id" = ${user.company_id}
+    `);
+
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: "work_order.completed",
+      metadata: {
+        actualCost,
+        slaStatus: finalSlaStatus,
+        beforePhotos: completion.before_photos,
+        afterPhotos: completion.after_photos,
+      },
+    });
+
+    return NextResponse.json({ success: true, actualCost, slaStatus: finalSlaStatus });
   }
 
   return NextResponse.json({ error: "Åtgärden stöds inte" }, { status: 400 });
