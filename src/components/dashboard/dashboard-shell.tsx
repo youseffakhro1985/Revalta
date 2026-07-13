@@ -19,6 +19,7 @@ import {
   Hammer,
   MessageSquareText,
   Plug,
+  ReceiptText,
   Settings,
   ShieldCheck,
   Users,
@@ -40,6 +41,7 @@ const navigation = [
       { href: "/dashboard/ronder", label: "Ronder", icon: ClipboardCheck },
       { href: "/dashboard/underhall", label: "Underhåll", icon: Hammer },
       { href: "/dashboard/dokument", label: "Dokument", icon: FileArchive },
+      { href: "/dashboard/offerter", label: "Offerter", icon: ReceiptText },
     ],
   },
   {
