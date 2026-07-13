@@ -55,6 +55,7 @@ const navigation = [
       { href: "/dashboard/hyresavisering", label: "Hyresavisering", icon: HandCoins },
       { href: "/dashboard/underhall", label: "Underhåll", icon: Hammer },
       { href: "/dashboard/energi", label: "Energi", icon: Gauge },
+      { href: "/dashboard/imd", label: "Mätare & IMD", icon: Gauge },
       { href: "/dashboard/dokument", label: "Dokument", icon: FileArchive },
       { href: "/dashboard/offerter", label: "Offerter", icon: ReceiptText },
     ],
