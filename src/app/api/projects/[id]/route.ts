@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -35,20 +36,7 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
 
   const body = await request.json();
-  const data: {
-    name?: string;
-    description?: string | null;
-    status?: string;
-    risk?: string;
-    contractor?: string | null;
-    manager_id?: string | null;
-    start_date?: Date | null;
-    end_date?: Date | null;
-    budget?: number | null;
-    forecast?: number | null;
-    actual?: number | null;
-    completed_at?: Date | null;
-  } = {};
+  const data: Prisma.ProjectUncheckedUpdateInput = {};
 
   if (body.name !== undefined) {
     const name = String(body.name).trim();
@@ -92,7 +80,10 @@ export async function PATCH(
     if (value === undefined) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 });
     data.end_date = value;
   }
-  if (data.start_date && data.end_date && data.end_date < data.start_date) {
+
+  const startDate = data.start_date instanceof Date ? data.start_date : null;
+  const endDate = data.end_date instanceof Date ? data.end_date : null;
+  if (startDate && endDate && endDate < startDate) {
     return NextResponse.json({ error: "Slutdatum kan inte vara före startdatum" }, { status: 400 });
   }
 
@@ -104,7 +95,7 @@ export async function PATCH(
     if (body[bodyKey] !== undefined) {
       const value = parseOptionalMoney(body[bodyKey]);
       if (value === undefined) return NextResponse.json({ error: `Ogiltigt ${label}` }, { status: 400 });
-      data[dataKey] = value;
+      data[dataKey] = value ?? 0;
     }
   }
 
