@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BriefcaseBusiness,
   Building2,
   CircleGauge,
   ClipboardCheck,
@@ -36,6 +37,7 @@ const navigation = [
   {
     label: "Organisation",
     items: [
+      { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness },
       { href: "/dashboard/team", label: "Team", icon: Users },
       { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck },
       { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug },
@@ -78,9 +80,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5">
           {navigation.map((group, groupIndex) => (
             <div key={group.label} className={groupIndex > 0 ? "mt-7" : ""}>
-              <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-400">
-                {group.label}
-              </p>
+              <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-400">{group.label}</p>
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
@@ -90,11 +90,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       key={item.href}
                       href={item.href}
                       aria-current={active ? "page" : undefined}
-                      className={`flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors ${
-                        active
-                          ? "border border-sand-200 bg-white text-petroleum-800 shadow-[0_1px_2px_rgba(17,34,31,0.04)]"
-                          : "border border-transparent text-ink-500 hover:bg-white/60 hover:text-ink-900"
-                      }`}
+                      className={`flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors ${active ? "border border-sand-200 bg-white text-petroleum-800 shadow-[0_1px_2px_rgba(17,34,31,0.04)]" : "border border-transparent text-ink-500 hover:bg-white/60 hover:text-ink-900"}`}
                     >
                       <Icon className="h-[17px] w-[17px]" strokeWidth={1.65} aria-hidden="true" />
                       {item.label}
@@ -122,9 +118,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-[248px]">
         <header className="sticky top-0 z-30 border-b border-sand-200 bg-[#FAFAF8]/95 backdrop-blur-sm">
           <div className="flex h-[64px] items-center justify-between px-5 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
-            <Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800 lg:hidden">
-              Revalta
-            </Link>
+            <Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800 lg:hidden">Revalta</Link>
             <div className="hidden lg:block">
               <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">Fastighetsförvaltning</p>
               <p className="mt-1 text-[12px] font-medium text-ink-600">Samlad arbetsyta</p>
@@ -134,22 +128,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <nav aria-label="Mobil dashboardmeny" className="flex gap-1 overflow-x-auto border-t border-sand-200 px-4 py-2 lg:hidden">
             {navigation.flatMap((group) => group.items).map((item) => {
               const active = isActive(pathname, item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-medium ${active ? "bg-petroleum-700 text-white" : "text-ink-500"}`}
-                >
-                  {item.label}
-                </Link>
-              );
+              return <Link key={item.href} href={item.href} className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-medium ${active ? "bg-petroleum-700 text-white" : "text-ink-500"}`}>{item.label}</Link>;
             })}
           </nav>
         </header>
 
-        <main className="mx-auto w-full max-w-[1440px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 xl:px-12">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-[1440px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 xl:px-12">{children}</main>
       </div>
     </div>
   );
