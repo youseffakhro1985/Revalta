@@ -4,18 +4,26 @@ import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
 const action = "quote.created";
+const decisionAction = "quote.status_changed";
+const allowedStatuses = new Set(["draft", "sent", "approved", "rejected", "invoiced"]);
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-    const [logs, properties] = await Promise.all([
+    const [logs, decisions, properties] = await Promise.all([
       db.auditLog.findMany({
         where: { company_id: user.company_id ?? undefined, action },
         orderBy: { created_at: "desc" },
         take: 300,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
+      }),
+      db.auditLog.findMany({
+        where: { company_id: user.company_id ?? undefined, action: decisionAction },
+        orderBy: { created_at: "desc" },
+        take: 500,
+        select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
       }),
       db.property.findMany({
         where: tenantWhere(user),
@@ -24,11 +32,27 @@ export async function GET() {
       }),
     ]);
 
+    const decisionMap = new Map<string, Array<Record<string, unknown>>>();
+    for (const decision of decisions) {
+      const metadata = (decision.metadata || {}) as Record<string, unknown>;
+      const quoteId = String(metadata.quote_id || "");
+      if (!quoteId) continue;
+      const items = decisionMap.get(quoteId) || [];
+      items.push({
+        id: decision.id,
+        ...metadata,
+        actor_name: decision.actor?.name || decision.actor?.email || "Användare",
+        created_at: decision.created_at,
+      });
+      decisionMap.set(quoteId, items);
+    }
+
     return NextResponse.json({
       quotes: logs.map((log) => ({
         id: log.id,
         property_id: log.entity_id,
         ...(log.metadata as object),
+        history: decisionMap.get(log.id) || [],
         created_at: log.created_at,
       })),
       properties,
@@ -58,7 +82,6 @@ export async function POST(request: Request) {
     const other = Number(body.other || 0);
     const vatRate = Number(body.vatRate ?? 25);
 
-    const allowedStatuses = new Set(["draft", "sent", "approved", "rejected", "invoiced"]);
     if (!propertyId || !title || !allowedStatuses.has(status)) {
       return NextResponse.json({ error: "Fastighet, offertnamn och giltig status krävs" }, { status: 400 });
     }
@@ -103,6 +126,64 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
     console.error("Create quote error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+
+    const body = await request.json();
+    const quoteId = String(body.quoteId || "").trim();
+    const status = String(body.status || "").trim();
+    const comment = String(body.comment || "").trim();
+
+    if (!quoteId || !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Offert och giltig status krävs" }, { status: 400 });
+    }
+
+    const quote = await db.auditLog.findFirst({
+      where: { id: quoteId, company_id: user.company_id ?? undefined, action },
+      select: { id: true, entity_id: true, metadata: true },
+    });
+    if (!quote) return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
+
+    const current = (quote.metadata || {}) as Record<string, unknown>;
+    const previousStatus = String(current.status || "draft");
+    const changedAt = new Date().toISOString();
+
+    await db.auditLog.update({
+      where: { id: quote.id },
+      data: {
+        metadata: {
+          ...current,
+          status,
+          decision_comment: comment || null,
+          decision_at: changedAt,
+          decision_by: user.name || user.email,
+        },
+      },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "quote",
+      entityId: quote.entity_id || undefined,
+      action: decisionAction,
+      metadata: {
+        quote_id: quote.id,
+        title: current.title,
+        previous_status: previousStatus,
+        status,
+        comment: comment || null,
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Update quote status error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
