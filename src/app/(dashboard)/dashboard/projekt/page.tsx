@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, CircleDollarSign, FolderKanban, TrendingUp, WalletCards } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -141,10 +142,10 @@ export default function ProjectsPage() {
       {loading ? <p className="p-6 text-sm text-ink-500">Laddar projekt…</p> : projects.length === 0 ? <EmptyState title="Inga projekt registrerade" description="Skapa det första projektet eller omvandla en större arbetsorder till projekt." /> : <div className="divide-y divide-sand-100">{projects.map((project) => <article key={project.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
         <div className="flex flex-col justify-between gap-5 lg:flex-row">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{project.name}</h3><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{statusLabels[project.status] || project.status}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${project.risk === "high" ? "bg-red-50 text-red-800" : "bg-sand-100 text-ink-600"}`}>Risk {riskLabels[project.risk] || project.risk}</span></div>
+            <div className="flex flex-wrap items-center gap-2"><Link href={`/dashboard/projekt/${project.id}`} className="font-semibold text-ink-900 transition hover:text-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200 focus:ring-offset-2">{project.name}</Link><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{statusLabels[project.status] || project.status}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${project.risk === "high" ? "bg-red-50 text-red-800" : "bg-sand-100 text-ink-600"}`}>Risk {riskLabels[project.risk] || project.risk}</span></div>
             <p className="mt-1 text-sm text-ink-500">{project.property_name}</p>
             <p className="mt-3 text-xs text-ink-400">{formatDate(project.start_date)} – {formatDate(project.end_date)}</p>
-            {project.source_work_order ? <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-sand-50 px-3 py-2 text-xs text-ink-600"><FolderKanban className="h-4 w-4 text-petroleum-700" />Från arbetsorder: {project.source_work_order.title}</div> : null}
+            {project.source_work_order ? <Link href={`/dashboard/arbetsorder/${project.source_work_order.id}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-sand-50 px-3 py-2 text-xs text-ink-600 transition hover:bg-sand-100 hover:text-petroleum-800"><FolderKanban className="h-4 w-4 text-petroleum-700" />Från arbetsorder: {project.source_work_order.title}</Link> : null}
           </div>
           <div className="grid grid-cols-2 gap-4 text-xs text-ink-500 sm:grid-cols-4 lg:min-w-[520px]">
             <span>Projektledare<strong className="mt-1 block text-ink-800">{project.project_manager || "Ej tilldelad"}</strong></span>
@@ -153,8 +154,11 @@ export default function ProjectsPage() {
             <span>Avvikelse<strong className={`mt-1 block ${Number(project.deviation || 0) > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(Number(project.deviation || 0))}</strong></span>
           </div>
         </div>
-        <div className="mt-5 flex flex-col gap-2 border-t border-sand-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-ink-400">Budget {money.format(Number(project.budget || 0))} · Utfall {money.format(Number(project.actual || 0))}</p>
+        <div className="mt-5 flex flex-col gap-3 border-t border-sand-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <p className="text-xs text-ink-400">Budget {money.format(Number(project.budget || 0))} · Utfall {money.format(Number(project.actual || 0))}</p>
+            <Link href={`/dashboard/projekt/${project.id}`} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Öppna projektdetalj</Link>
+          </div>
           <select value={project.status} disabled={updatingId === project.id} onChange={(event) => void changeStatus(project.id, event.target.value)} className={`${premiumFieldClass} sm:w-44`} aria-label={`Ändra status för ${project.name}`}><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option><option value="cancelled">Avbruten</option></select>
         </div>
       </article>)}</div>}
