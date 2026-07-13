@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Banknote, CheckCircle2, Clock3, Package, Route, ShieldCheck, Square, Wrench } from "lucide-react";
+import { Banknote, Camera, CheckCircle2, Clock3, LockKeyhole, Package, Route, ShieldCheck, Square, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type ChecklistItem = {
@@ -41,6 +41,12 @@ type Sla = {
   sla_status: string;
 };
 
+type Completion = {
+  required_incomplete: number;
+  before_photos: number;
+  after_photos: number;
+};
+
 type Props = { workOrderId: string };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
@@ -60,6 +66,8 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
   const [entries, setEntries] = useState<ExecutionEntry[]>([]);
   const [summary, setSummary] = useState<Summary>({ total_minutes: 0, material_cost: 0, travel_cost: 0, external_cost: 0, total_cost: 0 });
   const [sla, setSla] = useState<Sla>({ response_due_at: null, completion_due_at: null, responded_at: null, sla_status: "not_set" });
+  const [completion, setCompletion] = useState<Completion>({ required_incomplete: 0, before_photos: 0, after_photos: 0 });
+  const [workOrderStatus, setWorkOrderStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -76,6 +84,8 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
       setEntries(data.entries || []);
       setSummary(data.summary || {});
       setSla(data.sla || {});
+      setCompletion(data.completion || {});
+      setWorkOrderStatus(data.workOrder?.status || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta arbetsorderregistreringar");
     } finally {
@@ -103,6 +113,8 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
   const requiredIncomplete = checklist.filter((item) => item.is_required && !item.completed_at).length;
   const hours = Math.floor(summary.total_minutes / 60);
   const minutes = summary.total_minutes % 60;
+  const isCompleted = workOrderStatus === "completed";
+  const canFinalize = requiredIncomplete === 0 && completion.after_photos > 0 && !isCompleted;
 
   const slaTone = useMemo(() => sla.sla_status === "breached" ? "text-red-700 bg-red-50 border-red-200" : sla.sla_status === "at_risk" ? "text-amber-700 bg-amber-50 border-amber-200" : "text-petroleum-700 bg-petroleum-50 border-petroleum-200", [sla.sla_status]);
 
@@ -118,16 +130,45 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
       <article className={`rounded-2xl border p-5 ${slaTone}`}><div className="flex items-start justify-between"><div><p className="text-sm font-medium">SLA-status</p><p className="mt-2 text-2xl font-semibold">{slaLabels[sla.sla_status] || sla.sla_status}</p></div><ShieldCheck className="h-5 w-5" /></div></article>
     </section>
 
+    <Panel title="Slutkontroll" description="Arbetsordern kan slutföras när obligatoriska kontroller och dokumentation är klara.">
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className={`rounded-2xl border p-4 ${requiredIncomplete === 0 ? "border-petroleum-200 bg-petroleum-50/60" : "border-amber-200 bg-amber-50"}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Obligatoriska kontroller</p>
+            <p className="mt-2 text-lg font-semibold text-ink-900">{requiredIncomplete === 0 ? "Klara" : `${requiredIncomplete} återstår`}</p>
+          </div>
+          <div className={`rounded-2xl border p-4 ${completion.after_photos > 0 ? "border-petroleum-200 bg-petroleum-50/60" : "border-amber-200 bg-amber-50"}`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Bilddokumentation</p>
+            <p className="mt-2 text-lg font-semibold text-ink-900">{completion.before_photos} före · {completion.after_photos} efter</p>
+          </div>
+          <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Faktisk kostnad</p>
+            <p className="mt-2 text-lg font-semibold text-ink-900">{money.format(summary.total_cost)}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={saving || !canFinalize}
+          onClick={() => void post({ action: "completion.finalize" }, "Arbetsordern har slutförts och faktiskt utfall har uppdaterats.")}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-petroleum-700 px-6 text-sm font-semibold text-white transition hover:bg-petroleum-800 disabled:cursor-not-allowed disabled:bg-sand-200 disabled:text-ink-400"
+        >
+          {isCompleted ? <LockKeyhole className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          {isCompleted ? "Arbetsordern är slutförd" : "Slutför arbetsorder"}
+        </button>
+      </div>
+      {!isCompleted && completion.after_photos < 1 ? <p className="mt-4 flex items-center gap-2 text-sm text-amber-700"><Camera className="h-4 w-4" />Ladda upp minst en fil med kategorin Efterbild i dokumentpanelen nedan.</p> : null}
+    </Panel>
+
     <div className="grid gap-6 xl:grid-cols-2">
       <Panel title="Checklista" description="Kontrollpunkter som ska vara klara innan arbetsordern avslutas.">
         <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); void post({ action: "checklist.create", title: data.get("title"), description: data.get("description"), isRequired: data.get("isRequired") === "on" }, "Kontrollpunkten har lagts till.", () => form.reset()); }} className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2">
           <input name="title" required placeholder="Ny kontrollpunkt" className={premiumFieldClass} />
           <input name="description" placeholder="Beskrivning eller krav" className={premiumFieldClass} />
           <label className="inline-flex items-center gap-2 text-sm text-ink-600"><input name="isRequired" type="checkbox" defaultChecked className="h-4 w-4 rounded border-sand-300" />Obligatorisk</label>
-          <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till"}</button>
+          <button disabled={saving || isCompleted} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till"}</button>
         </form>
         <div className="mt-4 space-y-3">
-          {checklist.length === 0 ? <EmptyState title="Ingen checklista ännu" description="Lägg till kontrollpunkter för kvalitetssäkring och avslut." /> : checklist.map((item) => <button key={item.id} type="button" disabled={saving} onClick={() => void post({ action: "checklist.complete", itemId: item.id, completed: !item.completed_at }, item.completed_at ? "Kontrollpunkten har återöppnats." : "Kontrollpunkten är klar.")} className="flex w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left transition hover:border-petroleum-200 hover:bg-petroleum-50/30 disabled:opacity-60">
+          {checklist.length === 0 ? <EmptyState title="Ingen checklista ännu" description="Lägg till kontrollpunkter för kvalitetssäkring och avslut." /> : checklist.map((item) => <button key={item.id} type="button" disabled={saving || isCompleted} onClick={() => void post({ action: "checklist.complete", itemId: item.id, completed: !item.completed_at }, item.completed_at ? "Kontrollpunkten har återöppnats." : "Kontrollpunkten är klar.")} className="flex w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left transition hover:border-petroleum-200 hover:bg-petroleum-50/30 disabled:opacity-60">
             {item.completed_at ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-petroleum-700" /> : <Square className="mt-0.5 h-5 w-5 shrink-0 text-ink-300" />}
             <span className="min-w-0"><span className={`block text-sm font-semibold ${item.completed_at ? "text-ink-400 line-through" : "text-ink-900"}`}>{item.title}</span>{item.description ? <span className="mt-1 block text-xs leading-5 text-ink-500">{item.description}</span> : null}{item.is_required ? <span className="mt-2 inline-block rounded-full bg-sand-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">Obligatorisk</span> : null}</span>
           </button>)}
@@ -140,7 +181,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
           <label className="space-y-1.5 text-sm text-ink-600"><span>Klart senast</span><input name="completionDueAt" type="datetime-local" defaultValue={toLocalInput(sla.completion_due_at)} className={premiumFieldClass} /></label>
           <label className="space-y-1.5 text-sm text-ink-600"><span>Svar registrerat</span><input name="respondedAt" type="datetime-local" defaultValue={toLocalInput(sla.responded_at)} className={premiumFieldClass} /></label>
           <label className="space-y-1.5 text-sm text-ink-600"><span>Status</span><select name="slaStatus" defaultValue={sla.sla_status} className={premiumFieldClass}>{Object.entries(slaLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara SLA"}</button>
+          <button disabled={saving || isCompleted} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara SLA"}</button>
         </form>
       </Panel>
     </div>
@@ -159,7 +200,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
             {card.fields === "cost" ? <><div className="grid grid-cols-2 gap-2"><input name="quantity" type="number" min="0" step="0.01" defaultValue="1" placeholder="Antal" className={premiumFieldClass} /><input name="unit" placeholder="Enhet" className={premiumFieldClass} /></div><input name="unitCost" type="number" min="0" step="0.01" placeholder="Pris per enhet" className={premiumFieldClass} /></> : null}
             {card.fields === "travel" ? <><input name="distanceKm" type="number" min="0" step="0.1" placeholder="Kilometer" className={premiumFieldClass} /><input name="totalAmount" type="number" min="0" step="0.01" placeholder="Resekostnad" className={premiumFieldClass} /></> : null}
             {card.fields === "external" ? <><input name="supplier" placeholder="Leverantör" className={premiumFieldClass} /><input name="totalAmount" type="number" min="0" step="0.01" required placeholder="Belopp exkl. moms" className={premiumFieldClass} /></> : null}
-            <button disabled={saving} className="h-11 w-full rounded-xl border border-petroleum-700 bg-petroleum-700 px-4 text-sm font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-60">Registrera</button>
+            <button disabled={saving || isCompleted} className="h-11 w-full rounded-xl border border-petroleum-700 bg-petroleum-700 px-4 text-sm font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-60">Registrera</button>
           </div>
         </form>; })}
       </div>
