@@ -21,7 +21,7 @@ async function buildSnapshot(id: string, companyId: string) {
   const workOrder = await resolveWorkOrder(id, companyId);
   if (!workOrder) return null;
 
-  const [checklist, entries, documents] = await Promise.all([
+  const [checklist, entries, documents, signatures] = await Promise.all([
     db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
       SELECT "title", "description", "is_required", "completed_at"
       FROM "WorkOrderChecklistItem"
@@ -42,9 +42,15 @@ async function buildSnapshot(id: string, companyId: string) {
       select: { id: true, file_name: true, storage_url: true, category: true, created_at: true },
       orderBy: { created_at: "asc" },
     }),
+    db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+      SELECT "signer_role", "signer_name", "signer_email", "confirmation_text", "signed_at"
+      FROM "WorkOrderSignature"
+      WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
+      ORDER BY "signed_at" ASC
+    `),
   ]);
 
-  return { workOrder, checklist, entries, documents, generatedAt: new Date().toISOString() };
+  return { workOrder, checklist, entries, documents, signatures, generatedAt: new Date().toISOString() };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -139,6 +145,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ id: reportId, version }, { status: 201 });
   }
 
+  if (action === "report.approve") {
+    const reportId = String(body.reportId || "");
+    if (!reportId) return NextResponse.json({ error: "Rapport saknas" }, { status: 400 });
+    const changed = await db.$executeRaw(Prisma.sql`
+      UPDATE "WorkOrderReport"
+      SET "status" = 'approved', "approved_by_id" = ${user.id}, "approved_at" = CURRENT_TIMESTAMP
+      WHERE "id" = ${reportId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+    `);
+    if (!changed) return NextResponse.json({ error: "Rapporten hittades inte" }, { status: 404 });
+    await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.report_approved", metadata: { reportId } });
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "invoice.create") {
     const snapshot = await buildSnapshot(id, user.company_id);
     if (!snapshot) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
@@ -161,6 +180,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     `);
     await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.invoice_basis_created", metadata: { invoiceId, reference, subtotal, vatAmount, total } });
     return NextResponse.json({ id: invoiceId, reference, subtotal, vatAmount, total }, { status: 201 });
+  }
+
+  if (action === "invoice.approve") {
+    const invoiceId = String(body.invoiceId || "");
+    if (!invoiceId) return NextResponse.json({ error: "Fakturaunderlag saknas" }, { status: 400 });
+    const changed = await db.$executeRaw(Prisma.sql`
+      UPDATE "WorkOrderInvoiceBasis"
+      SET "status" = 'approved', "approved_by_id" = ${user.id}, "approved_at" = CURRENT_TIMESTAMP, "updated_at" = CURRENT_TIMESTAMP
+      WHERE "id" = ${invoiceId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+    `);
+    if (!changed) return NextResponse.json({ error: "Fakturaunderlaget hittades inte" }, { status: 404 });
+    await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.invoice_basis_approved", metadata: { invoiceId } });
+    return NextResponse.json({ success: true });
   }
 
   return NextResponse.json({ error: "Åtgärden stöds inte" }, { status: 400 });
