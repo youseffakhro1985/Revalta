@@ -25,6 +25,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 
 const navigation = [
   {
@@ -103,7 +104,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </aside>
       <div className="lg:pl-[248px]">
         <header className="sticky top-0 z-30 border-b border-sand-200 bg-[#FAFAF8]/95 backdrop-blur-sm">
-          <div className="flex h-[64px] items-center justify-between px-5 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12"><Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800 lg:hidden">Revalta</Link><div className="hidden lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">Fastighetsförvaltning</p><p className="mt-1 text-[12px] font-medium text-ink-600">Samlad arbetsyta</p></div><div className="lg:hidden"><LogoutButton /></div></div>
+          <div className="flex h-[64px] items-center justify-between gap-4 px-5 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
+            <Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800 lg:hidden">Revalta</Link>
+            <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">Fastighetsförvaltning</p><p className="mt-1 text-[12px] font-medium text-ink-600">Samlad arbetsyta</p></div>
+            <div className="ml-auto flex items-center gap-3"><GlobalSearch /><div className="lg:hidden"><LogoutButton /></div></div>
+          </div>
           <nav aria-label="Mobil dashboardmeny" className="flex gap-1 overflow-x-auto border-t border-sand-200 px-4 py-2 lg:hidden">{navigation.flatMap((group) => group.items).map((item) => { const active = isActive(pathname, item.href); return <Link key={item.href} href={item.href} className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-medium ${active ? "bg-petroleum-700 text-white" : "text-ink-500"}`}>{item.label}</Link>; })}</nav>
         </header>
         <main className="mx-auto w-full max-w-[1440px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 xl:px-12">{children}</main>
