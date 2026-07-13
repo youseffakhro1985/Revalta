@@ -12,6 +12,7 @@ import {
   Plug,
   Settings,
   Users,
+  Wrench,
 } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 
@@ -22,6 +23,7 @@ const navigation = [
       { href: "/dashboard", label: "Översikt", icon: CircleGauge },
       { href: "/dashboard/fastigheter", label: "Fastigheter", icon: Building2 },
       { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
+      { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
     ],
   },
   {
