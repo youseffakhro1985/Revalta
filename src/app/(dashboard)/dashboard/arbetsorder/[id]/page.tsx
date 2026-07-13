@@ -8,6 +8,7 @@ import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumP
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
+import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
 
 type WorkOrder = {
   id: string; title: string; description: string; status: string; priority: string;
@@ -102,6 +103,7 @@ export default function WorkOrderDetailPage() {
     </section>
 
     <WorkOrderExecutionPanel workOrderId={workOrder.id} />
+    <WorkOrderReportingPanel workOrderId={workOrder.id} />
     <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
   </div>;
 }
