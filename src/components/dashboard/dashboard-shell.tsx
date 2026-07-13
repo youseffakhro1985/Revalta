@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BellRing,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
@@ -50,6 +51,7 @@ const navigation = [
   {
     label: "Administration",
     items: [
+      { href: "/dashboard/notiser", label: "Notiser", icon: BellRing },
       { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock },
       { href: "/dashboard/drift", label: "Driftstatus", icon: Activity },
       { href: "/dashboard/billing", label: "Abonnemang", icon: CreditCard },
