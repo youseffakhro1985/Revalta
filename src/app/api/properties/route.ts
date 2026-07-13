@@ -7,16 +7,13 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canCreateProperties(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att skapa fastigheter" }, { status: 403 });
-    }
 
     const properties = await db.property.findMany({
       where: tenantWhere(user),
       orderBy: { created_at: "desc" },
       include: {
         _count: {
-          select: { tickets: true },
+          select: { tickets: true, buildings: true, units: true },
         },
       },
     });
@@ -32,11 +29,14 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canCreateProperties(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att skapa fastigheter" }, { status: 403 });
+    }
 
     const { name, address, postalCode, city } = await request.json();
     const normalizedName = typeof name === "string" ? name.trim() : "";
     const normalizedAddress = typeof address === "string" ? address.trim() : "";
-    const normalizedPostalCode = typeof postalCode === "string" ? postalCode.trim() : null;
+    const normalizedPostalCode = typeof postalCode === "string" && postalCode.trim() ? postalCode.trim() : null;
     const normalizedCity = typeof city === "string" ? city.trim() : "";
 
     if (!normalizedName || !normalizedAddress || !normalizedCity) {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       },
       include: {
         _count: {
-          select: { tickets: true },
+          select: { tickets: true, buildings: true, units: true },
         },
       },
     });

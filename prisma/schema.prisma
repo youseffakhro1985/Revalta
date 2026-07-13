@@ -48,17 +48,70 @@ model Company {
 }
 
 model Property {
-  id          String   @id @default(uuid())
-  name        String
-  address     String
-  postal_code String?
-  city        String
-  company_id  String?
-  user_id     String
-  created_at  DateTime @default(now())
-  company     Company? @relation(fields: [company_id], references: [id])
-  user        User     @relation(fields: [user_id], references: [id])
-  tickets     Ticket[]
+  id                  String   @id @default(uuid())
+  name                String
+  address             String
+  postal_code         String?
+  city                String
+  property_identifier String?
+  property_type       String   @default("residential")
+  status              String   @default("active")
+  construction_year   Int?
+  total_area           Float?
+  boa                  Float?
+  loa                  Float?
+  manager_name         String?
+  contact_name         String?
+  contact_email        String?
+  contact_phone        String?
+  company_id           String?
+  user_id              String
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now()) @updatedAt
+  company              Company? @relation(fields: [company_id], references: [id])
+  user                 User     @relation(fields: [user_id], references: [id])
+  tickets              Ticket[]
+  buildings            Building[]
+  units                Unit[]
+
+  @@index([company_id])
+  @@index([user_id])
+  @@index([city])
+}
+
+model Building {
+  id                String   @id @default(uuid())
+  property_id       String
+  name              String
+  address           String?
+  construction_year Int?
+  floors            Int?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now()) @updatedAt
+  property          Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  units             Unit[]
+
+  @@index([property_id])
+}
+
+model Unit {
+  id          String    @id @default(uuid())
+  property_id String
+  building_id String?
+  designation String
+  unit_type   String    @default("apartment")
+  floor       String?
+  area        Float?
+  rooms       Float?
+  status      String    @default("active")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now()) @updatedAt
+  property    Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  building    Building? @relation(fields: [building_id], references: [id], onDelete: SetNull)
+
+  @@index([property_id])
+  @@index([building_id])
+  @@index([unit_type])
 }
 
 model Ticket {

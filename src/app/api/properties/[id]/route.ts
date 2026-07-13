@@ -1,0 +1,81 @@
+import { NextResponse } from "next/server";
+import db from "@/lib/db";
+import { writeAuditLog } from "@/lib/audit";
+import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+
+function optionalText(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function optionalNumber(value: unknown) {
+  if (value === "" || value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canCreateProperties(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att redigera fastigheter" }, { status: 403 });
+    }
+
+    const { id } = await params;
+    const existing = await db.property.findFirst({ where: { id, ...tenantWhere(user) } });
+    if (!existing) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
+
+    const body = await request.json();
+    const name = optionalText(body.name);
+    const address = optionalText(body.address);
+    const city = optionalText(body.city);
+
+    if (!name || !address || !city) {
+      return NextResponse.json({ error: "Namn, adress och ort krävs" }, { status: 400 });
+    }
+
+    const constructionYear = optionalNumber(body.constructionYear);
+    const totalArea = optionalNumber(body.totalArea);
+    const boa = optionalNumber(body.boa);
+    const loa = optionalNumber(body.loa);
+
+    if (constructionYear !== null && (!Number.isInteger(constructionYear) || constructionYear < 1600 || constructionYear > 2100)) {
+      return NextResponse.json({ error: "Ange ett giltigt byggår" }, { status: 400 });
+    }
+
+    const property = await db.property.update({
+      where: { id },
+      data: {
+        name,
+        address,
+        postal_code: optionalText(body.postalCode),
+        city,
+        property_identifier: optionalText(body.propertyIdentifier),
+        property_type: optionalText(body.propertyType) || "residential",
+        status: optionalText(body.status) || "active",
+        construction_year: constructionYear,
+        total_area: totalArea,
+        boa,
+        loa,
+        manager_name: optionalText(body.managerName),
+        contact_name: optionalText(body.contactName),
+        contact_email: optionalText(body.contactEmail),
+        contact_phone: optionalText(body.contactPhone),
+      },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "property",
+      entityId: id,
+      action: "property.updated",
+      metadata: { name: property.name, propertyIdentifier: property.property_identifier },
+    });
+
+    return NextResponse.json({ success: true, property });
+  } catch (error) {
+    console.error("Update property error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
