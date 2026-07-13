@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Property = { id: string; name: string; city: string };
 type Booking = { id: string; property_name?: string; resource: string; resident_name: string; unit?: string; start: string; end: string; status: string };
@@ -13,16 +13,18 @@ export default function BookingsPage() {
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ propertyId: "", resource: "Tvättstuga", residentName: "", unit: "", start: "", end: "", note: "" });
 
-  async function load() {
+  const load = useCallback(async () => {
     const response = await fetch("/api/bookings", { cache: "no-store" });
     if (!response.ok) return;
     const data = await response.json();
     setBookings(data.bookings || []);
     setProperties(data.properties || []);
-    if (!form.propertyId && data.properties?.[0]?.id) setForm((value) => ({ ...value, propertyId: data.properties[0].id }));
-  }
+    if (data.properties?.[0]?.id) {
+      setForm((value) => value.propertyId ? value : ({ ...value, propertyId: data.properties[0].id }));
+    }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setMessage("");
