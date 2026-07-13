@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -23,6 +24,7 @@ import {
   Hammer,
   HandCoins,
   KeyRound,
+  Menu,
   MessageSquareText,
   Plug,
   ReceiptText,
@@ -32,6 +34,7 @@ import {
   Users,
   WalletCards,
   Wrench,
+  X,
 } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
@@ -89,48 +92,62 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function NavigationContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  return <>
+    {navigation.map((group, groupIndex) => (
+      <div key={group.label} className={groupIndex > 0 ? "mt-7" : ""}>
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-400">{group.label}</p>
+        <div className="space-y-1">
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(pathname, item.href);
+            return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-petroleum-300 ${active ? "border border-sand-200 bg-white text-petroleum-800 shadow-[0_1px_2px_rgba(17,34,31,0.04)]" : "border border-transparent text-ink-500 hover:bg-white/60 hover:text-ink-900"}`}><Icon className="h-[17px] w-[17px]" strokeWidth={1.65} aria-hidden="true" />{item.label}{active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-petroleum-600" aria-hidden="true" /> : null}</Link>;
+          })}
+        </div>
+      </div>
+    ))}
+  </>;
+}
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("keydown", close);
+    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", close); };
+  }, [mobileOpen]);
 
   return (
     <div className="dashboard-surface min-h-screen bg-[#F7F7F3] text-ink-900">
+      <a href="#dashboard-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-petroleum-800 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Hoppa till innehåll</a>
+
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] border-r border-sand-200 bg-[#F1F1EC] lg:flex lg:flex-col">
         <div className="flex h-[72px] items-center border-b border-sand-200 px-6">
-          <Link href="/dashboard" className="flex items-center gap-3" aria-label="Revalta dashboard">
-            <span className="font-display text-[21px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</span>
-            <span className="h-5 w-px bg-sand-300" />
-            <span className="text-[8px] font-semibold uppercase leading-[1.2] tracking-[0.13em] text-ink-400">Förvaltning<br />Sverige</span>
+          <Link href="/dashboard" className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Revalta dashboard">
+            <span className="font-display text-[21px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</span><span className="h-5 w-px bg-sand-300" aria-hidden="true" /><span className="text-[8px] font-semibold uppercase leading-[1.2] tracking-[0.13em] text-ink-400">Förvaltning<br />Sverige</span>
           </Link>
         </div>
-        <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5">
-          {navigation.map((group, groupIndex) => (
-            <div key={group.label} className={groupIndex > 0 ? "mt-7" : ""}>
-              <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-400">{group.label}</p>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(pathname, item.href);
-                  return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors ${active ? "border border-sand-200 bg-white text-petroleum-800 shadow-[0_1px_2px_rgba(17,34,31,0.04)]" : "border border-transparent text-ink-500 hover:bg-white/60 hover:text-ink-900"}`}><Icon className="h-[17px] w-[17px]" strokeWidth={1.65} aria-hidden="true" />{item.label}{active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-petroleum-600" /> : null}</Link>;
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-        <div className="border-t border-sand-200 p-3">
-          <div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">RV</div><div className="min-w-0"><p className="truncate text-[12px] font-semibold text-ink-800">Organisation</p><p className="truncate text-[10px] text-ink-400">Aktiv användare</p></div></div>
-          <LogoutButton className="w-full justify-start" />
-        </div>
+        <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} /></nav>
+        <div className="border-t border-sand-200 p-3"><div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">RV</div><div className="min-w-0"><p className="truncate text-[12px] font-semibold text-ink-800">Organisation</p><p className="truncate text-[10px] text-ink-400">Aktiv användare</p></div></div><LogoutButton className="w-full justify-start" /></div>
       </aside>
+
+      {mobileOpen ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny"><button className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} /><aside className="relative flex h-full w-[min(88vw,340px)] flex-col border-r border-sand-200 bg-[#F7F7F3] shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-sand-200 px-5"><Link href="/dashboard" className="font-display text-xl font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link><button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Stäng meny"><X className="h-5 w-5" /></button></div><nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} onNavigate={() => setMobileOpen(false)} /></nav><div className="border-t border-sand-200 p-4"><LogoutButton className="w-full justify-start" /></div></aside></div> : null}
+
       <div className="lg:pl-[248px]">
         <header className="sticky top-0 z-30 border-b border-sand-200 bg-[#FAFAF8]/95 backdrop-blur-sm">
-          <div className="flex h-[64px] items-center justify-between gap-4 px-5 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
-            <Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800 lg:hidden">Revalta</Link>
+          <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
+            <div className="flex items-center gap-3 lg:hidden"><button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button><Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link></div>
             <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">Fastighetsförvaltning</p><p className="mt-1 text-[12px] font-medium text-ink-600">Samlad arbetsyta</p></div>
-            <div className="ml-auto flex items-center gap-3"><GlobalSearch /><div className="lg:hidden"><LogoutButton /></div></div>
+            <div className="ml-auto flex items-center gap-2 sm:gap-3"><GlobalSearch /><div className="hidden sm:block lg:hidden"><LogoutButton /></div></div>
           </div>
-          <nav aria-label="Mobil dashboardmeny" className="flex gap-1 overflow-x-auto border-t border-sand-200 px-4 py-2 lg:hidden">{navigation.flatMap((group) => group.items).map((item) => { const active = isActive(pathname, item.href); return <Link key={item.href} href={item.href} className={`shrink-0 rounded-lg px-3 py-2 text-[12px] font-medium ${active ? "bg-petroleum-700 text-white" : "text-ink-500"}`}>{item.label}</Link>; })}</nav>
         </header>
-        <main className="mx-auto w-full max-w-[1440px] px-5 py-8 sm:px-8 sm:py-10 lg:px-10 xl:px-12">{children}</main>
+        <main id="dashboard-content" tabIndex={-1} className="mx-auto w-full max-w-[1440px] px-4 py-6 outline-none sm:px-8 sm:py-10 lg:px-10 xl:px-12">{children}</main>
       </div>
     </div>
   );
