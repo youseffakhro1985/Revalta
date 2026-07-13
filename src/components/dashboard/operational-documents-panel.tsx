@@ -25,6 +25,8 @@ type Props = {
 const categoryLabels: Record<string, string> = {
   other: "Övrigt",
   photo: "Foto",
+  before_photo: "Förebild",
+  after_photo: "Efterbild",
   protocol: "Protokoll",
   drawing: "Ritning",
   invoice: "Faktura",
@@ -91,7 +93,7 @@ export function OperationalDocumentsPanel({ entityType, entityId }: Props) {
   }
 
   return (
-    <Panel title="Dokument" description="Samla ritningar, protokoll, foton, offerter och övriga filer på samma plats.">
+    <Panel title="Dokument" description="Samla ritningar, protokoll, före- och efterbilder, offerter och övriga filer på samma plats.">
       <div className="space-y-5">
         {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
