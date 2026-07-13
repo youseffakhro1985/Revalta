@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, ShieldCheck, UsersRound } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
@@ -24,7 +24,7 @@ export default function TeamPage() {
   const [success, setSuccess] = useState("");
   const router = useRouter();
 
-  async function loadTeam() {
+  const loadTeam = useCallback(async () => {
     setLoading(true);
     try {
       const [response, invitesResponse] = await Promise.all([fetch("/api/team", { cache: "no-store" }), fetch("/api/team/invites", { cache: "no-store" })]);
@@ -35,9 +35,9 @@ export default function TeamPage() {
       if (invitesResponse.ok) setInvites(invitesData.invites || []);
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte kontakta servern"); }
     finally { setLoading(false); }
-  }
+  }, [router]);
 
-  useEffect(() => { void loadTeam(); }, []);
+  useEffect(() => { void loadTeam(); }, [loadTeam]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault(); setError(""); setSuccess(""); setSubmitting(true);
