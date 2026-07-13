@@ -8,6 +8,7 @@ import {
   CircleGauge,
   ClipboardList,
   CreditCard,
+  FileArchive,
   FileClock,
   Plug,
   Settings,
@@ -25,6 +26,7 @@ const navigation = [
       { href: "/dashboard/fastigheter", label: "Fastigheter", icon: Building2 },
       { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
       { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
+      { href: "/dashboard/dokument", label: "Dokument", icon: FileArchive },
     ],
   },
   {
