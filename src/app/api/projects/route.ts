@@ -1,31 +1,64 @@
-import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
-import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
+import db from "@/lib/db";
+import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { writeAuditLog } from "@/lib/audit";
 
-const action = "project.created";
+const allowedStatuses = new Set(["planned", "active", "paused", "completed", "cancelled"]);
+const allowedRisks = new Set(["low", "medium", "high"]);
+
+function parseOptionalDate(value: unknown) {
+  if (!value) return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function parseMoney(value: unknown) {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-  const [logs, properties] = await Promise.all([
-    db.auditLog.findMany({
-      where: { company_id: user.company_id ?? undefined, action },
-      orderBy: { created_at: "desc" },
-      take: 300,
-      select: { id: true, entity_id: true, metadata: true, created_at: true },
+  const [projects, properties, members] = await Promise.all([
+    db.project.findMany({
+      where: { company_id: user.company_id },
+      orderBy: [{ status: "asc" }, { start_date: "asc" }, { created_at: "desc" }],
+      take: 500,
+      include: {
+        property: { select: { id: true, name: true } },
+        manager: { select: { id: true, name: true, email: true } },
+        source_work_order: { select: { id: true, title: true, status: true } },
+      },
     }),
     db.property.findMany({
-      where: tenantWhere(user),
+      where: { company_id: user.company_id },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
+    }),
+    db.user.findMany({
+      where: { company_id: user.company_id, status: "active" },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true },
     }),
   ]);
 
   return NextResponse.json({
-    projects: logs.map((log) => ({ id: log.id, property_id: log.entity_id, ...(log.metadata as object), created_at: log.created_at })),
+    projects: projects.map((project) => ({
+      ...project,
+      property_name: project.property.name,
+      project_manager: project.manager?.name || project.manager?.email || "",
+      start_date: project.start_date,
+      end_date: project.end_date,
+      budget: Number(project.budget),
+      forecast: Number(project.forecast),
+      actual: Number(project.actual),
+      deviation: Number(project.forecast) - Number(project.budget),
+    })),
     properties,
+    members,
   });
 }
 
@@ -33,47 +66,96 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const body = await request.json();
   const propertyId = String(body.propertyId || "").trim();
+  const sourceWorkOrderId = body.sourceWorkOrderId ? String(body.sourceWorkOrderId).trim() : null;
+  const managerId = body.managerId ? String(body.managerId).trim() : null;
   const name = String(body.name || "").trim();
+  const description = body.description ? String(body.description).trim() : null;
+  const contractor = body.contractor ? String(body.contractor).trim() : null;
   const status = String(body.status || "planned").trim();
-  const projectManager = String(body.projectManager || "").trim();
-  const contractor = String(body.contractor || "").trim();
-  const startDate = String(body.startDate || "").trim();
-  const endDate = String(body.endDate || "").trim();
   const risk = String(body.risk || "low").trim();
-  const budget = Number(body.budget || 0);
-  const forecast = Number(body.forecast || 0);
-  const actual = Number(body.actual || 0);
+  const startDate = parseOptionalDate(body.startDate);
+  const endDate = parseOptionalDate(body.endDate);
+  const budget = parseMoney(body.budget);
+  const forecast = parseMoney(body.forecast);
+  const actual = parseMoney(body.actual);
 
   if (!propertyId || !name) return NextResponse.json({ error: "Fastighet och projektnamn krävs" }, { status: 400 });
-  if (![budget, forecast, actual].every((value) => Number.isFinite(value) && value >= 0)) {
+  if (!allowedStatuses.has(status)) return NextResponse.json({ error: "Ogiltig projektstatus" }, { status: 400 });
+  if (!allowedRisks.has(risk)) return NextResponse.json({ error: "Ogiltig risknivå" }, { status: 400 });
+  if ([budget, forecast, actual].some((value) => value === undefined)) {
     return NextResponse.json({ error: "Kontrollera ekonomiska belopp" }, { status: 400 });
   }
+  if (startDate === undefined || endDate === undefined) return NextResponse.json({ error: "Kontrollera projektets datum" }, { status: 400 });
+  if (startDate && endDate && endDate < startDate) return NextResponse.json({ error: "Slutdatum kan inte vara före startdatum" }, { status: 400 });
 
-  const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
+  const property = await db.property.findFirst({
+    where: { id: propertyId, company_id: user.company_id },
+    select: { id: true, name: true },
+  });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
-  await writeAuditLog(user, {
-    entityType: "property",
-    entityId: property.id,
-    action,
-    metadata: {
-      property_name: property.name,
+  if (managerId) {
+    const manager = await db.user.findFirst({
+      where: { id: managerId, company_id: user.company_id, status: "active" },
+      select: { id: true },
+    });
+    if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
+  }
+
+  if (sourceWorkOrderId) {
+    const source = await db.workOrder.findFirst({
+      where: { id: sourceWorkOrderId, company_id: user.company_id, property_id: propertyId },
+      select: { id: true },
+    });
+    if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 400 });
+  }
+
+  const project = await db.project.create({
+    data: {
+      company_id: user.company_id,
+      property_id: propertyId,
+      source_work_order_id: sourceWorkOrderId,
+      manager_id: managerId,
+      created_by_id: user.id,
       name,
-      status,
-      project_manager: projectManager,
+      description,
       contractor,
-      start_date: startDate || null,
-      end_date: endDate || null,
+      status,
+      risk,
+      start_date: startDate,
+      end_date: endDate,
+      budget: budget ?? 0,
+      forecast: forecast ?? 0,
+      actual: actual ?? 0,
+      completed_at: status === "completed" ? new Date() : null,
+    },
+    include: {
+      property: { select: { id: true, name: true } },
+      manager: { select: { id: true, name: true, email: true } },
+      source_work_order: { select: { id: true, title: true, status: true } },
+    },
+  });
+
+  await writeAuditLog(user, {
+    entityType: "project",
+    entityId: project.id,
+    action: "project.created",
+    metadata: {
+      propertyId,
+      propertyName: property.name,
+      sourceWorkOrderId,
+      managerId,
+      status,
       risk,
       budget,
       forecast,
       actual,
-      deviation: forecast - budget,
     },
   });
 
-  return NextResponse.json({ success: true }, { status: 201 });
+  return NextResponse.json({ project }, { status: 201 });
 }
