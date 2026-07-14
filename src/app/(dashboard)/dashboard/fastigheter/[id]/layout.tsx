@@ -1,5 +1,6 @@
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { MaintenanceActionManager } from "@/components/properties/maintenance-action-manager";
+import { MaintenanceBudgetTimeline } from "@/components/properties/maintenance-budget-timeline";
 import { MaintenancePlanExportCard } from "@/components/properties/maintenance-plan-export-card";
 import { MaintenancePlanGovernance } from "@/components/properties/maintenance-plan-governance";
 import { MaintenancePlanPanel } from "@/components/properties/maintenance-plan-panel";
@@ -31,6 +32,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
       <MaintenancePlanPanel propertyId={id} />
       <MaintenancePlanExportCard propertyId={id} />
       <MaintenancePlanGovernance propertyId={id} />
+      <MaintenanceBudgetTimeline propertyId={id} />
       <MaintenanceActionManager propertyId={id} />
     </div>
   );
