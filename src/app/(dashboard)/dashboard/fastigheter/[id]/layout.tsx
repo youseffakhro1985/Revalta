@@ -1,4 +1,5 @@
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
+import { MaintenancePlanPanel } from "@/components/properties/maintenance-plan-panel";
 import { PropertyCardManager } from "@/components/properties/property-card-manager";
 import { PropertyCardOperations } from "@/components/properties/property-card-operations";
 import { PropertyLifecycleTimeline } from "@/components/properties/property-lifecycle-timeline";
@@ -24,6 +25,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
           description="Samla ritningar, driftinstruktioner, garantier, besiktningsprotokoll, avtal och andra underlag i fastighetens digitala pärm."
         />
       </section>
+      <MaintenancePlanPanel propertyId={id} />
     </div>
   );
 }
