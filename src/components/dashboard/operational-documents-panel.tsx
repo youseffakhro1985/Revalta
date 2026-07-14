@@ -18,8 +18,10 @@ type DocumentItem = {
 };
 
 type Props = {
-  entityType: "work_order" | "project";
+  entityType: "work_order" | "project" | "property";
   entityId: string;
+  title?: string;
+  description?: string;
 };
 
 const categoryLabels: Record<string, string> = {
@@ -32,6 +34,9 @@ const categoryLabels: Record<string, string> = {
   invoice: "Faktura",
   quote: "Offert",
   contract: "Avtal",
+  warranty: "Garanti",
+  inspection: "Besiktning",
+  operating_instruction: "Driftinstruktion",
 };
 
 function formatBytes(value: number) {
@@ -44,7 +49,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export function OperationalDocumentsPanel({ entityType, entityId }: Props) {
+export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokument", description = "Samla ritningar, protokoll, före- och efterbilder, offerter och övriga filer på samma plats." }: Props) {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -93,7 +98,7 @@ export function OperationalDocumentsPanel({ entityType, entityId }: Props) {
   }
 
   return (
-    <Panel title="Dokument" description="Samla ritningar, protokoll, före- och efterbilder, offerter och övriga filer på samma plats.">
+    <Panel title={title} description={description}>
       <div className="space-y-5">
         {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
