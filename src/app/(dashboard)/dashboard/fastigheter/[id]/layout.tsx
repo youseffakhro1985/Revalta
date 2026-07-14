@@ -1,4 +1,5 @@
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
+import { MaintenanceActionManager } from "@/components/properties/maintenance-action-manager";
 import { MaintenancePlanPanel } from "@/components/properties/maintenance-plan-panel";
 import { PropertyCardManager } from "@/components/properties/property-card-manager";
 import { PropertyCardOperations } from "@/components/properties/property-card-operations";
@@ -26,6 +27,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
         />
       </section>
       <MaintenancePlanPanel propertyId={id} />
+      <MaintenanceActionManager propertyId={id} />
     </div>
   );
 }
