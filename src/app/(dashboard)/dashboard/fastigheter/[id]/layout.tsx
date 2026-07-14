@@ -1,4 +1,5 @@
 import { PropertyCardOperations } from "@/components/properties/property-card-operations";
+import { PropertyCardManager } from "@/components/properties/property-card-manager";
 
 export default async function PropertyCardLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,6 +13,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
           <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Samlad överblick över tekniska installationer, service, garantier, besiktningar, avtal, arbetsordrar och projekt.</p>
         </div>
         <PropertyCardOperations propertyId={id} />
+        <PropertyCardManager propertyId={id} />
       </section>
     </div>
   );
