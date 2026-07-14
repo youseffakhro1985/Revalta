@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
@@ -5,6 +6,7 @@ import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
+const ENTITY_TYPES = new Set(["work_order", "project", "property"]);
 const ALLOWED_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
@@ -26,6 +28,9 @@ async function resolveEntity(companyId: string, entityType: string, entityId: st
   if (entityType === "project") {
     return db.project.findFirst({ where: { id: entityId, company_id: companyId }, select: { id: true } });
   }
+  if (entityType === "property") {
+    return db.property.findFirst({ where: { id: entityId, company_id: companyId }, select: { id: true } });
+  }
   return null;
 }
 
@@ -37,12 +42,26 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const entityType = url.searchParams.get("entityType") || "";
   const entityId = url.searchParams.get("entityId") || "";
-  if (!entityId || !["work_order", "project"].includes(entityType)) {
+  if (!entityId || !ENTITY_TYPES.has(entityType)) {
     return NextResponse.json({ error: "Ogiltig dokumentkoppling" }, { status: 400 });
   }
 
   const entity = await resolveEntity(user.company_id, entityType, entityId);
   if (!entity) return NextResponse.json({ error: "Objektet hittades inte" }, { status: 404 });
+
+  if (entityType === "property") {
+    const documents = await db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+      SELECT d."id", d."file_name", d."storage_key" AS "storage_url", d."content_type",
+             d."size_bytes", d."category", d."visibility", d."version", d."created_at",
+             json_build_object('id', u."id", 'name', u."name", 'email', u."email") AS "uploaded_by"
+      FROM "OperationalDocument" d
+      JOIN "User" u ON u."id" = d."uploaded_by_id"
+      WHERE d."company_id" = ${user.company_id} AND d."property_id" = ${entityId}
+      ORDER BY d."created_at" DESC
+      LIMIT 100
+    `);
+    return NextResponse.json({ documents });
+  }
 
   const documents = await db.operationalDocument.findMany({
     where: {
@@ -71,7 +90,7 @@ export async function POST(request: Request) {
   const visibility = String(formData.get("visibility") || "internal");
 
   if (!(file instanceof File)) return NextResponse.json({ error: "Välj en fil att ladda upp" }, { status: 400 });
-  if (!entityId || !["work_order", "project"].includes(entityType)) {
+  if (!entityId || !ENTITY_TYPES.has(entityType)) {
     return NextResponse.json({ error: "Ogiltig dokumentkoppling" }, { status: 400 });
   }
   if (!ALLOWED_TYPES.has(file.type)) return NextResponse.json({ error: "Filtypen stöds inte" }, { status: 415 });
@@ -89,22 +108,41 @@ export async function POST(request: Request) {
   const pathname = `companies/${user.company_id}/${entityType}/${entityId}/${crypto.randomUUID()}-${fileName}`;
   const blob = await put(pathname, file, { access: "public", addRandomSuffix: false, contentType: file.type });
 
-  const document = await db.operationalDocument.create({
-    data: {
-      company_id: user.company_id,
-      work_order_id: entityType === "work_order" ? entityId : null,
-      project_id: entityType === "project" ? entityId : null,
-      uploaded_by_id: user.id,
-      file_name: file.name.slice(0, 255),
-      storage_url: blob.url,
-      content_type: file.type,
-      size_bytes: file.size,
-      category,
-      visibility,
-      version: 1,
-    },
-    include: { uploaded_by: { select: { id: true, name: true, email: true } } },
-  });
+  let document: Record<string, unknown>;
+  if (entityType === "property") {
+    const documentId = crypto.randomUUID();
+    const rows = await db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+      INSERT INTO "OperationalDocument"
+        ("id", "company_id", "property_id", "uploaded_by_id", "file_name", "storage_key",
+         "content_type", "size_bytes", "category", "visibility", "version")
+      VALUES
+        (${documentId}, ${user.company_id}, ${entityId}, ${user.id}, ${file.name.slice(0, 255)},
+         ${blob.url}, ${file.type}, ${file.size}, ${category}, ${visibility}, 1)
+      RETURNING "id", "file_name", "storage_key" AS "storage_url", "content_type", "size_bytes",
+                "category", "visibility", "version", "created_at"
+    `);
+    document = {
+      ...rows[0],
+      uploaded_by: { id: user.id, name: user.name, email: user.email },
+    };
+  } else {
+    document = await db.operationalDocument.create({
+      data: {
+        company_id: user.company_id,
+        work_order_id: entityType === "work_order" ? entityId : null,
+        project_id: entityType === "project" ? entityId : null,
+        uploaded_by_id: user.id,
+        file_name: file.name.slice(0, 255),
+        storage_url: blob.url,
+        content_type: file.type,
+        size_bytes: file.size,
+        category,
+        visibility,
+        version: 1,
+      },
+      include: { uploaded_by: { select: { id: true, name: true, email: true } } },
+    });
+  }
 
   await writeAuditLog(user, {
     entityType,
