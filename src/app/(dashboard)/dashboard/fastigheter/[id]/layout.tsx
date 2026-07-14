@@ -1,4 +1,8 @@
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
+import { MaintenanceActionManager } from "@/components/properties/maintenance-action-manager";
+import { MaintenancePlanExportCard } from "@/components/properties/maintenance-plan-export-card";
+import { MaintenancePlanGovernance } from "@/components/properties/maintenance-plan-governance";
+import { MaintenancePlanPanel } from "@/components/properties/maintenance-plan-panel";
 import { PropertyCardManager } from "@/components/properties/property-card-manager";
 import { PropertyCardOperations } from "@/components/properties/property-card-operations";
 import { PropertyLifecycleTimeline } from "@/components/properties/property-lifecycle-timeline";
@@ -24,6 +28,10 @@ export default async function PropertyCardLayout({ children, params }: { childre
           description="Samla ritningar, driftinstruktioner, garantier, besiktningsprotokoll, avtal och andra underlag i fastighetens digitala pärm."
         />
       </section>
+      <MaintenancePlanPanel propertyId={id} />
+      <MaintenancePlanExportCard propertyId={id} />
+      <MaintenancePlanGovernance propertyId={id} />
+      <MaintenanceActionManager propertyId={id} />
     </div>
   );
 }
