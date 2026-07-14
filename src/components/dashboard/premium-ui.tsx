@@ -40,7 +40,13 @@ export function EmptyState({ title, description }: { title: string; description?
   </div>;
 }
 
-export function InlineAlert({ children, tone = "error" }: { children: ReactNode; tone?: "error" | "success" | "info" }) {
-  const styles = tone === "error" ? "border-red-200 bg-red-50 text-red-800" : tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-sand-200 bg-sand-50 text-ink-600";
+export function InlineAlert({ children, tone = "error" }: { children: ReactNode; tone?: "error" | "success" | "info" | "warning" }) {
+  const styles = tone === "error"
+    ? "border-red-200 bg-red-50 text-red-800"
+    : tone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+      : tone === "warning"
+        ? "border-amber-200 bg-amber-50 text-amber-900"
+        : "border-sand-200 bg-sand-50 text-ink-600";
   return <p className={`rounded-xl border px-3 py-2.5 text-sm ${styles}`}>{children}</p>;
 }
