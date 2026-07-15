@@ -13,6 +13,8 @@ async function loadDraft(workOrderId: string, companyId: string) {
   const drafts = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
     SELECT d."id", d."draft_number", d."customer_name", d."customer_reference", d."subtotal_ex_vat"::double precision,
       d."vat_amount"::double precision, d."total_inc_vat"::double precision, d."notes", d."status", d."sync_status",
+      d."external_system", d."external_invoice_number", d."last_reconciled_at", d."last_external_status", d."payment_reference",
+      d."last_synced_at", d."last_sync_error", d."paid_at", d."invoiced_at", d."cancelled_at",
       w."work_order_number", w."title",
       COALESCE(json_agg(json_build_object('description', l."description", 'quantity', l."quantity"::double precision,
         'unit', l."unit", 'unitPriceExVat', l."unit_price_ex_vat"::double precision, 'vatRate', l."vat_rate"::double precision,
