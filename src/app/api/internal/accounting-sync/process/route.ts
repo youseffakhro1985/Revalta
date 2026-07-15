@@ -15,7 +15,7 @@ function retryDelayMinutes(attemptNumber: number) {
   return Math.min(60 * 12, Math.max(2, 2 ** attemptNumber));
 }
 
-export async function POST(request: Request) {
+async function processQueue(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Obehörig intern körning" }, { status: 401 });
   const workerId = `worker-${randomUUID()}`;
   const limit = Math.min(20, Math.max(1, Number(new URL(request.url).searchParams.get("limit") || 5)));
@@ -98,4 +98,12 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ workerId, processedCount: processed.length, processed });
+}
+
+export async function GET(request: Request) {
+  return processQueue(request);
+}
+
+export async function POST(request: Request) {
+  return processQueue(request);
 }
