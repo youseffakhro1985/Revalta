@@ -36,7 +36,8 @@ async function financialSnapshot(id: string, companyId: string) {
              "subtotal_ex_vat"::double precision AS "subtotal_ex_vat",
              "vat_amount"::double precision AS "vat_amount",
              "total_inc_vat"::double precision AS "total_inc_vat",
-             "notes", "approved_at", "created_at"
+             "notes", "approved_at", "created_at", "external_system", "external_invoice_id",
+             "exported_at", "sent_at", "invoiced_at", "paid_at", "cancelled_at", "status_comment"
       FROM "WorkOrderInvoiceDraft"
       WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
       LIMIT 1
@@ -138,6 +139,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           VALUES (${randomUUID()}, ${draftId}, ${String(line.id)}, ${String(line.description)}, ${Number(line.quantity ?? 1)}, ${line.unit ? String(line.unit) : null}, ${Number(line.unit_price ?? 0)}, ${vatRate}, ${Number(line.total_amount ?? 0)}, ${index})
         `);
       }
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "WorkOrderInvoiceStatusEvent" ("id", "company_id", "invoice_draft_id", "actor_user_id", "from_status", "to_status", "comment")
+        VALUES (${randomUUID()}, ${user.company_id}, ${draftId}, ${user.id}, NULL, 'draft', 'Faktureringsunderlag skapat')
+      `);
     });
     await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.invoice_draft_generated", metadata: { draftId, draftNumber, subtotal, vat, total: subtotal + vat } });
     return NextResponse.json({ success: true, draftId, draftNumber }, { status: 201 });
