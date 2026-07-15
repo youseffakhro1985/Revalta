@@ -18,7 +18,7 @@ type DocumentItem = {
 };
 
 type Props = {
-  entityType: "work_order" | "project" | "property";
+  entityType: "work_order" | "project" | "property" | "technical_asset";
   entityId: string;
   title?: string;
   description?: string;

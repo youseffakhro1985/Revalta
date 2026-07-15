@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarRange, CircleDollarSign, Gauge, Layers3 } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
@@ -71,14 +72,15 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <Panel title="Komponenter och tekniskt skick" description="Prioriterad efter utbytesår och skick." bodyClassName="p-0">
+        <Panel title="Komponenter och tekniskt skick" description="Prioriterad efter utbytesår och skick. Öppna en komponent för full historik och dokument." bodyClassName="p-0">
           <div className="divide-y divide-sand-100">
             {data.assets.map((asset) => {
               const condition = number(asset, "condition_grade");
               const replacementYear = number(asset, "expected_replacement_year");
               const warning = condition >= 4 || (replacementYear > 0 && replacementYear <= data.currentYear + 5);
+              const assetId = text(asset, "id");
               return (
-                <article key={text(asset, "id")} className="grid gap-4 p-5 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6">
+                <Link key={assetId} href={`/dashboard/fastigheter/${propertyId}/komponenter/${assetId}`} className="grid gap-4 p-5 transition hover:bg-sand-50 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold text-ink-900">{text(asset, "name")}</h3>
@@ -88,8 +90,8 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
                     <p className="mt-2 text-xs text-ink-400">Senaste händelse {formatDate(asset.last_event_at)} · {number(asset, "event_count")} livscykelhändelser</p>
                   </div>
                   <div className="sm:text-right"><p className="text-xs text-ink-400">Beräknat byte</p><p className="mt-1 font-semibold text-ink-900">{replacementYear || "Ej satt"}</p></div>
-                  <div className="sm:text-right"><p className="text-xs text-ink-400">Återanskaffning</p><p className="mt-1 font-semibold text-ink-900">{number(asset, "replacement_value") ? money.format(number(asset, "replacement_value")) : "Ej satt"}</p><p className="mt-1 text-xs text-ink-400">Historik {money.format(number(asset, "lifetime_cost"))}</p></div>
-                </article>
+                  <div className="sm:text-right"><p className="text-xs text-ink-400">Återanskaffning</p><p className="mt-1 font-semibold text-ink-900">{number(asset, "replacement_value") ? money.format(number(asset, "replacement_value")) : "Ej satt"}</p><p className="mt-1 text-xs font-semibold text-petroleum-700">Öppna komponent</p></div>
+                </Link>
               );
             })}
           </div>
