@@ -8,6 +8,7 @@ import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumP
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
+import { WorkOrderFinancialPanel } from "@/components/dashboard/work-order-financial-panel";
 import { WorkOrderMaterialsPanel } from "@/components/dashboard/work-order-materials-panel";
 import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
 import { WorkOrderTechnicianPanel } from "@/components/dashboard/work-order-technician-panel";
@@ -105,6 +106,7 @@ export default function WorkOrderDetailPage() {
 
     <WorkOrderExecutionPanel workOrderId={workOrder.id} />
     <WorkOrderMaterialsPanel workOrderId={workOrder.id} />
+    <WorkOrderFinancialPanel workOrderId={workOrder.id} />
     <WorkOrderReportingPanel workOrderId={workOrder.id} />
     <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
   </div>;
