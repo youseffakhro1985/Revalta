@@ -1,16 +1,57 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { writeAuditLog } from "@/lib/audit";
+import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string; componentId: string }> }) {
+const COMPONENT_STATUSES = new Set(["active", "planned", "inactive", "replaced", "decommissioned"]);
+const CRITICALITIES = new Set(["low", "normal", "high", "critical"]);
+
+function optionalText(value: unknown, maxLength = 255) {
+  if (value == null || value === "") return null;
+  return String(value).trim().slice(0, maxLength) || null;
+}
+
+function optionalInteger(value: unknown, min: number, max: number) {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new Error("Ogiltigt heltal");
+  return parsed;
+}
+
+function optionalNumber(value: unknown, min: number, max: number) {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) throw new Error("Ogiltigt belopp");
+  return parsed;
+}
+
+function optionalDate(value: unknown) {
+  if (value == null || value === "") return null;
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) throw new Error("Ogiltigt datum");
+  return parsed;
+}
+
+async function resolveContext(params: Promise<{ id: string; componentId: string }>) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!user) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) };
+  if (!user.company_id) return { error: NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 }) };
 
   const { id: propertyId, componentId } = await params;
-  const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
-  if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
+  const property = await db.property.findFirst({
+    where: { id: propertyId, ...tenantWhere(user) },
+    select: { id: true, name: true },
+  });
+  if (!property) return { error: NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 }) };
+
+  return { user, propertyId, componentId, property };
+}
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string; componentId: string }> }) {
+  const context = await resolveContext(params);
+  if ("error" in context) return context.error;
+  const { user, propertyId, componentId, property } = context;
 
   const components = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
     SELECT a.*, b."name" AS "building_name"
@@ -73,4 +114,81 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   };
 
   return NextResponse.json({ property, component, events, costs, linkedWorkOrders, linkedProjects, metrics });
+}
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; componentId: string }> }) {
+  const context = await resolveContext(params);
+  if ("error" in context) return context.error;
+  const { user, propertyId, componentId } = context;
+
+  if (!canCreateProperties(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att ändra tekniska komponenter" }, { status: 403 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
+  }
+
+  const name = String(body.name || "").trim().slice(0, 160);
+  if (name.length < 2) return NextResponse.json({ error: "Komponentnamnet måste innehålla minst två tecken" }, { status: 400 });
+
+  const status = String(body.status || "active");
+  const criticality = String(body.criticality || "normal");
+  if (!COMPONENT_STATUSES.has(status)) return NextResponse.json({ error: "Ogiltig komponentstatus" }, { status: 400 });
+  if (!CRITICALITIES.has(criticality)) return NextResponse.json({ error: "Ogiltig kritikalitet" }, { status: 400 });
+
+  try {
+    const installationYear = optionalInteger(body.installation_year, 1800, 2200);
+    const technicalLifetime = optionalInteger(body.technical_lifetime_years, 0, 500);
+    const economicLifetime = optionalInteger(body.economic_lifetime_years, 0, 500);
+    const replacementYear = optionalInteger(body.expected_replacement_year, 1800, 2500);
+    const conditionGrade = optionalInteger(body.condition_grade, 1, 5);
+    const replacementValue = optionalNumber(body.replacement_value, 0, 1_000_000_000_000);
+    const commissionedAt = optionalDate(body.commissioned_at);
+    const nextServiceAt = optionalDate(body.next_service_at);
+
+    const updated = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+      UPDATE "PropertyTechnicalAsset"
+      SET "name" = ${name},
+          "category" = ${optionalText(body.category, 120)},
+          "component_class" = ${optionalText(body.component_class, 120)},
+          "location" = ${optionalText(body.location, 255)},
+          "status" = ${status},
+          "criticality" = ${criticality},
+          "manufacturer" = ${optionalText(body.manufacturer, 160)},
+          "model" = ${optionalText(body.model, 160)},
+          "serial_number" = ${optionalText(body.serial_number, 160)},
+          "installation_year" = ${installationYear},
+          "commissioned_at" = ${commissionedAt},
+          "technical_lifetime_years" = ${technicalLifetime},
+          "economic_lifetime_years" = ${economicLifetime},
+          "expected_replacement_year" = ${replacementYear},
+          "condition_grade" = ${conditionGrade},
+          "replacement_value" = ${replacementValue},
+          "responsible_supplier" = ${optionalText(body.responsible_supplier, 200)},
+          "next_service_at" = ${nextServiceAt},
+          "updated_at" = CURRENT_TIMESTAMP
+      WHERE "id" = ${componentId}
+        AND "property_id" = ${propertyId}
+        AND "company_id" = ${user.company_id}
+      RETURNING *
+    `);
+
+    if (!updated[0]) return NextResponse.json({ error: "Komponenten hittades inte" }, { status: 404 });
+
+    await writeAuditLog(user, {
+      entityType: "technical_asset",
+      entityId: componentId,
+      action: "updated",
+      metadata: { propertyId, fields: Object.keys(body).sort() },
+    });
+
+    return NextResponse.json({ component: updated[0] });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Kunde inte uppdatera komponenten";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }
