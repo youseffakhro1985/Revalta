@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle2, CircleAlert, FolderKanban, Gauge, MapPin, User
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
+import { WorkOrderAccountingSyncPanel } from "@/components/dashboard/work-order-accounting-sync-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
 import { WorkOrderFinancialPanel } from "@/components/dashboard/work-order-financial-panel";
 import { WorkOrderMaterialsPanel } from "@/components/dashboard/work-order-materials-panel";
@@ -107,6 +108,7 @@ export default function WorkOrderDetailPage() {
     <WorkOrderExecutionPanel workOrderId={workOrder.id} />
     <WorkOrderMaterialsPanel workOrderId={workOrder.id} />
     <WorkOrderFinancialPanel workOrderId={workOrder.id} />
+    <WorkOrderAccountingSyncPanel workOrderId={workOrder.id} />
     <WorkOrderReportingPanel workOrderId={workOrder.id} />
     <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
   </div>;
