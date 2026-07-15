@@ -14,6 +14,9 @@ ALTER TABLE "WorkOrder"
   ADD COLUMN "billable" BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN "requires_inspection" BOOLEAN NOT NULL DEFAULT false;
 
+-- Normalisera äldre status innan det nya enterprise-flödet låses med CHECK.
+UPDATE "WorkOrder" SET "status" = 'waiting_material' WHERE "status" = 'waiting';
+
 CREATE TABLE "WorkOrderNumberCounter" (
   "company_id" TEXT NOT NULL,
   "year" INTEGER NOT NULL,
