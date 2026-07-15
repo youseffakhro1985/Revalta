@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
+import { ComponentRegistryManager } from "@/components/properties/component-registry-manager";
+import { ComponentRegistryOverview } from "@/components/properties/component-registry-overview";
 import { MaintenanceActionManager } from "@/components/properties/maintenance-action-manager";
 import { MaintenanceBudgetTimeline } from "@/components/properties/maintenance-budget-timeline";
 import { MaintenancePlanExportCard } from "@/components/properties/maintenance-plan-export-card";
@@ -31,6 +33,8 @@ export default async function PropertyCardLayout({ children, params }: { childre
           description="Samla ritningar, driftinstruktioner, garantier, besiktningsprotokoll, avtal och andra underlag i fastighetens digitala pärm."
         />
       </section>
+      <ComponentRegistryOverview propertyId={id} />
+      <ComponentRegistryManager propertyId={id} />
       <MaintenancePlanPanel propertyId={id} />
       <MaintenancePlanExportCard propertyId={id} />
       <MaintenancePlanGovernance propertyId={id} />
