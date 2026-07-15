@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Banknote, CalendarClock, CheckCircle2, CircleAlert, FolderKanban, Gauge, MapPin, UserRound, Wrench } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CircleAlert, FolderKanban, Gauge, MapPin, UserRound, Wrench } from "lucide-react";
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
 import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
+import { WorkOrderTechnicianPanel } from "@/components/dashboard/work-order-technician-panel";
 
 type StatusEvent = { id: string; from_status: string | null; to_status: string; reason: string | null; created_at: string; actor: { name: string | null; email: string } };
 type WorkOrder = {
@@ -69,6 +70,8 @@ export default function WorkOrderDetailPage() {
       <MetricCard icon={Gauge} label="Respons-SLA" value={responseSla.label} hint={`Senast ${formatDate(workOrder.sla_response_due_at, true)}`} />
       <MetricCard icon={responseSla.late || resolutionSla.late ? CircleAlert : CheckCircle2} label="Lösnings-SLA" value={resolutionSla.label} hint={`Senast ${formatDate(workOrder.sla_resolution_due_at, true)}`} />
     </section>
+
+    <WorkOrderTechnicianPanel workOrderId={workOrder.id} />
 
     <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
       <Panel title="Operativ styrning" description="Validerade nästa steg, tidsplan, SLA och ekonomi.">
