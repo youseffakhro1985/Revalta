@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
 
+const RECOVERABLE_FAILED_MIGRATION = "20260713190000_add_work_orders_and_projects";
+
 function execute(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
@@ -24,6 +26,30 @@ function sleep(milliseconds) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 }
 
+function tryRepairKnownFailedMigration(diagnostics) {
+  const isP3009 = /P3009/i.test(diagnostics);
+  const isKnownMigration = diagnostics.includes(RECOVERABLE_FAILED_MIGRATION);
+  if (!isP3009 || !isKnownMigration) return false;
+
+  console.warn(`Detected the known failed migration ${RECOVERABLE_FAILED_MIGRATION}.`);
+  console.warn("Marking only this failed attempt as rolled back before a safe idempotent retry.");
+
+  const resolve = execute("npx", [
+    "prisma",
+    "migrate",
+    "resolve",
+    "--rolled-back",
+    RECOVERABLE_FAILED_MIGRATION,
+  ]);
+
+  if (resolve.status !== 0) {
+    console.error("Could not resolve the known failed migration. Deployment remains stopped.");
+    process.exit(resolve.status ?? 1);
+  }
+
+  return true;
+}
+
 function runMigrationWithRetry() {
   const transientPatterns = [
     /P1001/i,
@@ -34,15 +60,22 @@ function runMigrationWithRetry() {
     /prepared statement.*already exists/i,
   ];
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    console.log(`Applying production database migrations (attempt ${attempt}/3)…`);
+  let repairedKnownMigration = false;
+
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    console.log(`Applying production database migrations (attempt ${attempt}/4)…`);
     const result = execute("npx", ["prisma", "migrate", "deploy"]);
     if (result.status === 0) return;
 
     const diagnostics = `${result.stdout || ""}\n${result.stderr || ""}`;
-    const isTransient = transientPatterns.some((pattern) => pattern.test(diagnostics));
 
-    if (!isTransient || attempt === 3) {
+    if (!repairedKnownMigration && tryRepairKnownFailedMigration(diagnostics)) {
+      repairedKnownMigration = true;
+      continue;
+    }
+
+    const isTransient = transientPatterns.some((pattern) => pattern.test(diagnostics));
+    if (!isTransient || attempt === 4) {
       console.error("Production migration failed with a non-transient error. Deployment stopped to protect database consistency.");
       process.exit(result.status ?? 1);
     }
