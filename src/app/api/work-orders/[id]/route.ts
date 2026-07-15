@@ -55,7 +55,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     WHERE e."work_order_id" = ${id} AND e."company_id" = ${user.company_id}
     ORDER BY e."created_at" DESC LIMIT 100
   `);
-  const projects = await db.project.findMany({ where: { company_id: user.company_id, OR: [{ source_work_order_id: id }, { work_orders: { some: { id } } }] }, select: { id: true, name: true, status: true } });
+  const projects = await db.project.findMany({
+    where: { company_id: user.company_id, source_work_order_id: id },
+    select: { id: true, name: true, status: true },
+  });
   const status = String(rows[0].status);
   return NextResponse.json({ workOrder: { ...rows[0], projects, status_history: history, allowed_transitions: isWorkOrderStatus(status) ? allowedTransitions(status) : [] } });
 }
