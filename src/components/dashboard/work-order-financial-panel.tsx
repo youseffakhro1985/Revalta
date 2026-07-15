@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Banknote, CircleAlert, FileText, LockKeyhole, RotateCcw } from "lucide-react";
+import { BadgeCheck, Banknote, CircleAlert, Download, FileJson, FileText, LockKeyhole, Printer, ReceiptText, RotateCcw, Send } from "lucide-react";
 import { InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type FinancialData = {
@@ -16,15 +17,23 @@ type FinancialData = {
   };
   summary: { actual_total: number; approved_total: number; pending_total: number; rejected_total: number; pending_count: number };
   variance: { amount: number; percent: number | null };
-  invoiceDraft: null | { draft_number: string; status: string; subtotal_ex_vat: number; vat_amount: number; total_inc_vat: number; customer_name: string | null; customer_reference: string | null; created_at: string };
+  invoiceDraft: null | {
+    id: string; draft_number: string; status: string; subtotal_ex_vat: number; vat_amount: number; total_inc_vat: number;
+    customer_name: string | null; customer_reference: string | null; created_at: string;
+    external_system: string | null; external_invoice_id: string | null; exported_at: string | null; sent_at: string | null;
+    invoiced_at: string | null; paid_at: string | null; cancelled_at: string | null; status_comment: string | null;
+  };
 };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 const percent = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 1 });
 const statusLabels: Record<string, string> = { open: "Öppen", review: "Under granskning", approved: "Slutgodkänd", rejected: "Avvisad", reopened: "Återöppnad" };
+const invoiceStatusLabels: Record<string, string> = { draft: "Utkast", exported: "Exporterat", sent: "Skickat", invoiced: "Fakturerat", paid: "Betalt", cancelled: "Annullerat" };
+const invoiceTransitions: Record<string, string[]> = { draft: ["exported", "cancelled"], exported: ["sent", "invoiced", "cancelled"], sent: ["invoiced", "cancelled"], invoiced: ["paid", "cancelled"], paid: [], cancelled: [] };
 
 export function WorkOrderFinancialPanel({ workOrderId }: { workOrderId: string }) {
   const endpoint = `/api/work-orders/${workOrderId}/financial`;
+  const exportEndpoint = `${endpoint}/export`;
   const [data, setData] = useState<FinancialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +65,18 @@ export function WorkOrderFinancialPanel({ workOrderId }: { workOrderId: string }
     finally { setSaving(false); }
   }
 
+  async function changeInvoiceStatus(form: HTMLFormElement) {
+    const formData = new FormData(form);
+    setSaving(true); setError(""); setSuccess("");
+    try {
+      const response = await fetch(exportEndpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: formData.get("status"), externalSystem: formData.get("externalSystem"), externalInvoiceId: formData.get("externalInvoiceId"), comment: formData.get("comment") }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Fakturastatus kunde inte uppdateras");
+      setSuccess("Fakturastatusen har uppdaterats och loggats."); await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Fakturastatus kunde inte uppdateras"); }
+    finally { setSaving(false); }
+  }
+
   const budget = useMemo(() => Number(data?.workOrder.approved_budget ?? data?.workOrder.estimated_cost ?? 0), [data]);
   const actual = Number(data?.summary.actual_total ?? 0);
   const variance = Number(data?.variance.amount ?? 0);
@@ -64,6 +85,8 @@ export function WorkOrderFinancialPanel({ workOrderId }: { workOrderId: string }
 
   if (loading) return <div className="h-80 animate-pulse rounded-2xl bg-sand-100" aria-label="Laddar ekonomisk uppföljning" />;
   if (!data) return <InlineAlert tone="error">{error || "Ekonomisk information saknas"}</InlineAlert>;
+
+  const nextInvoiceStatuses = data.invoiceDraft ? invoiceTransitions[data.invoiceDraft.status] || [] : [];
 
   return <div className="space-y-6">
     <div aria-live="polite">{(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}</div>
@@ -77,7 +100,7 @@ export function WorkOrderFinancialPanel({ workOrderId }: { workOrderId: string }
       </section>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const formData = new FormData(form); void act({ action: "budget.set", approvedBudget: formData.get("approvedBudget") }, "Budgeten har sparats."); }} className="rounded-2xl border border-sand-200 bg-sand-50/70 p-5">
+        <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const formData = new FormData(event.currentTarget); void act({ action: "budget.set", approvedBudget: formData.get("approvedBudget") }, "Budgeten har sparats."); }} className="rounded-2xl border border-sand-200 bg-sand-50/70 p-5">
           <div className="flex items-center gap-3"><Banknote className="h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-950">Godkänd kostnadsbudget</h3><p className="text-sm text-ink-500">Lås referensvärdet innan slutlig ekonomisk granskning.</p></div></div>
           <input name="approvedBudget" type="number" min="0" step="0.01" defaultValue={budget || ""} disabled={isLocked} placeholder="Budget exkl. moms" className={`${premiumFieldClass} mt-4`} />
           <button disabled={saving || isLocked} className={`${premiumPrimaryButtonClass} mt-3 w-full disabled:opacity-50`}>{isLocked ? "Budgeten är låst" : "Spara godkänd budget"}</button>
@@ -97,12 +120,30 @@ export function WorkOrderFinancialPanel({ workOrderId }: { workOrderId: string }
       </div>
     </Panel>
 
-    <Panel title="Faktureringsunderlag" description="Skapas från slutgodkända kostnadsrader och kan senare exporteras till ekonomisystem.">
-      {data.invoiceDraft ? <div className="grid gap-4 rounded-2xl border border-petroleum-200 bg-petroleum-50 p-5 sm:grid-cols-2 xl:grid-cols-4">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Underlag</p><p className="mt-1 font-semibold text-petroleum-950">{data.invoiceDraft.draft_number}</p></div>
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Exkl. moms</p><p className="mt-1 font-semibold text-petroleum-950">{money.format(data.invoiceDraft.subtotal_ex_vat)}</p></div>
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Moms</p><p className="mt-1 font-semibold text-petroleum-950">{money.format(data.invoiceDraft.vat_amount)}</p></div>
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Inkl. moms</p><p className="mt-1 font-semibold text-petroleum-950">{money.format(data.invoiceDraft.total_inc_vat)}</p></div>
+    <Panel title="Faktureringsunderlag" description="Export, ekonomisystem och spårbar fakturalivscykel.">
+      {data.invoiceDraft ? <div className="space-y-5">
+        <div className="grid gap-4 rounded-2xl border border-petroleum-200 bg-petroleum-50 p-5 sm:grid-cols-2 xl:grid-cols-5">
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Underlag</p><p className="mt-1 font-semibold text-petroleum-950">{data.invoiceDraft.draft_number}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Status</p><p className="mt-1 font-semibold text-petroleum-950">{invoiceStatusLabels[data.invoiceDraft.status] || data.invoiceDraft.status}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Exkl. moms</p><p className="mt-1 font-semibold text-petroleum-950">{money.format(data.invoiceDraft.subtotal_ex_vat)}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Moms</p><p className="mt-1 font-semibold text-petroleum-950">{money.format(data.invoiceDraft.vat_amount)}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-600">Inkl. moms</p><p className="mt-1 font-semibold text-petroleum-950">{money.format(data.invoiceDraft.total_inc_vat)}</p></div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <a href={`${exportEndpoint}?format=csv`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-4 text-sm font-semibold text-ink-700 hover:border-petroleum-300"><Download className="h-4 w-4" />Excel / CSV</a>
+          <a href={`${exportEndpoint}?format=json`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-4 text-sm font-semibold text-ink-700 hover:border-petroleum-300"><FileJson className="h-4 w-4" />Integration / JSON</a>
+          <Link href={`/dashboard/arbetsorder/${workOrderId}/fakturaunderlag`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-4 text-sm font-semibold text-ink-700 hover:border-petroleum-300"><Printer className="h-4 w-4" />PDF / utskrift</Link>
+        </div>
+
+        {nextInvoiceStatuses.length > 0 ? <form onSubmit={(event) => { event.preventDefault(); void changeInvoiceStatus(event.currentTarget); }} className="grid gap-4 rounded-2xl border border-sand-200 bg-sand-50/70 p-5 sm:grid-cols-2">
+          <div className="sm:col-span-2 flex items-center gap-3"><ReceiptText className="h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-950">Uppdatera fakturastatus</h3><p className="text-sm text-ink-500">Statusändringen sparas i ett oföränderligt revisionsspår.</p></div></div>
+          <select name="status" className={premiumFieldClass}>{nextInvoiceStatuses.map((status) => <option key={status} value={status}>{invoiceStatusLabels[status]}</option>)}</select>
+          <input name="externalSystem" defaultValue={data.invoiceDraft.external_system || ""} placeholder="Ekonomisystem, t.ex. Fortnox" className={premiumFieldClass} />
+          <input name="externalInvoiceId" defaultValue={data.invoiceDraft.external_invoice_id || ""} placeholder="Externt fakturanummer" className={premiumFieldClass} />
+          <input name="comment" placeholder="Kommentar eller annulleringsorsak" className={premiumFieldClass} />
+          <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}><Send className="mr-2 inline h-4 w-4" />Spara fakturastatus</button>
+        </form> : <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">Fakturaflödet är avslutat med status <strong>{invoiceStatusLabels[data.invoiceDraft.status] || data.invoiceDraft.status}</strong>.</div>}
       </div> : <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const formData = new FormData(form); void act({ action: "invoice.generate", customerName: formData.get("customerName"), customerReference: formData.get("customerReference"), vatRate: formData.get("vatRate"), notes: formData.get("notes") }, "Faktureringsunderlaget har skapats.", () => form.reset()); }} className="grid gap-4 sm:grid-cols-2">
         <input name="customerName" placeholder="Kund eller kostnadsbärare" className={premiumFieldClass} />
         <input name="customerReference" placeholder="Kundreferens" className={premiumFieldClass} />
