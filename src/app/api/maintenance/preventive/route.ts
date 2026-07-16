@@ -24,6 +24,8 @@ type OverviewRow = {
   work_order_number: string | null;
   work_order_status: string | null;
   maintenance_cycle_key: string | null;
+  completed_at: Date | null;
+  maintenance_cycle_advanced_at: Date | null;
 };
 
 export async function GET() {
@@ -36,17 +38,18 @@ export async function GET() {
            a."name", a."category", a."location", a."criticality", a."next_service_at",
            a."service_interval_months", a."service_lead_days", a."auto_create_service_work_orders",
            w."id" AS "work_order_id", w."work_order_number", w."status" AS "work_order_status",
-           w."maintenance_cycle_key"
+           w."maintenance_cycle_key", w."completed_at", w."maintenance_cycle_advanced_at"
     FROM "PropertyTechnicalAsset" a
     INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
     LEFT JOIN "Building" b ON b."id" = a."building_id"
     LEFT JOIN LATERAL (
-      SELECT wo."id", wo."work_order_number", wo."status", wo."maintenance_cycle_key"
+      SELECT wo."id", wo."work_order_number", wo."status", wo."maintenance_cycle_key",
+             wo."completed_at", wo."maintenance_cycle_advanced_at"
       FROM "WorkOrder" wo
       WHERE wo."company_id" = a."company_id"
         AND wo."technical_asset_id" = a."id"
         AND wo."source" = 'maintenance_plan'
-      ORDER BY wo."created_at" DESC
+      ORDER BY COALESCE(wo."maintenance_cycle_advanced_at", wo."created_at") DESC
       LIMIT 1
     ) w ON TRUE
     WHERE a."company_id" = ${user.company_id}
@@ -63,6 +66,7 @@ export async function GET() {
     dueSoon: rows.filter((row) => row.next_service_at && row.next_service_at >= now && row.next_service_at <= in30Days).length,
     automatic: rows.filter((row) => row.auto_create_service_work_orders).length,
     withWorkOrder: rows.filter((row) => row.work_order_id).length,
+    completedCycles: rows.filter((row) => row.maintenance_cycle_advanced_at).length,
   };
 
   return NextResponse.json({ rows, metrics, canRun: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
