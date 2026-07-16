@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     if (query.length < 2) return NextResponse.json({ results: [] });
 
     const contains = { contains: query, mode: "insensitive" as const };
-    const [properties, tickets, users] = await Promise.all([
+    const [properties, tickets, users, leaseHolders] = await Promise.all([
       db.property.findMany({
         where: {
           ...tenantWhere(user),
@@ -50,6 +50,27 @@ export async function GET(request: Request) {
         orderBy: { name: "asc" },
         select: { id: true, name: true, email: true, role: true },
       }),
+      user.company_id ? db.leaseHolder.findMany({
+        where: {
+          company_id: user.company_id,
+          status: "active",
+          OR: [{ name: contains }, { contact_name: contains }, { email: contains }, { organization_number: contains }],
+        },
+        take: 6,
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          organization_number: true,
+          leases: {
+            where: { status: { in: ["reserved", "active", "notice"] } },
+            orderBy: { updated_at: "desc" },
+            take: 1,
+            select: { lease_number: true, unit: { select: { designation: true } }, property: { select: { name: true } } },
+          },
+        },
+      }) : Promise.resolve([]),
     ]);
 
     const results = [
@@ -73,6 +94,15 @@ export async function GET(request: Request) {
         title: item.name || item.email,
         subtitle: `${item.email} · ${item.role}`,
         href: "/dashboard/team",
+      })),
+      ...leaseHolders.map((item) => ({
+        id: item.id,
+        type: "lease_holder",
+        title: item.name,
+        subtitle: item.leases[0]
+          ? [item.leases[0].property.name, item.leases[0].unit.designation, item.leases[0].lease_number].join(" · ")
+          : item.organization_number || item.email || "Hyrespart",
+        href: "/dashboard/uthyrning",
       })),
     ];
 

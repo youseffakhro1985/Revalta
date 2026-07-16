@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Building2, ClipboardList, Search, UserRound, X } from "lucide-react";
+import { Building2, ClipboardList, FileSignature, Search, UserRound, X } from "lucide-react";
 
 type SearchResult = {
   id: string;
-  type: "property" | "ticket" | "user";
+  type: "property" | "ticket" | "user" | "lease_holder";
   title: string;
   subtitle: string;
   href: string;
@@ -16,6 +16,7 @@ const icons = {
   property: Building2,
   ticket: ClipboardList,
   user: UserRound,
+  lease_holder: FileSignature,
 };
 
 export function GlobalSearch() {
@@ -90,7 +91,7 @@ export function GlobalSearch() {
                 ref={inputRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Sök fastighet, ärende eller person..."
+                placeholder="Sök fastighet, ärende, användare eller hyrespart..."
                 className="h-16 flex-1 bg-transparent text-[15px] text-ink-900 outline-none placeholder:text-ink-400"
               />
               <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 text-ink-400 hover:bg-sand-100 hover:text-ink-700">
@@ -102,7 +103,7 @@ export function GlobalSearch() {
               {query.trim().length < 2 ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-[13px] font-medium text-ink-700">Sök i hela fastighetssystemet</p>
-                  <p className="mt-1 text-[12px] text-ink-400">Skriv minst två tecken för att hitta fastigheter, ärenden och användare.</p>
+                  <p className="mt-1 text-[12px] text-ink-400">Skriv minst två tecken för att hitta fastigheter, ärenden, användare och hyresparter.</p>
                 </div>
               ) : loading ? (
                 <p className="px-4 py-10 text-center text-[12px] text-ink-400">Söker...</p>

@@ -4,7 +4,6 @@ import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
 const noticeAction = "rent_notice.created";
-const leaseAction = "lease.created";
 
 export async function GET() {
   try {
@@ -18,12 +17,16 @@ export async function GET() {
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       }),
-      db.auditLog.findMany({
-        where: { company_id: user.company_id ?? undefined, action: leaseAction },
-        orderBy: { created_at: "desc" },
+      user.company_id ? db.lease.findMany({
+        where: { company_id: user.company_id },
+        orderBy: { updated_at: "desc" },
         take: 500,
-        select: { id: true, entity_id: true, metadata: true },
-      }),
+        include: {
+          property: { select: { name: true } },
+          unit: { select: { designation: true } },
+          lease_holder: { select: { name: true } },
+        },
+      }) : Promise.resolve([]),
       db.property.findMany({
         where: tenantWhere(user),
         orderBy: { name: "asc" },
@@ -33,7 +36,15 @@ export async function GET() {
 
     return NextResponse.json({
       notices: notices.map((log) => ({ id: log.id, property_id: log.entity_id, ...(log.metadata as object), created_at: log.created_at })),
-      leases: leases.map((log) => ({ id: log.id, property_id: log.entity_id, ...(log.metadata as object) })),
+      leases: leases.map((lease) => ({
+        id: lease.id,
+        property_id: lease.property_id,
+        property_name: lease.property.name,
+        tenant_name: lease.lease_holder.name,
+        unit: lease.unit.designation,
+        monthly_rent: Number(lease.monthly_rent),
+        status: lease.status,
+      })),
       properties,
     });
   } catch (error) {
@@ -51,26 +62,41 @@ export async function POST(request: Request) {
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();
     const leaseId = String(body.leaseId || "").trim();
-    const tenantName = String(body.tenantName || "").trim();
-    const unit = String(body.unit || "").trim();
+    let tenantName = String(body.tenantName || "").trim();
+    let unit = String(body.unit || "").trim();
     const period = String(body.period || "").trim();
     const dueDate = String(body.dueDate || "").trim();
     const status = String(body.status || "draft").trim();
-    const baseRent = Number(body.baseRent || 0);
+    let baseRent = Number(body.baseRent || 0);
     const additions = Number(body.additions || 0);
     const deductions = Number(body.deductions || 0);
     const indexPercent = Number(body.indexPercent || 0);
     const note = String(body.note || "").trim();
 
     const allowedStatuses = new Set(["draft", "sent", "paid", "overdue", "credited"]);
-    if (!propertyId || !period || !dueDate || !allowedStatuses.has(status)) {
+    if (!period || !dueDate || !allowedStatuses.has(status)) {
       return NextResponse.json({ error: "Fastighet, period, förfallodatum och giltig status krävs" }, { status: 400 });
     }
     if ([baseRent, additions, deductions, indexPercent].some((value) => !Number.isFinite(value) || value < 0)) {
       return NextResponse.json({ error: "Kontrollera hyra, tillägg, avdrag och index" }, { status: 400 });
     }
 
-    const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
+    let resolvedPropertyId = propertyId;
+    if (leaseId) {
+      if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+      const lease = await db.lease.findFirst({
+        where: { id: leaseId, company_id: user.company_id },
+        include: { lease_holder: { select: { name: true } }, unit: { select: { designation: true } } },
+      });
+      if (!lease) return NextResponse.json({ error: "Kontraktet hittades inte" }, { status: 400 });
+      resolvedPropertyId = lease.property_id;
+      tenantName = lease.lease_holder.name;
+      unit = lease.unit.designation;
+      if (body.baseRent === "" || body.baseRent === undefined || body.baseRent === null) baseRent = Number(lease.monthly_rent);
+    }
+
+    if (!resolvedPropertyId) return NextResponse.json({ error: "Fastighet krävs" }, { status: 400 });
+    const property = await db.property.findFirst({ where: { id: resolvedPropertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
     const indexedRent = baseRent * (1 + indexPercent / 100);
