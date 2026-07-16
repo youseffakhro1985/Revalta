@@ -87,12 +87,14 @@ export default function RegisterPage() {
             <input 
               type="password" 
               required
-              minLength={6}
+              minLength={10}
+              maxLength={128}
               className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
+            <p className="mt-2 text-xs text-slate-500">Minst 10 tecken med både bokstav och siffra.</p>
           </div>
           <button 
             type="submit" 

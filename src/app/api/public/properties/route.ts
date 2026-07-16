@@ -10,9 +10,7 @@ export async function GET() {
     }
 
     const properties = await db.property.findMany({
-      where: process.env.PUBLIC_PORTAL_COMPANY_ID
-        ? { company_id: portal.company.id }
-        : { company: { status: "active" } },
+      where: { company_id: portal.company.id, status: "active" },
       orderBy: { name: "asc" },
       select: {
         id: true,

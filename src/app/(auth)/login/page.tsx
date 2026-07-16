@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { safeInternalPath } from "@/lib/security";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -24,7 +25,7 @@ export default function LoginPage() {
       if (res.ok) {
         const params = new URLSearchParams(window.location.search);
         const nextPath = params.get("next");
-        router.push(nextPath?.startsWith("/") ? nextPath : "/dashboard");
+        router.push(safeInternalPath(nextPath));
       } else {
         const data = await res.json();
         setError(data.error || "Inloggningen misslyckades");

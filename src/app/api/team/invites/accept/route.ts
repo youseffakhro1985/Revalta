@@ -2,12 +2,16 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { hashPassword, hashResetToken } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import { isStrongPassword, passwordPolicyMessage } from "@/lib/security";
 
 export async function POST(request: Request) {
   try {
     const { token, password, name } = await request.json();
-    if (typeof token !== "string" || !token || typeof password !== "string" || password.length < 6) {
-      return NextResponse.json({ error: "Token och minst 6 tecken i lösenord krävs" }, { status: 400 });
+    if (typeof token !== "string" || !token) {
+      return NextResponse.json({ error: "Inbjudningslänken saknas" }, { status: 400 });
+    }
+    if (!isStrongPassword(password)) {
+      return NextResponse.json({ error: passwordPolicyMessage }, { status: 400 });
     }
 
     const invite = await db.teamInvite.findUnique({

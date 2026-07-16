@@ -4,6 +4,7 @@ import { createResetToken, hashResetToken } from "@/lib/auth";
 import { canManageTeam, getCurrentUser } from "@/lib/current-user";
 import { queueTicketNotification } from "@/lib/integrations";
 import { NextResponse } from "next/server";
+import { isValidEmail, normalizeEmail } from "@/lib/security";
 
 const allowedRoles = new Set(["admin", "manager", "technician", "viewer"]);
 
@@ -47,11 +48,11 @@ export async function POST(request: Request) {
     }
 
     const { name, email, role } = await request.json();
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedEmail = normalizeEmail(email);
     const normalizedName = typeof name === "string" && name.trim() ? name.trim() : null;
     const normalizedRole = typeof role === "string" && allowedRoles.has(role) ? role : "viewer";
 
-    if (!normalizedEmail.includes("@")) {
+    if (!isValidEmail(normalizedEmail)) {
       return NextResponse.json({ error: "Giltig e-post krävs" }, { status: 400 });
     }
 

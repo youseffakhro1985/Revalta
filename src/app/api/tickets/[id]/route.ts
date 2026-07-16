@@ -91,7 +91,15 @@ export async function GET(
       return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
     }
 
-    return NextResponse.json({ ticket });
+    return NextResponse.json({
+      ticket: {
+        ...ticket,
+        attachments: ticket.attachments.map((attachment) => ({
+          ...attachment,
+          data_url: `/api/attachments/${attachment.id}`,
+        })),
+      },
+    });
   } catch (error) {
     console.error("Get ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -105,6 +113,9 @@ export async function PATCH(
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att uppdatera ärenden" }, { status: 403 });
+    }
     const { id } = await params;
     const { status, priority, assignedToId } = await request.json();
 
@@ -137,6 +148,16 @@ export async function PATCH(
 
     const normalizedStatus = typeof status === "string" && status.trim() ? status.trim() : undefined;
     const normalizedPriority = typeof priority === "string" && priority.trim() ? priority.trim() : undefined;
+
+    const allowedStatuses = new Set(["new", "assigned", "in_progress", "waiting", "closed"]);
+    const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
+
+    if (normalizedStatus && !allowedStatuses.has(normalizedStatus)) {
+      return NextResponse.json({ error: "Ogiltig ärendestatus" }, { status: 400 });
+    }
+    if (normalizedPriority && !allowedPriorities.has(normalizedPriority)) {
+      return NextResponse.json({ error: "Ogiltig prioritet" }, { status: 400 });
+    }
 
     const ticket = await db.ticket.update({
       where: { id },

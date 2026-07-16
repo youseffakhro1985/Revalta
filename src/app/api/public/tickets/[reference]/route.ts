@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`public-track:${ip}`, 20, 60 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`public-track:${ip}`, 20, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
     }

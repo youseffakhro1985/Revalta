@@ -3,18 +3,22 @@ import db from "@/lib/db";
 import { hashPassword, hashResetToken } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { isStrongPassword, passwordPolicyMessage } from "@/lib/security";
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`password-reset-confirm:${ip}`, 10, 60 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`password-reset-confirm:${ip}`, 10, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
     }
 
     const { token, password } = await request.json();
-    if (typeof token !== "string" || !token || typeof password !== "string" || password.length < 6) {
-      return NextResponse.json({ error: "Token och minst 6 tecken i lösenord krävs" }, { status: 400 });
+    if (typeof token !== "string" || !token) {
+      return NextResponse.json({ error: "Återställningslänken saknas" }, { status: 400 });
+    }
+    if (!isStrongPassword(password)) {
+      return NextResponse.json({ error: passwordPolicyMessage }, { status: 400 });
     }
 
     const tokenHash = hashResetToken(token);

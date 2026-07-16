@@ -10,6 +10,7 @@ export function LogoutButton({ className = "" }: { className?: string }) {
   async function handleLogout() {
     setLoading(true);
     await fetch("/api/auth/logout", { method: "POST" });
+    navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_AUTH_CACHE" });
     router.push("/login");
     router.refresh();
   }
