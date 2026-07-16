@@ -22,13 +22,7 @@ type Job = {
 };
 type Data = { jobs: Job[]; counts: Record<string, number>; total: number; providers: Provider[]; canManage: boolean };
 
-const statusLabels: Record<string, string> = {
-  queued: "I kö",
-  processing: "Bearbetas",
-  sent: "Skickad",
-  failed: "Misslyckad",
-  cancelled: "Avbruten",
-};
+const statusLabels: Record<string, string> = { queued: "I kö", processing: "Bearbetas", sent: "Skickad", failed: "Misslyckad", cancelled: "Avbruten" };
 const providerLabels: Record<string, string> = { fortnox: "Fortnox", visma: "Visma", webhook: "Webhook" };
 const dt = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 
@@ -101,7 +95,8 @@ export default function InvoiceExportOperationsPage() {
     <header className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[.16em] text-petroleum-600">Ekonomi · integrationer</p>
+          <Link href="/dashboard/integrationer" className="text-sm font-semibold text-petroleum-700">Integrationer</Link>
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[.16em] text-petroleum-600">Ekonomi · integrationer</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink-950">Driftcenter för fakturaexporter</h1>
           <p className="mt-2 max-w-3xl text-ink-600">Samlad kontroll över Fortnox-, Visma- och webhookexporter för hela organisationen. Följ köer, fel, kvittenser och återförsök från en plats.</p>
         </div>
