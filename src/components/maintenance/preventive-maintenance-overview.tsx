@@ -21,11 +21,13 @@ type Row = {
   work_order_id: string | null;
   work_order_number: string | null;
   work_order_status: string | null;
+  completed_at: string | null;
+  maintenance_cycle_advanced_at: string | null;
 };
 
 type Payload = {
   rows: Row[];
-  metrics: { total: number; overdue: number; dueSoon: number; automatic: number; withWorkOrder: number };
+  metrics: { total: number; overdue: number; dueSoon: number; automatic: number; withWorkOrder: number; completedCycles: number };
   canRun: boolean;
 };
 
@@ -112,33 +114,30 @@ export function PreventiveMaintenanceOverview() {
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">{message}</div> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <MetricCard icon={Wrench} label="Komponenter" value={data.metrics.total} hint="Aktiva och planerade" />
         <MetricCard icon={AlertTriangle} label="Förfallen service" value={data.metrics.overdue} hint="Kräver åtgärd" />
         <MetricCard icon={CalendarClock} label="Inom 30 dagar" value={data.metrics.dueSoon} hint="Kommande service" />
         <MetricCard icon={Settings2} label="Automatik aktiv" value={data.metrics.automatic} hint="Skapar arbetsorder" />
         <MetricCard icon={ClipboardList} label="Med arbetsorder" value={data.metrics.withWorkOrder} hint="Senaste servicecykeln" />
+        <MetricCard icon={RefreshCw} label="Avslutade cykler" value={data.metrics.completedCycles} hint="Datum framflyttat" />
       </div>
 
       <Panel title="Serviceöversikt" description="Filtrera och öppna komponenter eller deras senaste planerade arbetsorder.">
         <div className="mb-5 flex flex-wrap gap-2">
-          {([['all','Alla'],['overdue','Förfallna'],['soon','Inom 30 dagar'],['automatic','Automatik aktiv']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
+          {([["all","Alla"],["overdue","Förfallna"],["soon","Inom 30 dagar"],["automatic","Automatik aktiv"]] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
         </div>
 
         {rows.length === 0 ? <EmptyState title="Inga servicepunkter i detta urval" description="Ändra filtret eller lägg till nästa servicedatum på komponenterna." /> : (
           <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200 bg-white">
             {rows.map((row) => {
               const state = serviceState(row.next_service_at);
-              return <div key={row.id} className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-center">
-                <div>
-                  <Link href={`/dashboard/fastigheter/${row.property_id}/komponenter/${row.id}`} className="font-semibold text-ink-900 hover:text-petroleum-800">{row.name}</Link>
-                  <p className="mt-1 text-xs text-ink-500">{[row.property_name, row.building_name, row.category, row.location].filter(Boolean).join(" · ")}</p>
-                </div>
+              return <div key={row.id} className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-center">
+                <div><Link href={`/dashboard/fastigheter/${row.property_id}/komponenter/${row.id}`} className="font-semibold text-ink-900 hover:text-petroleum-800">{row.name}</Link><p className="mt-1 text-xs text-ink-500">{[row.property_name, row.building_name, row.category, row.location].filter(Boolean).join(" · ")}</p></div>
                 <div className="text-sm text-ink-600"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${state.className}`}>{state.label}</span><p className="mt-1 text-xs text-ink-400">Intervall {row.service_interval_months} mån · framförhållning {row.service_lead_days} dagar</p></div>
                 <div className="text-sm"><p className="font-medium text-ink-800">{criticalityLabels[row.criticality || "normal"] || "Normal"} kritikalitet</p><p className="mt-1 text-xs text-ink-400">{row.auto_create_service_work_orders ? "Automatisk arbetsorder aktiv" : "Automatik avstängd"}</p></div>
-                <div className="flex justify-end">
-                  {row.work_order_id ? <Link href={`/dashboard/arbetsorder/${row.work_order_id}`} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">{row.work_order_number || "Öppna arbetsorder"} · {statusLabels[row.work_order_status || ""] || row.work_order_status}</Link> : <span className="text-xs text-ink-400">Ingen arbetsorder skapad</span>}
-                </div>
+                <div className="text-sm"><p className="font-medium text-ink-800">{row.maintenance_cycle_advanced_at ? `Cykel flyttad ${date.format(new Date(row.maintenance_cycle_advanced_at))}` : "Ingen avslutad cykel"}</p><p className="mt-1 text-xs text-ink-400">{row.completed_at ? `Service utförd ${date.format(new Date(row.completed_at))}` : "Inväntar genomförd service"}</p></div>
+                <div className="flex justify-end">{row.work_order_id ? <Link href={`/dashboard/arbetsorder/${row.work_order_id}`} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">{row.work_order_number || "Öppna arbetsorder"} · {statusLabels[row.work_order_status || ""] || row.work_order_status}</Link> : <span className="text-xs text-ink-400">Ingen arbetsorder skapad</span>}</div>
               </div>;
             })}
           </div>
