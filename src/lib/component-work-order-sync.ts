@@ -46,7 +46,8 @@ export function parseMaintenanceCycleDate(cycleKey: string | null) {
 }
 
 export function addServiceInterval(baseDate: Date, months: number) {
-  const safeMonths = Math.max(1, Math.min(Math.trunc(months || 12), 120));
+  const normalizedMonths = Number.isFinite(months) ? Math.trunc(months) : 12;
+  const safeMonths = Math.max(1, Math.min(normalizedMonths, 120));
   const result = new Date(baseDate);
   const originalDay = result.getUTCDate();
   result.setUTCDate(1);
