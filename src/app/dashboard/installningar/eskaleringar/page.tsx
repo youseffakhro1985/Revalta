@@ -49,6 +49,8 @@ type Data = {
   statusCounts: Record<string, number>;
 };
 
+type RulesSnapshot = Rules & { updatedAt: string | null };
+
 const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 const dateOnly = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" });
 const statusLabels: Record<string, string> = { sent: "Skickat", failed: "Misslyckat", processing: "Bearbetas", skipped: "Överhoppat" };
@@ -58,6 +60,29 @@ const roleLabels: Record<string, string> = {
   manager: "Förvaltare",
   property_manager: "Fastighetsförvaltare",
 };
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function rulesSnapshot(payload: Record<string, unknown> | null): RulesSnapshot | null {
+  const snapshot = objectValue(payload?.rulesSnapshot);
+  if (!snapshot) return null;
+  return {
+    enabled: snapshot.enabled === true,
+    escalateBlocked: snapshot.escalateBlocked === true,
+    escalateOverdue: snapshot.escalateOverdue === true,
+    graceDays: typeof snapshot.graceDays === "number" ? snapshot.graceDays : 0,
+    repeatDays: typeof snapshot.repeatDays === "number" ? snapshot.repeatDays : 1,
+    recipientRoles: Array.isArray(snapshot.recipientRoles) ? snapshot.recipientRoles.filter((role): role is string => typeof role === "string") : [],
+    includeAssignee: snapshot.includeAssignee === true,
+    updatedAt: typeof snapshot.updatedAt === "string" ? snapshot.updatedAt : null,
+  };
+}
+
+function stringList(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
 
 export default function EscalationAdminPage() {
   const [data, setData] = useState<Data | null>(null);
@@ -153,9 +178,40 @@ export default function EscalationAdminPage() {
         {data?.assignments.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{data.assignments.map((item) => <div key={item.notificationKey} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink-950">{item.componentName}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.reason === "blocked" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{item.reason === "blocked" ? "Blockerad" : "Deadline passerad"}</span></div><p className="mt-1 text-sm text-ink-500">{item.propertyName}</p>{item.note ? <p className="mt-2 text-sm text-ink-600">{item.note}</p> : null}</div><div className="text-sm text-ink-600"><p><span className="font-semibold text-ink-800">Ansvarig:</span> {item.assigneeName || "Ej angiven"}</p><p className="mt-1"><span className="font-semibold text-ink-800">Deadline:</span> {item.deadline ? dateOnly.format(new Date(item.deadline)) : "Ingen"}</p></div><Link href={item.href} className="rounded-lg bg-petroleum-800 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-petroleum-900">Öppna komponent</Link></div>)}</div> : null}
       </Panel>
 
-      <Panel title="Eskaleringshistorik" description="De senaste automatiska leveransförsöken för organisationen.">
-        {!loading && data?.events.length === 0 ? <EmptyState title="Ingen historik ännu" description="När eskaleringsmotorn körs visas resultatet här." /> : null}
-        {data?.events.length ? <div className="overflow-x-auto rounded-xl border border-sand-200"><table className="min-w-full divide-y divide-sand-100 text-sm"><thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-400"><tr><th className="px-5 py-3">Tidpunkt</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Orsak</th><th className="px-5 py-3">Körningsnyckel</th></tr></thead><tbody className="divide-y divide-sand-100">{data.events.map((event) => { const reason = typeof event.payload?.reason === "string" ? event.payload.reason : "–"; return <tr key={event.id}><td className="px-5 py-4 font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-emerald-50 text-emerald-800" : event.status === "failed" ? "bg-red-50 text-red-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></td><td className="px-5 py-4 text-ink-600">{reason === "blocked" ? "Blockerad" : reason === "overdue_deadline" ? "Deadline passerad" : reason}</td><td className="max-w-md truncate px-5 py-4 text-ink-500">{event.recipient || "–"}</td></tr>; })}</tbody></table></div> : null}
+      <Panel title="Revisionssäker eskaleringshistorik" description="Varje nytt leveransförsök sparar en oföränderlig ögonblicksbild av regler, kvalificering och faktiska mottagare.">
+        {!loading && data?.events.length === 0 ? <EmptyState title="Ingen historik ännu" description="När eskaleringsmotorn körs visas resultatet och regelunderlaget här." /> : null}
+        {data?.events.length ? <div className="space-y-3">{data.events.map((event) => {
+          const payload = event.payload;
+          const reason = typeof payload?.reason === "string" ? payload.reason : "–";
+          const snapshot = rulesSnapshot(payload);
+          const recipients = stringList(payload?.recipients);
+          const componentName = typeof payload?.componentName === "string" ? payload.componentName : null;
+          const propertyName = typeof payload?.propertyName === "string" ? payload.propertyName : null;
+          const graceAt = typeof payload?.graceAt === "string" ? payload.graceAt : null;
+          const errorMessage = typeof payload?.error === "string" ? payload.error : null;
+          return (
+            <details key={event.id} className="group rounded-xl border border-sand-200 bg-white">
+              <summary className="grid cursor-pointer list-none gap-3 p-4 sm:grid-cols-[170px_120px_minmax(0,1fr)_auto] sm:items-center">
+                <span className="font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</span>
+                <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-emerald-50 text-emerald-800" : event.status === "failed" ? "bg-red-50 text-red-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span>
+                <span className="min-w-0"><span className="block truncate font-semibold text-ink-900">{componentName || (reason === "blocked" ? "Blockerad uppgift" : reason === "overdue_deadline" ? "Passerad deadline" : "Eskalering")}</span><span className="block truncate text-sm text-ink-500">{propertyName || event.recipient || "Äldre historikpost"}</span></span>
+                <span className="text-sm font-semibold text-petroleum-700 group-open:hidden">Visa underlag</span>
+              </summary>
+              <div className="border-t border-sand-100 p-5">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Orsak</p><p className="mt-1 font-semibold text-ink-800">{reason === "blocked" ? "Blockerad" : reason === "overdue_deadline" ? "Deadline passerad" : reason}</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Respittid slut</p><p className="mt-1 font-semibold text-ink-800">{graceAt ? dateTime.format(new Date(graceAt)) : "Ej tillämplig"}</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Mottagare</p><p className="mt-1 font-semibold text-ink-800">{recipients.length}</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Dataversion</p><p className="mt-1 font-semibold text-ink-800">{payload?.schemaVersion === 2 ? "Revisionsspår v2" : "Äldre format"}</p></div>
+                </div>
+                {snapshot ? <div className="mt-5 rounded-xl bg-sand-50 p-4"><p className="text-sm font-semibold text-ink-900">Regelögonblicksbild</p><div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-ink-700"><span className="rounded-full bg-white px-3 py-1">Respittid {snapshot.graceDays} dagar</span><span className="rounded-full bg-white px-3 py-1">Upprepning {snapshot.repeatDays} dagar</span><span className="rounded-full bg-white px-3 py-1">{snapshot.includeAssignee ? "Ansvarig inkluderad" : "Ansvarig ej inkluderad"}</span>{snapshot.recipientRoles.map((role) => <span key={role} className="rounded-full bg-white px-3 py-1">{roleLabels[role] || role}</span>)}</div>{snapshot.updatedAt ? <p className="mt-3 text-xs text-ink-500">Reglerna ändrades senast {dateTime.format(new Date(snapshot.updatedAt))} före detta försök.</p> : null}</div> : <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Den här äldre historikposten skapades innan regelögonblicksbilder infördes.</p>}
+                {recipients.length ? <div className="mt-5"><p className="text-sm font-semibold text-ink-900">Faktiska mottagare</p><div className="mt-2 flex flex-wrap gap-2">{recipients.map((email) => <span key={email} className="rounded-full border border-sand-200 px-3 py-1 text-xs text-ink-600">{email}</span>)}</div></div> : null}
+                {errorMessage ? <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p> : null}
+                <p className="mt-5 break-all text-xs text-ink-400">Körningsnyckel: {event.recipient || "–"}</p>
+              </div>
+            </details>
+          );
+        })}</div> : null}
       </Panel>
     </div>
   );
