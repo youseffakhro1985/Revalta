@@ -55,8 +55,29 @@ export async function getPublicPortalCompany(propertyId?: string | null) {
     }
   }
 
-  // A public portal must never guess a tenant. Configure PUBLIC_PORTAL_COMPANY_ID
-  // for the shared /portal route, or supply an opaque property id when creating a ticket.
+  const companies = await db.company.findMany({
+    where: { status: "active", users: { some: { status: "active" } } },
+    orderBy: { created_at: "asc" },
+    take: 2,
+    select: {
+      id: true,
+      name: true,
+      users: {
+        where: { status: "active" },
+        orderBy: { created_at: "asc" },
+        take: 1,
+        select: { id: true, email: true },
+      },
+    },
+  });
+
+  if (companies.length === 1 && companies[0].users[0]) {
+    return { company: companies[0], owner: companies[0].users[0] };
+  }
+
+  // Never guess between tenants. A shared portal may auto-resolve only while the
+  // installation has exactly one active company; multi-tenant installations must
+  // configure PUBLIC_PORTAL_COMPANY_ID or provide an opaque property id.
   return null;
 }
 

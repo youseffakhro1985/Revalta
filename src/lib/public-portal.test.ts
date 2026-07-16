@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { companyFindFirst, propertyFindFirst } = vi.hoisted(() => ({
+const { companyFindFirst, companyFindMany, propertyFindFirst } = vi.hoisted(() => ({
   companyFindFirst: vi.fn(),
+  companyFindMany: vi.fn(),
   propertyFindFirst: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   default: {
-    company: { findFirst: companyFindFirst },
+    company: { findFirst: companyFindFirst, findMany: companyFindMany },
     property: { findFirst: propertyFindFirst },
   },
 }));
@@ -24,16 +25,36 @@ describe("public portal tenant resolution", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.PUBLIC_PORTAL_COMPANY_ID;
+    companyFindMany.mockResolvedValue([]);
   });
 
   afterEach(() => {
     delete process.env.PUBLIC_PORTAL_COMPANY_ID;
   });
 
-  it("never guesses a tenant for the shared portal", async () => {
+  it("does not resolve an ambiguous or empty shared portal", async () => {
     await expect(getPublicPortalCompany()).resolves.toBeNull();
     expect(companyFindFirst).not.toHaveBeenCalled();
     expect(propertyFindFirst).not.toHaveBeenCalled();
+    expect(companyFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 2, where: { status: "active", users: { some: { status: "active" } } } })
+    );
+  });
+
+  it("safely resolves a single-company installation", async () => {
+    companyFindMany.mockResolvedValue([activeCompany]);
+    await expect(getPublicPortalCompany()).resolves.toEqual({
+      company: activeCompany,
+      owner: activeCompany.users[0],
+    });
+  });
+
+  it("requires explicit configuration when several companies are active", async () => {
+    companyFindMany.mockResolvedValue([
+      activeCompany,
+      { ...activeCompany, id: "company-2", name: "Annan organisation" },
+    ]);
+    await expect(getPublicPortalCompany()).resolves.toBeNull();
   });
 
   it("resolves only the explicitly configured active company", async () => {
