@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardList, Play, RefreshCw, Settings2, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, ClipboardList, Play, RefreshCw, Settings2, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
 type Row = {
@@ -125,7 +125,7 @@ export function PreventiveMaintenanceOverview() {
           {([['all','Alla'],['overdue','Förfallna'],['soon','Inom 30 dagar'],['automatic','Automatik aktiv']] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
         </div>
 
-        {rows.length === 0 ? <EmptyState icon={CheckCircle2} title="Inga servicepunkter i detta urval" description="Ändra filtret eller lägg till nästa servicedatum på komponenterna." /> : (
+        {rows.length === 0 ? <EmptyState title="Inga servicepunkter i detta urval" description="Ändra filtret eller lägg till nästa servicedatum på komponenterna." /> : (
           <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200 bg-white">
             {rows.map((row) => {
               const state = serviceState(row.next_service_at);
