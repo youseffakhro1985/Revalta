@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
       await tx.auditLog.create({
         data: {
-          user_id: user.id,
+          actor_user_id: user.id,
           company_id: user.company_id,
           action: "resident_portal.ticket_created",
           entity_type: "ticket",
