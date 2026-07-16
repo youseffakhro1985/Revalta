@@ -58,14 +58,18 @@ SET
     END
   ),
   "work_type" = COALESCE(NULLIF("work_type", ''), 'corrective'),
-  "source" = COALESCE(NULLIF("source", ''), CASE WHEN "ticket_id" IS NOT NULL THEN 'ticket' ELSE 'internal' END)
+  "source" = CASE
+    WHEN "ticket_id" IS NOT NULL AND COALESCE(NULLIF("source", ''), 'internal') = 'internal' THEN 'ticket'
+    ELSE COALESCE(NULLIF("source", ''), 'internal')
+  END
 WHERE
   "sla_response_due_at" IS NULL
   OR "sla_resolution_due_at" IS NULL
   OR "work_type" IS NULL
   OR "work_type" = ''
   OR "source" IS NULL
-  OR "source" = '';
+  OR "source" = ''
+  OR ("ticket_id" IS NOT NULL AND "source" = 'internal');
 
 -- 3. Skapa en tydligt märkt initial statushändelse för äldre arbetsorder.
 INSERT INTO "WorkOrderStatusEvent" (
