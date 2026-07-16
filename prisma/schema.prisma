@@ -34,6 +34,7 @@ model User {
   work_order_comments       WorkOrderComment[]
   project_comments          ProjectComment[]
   uploaded_documents        OperationalDocument[]    @relation("UploadedOperationalDocuments")
+  created_leases            Lease[]                  @relation("CreatedLeases")
 }
 
 model Company {
@@ -57,6 +58,8 @@ model Company {
   work_order_comments    WorkOrderComment[]
   project_comments       ProjectComment[]
   operational_documents  OperationalDocument[]
+  lease_holders          LeaseHolder[]
+  leases                 Lease[]
 }
 
 model Property {
@@ -87,6 +90,7 @@ model Property {
   units               Unit[]
   work_orders         WorkOrder[]
   projects            Project[]
+  leases              Lease[]
 
   @@index([company_id])
   @@index([user_id])
@@ -123,6 +127,7 @@ model Unit {
   property    Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
   building    Building?   @relation(fields: [building_id], references: [id], onDelete: SetNull)
   work_orders WorkOrder[]
+  leases      Lease[]
 
   @@index([property_id])
   @@index([building_id])
@@ -289,6 +294,61 @@ model OperationalDocument {
   @@index([company_id, project_id, created_at])
   @@index([uploaded_by_id])
   @@index([storage_url])
+}
+
+model LeaseHolder {
+  id                  String   @id @default(uuid())
+  company_id          String
+  party_type          String   @default("individual")
+  name                String
+  contact_name        String?
+  email               String?
+  phone               String?
+  organization_number String?
+  status              String   @default("active")
+  created_at          DateTime @default(now())
+  updated_at          DateTime @default(now()) @updatedAt
+  company             Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  leases              Lease[]
+
+  @@index([company_id, name])
+  @@index([company_id, email])
+  @@index([company_id, status])
+}
+
+model Lease {
+  id                   String      @id @default(uuid())
+  company_id           String
+  property_id          String
+  unit_id              String
+  lease_holder_id      String
+  created_by_id        String
+  lease_number         String
+  status               String      @default("draft")
+  start_date           DateTime?
+  end_date             DateTime?
+  notice_date          DateTime?
+  monthly_rent         Decimal     @default(0) @db.Decimal(14, 2)
+  deposit              Decimal     @default(0) @db.Decimal(14, 2)
+  annual_index_percent Decimal     @default(0) @db.Decimal(7, 3)
+  payment_terms_days   Int         @default(30)
+  note                 String?
+  ended_at             DateTime?
+  created_at           DateTime    @default(now())
+  updated_at           DateTime    @default(now()) @updatedAt
+  company              Company     @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property             Property    @relation(fields: [property_id], references: [id], onDelete: Restrict)
+  unit                 Unit        @relation(fields: [unit_id], references: [id], onDelete: Restrict)
+  lease_holder         LeaseHolder @relation(fields: [lease_holder_id], references: [id], onDelete: Restrict)
+  created_by           User        @relation("CreatedLeases", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([company_id, lease_number])
+  @@index([company_id, status])
+  @@index([property_id])
+  @@index([unit_id, status])
+  @@index([lease_holder_id])
+  @@index([start_date])
+  @@index([end_date])
 }
 
 model TicketComment {

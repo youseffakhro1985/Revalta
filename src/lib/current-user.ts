@@ -50,6 +50,10 @@ export function canManageTickets(role: string) {
   return role === "owner" || role === "admin" || role === "manager" || role === "technician";
 }
 
+export function canManageLeases(role: string) {
+  return role === "owner" || role === "admin" || role === "manager";
+}
+
 export function canCreateProperties(role: string) {
   return role === "owner" || role === "admin" || role === "manager";
 }
