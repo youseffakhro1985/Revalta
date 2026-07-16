@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/session";
+import { isTrustedMutationRequest } from "@/lib/request-security";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const unsafeMethod = !["GET", "HEAD", "OPTIONS"].includes(request.method);
 
   if (pathname.startsWith("/api/") && pathname !== "/api/stripe/webhook" && unsafeMethod) {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== request.nextUrl.origin) {
+    if (!isTrustedMutationRequest(request)) {
       return NextResponse.json({ error: "Otillåtet anrop" }, { status: 403 });
     }
   }
