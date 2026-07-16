@@ -1,12 +1,22 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
+  addWorkOrderStatusEvent,
+  calculateWorkOrderSla,
+  canTransitionWorkOrder,
+  getWorkOrderEnterpriseState,
+  getWorkOrderStatusEvents,
+} from "@/lib/work-order-enterprise-core";
+import {
   normalizeWorkOrderPriority,
   normalizeWorkOrderStatus,
   WORK_ORDER_PRIORITIES,
   WORK_ORDER_STATUSES,
+  type WorkOrderPriority,
+  type WorkOrderStatus,
 } from "@/lib/work-order-workflow";
 
 function parseOptionalDate(value: unknown) {
@@ -41,16 +51,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const [workOrder, users] = await Promise.all([
+  const [workOrder, users, enterprise, statusEvents] = await Promise.all([
     db.workOrder.findFirst({ where: { id, company_id: user.company_id }, include }),
     db.user.findMany({
       where: { company_id: user.company_id, status: "active" },
       orderBy: [{ name: "asc" }, { email: "asc" }],
       select: { id: true, name: true, email: true, role: true },
     }),
+    getWorkOrderEnterpriseState(db, user.company_id, id),
+    getWorkOrderStatusEvents(db, user.company_id, id),
   ]);
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-  return NextResponse.json({ workOrder, users, canManage: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ workOrder: { ...workOrder, enterprise, statusEvents }, users, canManage: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -60,10 +72,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const existing = await db.workOrder.findFirst({
-    where: { id, company_id: user.company_id },
-    select: { id: true, status: true, scheduled_start: true, scheduled_end: true },
-  });
+  const [existing, enterpriseBefore] = await Promise.all([
+    db.workOrder.findFirst({
+      where: { id, company_id: user.company_id },
+      select: { id: true, status: true, priority: true, scheduled_start: true, scheduled_end: true, created_at: true },
+    }),
+    getWorkOrderEnterpriseState(db, user.company_id, id),
+  ]);
   if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
   const body = await request.json().catch(() => null);
@@ -75,19 +90,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     estimated_cost?: number | null; actual_cost?: number | null; completed_at?: Date | null;
   } = {};
 
+  let nextStatus: WorkOrderStatus | null = null;
+  let nextPriority: WorkOrderPriority | null = null;
+  const statusReason = body.statusReason === undefined ? null : String(body.statusReason || "").trim();
+
   if (body.title !== undefined) { const value = String(body.title).trim(); if (!value) return NextResponse.json({ error: "Rubrik får inte vara tom" }, { status: 400 }); data.title = value; }
   if (body.description !== undefined) { const value = String(body.description).trim(); if (!value) return NextResponse.json({ error: "Beskrivning får inte vara tom" }, { status: 400 }); data.description = value; }
   if (body.status !== undefined) {
     const raw = String(body.status).trim();
     if (!WORK_ORDER_STATUSES.includes(raw as never)) return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
-    const value = normalizeWorkOrderStatus(raw);
-    data.status = value;
-    data.completed_at = value === "completed" || value === "invoiced" ? new Date() : null;
+    nextStatus = normalizeWorkOrderStatus(raw);
+    const currentStatus = normalizeWorkOrderStatus(existing.status);
+    if (!canTransitionWorkOrder(currentStatus, nextStatus)) return NextResponse.json({ error: `Status kan inte ändras från ${currentStatus} till ${nextStatus}` }, { status: 409 });
+    if (["blocked", "cancelled"].includes(nextStatus) && !statusReason) return NextResponse.json({ error: "Ange en orsak till statusändringen" }, { status: 400 });
+    if (statusReason && statusReason.length > 1000) return NextResponse.json({ error: "Statusorsaken får vara högst 1 000 tecken" }, { status: 400 });
+    data.status = nextStatus;
+    data.completed_at = nextStatus === "completed" || nextStatus === "invoiced" ? existing.status === "completed" || existing.status === "invoiced" ? undefined : new Date() : null;
   }
   if (body.priority !== undefined) {
     const raw = String(body.priority).trim();
     if (!WORK_ORDER_PRIORITIES.includes(raw as never)) return NextResponse.json({ error: "Ogiltig prioritet" }, { status: 400 });
-    data.priority = normalizeWorkOrderPriority(raw);
+    nextPriority = normalizeWorkOrderPriority(raw);
+    data.priority = nextPriority;
   }
   if (body.assignedToId !== undefined) {
     const assignedToId = body.assignedToId ? String(body.assignedToId).trim() : null;
@@ -105,10 +129,47 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.estimatedCost !== undefined) { const value = parseOptionalMoney(body.estimatedCost); if (value === undefined) return NextResponse.json({ error: "Ogiltig beräknad kostnad" }, { status: 400 }); data.estimated_cost = value; }
   if (body.actualCost !== undefined) { const value = parseOptionalMoney(body.actualCost); if (value === undefined) return NextResponse.json({ error: "Ogiltig faktisk kostnad" }, { status: 400 }); data.actual_cost = value; }
 
-  const workOrder = await db.workOrder.update({ where: { id: existing.id }, data, include });
+  const now = new Date();
+  const workOrder = await db.$transaction(async (tx) => {
+    const updated = await tx.workOrder.update({ where: { id: existing.id }, data, include });
+
+    if (nextPriority && nextPriority !== normalizeWorkOrderPriority(existing.priority) && !enterpriseBefore?.responded_at) {
+      const sla = calculateWorkOrderSla(existing.created_at, nextPriority);
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE "WorkOrder"
+        SET "sla_response_due_at" = ${sla.responseDueAt}, "sla_resolution_due_at" = ${sla.resolutionDueAt}
+        WHERE "id" = ${existing.id} AND "company_id" = ${user.company_id!}
+      `);
+    }
+
+    if (nextStatus && nextStatus !== normalizeWorkOrderStatus(existing.status)) {
+      const becomesResponded = !enterpriseBefore?.responded_at && ["in_progress", "waiting_material", "blocked", "completed", "invoiced"].includes(nextStatus);
+      const becomesPaused = ["waiting_material", "blocked"].includes(nextStatus);
+      const becomesClosed = ["invoiced", "cancelled"].includes(nextStatus);
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE "WorkOrder"
+        SET "responded_at" = CASE WHEN ${becomesResponded} THEN COALESCE("responded_at", ${now}) ELSE "responded_at" END,
+            "paused_at" = CASE WHEN ${becomesPaused} THEN COALESCE("paused_at", ${now}) ELSE NULL END,
+            "pause_reason" = CASE WHEN ${becomesPaused} THEN ${statusReason || (nextStatus === "waiting_material" ? "Väntar material" : "Blockerad")} ELSE NULL END,
+            "closed_at" = CASE WHEN ${becomesClosed} THEN COALESCE("closed_at", ${now}) ELSE NULL END
+        WHERE "id" = ${existing.id} AND "company_id" = ${user.company_id!}
+      `);
+      await addWorkOrderStatusEvent(tx, {
+        companyId: user.company_id!, workOrderId: existing.id, actorUserId: user.id,
+        fromStatus: existing.status, toStatus: nextStatus, reason: statusReason,
+        metadata: { priorityBefore: existing.priority, priorityAfter: nextPriority ?? existing.priority, scheduledStart: finalStart?.toISOString() ?? null, scheduledEnd: finalEnd?.toISOString() ?? null },
+      });
+    }
+    return updated;
+  });
+
+  const [enterprise, statusEvents] = await Promise.all([
+    getWorkOrderEnterpriseState(db, user.company_id, existing.id),
+    getWorkOrderStatusEvents(db, user.company_id, existing.id),
+  ]);
   await writeAuditLog(user, {
     entityType: "work_order", entityId: workOrder.id, action: "work_order.updated",
-    metadata: { previousStatus: existing.status, status: workOrder.status, assignedToId: workOrder.assigned_to_id, estimatedCost: workOrder.estimated_cost?.toString() ?? null, actualCost: workOrder.actual_cost?.toString() ?? null },
+    metadata: { previousStatus: existing.status, status: workOrder.status, statusReason, assignedToId: workOrder.assigned_to_id, estimatedCost: workOrder.estimated_cost?.toString() ?? null, actualCost: workOrder.actual_cost?.toString() ?? null, enterprise },
   });
-  return NextResponse.json({ workOrder });
+  return NextResponse.json({ workOrder: { ...workOrder, enterprise, statusEvents } });
 }
