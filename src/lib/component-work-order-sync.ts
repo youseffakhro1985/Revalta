@@ -19,12 +19,87 @@ const COST_TYPE_BY_WORK_TYPE: Record<string, string> = {
   warranty: "repair",
 };
 
+type MaintenanceCycleRow = {
+  source: string;
+  maintenance_cycle_key: string | null;
+  maintenance_cycle_advanced_at: Date | null;
+};
+
+type AssetMaintenanceRow = {
+  service_interval_months: number;
+};
+
 export function componentEventTypeForWorkOrder(workType: string) {
   return EVENT_TYPE_BY_WORK_TYPE[workType] || "repair";
 }
 
 export function componentCostTypeForWorkOrder(workType: string) {
   return COST_TYPE_BY_WORK_TYPE[workType] || "other";
+}
+
+export function parseMaintenanceCycleDate(cycleKey: string | null) {
+  if (!cycleKey) return null;
+  const match = cycleKey.match(/^component-service:[^:]+:(\d{4}-\d{2}-\d{2})$/);
+  if (!match) return null;
+  const date = new Date(`${match[1]}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function addServiceInterval(baseDate: Date, months: number) {
+  const normalizedMonths = Number.isFinite(months) ? Math.trunc(months) : 12;
+  const safeMonths = Math.max(1, Math.min(normalizedMonths, 120));
+  const result = new Date(baseDate);
+  const originalDay = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + safeMonths);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(originalDay, lastDay));
+  return result;
+}
+
+async function advancePreventiveMaintenanceCycle(
+  tx: Prisma.TransactionClient,
+  args: { companyId: string; technicalAssetId: string; workOrderId: string; completedAt: Date },
+) {
+  const workOrders = await tx.$queryRaw<MaintenanceCycleRow[]>(Prisma.sql`
+    SELECT "source", "maintenance_cycle_key", "maintenance_cycle_advanced_at"
+    FROM "WorkOrder"
+    WHERE "id" = ${args.workOrderId} AND "company_id" = ${args.companyId}
+    LIMIT 1
+    FOR UPDATE
+  `);
+  const workOrder = workOrders[0];
+  if (!workOrder || workOrder.source !== "maintenance_plan" || !workOrder.maintenance_cycle_key || workOrder.maintenance_cycle_advanced_at) {
+    return { maintenanceCycleAdvanced: false, nextServiceAt: null as Date | null };
+  }
+
+  const cycleDate = parseMaintenanceCycleDate(workOrder.maintenance_cycle_key);
+  if (!cycleDate) return { maintenanceCycleAdvanced: false, nextServiceAt: null as Date | null };
+
+  const assets = await tx.$queryRaw<AssetMaintenanceRow[]>(Prisma.sql`
+    SELECT "service_interval_months"
+    FROM "PropertyTechnicalAsset"
+    WHERE "id" = ${args.technicalAssetId} AND "company_id" = ${args.companyId}
+    LIMIT 1
+    FOR UPDATE
+  `);
+  const asset = assets[0];
+  if (!asset) return { maintenanceCycleAdvanced: false, nextServiceAt: null as Date | null };
+
+  const nextServiceAt = addServiceInterval(cycleDate, asset.service_interval_months);
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "PropertyTechnicalAsset"
+    SET "next_service_at" = ${nextServiceAt}, "updated_at" = CURRENT_TIMESTAMP
+    WHERE "id" = ${args.technicalAssetId} AND "company_id" = ${args.companyId}
+  `);
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "WorkOrder"
+    SET "maintenance_cycle_advanced_at" = ${args.completedAt}
+    WHERE "id" = ${args.workOrderId} AND "company_id" = ${args.companyId}
+      AND "maintenance_cycle_advanced_at" IS NULL
+  `);
+
+  return { maintenanceCycleAdvanced: true, nextServiceAt };
 }
 
 export async function syncCompletedWorkOrderToComponent(
@@ -55,7 +130,7 @@ export async function syncCompletedWorkOrderToComponent(
       DELETE FROM "ComponentLifecycleEvent"
       WHERE "company_id" = ${args.companyId} AND "sync_key" = ${lifecycleSyncKey}
     `);
-    return { lifecycleSynced: false, costSynced: false };
+    return { lifecycleSynced: false, costSynced: false, maintenanceCycleAdvanced: false, nextServiceAt: null as Date | null };
   }
 
   const reference = args.workOrderNumber || args.workOrderId;
@@ -107,5 +182,17 @@ export async function syncCompletedWorkOrderToComponent(
     `);
   }
 
-  return { lifecycleSynced: true, costSynced: Boolean(actualCost) };
+  const cycle = await advancePreventiveMaintenanceCycle(tx, {
+    companyId: args.companyId,
+    technicalAssetId: args.technicalAssetId,
+    workOrderId: args.workOrderId,
+    completedAt: args.completedAt,
+  });
+
+  return {
+    lifecycleSynced: true,
+    costSynced: Boolean(actualCost),
+    maintenanceCycleAdvanced: cycle.maintenanceCycleAdvanced,
+    nextServiceAt: cycle.nextServiceAt,
+  };
 }
