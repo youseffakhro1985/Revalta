@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, BellRing, CheckCheck, Clock3, RefreshCw, RotateCcw, TimerReset } from "lucide-react";
+import { NotificationAssignment } from "@/components/dashboard/notification-assignment";
 
 type Notification = {
   key: string;
@@ -129,7 +130,7 @@ export default function NotificationCenterPage() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och underhåll</p>
           <h1 className="mt-3 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Aviseringscenter</h1>
-          <p className="mt-3 max-w-2xl text-ink-600">Prioritera, läs och skjut upp servicevarningar utan att förlora historik eller spårbarhet.</p>
+          <p className="mt-3 max-w-2xl text-ink-600">Prioritera, tilldela, läs och skjut upp servicevarningar utan att förlora historik eller spårbarhet.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
@@ -159,7 +160,7 @@ export default function NotificationCenterPage() {
         {!loading && data?.notifications.length === 0 ? <div className="p-12 text-center"><BellRing className="mx-auto h-10 w-10 text-sand-400" /><h2 className="mt-4 text-xl font-semibold text-ink-900">Inga aviseringar i detta filter</h2><p className="mt-2 text-sm text-ink-500">När en komponent behöver service visas den här.</p></div> : null}
         <div className="divide-y divide-sand-100">
           {data?.notifications.map((item) => (
-            <div key={item.key} className={`flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between ${item.read ? "bg-white" : "bg-sand-50/70"}`}>
+            <div key={item.key} className={`grid gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_260px_auto] xl:items-start ${item.read ? "bg-white" : "bg-sand-50/70"}`}>
               <div className="flex min-w-0 gap-4">
                 <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${item.overdue ? "bg-red-50 text-red-700" : item.high ? "bg-amber-50 text-amber-700" : "bg-petroleum-50 text-petroleum-700"}`}><AlertTriangle className="h-5 w-5" /></div>
                 <div className="min-w-0">
@@ -170,7 +171,9 @@ export default function NotificationCenterPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 lg:max-w-[440px] lg:justify-end">
+              <NotificationAssignment notificationKey={item.key} />
+
+              <div className="flex flex-wrap gap-2 xl:max-w-[440px] xl:justify-end">
                 {item.snoozedUntil ? (
                   <button onClick={() => void unsnooze(item.key)} disabled={actingKey === item.key} className="inline-flex items-center gap-2 rounded-lg border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-600 hover:bg-sand-50 disabled:opacity-40"><RotateCcw className="h-4 w-4" /> Återaktivera</button>
                 ) : (
