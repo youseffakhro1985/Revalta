@@ -4,6 +4,7 @@ import { ArrowLeft, Building2, ClipboardList, DoorOpen, MapPin, Ruler, UserRound
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { PropertyRegistryManager } from "@/components/properties/property-registry-manager";
+import { PropertyComponentOverview } from "@/components/properties/property-component-overview";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" }).format(date);
@@ -75,6 +76,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           { label: "Registrerad area", value: `${Math.round(totalRegisteredArea)} m²`, icon: Ruler },
         ].map((item) => { const Icon = item.icon; return <article key={item.label} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-medium text-ink-500">{item.label}</p><p className="mt-2 text-[26px] font-semibold tracking-[-0.04em] text-ink-950">{item.value}</p></div><div className="rounded-xl bg-sand-50 p-3 text-petroleum-700"><Icon className="h-5 w-5" strokeWidth={1.7} /></div></div></article>; })}
       </section>
+
+      <PropertyComponentOverview propertyId={property.id} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
