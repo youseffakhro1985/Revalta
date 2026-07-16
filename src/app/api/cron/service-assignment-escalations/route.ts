@@ -25,7 +25,8 @@ type AssignmentPayload = {
   note?: string | null;
 };
 
-type Assignment = AssignmentPayload & {
+type Assignment = Omit<AssignmentPayload, "notificationKey"> & {
+  notificationKey: string;
   companyId: string;
   createdAt: Date;
 };
@@ -136,7 +137,12 @@ export async function GET(request: Request) {
     const payload = payloadFor(event.payload);
     const key = payload?.notificationKey;
     if (!key || latest.has(`${event.company_id}:${key}`)) continue;
-    latest.set(`${event.company_id}:${key}`, { ...payload, companyId: event.company_id, createdAt: event.created_at });
+    latest.set(`${event.company_id}:${key}`, {
+      ...payload,
+      notificationKey: key,
+      companyId: event.company_id,
+      createdAt: event.created_at,
+    });
   }
 
   const candidates = Array.from(latest.entries()).flatMap(([compoundKey, assignment]) => {
