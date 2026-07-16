@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { getServiceEscalationRules } from "@/lib/service-escalation-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,8 @@ export async function GET() {
 
   const now = new Date();
   const dueBefore = new Date(now.getTime() + 30 * 86400000);
+  const { rules, updatedAt: rulesUpdatedAt } = await getServiceEscalationRules(user.company_id);
+
   const [assets, assignmentEvents, escalationEvents, recipients] = await Promise.all([
     db.$queryRaw<AssetRow[]>(Prisma.sql`
       SELECT a."id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name"
@@ -66,7 +69,11 @@ export async function GET() {
       take: 100,
     }),
     db.user.findMany({
-      where: { company_id: user.company_id, status: "active", role: { in: ["owner", "admin"] } },
+      where: {
+        company_id: user.company_id,
+        status: "active",
+        role: { in: rules.recipientRoles },
+      },
       select: { id: true, name: true, email: true, role: true },
       orderBy: [{ role: "asc" }, { name: "asc" }, { email: "asc" }],
     }),
@@ -81,26 +88,40 @@ export async function GET() {
     latest.set(key, { ...payload, updatedAt: event.created_at.toISOString() });
   }
 
-  const assignments = Array.from(latest.entries()).flatMap(([key, assignment]) => {
-    const asset = assetsByKey.get(key);
-    if (!asset || assignment.status === "completed") return [];
-    const deadline = assignment.deadline ? new Date(assignment.deadline) : null;
-    const deadlinePassed = Boolean(deadline && !Number.isNaN(deadline.getTime()) && deadline < now);
-    const reason = assignment.status === "blocked" ? "blocked" : deadlinePassed ? "overdue_deadline" : null;
-    if (!reason) return [];
-    return [{
-      notificationKey: key,
-      componentName: asset.component_name,
-      propertyName: asset.property_name,
-      href: `/dashboard/fastigheter/${asset.property_id}/komponenter/${asset.id}`,
-      assigneeName: assignment.assigneeName || null,
-      status: assignment.status || "assigned",
-      deadline: assignment.deadline || null,
-      note: assignment.note || null,
-      reason,
-      updatedAt: assignment.updatedAt,
-    }];
-  });
+  const graceMs = rules.graceDays * 86400000;
+  const assignments = rules.enabled
+    ? Array.from(latest.entries()).flatMap(([key, assignment]) => {
+        const asset = assetsByKey.get(key);
+        if (!asset || assignment.status === "completed") return [];
+
+        const deadline = assignment.deadline ? new Date(assignment.deadline) : null;
+        const deadlinePassed = Boolean(
+          deadline &&
+          !Number.isNaN(deadline.getTime()) &&
+          deadline.getTime() + graceMs < now.getTime(),
+        );
+
+        const reason = assignment.status === "blocked" && rules.escalateBlocked
+          ? "blocked"
+          : deadlinePassed && rules.escalateOverdue
+            ? "overdue_deadline"
+            : null;
+
+        if (!reason) return [];
+        return [{
+          notificationKey: key,
+          componentName: asset.component_name,
+          propertyName: asset.property_name,
+          href: `/dashboard/fastigheter/${asset.property_id}/komponenter/${asset.id}`,
+          assigneeName: assignment.assigneeName || null,
+          status: assignment.status || "assigned",
+          deadline: assignment.deadline || null,
+          note: assignment.note || null,
+          reason,
+          updatedAt: assignment.updatedAt,
+        }];
+      })
+    : [];
 
   const statusCounts = escalationEvents.reduce<Record<string, number>>((result, event) => {
     result[event.status] = (result[event.status] || 0) + 1;
@@ -114,6 +135,8 @@ export async function GET() {
       emailApiKey: Boolean(process.env.EMAIL_PROVIDER_API_KEY),
       emailFrom: Boolean(process.env.EMAIL_FROM),
     },
+    rules,
+    rulesUpdatedAt,
     summary: {
       active: assignments.length,
       blocked: assignments.filter((item) => item.reason === "blocked").length,
