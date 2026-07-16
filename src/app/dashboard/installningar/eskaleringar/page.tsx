@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertOctagon, CheckCircle2, Clock3, MailWarning, RefreshCw, ShieldCheck, Users } from "lucide-react";
+import { EscalationAdminActions } from "@/components/dashboard/escalation-admin-actions";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
 type Assignment = {
@@ -83,6 +84,10 @@ export default function EscalationAdminPage() {
       </header>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
+
+      <Panel title="Manuell driftkontroll" description="Verifiera e-postleveransen eller starta den tenant-säkra eskaleringsmotorn direkt. Varje åtgärd loggas med användare, status och resultat.">
+        <EscalationAdminActions canManage={Boolean(data?.canManage)} configured={configured} onComplete={load} />
+      </Panel>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={AlertOctagon} label="Aktiva eskaleringar" value={data?.summary.active ?? "–"} />
