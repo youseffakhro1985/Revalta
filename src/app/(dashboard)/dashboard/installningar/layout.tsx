@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BellRing, Building2, UserRoundCog } from "lucide-react";
+import { BellRing, Building2, Inbox, UserRoundCog } from "lucide-react";
 
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +14,9 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         </Link>
         <Link href="/dashboard/installningar/mina-aviseringar" className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 hover:text-petroleum-800">
           <UserRoundCog className="h-4 w-4" /> Mina aviseringar
+        </Link>
+        <Link href="/dashboard/aviseringscenter" className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 hover:text-petroleum-800">
+          <Inbox className="h-4 w-4" /> Aviseringscenter
         </Link>
       </nav>
       {children}
