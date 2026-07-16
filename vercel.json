@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/component-service-reminders",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/service-assignment-escalations",
+      "schedule": "30 6 * * *"
     }
   ]
 }
