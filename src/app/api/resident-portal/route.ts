@@ -133,6 +133,7 @@ export async function POST(request: Request) {
 
       await tx.auditLog.create({
         data: {
+          // AuditLog uses actor_user_id in the Prisma schema.
           actor_user_id: user.id,
           company_id: user.company_id,
           action: "resident_portal.ticket_created",
