@@ -1,4 +1,5 @@
 import { ComponentActivityForms } from "@/components/properties/component-activity-forms";
+import { ComponentAuditReport } from "@/components/properties/component-audit-report";
 import { ComponentDetailView } from "@/components/properties/component-detail-view";
 import { ComponentEntryCorrections } from "@/components/properties/component-entry-corrections";
 
@@ -9,6 +10,7 @@ export default async function ComponentDetailPage({ params }: { params: Promise<
       <ComponentDetailView propertyId={id} componentId={componentId} />
       <ComponentActivityForms propertyId={id} componentId={componentId} />
       <ComponentEntryCorrections propertyId={id} componentId={componentId} />
+      <ComponentAuditReport propertyId={id} componentId={componentId} />
     </div>
   );
 }
