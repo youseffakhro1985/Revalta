@@ -1,7 +1,14 @@
 import db from "@/lib/db";
 
+// Public deployment configuration for www.revalta.se. This identifier is already
+// public in the portal response and is not a credential. An explicit environment
+// variable always wins, which keeps staging and future tenant domains configurable.
+export const REVALTA_PORTAL_COMPANY_ID = "6288b3f6-2ea4-480f-af34-d35d95a2e777";
+
 export async function getPublicPortalCompany(propertyId?: string | null) {
-  const configuredCompanyId = process.env.PUBLIC_PORTAL_COMPANY_ID;
+  const configuredCompanyId =
+    process.env.PUBLIC_PORTAL_COMPANY_ID?.trim() ||
+    (process.env.VERCEL === "1" ? REVALTA_PORTAL_COMPANY_ID : undefined);
 
   if (configuredCompanyId) {
     const company = await db.company.findFirst({

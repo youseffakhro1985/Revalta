@@ -13,7 +13,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { getPublicPortalCompany } from "@/lib/public-portal";
+import { getPublicPortalCompany, REVALTA_PORTAL_COMPANY_ID } from "@/lib/public-portal";
 
 const activeCompany = {
   id: "company-1",
@@ -25,11 +25,13 @@ describe("public portal tenant resolution", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.PUBLIC_PORTAL_COMPANY_ID;
+    delete process.env.VERCEL;
     companyFindMany.mockResolvedValue([]);
   });
 
   afterEach(() => {
     delete process.env.PUBLIC_PORTAL_COMPANY_ID;
+    delete process.env.VERCEL;
   });
 
   it("does not resolve an ambiguous or empty shared portal", async () => {
@@ -67,6 +69,19 @@ describe("public portal tenant resolution", () => {
     });
     expect(companyFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "company-1", status: "active" } })
+    );
+  });
+
+  it("uses the public Revalta tenant configuration on Vercel", async () => {
+    process.env.VERCEL = "1";
+    companyFindFirst.mockResolvedValue(activeCompany);
+
+    await expect(getPublicPortalCompany()).resolves.toEqual({
+      company: activeCompany,
+      owner: activeCompany.users[0],
+    });
+    expect(companyFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: REVALTA_PORTAL_COMPANY_ID, status: "active" } })
     );
   });
 

@@ -16,7 +16,7 @@ Migrationen `20260713190000_add_work_orders_and_projects` är idempotent. Builds
 
 - `JWT_SECRET`: minst 32 slumpmässiga byte.
 - `DATABASE_URL` och `DIRECT_URL`: produktionsdatabasen.
-- `PUBLIC_PORTAL_COMPANY_ID`: organisationen som får visas i den gemensamma boendeportalen. Den är obligatorisk när fler än ett aktivt företag finns; en installation med exakt ett aktivt företag kan identifieras säkert automatiskt.
+- `PUBLIC_PORTAL_COMPANY_ID`: organisationen som får visas i den gemensamma boendeportalen. Revaltas Vercel-projekt har en versionsstyrd publik standard; sätt variabeln för att överstyra den i andra flerorganisationsmiljöer. En installation med exakt ett aktivt företag kan identifieras säkert automatiskt.
 - `EMAIL_PROVIDER_API_KEY` och `EMAIL_FROM`: transaktionsmail.
 - `STORAGE_PROVIDER_KEY`: privat Vercel Blob-token.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` och pris-id:n om betalning är aktiverad.

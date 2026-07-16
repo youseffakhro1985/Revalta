@@ -41,7 +41,7 @@ Kopiera `.env.example` och konfigurera minst:
 
 - `DATABASE_URL` och `DIRECT_URL`
 - `JWT_SECRET` med ett långt slumpmässigt värde
-- `PUBLIC_PORTAL_COMPANY_ID` för att låsa den delade boendeportalen till rätt organisation i en flerorganisationsmiljö
+- `PUBLIC_PORTAL_COMPANY_ID` för att låsa den delade boendeportalen till rätt organisation i en flerorganisationsmiljö. Revaltas Vercel-projekt har en versionsstyrd publik standard som variabeln kan överstyra.
 - leverantörsnycklar för e-post, SMS, Stripe, privat fillagring och AI när funktionerna ska köras skarpt
 
 Utan integrationsnycklar används spårbara utvecklingshändelser där det stöds. Se [produktionschecklistan](docs/production-launch.md) före driftsättning.
