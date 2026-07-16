@@ -8,6 +8,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/preventive-maintenance",
+      "schedule": "15 6 * * *"
+    },
+    {
       "path": "/api/cron/service-assignment-escalations",
       "schedule": "30 6 * * *"
     },
