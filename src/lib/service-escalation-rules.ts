@@ -25,8 +25,8 @@ export const DEFAULT_ESCALATION_RULES: ServiceEscalationRules = {
   includeAssignee: true,
 };
 
-function isObject(value: Prisma.JsonValue | null): value is Prisma.JsonObject {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+function isObject(value: Prisma.JsonValue | null | undefined): value is Prisma.JsonObject {
+  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value);
 }
 
 export function normalizeEscalationRules(value: unknown): ServiceEscalationRules {
@@ -52,7 +52,18 @@ export async function getServiceEscalationRules(companyId: string) {
     orderBy: { created_at: "desc" },
     select: { payload: true, created_at: true },
   });
-  const payload = isObject(event?.payload ?? null) ? event?.payload : null;
-  const rules = normalizeEscalationRules(payload && "rules" in payload ? payload.rules : payload);
+
+  const rawPayload = event?.payload;
+  let rulesValue: Prisma.JsonValue | null = null;
+
+  if (isObject(rawPayload)) {
+    rulesValue = Object.prototype.hasOwnProperty.call(rawPayload, "rules")
+      ? rawPayload.rules ?? null
+      : rawPayload;
+  } else if (rawPayload !== undefined) {
+    rulesValue = rawPayload;
+  }
+
+  const rules = normalizeEscalationRules(rulesValue);
   return { rules, updatedAt: event?.created_at.toISOString() ?? null };
 }
