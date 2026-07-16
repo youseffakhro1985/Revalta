@@ -16,26 +16,40 @@ export async function POST(
     }
 
     const { reference } = await params;
-    const { email, body } = await request.json();
+    const { email, name, body } = await request.json();
     const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedName = typeof name === "string" ? name.trim() : "";
     const normalizedBody = typeof body === "string" ? body.trim() : "";
 
     if (!normalizedEmail.includes("@") || !normalizedBody) {
       return NextResponse.json({ error: "E-post och kommentar krävs" }, { status: 400 });
     }
+    if (normalizedEmail.length > 254 || normalizedName.length > 120 || normalizedBody.length > 5_000) {
+      return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
+    }
 
     const ticket = await db.ticket.findFirst({
       where: { public_reference: reference.toUpperCase(), reporter_email: normalizedEmail },
-      select: { id: true, title: true, company_id: true, user_id: true },
+      select: {
+        id: true,
+        title: true,
+        company_id: true,
+        user_id: true,
+        reporter_name: true,
+        reporter_email: true,
+      },
     });
 
     if (!ticket) {
       return NextResponse.json({ error: "Ärendet hittades inte. Kontrollera referensnummer och e-post." }, { status: 404 });
     }
 
+    const authorName = normalizedName || ticket.reporter_name || "Boende";
     const comment = await db.ticketComment.create({
       data: {
         ticket_id: ticket.id,
+        // TicketComment kräver en intern user_id. Den publika avsändaren lagras
+        // revisionssäkert nedan och används vid extern visning.
         user_id: ticket.user_id,
         body: normalizedBody,
         is_internal: false,
@@ -44,7 +58,6 @@ export async function POST(
         id: true,
         body: true,
         created_at: true,
-        user: { select: { name: true } },
       },
     });
 
@@ -52,7 +65,12 @@ export async function POST(
       entityType: "ticket",
       entityId: ticket.id,
       action: "public.comment_created",
-      metadata: { reporterEmail: normalizedEmail, commentId: comment.id },
+      metadata: {
+        reporterName: authorName,
+        reporterEmail: ticket.reporter_email || normalizedEmail,
+        commentId: comment.id,
+        schemaVersion: 2,
+      },
     });
     await queueTicketNotification({ company_id: ticket.company_id }, {
       ticketId: ticket.id,
@@ -61,7 +79,13 @@ export async function POST(
       event: "commented",
     });
 
-    return NextResponse.json({ success: true, comment }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      comment: {
+        ...comment,
+        author: { type: "resident", name: authorName },
+      },
+    }, { status: 201 });
   } catch (error) {
     console.error("Create public comment error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
