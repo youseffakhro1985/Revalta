@@ -18,10 +18,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const context = await resolveContext(params);
   if ("error" in context) return context.error;
   const rows = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
-    SELECT "id", "name", "next_service_at", "service_interval_months", "service_lead_days",
-           "auto_create_service_work_orders", "criticality", "status"
-    FROM "PropertyTechnicalAsset"
-    WHERE "id" = ${context.componentId} AND "property_id" = ${context.propertyId} AND "company_id" = ${context.user.company_id}
+    SELECT a."id", a."name", a."next_service_at", a."service_interval_months", a."service_lead_days",
+           a."auto_create_service_work_orders", a."criticality", a."status",
+           w."id" AS "last_service_work_order_id", w."work_order_number" AS "last_service_work_order_number",
+           w."completed_at" AS "last_service_completed_at", w."maintenance_cycle_advanced_at",
+           w."maintenance_cycle_key" AS "last_service_cycle_key"
+    FROM "PropertyTechnicalAsset" a
+    LEFT JOIN LATERAL (
+      SELECT wo."id", wo."work_order_number", wo."completed_at", wo."maintenance_cycle_advanced_at", wo."maintenance_cycle_key"
+      FROM "WorkOrder" wo
+      WHERE wo."company_id" = a."company_id"
+        AND wo."technical_asset_id" = a."id"
+        AND wo."source" = 'maintenance_plan'
+        AND wo."maintenance_cycle_advanced_at" IS NOT NULL
+      ORDER BY wo."maintenance_cycle_advanced_at" DESC
+      LIMIT 1
+    ) w ON TRUE
+    WHERE a."id" = ${context.componentId} AND a."property_id" = ${context.propertyId} AND a."company_id" = ${context.user.company_id}
     LIMIT 1
   `);
   if (!rows[0]) return NextResponse.json({ error: "Komponenten hittades inte" }, { status: 404 });
