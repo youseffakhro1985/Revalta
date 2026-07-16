@@ -3,6 +3,15 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 
+type ComponentOverviewSummary = {
+  total: number;
+  overdue: number;
+  dueSoon: number;
+  critical: number;
+  highRisk: number;
+  totalCostExVat: number;
+};
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
@@ -44,7 +53,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const now = new Date();
   const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const summary = components.reduce(
+  const summary = components.reduce<ComponentOverviewSummary>(
     (result, row) => {
       const next = row.next_service_at ? new Date(String(row.next_service_at)) : null;
       const condition = Number(row.condition_grade || 0);
