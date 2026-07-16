@@ -1,9 +1,39 @@
 import db from "@/lib/db";
 
 export async function getPublicPortalCompany(propertyId?: string | null) {
+  const configuredCompanyId = process.env.PUBLIC_PORTAL_COMPANY_ID;
+
+  if (configuredCompanyId) {
+    const company = await db.company.findFirst({
+      where: { id: configuredCompanyId, status: "active" },
+      select: {
+        id: true,
+        name: true,
+        users: {
+          where: { status: "active" },
+          orderBy: { created_at: "asc" },
+          take: 1,
+          select: { id: true, email: true },
+        },
+      },
+    });
+
+    if (!company?.users[0]) return null;
+
+    if (propertyId) {
+      const property = await db.property.findFirst({
+        where: { id: propertyId, company_id: company.id, status: "active" },
+        select: { id: true },
+      });
+      if (!property) return null;
+    }
+
+    return { company, owner: company.users[0] };
+  }
+
   if (propertyId) {
-    const property = await db.property.findUnique({
-      where: { id: propertyId },
+    const property = await db.property.findFirst({
+      where: { id: propertyId, status: "active", company: { status: "active" } },
       select: {
         company: {
           select: {
@@ -25,43 +55,9 @@ export async function getPublicPortalCompany(propertyId?: string | null) {
     }
   }
 
-  const configuredCompanyId = process.env.PUBLIC_PORTAL_COMPANY_ID;
-
-  if (configuredCompanyId) {
-    const company = await db.company.findUnique({
-      where: { id: configuredCompanyId },
-      select: {
-        id: true,
-        name: true,
-        users: {
-          where: { status: "active" },
-          orderBy: { created_at: "asc" },
-          take: 1,
-          select: { id: true, email: true },
-        },
-      },
-    });
-
-    if (company?.users[0]) return { company, owner: company.users[0] };
-  }
-
-  const company = await db.company.findFirst({
-    where: { status: "active" },
-    orderBy: { created_at: "asc" },
-    select: {
-      id: true,
-      name: true,
-      users: {
-        where: { status: "active" },
-        orderBy: { created_at: "asc" },
-        take: 1,
-        select: { id: true, email: true },
-      },
-    },
-  });
-
-  if (!company?.users[0]) return null;
-  return { company, owner: company.users[0] };
+  // A public portal must never guess a tenant. Configure PUBLIC_PORTAL_COMPANY_ID
+  // for the shared /portal route, or supply an opaque property id when creating a ticket.
+  return null;
 }
 
 export function generatePublicReference() {

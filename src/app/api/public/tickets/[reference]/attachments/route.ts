@@ -14,7 +14,7 @@ export async function POST(
 ) {
   try {
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`public-attachment:${ip}`, 10, 60 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`public-attachment:${ip}`, 10, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "För många uppladdningar. Vänta en stund och prova igen." }, { status: 429 });
     }

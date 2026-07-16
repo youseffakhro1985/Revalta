@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`public-ticket:${ip}`, 5, 60 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`public-ticket:${ip}`, 5, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
     }
@@ -32,11 +32,21 @@ export async function POST(request: Request) {
     if (!normalizedReporterName || !normalizedReporterEmail.includes("@") || !normalizedTitle || normalizedDescription.length < 10) {
       return NextResponse.json({ error: "Namn, e-post, titel och tydlig beskrivning krävs" }, { status: 400 });
     }
+    if (
+      normalizedReporterName.length > 120 ||
+      normalizedReporterEmail.length > 254 ||
+      normalizedReporterPhone.length > 50 ||
+      normalizedReporterUnit.length > 80 ||
+      normalizedTitle.length > 200 ||
+      normalizedDescription.length > 5_000
+    ) {
+      return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
+    }
 
     let property = null;
     if (normalizedPropertyId) {
       property = await db.property.findFirst({
-        where: { id: normalizedPropertyId },
+        where: { id: normalizedPropertyId, company_id: portal.company.id, status: "active" },
         select: { id: true, name: true, address: true, city: true },
       });
       if (!property) {

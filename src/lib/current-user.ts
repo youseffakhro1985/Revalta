@@ -9,7 +9,7 @@ export async function getCurrentUser() {
 
   if (!session) return null;
 
-  return db.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: session.sub },
     select: {
       id: true,
@@ -30,6 +30,12 @@ export async function getCurrentUser() {
       },
     },
   });
+
+  if (!user || user.status !== "active" || (user.company && user.company.status !== "active")) {
+    return null;
+  }
+
+  return user;
 }
 
 export function tenantWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {

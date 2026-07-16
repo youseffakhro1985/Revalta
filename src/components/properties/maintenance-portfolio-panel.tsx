@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, CalendarRange, CircleDollarSign, Filter, Landmark, RotateCcw } from "lucide-react";
+import { AlertTriangle, CalendarRange, CircleDollarSign, Filter, Landmark, RotateCcw } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 
 type Row = {

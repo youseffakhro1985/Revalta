@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, CalendarClock, ClipboardCheck, FileBadge2, Gauge, ShieldCheck, Wrench } from "lucide-react";
+import { AlertTriangle, CalendarClock, ClipboardCheck, FileBadge2, Gauge, ShieldCheck, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
 type PropertyCardData = {

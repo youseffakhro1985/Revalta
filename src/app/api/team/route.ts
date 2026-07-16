@@ -3,6 +3,7 @@ import { canManageTeam, getCurrentUser } from "@/lib/current-user";
 import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
+import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 
 const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer"]);
 
@@ -49,12 +50,15 @@ export async function POST(request: Request) {
     }
 
     const { name, email, role, password } = await request.json();
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedEmail = normalizeEmail(email);
     const normalizedName = typeof name === "string" ? name.trim() : null;
     const normalizedRole = typeof role === "string" && allowedRoles.has(role) ? role : "viewer";
 
-    if (!normalizedEmail || !normalizedEmail.includes("@") || typeof password !== "string" || password.length < 6) {
-      return NextResponse.json({ error: "E-post och minst 6 tecken i lösenord krävs" }, { status: 400 });
+    if (!isValidEmail(normalizedEmail)) {
+      return NextResponse.json({ error: "En giltig e-postadress krävs" }, { status: 400 });
+    }
+    if (!isStrongPassword(password)) {
+      return NextResponse.json({ error: passwordPolicyMessage }, { status: 400 });
     }
 
     const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });

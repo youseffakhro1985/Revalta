@@ -38,7 +38,6 @@ type ActionRow = {
   technical_asset_name: string | null;
 };
 
-const PLAN_STATUSES = new Set(["draft", "active", "archived"]);
 const PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
 const RISKS = new Set(["low", "medium", "high", "critical"]);
 const ACTION_STATUSES = new Set(["planned", "approved", "in_progress", "completed", "deferred", "cancelled"]);

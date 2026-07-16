@@ -187,7 +187,8 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Nytt lösenord</label>
-              <input type="password" minLength={6} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+              <input type="password" minLength={10} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+              <p className="mt-2 text-xs text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
             </div>
             <button disabled={loading} className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">Byt lösenord</button>
           </div>

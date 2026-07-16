@@ -82,7 +82,16 @@ export async function POST(
       provider: storedFile.provider,
     });
 
-    return NextResponse.json({ success: true, attachment }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        attachment: {
+          ...attachment,
+          data_url: `/api/attachments/${attachment.id}`,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Create attachment error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

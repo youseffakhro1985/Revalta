@@ -61,7 +61,7 @@ function AcceptInviteForm() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-ink-700">Lösenord</label>
-          <input type="password" minLength={6} required value={password} onChange={(event) => setPassword(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Minst 6 tecken" />
+          <input type="password" minLength={10} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Minst 10 tecken med bokstav och siffra" />
         </div>
         <button disabled={loading || !token} className="w-full rounded-xl bg-petroleum-600 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70">
           {loading ? "Skapar konto..." : "Acceptera inbjudan"}

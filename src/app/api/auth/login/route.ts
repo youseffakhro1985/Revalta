@@ -3,26 +3,34 @@ import { cookies } from "next/headers";
 import db from "@/lib/db";
 import { comparePassword, signToken } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { isValidEmail, normalizeEmail } from "@/lib/security";
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "För många inloggningsförsök. Vänta en stund och prova igen." }, { status: 429 });
     }
 
     const { email, password } = await request.json();
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedEmail = normalizeEmail(email);
     
-    if (!normalizedEmail || typeof password !== "string" || !password) {
+    if (!isValidEmail(normalizedEmail) || typeof password !== "string" || !password) {
       return NextResponse.json({ error: "E-post och lösenord krävs" }, { status: 400 });
     }
 
-    const user = await db.user.findUnique({ where: { email: normalizedEmail } });
+    const user = await db.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { company: { select: { status: true } } },
+    });
     
     if (!user) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401 });
+    }
+
+    if (user.status !== "active" || (user.company && user.company.status !== "active")) {
+      return NextResponse.json({ error: "Kontot är inte aktivt. Kontakta organisationens administratör." }, { status: 403 });
     }
 
     const isValid = await comparePassword(password, user.password);

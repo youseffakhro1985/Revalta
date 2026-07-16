@@ -3,19 +3,20 @@ import db from "@/lib/db";
 import { createResetToken, hashResetToken } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification } from "@/lib/integrations";
+import { isValidEmail, normalizeEmail } from "@/lib/security";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`password-reset:${ip}`, 5, 60 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`password-reset:${ip}`, 5, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
     }
 
     const { email } = await request.json();
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
-    if (!normalizedEmail.includes("@")) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!isValidEmail(normalizedEmail)) {
       return NextResponse.json({ error: "Ange en giltig e-postadress" }, { status: 400 });
     }
 

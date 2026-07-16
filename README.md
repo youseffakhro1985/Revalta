@@ -1,81 +1,60 @@
-# Revalta – Fastighetsförvaltning och Felanmälan
+# Revalta
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js) ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql) ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css)
+Revalta är en svensk plattform för fastighetsförvaltning. Applikationen samlar fastigheter, felanmälningar, arbetsorder, projekt, underhåll, dokument, ekonomi och boendedialog i ett tenant-isolerat arbetsflöde.
 
-Revalta är en modern plattform för fastighetsförvaltning och felanmälan, byggd med fokus på tydliga flöden, säker inloggning och en professionell dashboard.
+## Teknisk grund
 
----
+- Next.js 16 med App Router och TypeScript
+- PostgreSQL och Prisma
+- JWT-session i `httpOnly`-cookie
+- Tailwind CSS
+- Vercel för applikation och privat blobblagring
+- Vitest, ESLint, TypeScript och produktionsbuild i CI
 
-## 🏗 Projektstruktur
-Plattformen är organiserad med Next.js App Router:
-- **`/(auth)`**: Sidor för inloggning och registrering (`/login`, `/register`).
-- **`/(dashboard)`**: Skyddad huvudpanel för inloggade användare.
-  - **`/dashboard/team`**: Hantera organisation, roller och teammedlemmar.
-  - **`/dashboard/fastigheter`**: Skapa och lista fastigheter i beståndet.
-  - **`/dashboard/felanmalan`**: Skapa, lista, tilldela och kommentera felanmälningar kopplade till fastighet.
-- **`/portal`**: Publik boendeportal där boende kan skapa och följa ärenden utan konto.
-- **`/forgot-password`** och **`/reset-password`**: Lösenordsåterställning med spårbar mock/e-post-händelse.
-- **`/verify-email`**: E-postverifiering med mock/e-post-händelse.
-- **`/juridik/*`**: Integritet, cookies, villkor och GDPR-information på svenska.
-- **`/api`**: REST API-rutter för autentisering och datahantering (`/api/auth`, `/api/tickets`).
-- **`/components`**: UI-komponenter, layout-element och specifika vyer.
-- **`/lib`**: Centraliserad logik för databas (`db.ts`), sessioner (`session.ts`) och autentisering (`auth.ts`).
+## Kom igång lokalt
 
-## 🗄 Databas & Backend
-Backend använder Prisma mot PostgreSQL:
-- **`prisma/schema.prisma`**: Datamodeller för företag, användare, roller, fastigheter, felanmälningar och kommentarer.
-- **`src/app/api/auth/*`**: Registrering, inloggning och utloggning.
-- **`src/app/api/auth/password-reset/*`**: Skapa och bekräfta lösenordsåterställning.
-- **`src/app/api/auth/email-verification/*`**: Bekräfta e-postadress.
-- **`src/app/api/team`**: Lista och skapa teammedlemmar inom organisationen.
-- **`src/app/api/properties`**: Lista och skapa fastigheter för inloggad användare.
-- **`src/app/api/tickets`**: Lista och skapa ärenden med kategori, prioritet, ansvarig och fastighet.
-- **`src/app/api/tickets/[id]`**: Hämta och uppdatera ett specifikt ärende.
-- **`src/app/api/tickets/[id]/comments`**: Lägg till kommentarer på ärenden.
-- **`src/app/api/tickets/[id]/attachments`**: Ladda upp små dev-bilagor på ärenden.
-- **`src/app/api/tickets/[id]/ai`**: AI-analysera och uppdatera kategori/prioritet/sammanfattning.
-- **`src/app/api/billing`**: Visa och ändra plan i Stripe-ready mockläge.
-- **`src/app/api/public/*`**: Publika API:er för boendeportal och ärendespårning.
-- **`src/app/api/tickets/export`**: CSV-export av ärenden.
-- **`src/app/api/health`**: Driftstatus för databas och miljö.
-- **`src/app/api/audit`**: Audit log för viktiga händelser.
-- **`src/app/api/integrations`**: Konfigurationsstatus och dev-mockade händelser för e-post, SMS, Stripe, storage och AI.
+Förutsättningar: Node.js 20.9 eller senare samt PostgreSQL.
 
-## 🔑 Autentisering
-- Egenbyggd och säker autentisering med JWT.
-- **`jose`**: Används för att signera och verifiera JSON Web Tokens säkert.
-- **`bcryptjs`**: Används för att hasha lösenord innan de sparas i databasen.
+```bash
+npm ci
+cp .env.example .env
+npm run db:dev
+npm run dev
+```
 
-## 🔒 Sessioner
-- JWT lagras som httpOnly-cookie.
-- `/dashboard` skyddas via `proxy.ts`.
-- `JWT_SECRET` ska alltid sättas i produktionsmiljö.
+Applikationen finns därefter på [http://localhost:3000](http://localhost:3000).
 
-## 🔌 Externa integrationer
-- E-post, SMS, Stripe, storage och AI körs som fullt spårbara dev-mockar om leverantörsnycklar saknas.
-- Sätt nycklarna i `.env` enligt `.env.example` för att koppla riktiga leverantörer.
-- Alla mockade/queue:ade integrationshändelser sparas i `IntegrationEvent`.
+## Kvalitetskontroller
 
----
+```bash
+npm run lint
+npm run test:ci
+npm run typecheck
+npm run build:ci
+```
 
-### 🚀 Starta Projektet Lokalt
-1. Klon ned reponet.
-2. Installera beroenden:
-   ```bash
-   npm install
-   ```
-3. Skapa `.env` från `.env.example` och fyll i PostgreSQL-URL:er samt `JWT_SECRET`.
-4. Kör Prisma-migrationer:
-   ```bash
-   npm run db:dev
-   ```
-5. Starta utvecklingsservern:
-   ```bash
-   npm run dev
-   ```
-cursor/professional-mvp-6157
-6. Öppna [http://localhost:3000](http://localhost:3000) i din webbläsare.
+`build:ci` bygger utan produktionsmigrationer. Vercels produktionskommando kör `scripts/vercel-build.mjs`, som genererar Prisma-klienten, applicerar migrationer och stoppar releasen om databasen inte kan uppdateras säkert.
 
-5. Öppna [http://localhost:3000](http://localhost:3000) i din webbläsare. 
+## Miljövariabler
 
-main
+Kopiera `.env.example` och konfigurera minst:
+
+- `DATABASE_URL` och `DIRECT_URL`
+- `JWT_SECRET` med ett långt slumpmässigt värde
+- `PUBLIC_PORTAL_COMPANY_ID` för den delade boendeportalen
+- leverantörsnycklar för e-post, SMS, Stripe, privat fillagring och AI när funktionerna ska köras skarpt
+
+Utan integrationsnycklar används spårbara utvecklingshändelser där det stöds. Se [produktionschecklistan](docs/production-launch.md) före driftsättning.
+
+## Viktiga delar
+
+- `/dashboard` – skyddad förvaltningsyta
+- `/portal` – publik boendeportal, uttryckligen bunden till en organisation
+- `/api/health` – driftstatus
+- `prisma/schema.prisma` – datamodell
+- `prisma/migrations` – versionsstyrda databasmigrationer
+- `docs` – arkitektur, releaseunderlag och funktionsspecifikationer
+
+## Säkerhetsprinciper
+
+All organisationsdata filtreras server-side. Inaktiva användare och företag nekas session, skrivande API-anrop har origin-skydd, känsliga svar cachelagras inte och nya bilagor lagras privat. Hemligheter ska endast sättas i driftsmiljön och får aldrig checkas in.

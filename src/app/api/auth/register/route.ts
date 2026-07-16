@@ -4,17 +4,18 @@ import { createResetToken, hashPassword, hashResetToken } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { queueTicketNotification } from "@/lib/integrations";
+import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const rateLimit = checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
+    const rateLimit = await checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: "För många registreringar. Vänta en stund och prova igen." }, { status: 429 });
     }
 
     const { name, email, password, companyName } = await request.json();
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const normalizedEmail = normalizeEmail(email);
     const normalizedName = typeof name === "string" ? name.trim() : null;
     const normalizedCompanyName =
       typeof companyName === "string" && companyName.trim()
@@ -23,12 +24,11 @@ export async function POST(request: Request) {
           ? `${normalizedName}s bolag`
           : "Mitt företag";
     
-    if (!normalizedEmail || typeof password !== "string" || password.length < 6) {
-      return NextResponse.json({ error: "E-post och minst 6 tecken i lösenord krävs" }, { status: 400 });
+    if (!isValidEmail(normalizedEmail)) {
+      return NextResponse.json({ error: "En giltig e-postadress krävs" }, { status: 400 });
     }
-
-    if (!normalizedEmail.includes("@")) {
-      return NextResponse.json({ error: "E-post och lösenord krävs" }, { status: 400 });
+    if (!isStrongPassword(password)) {
+      return NextResponse.json({ error: passwordPolicyMessage }, { status: 400 });
     }
 
     const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });

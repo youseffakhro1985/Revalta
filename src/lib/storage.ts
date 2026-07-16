@@ -21,7 +21,7 @@ export async function storeAttachment(input: {
   const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
   const pathname = `${input.prefix}/${Date.now()}-${safeFileName}`;
   const blob = await put(pathname, input.buffer, {
-    access: "public",
+    access: "private",
     contentType: input.contentType,
     token: process.env.STORAGE_PROVIDER_KEY,
   });

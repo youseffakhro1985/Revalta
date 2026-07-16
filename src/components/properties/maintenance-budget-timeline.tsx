@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BarChart3, Building2, CalendarRange, CheckCircle2, Filter, Layers3, RotateCcw } from "lucide-react";
+import { BarChart3, CalendarRange, CheckCircle2, Filter, Layers3, RotateCcw } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 
 type Action = {

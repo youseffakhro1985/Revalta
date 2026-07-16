@@ -58,11 +58,12 @@ function ResetPasswordForm() {
           <input
             type="password"
             required
-            minLength={6}
+            minLength={10}
+            maxLength={128}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             className="block w-full rounded-xl border border-slate-200 p-3 shadow-inner-sm outline-none focus:border-brand-500"
-            placeholder="Minst 6 tecken"
+            placeholder="Minst 10 tecken med bokstav och siffra"
           />
         </div>
         <button disabled={loading || !token} className="w-full rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700 disabled:opacity-70">
