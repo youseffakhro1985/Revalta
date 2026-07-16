@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, canManageTickets } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   addWorkOrderStatusEvent,
@@ -11,6 +11,7 @@ import {
   getWorkOrderStatusEvents,
 } from "@/lib/work-order-enterprise-core";
 import { getWorkOrderAssetLink, setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
+import { syncCompletedWorkOrderToComponent } from "@/lib/component-work-order-sync";
 import {
   normalizeWorkOrderPriority,
   normalizeWorkOrderStatus,
@@ -64,7 +65,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     getWorkOrderAssetLink(db, user.company_id, id),
   ]);
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-  return NextResponse.json({ workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents }, users, canManage: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json(
+    { workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents }, users, canManage: canManageTickets(user.role) },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -77,7 +81,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
       where: { id, company_id: user.company_id },
-      select: { id: true, property_id: true, status: true, priority: true, scheduled_start: true, scheduled_end: true, created_at: true },
+      select: {
+        id: true,
+        property_id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        actual_cost: true,
+        scheduled_start: true,
+        scheduled_end: true,
+        completed_at: true,
+        created_at: true,
+      },
     }),
     getWorkOrderEnterpriseState(db, user.company_id, id),
     getWorkOrderAssetLink(db, user.company_id, id),
@@ -88,9 +104,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
 
   const data: {
-    title?: string; description?: string; status?: string; priority?: string;
-    assigned_to_id?: string | null; scheduled_start?: Date | null; scheduled_end?: Date | null;
-    estimated_cost?: number | null; actual_cost?: number | null; completed_at?: Date | null;
+    title?: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    assigned_to_id?: string | null;
+    scheduled_start?: Date | null;
+    scheduled_end?: Date | null;
+    estimated_cost?: number | null;
+    actual_cost?: number | null;
+    completed_at?: Date | null;
   } = {};
 
   let nextStatus: WorkOrderStatus | null = null;
@@ -100,8 +123,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const buildingId = body.buildingId !== undefined ? (body.buildingId ? String(body.buildingId).trim() : null) : assetLinkBefore?.building_id ?? null;
   const technicalAssetId = body.technicalAssetId !== undefined ? (body.technicalAssetId ? String(body.technicalAssetId).trim() : null) : assetLinkBefore?.technical_asset_id ?? null;
 
-  if (body.title !== undefined) { const value = String(body.title).trim(); if (!value) return NextResponse.json({ error: "Rubrik får inte vara tom" }, { status: 400 }); data.title = value; }
-  if (body.description !== undefined) { const value = String(body.description).trim(); if (!value) return NextResponse.json({ error: "Beskrivning får inte vara tom" }, { status: 400 }); data.description = value; }
+  if (body.title !== undefined) {
+    const value = String(body.title).trim();
+    if (!value) return NextResponse.json({ error: "Rubrik får inte vara tom" }, { status: 400 });
+    data.title = value;
+  }
+  if (body.description !== undefined) {
+    const value = String(body.description).trim();
+    if (!value) return NextResponse.json({ error: "Beskrivning får inte vara tom" }, { status: 400 });
+    data.description = value;
+  }
   if (body.status !== undefined) {
     const raw = String(body.status).trim();
     if (!WORK_ORDER_STATUSES.includes(raw as never)) return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
@@ -111,7 +142,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (["blocked", "cancelled"].includes(nextStatus) && !statusReason) return NextResponse.json({ error: "Ange en orsak till statusändringen" }, { status: 400 });
     if (statusReason && statusReason.length > 1000) return NextResponse.json({ error: "Statusorsaken får vara högst 1 000 tecken" }, { status: 400 });
     data.status = nextStatus;
-    data.completed_at = nextStatus === "completed" || nextStatus === "invoiced" ? existing.status === "completed" || existing.status === "invoiced" ? undefined : new Date() : null;
+    data.completed_at = nextStatus === "completed" || nextStatus === "invoiced"
+      ? existing.status === "completed" || existing.status === "invoiced" ? undefined : new Date()
+      : null;
   }
   if (body.priority !== undefined) {
     const raw = String(body.priority).trim();
@@ -127,13 +160,29 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     data.assigned_to_id = assignedToId;
   }
-  if (body.scheduledStart !== undefined) { const value = parseOptionalDate(body.scheduledStart); if (value === undefined) return NextResponse.json({ error: "Ogiltigt startdatum" }, { status: 400 }); data.scheduled_start = value; }
-  if (body.scheduledEnd !== undefined) { const value = parseOptionalDate(body.scheduledEnd); if (value === undefined) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 }); data.scheduled_end = value; }
+  if (body.scheduledStart !== undefined) {
+    const value = parseOptionalDate(body.scheduledStart);
+    if (value === undefined) return NextResponse.json({ error: "Ogiltigt startdatum" }, { status: 400 });
+    data.scheduled_start = value;
+  }
+  if (body.scheduledEnd !== undefined) {
+    const value = parseOptionalDate(body.scheduledEnd);
+    if (value === undefined) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 });
+    data.scheduled_end = value;
+  }
   const finalStart = data.scheduled_start !== undefined ? data.scheduled_start : existing.scheduled_start;
   const finalEnd = data.scheduled_end !== undefined ? data.scheduled_end : existing.scheduled_end;
   if (finalStart && finalEnd && finalEnd <= finalStart) return NextResponse.json({ error: "Sluttiden måste ligga efter starttiden" }, { status: 400 });
-  if (body.estimatedCost !== undefined) { const value = parseOptionalMoney(body.estimatedCost); if (value === undefined) return NextResponse.json({ error: "Ogiltig beräknad kostnad" }, { status: 400 }); data.estimated_cost = value; }
-  if (body.actualCost !== undefined) { const value = parseOptionalMoney(body.actualCost); if (value === undefined) return NextResponse.json({ error: "Ogiltig faktisk kostnad" }, { status: 400 }); data.actual_cost = value; }
+  if (body.estimatedCost !== undefined) {
+    const value = parseOptionalMoney(body.estimatedCost);
+    if (value === undefined) return NextResponse.json({ error: "Ogiltig beräknad kostnad" }, { status: 400 });
+    data.estimated_cost = value;
+  }
+  if (body.actualCost !== undefined) {
+    const value = parseOptionalMoney(body.actualCost);
+    if (value === undefined) return NextResponse.json({ error: "Ogiltig faktisk kostnad" }, { status: 400 });
+    data.actual_cost = value;
+  }
 
   if (assetLinksChanged) {
     try {
@@ -144,7 +193,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const now = new Date();
-  const workOrder = await db.$transaction(async (tx) => {
+  const transactionResult = await db.$transaction(async (tx) => {
     const updated = await tx.workOrder.update({ where: { id: existing.id }, data, include });
 
     if (assetLinksChanged) {
@@ -173,22 +222,64 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         WHERE "id" = ${existing.id} AND "company_id" = ${user.company_id!}
       `);
       await addWorkOrderStatusEvent(tx, {
-        companyId: user.company_id!, workOrderId: existing.id, actorUserId: user.id,
-        fromStatus: existing.status, toStatus: nextStatus, reason: statusReason,
-        metadata: { priorityBefore: existing.priority, priorityAfter: nextPriority ?? existing.priority, scheduledStart: finalStart?.toISOString() ?? null, scheduledEnd: finalEnd?.toISOString() ?? null, buildingId, technicalAssetId },
+        companyId: user.company_id!,
+        workOrderId: existing.id,
+        actorUserId: user.id,
+        fromStatus: existing.status,
+        toStatus: nextStatus,
+        reason: statusReason,
+        metadata: {
+          priorityBefore: existing.priority,
+          priorityAfter: nextPriority ?? existing.priority,
+          scheduledStart: finalStart?.toISOString() ?? null,
+          scheduledEnd: finalEnd?.toISOString() ?? null,
+          buildingId,
+          technicalAssetId,
+        },
       });
     }
-    return updated;
+
+    const finalStatus = normalizeWorkOrderStatus(updated.status);
+    const isCompleted = finalStatus === "completed" || finalStatus === "invoiced";
+    const componentSync = await syncCompletedWorkOrderToComponent(tx, {
+      companyId: user.company_id!,
+      propertyId: existing.property_id,
+      technicalAssetId: isCompleted ? technicalAssetId : null,
+      workOrderId: existing.id,
+      workOrderNumber: enterpriseBefore?.work_order_number ?? null,
+      workType: enterpriseBefore?.work_type || "corrective",
+      title: updated.title,
+      description: updated.description,
+      actorUserId: user.id,
+      completedAt: updated.completed_at ?? existing.completed_at ?? now,
+      actualCost: updated.actual_cost === null ? null : Number(updated.actual_cost),
+    });
+
+    return { workOrder: updated, componentSync };
   });
 
+  const workOrder = transactionResult.workOrder;
   const [enterprise, statusEvents, assetLink] = await Promise.all([
     getWorkOrderEnterpriseState(db, user.company_id, existing.id),
     getWorkOrderStatusEvents(db, user.company_id, existing.id),
     getWorkOrderAssetLink(db, user.company_id, existing.id),
   ]);
   await writeAuditLog(user, {
-    entityType: "work_order", entityId: workOrder.id, action: "work_order.updated",
-    metadata: { previousStatus: existing.status, status: workOrder.status, statusReason, assignedToId: workOrder.assigned_to_id, buildingId, technicalAssetId, estimatedCost: workOrder.estimated_cost?.toString() ?? null, actualCost: workOrder.actual_cost?.toString() ?? null, enterprise },
+    entityType: "work_order",
+    entityId: workOrder.id,
+    action: "work_order.updated",
+    metadata: {
+      previousStatus: existing.status,
+      status: workOrder.status,
+      statusReason,
+      assignedToId: workOrder.assigned_to_id,
+      buildingId,
+      technicalAssetId,
+      estimatedCost: workOrder.estimated_cost?.toString() ?? null,
+      actualCost: workOrder.actual_cost?.toString() ?? null,
+      componentSync: transactionResult.componentSync,
+      enterprise,
+    },
   });
   return NextResponse.json({ workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents } });
 }
