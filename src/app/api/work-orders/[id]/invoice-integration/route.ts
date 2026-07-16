@@ -10,8 +10,8 @@ const providers = new Set(["fortnox", "visma", "webhook"]);
 type Obj = Record<string, unknown>;
 function asObject(value: unknown): Obj | null { return value && typeof value === "object" && !Array.isArray(value) ? value as Obj : null; }
 function configured(provider: string) {
-  if (provider === "fortnox") return Boolean(process.env.FORTNOX_ACCESS_TOKEN);
-  if (provider === "visma") return Boolean(process.env.VISMA_ACCESS_TOKEN);
+  if (provider === "fortnox") return Boolean(process.env.FORTNOX_ACCESS_TOKEN && process.env.FORTNOX_INVOICE_EXPORT_URL);
+  if (provider === "visma") return Boolean(process.env.VISMA_ACCESS_TOKEN && process.env.VISMA_INVOICE_EXPORT_URL);
   return Boolean(process.env.INVOICE_WEBHOOK_URL);
 }
 async function getOrder(id: string, companyId: string) {
@@ -64,7 +64,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (action === "queue") {
     const provider = String(body.provider ?? "");
     if (!providers.has(provider)) return NextResponse.json({ error: "Ogiltig integrationsleverantör" }, { status: 400 });
-    if (!configured(provider)) return NextResponse.json({ error: "Integrationen saknar nödvändig miljökonfiguration" }, { status: 400 });
+    if (!configured(provider)) return NextResponse.json({ error: "Integrationen saknar endpoint eller autentisering" }, { status: 400 });
     const invoice = await latestInvoice(id, user.company_id);
     if (!invoice) return NextResponse.json({ error: "Faktureringsunderlag saknas" }, { status: 400 });
     payload = { jobId: crypto.randomUUID(), workOrderId: id, provider, status: "queued", attempt: 1, invoiceVersionId: invoice.versionId ?? null, createdById: user.id, createdAt: now, updatedAt: now, error: null };
