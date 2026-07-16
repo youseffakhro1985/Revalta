@@ -136,11 +136,16 @@ export async function GET(request: Request) {
   for (const event of assignmentEvents) {
     const payload = payloadFor(event.payload);
     const key = payload?.notificationKey;
-    if (!key || latest.has(`${event.company_id}:${key}`)) continue;
-    latest.set(`${event.company_id}:${key}`, {
+    const companyId = event.company_id;
+    if (!key || !companyId) continue;
+
+    const compoundKey = `${companyId}:${key}`;
+    if (latest.has(compoundKey)) continue;
+
+    latest.set(compoundKey, {
       ...payload,
       notificationKey: key,
-      companyId: event.company_id,
+      companyId,
       createdAt: event.created_at,
     });
   }
