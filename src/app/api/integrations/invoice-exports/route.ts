@@ -6,6 +6,16 @@ import { writeAuditLog } from "@/lib/audit";
 
 const JOB_TYPE = "work_order.invoice_integration_job";
 type Obj = Record<string, unknown>;
+type ExportJob = Obj & {
+  jobId: string;
+  workOrderId: string;
+  createdAt: string;
+  updatedAt?: unknown;
+  status?: unknown;
+  provider?: unknown;
+  error?: unknown;
+  externalId?: unknown;
+};
 
 function object(value: unknown): Obj | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Obj : null;
@@ -18,14 +28,14 @@ function configured(provider: string) {
   return false;
 }
 
-async function latestJobs(companyId: string) {
+async function latestJobs(companyId: string): Promise<ExportJob[]> {
   const events = await db.integrationEvent.findMany({
     where: { company_id: companyId, type: JOB_TYPE },
     orderBy: { created_at: "asc" },
     take: 10000,
     select: { recipient: true, payload: true, created_at: true },
   });
-  const jobs = new Map<string, Obj & { createdAt: string; workOrderId: string }>();
+  const jobs = new Map<string, ExportJob>();
   for (const event of events) {
     const payload = object(event.payload);
     if (!payload || typeof payload.jobId !== "string" || !event.recipient) continue;
@@ -33,6 +43,7 @@ async function latestJobs(companyId: string) {
     jobs.set(payload.jobId, {
       ...previous,
       ...payload,
+      jobId: payload.jobId,
       workOrderId: event.recipient,
       createdAt: previous?.createdAt ?? event.created_at.toISOString(),
     });
@@ -59,8 +70,8 @@ export async function GET(request: Request) {
 
   const jobs = allJobs
     .map(job => ({ ...job, workOrder: orderMap.get(job.workOrderId) ?? null }))
-    .filter(job => !status || job.status === status)
-    .filter(job => !provider || job.provider === provider)
+    .filter(job => !status || String(job.status ?? "") === status)
+    .filter(job => !provider || String(job.provider ?? "") === provider)
     .filter(job => {
       if (!query) return true;
       const haystack = [job.jobId, job.provider, job.status, job.workOrderId, job.workOrder?.title, job.workOrder?.property?.name, job.error, job.externalId].join(" ").toLowerCase();
