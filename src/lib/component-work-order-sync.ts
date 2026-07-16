@@ -43,10 +43,21 @@ export async function syncCompletedWorkOrderToComponent(
     actualCost: number | null;
   },
 ) {
-  if (!args.technicalAssetId) return { lifecycleSynced: false, costSynced: false };
-
   const lifecycleSyncKey = `work-order:${args.workOrderId}:completion`;
   const costSyncKey = `work-order:${args.workOrderId}:actual-cost`;
+
+  if (!args.technicalAssetId) {
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM "ComponentCostEntry"
+      WHERE "company_id" = ${args.companyId} AND "sync_key" = ${costSyncKey}
+    `);
+    await tx.$executeRaw(Prisma.sql`
+      DELETE FROM "ComponentLifecycleEvent"
+      WHERE "company_id" = ${args.companyId} AND "sync_key" = ${lifecycleSyncKey}
+    `);
+    return { lifecycleSynced: false, costSynced: false };
+  }
+
   const reference = args.workOrderNumber || args.workOrderId;
   const eventType = componentEventTypeForWorkOrder(args.workType);
   const costType = componentCostTypeForWorkOrder(args.workType);
