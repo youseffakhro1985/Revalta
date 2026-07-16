@@ -10,6 +10,7 @@ import {
   getWorkOrderEnterpriseState,
   getWorkOrderStatusEvents,
 } from "@/lib/work-order-enterprise-core";
+import { getWorkOrderAssetLink, setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import {
   normalizeWorkOrderPriority,
   normalizeWorkOrderStatus,
@@ -51,7 +52,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const [workOrder, users, enterprise, statusEvents] = await Promise.all([
+  const [workOrder, users, enterprise, statusEvents, assetLink] = await Promise.all([
     db.workOrder.findFirst({ where: { id, company_id: user.company_id }, include }),
     db.user.findMany({
       where: { company_id: user.company_id, status: "active" },
@@ -60,9 +61,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     }),
     getWorkOrderEnterpriseState(db, user.company_id, id),
     getWorkOrderStatusEvents(db, user.company_id, id),
+    getWorkOrderAssetLink(db, user.company_id, id),
   ]);
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-  return NextResponse.json({ workOrder: { ...workOrder, enterprise, statusEvents }, users, canManage: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents }, users, canManage: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -72,12 +74,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const [existing, enterpriseBefore] = await Promise.all([
+  const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
       where: { id, company_id: user.company_id },
-      select: { id: true, status: true, priority: true, scheduled_start: true, scheduled_end: true, created_at: true },
+      select: { id: true, property_id: true, status: true, priority: true, scheduled_start: true, scheduled_end: true, created_at: true },
     }),
     getWorkOrderEnterpriseState(db, user.company_id, id),
+    getWorkOrderAssetLink(db, user.company_id, id),
   ]);
   if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
@@ -93,6 +96,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   let nextStatus: WorkOrderStatus | null = null;
   let nextPriority: WorkOrderPriority | null = null;
   const statusReason = body.statusReason === undefined ? null : String(body.statusReason || "").trim();
+  const assetLinksChanged = body.buildingId !== undefined || body.technicalAssetId !== undefined;
+  const buildingId = body.buildingId !== undefined ? (body.buildingId ? String(body.buildingId).trim() : null) : assetLinkBefore?.building_id ?? null;
+  const technicalAssetId = body.technicalAssetId !== undefined ? (body.technicalAssetId ? String(body.technicalAssetId).trim() : null) : assetLinkBefore?.technical_asset_id ?? null;
 
   if (body.title !== undefined) { const value = String(body.title).trim(); if (!value) return NextResponse.json({ error: "Rubrik får inte vara tom" }, { status: 400 }); data.title = value; }
   if (body.description !== undefined) { const value = String(body.description).trim(); if (!value) return NextResponse.json({ error: "Beskrivning får inte vara tom" }, { status: 400 }); data.description = value; }
@@ -129,9 +135,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.estimatedCost !== undefined) { const value = parseOptionalMoney(body.estimatedCost); if (value === undefined) return NextResponse.json({ error: "Ogiltig beräknad kostnad" }, { status: 400 }); data.estimated_cost = value; }
   if (body.actualCost !== undefined) { const value = parseOptionalMoney(body.actualCost); if (value === undefined) return NextResponse.json({ error: "Ogiltig faktisk kostnad" }, { status: 400 }); data.actual_cost = value; }
 
+  if (assetLinksChanged) {
+    try {
+      await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId: existing.property_id, buildingId, technicalAssetId });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Ogiltig komponentkoppling" }, { status: 400 });
+    }
+  }
+
   const now = new Date();
   const workOrder = await db.$transaction(async (tx) => {
     const updated = await tx.workOrder.update({ where: { id: existing.id }, data, include });
+
+    if (assetLinksChanged) {
+      await setWorkOrderAssetLinks(tx, { workOrderId: existing.id, companyId: user.company_id!, buildingId, technicalAssetId });
+    }
 
     if (nextPriority && nextPriority !== normalizeWorkOrderPriority(existing.priority) && !enterpriseBefore?.responded_at) {
       const sla = calculateWorkOrderSla(existing.created_at, nextPriority);
@@ -157,19 +175,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await addWorkOrderStatusEvent(tx, {
         companyId: user.company_id!, workOrderId: existing.id, actorUserId: user.id,
         fromStatus: existing.status, toStatus: nextStatus, reason: statusReason,
-        metadata: { priorityBefore: existing.priority, priorityAfter: nextPriority ?? existing.priority, scheduledStart: finalStart?.toISOString() ?? null, scheduledEnd: finalEnd?.toISOString() ?? null },
+        metadata: { priorityBefore: existing.priority, priorityAfter: nextPriority ?? existing.priority, scheduledStart: finalStart?.toISOString() ?? null, scheduledEnd: finalEnd?.toISOString() ?? null, buildingId, technicalAssetId },
       });
     }
     return updated;
   });
 
-  const [enterprise, statusEvents] = await Promise.all([
+  const [enterprise, statusEvents, assetLink] = await Promise.all([
     getWorkOrderEnterpriseState(db, user.company_id, existing.id),
     getWorkOrderStatusEvents(db, user.company_id, existing.id),
+    getWorkOrderAssetLink(db, user.company_id, existing.id),
   ]);
   await writeAuditLog(user, {
     entityType: "work_order", entityId: workOrder.id, action: "work_order.updated",
-    metadata: { previousStatus: existing.status, status: workOrder.status, statusReason, assignedToId: workOrder.assigned_to_id, estimatedCost: workOrder.estimated_cost?.toString() ?? null, actualCost: workOrder.actual_cost?.toString() ?? null, enterprise },
+    metadata: { previousStatus: existing.status, status: workOrder.status, statusReason, assignedToId: workOrder.assigned_to_id, buildingId, technicalAssetId, estimatedCost: workOrder.estimated_cost?.toString() ?? null, actualCost: workOrder.actual_cost?.toString() ?? null, enterprise },
   });
-  return NextResponse.json({ workOrder: { ...workOrder, enterprise, statusEvents } });
+  return NextResponse.json({ workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents } });
 }

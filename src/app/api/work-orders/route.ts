@@ -13,6 +13,7 @@ import {
   WORK_ORDER_SOURCES,
   WORK_ORDER_TYPES,
 } from "@/lib/work-order-enterprise-core";
+import { setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { WORK_ORDER_PRIORITIES, WORK_ORDER_STATUSES, normalizeWorkOrderPriority, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 
 function parseOptionalDate(value: unknown) {
@@ -38,6 +39,12 @@ type EnterpriseListRow = {
   paused_at: Date | null;
   pause_reason: string | null;
   closed_at: Date | null;
+  building_id: string | null;
+  building_name: string | null;
+  technical_asset_id: string | null;
+  technical_asset_name: string | null;
+  technical_asset_category: string | null;
+  technical_asset_location: string | null;
 };
 
 export async function GET() {
@@ -59,10 +66,14 @@ export async function GET() {
       },
     }),
     db.$queryRaw<EnterpriseListRow[]>(Prisma.sql`
-      SELECT "id", "work_order_number", "work_type", "source", "sla_response_due_at", "sla_resolution_due_at",
-             "responded_at", "paused_at", "pause_reason", "closed_at"
-      FROM "WorkOrder"
-      WHERE "company_id" = ${user.company_id}
+      SELECT w."id", w."work_order_number", w."work_type", w."source", w."sla_response_due_at", w."sla_resolution_due_at",
+             w."responded_at", w."paused_at", w."pause_reason", w."closed_at", w."building_id", b."name" AS "building_name",
+             w."technical_asset_id", a."name" AS "technical_asset_name", a."category" AS "technical_asset_category",
+             a."location" AS "technical_asset_location"
+      FROM "WorkOrder" w
+      LEFT JOIN "Building" b ON b."id" = w."building_id"
+      LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
+      WHERE w."company_id" = ${user.company_id}
     `),
   ]);
 
@@ -82,6 +93,8 @@ export async function POST(request: Request) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
 
   const propertyId = String(body.propertyId || "").trim();
+  const buildingId = body.buildingId ? String(body.buildingId).trim() : null;
+  const technicalAssetId = body.technicalAssetId ? String(body.technicalAssetId).trim() : null;
   const unitId = body.unitId ? String(body.unitId).trim() : null;
   const assignedToId = body.assignedToId ? String(body.assignedToId).trim() : null;
   const ticketId = body.ticketId ? String(body.ticketId).trim() : null;
@@ -90,7 +103,7 @@ export async function POST(request: Request) {
   const rawStatus = String(body.status || "planned").trim();
   const rawPriority = String(body.priority || "normal").trim();
   const rawWorkType = String(body.workType || "corrective").trim();
-  const rawSource = String(body.source || (ticketId ? "ticket" : "internal")).trim();
+  const rawSource = String(body.source || (technicalAssetId ? "component" : ticketId ? "ticket" : "internal")).trim();
   const status = normalizeWorkOrderStatus(rawStatus);
   const priority = normalizeWorkOrderPriority(rawPriority);
   const workType = normalizeWorkOrderType(rawWorkType);
@@ -126,6 +139,11 @@ export async function POST(request: Request) {
     const ticket = await db.ticket.findFirst({ where: { id: ticketId, company_id: user.company_id }, select: { id: true } });
     if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
   }
+  try {
+    await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId, buildingId, technicalAssetId });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Ogiltig komponentkoppling" }, { status: 400 });
+  }
 
   const createdAt = new Date();
   const sla = calculateWorkOrderSla(createdAt, priority);
@@ -135,10 +153,11 @@ export async function POST(request: Request) {
       data: { company_id: user.company_id!, property_id: propertyId, unit_id: unitId, assigned_to_id: assignedToId, ticket_id: ticketId, created_by_id: user.id, title, description, status, priority, scheduled_start: scheduledStart, scheduled_end: scheduledEnd, estimated_cost: estimatedCost, created_at: createdAt },
     });
     await setWorkOrderEnterpriseFields(tx, { workOrderId: created.id, companyId: user.company_id!, workOrderNumber, workType, source, responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt });
-    await addWorkOrderStatusEvent(tx, { companyId: user.company_id!, workOrderId: created.id, actorUserId: user.id, fromStatus: null, toStatus: status, reason: "Arbetsorder skapad", metadata: { workOrderNumber, priority, workType, source } });
-    return { ...created, enterprise: { work_order_number: workOrderNumber, work_type: workType, source, sla_response_due_at: sla.responseDueAt, sla_resolution_due_at: sla.resolutionDueAt, responded_at: null, paused_at: null, pause_reason: null, closed_at: null } };
+    await setWorkOrderAssetLinks(tx, { workOrderId: created.id, companyId: user.company_id!, buildingId, technicalAssetId });
+    await addWorkOrderStatusEvent(tx, { companyId: user.company_id!, workOrderId: created.id, actorUserId: user.id, fromStatus: null, toStatus: status, reason: "Arbetsorder skapad", metadata: { workOrderNumber, priority, workType, source, buildingId, technicalAssetId } });
+    return { ...created, enterprise: { work_order_number: workOrderNumber, work_type: workType, source, sla_response_due_at: sla.responseDueAt, sla_resolution_due_at: sla.resolutionDueAt, responded_at: null, paused_at: null, pause_reason: null, closed_at: null, building_id: buildingId, technical_asset_id: technicalAssetId } };
   });
 
-  await writeAuditLog(user, { entityType: "work_order", entityId: workOrder.id, action: "work_order.created", metadata: { workOrderNumber: workOrder.enterprise.work_order_number, propertyId, unitId, assignedToId, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } });
+  await writeAuditLog(user, { entityType: "work_order", entityId: workOrder.id, action: "work_order.created", metadata: { workOrderNumber: workOrder.enterprise.work_order_number, propertyId, buildingId, technicalAssetId, unitId, assignedToId, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } });
   return NextResponse.json({ workOrder }, { status: 201 });
 }
