@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -76,7 +77,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (action === "retry" && !configured(provider)) return NextResponse.json({ error: "Integrationen är inte konfigurerad" }, { status: 400 });
     payload = { ...existing, status: action === "cancel" ? "cancelled" : "queued", attempt: Number(existing.attempt ?? 0) + (action === "retry" ? 1 : 0), updatedAt: now, error: null, actedById: user.id };
   }
-  await db.integrationEvent.create({ data: { company_id: user.company_id, type: JOB_TYPE, status: String(payload.status), recipient: id, payload } });
+
+  const jsonPayload = JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue;
+  await db.integrationEvent.create({ data: { company_id: user.company_id, type: JOB_TYPE, status: String(payload.status), recipient: id, payload: jsonPayload } });
   await writeAuditLog(user, { entityType: "work_order", entityId: id, action: `work_order.invoice_integration_${action}`, metadata: { jobId: payload.jobId, provider: payload.provider, status: payload.status, attempt: payload.attempt } });
   return NextResponse.json({ job: payload }, { status: 201 });
 }
