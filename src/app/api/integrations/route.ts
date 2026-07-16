@@ -8,6 +8,9 @@ const requiredEnv: Record<string, string[]> = {
   stripe: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
   storage: ["STORAGE_PROVIDER_KEY"],
   ai: ["AI_PROVIDER_API_KEY"],
+  fortnox: ["FORTNOX_ACCESS_TOKEN", "FORTNOX_INVOICE_ENDPOINT"],
+  visma: ["VISMA_ACCESS_TOKEN", "VISMA_INVOICE_ENDPOINT"],
+  invoice_webhook: ["INVOICE_WEBHOOK_URL", "INVOICE_WEBHOOK_SECRET"],
 };
 
 export async function GET() {
@@ -30,7 +33,18 @@ export async function GET() {
       take: 50,
     });
 
-    return NextResponse.json({ integrations, events });
+    const invoiceExportEvents = events.filter((event) => event.type === "work_order.invoice_integration_job");
+    const invoiceExportSummary = {
+      total: invoiceExportEvents.length,
+      active: invoiceExportEvents.filter((event) => event.status === "queued" || event.status === "processing").length,
+      failed: invoiceExportEvents.filter((event) => event.status === "failed").length,
+      sent: invoiceExportEvents.filter((event) => event.status === "sent").length,
+    };
+
+    return NextResponse.json(
+      { integrations, events, invoiceExportSummary },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (error) {
     console.error("Get integrations error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
