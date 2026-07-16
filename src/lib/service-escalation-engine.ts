@@ -1,0 +1,99 @@
+import { Prisma } from "@prisma/client";
+import db from "@/lib/db";
+import { getServiceEscalationRules, type ServiceEscalationRules } from "@/lib/service-escalation-rules";
+
+type AssetRow = { id: string; company_id: string; property_id: string; component_name: string; next_service_at: Date; property_name: string; property_address: string; property_city: string };
+type AssignmentPayload = { notificationKey?: string; assigneeId?: string | null; assigneeName?: string | null; status?: string; deadline?: string | null; note?: string | null };
+type Assignment = Omit<AssignmentPayload, "notificationKey"> & { notificationKey: string; companyId: string; createdAt: Date };
+type Candidate = { notificationKey: string; asset: AssetRow; assignment: Assignment; reason: "blocked" | "overdue_deadline"; rules: ServiceEscalationRules };
+
+function payloadFor(value: Prisma.JsonValue | null): AssignmentPayload | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as AssignmentPayload : null;
+}
+function keyFor(row: AssetRow) { return `component-service:${row.id}:${row.next_service_at.toISOString().slice(0, 10)}`; }
+function escapeHtml(value: unknown) { return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;"); }
+function appBaseUrl() { const value = process.env.NEXT_PUBLIC_APP_URL?.trim(); if (value) return value.replace(/\/$/, ""); const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim(); return host ? `https://${host}` : "https://www.revalta.se"; }
+function formatDate(value: Date) { return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeZone: "Europe/Stockholm" }).format(value); }
+function repeatBucket(now: Date, repeatDays: number) { return Math.floor(now.getTime() / (repeatDays * 86400000)); }
+
+async function sendEscalation(candidate: Candidate, emails: string[]) {
+  const apiKey = process.env.EMAIL_PROVIDER_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  if (!apiKey || !from) throw new Error("E-postleverantören är inte konfigurerad");
+  const { asset, assignment, reason } = candidate;
+  const deadline = assignment.deadline ? new Date(assignment.deadline) : null;
+  const reasonLabel = reason === "blocked" ? "Uppgiften är blockerad" : "Deadline har passerat";
+  const href = `${appBaseUrl()}/dashboard/fastigheter/${asset.property_id}/komponenter/${asset.id}`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from,
+      to: emails,
+      subject: `Revalta: eskalering för ${asset.component_name}`,
+      html: `<!doctype html><html lang="sv"><body style="margin:0;background:#f6f3ed;font-family:Arial,sans-serif;color:#22201d"><div style="max-width:680px;margin:0 auto;padding:32px 18px"><div style="overflow:hidden;border:1px solid #e7e1d7;border-radius:18px;background:#fff"><div style="padding:26px 30px;background:#7b2e26;color:#fff"><div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.85">Revalta · automatisk eskalering</div><h1 style="margin:8px 0 0;font-size:25px">${escapeHtml(reasonLabel)}</h1></div><div style="padding:28px 30px"><h2 style="margin:0;font-size:20px">${escapeHtml(asset.component_name)}</h2><p style="margin:8px 0 0;color:#615d56">${escapeHtml(asset.property_name)} · ${escapeHtml(asset.property_address)}, ${escapeHtml(asset.property_city)}</p><table style="width:100%;margin-top:22px;border-collapse:collapse"><tr><td style="padding:10px 0;color:#77726a">Ansvarig</td><td style="padding:10px 0;text-align:right;font-weight:700">${escapeHtml(assignment.assigneeName || "Ej angiven")}</td></tr><tr><td style="padding:10px 0;border-top:1px solid #eee8de;color:#77726a">Deadline</td><td style="padding:10px 0;border-top:1px solid #eee8de;text-align:right;font-weight:700">${deadline ? escapeHtml(formatDate(deadline)) : "Ingen deadline"}</td></tr></table>${assignment.note ? `<div style="margin-top:22px;border-radius:12px;background:#f7f4ee;padding:16px;color:#514e48"><strong>Kommentar</strong><br>${escapeHtml(assignment.note)}</div>` : ""}<p style="margin:26px 0 0"><a href="${escapeHtml(href)}" style="display:inline-block;border-radius:10px;background:#174d45;padding:12px 18px;color:#fff;font-weight:700;text-decoration:none">Öppna komponenten i Revalta</a></p></div></div></div></body></html>`,
+    }),
+  });
+  const body = await response.text();
+  if (!response.ok) throw new Error(`E-postleverantören svarade ${response.status}: ${body.slice(0, 300)}`);
+  return body;
+}
+
+export async function runServiceEscalations(now = new Date()) {
+  const dueBefore = new Date(now.getTime() + 30 * 86400000);
+  const [assets, assignmentEvents] = await Promise.all([
+    db.$queryRaw<AssetRow[]>(Prisma.sql`SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city" FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id" WHERE a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${dueBefore} AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed') ORDER BY a."company_id", a."next_service_at" ASC LIMIT 5000`),
+    db.integrationEvent.findMany({ where: { type: "service_notification_assignment" }, orderBy: { created_at: "desc" }, take: 10000, select: { company_id: true, payload: true, created_at: true } }),
+  ]);
+
+  const companyIds = Array.from(new Set(assets.map((asset) => asset.company_id)));
+  const rulesByCompany = new Map<string, ServiceEscalationRules>();
+  await Promise.all(companyIds.map(async (companyId) => rulesByCompany.set(companyId, (await getServiceEscalationRules(companyId)).rules)));
+  const assetsByKey = new Map(assets.map((asset) => [keyFor(asset), asset]));
+  const latest = new Map<string, Assignment>();
+  for (const event of assignmentEvents) {
+    const payload = payloadFor(event.payload);
+    if (!payload?.notificationKey || !event.company_id) continue;
+    const compound = `${event.company_id}:${payload.notificationKey}`;
+    if (!latest.has(compound)) latest.set(compound, { ...payload, notificationKey: payload.notificationKey, companyId: event.company_id, createdAt: event.created_at });
+  }
+
+  const candidates: Candidate[] = [];
+  for (const assignment of latest.values()) {
+    const asset = assetsByKey.get(assignment.notificationKey);
+    const rules = rulesByCompany.get(assignment.companyId);
+    if (!asset || !rules?.enabled || asset.company_id !== assignment.companyId || assignment.status === "completed") continue;
+    const deadline = assignment.deadline ? new Date(assignment.deadline) : null;
+    const graceAt = deadline && !Number.isNaN(deadline.getTime()) ? new Date(deadline.getTime() + rules.graceDays * 86400000) : null;
+    const blocked = assignment.status === "blocked" && rules.escalateBlocked;
+    const overdue = Boolean(graceAt && graceAt < now && rules.escalateOverdue);
+    const reason = blocked ? "blocked" as const : overdue ? "overdue_deadline" as const : null;
+    if (reason) candidates.push({ notificationKey: assignment.notificationKey, asset, assignment, reason, rules });
+  }
+
+  const result = { candidates: candidates.length, sent: 0, skipped: 0, failed: 0, disabledCompanies: companyIds.filter((id) => !rulesByCompany.get(id)?.enabled).length };
+  for (const candidate of candidates) {
+    const bucket = repeatBucket(now, candidate.rules.repeatDays);
+    const dedupeKey = `service-escalation:${candidate.notificationKey}:${candidate.reason}:${bucket}`;
+    const existing = await db.integrationEvent.findFirst({ where: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", recipient: dedupeKey, status: { in: ["processing", "sent"] } }, select: { id: true } });
+    if (existing) { result.skipped += 1; continue; }
+
+    const orFilters: Array<{ id: string } | { role: { in: string[] } }> = [];
+    if (candidate.rules.includeAssignee && candidate.assignment.assigneeId) orFilters.push({ id: candidate.assignment.assigneeId });
+    if (candidate.rules.recipientRoles.length) orFilters.push({ role: { in: candidate.rules.recipientRoles } });
+    const users = orFilters.length ? await db.user.findMany({ where: { company_id: candidate.asset.company_id, status: "active", OR: orFilters }, select: { email: true } }) : [];
+    const emails = Array.from(new Set(users.map((user) => user.email.trim().toLowerCase()).filter(Boolean)));
+    const basePayload = { notificationKey: candidate.notificationKey, reason: candidate.reason, recipients: emails, assigneeId: candidate.assignment.assigneeId || null, deadline: candidate.assignment.deadline || null, repeatDays: candidate.rules.repeatDays, graceDays: candidate.rules.graceDays, bucket };
+    if (!emails.length) { await db.integrationEvent.create({ data: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", status: "skipped", recipient: dedupeKey, payload: { ...basePayload, reasonCode: "no_recipients" } } }); result.skipped += 1; continue; }
+    const event = await db.integrationEvent.create({ data: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", status: "processing", recipient: dedupeKey, payload: basePayload } });
+    try {
+      const providerResponse = await sendEscalation(candidate, emails);
+      await db.integrationEvent.update({ where: { id: event.id }, data: { status: "sent", payload: { ...basePayload, providerResponse } } });
+      result.sent += 1;
+    } catch (error) {
+      await db.integrationEvent.update({ where: { id: event.id }, data: { status: "failed", payload: { ...basePayload, error: error instanceof Error ? error.message : "Okänt fel" } } });
+      result.failed += 1;
+    }
+  }
+  return result;
+}
