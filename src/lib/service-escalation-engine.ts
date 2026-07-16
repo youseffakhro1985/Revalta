@@ -5,7 +5,8 @@ import { getServiceEscalationRules, type ServiceEscalationRules } from "@/lib/se
 type AssetRow = { id: string; company_id: string; property_id: string; component_name: string; next_service_at: Date; property_name: string; property_address: string; property_city: string };
 type AssignmentPayload = { notificationKey?: string; assigneeId?: string | null; assigneeName?: string | null; status?: string; deadline?: string | null; note?: string | null };
 type Assignment = Omit<AssignmentPayload, "notificationKey"> & { notificationKey: string; companyId: string; createdAt: Date };
-type Candidate = { notificationKey: string; asset: AssetRow; assignment: Assignment; reason: "blocked" | "overdue_deadline"; rules: ServiceEscalationRules };
+type CompanyRules = { rules: ServiceEscalationRules; updatedAt: string | null };
+type Candidate = { notificationKey: string; asset: AssetRow; assignment: Assignment; reason: "blocked" | "overdue_deadline"; companyRules: CompanyRules; graceAt: Date | null };
 
 function payloadFor(value: Prisma.JsonValue | null): AssignmentPayload | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as AssignmentPayload : null;
@@ -47,8 +48,11 @@ export async function runServiceEscalations(now = new Date()) {
   ]);
 
   const companyIds = Array.from(new Set(assets.map((asset) => asset.company_id)));
-  const rulesByCompany = new Map<string, ServiceEscalationRules>();
-  await Promise.all(companyIds.map(async (companyId) => rulesByCompany.set(companyId, (await getServiceEscalationRules(companyId)).rules)));
+  const rulesByCompany = new Map<string, CompanyRules>();
+  await Promise.all(companyIds.map(async (companyId) => {
+    const current = await getServiceEscalationRules(companyId);
+    rulesByCompany.set(companyId, current);
+  }));
   const assetsByKey = new Map(assets.map((asset) => [keyFor(asset), asset]));
   const latest = new Map<string, Assignment>();
   for (const event of assignmentEvents) {
@@ -61,29 +65,57 @@ export async function runServiceEscalations(now = new Date()) {
   const candidates: Candidate[] = [];
   for (const assignment of latest.values()) {
     const asset = assetsByKey.get(assignment.notificationKey);
-    const rules = rulesByCompany.get(assignment.companyId);
-    if (!asset || !rules?.enabled || asset.company_id !== assignment.companyId || assignment.status === "completed") continue;
+    const companyRules = rulesByCompany.get(assignment.companyId);
+    const rules = companyRules?.rules;
+    if (!asset || !companyRules || !rules?.enabled || asset.company_id !== assignment.companyId || assignment.status === "completed") continue;
     const deadline = assignment.deadline ? new Date(assignment.deadline) : null;
     const graceAt = deadline && !Number.isNaN(deadline.getTime()) ? new Date(deadline.getTime() + rules.graceDays * 86400000) : null;
     const blocked = assignment.status === "blocked" && rules.escalateBlocked;
     const overdue = Boolean(graceAt && graceAt < now && rules.escalateOverdue);
     const reason = blocked ? "blocked" as const : overdue ? "overdue_deadline" as const : null;
-    if (reason) candidates.push({ notificationKey: assignment.notificationKey, asset, assignment, reason, rules });
+    if (reason) candidates.push({ notificationKey: assignment.notificationKey, asset, assignment, reason, companyRules, graceAt });
   }
 
-  const result = { candidates: candidates.length, sent: 0, skipped: 0, failed: 0, disabledCompanies: companyIds.filter((id) => !rulesByCompany.get(id)?.enabled).length };
+  const result = { candidates: candidates.length, sent: 0, skipped: 0, failed: 0, disabledCompanies: companyIds.filter((id) => !rulesByCompany.get(id)?.rules.enabled).length };
   for (const candidate of candidates) {
-    const bucket = repeatBucket(now, candidate.rules.repeatDays);
+    const rules = candidate.companyRules.rules;
+    const bucket = repeatBucket(now, rules.repeatDays);
     const dedupeKey = `service-escalation:${candidate.notificationKey}:${candidate.reason}:${bucket}`;
     const existing = await db.integrationEvent.findFirst({ where: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", recipient: dedupeKey, status: { in: ["processing", "sent"] } }, select: { id: true } });
     if (existing) { result.skipped += 1; continue; }
 
     const orFilters: Array<{ id: string } | { role: { in: string[] } }> = [];
-    if (candidate.rules.includeAssignee && candidate.assignment.assigneeId) orFilters.push({ id: candidate.assignment.assigneeId });
-    if (candidate.rules.recipientRoles.length) orFilters.push({ role: { in: candidate.rules.recipientRoles } });
+    if (rules.includeAssignee && candidate.assignment.assigneeId) orFilters.push({ id: candidate.assignment.assigneeId });
+    if (rules.recipientRoles.length) orFilters.push({ role: { in: rules.recipientRoles } });
     const users = orFilters.length ? await db.user.findMany({ where: { company_id: candidate.asset.company_id, status: "active", OR: orFilters }, select: { email: true } }) : [];
     const emails = Array.from(new Set(users.map((user) => user.email.trim().toLowerCase()).filter(Boolean)));
-    const basePayload = { notificationKey: candidate.notificationKey, reason: candidate.reason, recipients: emails, assigneeId: candidate.assignment.assigneeId || null, deadline: candidate.assignment.deadline || null, repeatDays: candidate.rules.repeatDays, graceDays: candidate.rules.graceDays, bucket };
+    const basePayload = {
+      schemaVersion: 2,
+      capturedAt: now.toISOString(),
+      notificationKey: candidate.notificationKey,
+      reason: candidate.reason,
+      recipients: emails,
+      assigneeId: candidate.assignment.assigneeId || null,
+      deadline: candidate.assignment.deadline || null,
+      graceAt: candidate.graceAt?.toISOString() || null,
+      assignmentStatus: candidate.assignment.status || "assigned",
+      assignmentUpdatedAt: candidate.assignment.createdAt.toISOString(),
+      componentId: candidate.asset.id,
+      componentName: candidate.asset.component_name,
+      propertyId: candidate.asset.property_id,
+      propertyName: candidate.asset.property_name,
+      repeatBucket: bucket,
+      rulesSnapshot: {
+        enabled: rules.enabled,
+        escalateBlocked: rules.escalateBlocked,
+        escalateOverdue: rules.escalateOverdue,
+        graceDays: rules.graceDays,
+        repeatDays: rules.repeatDays,
+        recipientRoles: [...rules.recipientRoles],
+        includeAssignee: rules.includeAssignee,
+        updatedAt: candidate.companyRules.updatedAt,
+      },
+    };
     if (!emails.length) { await db.integrationEvent.create({ data: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", status: "skipped", recipient: dedupeKey, payload: { ...basePayload, reasonCode: "no_recipients" } } }); result.skipped += 1; continue; }
     const event = await db.integrationEvent.create({ data: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", status: "processing", recipient: dedupeKey, payload: basePayload } });
     try {
