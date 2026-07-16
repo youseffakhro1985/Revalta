@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
@@ -14,6 +15,10 @@ function appBaseUrl() {
   if (configured) return configured.replace(/\/$/, "");
   const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
   return productionHost ? `https://${productionHost}` : "https://www.revalta.se";
+}
+
+function toInputJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
 async function sendTestEmail(to: string) {
@@ -72,9 +77,10 @@ export async function POST(request: Request) {
       result = JSON.parse(text) as unknown;
     }
 
+    const jsonResult = toInputJson(result);
     await db.integrationEvent.update({
       where: { id: event.id },
-      data: { status: "sent", payload: { action, requestedBy: user.id, result } },
+      data: { status: "sent", payload: { action, requestedBy: user.id, result: jsonResult } },
     });
     return NextResponse.json({ success: true, action, result });
   } catch (error) {
