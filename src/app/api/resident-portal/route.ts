@@ -114,6 +114,10 @@ export async function GET() {
 
       if (accessibleLeaseIds.length === 0) return [];
 
+      const contentType = typeof metadata.contentType === "string" ? metadata.contentType : null;
+      const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : null;
+      const downloadable = Boolean(contentType && dataUrl?.startsWith(`data:${contentType};base64,`));
+
       return [{
         id: log.id,
         name: typeof metadata.name === "string" ? metadata.name : "Dokument",
@@ -121,9 +125,9 @@ export async function GET() {
         visibility,
         validUntil: typeof metadata.validUntil === "string" ? metadata.validUntil : null,
         fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
-        contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
+        contentType,
         sizeBytes: typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : 0,
-        dataUrl: typeof metadata.dataUrl === "string" ? metadata.dataUrl : null,
+        downloadable,
         propertyId,
         unitId,
         leaseId,
