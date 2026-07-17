@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
 
 const activeLeaseStatuses = ["active", "notice"];
 const residentDocumentVisibilities = new Set([
@@ -81,6 +82,11 @@ export async function GET(
 
     if (!lease || !documentLog) {
       return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    }
+
+    const lifecycle = await getDocumentLifecycleState(user.company_id, documentLog.id);
+    if (lifecycle.state !== "active") {
+      return NextResponse.json({ error: "Dokumentet är inte längre publicerat" }, { status: 410 });
     }
 
     const metadata = (documentLog.metadata || {}) as DocumentMetadata;
