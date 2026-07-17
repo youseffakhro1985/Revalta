@@ -29,7 +29,7 @@ type ResidentDocument = {
   fileName: string | null;
   contentType: string | null;
   sizeBytes: number;
-  dataUrl: string | null;
+  downloadable: boolean;
   accessibleLeaseIds: string[];
   uploadedBy: string;
   createdAt: string;
@@ -59,10 +59,6 @@ function formatBytes(value: number) {
   return `${(value / (1024 * 1024)).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MB`;
 }
 
-function isSafeDocumentUrl(value: string | null) {
-  return Boolean(value && /^data:(application\/pdf|image\/(jpeg|png)|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet));base64,/i.test(value));
-}
-
 export default function ResidentDocumentsPage() {
   const [data, setData] = useState<Payload | null>(null);
   const [selectedLeaseId, setSelectedLeaseId] = useState("");
@@ -78,7 +74,10 @@ export default function ResidentDocumentsPage() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta boendedokument");
       setData({ leases: payload.leases || [], documents: payload.documents || [] });
-      setSelectedLeaseId((current) => current || payload.leases?.[0]?.id || "");
+      setSelectedLeaseId((current) => {
+        if (current && payload.leases?.some((lease: Lease) => lease.id === current)) return current;
+        return payload.leases?.[0]?.id || "";
+      });
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte hämta boendedokument");
     } finally {
@@ -121,7 +120,7 @@ export default function ResidentDocumentsPage() {
         <MetricCard icon={FileText} label="Tillgängliga dokument" value={visibleDocuments.length} hint="För valt avtal" />
         <MetricCard icon={FileCheck2} label="Giltiga dokument" value={visibleDocuments.filter((item) => !item.validUntil || new Date(item.validUntil).getTime() >= Date.now()).length} hint="Inte passerat slutdatum" />
         <MetricCard icon={RefreshCw} label="Går ut inom 30 dagar" value={expiringCount} hint="Kräver uppföljning" />
-        <MetricCard icon={ShieldCheck} label="Åtkomstmodell" value="Tenant-säker" hint="Filtreras på servern" />
+        <MetricCard icon={ShieldCheck} label="Åtkomstmodell" value="Tenant-säker" hint="Kontrolleras vid hämtning" />
       </section>
 
       <Panel title="Välj boende och avtal" description="Dokumentlistan räknas om efter det valda aktiva avtalet.">
@@ -170,7 +169,7 @@ export default function ResidentDocumentsPage() {
           <div className="divide-y divide-sand-100">
             {visibleDocuments.map((document) => {
               const expired = Boolean(document.validUntil && new Date(document.validUntil).getTime() < Date.now());
-              const safeUrl = isSafeDocumentUrl(document.dataUrl);
+              const downloadUrl = `/api/resident-portal/documents/${encodeURIComponent(document.id)}/download?leaseId=${encodeURIComponent(selectedLeaseId)}`;
               return (
                 <article key={document.id} className="grid gap-4 p-5 transition hover:bg-sand-50/70 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
                   <div className="min-w-0">
@@ -187,8 +186,8 @@ export default function ResidentDocumentsPage() {
                       {document.validUntil ? ` · giltigt till ${dateFormatter.format(new Date(document.validUntil))}` : ""}
                     </p>
                   </div>
-                  {safeUrl ? (
-                    <a href={document.dataUrl || undefined} download={document.fileName || document.name} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-petroleum-900">
+                  {document.downloadable ? (
+                    <a href={downloadUrl} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-petroleum-900">
                       <Download className="h-4 w-4" /> Hämta dokument
                     </a>
                   ) : (
