@@ -6,7 +6,27 @@ import { generatePublicReference } from "@/lib/public-portal";
 
 const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "heating", "access", "noise", "other"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
+const residentDocumentVisibilities = new Set([
+  "resident_all",
+  "resident_property",
+  "resident_unit",
+  "resident_lease",
+]);
 const activeLeaseStatuses = ["active", "notice"];
+
+type DocumentMetadata = {
+  name?: unknown;
+  category?: unknown;
+  visibility?: unknown;
+  propertyId?: unknown;
+  unitId?: unknown;
+  leaseId?: unknown;
+  validUntil?: unknown;
+  fileName?: unknown;
+  contentType?: unknown;
+  sizeBytes?: unknown;
+  dataUrl?: unknown;
+};
 
 export async function GET() {
   try {
@@ -14,7 +34,7 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-    const [leases, tickets] = await Promise.all([
+    const [leases, tickets, documentLogs] = await Promise.all([
       db.lease.findMany({
         where: { company_id: user.company_id, status: { in: activeLeaseStatuses } },
         orderBy: [{ property: { name: "asc" } }, { unit: { designation: "asc" } }],
@@ -26,6 +46,8 @@ export async function GET() {
           start_date: true,
           end_date: true,
           monthly_rent: true,
+          property_id: true,
+          unit_id: true,
           property: { select: { id: true, name: true, address: true, city: true } },
           unit: { select: { id: true, designation: true, unit_type: true } },
           lease_holder: {
@@ -55,12 +77,67 @@ export async function GET() {
           assigned_to: { select: { id: true, name: true, email: true } },
         },
       }),
+      db.auditLog.findMany({
+        where: {
+          company_id: user.company_id,
+          entity_type: "document",
+          action: "document.created",
+        },
+        orderBy: { created_at: "desc" },
+        take: 500,
+        select: {
+          id: true,
+          metadata: true,
+          created_at: true,
+          actor: { select: { name: true, email: true } },
+        },
+      }),
     ]);
+
+    const residentDocuments = documentLogs.flatMap((log) => {
+      const metadata = (log.metadata || {}) as DocumentMetadata;
+      const visibility = typeof metadata.visibility === "string" ? metadata.visibility : "internal";
+      if (!residentDocumentVisibilities.has(visibility)) return [];
+
+      const propertyId = typeof metadata.propertyId === "string" ? metadata.propertyId : null;
+      const unitId = typeof metadata.unitId === "string" ? metadata.unitId : null;
+      const leaseId = typeof metadata.leaseId === "string" ? metadata.leaseId : null;
+      const accessibleLeaseIds = leases
+        .filter((lease) => {
+          if (visibility === "resident_all") return true;
+          if (visibility === "resident_property") return Boolean(propertyId && lease.property_id === propertyId);
+          if (visibility === "resident_unit") return Boolean(unitId && lease.unit_id === unitId);
+          if (visibility === "resident_lease") return Boolean(leaseId && lease.id === leaseId);
+          return false;
+        })
+        .map((lease) => lease.id);
+
+      if (accessibleLeaseIds.length === 0) return [];
+
+      return [{
+        id: log.id,
+        name: typeof metadata.name === "string" ? metadata.name : "Dokument",
+        category: typeof metadata.category === "string" ? metadata.category : "other",
+        visibility,
+        validUntil: typeof metadata.validUntil === "string" ? metadata.validUntil : null,
+        fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
+        contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
+        sizeBytes: typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : 0,
+        dataUrl: typeof metadata.dataUrl === "string" ? metadata.dataUrl : null,
+        propertyId,
+        unitId,
+        leaseId,
+        accessibleLeaseIds,
+        uploadedBy: log.actor?.name || log.actor?.email || "Förvaltningen",
+        createdAt: log.created_at,
+      }];
+    });
 
     return NextResponse.json(
       {
         leases: leases.map((lease) => ({ ...lease, monthly_rent: Number(lease.monthly_rent) })),
         tickets,
+        documents: residentDocuments,
         canManage: canManageTickets(user.role),
       },
       { headers: { "Cache-Control": "private, no-store" } },
@@ -133,7 +210,6 @@ export async function POST(request: Request) {
 
       await tx.auditLog.create({
         data: {
-          // AuditLog uses actor_user_id in the Prisma schema.
           actor_user_id: user.id,
           company_id: user.company_id,
           action: "resident_portal.ticket_created",
