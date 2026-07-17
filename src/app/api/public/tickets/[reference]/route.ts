@@ -2,6 +2,12 @@ import db from "@/lib/db";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
+type PublicCommentAuditMetadata = {
+  commentId?: unknown;
+  reporterName?: unknown;
+  reporterEmail?: unknown;
+};
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ reference: string }> }
@@ -27,6 +33,10 @@ export async function GET(
         reporter_email: email,
       },
       select: {
+        id: true,
+        company_id: true,
+        reporter_name: true,
+        reporter_email: true,
         public_reference: true,
         title: true,
         status: true,
@@ -53,7 +63,49 @@ export async function GET(
       return NextResponse.json({ error: "Ärendet hittades inte. Kontrollera referensnummer och e-post." }, { status: 404 });
     }
 
-    return NextResponse.json({ ticket });
+    const externalAuthorLogs = await db.auditLog.findMany({
+      where: {
+        company_id: ticket.company_id ?? undefined,
+        entity_type: "ticket",
+        entity_id: ticket.id,
+        action: "public.comment_created",
+      },
+      orderBy: { created_at: "asc" },
+      select: { metadata: true },
+    });
+
+    const externalAuthors = new Map<string, { type: "resident"; name: string }>();
+    for (const log of externalAuthorLogs) {
+      const metadata = (log.metadata || {}) as PublicCommentAuditMetadata;
+      if (typeof metadata.commentId !== "string") continue;
+      const name = typeof metadata.reporterName === "string" && metadata.reporterName.trim()
+        ? metadata.reporterName.trim()
+        : ticket.reporter_name || "Boende";
+      externalAuthors.set(metadata.commentId, { type: "resident", name });
+    }
+
+    return NextResponse.json({
+      ticket: {
+        public_reference: ticket.public_reference,
+        title: ticket.title,
+        status: ticket.status,
+        priority: ticket.priority,
+        category: ticket.category,
+        created_at: ticket.created_at,
+        updated_at: ticket.updated_at,
+        ai_summary: ticket.ai_summary,
+        property: ticket.property,
+        comments: ticket.comments.map((comment) => ({
+          id: comment.id,
+          body: comment.body,
+          created_at: comment.created_at,
+          author: externalAuthors.get(comment.id) || {
+            type: "management" as const,
+            name: comment.user.name || "Förvaltningen",
+          },
+        })),
+      },
+    });
   } catch (error) {
     console.error("Get public ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
