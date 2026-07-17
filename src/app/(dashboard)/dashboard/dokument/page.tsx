@@ -1,22 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Download, FileText, FolderArchive, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Download, FileText, FolderArchive, Search, ShieldCheck, UsersRound } from "lucide-react";
+import {
+  EmptyState,
+  InlineAlert,
+  MetricCard,
+  PageHeader,
+  Panel,
+  premiumFieldClass,
+  premiumPrimaryButtonClass,
+} from "@/components/dashboard/premium-ui";
 
-type Property = { id: string; name: string; address: string; city: string };
+type Unit = { id: string; designation: string };
+type Property = { id: string; name: string; address: string; city: string; units: Unit[] };
+type Lease = {
+  id: string;
+  lease_number: string;
+  status: string;
+  property_id: string;
+  unit_id: string;
+  lease_holder: { name: string; contact_name: string | null };
+  unit: { designation: string };
+};
 type DocumentItem = {
   id: string;
   name: string;
   category: string;
+  visibility: string;
   validUntil: string | null;
   fileName: string | null;
   contentType: string | null;
   sizeBytes: number;
   dataUrl: string | null;
   property: Property | null;
+  unit: Unit | null;
+  lease: { id: string; leaseNumber: string; status: string; holder: string; unit: string } | null;
   uploadedBy: string;
   createdAt: string;
 };
+
+type Payload = { documents: DocumentItem[]; properties: Property[]; leases: Lease[] };
+
+type Visibility = "internal" | "resident_all" | "resident_property" | "resident_unit" | "resident_lease";
 
 const categoryLabels: Record<string, string> = {
   contract: "Avtal",
@@ -28,20 +54,50 @@ const categoryLabels: Record<string, string> = {
   insurance: "Försäkring",
   warranty: "Garanti",
   protocol: "Protokoll",
+  notice: "Information",
+  rules: "Ordningsregler",
+  certificate: "Intyg",
+  invoice: "Ekonomi",
   other: "Övrigt",
 };
 
-const inputClass = "block w-full rounded-lg border border-sand-200 bg-white px-3 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100";
+const visibilityLabels: Record<Visibility, string> = {
+  internal: "Endast internt",
+  resident_all: "Alla boende",
+  resident_property: "Boende i vald fastighet",
+  resident_unit: "Boende i valt objekt",
+  resident_lease: "Specifikt hyresavtal",
+};
+
+const visibilityDescriptions: Record<Visibility, string> = {
+  internal: "Dokumentet visas endast i Revaltas interna dokumentarkiv.",
+  resident_all: "Alla aktiva boendeavtal i organisationen får tillgång.",
+  resident_property: "Alla aktiva avtal i den valda fastigheten får tillgång.",
+  resident_unit: "Endast aktiva avtal för det valda objektet får tillgång.",
+  resident_lease: "Endast det valda aktiva hyresavtalet får tillgång.",
+};
+
+const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" });
+
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "Okänd storlek";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} kB`;
+  return `${(value / (1024 * 1024)).toLocaleString("sv-SE", { maximumFractionDigits: 1 })} MB`;
+}
 
 export default function DocumentsPage() {
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [data, setData] = useState<Payload>({ documents: [], properties: [], leases: [] });
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [propertyFilter, setPropertyFilter] = useState("");
+  const [visibilityFilter, setVisibilityFilter] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("other");
+  const [visibility, setVisibility] = useState<Visibility>("internal");
   const [propertyId, setPropertyId] = useState("");
+  const [unitId, setUnitId] = useState("");
+  const [leaseId, setLeaseId] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,95 +105,189 @@ export default function DocumentsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function loadDocuments() {
+  const loadDocuments = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const response = await fetch("/api/documents", { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Kunde inte hämta dokument");
-      setDocuments(data.documents || []);
-      setProperties(data.properties || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunde inte hämta dokument");
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Kunde inte hämta dokument");
+      setData({ documents: payload.documents || [], properties: payload.properties || [], leases: payload.leases || [] });
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Kunde inte hämta dokument");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => { void loadDocuments(); }, [loadDocuments]);
+
+  const selectedProperty = data.properties.find((property) => property.id === propertyId) || null;
+  const availableUnits = selectedProperty?.units || [];
+  const availableLeases = data.leases.filter((lease) => {
+    if (visibility === "resident_property") return lease.property_id === propertyId;
+    if (visibility === "resident_unit") return lease.unit_id === unitId;
+    return true;
+  });
+
+  const filtered = useMemo(() => data.documents.filter((document) => {
+    const text = `${document.name} ${document.fileName || ""} ${document.property?.name || ""} ${document.unit?.designation || ""} ${document.lease?.leaseNumber || ""}`.toLowerCase();
+    return (!search || text.includes(search.toLowerCase()))
+      && (!categoryFilter || document.category === categoryFilter)
+      && (!propertyFilter || document.property?.id === propertyFilter)
+      && (!visibilityFilter || document.visibility === visibilityFilter);
+  }), [data.documents, search, categoryFilter, propertyFilter, visibilityFilter]);
+
+  const residentPublished = data.documents.filter((document) => document.visibility !== "internal").length;
+  const expiring = data.documents.filter((document) => {
+    if (!document.validUntil) return false;
+    const value = new Date(document.validUntil).getTime();
+    return Number.isFinite(value) && value >= Date.now() && value <= Date.now() + 90 * 86_400_000;
+  }).length;
+
+  function changeVisibility(next: Visibility) {
+    setVisibility(next);
+    setPropertyId("");
+    setUnitId("");
+    setLeaseId("");
   }
 
-  useEffect(() => { void loadDocuments(); }, []);
+  function changeProperty(next: string) {
+    setPropertyId(next);
+    setUnitId("");
+    setLeaseId("");
+  }
 
-  const filtered = useMemo(() => documents.filter((document) => {
-    const text = `${document.name} ${document.fileName || ""} ${document.property?.name || ""}`.toLowerCase();
-    return (!search || text.includes(search.toLowerCase())) && (!categoryFilter || document.category === categoryFilter) && (!propertyFilter || document.property?.id === propertyFilter);
-  }), [documents, search, categoryFilter, propertyFilter]);
+  function changeUnit(next: string) {
+    setUnitId(next);
+    setLeaseId("");
+  }
 
-  const expiring = documents.filter((document) => document.validUntil && new Date(document.validUntil).getTime() < Date.now() + 1000 * 60 * 60 * 24 * 90).length;
+  function resetForm() {
+    setName("");
+    setCategory("other");
+    setVisibility("internal");
+    setPropertyId("");
+    setUnitId("");
+    setLeaseId("");
+    setValidUntil("");
+    setFile(null);
+  }
 
   async function uploadDocument(event: React.FormEvent) {
     event.preventDefault();
     if (!file) return setError("Välj en fil");
-    setSubmitting(true); setError(""); setMessage("");
+    setSubmitting(true);
+    setError("");
+    setMessage("");
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("name", name);
       formData.append("category", category);
+      formData.append("visibility", visibility);
       formData.append("propertyId", propertyId);
+      formData.append("unitId", unitId);
+      formData.append("leaseId", leaseId);
       formData.append("validUntil", validUntil);
       const response = await fetch("/api/documents", { method: "POST", body: formData });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Kunde inte ladda upp dokumentet");
-      setName(""); setCategory("other"); setPropertyId(""); setValidUntil(""); setFile(null);
-      setMessage("Dokumentet har sparats i fastighetspärmen.");
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Kunde inte ladda upp dokumentet");
+      resetForm();
+      setMessage("Dokumentet har sparats med vald åtkomstnivå.");
       await loadDocuments();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Kunde inte ladda upp dokumentet");
-    } finally { setSubmitting(false); }
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Kunde inte ladda upp dokumentet");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-soft">
-      <header className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm sm:p-8">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Digital fastighetspärm</p>
-        <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div><h1 className="text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Dokumentarkiv</h1><p className="mt-3 max-w-2xl text-ink-600">Samla avtal, ritningar, protokoll, besiktningar och myndighetsdokument på rätt fastighet.</p></div>
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-xl bg-sand-50 px-4 py-3"><p className="text-2xl font-semibold text-ink-950">{documents.length}</p><p className="text-[10px] uppercase tracking-wide text-ink-500">Dokument</p></div>
-            <div className="rounded-xl bg-petroleum-50 px-4 py-3"><p className="text-2xl font-semibold text-petroleum-700">{new Set(documents.map((item) => item.property?.id).filter(Boolean)).size}</p><p className="text-[10px] uppercase tracking-wide text-petroleum-700">Fastigheter</p></div>
-            <div className="rounded-xl bg-warning-50 px-4 py-3"><p className="text-2xl font-semibold text-warning-700">{expiring}</p><p className="text-[10px] uppercase tracking-wide text-warning-700">Bevakas</p></div>
-          </div>
-        </div>
-      </header>
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow="Digital fastighetspärm"
+        title="Dokumentarkiv"
+        description="Publicera interna dokument eller ge boende exakt åtkomst per organisation, fastighet, objekt eller hyresavtal."
+      />
 
-      {(error || message) && <div className={`rounded-xl border p-4 text-sm font-medium ${error ? "border-danger-200 bg-danger-50 text-danger-700" : "border-success-200 bg-success-50 text-success-700"}`}>{error || message}</div>}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-        <form onSubmit={uploadDocument} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
-          <div className="flex items-center gap-3"><div className="rounded-xl bg-petroleum-50 p-3 text-petroleum-700"><FolderArchive className="h-5 w-5" /></div><div><h2 className="font-semibold text-ink-950">Lägg till dokument</h2><p className="text-sm text-ink-500">PDF, bild, Word eller Excel. Max 2 MB.</p></div></div>
-          <div className="mt-6 space-y-4">
-            <label className="block text-sm font-medium text-ink-700">Dokumentnamn<input required value={name} onChange={(e) => setName(e.target.value)} className={`${inputClass} mt-1`} placeholder="Ex. OVK-protokoll 2026" /></label>
-            <label className="block text-sm font-medium text-ink-700">Kategori<select value={category} onChange={(e) => setCategory(e.target.value)} className={`${inputClass} mt-1`}>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label className="block text-sm font-medium text-ink-700">Fastighet<select value={propertyId} onChange={(e) => setPropertyId(e.target.value)} className={`${inputClass} mt-1`}><option value="">Gemensamt dokument</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></label>
-            <label className="block text-sm font-medium text-ink-700">Giltigt till<input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={`${inputClass} mt-1`} /></label>
-            <label className="block text-sm font-medium text-ink-700">Fil<input required type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx" onChange={(e) => setFile(e.target.files?.[0] || null)} className={`${inputClass} mt-1`} /></label>
-            <button disabled={submitting} className="w-full rounded-lg bg-petroleum-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-60">{submitting ? "Sparar..." : "Spara i fastighetspärmen"}</button>
-          </div>
-        </form>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard icon={FileText} label="Dokument" value={data.documents.length} hint="Totalt i arkivet" />
+        <MetricCard icon={UsersRound} label="Publicerade till boende" value={residentPublished} hint="Minst en extern målgrupp" />
+        <MetricCard icon={ShieldCheck} label="Endast interna" value={data.documents.length - residentPublished} hint="Syns inte i boendeportalen" />
+        <MetricCard icon={FolderArchive} label="Går ut inom 90 dagar" value={expiring} hint="Kräver uppföljning" />
+      </section>
 
-        <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
-          <div className="border-b border-sand-200 p-5 sm:p-6">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_220px]">
-              <label className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-ink-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputClass} pl-9`} placeholder="Sök dokument eller fastighet" /></label>
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={inputClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className={inputClass}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+      <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
+        <Panel title="Lägg till dokument" description="PDF, bild, Word eller Excel. Max 2 MB. Åtkomsten kontrolleras även när filen laddas ned.">
+          <form onSubmit={uploadDocument} className="space-y-4">
+            <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Dokumentnamn</span><input required maxLength={200} value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} placeholder="Exempel: Ordningsregler 2026" /></label>
+            <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Kategori</span><select value={category} onChange={(event) => setCategory(event.target.value)} className={premiumFieldClass}>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Synlighet</span><select value={visibility} onChange={(event) => changeVisibility(event.target.value as Visibility)} className={premiumFieldClass}>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+
+            <div className="rounded-xl border border-petroleum-100 bg-petroleum-50/70 p-4">
+              <p className="text-sm font-semibold text-petroleum-950">{visibilityLabels[visibility]}</p>
+              <p className="mt-1 text-xs leading-5 text-petroleum-800">{visibilityDescriptions[visibility]}</p>
             </div>
+
+            {visibility === "resident_property" || visibility === "resident_unit" ? (
+              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fastighet</span><select required value={propertyId} onChange={(event) => changeProperty(event.target.value)} className={premiumFieldClass}><option value="">Välj fastighet</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.address}</option>)}</select></label>
+            ) : null}
+
+            {visibility === "resident_unit" ? (
+              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Objekt</span><select required disabled={!propertyId} value={unitId} onChange={(event) => changeUnit(event.target.value)} className={premiumFieldClass}><option value="">Välj objekt</option>{availableUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.designation}</option>)}</select></label>
+            ) : null}
+
+            {visibility === "resident_lease" ? (
+              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Hyresavtal</span><select required value={leaseId} onChange={(event) => setLeaseId(event.target.value)} className={premiumFieldClass}><option value="">Välj aktivt avtal</option>{availableLeases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.unit.designation} · {lease.lease_holder.contact_name || lease.lease_holder.name}</option>)}</select></label>
+            ) : null}
+
+            <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Giltigt till</span><input type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} className={premiumFieldClass} /></label>
+            <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fil</span><input required type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx" onChange={(event) => setFile(event.target.files?.[0] || null)} className={premiumFieldClass} /></label>
+            <button disabled={submitting} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Sparar dokument…" : "Spara med vald åtkomst"}</button>
+          </form>
+        </Panel>
+
+        <Panel title="Dokumentbibliotek" description="Sök, filtrera och kontrollera dokumentens publiceringsnivå." bodyClassName="p-0">
+          <div className="grid gap-3 border-b border-sand-200 p-5 lg:grid-cols-[1fr_170px_190px_180px]">
+            <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input value={search} onChange={(event) => setSearch(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, objekt eller avtal" /></label>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={visibilityFilter} onChange={(event) => setVisibilityFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla fastigheter</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           </div>
-          {loading ? <div className="p-8"><div className="h-40 animate-pulse rounded-xl bg-sand-100" /></div> : filtered.length ? <div className="divide-y divide-sand-100">{filtered.map((document) => <article key={document.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div className="flex min-w-0 items-start gap-4"><div className="rounded-xl bg-sand-50 p-3 text-petroleum-700"><FileText className="h-5 w-5" /></div><div className="min-w-0"><h3 className="truncate font-semibold text-ink-950">{document.name}</h3><p className="mt-1 text-sm text-ink-500">{categoryLabels[document.category] || document.category} · {document.property?.name || "Gemensamt"}</p><p className="mt-1 text-xs text-ink-400">{document.fileName || "Fil"} · {(document.sizeBytes / 1024).toFixed(0)} KB · {document.uploadedBy}</p>{document.validUntil && <p className="mt-2 text-xs font-semibold text-warning-700">Giltigt till {new Intl.DateTimeFormat("sv-SE").format(new Date(document.validUntil))}</p>}</div></div>
-            {document.dataUrl && <a href={document.dataUrl} download={document.fileName || document.name} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-700 transition hover:bg-sand-50"><Download className="h-4 w-4" /> Hämta</a>}
-          </article>)}</div> : <div className="p-12 text-center"><p className="font-semibold text-ink-800">Inga dokument matchar</p><p className="mt-2 text-sm text-ink-500">Ladda upp första dokumentet eller ändra filtreringen.</p></div>}
-        </section>
-      </div>
+
+          {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}</div> : filtered.length === 0 ? (
+            <EmptyState title="Inga dokument matchar" description="Ladda upp ett dokument eller justera sökning och filter." />
+          ) : (
+            <div className="divide-y divide-sand-100">
+              {filtered.map((document) => {
+                const scope = document.lease
+                  ? `${document.lease.leaseNumber} · ${document.lease.unit} · ${document.lease.holder}`
+                  : document.unit
+                    ? `${document.property?.name || "Fastighet"} · ${document.unit.designation}`
+                    : document.property?.name || visibilityLabels[document.visibility as Visibility] || document.visibility;
+                return (
+                  <article key={document.id} className="grid gap-4 p-5 transition hover:bg-sand-50/70 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                    <div className="flex min-w-0 items-start gap-4">
+                      <div className="rounded-xl bg-sand-50 p-3 text-petroleum-700"><FileText className="h-5 w-5" /></div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-950">{document.name}</h3><span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{categoryLabels[document.category] || document.category}</span><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{visibilityLabels[document.visibility as Visibility] || document.visibility}</span></div>
+                        <p className="mt-2 text-sm text-ink-600">{scope}</p>
+                        <p className="mt-1 text-xs text-ink-400">{document.fileName || "Fil"} · {formatBytes(document.sizeBytes)} · publicerat {dateFormatter.format(new Date(document.createdAt))} av {document.uploadedBy}</p>
+                        {document.validUntil ? <p className="mt-2 text-xs font-semibold text-warning-700">Giltigt till {dateFormatter.format(new Date(document.validUntil))}</p> : null}
+                      </div>
+                    </div>
+                    {document.dataUrl ? <a href={document.dataUrl} download={document.fileName || document.name} className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700 transition hover:bg-sand-50"><Download className="h-4 w-4" /> Hämta</a> : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </Panel>
+      </section>
     </div>
   );
 }
