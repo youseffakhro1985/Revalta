@@ -3,15 +3,11 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { generatePublicReference } from "@/lib/public-portal";
+import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 
 const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "heating", "access", "noise", "other"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
-const residentDocumentVisibilities = new Set([
-  "resident_all",
-  "resident_property",
-  "resident_unit",
-  "resident_lease",
-]);
+const residentDocumentVisibilities = new Set(["resident_all", "resident_property", "resident_unit", "resident_lease"]);
 const activeLeaseStatuses = ["active", "notice"];
 
 type DocumentMetadata = {
@@ -50,9 +46,7 @@ export async function GET() {
           unit_id: true,
           property: { select: { id: true, name: true, address: true, city: true } },
           unit: { select: { id: true, designation: true, unit_type: true } },
-          lease_holder: {
-            select: { id: true, name: true, contact_name: true, email: true, phone: true, party_type: true },
-          },
+          lease_holder: { select: { id: true, name: true, contact_name: true, email: true, phone: true, party_type: true } },
         },
       }),
       db.ticket.findMany({
@@ -78,23 +72,16 @@ export async function GET() {
         },
       }),
       db.auditLog.findMany({
-        where: {
-          company_id: user.company_id,
-          entity_type: "document",
-          action: "document.created",
-        },
+        where: { company_id: user.company_id, entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
-        select: {
-          id: true,
-          metadata: true,
-          created_at: true,
-          actor: { select: { name: true, email: true } },
-        },
+        select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
       }),
     ]);
 
+    const lifecycleMap = await getDocumentLifecycleMap(user.company_id, documentLogs.map((log) => log.id));
     const residentDocuments = documentLogs.flatMap((log) => {
+      if (lifecycleMap.get(log.id)?.state !== "active") return [];
       const metadata = (log.metadata || {}) as DocumentMetadata;
       const visibility = typeof metadata.visibility === "string" ? metadata.visibility : "internal";
       if (!residentDocumentVisibilities.has(visibility)) return [];
@@ -102,18 +89,15 @@ export async function GET() {
       const propertyId = typeof metadata.propertyId === "string" ? metadata.propertyId : null;
       const unitId = typeof metadata.unitId === "string" ? metadata.unitId : null;
       const leaseId = typeof metadata.leaseId === "string" ? metadata.leaseId : null;
-      const accessibleLeaseIds = leases
-        .filter((lease) => {
-          if (visibility === "resident_all") return true;
-          if (visibility === "resident_property") return Boolean(propertyId && lease.property_id === propertyId);
-          if (visibility === "resident_unit") return Boolean(unitId && lease.unit_id === unitId);
-          if (visibility === "resident_lease") return Boolean(leaseId && lease.id === leaseId);
-          return false;
-        })
-        .map((lease) => lease.id);
+      const accessibleLeaseIds = leases.filter((lease) => {
+        if (visibility === "resident_all") return true;
+        if (visibility === "resident_property") return Boolean(propertyId && lease.property_id === propertyId);
+        if (visibility === "resident_unit") return Boolean(unitId && lease.unit_id === unitId);
+        if (visibility === "resident_lease") return Boolean(leaseId && lease.id === leaseId);
+        return false;
+      }).map((lease) => lease.id);
 
       if (accessibleLeaseIds.length === 0) return [];
-
       const contentType = typeof metadata.contentType === "string" ? metadata.contentType : null;
       const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : null;
       const downloadable = Boolean(contentType && dataUrl?.startsWith(`data:${contentType};base64,`));
@@ -168,15 +152,9 @@ export async function POST(request: Request) {
     const category = String(body.category || "other").trim();
     const priority = String(body.priority || "normal").trim();
 
-    if (!leaseId || !subject || message.length < 10) {
-      return NextResponse.json({ error: "Hyresavtal, ämne och en tydlig beskrivning krävs" }, { status: 400 });
-    }
-    if (subject.length > 200 || message.length > 5000) {
-      return NextResponse.json({ error: "Ämnet eller beskrivningen är för lång" }, { status: 400 });
-    }
-    if (!allowedCategories.has(category) || !allowedPriorities.has(priority)) {
-      return NextResponse.json({ error: "Ogiltig kategori eller prioritet" }, { status: 400 });
-    }
+    if (!leaseId || !subject || message.length < 10) return NextResponse.json({ error: "Hyresavtal, ämne och en tydlig beskrivning krävs" }, { status: 400 });
+    if (subject.length > 200 || message.length > 5000) return NextResponse.json({ error: "Ämnet eller beskrivningen är för lång" }, { status: 400 });
+    if (!allowedCategories.has(category) || !allowedPriorities.has(priority)) return NextResponse.json({ error: "Ogiltig kategori eller prioritet" }, { status: 400 });
 
     const lease = await db.lease.findFirst({
       where: { id: leaseId, company_id: user.company_id, status: { in: activeLeaseStatuses } },
@@ -231,7 +209,6 @@ export async function POST(request: Request) {
           },
         },
       });
-
       return created;
     });
 
