@@ -4,6 +4,9 @@ import { getCurrentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
+const MAX_NOTIFICATIONS = 200;
+const MAX_READ_MARKERS = 1000;
+
 type Payload = {
   notificationKey?: unknown;
   title?: unknown;
@@ -57,22 +60,30 @@ function safeNotification(value: unknown, readKeys: Set<string>) {
   };
 }
 
+function noStore(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { "Cache-Control": "private, no-store", ...(init?.headers || {}) },
+  });
+}
+
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
+  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const [events, reads] = await Promise.all([
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "work_order_edit_lock_forced_release", recipient: user.id },
       orderBy: { created_at: "desc" },
       select: { payload: true },
-      take: 200,
+      take: MAX_NOTIFICATIONS,
     }),
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "work_order_lock_notification_read", recipient: user.id, status: "read" },
+      orderBy: { created_at: "desc" },
       select: { payload: true },
-      take: 1000,
+      take: MAX_READ_MARKERS,
     }),
   ]);
 
@@ -83,26 +94,27 @@ export async function GET() {
     .map((event) => safeNotification(event.payload, readKeys))
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
-  return NextResponse.json({
+  return noStore({
     notifications,
     summary: {
       total: notifications.length,
       unread: notifications.filter((item) => !item.read).length,
       high: notifications.filter((item) => item.high).length,
     },
-  }, { headers: { "Cache-Control": "private, no-store" } });
+  });
 }
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
+  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const body = await request.json().catch(() => ({})) as { key?: unknown; all?: unknown };
   const events = await db.integrationEvent.findMany({
     where: { company_id: user.company_id, type: "work_order_edit_lock_forced_release", recipient: user.id },
+    orderBy: { created_at: "desc" },
     select: { payload: true },
-    take: 200,
+    take: MAX_NOTIFICATIONS,
   });
   const validKeys = new Set(
     events.map((event) => notificationKeyFrom(event.payload)).filter((value): value is string => value !== null),
@@ -111,12 +123,14 @@ export async function PATCH(request: Request) {
   const keys: string[] = body.all === true ? Array.from(validKeys) : requestedKey ? [requestedKey] : [];
 
   if (!keys.length || keys.some((key) => !validKeys.has(key))) {
-    return NextResponse.json({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
+    return noStore({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
   }
 
   const existing = await db.integrationEvent.findMany({
     where: { company_id: user.company_id, type: "work_order_lock_notification_read", recipient: user.id, status: "read" },
+    orderBy: { created_at: "desc" },
     select: { payload: true },
+    take: MAX_READ_MARKERS,
   });
   const existingKeys = new Set(
     existing.map((event) => notificationKeyFrom(event.payload)).filter((value): value is string => value !== null),
@@ -135,5 +149,5 @@ export async function PATCH(request: Request) {
     });
   }
 
-  return NextResponse.json({ success: true, marked: missing.length });
+  return noStore({ success: true, marked: missing.length });
 }
