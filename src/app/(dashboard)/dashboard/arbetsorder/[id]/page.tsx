@@ -21,7 +21,7 @@ type EnterpriseState = {
 
 type StatusEvent = { id: string; from_status: string | null; to_status: string; reason: string | null; created_at: string; actor_name: string | null; actor_email: string };
 type WorkOrder = {
-  id: string; title: string; description: string; status: string; priority: string;
+  id: string; title: string; description: string; status: string; priority: string; assigned_to_id: string | null;
   scheduled_start: string | null; scheduled_end: string | null;
   estimated_cost: string | number | null; actual_cost: string | number | null;
   property: { id: string; name: string; address: string; city: string };
@@ -32,6 +32,8 @@ type WorkOrder = {
   projects: { id: string; name: string; status: string }[];
   enterprise: EnterpriseState; statusEvents: StatusEvent[];
 };
+type Person = { id: string; name: string | null; email: string; role: string };
+type TransitionData = { currentStatus: string; allowedStatuses: string[]; assignedToId: string | null; users: Person[]; canManage: boolean };
 type BuildingOption = { id: string; name: string; address: string | null };
 type AssetOption = { id: string; name: string; category: string; component_class: string | null; location: string | null; status: string; criticality: string; building_id: string | null; building_name: string | null };
 
@@ -57,10 +59,14 @@ export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
+  const [transitions, setTransitions] = useState<TransitionData | null>(null);
   const [buildings, setBuildings] = useState<BuildingOption[]>([]);
   const [assets, setAssets] = useState<AssetOption[]>([]);
   const [buildingId, setBuildingId] = useState("");
   const [technicalAssetId, setTechnicalAssetId] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [statusReason, setStatusReason] = useState("");
+  const [assignedToId, setAssignedToId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -69,19 +75,25 @@ export default function WorkOrderDetailPage() {
   async function load() {
     setError("");
     try {
-      const [workOrderResponse, optionsResponse] = await Promise.all([
+      const [workOrderResponse, optionsResponse, transitionResponse] = await Promise.all([
         fetch(`/api/work-orders/${id}`, { cache: "no-store" }),
         fetch(`/api/work-orders/${id}/asset-options`, { cache: "no-store" }),
+        fetch(`/api/work-orders/${id}/transitions`, { cache: "no-store" }),
       ]);
-      if (workOrderResponse.status === 401 || optionsResponse.status === 401) { router.push("/login"); return; }
-      const [workOrderData, optionsData] = await Promise.all([workOrderResponse.json(), optionsResponse.json()]);
+      if ([workOrderResponse, optionsResponse, transitionResponse].some((response) => response.status === 401)) { router.push("/login"); return; }
+      const [workOrderData, optionsData, transitionData] = await Promise.all([workOrderResponse.json(), optionsResponse.json(), transitionResponse.json()]);
       if (!workOrderResponse.ok) throw new Error(workOrderData.error || "Kunde inte hämta arbetsordern");
       if (!optionsResponse.ok) throw new Error(optionsData.error || "Kunde inte hämta komponentregistret");
+      if (!transitionResponse.ok) throw new Error(transitionData.error || "Kunde inte hämta styrningsalternativ");
       setWorkOrder(workOrderData.workOrder);
+      setTransitions(transitionData);
       setBuildings(optionsData.buildings || []);
       setAssets(optionsData.assets || []);
       setBuildingId(workOrderData.workOrder.enterprise?.building_id || "");
       setTechnicalAssetId(workOrderData.workOrder.enterprise?.technical_asset_id || "");
+      setSelectedStatus(transitionData.currentStatus);
+      setAssignedToId(transitionData.assignedToId || "");
+      setStatusReason("");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte hämta arbetsordern"); }
     finally { setLoading(false); }
   }
@@ -91,12 +103,19 @@ export default function WorkOrderDetailPage() {
   async function save(formData: FormData) {
     setSaving(true); setError(""); setSuccess("");
     try {
-      const payload = { ...Object.fromEntries(formData.entries()), buildingId, technicalAssetId };
+      const payload = {
+        ...Object.fromEntries(formData.entries()),
+        status: selectedStatus,
+        statusReason,
+        assignedToId,
+        buildingId,
+        technicalAssetId,
+      };
       const response = await fetch(`/api/work-orders/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera arbetsordern");
       await load();
-      setSuccess("Arbetsordern har uppdaterats.");
+      setSuccess("Arbetsordern har uppdaterats och ändringen är registrerad i historiken.");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte uppdatera arbetsordern"); }
     finally { setSaving(false); }
   }
@@ -105,9 +124,10 @@ export default function WorkOrderDetailPage() {
   const resolutionSla = useMemo(() => deadlineState(workOrder?.enterprise?.sla_resolution_due_at ?? null, workOrder?.enterprise?.closed_at ?? null), [workOrder]);
   const filteredAssets = useMemo(() => assets.filter((asset) => !buildingId || !asset.building_id || asset.building_id === buildingId), [assets, buildingId]);
   const selectedAsset = assets.find((asset) => asset.id === technicalAssetId) || null;
+  const requiresReason = selectedStatus === "blocked" || selectedStatus === "cancelled";
 
   if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-  if (!workOrder) return <InlineAlert>{error || "Arbetsordern hittades inte"}</InlineAlert>;
+  if (!workOrder || !transitions) return <InlineAlert>{error || "Arbetsordern hittades inte"}</InlineAlert>;
 
   const estimated = Number(workOrder.estimated_cost || 0);
   const actual = Number(workOrder.actual_cost || 0);
@@ -141,8 +161,8 @@ export default function WorkOrderDetailPage() {
 
     <Panel title="Teknisk koppling" description="Knyt arbetsordern till rätt byggnad och exakt installation för spårbar drift, kostnad och livscykel.">
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Byggnad</span><select value={buildingId} onChange={(event) => { const next = event.target.value; setBuildingId(next); if (technicalAssetId && !assets.some((asset) => asset.id === technicalAssetId && (!next || !asset.building_id || asset.building_id === next))) setTechnicalAssetId(""); }} className={premiumFieldClass}><option value="">Ingen särskild byggnad</option>{buildings.map((building) => <option key={building.id} value={building.id}>{building.name}{building.address ? ` · ${building.address}` : ""}</option>)}</select></label>
-        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Teknisk komponent</span><select value={technicalAssetId} onChange={(event) => setTechnicalAssetId(event.target.value)} className={premiumFieldClass}><option value="">Ingen särskild komponent</option>{filteredAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}{asset.building_name ? ` · ${asset.building_name}` : ""}{asset.location ? ` · ${asset.location}` : ""}</option>)}</select></label>
+        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Byggnad</span><select disabled={!transitions.canManage} value={buildingId} onChange={(event) => { const next = event.target.value; setBuildingId(next); if (technicalAssetId && !assets.some((asset) => asset.id === technicalAssetId && (!next || !asset.building_id || asset.building_id === next))) setTechnicalAssetId(""); }} className={premiumFieldClass}><option value="">Ingen särskild byggnad</option>{buildings.map((building) => <option key={building.id} value={building.id}>{building.name}{building.address ? ` · ${building.address}` : ""}</option>)}</select></label>
+        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Teknisk komponent</span><select disabled={!transitions.canManage} value={technicalAssetId} onChange={(event) => setTechnicalAssetId(event.target.value)} className={premiumFieldClass}><option value="">Ingen särskild komponent</option>{filteredAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}{asset.building_name ? ` · ${asset.building_name}` : ""}{asset.location ? ` · ${asset.location}` : ""}</option>)}</select></label>
         <Link href={`/dashboard/fastigheter/${workOrder.property.id}/komponenter`} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-petroleum-800 hover:bg-sand-50">Öppna register</Link>
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -152,16 +172,17 @@ export default function WorkOrderDetailPage() {
     </Panel>
 
     <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-      <Panel title="Styrning" description="Uppdatera status, prioritet, tidsplan, ekonomi och teknisk koppling.">
+      <Panel title="Styrning" description="Endast giltiga statusövergångar visas. Alla ändringar valideras server-side och registreras i revisionshistoriken.">
         <form action={save} className="grid gap-4 sm:grid-cols-2">
-          <select name="status" defaultValue={workOrder.status} className={premiumFieldClass}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select name="priority" defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <input name="statusReason" placeholder="Orsak vid blockering eller avbrott" className={`${premiumFieldClass} sm:col-span-2`} />
-          <input name="scheduledStart" type="date" defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} />
-          <input name="scheduledEnd" type="date" defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} />
-          <input name="estimatedCost" type="number" min="0" step="0.01" defaultValue={estimated || ""} placeholder="Beräknad kostnad" className={premiumFieldClass} />
-          <input name="actualCost" type="number" min="0" step="0.01" defaultValue={actual || ""} placeholder="Faktisk kostnad" className={premiumFieldClass} />
-          <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara ändringar"}</button>
+          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select disabled={!transitions.canManage} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!['blocked', 'cancelled'].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass}>{transitions.allowedStatuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
+          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={!transitions.canManage} defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={!transitions.canManage} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{transitions.users.map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select></label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={!transitions.canManage} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
+          <input name="scheduledStart" type="date" disabled={!transitions.canManage} defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} />
+          <input name="scheduledEnd" type="date" disabled={!transitions.canManage} defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} />
+          <input name="estimatedCost" type="number" min="0" step="0.01" disabled={!transitions.canManage} defaultValue={estimated || ""} placeholder="Beräknad kostnad" className={premiumFieldClass} />
+          <input name="actualCost" type="number" min="0" step="0.01" disabled={!transitions.canManage} defaultValue={actual || ""} placeholder="Faktisk kostnad" className={premiumFieldClass} />
+          {transitions.canManage ? <button disabled={saving || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara validerad ändring"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
         </form>
         <div className="mt-5 space-y-2 border-t border-sand-100 pt-5 text-sm text-ink-500">
           {workOrder.unit ? <p>Enhet: <strong className="text-ink-800">{workOrder.unit.designation}</strong></p> : null}
