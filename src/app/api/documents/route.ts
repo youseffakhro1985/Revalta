@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 
 const allowedTypes = new Set([
   "application/pdf",
@@ -25,11 +26,7 @@ export async function GET() {
 
     const [logs, properties, leases] = await Promise.all([
       db.auditLog.findMany({
-        where: {
-          ...tenantWhere(user),
-          entity_type: "document",
-          action: "document.created",
-        },
+        where: { ...tenantWhere(user), entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
@@ -63,6 +60,9 @@ export async function GET() {
         : Promise.resolve([]),
     ]);
 
+    const lifecycleMap = user.company_id
+      ? await getDocumentLifecycleMap(user.company_id, logs.map((log) => log.id))
+      : new Map();
     const propertyMap = new Map(properties.map((property) => [property.id, property]));
     const leaseMap = new Map(leases.map((lease) => [lease.id, lease]));
     const documents = logs.map((log) => {
@@ -76,12 +76,15 @@ export async function GET() {
       const property = propertyId ? propertyMap.get(propertyId) || null : null;
       const unit = unitId ? property?.units.find((candidate) => candidate.id === unitId) || null : null;
       const lease = leaseId ? leaseMap.get(leaseId) || null : null;
+      const lifecycle = lifecycleMap.get(log.id) || { state: "active", changedAt: null };
 
       return {
         id: log.id,
         name: typeof metadata.name === "string" ? metadata.name : "Dokument",
         category: typeof metadata.category === "string" ? metadata.category : "other",
         visibility,
+        lifecycleState: lifecycle.state,
+        lifecycleChangedAt: lifecycle.changedAt,
         validUntil: typeof metadata.validUntil === "string" ? metadata.validUntil : null,
         fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
         contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
@@ -89,21 +92,22 @@ export async function GET() {
         dataUrl: typeof metadata.dataUrl === "string" ? metadata.dataUrl : null,
         property,
         unit,
-        lease: lease
-          ? {
-              id: lease.id,
-              leaseNumber: lease.lease_number,
-              status: lease.status,
-              holder: lease.lease_holder.contact_name || lease.lease_holder.name,
-              unit: lease.unit.designation,
-            }
-          : null,
+        lease: lease ? {
+          id: lease.id,
+          leaseNumber: lease.lease_number,
+          status: lease.status,
+          holder: lease.lease_holder.contact_name || lease.lease_holder.name,
+          unit: lease.unit.designation,
+        } : null,
         uploadedBy: log.actor?.name || log.actor?.email || "Okänd",
         createdAt: log.created_at,
       };
     });
 
-    return NextResponse.json({ documents, properties, leases });
+    return NextResponse.json(
+      { documents, properties, leases, canManageLifecycle: Boolean(user.company_id && ["owner", "admin", "manager"].includes(user.role)) },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (error) {
     console.error("Get documents error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -129,66 +133,39 @@ export async function POST(request: Request) {
     const leaseId = String(formData.get("leaseId") || "").trim();
     const validUntil = String(formData.get("validUntil") || "").trim();
 
-    if (!(file instanceof File) || !name) {
-      return NextResponse.json({ error: "Dokumentnamn och fil krävs" }, { status: 400 });
-    }
-    if (name.length > 200 || category.length > 80) {
-      return NextResponse.json({ error: "Dokumentnamnet eller kategorin är för lång" }, { status: 400 });
-    }
-    if (!allowedTypes.has(file.type)) {
-      return NextResponse.json({ error: "Filtypen stöds inte" }, { status: 400 });
-    }
-    if (file.size > 2_000_000) {
-      return NextResponse.json({ error: "Filen får vara högst 2 MB i denna version" }, { status: 400 });
-    }
-    if (!allowedVisibilities.has(visibility)) {
-      return NextResponse.json({ error: "Ogiltig dokumentsynlighet" }, { status: 400 });
-    }
+    if (!(file instanceof File) || !name) return NextResponse.json({ error: "Dokumentnamn och fil krävs" }, { status: 400 });
+    if (name.length > 200 || category.length > 80) return NextResponse.json({ error: "Dokumentnamnet eller kategorin är för lång" }, { status: 400 });
+    if (!allowedTypes.has(file.type)) return NextResponse.json({ error: "Filtypen stöds inte" }, { status: 400 });
+    if (file.size > 2_000_000) return NextResponse.json({ error: "Filen får vara högst 2 MB i denna version" }, { status: 400 });
+    if (!allowedVisibilities.has(visibility)) return NextResponse.json({ error: "Ogiltig dokumentsynlighet" }, { status: 400 });
 
     let resolvedPropertyId = propertyId || null;
     let resolvedUnitId = unitId || null;
     let resolvedLeaseId = leaseId || null;
 
-    if (visibility === "resident_property" && !propertyId) {
-      return NextResponse.json({ error: "Fastighet krävs för denna synlighet" }, { status: 400 });
-    }
-    if (visibility === "resident_unit" && !unitId) {
-      return NextResponse.json({ error: "Objekt krävs för denna synlighet" }, { status: 400 });
-    }
-    if (visibility === "resident_lease" && !leaseId) {
-      return NextResponse.json({ error: "Hyresavtal krävs för denna synlighet" }, { status: 400 });
-    }
+    if (visibility === "resident_property" && !propertyId) return NextResponse.json({ error: "Fastighet krävs för denna synlighet" }, { status: 400 });
+    if (visibility === "resident_unit" && !unitId) return NextResponse.json({ error: "Objekt krävs för denna synlighet" }, { status: 400 });
+    if (visibility === "resident_lease" && !leaseId) return NextResponse.json({ error: "Hyresavtal krävs för denna synlighet" }, { status: 400 });
 
     if (leaseId) {
-      const lease = await db.lease.findFirst({
-        where: { id: leaseId, company_id: user.company_id },
-        select: { id: true, property_id: true, unit_id: true },
-      });
+      const lease = await db.lease.findFirst({ where: { id: leaseId, company_id: user.company_id }, select: { id: true, property_id: true, unit_id: true } });
       if (!lease) return NextResponse.json({ error: "Hyresavtalet hittades inte" }, { status: 404 });
       resolvedLeaseId = lease.id;
       resolvedPropertyId = lease.property_id;
       resolvedUnitId = lease.unit_id;
     } else if (unitId) {
-      const unit = await db.unit.findFirst({
-        where: { id: unitId, property: { company_id: user.company_id } },
-        select: { id: true, property_id: true },
-      });
+      const unit = await db.unit.findFirst({ where: { id: unitId, property: { company_id: user.company_id } }, select: { id: true, property_id: true } });
       if (!unit) return NextResponse.json({ error: "Objektet hittades inte" }, { status: 404 });
-      if (propertyId && propertyId !== unit.property_id) {
-        return NextResponse.json({ error: "Objektet tillhör inte den valda fastigheten" }, { status: 400 });
-      }
+      if (propertyId && propertyId !== unit.property_id) return NextResponse.json({ error: "Objektet tillhör inte den valda fastigheten" }, { status: 400 });
       resolvedUnitId = unit.id;
       resolvedPropertyId = unit.property_id;
     } else if (propertyId) {
-      const property = await db.property.findFirst({
-        where: { id: propertyId, company_id: user.company_id },
-        select: { id: true },
-      });
+      const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id }, select: { id: true } });
       if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
       resolvedPropertyId = property.id;
     }
 
-    if (visibility === "resident_all") {
+    if (visibility === "resident_all" || visibility === "internal") {
       resolvedPropertyId = null;
       resolvedUnitId = null;
       resolvedLeaseId = null;
