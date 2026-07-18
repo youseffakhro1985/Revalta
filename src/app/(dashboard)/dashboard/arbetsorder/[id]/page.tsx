@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Banknote, Building2, CalendarClock, CheckCircle2, Clock3, FolderKanban, History, MapPin, PauseCircle, ShieldAlert, UserRound, Wrench } from "lucide-react";
+import { ArrowLeft, Banknote, Building2, CalendarClock, CheckCircle2, Clock3, FolderKanban, History, LockKeyhole, MapPin, PauseCircle, RefreshCw, ShieldAlert, UserRound, Wrench } from "lucide-react";
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
 import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
+import { useWorkOrderEditLock } from "@/hooks/use-work-order-edit-lock";
 
 type EnterpriseState = {
   work_order_number: string | null; work_type: string; source: string;
@@ -21,7 +22,7 @@ type EnterpriseState = {
 
 type StatusEvent = { id: string; from_status: string | null; to_status: string; reason: string | null; created_at: string; actor_name: string | null; actor_email: string };
 type WorkOrder = {
-  id: string; title: string; description: string; status: string; priority: string; assigned_to_id: string | null;
+  id: string; title: string; description: string; status: string; priority: string; assigned_to_id: string | null; updated_at: string;
   scheduled_start: string | null; scheduled_end: string | null;
   estimated_cost: string | number | null; actual_cost: string | number | null;
   property: { id: string; name: string; address: string; city: string };
@@ -71,6 +72,7 @@ export default function WorkOrderDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const editLock = useWorkOrderEditLock(id, Boolean(transitions?.canManage));
 
   async function load() {
     setError("");
@@ -101,6 +103,10 @@ export default function WorkOrderDetailPage() {
   useEffect(() => { void load(); }, [id]);
 
   async function save(formData: FormData) {
+    if (editLock.state.status !== "owned") {
+      setError("Arbetsordern saknar ett aktivt redigeringslås. Försök låsa den igen.");
+      return;
+    }
     setSaving(true); setError(""); setSuccess("");
     try {
       const payload = {
@@ -110,10 +116,20 @@ export default function WorkOrderDetailPage() {
         assignedToId,
         buildingId,
         technicalAssetId,
+        editToken: editLock.state.token,
+        version: editLock.state.version,
       };
-      const response = await fetch(`/api/work-orders/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const response = await fetch(`/api/work-orders/${id}/locked-update`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera arbetsordern");
+      if (!response.ok) {
+        if (data.code === "version_conflict") {
+          await load();
+          await editLock.acquire();
+          throw new Error("Arbetsordern ändrades av någon annan. Den senaste versionen har laddats och dina osparade ändringar återställdes.");
+        }
+        throw new Error(data.error || "Kunde inte uppdatera arbetsordern");
+      }
+      if (data.workOrder?.updated_at) editLock.setVersion(data.workOrder.updated_at);
       await load();
       setSuccess("Arbetsordern har uppdaterats och ändringen är registrerad i historiken.");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte uppdatera arbetsordern"); }
@@ -125,6 +141,7 @@ export default function WorkOrderDetailPage() {
   const filteredAssets = useMemo(() => assets.filter((asset) => !buildingId || !asset.building_id || asset.building_id === buildingId), [assets, buildingId]);
   const selectedAsset = assets.find((asset) => asset.id === technicalAssetId) || null;
   const requiresReason = selectedStatus === "blocked" || selectedStatus === "cancelled";
+  const editable = Boolean(transitions?.canManage) && editLock.state.status === "owned";
 
   if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
   if (!workOrder || !transitions) return <InlineAlert>{error || "Arbetsordern hittades inte"}</InlineAlert>;
@@ -137,6 +154,11 @@ export default function WorkOrderDetailPage() {
     <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordrar</Link>
     <PageHeader eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder.title} description={workOrder.description} />
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
+
+    {transitions.canManage ? <div className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${editable ? "border-emerald-200 bg-emerald-50" : editLock.state.status === "locked" ? "border-amber-200 bg-amber-50" : "border-sand-200 bg-white"}`}>
+      <div className="flex items-start gap-3"><LockKeyhole className={`mt-0.5 h-5 w-5 ${editable ? "text-emerald-700" : "text-amber-700"}`} /><div><p className="font-semibold text-ink-900">{editable ? "Säker redigering aktiv" : editLock.state.status === "locked" ? "Arbetsordern redigeras av en annan användare" : editLock.state.status === "acquiring" ? "Låser arbetsordern för redigering…" : "Redigeringslåset är inte aktivt"}</p><p className="mt-1 text-sm text-ink-600">{editable ? `Låset förnyas automatiskt till ${dateTime.format(new Date(editLock.state.expiresAt))}.` : editLock.state.status === "locked" ? `${editLock.state.holder.name || editLock.state.holder.email} har låset till ${dateTime.format(new Date(editLock.state.expiresAt))}.` : editLock.state.status === "lost" || editLock.state.status === "error" ? editLock.state.message : "Vänta medan ett exklusivt redigeringslås skapas."}</p></div></div>
+      {!editable && editLock.state.status !== "acquiring" ? <button type="button" onClick={() => void editLock.acquire()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-4 py-2 text-sm font-semibold text-petroleum-800"><RefreshCw className="h-4 w-4" />Försök igen</button> : null}
+    </div> : null}
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={MapPin} label="Fastighet" value={workOrder.property.name} hint={`${workOrder.property.address}, ${workOrder.property.city}`} />
@@ -161,8 +183,8 @@ export default function WorkOrderDetailPage() {
 
     <Panel title="Teknisk koppling" description="Knyt arbetsordern till rätt byggnad och exakt installation för spårbar drift, kostnad och livscykel.">
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Byggnad</span><select disabled={!transitions.canManage} value={buildingId} onChange={(event) => { const next = event.target.value; setBuildingId(next); if (technicalAssetId && !assets.some((asset) => asset.id === technicalAssetId && (!next || !asset.building_id || asset.building_id === next))) setTechnicalAssetId(""); }} className={premiumFieldClass}><option value="">Ingen särskild byggnad</option>{buildings.map((building) => <option key={building.id} value={building.id}>{building.name}{building.address ? ` · ${building.address}` : ""}</option>)}</select></label>
-        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Teknisk komponent</span><select disabled={!transitions.canManage} value={technicalAssetId} onChange={(event) => setTechnicalAssetId(event.target.value)} className={premiumFieldClass}><option value="">Ingen särskild komponent</option>{filteredAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}{asset.building_name ? ` · ${asset.building_name}` : ""}{asset.location ? ` · ${asset.location}` : ""}</option>)}</select></label>
+        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Byggnad</span><select disabled={!editable} value={buildingId} onChange={(event) => { const next = event.target.value; setBuildingId(next); if (technicalAssetId && !assets.some((asset) => asset.id === technicalAssetId && (!next || !asset.building_id || asset.building_id === next))) setTechnicalAssetId(""); }} className={premiumFieldClass}><option value="">Ingen särskild byggnad</option>{buildings.map((building) => <option key={building.id} value={building.id}>{building.name}{building.address ? ` · ${building.address}` : ""}</option>)}</select></label>
+        <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Teknisk komponent</span><select disabled={!editable} value={technicalAssetId} onChange={(event) => setTechnicalAssetId(event.target.value)} className={premiumFieldClass}><option value="">Ingen särskild komponent</option>{filteredAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}{asset.building_name ? ` · ${asset.building_name}` : ""}{asset.location ? ` · ${asset.location}` : ""}</option>)}</select></label>
         <Link href={`/dashboard/fastigheter/${workOrder.property.id}/komponenter`} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-petroleum-800 hover:bg-sand-50">Öppna register</Link>
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -172,17 +194,17 @@ export default function WorkOrderDetailPage() {
     </Panel>
 
     <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-      <Panel title="Styrning" description="Endast giltiga statusövergångar visas. Alla ändringar valideras server-side och registreras i revisionshistoriken.">
+      <Panel title="Styrning" description="Endast giltiga statusövergångar visas. Alla ändringar kräver ett aktivt redigeringslås och registreras i revisionshistoriken.">
         <form action={save} className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select disabled={!transitions.canManage} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!['blocked', 'cancelled'].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass}>{transitions.allowedStatuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
-          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={!transitions.canManage} defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={!transitions.canManage} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{transitions.users.map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select></label>
-          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={!transitions.canManage} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
-          <input name="scheduledStart" type="date" disabled={!transitions.canManage} defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} />
-          <input name="scheduledEnd" type="date" disabled={!transitions.canManage} defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} />
-          <input name="estimatedCost" type="number" min="0" step="0.01" disabled={!transitions.canManage} defaultValue={estimated || ""} placeholder="Beräknad kostnad" className={premiumFieldClass} />
-          <input name="actualCost" type="number" min="0" step="0.01" disabled={!transitions.canManage} defaultValue={actual || ""} placeholder="Faktisk kostnad" className={premiumFieldClass} />
-          {transitions.canManage ? <button disabled={saving || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara validerad ändring"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
+          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select disabled={!editable} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!["blocked", "cancelled"].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass}>{transitions.allowedStatuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
+          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={!editable} defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={!editable} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{transitions.users.map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select></label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={!editable} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
+          <input name="scheduledStart" type="date" disabled={!editable} defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} />
+          <input name="scheduledEnd" type="date" disabled={!editable} defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} />
+          <input name="estimatedCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={estimated || ""} placeholder="Beräknad kostnad" className={premiumFieldClass} />
+          <input name="actualCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={actual || ""} placeholder="Faktisk kostnad" className={premiumFieldClass} />
+          {transitions.canManage ? <button disabled={!editable || saving || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : editable ? "Spara låst och validerad ändring" : "Väntar på redigeringslås"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
         </form>
         <div className="mt-5 space-y-2 border-t border-sand-100 pt-5 text-sm text-ink-500">
           {workOrder.unit ? <p>Enhet: <strong className="text-ink-800">{workOrder.unit.designation}</strong></p> : null}
