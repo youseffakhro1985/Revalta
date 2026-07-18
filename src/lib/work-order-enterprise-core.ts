@@ -70,6 +70,10 @@ export function canTransitionWorkOrder(from: WorkOrderStatus, to: WorkOrderStatu
   return from === to || TRANSITIONS[from].includes(to);
 }
 
+export function getAllowedWorkOrderTransitions(from: WorkOrderStatus) {
+  return [from, ...TRANSITIONS[from]] as readonly WorkOrderStatus[];
+}
+
 export async function allocateWorkOrderNumber(tx: Prisma.TransactionClient, companyId: string, now = new Date()) {
   const year = now.getUTCFullYear();
   const rows = await tx.$queryRaw<Array<{ last_number: number }>>(Prisma.sql`
