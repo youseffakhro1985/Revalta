@@ -2,6 +2,15 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification } from "@/lib/integrations";
+import { calculateDueDate } from "@/lib/sla";
+import {
+  allowedWorkOrderTransitions,
+  canTransitionWorkOrder,
+  deriveWorkOrderStatus,
+  isTerminalWorkOrderStatus,
+  isWorkOrderStatus,
+  type WorkOrderStatus,
+} from "@/lib/work-order-lifecycle";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -91,9 +100,13 @@ export async function GET(
       return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
     }
 
+    const normalizedStatus = isWorkOrderStatus(ticket.status) ? ticket.status : "new";
+
     return NextResponse.json({
       ticket: {
         ...ticket,
+        status: normalizedStatus,
+        allowedTransitions: allowedWorkOrderTransitions(normalizedStatus),
         attachments: ticket.attachments.map((attachment) => ({
           ...attachment,
           data_url: `/api/attachments/${attachment.id}`,
@@ -117,20 +130,34 @@ export async function PATCH(
       return NextResponse.json({ error: "Du saknar behörighet att uppdatera ärenden" }, { status: 403 });
     }
     const { id } = await params;
-    const { status, priority, assignedToId } = await request.json();
+    const body = (await request.json().catch(() => null)) as {
+      status?: unknown;
+      priority?: unknown;
+      assignedToId?: unknown;
+      transitionReason?: unknown;
+    } | null;
+    if (!body) return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
     const existing = await db.ticket.findFirst({
       where: { id, ...tenantWhere(user) },
-      select: { id: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        assigned_to_id: true,
+        due_date: true,
+      },
     });
 
     if (!existing) {
       return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
     }
 
-    const shouldUpdateAssignee = typeof assignedToId === "string";
+    const currentStatus: WorkOrderStatus = isWorkOrderStatus(existing.status) ? existing.status : "new";
+    const shouldUpdateAssignee = typeof body.assignedToId === "string" || body.assignedToId === null;
     const normalizedAssignedToId =
-      shouldUpdateAssignee && assignedToId.trim() ? assignedToId.trim() : null;
+      typeof body.assignedToId === "string" && body.assignedToId.trim() ? body.assignedToId.trim() : null;
 
     if (normalizedAssignedToId) {
       const assignee = await db.user.findFirst({
@@ -146,46 +173,103 @@ export async function PATCH(
       }
     }
 
-    const normalizedStatus = typeof status === "string" && status.trim() ? status.trim() : undefined;
-    const normalizedPriority = typeof priority === "string" && priority.trim() ? priority.trim() : undefined;
-
-    const allowedStatuses = new Set(["new", "assigned", "in_progress", "waiting", "closed"]);
-    const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
-
-    if (normalizedStatus && !allowedStatuses.has(normalizedStatus)) {
-      return NextResponse.json({ error: "Ogiltig ärendestatus" }, { status: 400 });
+    const requestedStatus = body.status === undefined ? undefined : body.status;
+    if (requestedStatus !== undefined && !isWorkOrderStatus(requestedStatus)) {
+      return NextResponse.json({ error: "Ogiltig arbetsorderstatus" }, { status: 400 });
     }
+
+    const normalizedPriority =
+      typeof body.priority === "string" && body.priority.trim() ? body.priority.trim() : undefined;
+    const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
     if (normalizedPriority && !allowedPriorities.has(normalizedPriority)) {
       return NextResponse.json({ error: "Ogiltig prioritet" }, { status: 400 });
     }
 
-    const ticket = await db.ticket.update({
-      where: { id },
-      data: {
-        status: normalizedStatus,
-        priority: normalizedPriority,
-        assigned_to_id: shouldUpdateAssignee ? normalizedAssignedToId : undefined,
-        closed_at: normalizedStatus === "closed" ? new Date() : undefined,
-      },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        priority: true,
-        assigned_to: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    const nextAssigneeId = shouldUpdateAssignee ? normalizedAssignedToId : existing.assigned_to_id;
+    const nextStatus = deriveWorkOrderStatus({
+      current: currentStatus,
+      requested: requestedStatus as WorkOrderStatus | undefined,
+      assignedToId: nextAssigneeId,
+    });
+
+    if (!canTransitionWorkOrder(currentStatus, nextStatus)) {
+      return NextResponse.json(
+        {
+          error: "Statusövergången är inte tillåten",
+          currentStatus,
+          requestedStatus: nextStatus,
+          allowedTransitions: allowedWorkOrderTransitions(currentStatus),
+        },
+        { status: 409 },
+      );
+    }
+
+    if (["assigned", "in_progress", "inspection"].includes(nextStatus) && !nextAssigneeId) {
+      return NextResponse.json({ error: "En ansvarig måste väljas för denna status" }, { status: 400 });
+    }
+
+    const nextPriority = normalizedPriority || existing.priority;
+    const priorityChanged = Boolean(normalizedPriority && normalizedPriority !== existing.priority);
+    const terminal = isTerminalWorkOrderStatus(nextStatus);
+    const transitionReason = typeof body.transitionReason === "string"
+      ? body.transitionReason.trim().slice(0, 500)
+      : "";
+
+    const ticket = await db.$transaction(async (tx) => {
+      const updated = await tx.ticket.update({
+        where: { id },
+        data: {
+          status: nextStatus,
+          priority: normalizedPriority,
+          assigned_to_id: shouldUpdateAssignee ? normalizedAssignedToId : undefined,
+          due_date: priorityChanged && !terminal ? calculateDueDate(nextPriority) : undefined,
+          closed_at: nextStatus === "closed" ? new Date() : currentStatus === "closed" ? null : undefined,
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          due_date: true,
+          closed_at: true,
+          assigned_to: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actor_user_id: user.id,
+          company_id: user.company_id,
+          entity_type: "ticket",
+          entity_id: updated.id,
+          action: currentStatus === nextStatus ? "ticket.updated" : "ticket.status_changed",
+          metadata: {
+            previousStatus: currentStatus,
+            nextStatus,
+            previousPriority: existing.priority,
+            nextPriority: updated.priority,
+            previousAssignedToId: existing.assigned_to_id,
+            nextAssignedToId: updated.assigned_to?.id ?? null,
+            previousDueDate: existing.due_date,
+            nextDueDate: updated.due_date,
+            reason: transitionReason || null,
+          },
+        },
+      });
+
+      return updated;
     });
 
     await writeAuditLog(user, {
       entityType: "ticket",
       entityId: ticket.id,
-      action: "ticket.updated",
+      action: "ticket.lifecycle_processed",
       metadata: {
         status: ticket.status,
         priority: ticket.priority,
@@ -199,7 +283,11 @@ export async function PATCH(
       event: "updated",
     });
 
-    return NextResponse.json({ success: true, ticket });
+    return NextResponse.json({
+      success: true,
+      ticket,
+      allowedTransitions: allowedWorkOrderTransitions(ticket.status as WorkOrderStatus),
+    });
   } catch (error) {
     console.error("Update ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
