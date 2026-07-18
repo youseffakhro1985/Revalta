@@ -24,6 +24,7 @@ import {
   Hammer,
   HandCoins,
   KeyRound,
+  LockKeyhole,
   Menu,
   MessageSquareText,
   Plug,
@@ -39,6 +40,7 @@ import {
 import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { NotificationMenu } from "@/components/dashboard/notification-menu";
+import { WorkOrderLockIndicator } from "@/components/dashboard/work-order-lock-indicator";
 
 const navigation = [
   {
@@ -82,6 +84,7 @@ const navigation = [
       { href: "/dashboard/notiser", label: "Notiser", icon: BellRing },
       { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock },
       { href: "/dashboard/drift", label: "Driftstatus", icon: Activity },
+      { href: "/dashboard/arbetsorder/redigeringslas", label: "Redigeringslås", icon: LockKeyhole },
       { href: "/dashboard/billing", label: "Abonnemang", icon: CreditCard },
       { href: "/dashboard/installningar", label: "Inställningar", icon: Settings },
     ],
@@ -145,7 +148,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
             <div className="flex items-center gap-3 lg:hidden"><button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button><Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link></div>
             <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">Fastighetsförvaltning</p><p className="mt-1 text-[12px] font-medium text-ink-600">Samlad arbetsyta</p></div>
-            <div className="ml-auto flex items-center gap-2 sm:gap-3"><GlobalSearch /><NotificationMenu /><div className="hidden sm:block lg:hidden"><LogoutButton /></div></div>
+            <div className="ml-auto flex items-center gap-2 sm:gap-3"><WorkOrderLockIndicator /><GlobalSearch /><NotificationMenu /><div className="hidden sm:block lg:hidden"><LogoutButton /></div></div>
           </div>
         </header>
         <main id="dashboard-content" tabIndex={-1} className="mx-auto w-full max-w-[1440px] px-4 py-6 outline-none sm:px-8 sm:py-10 lg:px-10 xl:px-12">{children}</main>
