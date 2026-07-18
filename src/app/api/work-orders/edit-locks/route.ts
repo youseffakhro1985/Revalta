@@ -1,7 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { writeAuditLog } from "@/lib/audit";
 import { canManageTeam, canViewOperations, getCurrentUser } from "@/lib/current-user";
 
 type ActiveLockRow = {
@@ -19,6 +19,16 @@ type ActiveLockRow = {
   acquired_at: Date;
   expires_at: Date;
   updated_at: Date;
+};
+
+type ForceReleaseRow = {
+  work_order_id: string;
+  work_order_number: string | null;
+  title: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string;
+  expires_at: Date;
 };
 
 function noStore(body: unknown, init?: ResponseInit) {
@@ -102,49 +112,85 @@ export async function DELETE(request: Request) {
   if (!reason) return noStore({ error: "Ange varför låset ska frigöras" }, { status: 400 });
   if (reason.length > 500) return noStore({ error: "Orsaken får vara högst 500 tecken" }, { status: 400 });
 
-  const rows = await db.$queryRaw<Array<{
-    work_order_id: string;
-    work_order_number: string | null;
-    title: string;
-    user_id: string;
-    user_name: string | null;
-    user_email: string;
-    expires_at: Date;
-  }>>(Prisma.sql`
-    SELECT l."work_order_id", w."work_order_number", w."title", u."id" AS "user_id",
-           u."name" AS "user_name", u."email" AS "user_email", l."expires_at"
-    FROM "WorkOrderEditLock" l
-    INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id"
-    INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
-    WHERE l."work_order_id" = ${workOrderId}
-      AND l."company_id" = ${user.company_id}
-    LIMIT 1
-  `);
+  const companyId = user.company_id;
+  const notificationKey = `work-order-lock-forced:${workOrderId}:${randomUUID()}`;
+  const occurredAt = new Date();
+  const actorName = user.name || user.email;
 
-  const lock = rows[0];
-  if (!lock) return noStore({ error: "Något aktivt lås hittades inte" }, { status: 404 });
+  const result = await db.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<ForceReleaseRow[]>(Prisma.sql`
+      SELECT l."work_order_id", w."work_order_number", w."title", u."id" AS "user_id",
+             u."name" AS "user_name", u."email" AS "user_email", l."expires_at"
+      FROM "WorkOrderEditLock" l
+      INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id"
+      INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
+      WHERE l."work_order_id" = ${workOrderId}
+        AND l."company_id" = ${companyId}
+      LIMIT 1
+      FOR UPDATE
+    `);
 
-  const removed = await db.$executeRaw(Prisma.sql`
-    DELETE FROM "WorkOrderEditLock"
-    WHERE "work_order_id" = ${workOrderId}
-      AND "company_id" = ${user.company_id}
-  `);
-  if (removed !== 1) return noStore({ error: "Låset kunde inte frigöras" }, { status: 409 });
+    const lock = rows[0];
+    if (!lock) return { ok: false as const, code: "not_found" as const };
 
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: workOrderId,
-    action: "work_order.edit_lock.force_released",
-    metadata: {
+    const removed = await tx.$executeRaw(Prisma.sql`
+      DELETE FROM "WorkOrderEditLock"
+      WHERE "work_order_id" = ${workOrderId}
+        AND "company_id" = ${companyId}
+    `);
+    if (removed !== 1) return { ok: false as const, code: "conflict" as const };
+
+    const reference = lock.work_order_number || lock.title;
+    const notificationPayload = {
+      notificationKey,
+      title: "Ditt redigeringslås frigjordes",
+      description: `${actorName} frigjorde redigeringslåset för ${reference}. Orsak: ${reason}`,
+      dueAt: occurredAt.toISOString(),
+      href: `/dashboard/arbetsorder/${workOrderId}`,
+      high: true,
+      workOrderId,
       workOrderNumber: lock.work_order_number,
-      title: lock.title,
-      previousHolderId: lock.user_id,
-      previousHolderName: lock.user_name,
-      previousHolderEmail: lock.user_email,
-      previousExpiresAt: lock.expires_at.toISOString(),
+      workOrderTitle: lock.title,
+      releasedById: user.id,
+      releasedByName: actorName,
       reason,
-    },
-  });
+    };
 
-  return noStore({ released: true, workOrderId });
+    await tx.integrationEvent.create({
+      data: {
+        company_id: companyId,
+        type: "work_order_edit_lock_forced_release",
+        status: "unread",
+        recipient: lock.user_id,
+        payload: notificationPayload,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        company_id: companyId,
+        actor_user_id: user.id,
+        entity_type: "work_order",
+        entity_id: workOrderId,
+        action: "work_order.edit_lock.force_released",
+        metadata: {
+          workOrderNumber: lock.work_order_number,
+          title: lock.title,
+          previousHolderId: lock.user_id,
+          previousHolderName: lock.user_name,
+          previousHolderEmail: lock.user_email,
+          previousExpiresAt: lock.expires_at.toISOString(),
+          notificationKey,
+          reason,
+        },
+      },
+    });
+
+    return { ok: true as const, lock };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+  if (!result.ok && result.code === "not_found") return noStore({ error: "Något aktivt lås hittades inte" }, { status: 404 });
+  if (!result.ok) return noStore({ error: "Låset kunde inte frigöras" }, { status: 409 });
+
+  return noStore({ released: true, workOrderId, notifiedUserId: result.lock.user_id });
 }
