@@ -27,9 +27,24 @@ function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
+function dateValue(value: unknown): Date | null {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value;
+  if (typeof value !== "string") return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
 function acknowledgedAlertId(payload: unknown) {
   const value = stringValue(record(payload)?.alertId);
   return value.length <= 100 ? value : "";
+}
+
+function durationMinutes(from: Date, to: Date) {
+  return Math.max(0, Math.round((to.getTime() - from.getTime()) / 60_000));
+}
+
+function average(values: number[]) {
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 }
 
 export async function GET() {
@@ -44,19 +59,18 @@ export async function GET() {
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: { in: ALERT_TYPES } },
       orderBy: { created_at: "desc" },
-      take: 75,
+      take: 100,
       select: { id: true, type: true, status: true, payload: true, created_at: true },
     }),
     db.integrationEvent.findMany({
       where: {
         company_id: user.company_id,
         type: "component_service_delivery_alert_acknowledgement",
-        recipient: user.id,
         status: "acknowledged",
       },
-      orderBy: { created_at: "desc" },
-      take: 250,
-      select: { payload: true },
+      orderBy: { created_at: "asc" },
+      take: 500,
+      select: { recipient: true, payload: true, created_at: true },
     }),
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "component_service_delivery_recovery" },
@@ -66,10 +80,19 @@ export async function GET() {
     }),
   ]);
 
-  const acknowledged = new Set(
-    acknowledgements.map((event) => acknowledgedAlertId(event.payload)).filter(Boolean),
-  );
+  const currentUserAcknowledged = new Set<string>();
+  const firstAcknowledgementByAlert = new Map<string, { at: Date; userId: string | null }>();
 
+  for (const event of acknowledgements) {
+    const alertId = acknowledgedAlertId(event.payload);
+    if (!alertId) continue;
+    if (event.recipient === user.id) currentUserAcknowledged.add(alertId);
+    if (!firstAcknowledgementByAlert.has(alertId)) {
+      firstAcknowledgementByAlert.set(alertId, { at: event.created_at, userId: event.recipient || null });
+    }
+  }
+
+  const now = new Date();
   const items = alerts.map((event) => {
     const payload = record(event.payload);
     const severity = stringValue(payload?.severity) === "critical" ? "critical" : "warning";
@@ -78,6 +101,9 @@ export async function GET() {
     const failedCount = numberValue(payload?.failedCount ?? payload?.failed);
     const successRate = numberValue(payload?.successRate);
     const target = numberValue(payload?.target) || 99;
+    const resolvedAt = dateValue(payload?.resolvedAt);
+    const acknowledgement = firstAcknowledgementByAlert.get(event.id) || null;
+    const effectiveEnd = resolvedAt || now;
 
     return {
       id: event.id,
@@ -85,10 +111,16 @@ export async function GET() {
       status: event.status === "resolved" ? "resolved" : "open",
       severity,
       createdAt: event.created_at,
+      resolvedAt,
+      acknowledgedAt: acknowledgement?.at || null,
+      acknowledgedBy: acknowledgement?.userId || null,
+      openMinutes: durationMinutes(event.created_at, effectiveEnd),
+      acknowledgementMinutes: acknowledgement ? durationMinutes(event.created_at, acknowledgement.at) : null,
+      resolutionMinutes: resolvedAt ? durationMinutes(event.created_at, resolvedAt) : null,
       sourceEventId: stringValue(payload?.sourceEventId),
       sentCount,
       failedCount,
-      acknowledged: acknowledged.has(event.id),
+      acknowledged: currentUserAcknowledged.has(event.id),
       title: isSlo
         ? severity === "critical" ? "Leverans-SLO är kritiskt" : "Leverans-SLO underskrids"
         : severity === "critical" ? "Serviceaviseringar kunde inte levereras" : "Serviceaviseringar levererades delvis",
@@ -100,15 +132,28 @@ export async function GET() {
     };
   });
 
+  const acknowledgedDurations = items
+    .map((item) => item.acknowledgementMinutes)
+    .filter((value): value is number => value !== null);
+  const resolvedDurations = items
+    .map((item) => item.resolutionMinutes)
+    .filter((value): value is number => value !== null);
+  const openItems = items.filter((item) => item.status === "open");
+
   return noStore({
     alerts: items,
     recoveries: recoveries.map((event) => ({ id: event.id, createdAt: event.created_at })),
     summary: {
       total: items.length,
-      open: items.filter((item) => item.status === "open").length,
-      unacknowledged: items.filter((item) => item.status === "open" && !item.acknowledged).length,
-      critical: items.filter((item) => item.status === "open" && item.severity === "critical").length,
+      open: openItems.length,
+      unacknowledged: openItems.filter((item) => !item.acknowledged).length,
+      critical: openItems.filter((item) => item.severity === "critical").length,
       resolved: items.filter((item) => item.status === "resolved").length,
+      mttaMinutes: average(acknowledgedDurations),
+      mttrMinutes: average(resolvedDurations),
+      oldestOpenMinutes: openItems.length ? Math.max(...openItems.map((item) => item.openMinutes)) : 0,
+      acknowledgedIncidents: acknowledgedDurations.length,
+      resolvedIncidents: resolvedDurations.length,
     },
   });
 }
