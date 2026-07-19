@@ -4,6 +4,7 @@ import { ServiceNotificationDeadLetter } from "@/components/dashboard/service-no
 import { ServiceNotificationEscalationCenter } from "@/components/dashboard/service-notification-escalation-center";
 import { ServiceNotificationHealthCard } from "@/components/dashboard/service-notification-health-card";
 import { ServiceNotificationMetricsCard } from "@/components/dashboard/service-notification-metrics-card";
+import { ServiceNotificationProviderStatus } from "@/components/dashboard/service-notification-provider-status";
 
 type ServiceNotificationLayoutProps = {
   children: ReactNode;
@@ -13,6 +14,7 @@ export default function ServiceNotificationLayout({ children }: ServiceNotificat
   return (
     <div className="space-y-6">
       <ServiceNotificationHealthCard />
+      <ServiceNotificationProviderStatus />
       <ServiceNotificationMetricsCard />
       <ServiceNotificationAlertCenter />
       <ServiceNotificationEscalationCenter />
