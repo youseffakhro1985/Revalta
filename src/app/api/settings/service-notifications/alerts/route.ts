@@ -4,6 +4,8 @@ import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
+const ALERT_TYPES = ["component_service_delivery_alert", "component_service_slo_alert"];
+
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
     ...init,
@@ -40,10 +42,10 @@ export async function GET() {
 
   const [alerts, acknowledgements, recoveries] = await Promise.all([
     db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "component_service_delivery_alert" },
+      where: { company_id: user.company_id, type: { in: ALERT_TYPES } },
       orderBy: { created_at: "desc" },
-      take: 50,
-      select: { id: true, status: true, payload: true, created_at: true },
+      take: 75,
+      select: { id: true, type: true, status: true, payload: true, created_at: true },
     }),
     db.integrationEvent.findMany({
       where: {
@@ -53,7 +55,7 @@ export async function GET() {
         status: "acknowledged",
       },
       orderBy: { created_at: "desc" },
-      take: 200,
+      take: 250,
       select: { payload: true },
     }),
     db.integrationEvent.findMany({
@@ -65,18 +67,21 @@ export async function GET() {
   ]);
 
   const acknowledged = new Set(
-    acknowledgements
-      .map((event) => acknowledgedAlertId(event.payload))
-      .filter(Boolean),
+    acknowledgements.map((event) => acknowledgedAlertId(event.payload)).filter(Boolean),
   );
 
   const items = alerts.map((event) => {
     const payload = record(event.payload);
     const severity = stringValue(payload?.severity) === "critical" ? "critical" : "warning";
-    const sentCount = numberValue(payload?.sentCount);
-    const failedCount = numberValue(payload?.failedCount);
+    const isSlo = event.type === "component_service_slo_alert";
+    const sentCount = numberValue(payload?.sentCount ?? payload?.sent);
+    const failedCount = numberValue(payload?.failedCount ?? payload?.failed);
+    const successRate = numberValue(payload?.successRate);
+    const target = numberValue(payload?.target) || 99;
+
     return {
       id: event.id,
+      kind: isSlo ? "slo" : "delivery",
       status: event.status === "resolved" ? "resolved" : "open",
       severity,
       createdAt: event.created_at,
@@ -84,10 +89,14 @@ export async function GET() {
       sentCount,
       failedCount,
       acknowledged: acknowledged.has(event.id),
-      title: severity === "critical" ? "Serviceaviseringar kunde inte levereras" : "Serviceaviseringar levererades delvis",
-      description: failedCount > 0
-        ? `${failedCount} leveranser misslyckades och ${sentCount} leveranser lyckades.`
-        : "Leveransutfallet behöver följas upp.",
+      title: isSlo
+        ? severity === "critical" ? "Leverans-SLO är kritiskt" : "Leverans-SLO underskrids"
+        : severity === "critical" ? "Serviceaviseringar kunde inte levereras" : "Serviceaviseringar levererades delvis",
+      description: isSlo
+        ? `Leveransgraden är ${successRate}% mot målet ${target}% under de senaste 30 dagarna.`
+        : failedCount > 0
+          ? `${failedCount} leveranser misslyckades och ${sentCount} leveranser lyckades.`
+          : "Leveransutfallet behöver följas upp.",
     };
   });
 
@@ -117,12 +126,12 @@ export async function PATCH(request: Request) {
   if (!alertId) return noStore({ error: "Driftlarmets id krävs" }, { status: 400 });
 
   const alert = await db.integrationEvent.findFirst({
-    where: { id: alertId, company_id: user.company_id, type: "component_service_delivery_alert" },
-    select: { id: true },
+    where: { id: alertId, company_id: user.company_id, type: { in: ALERT_TYPES } },
+    select: { id: true, type: true },
   });
   if (!alert) return noStore({ error: "Driftlarmet hittades inte" }, { status: 404 });
 
-  const existing = await db.integrationEvent.findFirst({
+  const existing = await db.integrationEvent.findMany({
     where: {
       company_id: user.company_id,
       type: "component_service_delivery_alert_acknowledgement",
@@ -130,9 +139,10 @@ export async function PATCH(request: Request) {
       status: "acknowledged",
     },
     orderBy: { created_at: "desc" },
+    take: 250,
     select: { payload: true },
   });
-  if (acknowledgedAlertId(existing?.payload) === alertId) {
+  if (existing.some((event) => acknowledgedAlertId(event.payload) === alertId)) {
     return noStore({ success: true, acknowledged: false });
   }
 
@@ -143,17 +153,17 @@ export async function PATCH(request: Request) {
         type: "component_service_delivery_alert_acknowledgement",
         status: "acknowledged",
         recipient: user.id,
-        payload: { alertId },
+        payload: { alertId, alertType: alert.type },
       },
     }),
     db.auditLog.create({
       data: {
         company_id: user.company_id,
         actor_user_id: user.id,
-        entity_type: "service_notification_delivery_alert",
+        entity_type: alert.type === "component_service_slo_alert" ? "service_notification_slo_alert" : "service_notification_delivery_alert",
         entity_id: alertId,
-        action: "component_service_delivery_alert.acknowledged",
-        metadata: { alertId },
+        action: alert.type === "component_service_slo_alert" ? "component_service_slo.acknowledged" : "component_service_delivery_alert.acknowledged",
+        metadata: { alertId, alertType: alert.type },
       },
     }),
   ]);
