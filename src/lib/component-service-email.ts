@@ -12,8 +12,8 @@ export type ServiceEmailDelivery = {
   email: string;
   mode: "all" | "overdue_only";
   status: "sent" | "failed";
-  providerResponse?: string;
-  error?: string;
+  providerResponse: string | null;
+  error: string | null;
 };
 
 function escapeHtml(value: unknown) {
@@ -61,7 +61,15 @@ export async function deliverServiceEmail(
 ): Promise<ServiceEmailDelivery> {
   const apiKey = process.env.EMAIL_PROVIDER_API_KEY;
   const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) return { email, mode, status: "failed", error: "E-postleverantören är inte konfigurerad" };
+  if (!apiKey || !from) {
+    return {
+      email,
+      mode,
+      status: "failed",
+      providerResponse: null,
+      error: "E-postleverantören är inte konfigurerad",
+    };
+  }
   const overdue = components.filter((item) => item.next_service_at < new Date()).length;
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -76,8 +84,20 @@ export async function deliverServiceEmail(
     });
     const body = await response.text();
     if (!response.ok) throw new Error(`E-postleverantören svarade ${response.status}: ${body.slice(0, 300)}`);
-    return { email, mode, status: "sent", providerResponse: body.slice(0, 1000) };
+    return {
+      email,
+      mode,
+      status: "sent",
+      providerResponse: body.slice(0, 1000),
+      error: null,
+    };
   } catch (error) {
-    return { email, mode, status: "failed", error: error instanceof Error ? error.message : "Okänt fel" };
+    return {
+      email,
+      mode,
+      status: "failed",
+      providerResponse: null,
+      error: error instanceof Error ? error.message : "Okänt fel",
+    };
   }
 }
