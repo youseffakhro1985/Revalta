@@ -7,7 +7,7 @@ import { GET as serviceAssignmentEscalations } from "../service-assignment-escal
 import { GET as invoiceExportJobs } from "../invoice-export-jobs/route";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 type Handler = (request: Request) => Promise<Response>;
 
