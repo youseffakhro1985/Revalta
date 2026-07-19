@@ -1,11 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, RefreshCw, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Activity, Gauge, RefreshCw, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
 
 type MetricsData = {
   periodDays: number;
   generatedAt: string;
+  slo: {
+    target: number;
+    warningThreshold: number;
+    criticalThreshold: number;
+    status: "no_data" | "healthy" | "warning" | "critical";
+    budgetConsumedPercent: number;
+    budgetRemainingPercent: number;
+    recommendation: string;
+  };
   summary: {
     runs: number;
     deliveries: number;
@@ -35,6 +44,20 @@ function statusLabel(status: string) {
   if (status === "sent") return "Levererad";
   if (status === "partial") return "Delvis levererad";
   return "Misslyckad";
+}
+
+function sloLabel(status: MetricsData["slo"]["status"]) {
+  if (status === "healthy") return "Målet uppfylls";
+  if (status === "warning") return "Varningsnivå";
+  if (status === "critical") return "Kritisk nivå";
+  return "Inväntar data";
+}
+
+function sloTone(status: MetricsData["slo"]["status"]) {
+  if (status === "healthy") return "border-emerald-200 bg-emerald-50 text-emerald-950";
+  if (status === "warning") return "border-amber-200 bg-amber-50 text-amber-950";
+  if (status === "critical") return "border-red-200 bg-red-50 text-red-950";
+  return "border-sand-200 bg-sand-50 text-ink-800";
 }
 
 export function ServiceNotificationMetricsCard() {
@@ -83,19 +106,20 @@ export function ServiceNotificationMetricsCard() {
   }
 
   const summary = data?.summary;
-  const healthy = (summary?.successRate || 0) >= 98 && (summary?.retryExhausted || 0) === 0;
+  const slo = data?.slo;
+  const healthy = slo?.status === "healthy" || slo?.status === "no_data";
 
   return (
     <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm" aria-labelledby="service-metrics-title">
       <div className="flex flex-col gap-4 border-b border-sand-100 bg-sand-50/70 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${healthy ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${healthy ? "bg-emerald-100 text-emerald-800" : slo?.status === "critical" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>
             {healthy ? <ShieldCheck className="h-5 w-5" aria-hidden="true" /> : <Activity className="h-5 w-5" aria-hidden="true" />}
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-400">Leveransstabilitet · 30 dagar</p>
             <h2 id="service-metrics-title" className="mt-1 font-semibold text-ink-950">Operativa mått för serviceaviseringar</h2>
-            <p className="mt-1 text-sm text-ink-600">Följ faktisk leveransgrad, automatiska återförsök och permanenta fel.</p>
+            <p className="mt-1 text-sm text-ink-600">Följ faktisk leveransgrad, SLO, felbudget och automatiska återförsök.</p>
           </div>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50">
@@ -104,6 +128,24 @@ export function ServiceNotificationMetricsCard() {
       </div>
 
       {error ? <div role="alert" className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-900">{error}</div> : null}
+
+      {slo ? (
+        <div className={`m-5 rounded-xl border px-4 py-4 ${sloTone(slo.status)}`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Gauge className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-semibold">SLO {slo.target}% · {sloLabel(slo.status)}</p>
+                <p className="mt-1 text-sm opacity-80">{slo.recommendation}</p>
+              </div>
+            </div>
+            <div className="shrink-0 sm:text-right">
+              <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Felbudget förbrukad</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums">{slo.budgetConsumedPercent}%</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-px bg-sand-100 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-white px-5 py-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Leveransgrad</p><p className="mt-1 text-2xl font-semibold text-ink-950">{summary?.successRate ?? 100}%</p><p className="mt-1 text-xs text-ink-500">{summary?.sent || 0} av {summary?.deliveries || 0}</p></div>
