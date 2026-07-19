@@ -5,6 +5,10 @@ import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 export const dynamic = "force-dynamic";
 
 const ALERT_TYPES = ["component_service_delivery_alert", "component_service_slo_alert"];
+const ACK_SLA_MINUTES = 30;
+const RESOLUTION_SLA_MINUTES = 24 * 60;
+const CRITICAL_ACK_MINUTES = 2 * 60;
+const CRITICAL_RESOLUTION_MINUTES = 48 * 60;
 
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
@@ -104,19 +108,35 @@ export async function GET() {
     const resolvedAt = dateValue(payload?.resolvedAt);
     const acknowledgement = firstAcknowledgementByAlert.get(event.id) || null;
     const effectiveEnd = resolvedAt || now;
+    const openMinutes = durationMinutes(event.created_at, effectiveEnd);
+    const acknowledgementMinutes = acknowledgement ? durationMinutes(event.created_at, acknowledgement.at) : null;
+    const resolutionMinutes = resolvedAt ? durationMinutes(event.created_at, resolvedAt) : null;
+    const isOpen = event.status !== "resolved";
+    const acknowledgementBreached = isOpen && !acknowledgement && openMinutes > ACK_SLA_MINUTES;
+    const resolutionBreached = isOpen && openMinutes > RESOLUTION_SLA_MINUTES;
+    const slaSeverity = resolutionBreached && openMinutes > CRITICAL_RESOLUTION_MINUTES
+      ? "critical"
+      : acknowledgementBreached && openMinutes > CRITICAL_ACK_MINUTES
+        ? "critical"
+        : resolutionBreached || acknowledgementBreached
+          ? "warning"
+          : "healthy";
 
     return {
       id: event.id,
       kind: isSlo ? "slo" : "delivery",
-      status: event.status === "resolved" ? "resolved" : "open",
+      status: isOpen ? "open" : "resolved",
       severity,
       createdAt: event.created_at,
       resolvedAt,
       acknowledgedAt: acknowledgement?.at || null,
       acknowledgedBy: acknowledgement?.userId || null,
-      openMinutes: durationMinutes(event.created_at, effectiveEnd),
-      acknowledgementMinutes: acknowledgement ? durationMinutes(event.created_at, acknowledgement.at) : null,
-      resolutionMinutes: resolvedAt ? durationMinutes(event.created_at, resolvedAt) : null,
+      openMinutes,
+      acknowledgementMinutes,
+      resolutionMinutes,
+      acknowledgementBreached,
+      resolutionBreached,
+      slaSeverity,
       sourceEventId: stringValue(payload?.sourceEventId),
       sentCount,
       failedCount,
@@ -139,6 +159,19 @@ export async function GET() {
     .map((item) => item.resolutionMinutes)
     .filter((value): value is number => value !== null);
   const openItems = items.filter((item) => item.status === "open");
+  const acknowledgementBreaches = openItems.filter((item) => item.acknowledgementBreached);
+  const resolutionBreaches = openItems.filter((item) => item.resolutionBreached);
+  const criticalSlaBreaches = openItems.filter((item) => item.slaSeverity === "critical");
+  const slaStatus = criticalSlaBreaches.length > 0
+    ? "critical"
+    : acknowledgementBreaches.length > 0 || resolutionBreaches.length > 0
+      ? "warning"
+      : "healthy";
+  const slaRecommendation = slaStatus === "critical"
+    ? "Prioritera incidenterna omedelbart, utse ansvarig och dokumentera nästa återställningsåtgärd."
+    : slaStatus === "warning"
+      ? "Kvittera öppna larm och säkerställ att en tydlig återställningsplan finns inom SLA-fönstret."
+      : "Incidenthanteringen ligger inom fastställda SLA-mål.";
 
   return noStore({
     alerts: items,
@@ -154,6 +187,13 @@ export async function GET() {
       oldestOpenMinutes: openItems.length ? Math.max(...openItems.map((item) => item.openMinutes)) : 0,
       acknowledgedIncidents: acknowledgedDurations.length,
       resolvedIncidents: resolvedDurations.length,
+      acknowledgementSlaMinutes: ACK_SLA_MINUTES,
+      resolutionSlaMinutes: RESOLUTION_SLA_MINUTES,
+      acknowledgementBreaches: acknowledgementBreaches.length,
+      resolutionBreaches: resolutionBreaches.length,
+      criticalSlaBreaches: criticalSlaBreaches.length,
+      slaStatus,
+      slaRecommendation,
     },
   });
 }
