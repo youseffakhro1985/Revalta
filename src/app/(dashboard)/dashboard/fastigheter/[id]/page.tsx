@@ -5,6 +5,7 @@ import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { PropertyRegistryManager } from "@/components/properties/property-registry-manager";
 import { PropertyComponentOverview } from "@/components/properties/property-component-overview";
+import { PropertyResidentRegister } from "@/components/properties/property-resident-register";
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" }).format(date);
@@ -82,7 +83,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
           <h2 className="text-xl font-semibold text-ink-950">Förvaltningsöversikt</h2><p className="mt-1 text-sm text-ink-500">Samlad basinformation för beståndet.</p>
-          <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 text-sm">
+          <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-5 text-sm sm:grid-cols-2">
             {[
               ["Fastighetstyp", property.property_type], ["Byggår", property.construction_year?.toString() || "Ej angivet"], ["Total area", property.total_area ? `${property.total_area} m²` : "Ej angivet"], ["BOA / LOA", `${property.boa ? `${property.boa} m²` : "–"} / ${property.loa ? `${property.loa} m²` : "–"}`], ["Ansvarig förvaltare", property.manager_name || "Ej angivet"], ["Kontaktperson", property.contact_name || "Ej angivet"], ["E-post", property.contact_email || "Ej angivet"], ["Registrerad", formatDate(property.created_at)],
             ].map(([label, value]) => <div key={label} className="border-b border-sand-100 pb-4"><dt className="text-ink-400">{label}</dt><dd className="mt-1 font-semibold text-ink-900">{value}</dd></div>)}
@@ -106,6 +107,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           {property.units.length ? <div className="max-h-[430px] divide-y divide-sand-100 overflow-y-auto">{property.units.map((unit) => <div key={unit.id} className="flex items-start justify-between gap-4 px-6 py-4 sm:px-7"><div><p className="font-semibold text-ink-900">{unit.designation}</p><p className="mt-1 text-sm text-ink-500">{unitTypeLabel(unit.unit_type)}{unit.building?.name ? ` · ${unit.building.name}` : ""}{unit.floor ? ` · Våning ${unit.floor}` : ""}</p></div><span className="text-sm font-semibold text-ink-600">{unit.area ? `${unit.area} m²` : "–"}</span></div>)}</div> : <div className="p-10 text-center text-sm text-ink-500">Inga lägenheter eller lokaler registrerade ännu.</div>}
         </section>
       </div>
+
+      <PropertyResidentRegister propertyId={property.id} />
 
       <PropertyRegistryManager propertyId={property.id} buildings={property.buildings.map(({ id, name }) => ({ id, name }))} initialValues={{ name: property.name, address: property.address, postalCode: property.postal_code || "", city: property.city, propertyIdentifier: property.property_identifier || "", propertyType: property.property_type, status: property.status, constructionYear: property.construction_year?.toString() || "", totalArea: property.total_area?.toString() || "", boa: property.boa?.toString() || "", loa: property.loa?.toString() || "", managerName: property.manager_name || "", contactName: property.contact_name || "", contactEmail: property.contact_email || "", contactPhone: property.contact_phone || "" }} />
     </div>
