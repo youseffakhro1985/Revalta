@@ -3,11 +3,11 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { calculateWorkOrderSla, allocateWorkOrderNumber, addWorkOrderStatusEvent, setWorkOrderEnterpriseFields } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
+import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 import type { LeaseHandoverPayload } from "@/lib/lease-handover";
 
 const HANDOVER_EVENT = "lease_handover_record";
 const LINK_EVENT = "lease_handover_work_order_link";
-const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
 
 type LinkPayload = {
   leaseId: string;
@@ -118,7 +118,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Överlämningen har ändrats. Ladda om innan arbetsordern skapas." }, { status: 409 });
     }
 
-    const priority = allowedPriorities.has(String(body.priority)) ? String(body.priority) : "normal";
+    const priority = normalizeWorkOrderPriority(body.priority);
     const assignedToId = typeof body.assignedToId === "string" && body.assignedToId.trim() ? body.assignedToId.trim() : null;
     const scheduledStart = typeof body.scheduledStart === "string" && body.scheduledStart ? new Date(body.scheduledStart) : null;
     const scheduledEnd = typeof body.scheduledEnd === "string" && body.scheduledEnd ? new Date(body.scheduledEnd) : null;
