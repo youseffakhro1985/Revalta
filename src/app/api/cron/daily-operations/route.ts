@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GET as componentServiceReminders } from "../component-service-reminders/route";
 import { GET as componentServiceDeadLetter } from "../component-service-dead-letter/route";
 import { GET as componentServiceDeadLetterRetry } from "../component-service-dead-letter-retry/route";
+import { GET as componentServiceSloMonitor } from "../component-service-slo-monitor/route";
 import { GET as preventiveMaintenance } from "../preventive-maintenance/route";
 import { GET as serviceAssignmentEscalations } from "../service-assignment-escalations/route";
 import { GET as invoiceExportJobs } from "../invoice-export-jobs/route";
@@ -15,6 +16,7 @@ const jobs: Array<{ name: string; handler: Handler }> = [
   { name: "component-service-reminders", handler: componentServiceReminders },
   { name: "component-service-dead-letter", handler: componentServiceDeadLetter },
   { name: "component-service-dead-letter-retry", handler: componentServiceDeadLetterRetry },
+  { name: "component-service-slo-monitor", handler: componentServiceSloMonitor },
   { name: "preventive-maintenance", handler: preventiveMaintenance },
   { name: "service-assignment-escalations", handler: serviceAssignmentEscalations },
   { name: "invoice-export-jobs", handler: invoiceExportJobs },
