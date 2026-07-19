@@ -15,12 +15,6 @@ function optionalInteger(value: unknown) {
   return Number.isInteger(parsed) ? parsed : Number.NaN;
 }
 
-async function context(id: string, buildingId: string) {
-  return db.building.findFirst({
-    where: { id: buildingId, property_id: id, property: tenantWhere(await getCurrentUser() as never) },
-  });
-}
-
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; buildingId: string }> }) {
   try {
     const user = await getCurrentUser();
