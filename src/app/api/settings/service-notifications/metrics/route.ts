@@ -4,6 +4,10 @@ import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
+const SLO_TARGET = 99;
+const SLO_WARNING = 97;
+const SLO_CRITICAL = 95;
+
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
     ...init,
@@ -36,6 +40,21 @@ function stockholmDay(value: Date) {
     month: "2-digit",
     day: "2-digit",
   }).format(value);
+}
+
+function sloStatus(successRate: number, deliveries: number, retryExhausted: number, permanentFailures: number) {
+  if (!deliveries) return "no_data" as const;
+  if (successRate < SLO_CRITICAL || permanentFailures > 0) return "critical" as const;
+  if (successRate < SLO_TARGET || retryExhausted > 0) return "warning" as const;
+  return "healthy" as const;
+}
+
+function sloRecommendation(status: "no_data" | "healthy" | "warning" | "critical", retryExhausted: number, permanentFailures: number) {
+  if (status === "no_data") return "Ingen leveranshistorik finns ännu. Kör en avisering för att börja mäta SLO.";
+  if (status === "healthy") return "Leveransmålet uppfylls. Fortsätt följa trend och provider-failover.";
+  if (permanentFailures > 0) return "Åtgärda permanenta fel först: kontrollera mottagare, verifierad avsändardomän och providerbehörigheter.";
+  if (retryExhausted > 0) return "Granska uttömda återförsök och säkerställ att reservprovidern är konfigurerad.";
+  return "Leveransgraden ligger under målet. Granska senaste körningar och providerfel innan nästa utskick.";
 }
 
 export async function GET() {
@@ -105,10 +124,24 @@ export async function GET() {
   const successRate = deliveries ? Math.round((sent / deliveries) * 1000) / 10 : 100;
   const retryRate = deliveries ? Math.round((retryRecovered / deliveries) * 1000) / 10 : 0;
   const averageAttempts = deliveries ? Math.round((totalAttempts / deliveries) * 100) / 100 : 0;
+  const status = sloStatus(successRate, deliveries, retryExhausted, permanentFailures);
+  const budgetCapacity = deliveries * ((100 - SLO_TARGET) / 100);
+  const budgetConsumedPercent = deliveries
+    ? Math.min(999, Math.round((failed / Math.max(budgetCapacity, 0.01)) * 1000) / 10)
+    : 0;
 
   return noStore({
     periodDays: 30,
     generatedAt: new Date(),
+    slo: {
+      target: SLO_TARGET,
+      warningThreshold: SLO_WARNING,
+      criticalThreshold: SLO_CRITICAL,
+      status,
+      budgetConsumedPercent,
+      budgetRemainingPercent: Math.max(0, Math.round((100 - budgetConsumedPercent) * 10) / 10),
+      recommendation: sloRecommendation(status, retryExhausted, permanentFailures),
+    },
     summary: {
       runs: events.length,
       deliveries,
