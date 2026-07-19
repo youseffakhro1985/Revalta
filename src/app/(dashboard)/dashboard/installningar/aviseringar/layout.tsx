@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ServiceNotificationAlertCenter } from "@/components/dashboard/service-notification-alert-center";
 import { ServiceNotificationHealthCard } from "@/components/dashboard/service-notification-health-card";
 
 type ServiceNotificationLayoutProps = {
@@ -9,6 +10,7 @@ export default function ServiceNotificationLayout({ children }: ServiceNotificat
   return (
     <div className="space-y-6">
       <ServiceNotificationHealthCard />
+      <ServiceNotificationAlertCenter />
       {children}
     </div>
   );
