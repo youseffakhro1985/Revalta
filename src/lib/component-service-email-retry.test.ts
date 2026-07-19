@@ -78,6 +78,7 @@ describe("deliverServiceEmail retry/backoff", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(result).toMatchObject({
       status: "failed",
+      attempts: 1,
       retryable: false,
       providerResponse: null,
     });
