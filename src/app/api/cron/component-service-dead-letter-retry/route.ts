@@ -57,7 +57,7 @@ function toJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
-async function claim(eventId: string) {
+async function claim(eventId: string): Promise<Record<string, unknown> | null> {
   return db.$transaction(async (tx) => {
     const current = await tx.integrationEvent.findUnique({
       where: { id: eventId },
@@ -65,11 +65,11 @@ async function claim(eventId: string) {
     });
     if (!current || current.status !== "open") return null;
 
-    const payload = record(current.payload) || {};
+    const payload: Record<string, unknown> = record(current.payload) || {};
     const processingAt = dateValue(payload.autoRetryProcessingAt);
     if (processingAt && processingAt.getTime() > Date.now() - PROCESSING_LEASE_MS) return null;
 
-    const nextPayload = {
+    const nextPayload: Record<string, unknown> = {
       ...payload,
       autoRetryProcessingAt: new Date().toISOString(),
     };
@@ -239,7 +239,7 @@ export async function GET(request: Request) {
     const exhausted = attemptNumber >= MAX_AUTO_RETRIES || delivery.retryable !== true;
     const nextDelay = RETRY_DELAYS_MS[Math.min(attemptNumber, RETRY_DELAYS_MS.length) - 1];
     const nextAutoRetryAt = exhausted ? null : new Date(Date.now() + nextDelay).toISOString();
-    const nextPayload = {
+    const nextPayload: Record<string, unknown> = {
       ...claimedPayload,
       autoRetryProcessingAt: null,
       autoRetryCount: attemptNumber,
@@ -256,7 +256,7 @@ export async function GET(request: Request) {
         : null,
     };
 
-    const operations = [
+    const operations: Prisma.PrismaPromise<unknown>[] = [
       db.integrationEvent.update({
         where: { id: candidate.id },
         data: { status: "open", payload: toJson(nextPayload) },
