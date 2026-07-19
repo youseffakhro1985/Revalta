@@ -3,6 +3,7 @@ import { ServiceNotificationAlertCenter } from "@/components/dashboard/service-n
 import { ServiceNotificationDeadLetter } from "@/components/dashboard/service-notification-dead-letter";
 import { ServiceNotificationEscalationCenter } from "@/components/dashboard/service-notification-escalation-center";
 import { ServiceNotificationHealthCard } from "@/components/dashboard/service-notification-health-card";
+import { ServiceNotificationIncidentMetrics } from "@/components/dashboard/service-notification-incident-metrics";
 import { ServiceNotificationMetricsCard } from "@/components/dashboard/service-notification-metrics-card";
 import { ServiceNotificationProviderStatus } from "@/components/dashboard/service-notification-provider-status";
 
@@ -16,6 +17,7 @@ export default function ServiceNotificationLayout({ children }: ServiceNotificat
       <ServiceNotificationHealthCard />
       <ServiceNotificationProviderStatus />
       <ServiceNotificationMetricsCard />
+      <ServiceNotificationIncidentMetrics />
       <ServiceNotificationAlertCenter />
       <ServiceNotificationEscalationCenter />
       <ServiceNotificationDeadLetter />
