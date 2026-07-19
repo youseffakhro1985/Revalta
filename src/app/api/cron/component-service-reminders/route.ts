@@ -22,6 +22,7 @@ function dateKey(date = new Date()) { return date.toISOString().slice(0, 10); }
 function authorized(request: Request) { const secret = process.env.CRON_SECRET; return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`; }
 function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 function record(value: unknown): Record<string, unknown> | null { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
+function toJson(value: unknown): Prisma.InputJsonValue { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
 
 function parsePreferences(payload: unknown): Preferences {
   const value = record(payload);
@@ -51,7 +52,7 @@ async function claimRun(companyId: string, dedupeKey: string, payload: Record<st
       select: { id: true, status: true },
     });
     if (existing) return { claimed: false as const, reason: existing.status === "sent" ? "already_sent" : "already_processing" };
-    const event = await tx.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "processing", recipient: dedupeKey, payload }, select: { id: true } });
+    const event = await tx.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "processing", recipient: dedupeKey, payload: toJson(payload) }, select: { id: true } });
     return { claimed: true as const, eventId: event.id };
   });
 }
@@ -112,7 +113,7 @@ export async function GET(request: Request) {
     const overdueComponents = companyComponents.filter((item) => item.next_service_at < now);
     const basePayload = { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference };
     if (!allEmails.size && (!overdueOnlyEmails.size || !overdueComponents.length)) {
-      await db.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "skipped", recipient: dedupeKey, payload: { ...basePayload, reason: "no_recipients_or_matching_components" } } });
+      await db.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "skipped", recipient: dedupeKey, payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }) } });
       result.skipped += 1;
       continue;
     }
@@ -127,7 +128,7 @@ export async function GET(request: Request) {
     const sentCount = deliveries.filter((item) => item.status === "sent").length;
     const failedCount = deliveries.length - sentCount;
     const status = sentCount === 0 ? "failed" : failedCount > 0 ? "partial" : "sent";
-    await db.integrationEvent.update({ where: { id: claim.eventId }, data: { status, payload: { ...basePayload, deliverySummary: { total: deliveries.length, sent: sentCount, failed: failedCount }, deliveries } } });
+    await db.integrationEvent.update({ where: { id: claim.eventId }, data: { status, payload: toJson({ ...basePayload, deliverySummary: { total: deliveries.length, sent: sentCount, failed: failedCount }, deliveries }) } });
     if (status === "sent") result.sent += 1;
     else if (status === "partial") result.partial += 1;
     else result.failed += 1;
