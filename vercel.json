@@ -4,28 +4,8 @@
   "buildCommand": "npm run build",
   "crons": [
     {
-      "path": "/api/cron/component-service-reminders",
+      "path": "/api/cron/daily-operations",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/component-service-dead-letter",
-      "schedule": "5 6 * * *"
-    },
-    {
-      "path": "/api/cron/component-service-dead-letter-retry",
-      "schedule": "10 6 * * *"
-    },
-    {
-      "path": "/api/cron/preventive-maintenance",
-      "schedule": "15 6 * * *"
-    },
-    {
-      "path": "/api/cron/service-assignment-escalations",
-      "schedule": "30 6 * * *"
-    },
-    {
-      "path": "/api/cron/invoice-export-jobs",
-      "schedule": "45 6 * * *"
     }
   ]
 }
