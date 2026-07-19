@@ -2,16 +2,14 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import {
+  parseComponentServiceNotificationPreferences,
+  validateComponentServiceNotificationPreferences,
+} from "@/lib/component-service-notifications";
 
 export const dynamic = "force-dynamic";
 
-const allowedRoles = ["owner", "admin", "manager", "property_manager"] as const;
-type AllowedRole = (typeof allowedRoles)[number];
 type ServiceCount = { total: bigint; overdue: bigint };
-type Preferences = { enabled: boolean; daysAhead: number; roles: AllowedRole[]; additionalEmails: string[] };
-
-const defaults: Preferences = { enabled: true, daysAhead: 30, roles: [...allowedRoles], additionalEmails: [] };
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
@@ -27,39 +25,16 @@ function appBaseUrl() {
   return productionHost ? `https://${productionHost}` : "https://www.revalta.se";
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function normalizeEmail(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
-
-function parsePreferences(payload: unknown): Preferences {
-  const value = record(payload);
-  if (!value) return defaults;
-  const roles = Array.isArray(value.roles)
-    ? Array.from(new Set(value.roles.filter((role): role is AllowedRole => typeof role === "string" && allowedRoles.includes(role as AllowedRole))))
-    : defaults.roles;
-  const additionalEmails = Array.isArray(value.additionalEmails)
-    ? Array.from(new Set(value.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)))).slice(0, 20)
-    : [];
-  const days = Number(value.daysAhead);
-  return {
-    enabled: value.enabled !== false,
-    daysAhead: Number.isInteger(days) && days >= 1 && days <= 90 ? days : defaults.daysAhead,
-    roles: roles.length ? roles : defaults.roles,
-    additionalEmails,
-  };
-}
-
 async function getPreferences(companyId: string) {
   const event = await db.integrationEvent.findFirst({
     where: { company_id: companyId, type: "component_service_settings", status: "active" },
     orderBy: { created_at: "desc" },
     select: { payload: true, created_at: true },
   });
-  return { preferences: parsePreferences(event?.payload), updatedAt: event?.created_at ?? null };
+  return {
+    preferences: parseComponentServiceNotificationPreferences(event?.payload),
+    updatedAt: event?.created_at ?? null,
+  };
 }
 
 export async function GET() {
@@ -118,27 +93,15 @@ export async function PATCH(request: Request) {
   const user = await getCurrentUser();
   if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
-  if (!canManageCompany(user.role)) return noStore({ error: "Endast ägare och administratörer kan ändra inställningarna" }, { status: 403 });
+  if (!canManageCompany(user.role)) {
+    return noStore({ error: "Endast ägare och administratörer kan ändra inställningarna" }, { status: 403 });
+  }
 
   const body = await request.json().catch(() => null);
-  const raw = record(body);
-  if (!raw) return noStore({ error: "Ogiltigt JSON-underlag" }, { status: 400 });
+  const validation = validateComponentServiceNotificationPreferences(body);
+  if (!validation.success) return noStore({ error: validation.error }, { status: 400 });
 
-  const daysAhead = Number(raw.daysAhead);
-  if (!Number.isInteger(daysAhead) || daysAhead < 1 || daysAhead > 90) {
-    return noStore({ error: "Aviseringsperioden måste vara mellan 1 och 90 dagar" }, { status: 400 });
-  }
-  if (!Array.isArray(raw.roles) || !raw.roles.some((role) => typeof role === "string" && allowedRoles.includes(role as AllowedRole))) {
-    return noStore({ error: "Minst en giltig mottagarroll måste väljas" }, { status: 400 });
-  }
-  if (Array.isArray(raw.additionalEmails)) {
-    const submitted = raw.additionalEmails.map(normalizeEmail).filter(Boolean);
-    if (submitted.length > 20 || submitted.some((email) => !emailPattern.test(email))) {
-      return noStore({ error: "Ange högst 20 giltiga e-postadresser" }, { status: 400 });
-    }
-  }
-
-  const preferences = parsePreferences(raw);
+  const preferences = validation.preferences;
   const previous = await getPreferences(user.company_id);
   const created = await db.$transaction(async (tx) => {
     await tx.integrationEvent.updateMany({
@@ -175,11 +138,15 @@ export async function POST() {
   const user = await getCurrentUser();
   if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
-  if (!canManageCompany(user.role)) return noStore({ error: "Endast ägare och administratörer kan skicka testutskick" }, { status: 403 });
+  if (!canManageCompany(user.role)) {
+    return noStore({ error: "Endast ägare och administratörer kan skicka testutskick" }, { status: 403 });
+  }
 
   const apiKey = process.env.EMAIL_PROVIDER_API_KEY;
   const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) return noStore({ error: "E-postleverantören är inte fullständigt konfigurerad" }, { status: 503 });
+  if (!apiKey || !from) {
+    return noStore({ error: "E-postleverantören är inte fullständigt konfigurerad" }, { status: 503 });
+  }
 
   const recentTest = await db.integrationEvent.findFirst({
     where: {
@@ -189,7 +156,9 @@ export async function POST() {
     },
     select: { id: true },
   });
-  if (recentTest) return noStore({ error: "Vänta en minut innan du skickar ett nytt testutskick" }, { status: 429 });
+  if (recentTest) {
+    return noStore({ error: "Vänta en minut innan du skickar ett nytt testutskick" }, { status: 429 });
+  }
 
   const event = await db.integrationEvent.create({
     data: {
@@ -213,7 +182,9 @@ export async function POST() {
       }),
     });
     const providerResponse = await response.text();
-    if (!response.ok) throw new Error(`E-postleverantören svarade ${response.status}: ${providerResponse.slice(0, 300)}`);
+    if (!response.ok) {
+      throw new Error(`E-postleverantören svarade ${response.status}: ${providerResponse.slice(0, 300)}`);
+    }
     await db.integrationEvent.update({
       where: { id: event.id },
       data: { status: "sent", payload: { initiatedBy: user.id, providerResponse } },
