@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { deliverServiceEmail, type ServiceEmailDelivery } from "@/lib/component-service-email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,60 +14,50 @@ type UserPreferences = { enabled: boolean; overdueOnly: boolean };
 const allowedRoles = ["owner", "admin", "manager", "property_manager"];
 const defaults: Preferences = { enabled: true, daysAhead: 30, roles: [...allowedRoles], additionalEmails: [] };
 const userDefaults: UserPreferences = { enabled: true, overdueOnly: false };
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PROCESSING_LEASE_MS = 15 * 60_000;
 
-function escapeHtml(value: unknown) { return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+function noStore(body: unknown, init?: ResponseInit) { return NextResponse.json(body, { ...init, headers: { "Cache-Control": "private, no-store", ...(init?.headers || {}) } }); }
 function dateKey(date = new Date()) { return date.toISOString().slice(0, 10); }
-function formatDate(value: Date) { return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeZone: "Europe/Stockholm" }).format(value); }
-function appBaseUrl() { const configured = process.env.NEXT_PUBLIC_APP_URL?.trim(); if (configured) return configured.replace(/\/$/, ""); const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim(); return host ? `https://${host}` : "https://www.revalta.se"; }
 function authorized(request: Request) { const secret = process.env.CRON_SECRET; return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`; }
-function normalizeEmail(value: unknown) { return String(value || "").trim().toLowerCase(); }
+function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
+function record(value: unknown): Record<string, unknown> | null { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 
 function parsePreferences(payload: unknown): Preferences {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return defaults;
-  const value = payload as Record<string, unknown>;
-  const roles = Array.isArray(value.roles) ? value.roles.map(String).filter((role) => allowedRoles.includes(role)) : defaults.roles;
-  const emails = Array.isArray(value.additionalEmails) ? Array.from(new Set(value.additionalEmails.map(normalizeEmail).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))).slice(0, 20) : [];
+  const value = record(payload);
+  if (!value) return defaults;
+  const roles = Array.isArray(value.roles) ? Array.from(new Set(value.roles.map(String).filter((role) => allowedRoles.includes(role)))) : defaults.roles;
+  const emails = Array.isArray(value.additionalEmails) ? Array.from(new Set(value.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)))).slice(0, 20) : [];
   const days = Number(value.daysAhead);
   return { enabled: value.enabled !== false, daysAhead: Number.isInteger(days) && days >= 1 && days <= 90 ? days : 30, roles: roles.length ? roles : defaults.roles, additionalEmails: emails };
 }
 
 function parseUserPreferences(payload: unknown): UserPreferences {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return userDefaults;
-  const value = payload as Record<string, unknown>;
+  const value = record(payload);
+  if (!value) return userDefaults;
   return { enabled: value.enabled !== false, overdueOnly: value.overdueOnly === true };
 }
 
-async function sendDigest(to: string[], components: DueComponent[], daysAhead: number, overdueOnly = false) {
-  const apiKey = process.env.EMAIL_PROVIDER_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) throw new Error("E-postleverantören är inte konfigurerad");
-  const now = new Date();
-  const overdue = components.filter((item) => item.next_service_at < now).length;
-  const rows = components.map((item) => {
-    const overdueLabel = item.next_service_at < now ? "Förfallen" : "Kommande";
-    const href = `${appBaseUrl()}/dashboard/fastigheter/${item.property_id}/komponenter/${item.id}`;
-    return `<tr><td style="padding:12px;border-bottom:1px solid #e7e1d7"><a href="${escapeHtml(href)}" style="color:#174d45;font-weight:700;text-decoration:none">${escapeHtml(item.component_name)}</a><div style="margin-top:4px;color:#6d6a63;font-size:13px">${escapeHtml(item.property_name)} · ${escapeHtml(item.property_address)}, ${escapeHtml(item.property_city)}</div></td><td style="padding:12px;border-bottom:1px solid #e7e1d7;color:#393733">${escapeHtml(formatDate(item.next_service_at))}</td><td style="padding:12px;border-bottom:1px solid #e7e1d7"><span style="display:inline-block;border-radius:999px;background:${overdueLabel === "Förfallen" ? "#fff1f0" : "#f4f0e8"};padding:5px 9px;color:${overdueLabel === "Förfallen" ? "#a4382f" : "#5d564b"};font-size:12px;font-weight:700">${overdueLabel}</span></td></tr>`;
-  }).join("");
-  const intro = overdueOnly
-    ? `Det finns ${components.length} förfallna servicepunkter som kräver uppföljning.`
-    : `Det finns ${components.length} komponenter med service som är förfallen eller ska utföras inom ${daysAhead} dagar. ${overdue > 0 ? `<strong>${overdue} är förfallna.</strong>` : "Inga servicepunkter är förfallna."}`;
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from,
-      to,
-      subject: overdueOnly || overdue > 0 ? `Revalta: ${overdue} förfallna servicepunkter` : "Revalta: kommande service för tekniska komponenter",
-      html: `<!doctype html><html lang="sv"><body style="margin:0;background:#f6f3ed;font-family:Arial,sans-serif;color:#22201d"><div style="max-width:760px;margin:0 auto;padding:32px 18px"><div style="background:#fff;border:1px solid #e7e1d7;border-radius:18px;overflow:hidden"><div style="padding:28px 30px;background:#174d45;color:#fff"><div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.8">Revalta</div><h1 style="margin:8px 0 0;font-size:26px">Serviceöversikt för tekniska komponenter</h1></div><div style="padding:28px 30px"><p style="margin-top:0;line-height:1.6;color:#514e48">${intro}</p><table style="width:100%;border-collapse:collapse;margin-top:20px"><thead><tr><th style="padding:10px 12px;text-align:left;color:#77726a;font-size:12px;text-transform:uppercase">Komponent</th><th style="padding:10px 12px;text-align:left;color:#77726a;font-size:12px;text-transform:uppercase">Service</th><th style="padding:10px 12px;text-align:left;color:#77726a;font-size:12px;text-transform:uppercase">Status</th></tr></thead><tbody>${rows}</tbody></table><p style="margin:26px 0 0"><a href="${appBaseUrl()}/dashboard/fastigheter" style="display:inline-block;border-radius:10px;background:#174d45;padding:12px 18px;color:#fff;font-weight:700;text-decoration:none">Öppna Revalta</a></p></div></div></div></body></html>`,
-    }),
+async function claimRun(companyId: string, dedupeKey: string, payload: Record<string, unknown>) {
+  return db.$transaction(async (tx) => {
+    const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`SELECT pg_try_advisory_xact_lock(hashtext(${dedupeKey})) AS "locked"`);
+    if (!lock[0]?.locked) return { claimed: false as const, reason: "concurrent_run" };
+    const existing = await tx.integrationEvent.findFirst({
+      where: { company_id: companyId, type: "component_service_digest", recipient: dedupeKey, OR: [
+        { status: "sent" },
+        { status: "processing", created_at: { gte: new Date(Date.now() - PROCESSING_LEASE_MS) } },
+      ] },
+      orderBy: { created_at: "desc" },
+      select: { id: true, status: true },
+    });
+    if (existing) return { claimed: false as const, reason: existing.status === "sent" ? "already_sent" : "already_processing" };
+    const event = await tx.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "processing", recipient: dedupeKey, payload }, select: { id: true } });
+    return { claimed: true as const, eventId: event.id };
   });
-  const body = await response.text();
-  if (!response.ok) throw new Error(`E-postleverantören svarade ${response.status}: ${body.slice(0, 300)}`);
-  return body;
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!authorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
   const now = new Date();
   const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
   const [components, settingsEvents, userPreferenceEvents] = await Promise.all([
@@ -100,67 +91,47 @@ export async function GET(request: Request) {
     grouped.set(component.company_id, list);
   }
 
-  const result = { companies: grouped.size, sent: 0, skipped: 0, failed: 0, components: Array.from(grouped.values()).reduce((sum, list) => sum + list.length, 0) };
+  const result = { companies: grouped.size, sent: 0, partial: 0, skipped: 0, failed: 0, components: Array.from(grouped.values()).reduce((sum, list) => sum + list.length, 0) };
   const runDate = dateKey(now);
 
   for (const [companyId, companyComponents] of grouped) {
     const preference = settings.get(companyId) || defaults;
     const dedupeKey = `component-service-digest:${companyId}:${runDate}`;
-    const existing = await db.integrationEvent.findFirst({ where: { company_id: companyId, type: "component_service_digest", recipient: dedupeKey, status: "sent" }, select: { id: true } });
-    if (existing) { result.skipped += 1; continue; }
-
-    const recipients = await db.user.findMany({
-      where: { company_id: companyId, status: "active", role: { in: preference.roles } },
-      select: { id: true, email: true, name: true, role: true },
-      orderBy: { created_at: "asc" },
-    }) as Recipient[];
-
-    const allEmails = new Set(preference.additionalEmails.map(normalizeEmail).filter(Boolean));
+    const recipients = await db.user.findMany({ where: { company_id: companyId, status: "active", role: { in: preference.roles } }, select: { id: true, email: true, name: true, role: true }, orderBy: { created_at: "asc" } }) as Recipient[];
+    const allEmails = new Set(preference.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)));
     const overdueOnlyEmails = new Set<string>();
     for (const recipient of recipients) {
       const personal = userSettings.get(`${companyId}:${recipient.id}`) || userDefaults;
       if (!personal.enabled) continue;
       const email = normalizeEmail(recipient.email);
-      if (!email) continue;
-      if (personal.overdueOnly) overdueOnlyEmails.add(email);
-      else allEmails.add(email);
+      if (!emailPattern.test(email)) continue;
+      if (personal.overdueOnly) overdueOnlyEmails.add(email); else allEmails.add(email);
     }
     for (const email of allEmails) overdueOnlyEmails.delete(email);
 
     const overdueComponents = companyComponents.filter((item) => item.next_service_at < now);
+    const basePayload = { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference };
     if (!allEmails.size && (!overdueOnlyEmails.size || !overdueComponents.length)) {
-      await db.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "skipped", recipient: dedupeKey, payload: { reason: "no_recipients_or_matching_components", componentCount: companyComponents.length, settings: preference } } });
+      await db.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "skipped", recipient: dedupeKey, payload: { ...basePayload, reason: "no_recipients_or_matching_components" } } });
       result.skipped += 1;
       continue;
     }
 
-    const event = await db.integrationEvent.create({
-      data: {
-        company_id: companyId,
-        type: "component_service_digest",
-        status: "processing",
-        recipient: dedupeKey,
-        payload: { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference },
-      },
-    });
+    const claim = await claimRun(companyId, dedupeKey, basePayload);
+    if (!claim.claimed) { result.skipped += 1; continue; }
 
-    try {
-      const providerResponses: string[] = [];
-      if (allEmails.size) providerResponses.push(await sendDigest(Array.from(allEmails), companyComponents, preference.daysAhead, false));
-      if (overdueOnlyEmails.size && overdueComponents.length) providerResponses.push(await sendDigest(Array.from(overdueOnlyEmails), overdueComponents, preference.daysAhead, true));
-      await db.integrationEvent.update({
-        where: { id: event.id },
-        data: { status: "sent", payload: { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference, providerResponses } },
-      });
-      result.sent += 1;
-    } catch (error) {
-      await db.integrationEvent.update({
-        where: { id: event.id },
-        data: { status: "failed", payload: { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference, error: error instanceof Error ? error.message : "Okänt fel" } },
-      });
-      result.failed += 1;
-    }
+    const deliveries: ServiceEmailDelivery[] = [];
+    for (const email of allEmails) deliveries.push(await deliverServiceEmail(email, companyComponents, preference.daysAhead, "all"));
+    if (overdueComponents.length) for (const email of overdueOnlyEmails) deliveries.push(await deliverServiceEmail(email, overdueComponents, preference.daysAhead, "overdue_only"));
+
+    const sentCount = deliveries.filter((item) => item.status === "sent").length;
+    const failedCount = deliveries.length - sentCount;
+    const status = sentCount === 0 ? "failed" : failedCount > 0 ? "partial" : "sent";
+    await db.integrationEvent.update({ where: { id: claim.eventId }, data: { status, payload: { ...basePayload, deliverySummary: { total: deliveries.length, sent: sentCount, failed: failedCount }, deliveries } } });
+    if (status === "sent") result.sent += 1;
+    else if (status === "partial") result.partial += 1;
+    else result.failed += 1;
   }
 
-  return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+  return noStore(result);
 }
