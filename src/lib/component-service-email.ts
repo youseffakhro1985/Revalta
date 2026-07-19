@@ -109,8 +109,10 @@ export async function deliverServiceEmail(
 
   let lastError = "Okänt fel";
   let wasRetryable = true;
+  let attempts = 0;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    attempts = attempt;
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -127,7 +129,7 @@ export async function deliverServiceEmail(
           status: "sent",
           providerResponse: body.slice(0, 1000),
           error: null,
-          attempts: attempt,
+          attempts,
           retryable: false,
         };
       }
@@ -149,7 +151,7 @@ export async function deliverServiceEmail(
     status: "failed",
     providerResponse: null,
     error: lastError,
-    attempts: MAX_ATTEMPTS,
+    attempts,
     retryable: wasRetryable,
   };
 }
