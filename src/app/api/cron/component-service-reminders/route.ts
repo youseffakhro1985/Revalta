@@ -10,6 +10,7 @@ type DueComponent = { id: string; company_id: string; property_id: string; compo
 type Recipient = { id: string; email: string; name: string | null; role: string };
 type Preferences = { enabled: boolean; daysAhead: number; roles: string[]; additionalEmails: string[] };
 type UserPreferences = { enabled: boolean; overdueOnly: boolean };
+type DeliveryStatus = "sent" | "partial" | "failed";
 
 const allowedRoles = ["owner", "admin", "manager", "property_manager"];
 const defaults: Preferences = { enabled: true, daysAhead: 30, roles: [...allowedRoles], additionalEmails: [] };
@@ -54,6 +55,86 @@ async function claimRun(companyId: string, dedupeKey: string, payload: Record<st
     if (existing) return { claimed: false as const, reason: existing.status === "sent" ? "already_sent" : "already_processing" };
     const event = await tx.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "processing", recipient: dedupeKey, payload: toJson(payload) }, select: { id: true } });
     return { claimed: true as const, eventId: event.id };
+  });
+}
+
+async function finalizeRun(input: {
+  companyId: string;
+  eventId: string;
+  dedupeKey: string;
+  status: DeliveryStatus;
+  payload: Record<string, unknown>;
+  sentCount: number;
+  failedCount: number;
+}) {
+  const { companyId, eventId, dedupeKey, status, payload, sentCount, failedCount } = input;
+  await db.$transaction(async (tx) => {
+    await tx.integrationEvent.update({
+      where: { id: eventId },
+      data: { status, payload: toJson(payload) },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        company_id: companyId,
+        actor_user_id: null,
+        entity_type: "service_notification_run",
+        entity_id: eventId,
+        action: `component_service_digest.${status}`,
+        metadata: toJson({ dedupeKey, status, sentCount, failedCount }),
+      },
+    });
+
+    if (status === "sent") {
+      const openAlerts = await tx.integrationEvent.findMany({
+        where: { company_id: companyId, type: "component_service_delivery_alert", status: "open" },
+        select: { id: true },
+        take: 100,
+      });
+      if (openAlerts.length) {
+        await tx.integrationEvent.updateMany({
+          where: { id: { in: openAlerts.map((alert) => alert.id) } },
+          data: { status: "resolved" },
+        });
+        await tx.integrationEvent.create({
+          data: {
+            company_id: companyId,
+            type: "component_service_delivery_recovery",
+            status: "resolved",
+            recipient: `company:${companyId}`,
+            payload: toJson({ recoveredByEventId: eventId, resolvedAlertIds: openAlerts.map((alert) => alert.id) }),
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            company_id: companyId,
+            actor_user_id: null,
+            entity_type: "service_notification_delivery",
+            entity_id: eventId,
+            action: "component_service_delivery.recovered",
+            metadata: toJson({ resolvedAlertIds: openAlerts.map((alert) => alert.id) }),
+          },
+        });
+      }
+      return;
+    }
+
+    const existingAlert = await tx.integrationEvent.findFirst({
+      where: { company_id: companyId, type: "component_service_delivery_alert", status: "open" },
+      orderBy: { created_at: "desc" },
+      select: { id: true },
+    });
+    if (!existingAlert) {
+      await tx.integrationEvent.create({
+        data: {
+          company_id: companyId,
+          type: "component_service_delivery_alert",
+          status: "open",
+          recipient: `company:${companyId}`,
+          payload: toJson({ sourceEventId: eventId, severity: status === "failed" ? "critical" : "warning", sentCount, failedCount, dedupeKey }),
+        },
+      });
+    }
   });
 }
 
@@ -127,8 +208,16 @@ export async function GET(request: Request) {
 
     const sentCount = deliveries.filter((item) => item.status === "sent").length;
     const failedCount = deliveries.length - sentCount;
-    const status = sentCount === 0 ? "failed" : failedCount > 0 ? "partial" : "sent";
-    await db.integrationEvent.update({ where: { id: claim.eventId }, data: { status, payload: toJson({ ...basePayload, deliverySummary: { total: deliveries.length, sent: sentCount, failed: failedCount }, deliveries }) } });
+    const status: DeliveryStatus = sentCount === 0 ? "failed" : failedCount > 0 ? "partial" : "sent";
+    await finalizeRun({
+      companyId,
+      eventId: claim.eventId,
+      dedupeKey,
+      status,
+      sentCount,
+      failedCount,
+      payload: { ...basePayload, deliverySummary: { total: deliveries.length, sent: sentCount, failed: failedCount }, deliveries },
+    });
     if (status === "sent") result.sent += 1;
     else if (status === "partial") result.partial += 1;
     else result.failed += 1;
