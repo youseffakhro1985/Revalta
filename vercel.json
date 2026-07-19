@@ -13,7 +13,7 @@
     },
     {
       "path": "/api/cron/component-service-dead-letter-retry",
-      "schedule": "*/15 * * * *"
+      "schedule": "10 6 * * *"
     },
     {
       "path": "/api/cron/preventive-maintenance",
