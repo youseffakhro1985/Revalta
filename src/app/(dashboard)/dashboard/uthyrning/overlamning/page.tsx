@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { LeaseHandoverCenter } from "@/components/leasing/lease-handover-center";
 import { LeaseInspectionItemsCenter } from "@/components/leasing/lease-inspection-items-center";
 import { InspectionWorkOrderCenter } from "@/components/leasing/inspection-work-order-center";
+import { InspectionResolutionCenter } from "@/components/leasing/inspection-resolution-center";
 
 export default function HandoverPage() {
   return <div className="space-y-6">
@@ -10,5 +11,6 @@ export default function HandoverPage() {
     <LeaseHandoverCenter />
     <LeaseInspectionItemsCenter />
     <InspectionWorkOrderCenter />
+    <InspectionResolutionCenter />
   </div>;
 }
