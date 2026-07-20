@@ -31,23 +31,28 @@ export async function GET(request: Request) {
       ? { company_id: user.company_id }
       : { actor_user_id: user.id };
 
-    const where: Prisma.AuditLogWhereInput = {
-      ...tenantFilter,
-      ...(entityType ? { entity_type: entityType } : {}),
-      ...(action ? { action: { contains: action, mode: "insensitive" } } : {}),
-      ...(actor
-        ? {
-            actor: {
-              is: {
-                OR: [
-                  { name: { contains: actor, mode: "insensitive" } },
-                  { email: { contains: actor, mode: "insensitive" } },
-                ],
-              },
-            },
-          }
-        : {}),
-    };
+    const filters: Prisma.AuditLogWhereInput[] = [tenantFilter];
+
+    if (entityType) filters.push({ entity_type: entityType });
+    if (action) {
+      filters.push({
+        action: { contains: action, mode: Prisma.QueryMode.insensitive },
+      });
+    }
+    if (actor) {
+      filters.push({
+        actor: {
+          is: {
+            OR: [
+              { name: { contains: actor, mode: Prisma.QueryMode.insensitive } },
+              { email: { contains: actor, mode: Prisma.QueryMode.insensitive } },
+            ],
+          },
+        },
+      });
+    }
+
+    const where: Prisma.AuditLogWhereInput = { AND: filters };
 
     const [auditLogs, total, entityTypes] = await Promise.all([
       db.auditLog.findMany({
