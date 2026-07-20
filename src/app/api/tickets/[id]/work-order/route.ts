@@ -8,6 +8,7 @@ import {
   calculateWorkOrderSla,
   setWorkOrderEnterpriseFields,
 } from "@/lib/work-order-enterprise-core";
+import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 
 export async function POST(
   request: Request,
@@ -80,9 +81,7 @@ export async function POST(
     }
   }
 
-  const priority = ["low", "normal", "high", "urgent"].includes(ticket.priority)
-    ? ticket.priority
-    : "normal";
+  const priority = normalizeWorkOrderPriority(ticket.priority);
   const createdAt = new Date();
   const sla = calculateWorkOrderSla(createdAt, priority);
 
