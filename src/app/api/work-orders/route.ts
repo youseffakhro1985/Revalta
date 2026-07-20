@@ -14,6 +14,7 @@ import {
   WORK_ORDER_TYPES,
 } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
+import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { WORK_ORDER_PRIORITIES, WORK_ORDER_STATUSES, normalizeWorkOrderPriority, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 
 function parseOptionalDate(value: unknown) {
@@ -77,10 +78,46 @@ export async function GET() {
     `),
   ]);
 
+  const now = new Date();
   const enterpriseById = new Map(enterpriseRows.map((row) => [row.id, row]));
-  return NextResponse.json({
-    workOrders: workOrders.map((workOrder) => ({ ...workOrder, enterprise: enterpriseById.get(workOrder.id) ?? null })),
+  const enriched = workOrders.map((workOrder) => {
+    const enterprise = enterpriseById.get(workOrder.id) ?? null;
+    const sla = evaluateWorkOrderSla({
+      status: workOrder.status,
+      responseDueAt: enterprise?.sla_response_due_at,
+      resolutionDueAt: enterprise?.sla_resolution_due_at,
+      respondedAt: enterprise?.responded_at,
+      completedAt: workOrder.completed_at,
+      closedAt: enterprise?.closed_at,
+      pausedAt: enterprise?.paused_at,
+      pauseReason: enterprise?.pause_reason,
+    }, now);
+    return { ...workOrder, enterprise, sla };
   });
+
+  const slaSummary = enriched.reduce((summary, workOrder) => {
+    summary.total += 1;
+    summary[workOrder.sla.risk] += 1;
+    if (workOrder.sla.phase === "response") summary.awaitingResponse += 1;
+    if (workOrder.sla.phase === "resolution") summary.awaitingResolution += 1;
+    return summary;
+  }, {
+    total: 0,
+    overdue: 0,
+    critical: 0,
+    soon: 0,
+    normal: 0,
+    fulfilled: 0,
+    paused: 0,
+    not_configured: 0,
+    awaitingResponse: 0,
+    awaitingResolution: 0,
+  });
+
+  return NextResponse.json(
+    { workOrders: enriched, slaSummary, evaluatedAt: now.toISOString() },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
 
 export async function POST(request: Request) {
