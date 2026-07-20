@@ -10,6 +10,52 @@ import {
 } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!canManageTickets(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa arbetsordrar" }, { status: 403 });
+  }
+  if (!user.company_id) {
+    return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  }
+
+  const { id } = await params;
+  const ticket = await db.ticket.findFirst({
+    where: { id, company_id: user.company_id },
+    select: {
+      id: true,
+      property_id: true,
+      assigned_to_id: true,
+      work_order: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          scheduled_start: true,
+          scheduled_end: true,
+          created_at: true,
+          assigned_to: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+
+  return NextResponse.json({
+    workOrder: ticket.work_order,
+    canCreate: Boolean(ticket.property_id),
+    suggestedAssignedToId: ticket.assigned_to_id,
+  });
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
