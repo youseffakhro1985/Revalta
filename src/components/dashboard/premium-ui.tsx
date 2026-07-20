@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 export const premiumFieldClass = "h-11 w-full rounded-xl border border-sand-200 bg-white px-3 text-sm text-ink-800 outline-none transition placeholder:text-ink-300 focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100 disabled:cursor-not-allowed disabled:bg-sand-50 disabled:text-ink-400";
 export const premiumTextareaClass = "min-h-24 w-full rounded-xl border border-sand-200 bg-white px-3 py-3 text-sm text-ink-800 outline-none transition placeholder:text-ink-300 focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100 disabled:cursor-not-allowed disabled:bg-sand-50";
 export const premiumPrimaryButtonClass = "inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200 disabled:cursor-not-allowed disabled:opacity-60";
+export const premiumSecondaryButtonClass = "inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 transition hover:border-sand-300 hover:bg-sand-50 focus:outline-none focus:ring-2 focus:ring-petroleum-100 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
   return <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
