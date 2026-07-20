@@ -5,11 +5,39 @@ import { canViewAudit, getCurrentUser } from "@/lib/current-user";
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
+const MAX_EXPORT_ROWS = 10_000;
 
 function parsePositiveInteger(value: string | null, fallback: number, max?: number) {
   const parsed = Number.parseInt(value || "", 10);
   if (!Number.isFinite(parsed) || parsed < 1) return fallback;
   return max ? Math.min(parsed, max) : parsed;
+}
+
+function csvCell(value: unknown) {
+  const normalized = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+  return `"${normalized.replaceAll('"', '""')}"`;
+}
+
+function createAuditCsv(rows: Array<{
+  created_at: Date;
+  entity_type: string;
+  entity_id: string | null;
+  action: string;
+  metadata: Prisma.JsonValue | null;
+  actor: { name: string | null; email: string } | null;
+}>) {
+  const header = ["Tidpunkt", "Händelsetyp", "Objekt-ID", "Åtgärd", "Utförd av", "E-post", "Metadata"];
+  const lines = rows.map((row) => [
+    row.created_at.toISOString(),
+    row.entity_type,
+    row.entity_id,
+    row.action,
+    row.actor?.name || "System",
+    row.actor?.email || "",
+    row.metadata,
+  ].map(csvCell).join(";"));
+
+  return `\uFEFF${header.map(csvCell).join(";")}\n${lines.join("\n")}`;
 }
 
 export async function GET(request: Request) {
@@ -26,6 +54,7 @@ export async function GET(request: Request) {
     const entityType = searchParams.get("entityType")?.trim() || "";
     const action = searchParams.get("action")?.trim() || "";
     const actor = searchParams.get("actor")?.trim() || "";
+    const format = searchParams.get("format")?.trim().toLowerCase() || "json";
 
     const tenantFilter: Prisma.AuditLogWhereInput = user.company_id
       ? { company_id: user.company_id }
@@ -35,9 +64,7 @@ export async function GET(request: Request) {
 
     if (entityType) filters.push({ entity_type: entityType });
     if (action) {
-      filters.push({
-        action: { contains: action, mode: Prisma.QueryMode.insensitive },
-      });
+      filters.push({ action: { contains: action, mode: Prisma.QueryMode.insensitive } });
     }
     if (actor) {
       filters.push({
@@ -54,6 +81,34 @@ export async function GET(request: Request) {
 
     const where: Prisma.AuditLogWhereInput = { AND: filters };
 
+    if (format === "csv") {
+      const rows = await db.auditLog.findMany({
+        where,
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        take: MAX_EXPORT_ROWS,
+        select: {
+          created_at: true,
+          entity_type: true,
+          entity_id: true,
+          action: true,
+          metadata: true,
+          actor: { select: { name: true, email: true } },
+        },
+      });
+      const date = new Date().toISOString().slice(0, 10);
+      return new NextResponse(createAuditCsv(rows), {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="revalta-systemlogg-${date}.csv"`,
+          "Cache-Control": "private, no-store",
+        },
+      });
+    }
+
+    if (format !== "json") {
+      return NextResponse.json({ error: "Formatet stöds inte" }, { status: 400 });
+    }
+
     const [auditLogs, total, entityTypes] = await Promise.all([
       db.auditLog.findMany({
         where,
@@ -67,13 +122,7 @@ export async function GET(request: Request) {
           action: true,
           metadata: true,
           created_at: true,
-          actor: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          actor: { select: { id: true, name: true, email: true } },
         },
       }),
       db.auditLog.count({ where }),
