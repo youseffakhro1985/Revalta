@@ -15,7 +15,8 @@ function parsePositiveInteger(value: string | null, fallback: number, max?: numb
 
 function csvCell(value: unknown) {
   const normalized = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value) ?? "";
-  return `"${normalized.replaceAll('"', '""')}"`;
+  const formulaSafe = /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
+  return `"${formulaSafe.replaceAll('"', '""')}"`;
 }
 
 type AuditCsvRow = {
