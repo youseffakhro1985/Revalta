@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Filter, RefreshCw, ShieldCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Filter, RefreshCw, ShieldCheck } from "lucide-react";
 import {
   InlineAlert,
   Panel,
@@ -78,13 +78,26 @@ export function AuditLogCenter() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const query = useMemo(() => {
-    const params = new URLSearchParams({ page: String(page), pageSize: "25" });
+  const filterParams = useMemo(() => {
+    const params = new URLSearchParams();
     if (entityType) params.set("entityType", entityType);
     if (action.trim()) params.set("action", action.trim());
     if (actor.trim()) params.set("actor", actor.trim());
+    return params;
+  }, [action, actor, entityType]);
+
+  const query = useMemo(() => {
+    const params = new URLSearchParams(filterParams);
+    params.set("page", String(page));
+    params.set("pageSize", "25");
     return params.toString();
-  }, [action, actor, entityType, page]);
+  }, [filterParams, page]);
+
+  const exportUrl = useMemo(() => {
+    const params = new URLSearchParams(filterParams);
+    params.set("format", "csv");
+    return `/api/audit?${params.toString()}`;
+  }, [filterParams]);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -163,11 +176,15 @@ export function AuditLogCenter() {
               placeholder="Namn eller e-post"
             />
           </label>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <button type="button" className={premiumSecondaryButtonClass} onClick={resetFilters}>
               <Filter className="mr-2 h-4 w-4" />
               Rensa
             </button>
+            <a className={premiumSecondaryButtonClass} href={exportUrl}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportera CSV
+            </a>
             <button type="button" className={premiumPrimaryButtonClass} onClick={() => void loadLogs()} disabled={loading}>
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Uppdatera
@@ -176,10 +193,7 @@ export function AuditLogCenter() {
         </div>
       </Panel>
 
-      <Panel
-        title="Händelser"
-        description={`${pagination.total.toLocaleString("sv-SE")} loggade händelser`}
-      >
+      <Panel title="Händelser" description={`${pagination.total.toLocaleString("sv-SE")} loggade händelser`}>
         <div className="space-y-4">
           {error ? <InlineAlert>{error}</InlineAlert> : null}
           {!loading && !error && logs.length === 0 ? (
