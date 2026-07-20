@@ -18,14 +18,16 @@ function csvCell(value: unknown) {
   return `"${normalized.replaceAll('"', '""')}"`;
 }
 
-function createAuditCsv(rows: Array<{
+type AuditCsvRow = {
   created_at: Date;
   entity_type: string;
   entity_id: string | null;
   action: string;
-  metadata: Prisma.JsonValue | null;
-  actor: { name: string | null; email: string } | null;
-}>) {
+  metadata: unknown;
+  actor: { name: string | null; email: string | null } | null;
+};
+
+function createAuditCsv(rows: AuditCsvRow[]) {
   const header = ["Tidpunkt", "Händelsetyp", "Objekt-ID", "Åtgärd", "Utförd av", "E-post", "Metadata"];
   const lines = rows.map((row) => [
     row.created_at.toISOString(),
