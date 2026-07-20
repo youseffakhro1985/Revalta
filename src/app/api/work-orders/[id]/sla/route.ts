@@ -55,6 +55,23 @@ export async function GET(
   const result = await resolveSla(id, user.company_id);
   if (!result) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
+  const auditHistory = await db.auditLog.findMany({
+    where: {
+      company_id: user.company_id,
+      entity_type: "work_order",
+      entity_id: id,
+      action: "work_order.sla_deadlines_updated",
+    },
+    orderBy: { created_at: "desc" },
+    take: 25,
+    select: {
+      id: true,
+      created_at: true,
+      metadata: true,
+      actor: { select: { id: true, name: true, email: true } },
+    },
+  });
+
   return NextResponse.json(
     {
       sla: result.sla,
@@ -66,6 +83,15 @@ export async function GET(
         responseLocked: Boolean(result.enterprise?.responded_at),
         resolutionLocked: Boolean(result.workOrder.completed_at || result.enterprise?.closed_at),
       },
+      auditHistory: auditHistory.map((entry) => ({
+        id: entry.id,
+        createdAt: entry.created_at.toISOString(),
+        actor: {
+          id: entry.actor?.id ?? null,
+          name: entry.actor?.name || entry.actor?.email || "Okänd användare",
+        },
+        metadata: entry.metadata,
+      })),
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );
