@@ -12,6 +12,7 @@ import {
 } from "@/lib/work-order-enterprise-core";
 import { getWorkOrderAssetLink, setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { syncCompletedWorkOrderToComponent } from "@/lib/component-work-order-sync";
+import { syncWorkOrderToTicket } from "@/lib/work-order-ticket-sync";
 import {
   normalizeWorkOrderPriority,
   normalizeWorkOrderStatus,
@@ -83,7 +84,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       where: { id, company_id: user.company_id },
       select: {
         id: true,
+        ticket_id: true,
         property_id: true,
+        assigned_to_id: true,
         title: true,
         description: true,
         status: true,
@@ -240,6 +243,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const finalStatus = normalizeWorkOrderStatus(updated.status);
+    const finalAssignedToId = updated.assigned_to_id ?? existing.assigned_to_id;
+    const ticketSync = await syncWorkOrderToTicket(tx, {
+      companyId: user.company_id!,
+      ticketId: existing.ticket_id,
+      workOrderId: existing.id,
+      status: finalStatus,
+      assignedToId: finalAssignedToId,
+      actorUserId: user.id,
+      statusReason,
+    });
+
     const isCompleted = finalStatus === "completed" || finalStatus === "invoiced";
     const componentSync = await syncCompletedWorkOrderToComponent(tx, {
       companyId: user.company_id!,
@@ -255,7 +269,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       actualCost: updated.actual_cost === null ? null : Number(updated.actual_cost),
     });
 
-    return { workOrder: updated, componentSync };
+    return { workOrder: updated, componentSync, ticketSync };
   });
 
   const workOrder = transactionResult.workOrder;
@@ -278,8 +292,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       estimatedCost: workOrder.estimated_cost?.toString() ?? null,
       actualCost: workOrder.actual_cost?.toString() ?? null,
       componentSync: transactionResult.componentSync,
+      ticketSync: transactionResult.ticketSync,
       enterprise,
     },
   });
-  return NextResponse.json({ workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents } });
+  return NextResponse.json({
+    workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
+    ticketSync: transactionResult.ticketSync,
+  });
 }
