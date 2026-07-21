@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -89,14 +90,15 @@ export async function POST(request: Request) {
     const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
-    const log = await writeAuditLog(user, {
+    const itemId = randomUUID();
+    await writeAuditLog(user, {
       entityType: "property",
       entityId: property.id,
       action,
-      metadata: { property_name: property.name, component, measure, planned_year: plannedYear, estimated_cost: estimatedCost, priority, interval_years: intervalYears, status: "planned" },
+      metadata: { item_id: itemId, property_name: property.name, component, measure, planned_year: plannedYear, estimated_cost: estimatedCost, priority, interval_years: intervalYears, status: "planned" },
     });
 
-    return NextResponse.json({ success: true, itemId: log?.id ?? null }, { status: 201 });
+    return NextResponse.json({ success: true, itemId }, { status: 201 });
   } catch (error) {
     console.error("Create maintenance item error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
