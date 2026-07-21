@@ -12,7 +12,7 @@ import {
 
 const scheduleAction = "work_order.recurring.schedule";
 const allowedFrequencies = ["weekly", "monthly", "quarterly", "yearly"] as const;
-const allowedPriorities = ["low", "normal", "high", "critical"] as const;
+const allowedPriorities = ["low", "normal", "high", "urgent"] as const;
 type Frequency = (typeof allowedFrequencies)[number];
 type Priority = (typeof allowedPriorities)[number];
 type ScheduleMetadata = {
