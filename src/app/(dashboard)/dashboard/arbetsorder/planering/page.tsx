@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, UserRoundX, UsersRound } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, UserRoundX } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
 
 type SlaRisk = "overdue" | "critical" | "soon" | "normal" | "fulfilled" | "paused" | "not_configured";
@@ -79,15 +79,12 @@ export default function TechnicianPlanningPage() {
     const map = new Map<string, Group>();
     for (const order of active) {
       const key = order.assigned_to?.id || "unassigned";
-      const current: Group = map.get(key) ?? {
+      const current: Group = map.get(key) || {
         key,
         name: order.assigned_to?.name || order.assigned_to?.email || "Ej tilldelade",
         email: order.assigned_to?.email || null,
         unassigned: !order.assigned_to,
-        orders: [],
-        overdue: 0,
-        critical: 0,
-        soon: 0,
+        orders: [], overdue: 0, critical: 0, soon: 0,
       };
       current.orders.push(order);
       if (order.sla.risk === "overdue") current.overdue += 1;
@@ -130,7 +127,7 @@ export default function TechnicianPlanningPage() {
 
     <Panel title="Arbetsbelastning per ansvarig" description="Ej tilldelade visas först, därefter teammedlemmar med högst SLA-risk." bodyClassName="p-4 sm:p-6">
       {loading && !orders.length ? <div className="h-64 animate-pulse rounded-xl bg-sand-50" /> : null}
-      {!loading && groups.length === 0 ? <EmptyState icon={UsersRound} title="Inga aktiva arbetsordrar" description="När arbetsordrar skapas eller planeras visas teamets arbetsbelastning här." /> : null}
+      {!loading && groups.length === 0 ? <EmptyState title="Inga aktiva arbetsordrar" description="När arbetsordrar skapas eller planeras visas teamets arbetsbelastning här." /> : null}
       <div className="grid gap-5 xl:grid-cols-2">
         {groups.map((group) => <section key={group.key} className={`overflow-hidden rounded-2xl border bg-white ${group.unassigned ? "border-amber-200" : "border-sand-200"}`}>
           <header className="flex flex-col gap-3 border-b border-sand-100 p-5 sm:flex-row sm:items-start sm:justify-between">
