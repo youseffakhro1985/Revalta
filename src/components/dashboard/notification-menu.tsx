@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, BellRing, Check, ChevronRight, ShieldAlert, TimerReset } from "lucide-react";
+import { AlertTriangle, BellRing, CalendarClock, Check, ChevronRight, ShieldAlert, TimerReset } from "lucide-react";
 
 type Notification = {
   key: string;
@@ -13,7 +13,7 @@ type Notification = {
   high: boolean;
   read: boolean;
   href: string;
-  kind?: "service" | "security" | "sla";
+  kind?: "service" | "security" | "sla" | "recurring";
 };
 
 type ResponseData = {
@@ -32,18 +32,21 @@ export function NotificationMenu() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [serviceResponse, securityResponse, slaResponse] = await Promise.all([
+      const [serviceResponse, securityResponse, slaResponse, recurringResponse] = await Promise.all([
         fetch("/api/notifications/service-center?filter=unread", { cache: "no-store" }),
         fetch("/api/notifications/work-order-locks", { cache: "no-store" }),
         fetch("/api/notifications/work-order-sla?filter=unread", { cache: "no-store" }),
+        fetch("/api/notifications/recurring-work-orders?filter=unread", { cache: "no-store" }),
       ]);
       const service = serviceResponse.ok ? await serviceResponse.json() as ResponseData : null;
       const security = securityResponse.ok ? await securityResponse.json() as ResponseData : null;
       const sla = slaResponse.ok ? await slaResponse.json() as ResponseData : null;
+      const recurring = recurringResponse.ok ? await recurringResponse.json() as ResponseData : null;
       const securityUnread = (security?.notifications || []).filter((item) => !item.read).map((item) => ({ ...item, kind: "security" as const }));
       const serviceUnread = (service?.notifications || []).map((item) => ({ ...item, kind: "service" as const }));
       const slaUnread = (sla?.notifications || []).map((item) => ({ ...item, kind: "sla" as const }));
-      const notifications = [...securityUnread, ...slaUnread, ...serviceUnread].sort((a, b) => {
+      const recurringUnread = (recurring?.notifications || []).map((item) => ({ ...item, kind: "recurring" as const }));
+      const notifications = [...securityUnread, ...recurringUnread, ...slaUnread, ...serviceUnread].sort((a, b) => {
         if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
         if (a.high !== b.high) return a.high ? -1 : 1;
         return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
@@ -51,10 +54,10 @@ export function NotificationMenu() {
       setData({
         notifications,
         summary: {
-          total: (security?.summary.total || 0) + (service?.summary.total || 0) + (sla?.summary.total || 0),
-          unread: securityUnread.length + (service?.summary.unread || 0) + (sla?.summary.unread || 0),
-          overdue: (service?.summary.overdue || 0) + (sla?.summary.overdue || 0),
-          high: (security?.summary.high || 0) + (service?.summary.high || 0) + (sla?.summary.high || 0),
+          total: (security?.summary.total || 0) + (service?.summary.total || 0) + (sla?.summary.total || 0) + (recurring?.summary.total || 0),
+          unread: securityUnread.length + (service?.summary.unread || 0) + (sla?.summary.unread || 0) + (recurring?.summary.unread || 0),
+          overdue: (service?.summary.overdue || 0) + (sla?.summary.overdue || 0) + (recurring?.summary.overdue || 0),
+          high: (security?.summary.high || 0) + (service?.summary.high || 0) + (sla?.summary.high || 0) + (recurring?.summary.high || 0),
         },
       });
     } finally {
@@ -76,7 +79,13 @@ export function NotificationMenu() {
   }, [open, load]);
 
   async function markRead(item: Notification) {
-    const endpoint = item.kind === "security" ? "/api/notifications/work-order-locks" : item.kind === "sla" ? "/api/notifications/work-order-sla" : "/api/notifications/service-center";
+    const endpoint = item.kind === "security"
+      ? "/api/notifications/work-order-locks"
+      : item.kind === "sla"
+        ? "/api/notifications/work-order-sla"
+        : item.kind === "recurring"
+          ? "/api/notifications/recurring-work-orders"
+          : "/api/notifications/service-center";
     const response = await fetch(endpoint, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -101,7 +110,7 @@ export function NotificationMenu() {
       {open ? (
         <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(92vw,410px)] overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-2xl">
           <div className="flex items-center justify-between border-b border-sand-100 px-5 py-4">
-            <div><p className="font-semibold text-ink-950">Aviseringar</p><p className="mt-0.5 text-xs text-ink-500">{unread} olästa drift-, säkerhets- och SLA-varningar</p></div>
+            <div><p className="font-semibold text-ink-950">Aviseringar</p><p className="mt-0.5 text-xs text-ink-500">{unread} olästa drift-, säkerhets-, schema- och SLA-varningar</p></div>
             <Link href="/dashboard/aviseringscenter" onClick={() => setOpen(false)} className="text-xs font-semibold text-petroleum-700 hover:text-petroleum-900">Visa alla</Link>
           </div>
 
@@ -110,11 +119,12 @@ export function NotificationMenu() {
             {!loading && preview.length === 0 ? <div className="px-6 py-10 text-center"><BellRing className="mx-auto h-8 w-8 text-sand-400" /><p className="mt-3 font-semibold text-ink-800">Inga olästa aviseringar</p><p className="mt-1 text-sm text-ink-500">Du är uppdaterad.</p></div> : null}
             <div className="divide-y divide-sand-100">
               {preview.map((item) => {
-                const Icon = item.kind === "security" ? ShieldAlert : item.kind === "sla" ? TimerReset : AlertTriangle;
+                const Icon = item.kind === "security" ? ShieldAlert : item.kind === "sla" ? TimerReset : item.kind === "recurring" ? CalendarClock : AlertTriangle;
+                const label = item.kind === "sla" ? "SLA" : item.kind === "security" ? "Säkerhet" : item.kind === "recurring" ? "Schema" : "Service";
                 return <div key={`${item.kind}-${item.key}`} className="p-4 hover:bg-sand-50/70">
                   <div className="flex gap-3">
                     <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.kind === "security" || item.overdue ? "bg-red-50 text-red-700" : item.high ? "bg-amber-50 text-amber-700" : item.kind === "sla" ? "bg-orange-50 text-orange-700" : "bg-petroleum-50 text-petroleum-700"}`}><Icon className="h-4 w-4" /></div>
-                    <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-ink-900">{item.title}</p><span className="shrink-0 rounded-full bg-sand-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-500">{item.kind === "sla" ? "SLA" : item.kind === "security" ? "Säkerhet" : "Service"}</span></div><p className="mt-1 line-clamp-2 text-xs leading-5 text-ink-500">{item.description}</p><p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-400">{dateFormat.format(new Date(item.dueAt))}</p></div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-ink-900">{item.title}</p><span className="shrink-0 rounded-full bg-sand-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-500">{label}</span></div><p className="mt-1 line-clamp-2 text-xs leading-5 text-ink-500">{item.description}</p><p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-400">{dateFormat.format(new Date(item.dueAt))}</p></div>
                   </div>
                   <div className="mt-3 flex items-center justify-end gap-2">
                     <button type="button" onClick={() => void markRead(item)} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-ink-500 hover:bg-white hover:text-ink-800"><Check className="h-3.5 w-3.5" /> Läst</button>
