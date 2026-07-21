@@ -7,6 +7,7 @@ import { readRecurringSchedules } from "@/lib/recurring-work-order-engine";
 export const dynamic = "force-dynamic";
 
 const INCIDENT_TYPE = "recurring_work_order_incident";
+const ESCALATION_TYPE = "recurring_incident_escalation";
 type IncidentStatus = "acknowledged" | "resolved" | "reopened";
 type IncidentPayload = {
   notificationKey?: string;
@@ -15,6 +16,10 @@ type IncidentPayload = {
   changedBy?: string;
   changedByName?: string;
   changedAt?: string;
+  level?: number;
+  reason?: string;
+  escalatedAt?: string;
+  recipientRole?: string;
 };
 
 function payload(value: Prisma.JsonValue | null): IncidentPayload {
@@ -47,24 +52,55 @@ export async function GET() {
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const events = await db.integrationEvent.findMany({
-    where: { company_id: user.company_id, type: INCIDENT_TYPE },
+    where: { company_id: user.company_id, type: { in: [INCIDENT_TYPE, ESCALATION_TYPE] } },
     orderBy: { created_at: "desc" },
-    select: { id: true, status: true, recipient: true, payload: true, created_at: true },
-    take: 1000,
+    select: { id: true, type: true, status: true, recipient: true, payload: true, created_at: true },
+    take: 2000,
   });
 
   const timelines = new Map<string, Array<Record<string, unknown>>>();
+  const operationalStatus = new Map<string, string>();
+  const escalationLevel = new Map<string, number>();
+  const lastEscalatedAt = new Map<string, string>();
+
   for (const event of events) {
     const data = payload(event.payload);
     if (!data.notificationKey) continue;
     const timeline = timelines.get(data.notificationKey) || [];
-    timeline.push({ id: event.id, status: data.status || event.status, comment: data.comment || "", changedBy: data.changedBy || event.recipient, changedByName: data.changedByName || "Användare", changedAt: data.changedAt || event.created_at.toISOString() });
+    if (event.type === ESCALATION_TYPE) {
+      const level = typeof data.level === "number" ? data.level : Number(String(event.status).replace("level_", "")) || 1;
+      timeline.push({
+        id: event.id,
+        kind: "escalation",
+        status: `level_${level}`,
+        level,
+        comment: data.reason || "Incidenten har eskalerats automatiskt",
+        changedBy: event.recipient,
+        changedByName: level >= 2 ? "Automatisk eskalering till ledning" : "Automatisk eskalering till driftansvarig",
+        changedAt: data.escalatedAt || event.created_at.toISOString(),
+      });
+      escalationLevel.set(data.notificationKey, Math.max(escalationLevel.get(data.notificationKey) || 0, level));
+      if (!lastEscalatedAt.has(data.notificationKey)) lastEscalatedAt.set(data.notificationKey, data.escalatedAt || event.created_at.toISOString());
+    } else {
+      timeline.push({
+        id: event.id,
+        kind: "action",
+        status: data.status || event.status,
+        comment: data.comment || "",
+        changedBy: data.changedBy || event.recipient,
+        changedByName: data.changedByName || "Användare",
+        changedAt: data.changedAt || event.created_at.toISOString(),
+      });
+      if (!operationalStatus.has(data.notificationKey)) operationalStatus.set(data.notificationKey, data.status || event.status);
+    }
     timelines.set(data.notificationKey, timeline);
   }
 
   const incidents = [...timelines.entries()].map(([notificationKey, timeline]) => ({
     notificationKey,
-    status: timeline[0]?.status || "acknowledged",
+    status: operationalStatus.get(notificationKey) || "open",
+    escalationLevel: escalationLevel.get(notificationKey) || 0,
+    lastEscalatedAt: lastEscalatedAt.get(notificationKey) || null,
     latest: timeline[0],
     timeline,
   }));
