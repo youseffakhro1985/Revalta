@@ -13,7 +13,7 @@ type Schedule = {
   title: string;
   description: string;
   frequency: "weekly" | "monthly" | "quarterly" | "yearly";
-  priority: "low" | "normal" | "high" | "critical";
+  priority: "low" | "normal" | "high" | "urgent";
   estimated_cost: number | null;
   next_run_at: string;
   active: boolean;
@@ -23,7 +23,7 @@ type Schedule = {
 };
 
 const frequencyLabel = { weekly: "Varje vecka", monthly: "Varje månad", quarterly: "Varje kvartal", yearly: "Varje år" };
-const priorityLabel = { low: "Låg", normal: "Normal", high: "Hög", critical: "Kritisk" };
+const priorityLabel = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
 const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 const currency = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 
@@ -100,7 +100,7 @@ export default function RecurringWorkOrdersPage() {
           <Field label="Fastighet"><select required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
           <Field label="Rubrik"><input required maxLength={180} className={premiumFieldClass} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Ex. Månadsvis kontroll av undercentral" /></Field>
           <Field label="Arbetsbeskrivning"><textarea required className={premiumTextareaClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Beskriv moment, kontrollpunkter och förväntat resultat" /></Field>
-          <div className="grid grid-cols-2 gap-3"><Field label="Frekvens"><select className={premiumFieldClass} value={form.frequency} onChange={(event) => setForm({ ...form, frequency: event.target.value })}><option value="weekly">Vecka</option><option value="monthly">Månad</option><option value="quarterly">Kvartal</option><option value="yearly">År</option></select></Field><Field label="Prioritet"><select className={premiumFieldClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="critical">Kritisk</option></select></Field></div>
+          <div className="grid grid-cols-2 gap-3"><Field label="Frekvens"><select className={premiumFieldClass} value={form.frequency} onChange={(event) => setForm({ ...form, frequency: event.target.value })}><option value="weekly">Vecka</option><option value="monthly">Månad</option><option value="quarterly">Kvartal</option><option value="yearly">År</option></select></Field><Field label="Prioritet"><select className={premiumFieldClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="urgent">Akut</option></select></Field></div>
           <Field label="Nästa körning"><input required type="datetime-local" className={premiumFieldClass} value={form.nextRunAt} onChange={(event) => setForm({ ...form, nextRunAt: event.target.value })} /></Field>
           <Field label="Beräknad kostnad exkl. moms"><input type="number" min="0" className={premiumFieldClass} value={form.estimatedCost} onChange={(event) => setForm({ ...form, estimatedCost: event.target.value })} placeholder="0" /></Field>
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Skapar…" : "Skapa schema"}</button>
