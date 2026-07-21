@@ -1,0 +1,77 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
+import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+
+type AlertItem = { key: string; title: string; description: string; dueAt: string; overdue: boolean; high: boolean; read: boolean; href: string };
+type TimelineEntry = { id: string; status: string; comment: string; changedBy: string; changedByName: string; changedAt: string };
+type Incident = { notificationKey: string; status: string; latest: TimelineEntry; timeline: TimelineEntry[] };
+
+const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
+function statusLabel(status: string) { return status === "resolved" ? "Löst" : status === "reopened" ? "Återöppnat" : "Kvitterat"; }
+function statusClass(status: string) { return status === "resolved" ? "bg-emerald-50 text-emerald-700" : status === "reopened" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"; }
+
+export default function RecurringIncidentsPage() {
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyKey, setBusyKey] = useState("");
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    setLoading(true); setError("");
+    try {
+      const [alertsResponse, incidentsResponse] = await Promise.all([
+        fetch("/api/notifications/recurring-work-orders", { cache: "no-store" }),
+        fetch("/api/work-orders/recurring/incidents", { cache: "no-store" }),
+      ]);
+      const [alertsBody, incidentsBody] = await Promise.all([alertsResponse.json(), incidentsResponse.json()]);
+      if (!alertsResponse.ok) throw new Error(alertsBody.error || "Kunde inte hämta schemavarningar");
+      if (!incidentsResponse.ok) throw new Error(incidentsBody.error || "Kunde inte hämta incidenter");
+      setAlerts(alertsBody.notifications || []); setIncidents(incidentsBody.incidents || []);
+    } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte hämta incidenter"); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { void load(); }, []);
+  const incidentMap = useMemo(() => new Map(incidents.map((item) => [item.notificationKey, item])), [incidents]);
+  const open = alerts.filter((item) => incidentMap.get(item.key)?.status !== "resolved").length;
+  const acknowledged = alerts.filter((item) => incidentMap.get(item.key)?.status === "acknowledged").length;
+  const resolved = incidents.filter((item) => item.status === "resolved").length;
+
+  async function act(notificationKey: string, status: "acknowledged" | "resolved" | "reopened") {
+    setBusyKey(notificationKey); setError(""); setMessage("");
+    try {
+      const response = await fetch("/api/work-orders/recurring/incidents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notificationKey, status, comment: comments[notificationKey] || "" }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Incidenten kunde inte uppdateras");
+      setComments((current) => ({ ...current, [notificationKey]: "" }));
+      setMessage(status === "resolved" ? "Incidenten har lösts." : status === "reopened" ? "Incidenten har återöppnats." : "Incidenten har kvitterats.");
+      await load();
+    } catch (value) { setError(value instanceof Error ? value.message : "Incidenten kunde inte uppdateras"); }
+    finally { setBusyKey(""); }
+  }
+
+  return <div className="space-y-8">
+    <PageHeader eyebrow="Driftincidenter" title="Incidenter för återkommande arbetsordrar" description="Kvittera, dokumentera och följ upp misslyckade körningar och kraftigt försenade scheman." action={<div className="flex gap-2"><Link href="/dashboard/arbetsorder/aterkommande" className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><ChevronLeft className="h-4 w-4" /> Till scheman</Link><button type="button" onClick={() => void load()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button></div>} />
+    <section className="grid gap-4 sm:grid-cols-3"><MetricCard icon={AlertTriangle} label="Öppna" value={open} /><MetricCard icon={ShieldCheck} label="Kvitterade" value={acknowledged} /><MetricCard icon={CheckCircle2} label="Lösta" value={resolved} /></section>
+    {error ? <InlineAlert>{error}</InlineAlert> : null}{message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
+    <Panel title="Aktiva schemaincidenter" description="Incidenter bygger på aktuella schemavarningar och behåller hela åtgärdshistoriken." bodyClassName="p-0">
+      {loading && !alerts.length ? <div className="p-8 text-sm text-ink-500">Hämtar incidenter…</div> : null}
+      {!loading && alerts.length === 0 ? <EmptyState title="Inga aktiva schemaincidenter" description="Automatiken fungerar utan kända fel eller kraftigt försenade scheman." /> : null}
+      <div className="divide-y divide-sand-100">{alerts.map((alert) => {
+        const incident = incidentMap.get(alert.key);
+        const status = incident?.status || "open";
+        return <article key={alert.key} className="p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status === "open" ? "bg-red-50 text-red-700" : statusClass(status)}`}>{status === "open" ? "Öppen" : statusLabel(status)}</span>{alert.high ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Hög prioritet</span> : null}</div><h2 className="mt-3 text-lg font-semibold text-ink-950">{alert.title}</h2><p className="mt-1 text-sm leading-6 text-ink-600">{alert.description}</p><p className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink-400">Registrerad {dateTime.format(new Date(alert.dueAt))}</p></div><Link href={alert.href} className="text-sm font-semibold text-petroleum-700 hover:underline">Öppna schemavyn</Link></div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]"><textarea className={premiumTextareaClass} value={comments[alert.key] || ""} onChange={(event) => setComments((current) => ({ ...current, [alert.key]: event.target.value }))} maxLength={2000} placeholder="Dokumentera orsak, utförd kontroll eller nästa åtgärd" /><div className="flex flex-wrap items-start gap-2">{status === "open" || status === "reopened" ? <button disabled={busyKey === alert.key} onClick={() => void act(alert.key, "acknowledged")} className={premiumPrimaryButtonClass}>Kvittera</button> : null}{status !== "resolved" ? <button disabled={busyKey === alert.key} onClick={() => void act(alert.key, "resolved")} className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" /> Markera löst</button> : <button disabled={busyKey === alert.key} onClick={() => void act(alert.key, "reopened")} className="inline-flex h-11 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800"><RotateCcw className="h-4 w-4" /> Återöppna</button>}</div></div>
+          {incident?.timeline?.length ? <div className="mt-5 rounded-xl border border-sand-200 bg-sand-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Åtgärdshistorik</p><div className="mt-3 space-y-3">{incident.timeline.map((entry) => <div key={entry.id} className="border-l-2 border-sand-300 pl-3"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusClass(entry.status)}`}>{statusLabel(entry.status)}</span><span className="text-xs text-ink-400">{entry.changedByName} · {dateTime.format(new Date(entry.changedAt))}</span></div>{entry.comment ? <p className="mt-1 text-sm leading-6 text-ink-600">{entry.comment}</p> : null}</div>)}</div></div> : null}
+        </article>;
+      })}</div>
+    </Panel>
+  </div>;
+}
