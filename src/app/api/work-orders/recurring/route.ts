@@ -18,15 +18,37 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-  const [schedules, properties] = await Promise.all([
+  const [schedules, properties, runs] = await Promise.all([
     readRecurringSchedules(user.company_id),
     db.property.findMany({
       where: { company_id: user.company_id },
       orderBy: { name: "asc" },
       select: { id: true, name: true, address: true, city: true },
     }),
+    db.integrationEvent.findMany({
+      where: { company_id: user.company_id, type: "recurring_work_orders_run" },
+      orderBy: { created_at: "desc" },
+      take: 20,
+      select: { id: true, status: true, payload: true, created_at: true },
+    }),
   ]);
-  return NextResponse.json({ schedules, properties }, { headers: { "Cache-Control": "private, no-store" } });
+
+  const now = Date.now();
+  const activeSchedules = schedules.filter((item) => item.active);
+  const overdueSchedules = activeSchedules.filter((item) => new Date(item.next_run_at).getTime() < now).length;
+  const lastRun = runs[0] ?? null;
+
+  return NextResponse.json({
+    schedules,
+    properties,
+    runs,
+    health: {
+      activeSchedules: activeSchedules.length,
+      overdueSchedules,
+      lastRunStatus: lastRun?.status ?? null,
+      lastRunAt: lastRun?.created_at ?? null,
+    },
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request) {
