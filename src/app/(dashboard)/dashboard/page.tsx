@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 
 async function getDashboardData() {
   const user = await getCurrentUser();
@@ -167,6 +168,8 @@ export default async function Dashboard() {
           );
         })}
       </section>
+
+      <DashboardSlaOperations />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_0.65fr]">
         <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
