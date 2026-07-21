@@ -79,12 +79,15 @@ export default function TechnicianPlanningPage() {
     const map = new Map<string, Group>();
     for (const order of active) {
       const key = order.assigned_to?.id || "unassigned";
-      const current = map.get(key) || {
+      const current: Group = map.get(key) ?? {
         key,
         name: order.assigned_to?.name || order.assigned_to?.email || "Ej tilldelade",
         email: order.assigned_to?.email || null,
         unassigned: !order.assigned_to,
-        orders: [], overdue: 0, critical: 0, soon: 0,
+        orders: [],
+        overdue: 0,
+        critical: 0,
+        soon: 0,
       };
       current.orders.push(order);
       if (order.sla.risk === "overdue") current.overdue += 1;
@@ -94,7 +97,7 @@ export default function TechnicianPlanningPage() {
     }
     return [...map.values()].map((group) => ({
       ...group,
-      orders: group.orders.sort((a, b) => {
+      orders: [...group.orders].sort((a, b) => {
         const risk = riskWeight[a.sla.risk] - riskWeight[b.sla.risk];
         if (risk !== 0) return risk;
         const aDue = a.sla.dueAt ? new Date(a.sla.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
