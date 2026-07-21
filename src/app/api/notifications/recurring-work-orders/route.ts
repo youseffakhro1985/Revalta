@@ -62,7 +62,7 @@ async function notificationsFor(companyId: string) {
         dueAt: dueAt.toISOString(),
         overdue: true,
         high: schedule.priority === "urgent" || ageHours >= 48,
-        href: "/dashboard/arbetsorder/aterkommande",
+        href: "/dashboard/arbetsorder/aterkommande/incidenter",
       };
     });
 
@@ -78,7 +78,7 @@ async function notificationsFor(companyId: string) {
       dueAt: run.created_at.toISOString(),
       overdue: run.status === "failed",
       high: true,
-      href: "/dashboard/arbetsorder/aterkommande",
+      href: "/dashboard/arbetsorder/aterkommande/incidenter",
     };
   });
 
