@@ -1,0 +1,66 @@
+import { NextResponse } from "next/server";
+import db from "@/lib/db";
+import { writeAuditLog } from "@/lib/audit";
+import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { runRecurringWorkOrderEngine } from "@/lib/recurring-work-order-engine";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+function cronAuthorized(request: Request) {
+  const secret = process.env.CRON_SECRET;
+  return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
+}
+
+async function execute(companyId?: string) {
+  const event = await db.integrationEvent.create({
+    data: {
+      company_id: companyId ?? null,
+      type: "recurring_work_orders_run",
+      status: "processing",
+      recipient: companyId ? `company:${companyId}` : "all-companies",
+      payload: { companyId: companyId ?? null, startedAt: new Date().toISOString() },
+    },
+  });
+
+  try {
+    const result = await runRecurringWorkOrderEngine({ companyId });
+    await db.integrationEvent.update({
+      where: { id: event.id },
+      data: {
+        status: result.failed > 0 ? "partial" : "sent",
+        payload: { ...result, companyId: companyId ?? null, completedAt: new Date().toISOString() },
+      },
+    });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Okänt fel";
+    await db.integrationEvent.update({
+      where: { id: event.id },
+      data: { status: "failed", payload: { companyId: companyId ?? null, error: message, completedAt: new Date().toISOString() } },
+    });
+    throw error;
+  }
+}
+
+export async function GET(request: Request) {
+  if (!cronAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const result = await execute();
+  return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function POST() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+
+  const result = await execute(user.company_id);
+  await writeAuditLog(user, {
+    entityType: "recurring_work_order",
+    entityId: user.company_id,
+    action: "recurring_work_orders.manual_run",
+    metadata: result,
+  });
+  return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+}
