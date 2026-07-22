@@ -1,5 +1,7 @@
 import VerifyEmailClient from "./verify-email-client";
 
+export const dynamic = "force-dynamic";
+
 type PageProps = {
   searchParams: Promise<{ token?: string | string[] }>;
 };
