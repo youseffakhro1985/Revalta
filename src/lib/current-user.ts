@@ -2,6 +2,19 @@ import { cookies } from "next/headers";
 import db from "@/lib/db";
 import { verifyToken } from "@/lib/session";
 
+export {
+  canCreateProperties,
+  canExportTickets,
+  canManageBilling,
+  canManageCompany,
+  canManageIntegrations,
+  canManageLeases,
+  canManageTeam,
+  canManageTickets,
+  canViewAudit,
+  canViewOperations,
+} from "@/lib/permissions";
+
 export async function getCurrentUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
@@ -40,44 +53,4 @@ export async function getCurrentUser() {
 
 export function tenantWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
   return user.company_id ? { company_id: user.company_id } : { user_id: user.id };
-}
-
-export function canManageTeam(role: string) {
-  return role === "owner" || role === "admin";
-}
-
-export function canManageTickets(role: string) {
-  return role === "owner" || role === "admin" || role === "manager" || role === "technician";
-}
-
-export function canManageLeases(role: string) {
-  return role === "owner" || role === "admin" || role === "manager";
-}
-
-export function canCreateProperties(role: string) {
-  return role === "owner" || role === "admin" || role === "manager";
-}
-
-export function canViewAudit(role: string) {
-  return role === "owner" || role === "admin";
-}
-
-export function canManageCompany(role: string) {
-  return role === "owner" || role === "admin";
-}
-
-export function canManageBilling(role: string) {
-  return role === "owner" || role === "admin";
-}
-
-export function canManageIntegrations(role: string) {
-  return role === "owner" || role === "admin";
-}
-
-export function canExportTickets(role: string) {
-  return role === "owner" || role === "admin" || role === "manager";
-}
-
-export function canViewOperations(role: string) {
-  return role === "owner" || role === "admin" || role === "manager";
 }
