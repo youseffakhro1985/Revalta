@@ -2,7 +2,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { recordStorageEvent } from "@/lib/integrations";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { storeAttachment } from "@/lib/storage";
+import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 const maxFileSize = 1024 * 1024;
@@ -33,7 +33,7 @@ export async function POST(
     }
 
     if (file.size > maxFileSize) {
-      return NextResponse.json({ error: "Filen får vara max 1 MB i dev-läge" }, { status: 400 });
+      return NextResponse.json({ error: "Filen får vara max 1 MB" }, { status: 400 });
     }
 
     const ticket = await db.ticket.findFirst({
@@ -88,6 +88,9 @@ export async function POST(
 
     return NextResponse.json({ success: true, attachment }, { status: 201 });
   } catch (error) {
+    if (error instanceof StorageConfigurationError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     console.error("Create public attachment error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

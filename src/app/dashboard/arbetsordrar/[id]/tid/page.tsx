@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Clock3, PauseCircle, Play, RefreshCw, Route, Save, Square, TimerReset } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
@@ -16,8 +16,8 @@ function localNow(offsetMinutes=0){const d=new Date(Date.now()+offsetMinutes*600
 export default function WorkOrderTimePage({params}:{params:Promise<{id:string}>}){
  const {id}=use(params);const [data,setData]=useState<Data|null>(null);const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);const [error,setError]=useState("");const [message,setMessage]=useState("");
  const [form,setForm]=useState({kind:"work",startedAt:localNow(-60),endedAt:localNow(),billable:true,note:""});
- async function load(){setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/time-entries`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta tidsrapporteringen");setData(b);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta tidsrapporteringen");}finally{setLoading(false);}}
- useEffect(()=>{void load();},[id]);
+ const load=useCallback(async()=>{setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/time-entries`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta tidsrapporteringen");setData(b);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta tidsrapporteringen");}finally{setLoading(false);}},[id]);
+ useEffect(()=>{void load();},[load]);
  async function action(payload:Record<string,unknown>){setSaving(true);setError("");setMessage("");try{const r=await fetch(`/api/work-orders/${id}/time-entries`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const b=await r.json();if(!r.ok)throw new Error(b.error||"Åtgärden misslyckades");setMessage("Tidsrapporteringen har uppdaterats.");setForm({...form,note:""});await load();}catch(e){setError(e instanceof Error?e.message:"Åtgärden misslyckades");}finally{setSaving(false);}}
  const rows=data?.entries??[];const running=rows.filter(x=>x.status==="running");const totals=useMemo(()=>data?.summary??{work:0,travel:0,break:0,billable:0,running:0,pending:0},[data]);
  return <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">

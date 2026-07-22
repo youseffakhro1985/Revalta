@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, BarChart3, CheckCircle2, ChevronLeft, Clock3, Download, RefreshCw, UserRoundX } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 
@@ -56,7 +56,7 @@ export default function RecurringIncidentSlaReportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function load(selectedDays = days) {
+  const load = useCallback(async (selectedDays: string) => {
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/work-orders/recurring/incidents/sla-report?days=${selectedDays}`, { cache: "no-store" });
@@ -66,9 +66,9 @@ export default function RecurringIncidentSlaReportPage() {
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte hämta SLA-rapporten");
     } finally { setLoading(false); }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load("30"); }, [load]);
 
   return <div className="space-y-8">
     <PageHeader
@@ -78,7 +78,7 @@ export default function RecurringIncidentSlaReportPage() {
       action={<div className="flex flex-wrap gap-2">
         <Link href="/dashboard/arbetsorder/aterkommande/incidenter" className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><ChevronLeft className="h-4 w-4" /> Till incidenter</Link>
         <a href={`/api/work-orders/recurring/incidents/sla-report?days=${days}&format=csv`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-petroleum-700 px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Exportera CSV</a>
-        <button type="button" onClick={() => void load()} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+        <button type="button" onClick={() => void load(days)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
       </div>}
     />
 

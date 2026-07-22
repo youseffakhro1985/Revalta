@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, Download, FileText, FolderArchive, RotateCcw, Search, ShieldCheck, UsersRound, EyeOff } from "lucide-react";
+import { Archive, Download, FileText, RotateCcw, Search, UsersRound, EyeOff } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,

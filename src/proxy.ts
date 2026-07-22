@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyToken } from "@/lib/session";
 import { isTrustedMutationRequest } from "@/lib/request-security";
+import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -12,7 +13,9 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const token = request.cookies.get("token")?.value;
+  const token =
+    request.cookies.get(SESSION_COOKIE_NAME)?.value ||
+    request.cookies.get(LEGACY_SESSION_COOKIE_NAME)?.value;
   const session = token ? await verifyToken(token) : null;
 
   if (pathname.startsWith("/dashboard") && !session) {

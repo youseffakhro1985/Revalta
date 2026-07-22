@@ -1,11 +1,16 @@
 import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { hasStorageConfig } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   const user = await getCurrentUser();
   const isPublic = !user;
   const startedAt = Date.now();
+  const release = {
+    commitSha: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local",
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
+  };
   const env = {
     databaseUrl: Boolean(process.env.DATABASE_URL),
     directUrl: Boolean(process.env.DIRECT_URL),
@@ -14,7 +19,7 @@ export async function GET() {
     emailProvider: Boolean(process.env.EMAIL_PROVIDER_API_KEY),
     smsProvider: Boolean(process.env.SMS_PROVIDER_API_KEY),
     stripe: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
-    storage: Boolean(process.env.STORAGE_PROVIDER_KEY),
+    storage: hasStorageConfig(),
     ai: Boolean(process.env.AI_PROVIDER_API_KEY),
   };
 
@@ -25,6 +30,7 @@ export async function GET() {
         status: "ok",
         database: "ok",
         latencyMs: Date.now() - startedAt,
+        release,
         checkedAt: new Date().toISOString(),
       });
     }
@@ -35,6 +41,7 @@ export async function GET() {
       status: "ok",
       database: "ok",
       latencyMs: Date.now() - startedAt,
+      release,
       env,
       checkedAt: new Date().toISOString(),
     });
@@ -44,6 +51,7 @@ export async function GET() {
       status: "error",
       database: "error",
       latencyMs: Date.now() - startedAt,
+      release,
       ...(isPublic ? {} : { env }),
       checkedAt: new Date().toISOString(),
     }, { status: 500 });

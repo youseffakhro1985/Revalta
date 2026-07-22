@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Calculator, CircleDollarSign, FileCheck2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
@@ -15,8 +15,8 @@ const round=(n:number)=>Math.round(n*100)/100;
 
 export default function InvoiceBasisPage({params}:{params:Promise<{id:string}>}){
  const {id}=use(params); const [data,setData]=useState<Data|null>(null); const [draft,setDraft]=useState<Draft|null>(null); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [error,setError]=useState(""); const [message,setMessage]=useState("");
- async function load(){setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/invoice-basis`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta faktureringsunderlaget");setData(b);setDraft(b.draft);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta faktureringsunderlaget");}finally{setLoading(false);}}
- useEffect(()=>{void load();},[id]);
+ const load=useCallback(async()=>{setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/invoice-basis`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta faktureringsunderlaget");setData(b);setDraft(b.draft);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta faktureringsunderlaget");}finally{setLoading(false);}},[id]);
+ useEffect(()=>{void load();},[load]);
  const totals=useMemo(()=>{const subtotal=round((draft?.lines??[]).reduce((s,l)=>s+(Number(l.quantity)||0)*(Number(l.unitPrice)||0),0));const discount=round(subtotal*(Number(draft?.discountPercent)||0)/100);const net=round(subtotal-discount);const vat=round(net*(Number(draft?.vatPercent)||0)/100);return{subtotal,discount,net,vat,total:round(net+vat)};},[draft]);
  function updateLine(index:number,key:keyof Line,value:string|number){if(!draft)return;const lines=[...draft.lines];const line={...lines[index],[key]:value};line.total=round((Number(line.quantity)||0)*(Number(line.unitPrice)||0));lines[index]=line;setDraft({...draft,lines});}
  function addLine(){if(!draft)return;setDraft({...draft,lines:[...draft.lines,{id:crypto.randomUUID(),type:"other",description:"",quantity:1,unit:"st",unitPrice:0,total:0}]});}

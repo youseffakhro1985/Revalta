@@ -75,6 +75,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Audit production dependencies
+        run: npm run audit:prod
+
       - name: Build without production migrations
         env:
           NODE_ENV: production

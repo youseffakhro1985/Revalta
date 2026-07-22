@@ -1,6 +1,7 @@
 import { get } from "@vercel/blob";
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { getStorageToken } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 function contentDisposition(fileName: string) {
@@ -37,13 +38,14 @@ export async function GET(
       return new Response(Buffer.from(encoded, "base64"), { headers });
     }
 
-    if (!process.env.STORAGE_PROVIDER_KEY) {
+    const token = getStorageToken();
+    if (!token) {
       return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
     }
 
     const blob = await get(attachment.data_url, {
       access: "private",
-      token: process.env.STORAGE_PROVIDER_KEY,
+      token,
     });
     if (!blob) return NextResponse.json({ error: "Bilagan hittades inte i fillagringen" }, { status: 404 });
 

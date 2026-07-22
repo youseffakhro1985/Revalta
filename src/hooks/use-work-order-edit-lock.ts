@@ -63,9 +63,11 @@ export function useWorkOrderEditLock(workOrderId: string, enabled: boolean) {
     void acquire();
   }, [acquire, enabled]);
 
+  const ownedVersion = state.status === "owned" ? state.version : null;
+
   useEffect(() => {
-    if (state.status !== "owned") return;
-    const currentVersion = state.version;
+    if (ownedVersion === null) return;
+    const currentVersion = ownedVersion;
     const interval = window.setInterval(async () => {
       const token = tokenRef.current;
       if (!token) return;
@@ -87,7 +89,7 @@ export function useWorkOrderEditLock(workOrderId: string, enabled: boolean) {
       }
     }, 60_000);
     return () => window.clearInterval(interval);
-  }, [state.status, state.status === "owned" ? state.version : null, workOrderId]);
+  }, [ownedVersion, workOrderId]);
 
   useEffect(() => () => {
     const token = tokenRef.current;
