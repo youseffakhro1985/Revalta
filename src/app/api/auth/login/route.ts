@@ -49,7 +49,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401, headers: { "Cache-Control": "no-store" } });
     }
 
-    const token = await signToken({ sub: user.id, email: user.email, name: user.name });
+    const latestPasswordChange = await db.auditLog.findFirst({
+      where: {
+        actor_user_id: user.id,
+        entity_type: "user",
+        entity_id: user.id,
+        action: "user.password_changed",
+      },
+      orderBy: { created_at: "desc" },
+      select: { created_at: true },
+    });
+
+    const token = await signToken({
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      passwordChangedAt: latestPasswordChange?.created_at.getTime() ?? null,
+    });
     const cookieStore = await cookies();
     cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
     cookieStore.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
