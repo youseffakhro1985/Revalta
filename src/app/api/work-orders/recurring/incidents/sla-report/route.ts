@@ -1,13 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { canViewOperations, getCurrentUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
 const INCIDENT_TYPE = "recurring_work_order_incident";
 const ASSIGNMENT_TYPE = "recurring_incident_assignment";
 const SLA_TYPE = "recurring_incident_sla";
+const MAX_EVENTS = 10_000;
 
 type Payload = {
   notificationKey?: string;
@@ -43,10 +44,13 @@ function payload(value: Prisma.JsonValue | null): Payload {
 
 function parsePeriod(request: Request) {
   const params = new URL(request.url).searchParams;
-  const days = Math.min(365, Math.max(7, Number(params.get("days") || 30) || 30));
+  const parsedDays = Number(params.get("days") || 30);
+  const days = Math.min(365, Math.max(7, Number.isFinite(parsedDays) ? Math.trunc(parsedDays) : 30));
+  const requestedFormat = params.get("format") || "json";
+  const format = requestedFormat === "csv" ? "csv" : "json";
   const to = new Date();
   const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
-  return { days, from, to, format: params.get("format") || "json" };
+  return { days, from, to, format };
 }
 
 function hoursBetween(start: string, end: string) {
@@ -58,10 +62,18 @@ function csvCell(value: unknown) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+function privateHeaders() {
+  return {
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+  };
+}
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet att visa operativa rapporter" }, { status: 403 });
 
   const { days, from, to, format } = parsePeriod(request);
   const events = await db.integrationEvent.findMany({
@@ -72,7 +84,7 @@ export async function GET(request: Request) {
     },
     orderBy: { created_at: "asc" },
     select: { id: true, type: true, status: true, payload: true, created_at: true },
-    take: 10000,
+    take: MAX_EVENTS,
   });
 
   const groups = new Map<string, typeof events>();
@@ -130,11 +142,11 @@ export async function GET(request: Request) {
       responseDueAt,
       acknowledgedAt,
       responseMet,
-      responseHours: slaChangedAt && acknowledgedAt ? hoursBetween(slaChangedAt, acknowledgedAt) : null,
+      responseHours: acknowledgedAt ? hoursBetween(slaChangedAt, acknowledgedAt) : null,
       resolutionDueAt,
       resolvedAt,
       resolutionMet,
-      resolutionHours: slaChangedAt && resolvedAt ? hoursBetween(slaChangedAt, resolvedAt) : null,
+      resolutionHours: resolvedAt ? hoursBetween(slaChangedAt, resolvedAt) : null,
       activeBreach,
     });
   }
@@ -162,6 +174,7 @@ export async function GET(request: Request) {
     averageResolutionHours: average(rows.map((row) => row.resolutionHours)),
     activeBreaches: rows.filter((row) => row.activeBreach).length,
     unassigned: rows.filter((row) => row.assignee === "Ej tilldelad" && row.status !== "resolved").length,
+    truncated: events.length === MAX_EVENTS,
   };
 
   if (format === "csv") {
@@ -177,12 +190,12 @@ export async function GET(request: Request) {
     }
     return new NextResponse(`\uFEFF${lines.join("\n")}`, {
       headers: {
+        ...privateHeaders(),
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="revalta-sla-rapport-${days}-dagar.csv"`,
-        "Cache-Control": "private, no-store",
       },
     });
   }
 
-  return NextResponse.json({ summary, rows }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ summary, rows }, { headers: privateHeaders() });
 }
