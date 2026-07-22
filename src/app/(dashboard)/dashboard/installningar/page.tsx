@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verificationLoading, setVerificationLoading] = useState(false);
 
   useEffect(() => {
     async function loadSettings() {
@@ -76,6 +77,22 @@ export default function SettingsPage() {
       setError("Kunde inte kontakta servern");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function requestEmailVerification() {
+    setError("");
+    setSuccess("");
+    setVerificationLoading(true);
+    try {
+      const response = await fetch("/api/auth/email-verification/request", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) return setError(data.error || "Kunde inte skicka verifieringslänken");
+      setSuccess(data.message || "Verifieringslänken har skickats.");
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setVerificationLoading(false);
     }
   }
 
@@ -152,9 +169,14 @@ export default function SettingsPage() {
           <div className="mt-4 rounded-lg bg-sand-50 p-4 text-sm text-ink-600">
             <p>{profile?.email}</p>
             <p className="mt-1">Roll: {profile?.role}</p>
-            <p className="mt-1">{profile?.email_verified_at ? "E-post verifierad" : "E-post ej verifierad"}</p>
+            <p className={`mt-1 font-medium ${profile?.email_verified_at ? "text-success-600" : "text-warning-700"}`}>{profile?.email_verified_at ? "E-post verifierad" : "E-post ej verifierad"}</p>
           </div>
-          <button disabled={loading} className="mt-6 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">Spara profil</button>
+          {!profile?.email_verified_at && profile && (
+            <button type="button" onClick={requestEmailVerification} disabled={verificationLoading} className="mt-4 w-full rounded-lg border border-petroleum-700 px-5 py-3 font-semibold text-petroleum-700 hover:bg-petroleum-50 disabled:opacity-70">
+              {verificationLoading ? "Skickar verifieringslänk…" : "Verifiera e-postadress"}
+            </button>
+          )}
+          <button disabled={loading} className="mt-4 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">Spara profil</button>
         </form>
 
         <form onSubmit={saveCompany} className="rounded-2xl border border-sand-200/80 bg-white p-6 shadow-premium-sm">
