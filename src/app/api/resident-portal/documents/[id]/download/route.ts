@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
+import { allowedDocumentContentTypes, safeDocumentFileName, validateDocumentFile } from "@/lib/document-file-security";
 
 const activeLeaseStatuses = ["active", "notice"];
 const residentDocumentVisibilities = new Set([
@@ -9,13 +10,6 @@ const residentDocumentVisibilities = new Set([
   "resident_property",
   "resident_unit",
   "resident_lease",
-]);
-const allowedContentTypes = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
 type DocumentMetadata = {
@@ -29,11 +23,6 @@ type DocumentMetadata = {
   sizeBytes?: unknown;
   dataUrl?: unknown;
 };
-
-function safeFileName(value: string) {
-  const sanitized = value.replace(/[\r\n"\\/]+/g, "_").trim();
-  return sanitized.slice(0, 180) || "dokument";
-}
 
 function documentAccessibleToLease(
   visibility: string,
@@ -55,6 +44,7 @@ export async function GET(
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet till boendedokument" }, { status: 403 });
 
     const { id } = await params;
     const leaseId = new URL(request.url).searchParams.get("leaseId")?.trim() || "";
@@ -97,7 +87,7 @@ export async function GET(
 
     const contentType = typeof metadata.contentType === "string" ? metadata.contentType : "";
     const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : "";
-    if (!allowedContentTypes.has(contentType)) {
+    if (!allowedDocumentContentTypes.has(contentType)) {
       return NextResponse.json({ error: "Dokumentets filformat stöds inte" }, { status: 415 });
     }
 
@@ -113,13 +103,17 @@ export async function GET(
       return NextResponse.json({ error: "Dokumentfilens storlek kunde inte verifieras" }, { status: 422 });
     }
 
-    const fileName = safeFileName(
+    const fileName = safeDocumentFileName(
       typeof metadata.fileName === "string"
         ? metadata.fileName
         : typeof metadata.name === "string"
           ? metadata.name
           : "dokument",
     );
+    const validation = validateDocumentFile({ bytes, contentType, fileName, maxBytes: 2_000_000 });
+    if (!validation.ok) {
+      return NextResponse.json({ error: "Dokumentfilens innehåll kunde inte verifieras" }, { status: 422 });
+    }
 
     await db.auditLog.create({
       data: {
@@ -133,9 +127,10 @@ export async function GET(
           leaseId: lease.id,
           leaseNumber: lease.lease_number,
           visibility,
-          fileName,
+          fileName: validation.fileName,
           contentType,
           sizeBytes: bytes.length,
+          accessMode: "operations_preview",
         },
       },
     });
@@ -145,9 +140,10 @@ export async function GET(
       headers: {
         "Content-Type": contentType,
         "Content-Length": String(bytes.length),
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(validation.fileName)}`,
         "Cache-Control": "private, no-store, max-age=0",
         "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
       },
     });
   } catch (error) {
