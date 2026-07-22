@@ -2,14 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
-
-const allowedTypes = new Set([
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
+import { validateDocumentFile } from "@/lib/document-file-security";
 
 const allowedVisibilities = new Set([
   "internal",
@@ -106,7 +99,7 @@ export async function GET() {
 
     return NextResponse.json(
       { documents, properties, leases, canManageLifecycle: Boolean(user.company_id && ["owner", "admin", "manager"].includes(user.role)) },
-      { headers: { "Cache-Control": "private, no-store" } },
+      { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } },
     );
   } catch (error) {
     console.error("Get documents error:", error);
@@ -135,9 +128,11 @@ export async function POST(request: Request) {
 
     if (!(file instanceof File) || !name) return NextResponse.json({ error: "Dokumentnamn och fil krävs" }, { status: 400 });
     if (name.length > 200 || category.length > 80) return NextResponse.json({ error: "Dokumentnamnet eller kategorin är för lång" }, { status: 400 });
-    if (!allowedTypes.has(file.type)) return NextResponse.json({ error: "Filtypen stöds inte" }, { status: 400 });
-    if (file.size > 2_000_000) return NextResponse.json({ error: "Filen får vara högst 2 MB i denna version" }, { status: 400 });
     if (!allowedVisibilities.has(visibility)) return NextResponse.json({ error: "Ogiltig dokumentsynlighet" }, { status: 400 });
+
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const validation = validateDocumentFile({ bytes, contentType: file.type, fileName: file.name, maxBytes: 2_000_000 });
+    if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
     let resolvedPropertyId = propertyId || null;
     let resolvedUnitId = unitId || null;
@@ -171,8 +166,7 @@ export async function POST(request: Request) {
       resolvedLeaseId = null;
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    const dataUrl = `data:${file.type};base64,${bytes.toString("base64")}`;
+    const dataUrl = `data:${validation.contentType};base64,${bytes.toString("base64")}`;
     const document = await db.auditLog.create({
       data: {
         company_id: user.company_id,
@@ -181,7 +175,7 @@ export async function POST(request: Request) {
         entity_id: resolvedLeaseId || resolvedUnitId || resolvedPropertyId,
         action: "document.created",
         metadata: {
-          schemaVersion: 2,
+          schemaVersion: 3,
           name,
           category,
           visibility,
@@ -189,16 +183,17 @@ export async function POST(request: Request) {
           unitId: resolvedUnitId,
           leaseId: resolvedLeaseId,
           validUntil: validUntil || null,
-          fileName: file.name,
-          contentType: file.type,
-          sizeBytes: file.size,
+          fileName: validation.fileName,
+          contentType: validation.contentType,
+          sizeBytes: validation.sizeBytes,
           dataUrl,
+          signatureValidated: true,
         },
       },
       select: { id: true, created_at: true },
     });
 
-    return NextResponse.json({ success: true, document }, { status: 201 });
+    return NextResponse.json({ success: true, document }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Create document error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
