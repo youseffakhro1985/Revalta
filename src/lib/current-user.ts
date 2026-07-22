@@ -45,7 +45,9 @@ export async function getCurrentUser() {
 
   if (!user || user.status !== "active" || (user.company && user.company.status !== "active")) return null;
   if (user.email.toLowerCase() !== session.email.toLowerCase()) return null;
-  if (latestPasswordChange && latestPasswordChange.created_at.getTime() > session.issuedAt * 1000) return null;
+
+  const currentPasswordVersion = latestPasswordChange?.created_at.getTime() ?? null;
+  if (session.passwordChangedAt !== currentPasswordVersion) return null;
 
   return user;
 }
