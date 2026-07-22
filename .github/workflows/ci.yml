@@ -54,10 +54,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Review dependency changes
-        if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
-
       - name: Generate Prisma client
         run: npx prisma generate
 
@@ -81,6 +77,11 @@ jobs:
 
       - name: Audit production dependencies
         run: npm run audit:prod
+
+      # GitHub dependency-review requires Dependency Graph to be enabled in repository settings.
+      # Until the owner enables it, the full lockfile audit below is the blocking dependency gate.
+      - name: Audit all dependencies
+        run: npm run audit:all
 
       - name: Build without production migrations
         env:
