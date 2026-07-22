@@ -216,7 +216,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="rounded-lg bg-sand-50 p-2 text-petroleum-700">{holder.party_type === "organization" ? <Building2 className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}</div>
+                        <div className="rounded-lg bg-sand-50 p-2 text-petroleum-700">{holder.party_type !== "individual" ? <Building2 className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}</div>
                         <h3 className="font-semibold text-ink-950">{holder.name}</h3>
                         <span className="rounded-full border border-sand-200 bg-sand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">{holder.status === "active" ? "Aktiv" : "Inaktiv"}</span>
                       </div>

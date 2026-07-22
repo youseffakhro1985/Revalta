@@ -30,5 +30,15 @@ export async function GET(
 
   const report = reports[0];
   if (!report) return NextResponse.json({ error: "Rapporten hittades inte" }, { status: 404 });
-  return NextResponse.json({ report });
+  const snapshot = { ...report.snapshot };
+  if (Array.isArray(snapshot.documents)) {
+    snapshot.documents = snapshot.documents.map((value) => {
+      if (!value || typeof value !== "object") return value;
+      const document = value as Record<string, unknown>;
+      return typeof document.id === "string"
+        ? { ...document, storage_url: `/api/operational-documents/${document.id}` }
+        : document;
+    });
+  }
+  return NextResponse.json({ report: { ...report, snapshot } });
 }

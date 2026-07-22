@@ -39,9 +39,12 @@ async function buildSnapshot(id: string, companyId: string) {
     `),
     db.operationalDocument.findMany({
       where: { company_id: companyId, work_order_id: id },
-      select: { id: true, file_name: true, storage_url: true, category: true, created_at: true },
+      select: { id: true, file_name: true, category: true, created_at: true },
       orderBy: { created_at: "asc" },
-    }),
+    }).then((rows) => rows.map((document) => ({
+      ...document,
+      storage_url: `/api/operational-documents/${document.id}`,
+    }))),
     db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
       SELECT "signer_role", "signer_name", "signer_email", "confirmation_text", "signed_at"
       FROM "WorkOrderSignature"

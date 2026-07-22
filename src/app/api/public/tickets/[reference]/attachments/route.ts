@@ -2,7 +2,8 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { recordStorageEvent } from "@/lib/integrations";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
+import { FileSecurityError, inspectUpload } from "@/lib/document-file-security";
+import { removeStoredFile, StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 const maxFileSize = 1024 * 1024;
@@ -49,45 +50,64 @@ export async function POST(
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    const inspection = inspectUpload(buffer, file.type, allowedTypes);
     const storedFile = await storeAttachment({
       fileName: file.name,
       contentType: file.type,
       buffer,
       prefix: `public-tickets/${ticket.id}`,
     });
-    const attachment = await db.ticketAttachment.create({
-      data: {
-        ticket_id: ticket.id,
-        file_name: file.name,
-        content_type: file.type,
-        size_bytes: file.size,
-        data_url: storedFile.url,
-        visibility: "public",
-      },
-      select: {
-        id: true,
-        file_name: true,
-        content_type: true,
-        size_bytes: true,
-        created_at: true,
-      },
-    });
+    let attachment;
+    try {
+      attachment = await db.ticketAttachment.create({
+        data: {
+          ticket_id: ticket.id,
+          file_name: file.name,
+          content_type: file.type,
+          size_bytes: file.size,
+          data_url: storedFile.url,
+          visibility: "public",
+        },
+        select: {
+          id: true,
+          file_name: true,
+          content_type: true,
+          size_bytes: true,
+          created_at: true,
+        },
+      });
+    } catch (error) {
+      await removeStoredFile(storedFile.url).catch(() => undefined);
+      throw error;
+    }
 
     await writeAuditLog({ id: ticket.user_id, company_id: ticket.company_id }, {
       entityType: "ticket",
       entityId: ticket.id,
       action: "public.attachment_created",
-      metadata: { fileName: attachment.file_name, reporterEmail: email },
+      metadata: {
+        fileName: attachment.file_name,
+        reporterEmail: email,
+        detectedContentType: inspection.detectedContentType,
+        checksumSha256: inspection.checksumSha256,
+        scanStatus: inspection.scanStatus,
+      },
     });
     await recordStorageEvent({ company_id: ticket.company_id }, {
       ticketId: ticket.id,
       fileName: attachment.file_name,
       source: "public_portal",
       provider: storedFile.provider,
+      detectedContentType: inspection.detectedContentType,
+      checksumSha256: inspection.checksumSha256,
+      scanStatus: inspection.scanStatus,
     });
 
     return NextResponse.json({ success: true, attachment }, { status: 201 });
   } catch (error) {
+    if (error instanceof FileSecurityError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     if (error instanceof StorageConfigurationError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }

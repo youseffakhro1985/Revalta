@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { getCurrentUser } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
+import { hasStoredDocumentFile } from "@/lib/document-storage";
+import { removeStoredFile, StorageConfigurationError, storeAttachment } from "@/lib/storage";
 
 const allowedVisibilities = new Set([
   "internal",
@@ -16,16 +18,17 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const [logs, properties, leases] = await Promise.all([
       db.auditLog.findMany({
-        where: { ...tenantWhere(user), entity_type: "document", action: "document.created" },
+        where: { company_id: user.company_id, entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
       }),
       db.property.findMany({
-        where: tenantWhere(user),
+        where: { company_id: user.company_id },
         orderBy: { name: "asc" },
         select: {
           id: true,
@@ -35,27 +38,23 @@ export async function GET() {
           units: { orderBy: { designation: "asc" }, select: { id: true, designation: true } },
         },
       }),
-      user.company_id
-        ? db.lease.findMany({
-            where: { company_id: user.company_id },
-            orderBy: { lease_number: "asc" },
-            take: 2000,
-            select: {
-              id: true,
-              lease_number: true,
-              status: true,
-              property_id: true,
-              unit_id: true,
-              lease_holder: { select: { name: true, contact_name: true } },
-              unit: { select: { designation: true } },
-            },
-          })
-        : Promise.resolve([]),
+      db.lease.findMany({
+        where: { company_id: user.company_id },
+        orderBy: { lease_number: "asc" },
+        take: 2000,
+        select: {
+          id: true,
+          lease_number: true,
+          status: true,
+          property_id: true,
+          unit_id: true,
+          lease_holder: { select: { name: true, contact_name: true } },
+          unit: { select: { designation: true } },
+        },
+      }),
     ]);
 
-    const lifecycleMap = user.company_id
-      ? await getDocumentLifecycleMap(user.company_id, logs.map((log) => log.id))
-      : new Map();
+    const lifecycleMap = await getDocumentLifecycleMap(user.company_id, logs.map((log) => log.id));
     const propertyMap = new Map(properties.map((property) => [property.id, property]));
     const leaseMap = new Map(leases.map((lease) => [lease.id, lease]));
     const documents = logs.map((log) => {
@@ -82,7 +81,7 @@ export async function GET() {
         fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
         contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
         sizeBytes: typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : 0,
-        dataUrl: typeof metadata.dataUrl === "string" ? metadata.dataUrl : null,
+        downloadUrl: hasStoredDocumentFile(metadata) ? `/api/documents/${log.id}/download` : null,
         property,
         unit,
         lease: lease ? {
@@ -98,7 +97,7 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      { documents, properties, leases, canManageLifecycle: Boolean(user.company_id && ["owner", "admin", "manager"].includes(user.role)) },
+      { documents, properties, leases, canManageLifecycle: ["owner", "admin", "manager"].includes(user.role) },
       { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } },
     );
   } catch (error) {
@@ -129,6 +128,8 @@ export async function POST(request: Request) {
     if (!(file instanceof File) || !name) return NextResponse.json({ error: "Dokumentnamn och fil krävs" }, { status: 400 });
     if (name.length > 200 || category.length > 80) return NextResponse.json({ error: "Dokumentnamnet eller kategorin är för lång" }, { status: 400 });
     if (!allowedVisibilities.has(visibility)) return NextResponse.json({ error: "Ogiltig dokumentsynlighet" }, { status: 400 });
+    if (file.size <= 0) return NextResponse.json({ error: "Filen är tom" }, { status: 400 });
+    if (file.size > 2_000_000) return NextResponse.json({ error: "Filen får vara högst 2 MB" }, { status: 413 });
 
     const bytes = Buffer.from(await file.arrayBuffer());
     const validation = validateDocumentFile({ bytes, contentType: file.type, fileName: file.name, maxBytes: 2_000_000 });
@@ -166,35 +167,51 @@ export async function POST(request: Request) {
       resolvedLeaseId = null;
     }
 
-    const dataUrl = `data:${validation.contentType};base64,${bytes.toString("base64")}`;
-    const document = await db.auditLog.create({
-      data: {
-        company_id: user.company_id,
-        actor_user_id: user.id,
-        entity_type: "document",
-        entity_id: resolvedLeaseId || resolvedUnitId || resolvedPropertyId,
-        action: "document.created",
-        metadata: {
-          schemaVersion: 3,
-          name,
-          category,
-          visibility,
-          propertyId: resolvedPropertyId,
-          unitId: resolvedUnitId,
-          leaseId: resolvedLeaseId,
-          validUntil: validUntil || null,
-          fileName: validation.fileName,
-          contentType: validation.contentType,
-          sizeBytes: validation.sizeBytes,
-          dataUrl,
-          signatureValidated: true,
-        },
-      },
-      select: { id: true, created_at: true },
+    const storedFile = await storeAttachment({
+      fileName: validation.fileName,
+      contentType: validation.contentType,
+      buffer: bytes,
+      prefix: `companies/${user.company_id}/documents`,
     });
+    try {
+      const document = await db.auditLog.create({
+        data: {
+          company_id: user.company_id,
+          actor_user_id: user.id,
+          entity_type: "document",
+          entity_id: resolvedLeaseId || resolvedUnitId || resolvedPropertyId,
+          action: "document.created",
+          metadata: {
+            schemaVersion: 4,
+            name,
+            category,
+            visibility,
+            propertyId: resolvedPropertyId,
+            unitId: resolvedUnitId,
+            leaseId: resolvedLeaseId,
+            validUntil: validUntil || null,
+            fileName: validation.fileName,
+            contentType: validation.contentType,
+            sizeBytes: validation.sizeBytes,
+            storageUrl: storedFile.url,
+            storageProvider: storedFile.provider,
+            detectedContentType: validation.detectedContentType,
+            checksumSha256: validation.checksumSha256,
+            scanStatus: validation.scanStatus,
+          },
+        },
+        select: { id: true, created_at: true },
+      });
 
-    return NextResponse.json({ success: true, document }, { status: 201, headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ success: true, document }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      await removeStoredFile(storedFile.url).catch(() => undefined);
+      throw error;
+    }
   } catch (error) {
+    if (error instanceof StorageConfigurationError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     console.error("Create document error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

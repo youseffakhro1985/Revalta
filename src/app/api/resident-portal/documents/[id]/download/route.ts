@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
-import { allowedDocumentContentTypes, safeDocumentFileName, validateDocumentFile } from "@/lib/document-file-security";
+import {
+  documentDownloadHeaders,
+  DocumentStorageError,
+  loadStoredDocumentFile,
+  type StoredDocumentMetadata,
+} from "@/lib/document-storage";
 
 const activeLeaseStatuses = ["active", "notice"];
 const residentDocumentVisibilities = new Set([
@@ -21,6 +26,8 @@ type DocumentMetadata = {
   fileName?: unknown;
   contentType?: unknown;
   sizeBytes?: unknown;
+  checksumSha256?: unknown;
+  storageUrl?: unknown;
   dataUrl?: unknown;
 };
 
@@ -85,35 +92,7 @@ export async function GET(
       return NextResponse.json({ error: "Du saknar behörighet till dokumentet" }, { status: 403 });
     }
 
-    const contentType = typeof metadata.contentType === "string" ? metadata.contentType : "";
-    const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : "";
-    if (!allowedDocumentContentTypes.has(contentType)) {
-      return NextResponse.json({ error: "Dokumentets filformat stöds inte" }, { status: 415 });
-    }
-
-    const prefix = `data:${contentType};base64,`;
-    if (!dataUrl.startsWith(prefix)) {
-      return NextResponse.json({ error: "Dokumentfilen är skadad eller saknas" }, { status: 422 });
-    }
-
-    const encoded = dataUrl.slice(prefix.length);
-    const bytes = Buffer.from(encoded, "base64");
-    const expectedSize = typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : null;
-    if (!bytes.length || (expectedSize !== null && bytes.length !== expectedSize)) {
-      return NextResponse.json({ error: "Dokumentfilens storlek kunde inte verifieras" }, { status: 422 });
-    }
-
-    const fileName = safeDocumentFileName(
-      typeof metadata.fileName === "string"
-        ? metadata.fileName
-        : typeof metadata.name === "string"
-          ? metadata.name
-          : "dokument",
-    );
-    const validation = validateDocumentFile({ bytes, contentType, fileName, maxBytes: 2_000_000 });
-    if (!validation.ok) {
-      return NextResponse.json({ error: "Dokumentfilens innehåll kunde inte verifieras" }, { status: 422 });
-    }
+    const file = await loadStoredDocumentFile(metadata as StoredDocumentMetadata);
 
     await db.auditLog.create({
       data: {
@@ -127,26 +106,19 @@ export async function GET(
           leaseId: lease.id,
           leaseNumber: lease.lease_number,
           visibility,
-          fileName: validation.fileName,
-          contentType,
-          sizeBytes: bytes.length,
+          fileName: file.fileName,
+          contentType: file.contentType,
+          sizeBytes: file.sizeBytes,
           accessMode: "operations_preview",
         },
       },
     });
 
-    return new NextResponse(bytes, {
-      status: 200,
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": String(bytes.length),
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(validation.fileName)}`,
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "default-src 'none'; sandbox",
-      },
-    });
+    return new NextResponse(file.body, { status: 200, headers: documentDownloadHeaders(file) });
   } catch (error) {
+    if (error instanceof DocumentStorageError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("Download resident document error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

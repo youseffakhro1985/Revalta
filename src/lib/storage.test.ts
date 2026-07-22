@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { putMock } = vi.hoisted(() => ({
+const { deleteMock, putMock } = vi.hoisted(() => ({
+  deleteMock: vi.fn(),
   putMock: vi.fn(),
 }));
 
-vi.mock("@vercel/blob", () => ({ put: putMock }));
+vi.mock("@vercel/blob", () => ({ del: deleteMock, put: putMock }));
 
 import {
   getStorageToken,

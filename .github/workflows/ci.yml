@@ -17,7 +17,7 @@ jobs:
   quality:
     name: Lint, test, migrate and build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -54,6 +54,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+
       - name: Generate Prisma client
         run: npx prisma generate
 
@@ -82,3 +86,11 @@ jobs:
         env:
           NODE_ENV: production
         run: npm run build:ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        env:
+          NODE_ENV: production
+        run: npm run test:e2e

@@ -30,13 +30,23 @@ const securityHeaders = [
 ];
 
 const noStoreHeaders = [{ key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" }];
+const noIndexHeaders = [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }];
 
 const nextConfig = {
   async headers() {
     return [
       { source: "/(.*)", headers: securityHeaders },
-      { source: "/dashboard/:path*", headers: noStoreHeaders },
-      { source: "/api/:path*", headers: noStoreHeaders },
+      { source: "/dashboard/:path*", headers: [...noStoreHeaders, ...noIndexHeaders] },
+      { source: "/api/:path*", headers: [...noStoreHeaders, ...noIndexHeaders] },
+      { source: "/portal/:path*", headers: noIndexHeaders },
+      { source: "/login", headers: noIndexHeaders },
+      { source: "/register", headers: noIndexHeaders },
+      { source: "/forgot-password", headers: noIndexHeaders },
+      { source: "/reset-password", headers: noIndexHeaders },
+      { source: "/accept-invite", headers: noIndexHeaders },
+      { source: "/verify-email", headers: noIndexHeaders },
+      { source: "/arbetsrapport/:path*", headers: noIndexHeaders },
+      { source: "/underhallsrapport/:path*", headers: noIndexHeaders },
     ];
   },
 };

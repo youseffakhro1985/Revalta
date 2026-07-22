@@ -2,46 +2,17 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 
-type Bucket = {
-  count: number;
-  resetAt: number;
-};
-
 export type RateLimitResult = {
   allowed: boolean;
   remaining: number;
   resetAt: Date;
-  source: "database" | "memory_fallback";
+  source: "database" | "unavailable";
 };
 
-const fallbackBuckets = new Map<string, Bucket>();
 let cleanupCounter = 0;
 
 function hashKey(key: string) {
   return createHash("sha256").update(key).digest("hex");
-}
-
-function checkMemoryFallback(keyHash: string, limit: number, windowMs: number): RateLimitResult {
-  const now = Date.now();
-  const bucket = fallbackBuckets.get(keyHash);
-
-  if (!bucket || bucket.resetAt <= now) {
-    const resetAt = now + windowMs;
-    fallbackBuckets.set(keyHash, { count: 1, resetAt });
-    return { allowed: true, remaining: limit - 1, resetAt: new Date(resetAt), source: "memory_fallback" };
-  }
-
-  if (bucket.count >= limit) {
-    return { allowed: false, remaining: 0, resetAt: new Date(bucket.resetAt), source: "memory_fallback" };
-  }
-
-  bucket.count += 1;
-  return {
-    allowed: true,
-    remaining: limit - bucket.count,
-    resetAt: new Date(bucket.resetAt),
-    source: "memory_fallback",
-  };
 }
 
 export async function checkRateLimit(key: string, limit: number, windowMs: number): Promise<RateLimitResult> {
@@ -92,8 +63,13 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
 
     return { ...result, source: "database" };
   } catch (error) {
-    console.error("Persistent rate limiter unavailable; using bounded in-memory fallback", error);
-    return checkMemoryFallback(keyHash, limit, windowMs);
+    console.error("Persistent rate limiter unavailable; denying request", error);
+    return {
+      allowed: false,
+      remaining: 0,
+      resetAt: new Date(Date.now() + Math.min(windowMs, 60_000)),
+      source: "unavailable",
+    };
   }
 }
 

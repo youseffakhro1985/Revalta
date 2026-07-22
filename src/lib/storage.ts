@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
 
 export type StoredFile = {
   url: string;
@@ -43,4 +43,10 @@ export async function storeAttachment(input: {
     provider: "vercel_blob",
     url: blob.url,
   };
+}
+
+export async function removeStoredFile(url: string) {
+  const token = getStorageToken();
+  if (!token) throw new StorageConfigurationError();
+  await del(url, { token });
 }

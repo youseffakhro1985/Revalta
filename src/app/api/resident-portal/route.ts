@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { generatePublicReference } from "@/lib/public-portal";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
+import { hasStoredDocumentFile } from "@/lib/document-storage";
 
 const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "heating", "access", "noise", "other"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
@@ -21,6 +22,7 @@ type DocumentMetadata = {
   fileName?: unknown;
   contentType?: unknown;
   sizeBytes?: unknown;
+  storageUrl?: unknown;
   dataUrl?: unknown;
 };
 
@@ -99,8 +101,7 @@ export async function GET() {
 
       if (accessibleLeaseIds.length === 0) return [];
       const contentType = typeof metadata.contentType === "string" ? metadata.contentType : null;
-      const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : null;
-      const downloadable = Boolean(contentType && dataUrl?.startsWith(`data:${contentType};base64,`));
+      const downloadable = hasStoredDocumentFile(metadata);
 
       return [{
         id: log.id,

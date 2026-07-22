@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { normalizeSwedishOrganizationNumber } from "@/lib/swedish-organization-number";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -31,9 +32,21 @@ export async function PATCH(request: Request) {
 
     const { name, orgNumber } = await request.json();
     const normalizedName = typeof name === "string" ? name.trim() : "";
-    const normalizedOrgNumber = typeof orgNumber === "string" && orgNumber.trim() ? orgNumber.trim() : null;
+    const orgNumberInput = typeof orgNumber === "string" && orgNumber.trim() ? orgNumber.trim() : null;
+    const normalizedOrgNumber = orgNumberInput ? normalizeSwedishOrganizationNumber(orgNumberInput) : null;
     if (!normalizedName) {
       return NextResponse.json({ error: "Organisationsnamn krävs" }, { status: 400 });
+    }
+    if (orgNumberInput && !normalizedOrgNumber) {
+      return NextResponse.json({ error: "Ange ett giltigt svenskt organisationsnummer" }, { status: 400 });
+    }
+
+    if (normalizedOrgNumber) {
+      const duplicate = await db.company.findFirst({
+        where: { id: { not: user.company_id }, org_number: normalizedOrgNumber },
+        select: { id: true },
+      });
+      if (duplicate) return NextResponse.json({ error: "Organisationsnumret används redan" }, { status: 409 });
     }
 
     const company = await db.company.update({

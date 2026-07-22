@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
+import { LEASE_HOLDER_TYPES } from "@/lib/leasing";
+import { normalizeSwedishOrganizationNumber } from "@/lib/swedish-organization-number";
 
-const partyTypes = new Set(["individual", "organization"]);
+const partyTypes = new Set<string>(LEASE_HOLDER_TYPES);
 const statuses = new Set(["active", "inactive"]);
 
 function text(value: unknown) {
@@ -72,17 +74,20 @@ export async function POST(request: Request) {
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
-    const partyType = partyTypes.has(text(body?.partyType)) ? text(body?.partyType) : "individual";
+    const requestedPartyType = text(body?.partyType) === "organization" ? "company" : text(body?.partyType);
+    const partyType = partyTypes.has(requestedPartyType) ? requestedPartyType : "individual";
     const name = text(body?.name);
     const contactName = optionalText(body?.contactName);
     const email = optionalText(body?.email)?.toLowerCase() || null;
     const phone = optionalText(body?.phone);
-    const organizationNumber = optionalText(body?.organizationNumber);
+    const organizationNumberInput = optionalText(body?.organizationNumber);
+    const organizationNumber = organizationNumberInput ? normalizeSwedishOrganizationNumber(organizationNumberInput) : null;
     const status = statuses.has(text(body?.status)) ? text(body?.status) : "active";
 
     if (name.length < 2 || name.length > 160) return NextResponse.json({ error: "Namn måste vara mellan 2 och 160 tecken" }, { status: 400 });
     if (!validEmail(email)) return NextResponse.json({ error: "Ange en giltig e-postadress" }, { status: 400 });
-    if (partyType === "organization" && !organizationNumber) return NextResponse.json({ error: "Organisationsnummer krävs för organisationer" }, { status: 400 });
+    if (organizationNumberInput && !organizationNumber) return NextResponse.json({ error: "Ange ett giltigt svenskt organisationsnummer" }, { status: 400 });
+    if (partyType !== "individual" && !organizationNumber) return NextResponse.json({ error: "Organisationsnummer krävs för företag och föreningar" }, { status: 400 });
 
     const duplicate = await db.leaseHolder.findFirst({
       where: {

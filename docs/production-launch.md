@@ -12,7 +12,7 @@ Den här checklistan ska vara uppfylld före och efter varje produktionsrelease.
 - Kör `Database Release` manuellt med exakt verifierad commit-SHA och bekräftelsen `MIGRATE_PRODUCTION`.
 - Driftsätt endast samma commit som migrationen godkändes för.
 
-Migrationen `20260713190000_add_work_orders_and_projects` är idempotent. Buildskriptet kan markera just en tidigare misslyckad körning av den migrationen som återställd och därefter göra ett säkert nytt försök. Inga andra misslyckade migrationer löses automatiskt.
+En misslyckad eller avbruten produktionsmigration ska alltid utredas manuellt. Ändra aldrig migrationshistoriken eller markera en migration som återställd utan att först verifiera databasens faktiska schema och data.
 
 ## 2. Obligatoriska hemligheter
 
@@ -35,6 +35,7 @@ npm run lint
 npm run test:ci
 npm run typecheck
 npm run build:ci
+npm run test:e2e
 ```
 
 Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview innan merge till `main`.
@@ -45,11 +46,11 @@ Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview in
 2. Låt CI validera Prisma-schemat och applicera samtliga migrationer mot ren PostgreSQL.
 3. Kräv grönt lint, tester, typkontroll och produktionsbuild.
 4. Verifiera Vercel Preview utan produktionsmigrationer.
-5. Mergea pull requesten till `main`.
-6. Ta en verifierad databasbackup när releasen innehåller migrationer.
-7. Kör `Database Release` för exakt merge-commit.
-8. Driftsätt exakt samma commit till Vercel.
-9. Kör smoke tests och rulla tillbaka applikationen vid fel.
+5. För en release utan schemaändring: mergea pull requesten och låt Vercel driftsätta exakt den verifierade merge-committen.
+6. För en release med schemaändring: kräv en framåt- och bakåtkompatibel expand-migration, verifierad backup och uttryckligt produktionsgodkännande. Mergea först när både gammal och ny applikationskod fungerar mot expansionsschemat.
+7. Kör `Database Release` för exakt merge-commit och verifiera migrationsstatus. Vercels automatiska `main`-deployment får inte antas vara en databasgrind; kontrollera dess status separat.
+8. Verifiera att Vercel-deploymenten avser exakt samma commit.
+9. Kör smoke tests och rulla tillbaka applikationen vid fel. Databasrollback sker genom en ny, granskad framåtmigration eller verifierad backupåterställning—aldrig genom att redigera en applicerad migration.
 
 ## 5. Verifiering efter driftsättning
 

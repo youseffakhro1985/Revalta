@@ -9,7 +9,7 @@ Revalta är en svensk plattform för fastighetsförvaltning. Applikationen samla
 - JWT-session i `httpOnly`-cookie
 - Tailwind CSS
 - Vercel för applikation och privat blobblagring
-- Vitest, ESLint, TypeScript och produktionsbuild i CI
+- Vitest, Playwright, ESLint, TypeScript och produktionsbuild i CI
 
 ## Kom igång lokalt
 
@@ -32,6 +32,7 @@ npm run lint
 npm run test:ci
 npm run typecheck
 npm run build:ci
+npm run test:e2e
 ```
 
 Varken `build:ci` eller Vercels normala byggkommando applicerar produktionsmigrationer. Produktionsmigrationer körs separat genom det skyddade GitHub Actions-flödet `Database Release`, mot en uttryckligen verifierad commit, innan samma commit driftsätts.

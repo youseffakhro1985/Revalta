@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   ArrowRight,
   BarChart3,
@@ -14,6 +15,11 @@ import {
 import { DashboardPreview } from "@/components/landing/dashboard-preview";
 import { MarketingHeader } from "@/components/marketing-header";
 import { SiteFooter } from "@/components/site-footer";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: { url: "/" },
+};
 
 const modules = [
   {
@@ -57,7 +63,7 @@ const assurances = [
 export default function Home() {
   return (
     <>
-      <main className="min-h-screen overflow-hidden bg-[#FAFAF8] text-ink-950 selection:bg-petroleum-100 selection:text-petroleum-950">
+      <main id="main-content" className="min-h-screen overflow-hidden bg-[#FAFAF8] text-ink-950 selection:bg-petroleum-100 selection:text-petroleum-950">
         <MarketingHeader />
 
         <section className="relative border-b border-sand-200/80">

@@ -37,77 +37,89 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 animate-fade-in p-4">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-card-lg border border-slate-100 animate-slide-up">
+    <main className="flex min-h-screen items-center justify-center bg-sand-50 p-4 text-ink-950">
+      <section aria-labelledby="register-title" className="w-full max-w-md rounded-3xl border border-sand-200 bg-white p-7 shadow-premium-sm sm:p-9">
         <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-slate-900 mb-2">Skapa konto</h2>
-          <p className="text-slate-500 text-sm">Bli medlem för att skapa felanmälningar</p>
+          <Link href="/" className="font-display text-xl font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link>
+          <h1 id="register-title" className="mt-6 font-display text-3xl font-semibold tracking-[-0.03em] text-ink-950">Skapa konto</h1>
+          <p className="mt-2 text-sm text-ink-500">Kom igång med samlad svensk fastighetsförvaltning.</p>
         </div>
         {error && (
-          <div className="mb-6 p-3 bg-danger-50 border border-danger-500 text-danger-600 rounded-lg text-sm text-center animate-pulse-soft">
+          <div role="alert" aria-live="polite" className="mb-6 rounded-xl border border-danger-200 bg-danger-50 p-3 text-center text-sm text-danger-700">
             {error}
           </div>
         )}
         <form onSubmit={handleRegister} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Namn</label>
+            <label htmlFor="register-name" className="mb-1.5 block text-sm font-semibold text-ink-700">Namn</label>
             <input 
+              id="register-name"
               type="text" 
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+              required
+              autoComplete="name"
+              className="block h-12 w-full rounded-xl border border-sand-200 bg-white px-4 text-sm shadow-premium-sm transition focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Förnamn Efternamn"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Företag</label>
+            <label htmlFor="register-company" className="mb-1.5 block text-sm font-semibold text-ink-700">Företag</label>
             <input
+              id="register-company"
               type="text"
               required
               minLength={2}
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
+              autoComplete="organization"
+              className="block h-12 w-full rounded-xl border border-sand-200 bg-white px-4 text-sm shadow-premium-sm transition focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Ex. Revalta Förvaltning AB"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">E-post</label>
+            <label htmlFor="register-email" className="mb-1.5 block text-sm font-semibold text-ink-700">E-post</label>
             <input 
+              id="register-email"
               type="email" 
               required
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+              autoComplete="email"
+              inputMode="email"
+              className="block h-12 w-full rounded-xl border border-sand-200 bg-white px-4 text-sm shadow-premium-sm transition focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="namn@exempel.se"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Lösenord</label>
+            <label htmlFor="register-password" className="mb-1.5 block text-sm font-semibold text-ink-700">Lösenord</label>
             <input 
+              id="register-password"
               type="password" 
               required
               minLength={10}
               maxLength={128}
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+              autoComplete="new-password"
+              aria-describedby="register-password-help"
+              className="block h-12 w-full rounded-xl border border-sand-200 bg-white px-4 text-sm shadow-premium-sm transition focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
-            <p className="mt-2 text-xs text-slate-500">Minst 10 tecken med både bokstav och siffra.</p>
+            <p id="register-password-help" className="mt-2 text-xs text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
           </div>
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full py-3 px-4 bg-brand-600 text-white font-medium rounded-xl hover:bg-brand-700 transition-all shadow-card hover:shadow-card-md active:scale-[0.98] disabled:opacity-70"
+            className="h-12 w-full rounded-xl bg-petroleum-700 px-4 font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Registrerar..." : "Registrera"}
+            {loading ? "Registrerar…" : "Registrera"}
           </button>
         </form>
-        <p className="mt-8 text-center text-sm text-slate-500">
-          Har du redan ett konto? <Link href="/login" className="text-brand-600 font-medium hover:text-brand-700 hover:underline transition-colors">Logga in</Link>
+        <p className="mt-8 text-center text-sm text-ink-500">
+          Har du redan ett konto? <Link href="/login" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">Logga in</Link>
         </p>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

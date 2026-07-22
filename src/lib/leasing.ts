@@ -1,4 +1,6 @@
 export const LEASE_STATUSES = ["draft", "reserved", "active", "notice", "ended", "cancelled"] as const;
+import { normalizeSwedishOrganizationNumber } from "@/lib/swedish-organization-number";
+
 export const LEASE_HOLDER_TYPES = ["individual", "company", "association"] as const;
 export const OCCUPYING_LEASE_STATUSES = ["reserved", "active", "notice"] as const;
 
@@ -66,6 +68,10 @@ export function parseLeaseInput(body: Record<string, unknown>): { data: ParsedLe
   const annualIndexPercent = Number(body.annualIndexPercent ?? 0);
   const paymentTermsDays = Number(body.paymentTermsDays ?? 30);
   const holderEmail = optionalText(body.holderEmail, 254)?.toLowerCase() ?? null;
+  const organizationNumberInput = optionalText(body.holderOrganizationNumber, 40);
+  const holderOrganizationNumber = organizationNumberInput
+    ? normalizeSwedishOrganizationNumber(organizationNumberInput)
+    : null;
 
   if (!unitId || !holderName) return { error: "Objekt och hyrespart krävs" };
   if (!holderTypeSet.has(holderTypeValue)) return { error: "Ogiltig typ av hyrespart" };
@@ -78,6 +84,8 @@ export function parseLeaseInput(body: Record<string, unknown>): { data: ParsedLe
   if (!Number.isFinite(annualIndexPercent) || annualIndexPercent < 0 || annualIndexPercent > 100) return { error: "Index måste vara mellan 0 och 100 procent" };
   if (!Number.isInteger(paymentTermsDays) || paymentTermsDays < 0 || paymentTermsDays > 120) return { error: "Betalningsvillkor måste vara 0–120 dagar" };
   if (holderEmail && !emailPattern.test(holderEmail)) return { error: "Ange en giltig e-postadress" };
+  if (organizationNumberInput && !holderOrganizationNumber) return { error: "Ange ett giltigt svenskt organisationsnummer" };
+  if (holderTypeValue !== "individual" && !holderOrganizationNumber) return { error: "Organisationsnummer krävs för företag och föreningar" };
 
   return {
     data: {
@@ -88,7 +96,7 @@ export function parseLeaseInput(body: Record<string, unknown>): { data: ParsedLe
       holderContactName: optionalText(body.holderContactName, 160),
       holderEmail,
       holderPhone: optionalText(body.holderPhone, 60),
-      holderOrganizationNumber: optionalText(body.holderOrganizationNumber, 40),
+      holderOrganizationNumber,
       leaseNumber,
       status: statusValue as LeaseStatus,
       startDate,

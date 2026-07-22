@@ -31,8 +31,8 @@ function ResetPasswordForm() {
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-600">Revalta</p>
       <h1 className="mt-3 text-3xl font-semibold text-ink-950">Välj nytt lösenord</h1>
       <p className="mt-3 text-sm text-ink-600">Länken gäller i 30 minuter och kan användas en gång.</p>
-      {error && <div className="mt-5 rounded-xl border border-danger-500 bg-danger-50 p-4 text-sm text-danger-600">{error}</div>}
-      {message && <div className="mt-5 rounded-xl border border-success-500 bg-success-50 p-4 text-sm text-success-600">{message}</div>}
+      {error && <div role="alert" aria-live="polite" className="mt-5 rounded-xl border border-danger-500 bg-danger-50 p-4 text-sm text-danger-600">{error}</div>}
+      {message && <div role="status" aria-live="polite" className="mt-5 rounded-xl border border-success-500 bg-success-50 p-4 text-sm text-success-600">{message}</div>}
       <form onSubmit={submit} className="mt-6 space-y-4">
         <label className="block text-sm font-medium text-ink-700">
           Nytt lösenord
@@ -65,7 +65,7 @@ function ResetPasswordForm() {
           disabled={loading || !token || Boolean(message)}
           className="w-full rounded-xl bg-petroleum-700 px-4 py-3 font-semibold text-white disabled:opacity-60"
         >
-          {loading ? "Sparar..." : "Spara nytt lösenord"}
+          {loading ? "Sparar…" : "Spara nytt lösenord"}
         </button>
       </form>
       <Link href="/login" className="mt-6 block text-center text-sm font-medium text-petroleum-700">

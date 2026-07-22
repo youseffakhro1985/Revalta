@@ -1,0 +1,71 @@
+name: Database Readiness Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact main commit SHA whose schema and audit script should run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revalta-production-database-readiness
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Read-only production readiness audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Check out approved revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Verify main commit
+        env:
+          EXPECTED_SHA: ${{ inputs.commit_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA" || (echo "Checked out commit does not match commit_sha" && exit 1)
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$EXPECTED_SHA" origin/main || (echo "commit_sha is not contained in main" && exit 1)
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate required secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          test -n "$DATABASE_URL" || (echo "DATABASE_URL is missing" && exit 1)
+          test -n "$DIRECT_URL" || (echo "DIRECT_URL is missing" && exit 1)
+
+      - name: Run aggregate read-only audit
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: node scripts/database-readiness.mjs > database-readiness.json
+
+      - name: Verify aggregate report
+        run: jq -e '.errors | length == 0' database-readiness.json >/dev/null
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-readiness-${{ inputs.commit_sha }}
+          path: database-readiness.json
+          retention-days: 30

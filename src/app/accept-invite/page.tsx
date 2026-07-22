@@ -49,22 +49,22 @@ function AcceptInviteForm() {
       <p className="mt-3 text-sm leading-6 text-ink-500">Skapa ditt lösenord för att gå med i organisationens arbetsyta.</p>
 
       {(error || message) && (
-        <div className={`mt-6 rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-600" : "border-success-500 bg-success-50 text-success-600"}`}>
+        <div role={error ? "alert" : "status"} aria-live="polite" className={`mt-6 rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-600" : "border-success-500 bg-success-50 text-success-600"}`}>
           {error || message}
         </div>
       )}
 
       <form onSubmit={acceptInvite} className="mt-6 space-y-5">
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-700">Namn</label>
-          <input value={name} onChange={(event) => setName(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Förnamn Efternamn" />
+          <label htmlFor="invite-name" className="mb-1 block text-sm font-medium text-ink-700">Namn</label>
+          <input id="invite-name" required autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Förnamn Efternamn" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-700">Lösenord</label>
-          <input type="password" minLength={10} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Minst 10 tecken med bokstav och siffra" />
+          <label htmlFor="invite-password" className="mb-1 block text-sm font-medium text-ink-700">Lösenord</label>
+          <input id="invite-password" type="password" minLength={10} maxLength={128} required autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Minst 10 tecken med bokstav och siffra" />
         </div>
         <button disabled={loading || !token} className="w-full rounded-xl bg-petroleum-600 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70">
-          {loading ? "Skapar konto..." : "Acceptera inbjudan"}
+          {loading ? "Skapar konto…" : "Acceptera inbjudan"}
         </button>
       </form>
 

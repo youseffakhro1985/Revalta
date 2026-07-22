@@ -9,7 +9,9 @@ const navigation = [
 
 export function MarketingHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-sand-200/80 bg-[#FAFAF8]/95 backdrop-blur-sm">
+    <>
+      <a href="#main-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-petroleum-800 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Hoppa till innehåll</a>
+      <header className="sticky top-0 z-50 border-b border-sand-200/80 bg-[#FAFAF8]/95 backdrop-blur-sm">
       <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12">
         <Link
           href="/"
@@ -55,6 +57,7 @@ export function MarketingHeader() {
           </Link>
         </div>
       </div>
-    </header>
+      </header>
+    </>
   );
 }

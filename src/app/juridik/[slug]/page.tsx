@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MarketingHeader } from "@/components/marketing-header";
+import { SiteFooter } from "@/components/site-footer";
 
 const pages: Record<string, { title: string; intro: string; sections: Array<{ title: string; body: string }> }> = {
   integritet: {
@@ -44,29 +47,43 @@ export function generateStaticParams() {
   return Object.keys(pages).map((slug) => ({ slug }));
 }
 
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const page = pages[slug];
+  if (!page) return {};
+  return {
+    title: page.title,
+    description: page.intro,
+    alternates: { canonical: `/juridik/${slug}` },
+    openGraph: { title: page.title, description: page.intro, url: `/juridik/${slug}` },
+  };
+}
+
 export default async function LegalPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const page = pages[slug];
   if (!page) notFound();
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-4xl px-6 py-12">
-        <Link href="/" className="font-bold text-brand-600">Revalta</Link>
-        <article className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-card">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">Juridik</p>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-950">{page.title}</h1>
-          <p className="mt-4 text-lg leading-8 text-slate-600">{page.intro}</p>
-          <div className="mt-8 space-y-6">
+    <div className="min-h-screen bg-[#FAFAF8] text-ink-950">
+      <MarketingHeader />
+      <main id="main-content" className="mx-auto max-w-4xl px-5 py-14 sm:px-8 sm:py-20">
+        <Link href="/" className="text-sm font-semibold text-petroleum-700 transition hover:text-petroleum-900">← Till startsidan</Link>
+        <article className="mt-8 rounded-3xl border border-sand-200 bg-white p-6 shadow-premium-sm sm:p-10 lg:p-12">
+          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Juridik och villkor</p>
+          <h1 className="font-display text-4xl font-semibold tracking-[-0.035em] text-ink-950 sm:text-5xl">{page.title}</h1>
+          <p className="mt-5 max-w-3xl text-lg leading-8 text-ink-600">{page.intro}</p>
+          <div className="mt-10 space-y-5 border-t border-sand-200 pt-8">
             {page.sections.map((section) => (
-              <section key={section.title} className="rounded-2xl bg-slate-50 p-6">
-                <h2 className="text-xl font-bold text-slate-950">{section.title}</h2>
-                <p className="mt-3 leading-7 text-slate-600">{section.body}</p>
+              <section key={section.title} className="rounded-2xl border border-sand-200 bg-sand-50/60 p-6 sm:p-7">
+                <h2 className="font-display text-xl font-semibold text-ink-950">{section.title}</h2>
+                <p className="mt-3 leading-7 text-ink-600">{section.body}</p>
               </section>
             ))}
           </div>
         </article>
-      </div>
-    </main>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }

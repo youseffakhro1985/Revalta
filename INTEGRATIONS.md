@@ -1,6 +1,6 @@
 # Revalta integrationer
 
-Revalta fungerar fullt i mockläge utan externa nycklar. När nycklar finns i Vercel aktiveras live-läge automatiskt för respektive provider.
+Revalta kan registrera spårbara integrationshändelser utan externa nycklar. Det innebär inte att ett externt meddelande eller en betalning har levererats. När respektive nyckel finns i Vercel aktiveras live-läge för den providern och leveransstatus sparas separat.
 
 ## E-post
 
@@ -66,11 +66,12 @@ Aktivera minst dessa events i Stripe:
 
 ## Filstorage
 
-Miljövariabel:
+Miljövariabler:
 
-- `STORAGE_PROVIDER_KEY`
+- `BLOB_READ_WRITE_TOKEN` (kanonisk)
+- `STORAGE_PROVIDER_KEY` (tillfällig kompatibilitetsreserv)
 
-I nuvarande version sparas små dev-bilagor som data-URL för att flödet ska vara testbart. Nästa steg är att ersätta lagringen med Vercel Blob, S3 eller Supabase Storage.
+Nya bilagor och dokument lagras som privata Vercel Blob-objekt efter storleks-, MIME- och filsignaturkontroll. Databasen lagrar endast lagringsreferens och metadata. Klienten får en intern API-adress; varje nedladdning autentiseras och tenantkontrolleras på servern. Äldre data-URL-bilagor kan läsas via en validerad kompatibilitetsväg tills en separat, inventerad datamigrering har genomförts.
 
 ## AI
 
