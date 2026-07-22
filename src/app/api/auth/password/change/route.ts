@@ -68,13 +68,13 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hashPassword(newPassword);
-    await db.$transaction(async (tx) => {
+    const passwordChange = await db.$transaction(async (tx) => {
       await tx.user.update({ where: { id: account.id }, data: { password: passwordHash } });
       await tx.passwordResetToken.updateMany({
         where: { user_id: account.id, used_at: null },
         data: { used_at: new Date() },
       });
-      await tx.auditLog.create({
+      return tx.auditLog.create({
         data: {
           company_id: account.company_id,
           actor_user_id: account.id,
@@ -83,10 +83,16 @@ export async function POST(request: Request) {
           action: "user.password_changed",
           metadata: { method: "authenticated", revokedResetTokens: true },
         },
+        select: { created_at: true },
       });
     });
 
-    const token = await signToken({ sub: account.id, email: account.email, name: account.name });
+    const token = await signToken({
+      sub: account.id,
+      email: account.email,
+      name: account.name,
+      passwordChangedAt: passwordChange.created_at.getTime(),
+    });
     const cookieStore = await cookies();
     cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
     cookieStore.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
