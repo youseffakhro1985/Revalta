@@ -113,8 +113,10 @@ export async function GET(request: Request) {
     }
 
     if (!slaChangedAt || new Date(slaChangedAt) < from || new Date(slaChangedAt) > to) continue;
-    const responseMet = responseDueAt && acknowledgedAt ? new Date(acknowledgedAt) <= new Date(responseDueAt) : responseDueAt ? false : null;
-    const resolutionMet = resolutionDueAt && resolvedAt ? new Date(resolvedAt) <= new Date(resolutionDueAt) : resolutionDueAt ? false : null;
+    const responseDecided = Boolean(responseDueAt && (acknowledgedAt || new Date(responseDueAt).getTime() < now));
+    const resolutionDecided = Boolean(resolutionDueAt && (resolvedAt || new Date(resolutionDueAt).getTime() < now));
+    const responseMet = !responseDecided ? null : Boolean(responseDueAt && acknowledgedAt && new Date(acknowledgedAt) <= new Date(responseDueAt));
+    const resolutionMet = !resolutionDecided ? null : Boolean(resolutionDueAt && resolvedAt && new Date(resolvedAt) <= new Date(resolutionDueAt));
     const activeBreach = status !== "resolved" && Boolean(
       (responseDueAt && !acknowledgedAt && new Date(responseDueAt).getTime() < now) ||
       (resolutionDueAt && new Date(resolutionDueAt).getTime() < now),
@@ -138,8 +140,8 @@ export async function GET(request: Request) {
   }
 
   rows.sort((a, b) => Number(b.activeBreach) - Number(a.activeBreach) || a.notificationKey.localeCompare(b.notificationKey));
-  const responseMeasured = rows.filter((row) => row.responseDueAt && row.acknowledgedAt);
-  const resolutionMeasured = rows.filter((row) => row.resolutionDueAt && row.resolvedAt);
+  const responseMeasured = rows.filter((row) => row.responseMet !== null);
+  const resolutionMeasured = rows.filter((row) => row.resolutionMet !== null);
   const average = (values: Array<number | null>) => {
     const valid = values.filter((value): value is number => typeof value === "number");
     return valid.length ? Math.round((valid.reduce((sum, value) => sum + value, 0) / valid.length) * 10) / 10 : null;
