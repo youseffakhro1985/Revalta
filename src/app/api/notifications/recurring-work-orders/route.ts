@@ -9,13 +9,26 @@ export const dynamic = "force-dynamic";
 type EventPayload = {
   generated?: number;
   failed?: number;
-  skipped?: number;
-  locked?: number;
   error?: string;
-  completedAt?: string;
+  notificationKey?: string;
+  status?: string;
+  responseDueAt?: string | null;
+  resolutionDueAt?: string | null;
+  assignedToName?: string | null;
 };
 
 type ReadPayload = { notificationKey?: string };
+
+type Notification = {
+  key: string;
+  title: string;
+  description: string;
+  dueAt: string;
+  overdue: boolean;
+  high: boolean;
+  href: string;
+  category?: "schedule" | "sla";
+};
 
 function objectPayload(value: Prisma.JsonValue | null) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
@@ -30,12 +43,77 @@ function notificationKey(value: Prisma.JsonValue | null) {
   return typeof key === "string" ? key : null;
 }
 
+async function slaNotifications(companyId: string, now: Date): Promise<Notification[]> {
+  const events = await db.integrationEvent.findMany({
+    where: {
+      company_id: companyId,
+      type: { in: ["recurring_incident_sla", "recurring_work_order_incident", "recurring_incident_assignment"] },
+    },
+    orderBy: { created_at: "desc" },
+    select: { id: true, type: true, status: true, payload: true, created_at: true },
+    take: 4000,
+  });
+
+  const sla = new Map<string, { responseDueAt: string | null; resolutionDueAt: string | null }>();
+  const status = new Map<string, string>();
+  const assignee = new Map<string, string | null>();
+
+  for (const event of events) {
+    const data = eventPayload(event.payload);
+    if (!data.notificationKey) continue;
+    if (event.type === "recurring_incident_sla" && !sla.has(data.notificationKey)) {
+      sla.set(data.notificationKey, {
+        responseDueAt: data.responseDueAt || null,
+        resolutionDueAt: data.resolutionDueAt || null,
+      });
+    } else if (event.type === "recurring_work_order_incident" && !status.has(data.notificationKey)) {
+      status.set(data.notificationKey, data.status || event.status);
+    } else if (event.type === "recurring_incident_assignment" && !assignee.has(data.notificationKey)) {
+      assignee.set(data.notificationKey, data.assignedToName || null);
+    }
+  }
+
+  const warningWindow = 60 * 60 * 1000;
+  const notifications: Notification[] = [];
+
+  for (const [incidentKey, targets] of sla.entries()) {
+    const incidentStatus = status.get(incidentKey) || "open";
+    const owner = assignee.get(incidentKey);
+    const ownerText = owner ? ` · Ansvarig ${owner}` : " · Saknar ansvarig";
+
+    const addTarget = (kind: "response" | "resolution", dueAtValue: string | null, fulfilled: boolean) => {
+      if (!dueAtValue || fulfilled) return;
+      const dueAt = new Date(dueAtValue);
+      if (Number.isNaN(dueAt.getTime())) return;
+      const remaining = dueAt.getTime() - now.getTime();
+      if (remaining > warningWindow) return;
+      const overdue = remaining < 0;
+      const label = kind === "response" ? "Svarstid" : "Lösningstid";
+      notifications.push({
+        key: `recurring-sla:${incidentKey}:${kind}:${dueAt.toISOString()}`,
+        title: overdue ? `${label} har överskridits` : `${label} löper snart ut`,
+        description: `${overdue ? "Förfallen" : "Mindre än en timme kvar"}${ownerText}`,
+        dueAt: dueAt.toISOString(),
+        overdue,
+        high: overdue || kind === "resolution",
+        href: "/dashboard/arbetsorder/aterkommande/incidenter",
+        category: "sla",
+      });
+    };
+
+    addTarget("response", targets.responseDueAt, incidentStatus === "acknowledged" || incidentStatus === "resolved");
+    addTarget("resolution", targets.resolutionDueAt, incidentStatus === "resolved");
+  }
+
+  return notifications;
+}
+
 async function notificationsFor(companyId: string) {
   const now = new Date();
   const staleBefore = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const historySince = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [schedules, runs] = await Promise.all([
+  const [schedules, runs, slaAlerts] = await Promise.all([
     readRecurringSchedules(companyId),
     db.integrationEvent.findMany({
       where: {
@@ -48,9 +126,10 @@ async function notificationsFor(companyId: string) {
       select: { id: true, status: true, payload: true, created_at: true },
       take: 20,
     }),
+    slaNotifications(companyId, now),
   ]);
 
-  const overdue = schedules
+  const overdue: Notification[] = schedules
     .filter((schedule) => schedule.active && schedule.next_run_at && new Date(schedule.next_run_at) < staleBefore)
     .map((schedule) => {
       const dueAt = new Date(schedule.next_run_at!);
@@ -63,10 +142,11 @@ async function notificationsFor(companyId: string) {
         overdue: true,
         high: schedule.priority === "urgent" || ageHours >= 48,
         href: "/dashboard/arbetsorder/aterkommande/incidenter",
+        category: "schedule",
       };
     });
 
-  const failedRuns = runs.map((run) => {
+  const failedRuns: Notification[] = runs.map((run) => {
     const payload = eventPayload(run.payload);
     const failed = typeof payload.failed === "number" ? payload.failed : 0;
     const generated = typeof payload.generated === "number" ? payload.generated : 0;
@@ -79,12 +159,14 @@ async function notificationsFor(companyId: string) {
       overdue: run.status === "failed",
       high: true,
       href: "/dashboard/arbetsorder/aterkommande/incidenter",
+      category: "schedule",
     };
   });
 
-  return [...failedRuns, ...overdue].sort((a, b) => {
+  return [...slaAlerts, ...failedRuns, ...overdue].sort((a, b) => {
     if (a.high !== b.high) return a.high ? -1 : 1;
-    return new Date(b.dueAt).getTime() - new Date(a.dueAt).getTime();
+    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
   });
 }
 
@@ -99,7 +181,7 @@ export async function GET(request: Request) {
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "recurring_notification_read", recipient: user.id, status: "read" },
       select: { payload: true },
-      take: 1000,
+      take: 2000,
     }),
   ]);
 
@@ -114,6 +196,8 @@ export async function GET(request: Request) {
       unread: hydrated.filter((item) => !item.read).length,
       overdue: hydrated.filter((item) => item.overdue).length,
       high: hydrated.filter((item) => item.high).length,
+      sla: hydrated.filter((item) => item.category === "sla").length,
+      slaBreached: hydrated.filter((item) => item.category === "sla" && item.overdue).length,
     },
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -129,7 +213,7 @@ export async function PATCH(request: Request) {
   const all = await notificationsFor(user.company_id);
   const validKeys = new Set(all.map((item) => item.key));
   const keys = body.all === true ? Array.from(validKeys) : [typeof body.key === "string" ? body.key.trim() : ""].filter(Boolean);
-  if (!keys.length || keys.some((key) => key.length > 400 || !validKeys.has(key))) {
+  if (!keys.length || keys.some((key) => key.length > 500 || !validKeys.has(key))) {
     return NextResponse.json({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
   }
 
