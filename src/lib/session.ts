@@ -12,6 +12,7 @@ export type SessionPayload = {
   email: string;
   name?: string | null;
   jti?: string;
+  issuedAt?: number;
 };
 
 function getSecretKey() {
@@ -43,8 +44,20 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
       audience: SESSION_AUDIENCE,
       clockTolerance: SESSION_CLOCK_TOLERANCE_SECONDS,
     });
-    if (protectedHeader.typ !== "JWT" || typeof payload.sub !== "string" || typeof payload.email !== "string" || typeof payload.jti !== "string") return null;
-    return { sub: payload.sub, email: payload.email, name: typeof payload.name === "string" ? payload.name : null, jti: payload.jti };
+    if (
+      protectedHeader.typ !== "JWT" ||
+      typeof payload.sub !== "string" ||
+      typeof payload.email !== "string" ||
+      typeof payload.jti !== "string" ||
+      typeof payload.iat !== "number"
+    ) return null;
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      name: typeof payload.name === "string" ? payload.name : null,
+      jti: payload.jti,
+      issuedAt: payload.iat,
+    };
   } catch {
     return null;
   }
