@@ -31,7 +31,26 @@ export async function POST(request: Request) {
       if (used.count !== 1) return null;
       await tx.user.update({ where: { id: reset.user_id }, data: { password: passwordHash } });
       await tx.passwordResetToken.updateMany({ where: { user_id: reset.user_id, used_at: null }, data: { used_at: new Date() } });
-      await tx.auditLog.create({ data: { company_id: reset.user.company_id, actor_user_id: reset.user.id, entity_type: "user", entity_id: reset.user.id, action: "auth.password_reset_completed", metadata: { method: "reset_token", revokedSessions: true } } });
+      await tx.auditLog.createMany({
+        data: [
+          {
+            company_id: reset.user.company_id,
+            actor_user_id: reset.user.id,
+            entity_type: "user",
+            entity_id: reset.user.id,
+            action: "user.password_changed",
+            metadata: { method: "reset_token", revokedSessions: true },
+          },
+          {
+            company_id: reset.user.company_id,
+            actor_user_id: reset.user.id,
+            entity_type: "user",
+            entity_id: reset.user.id,
+            action: "auth.password_reset_completed",
+            metadata: { method: "reset_token", revokedSessions: true },
+          },
+        ],
+      });
       return true;
     });
 

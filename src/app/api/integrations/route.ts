@@ -1,12 +1,13 @@
 import db from "@/lib/db";
 import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
+import { hasStorageConfig } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 const requiredEnv: Record<string, string[]> = {
   email: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM"],
   sms: ["SMS_PROVIDER_API_KEY", "SMS_PROVIDER_WEBHOOK_URL"],
   stripe: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
-  storage: ["STORAGE_PROVIDER_KEY"],
+  storage: ["BLOB_READ_WRITE_TOKEN"],
   ai: ["AI_PROVIDER_API_KEY"],
   fortnox: ["FORTNOX_ACCESS_TOKEN", "FORTNOX_INVOICE_ENDPOINT"],
   visma: ["VISMA_ACCESS_TOKEN", "VISMA_INVOICE_ENDPOINT"],
@@ -23,7 +24,7 @@ export async function GET() {
 
     const integrations = Object.entries(requiredEnv).map(([type, envKeys]) => ({
       type,
-      configured: envKeys.every((key) => Boolean(process.env[key])),
+      configured: type === "storage" ? hasStorageConfig() : envKeys.every((key) => Boolean(process.env[key])),
       requiredEnv: envKeys,
     }));
 

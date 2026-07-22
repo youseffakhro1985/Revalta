@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, UserRoundX, Wrench } from "lucide-react";
+import { AlertTriangle, Clock3, RefreshCw, UserRoundX, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
 type Item = { id:string; title:string; statusLabel:string; priorityLabel:string; risk:string; slaDeadline:string; scheduledStart:string|null; property:{id:string;name:string;address:string;city:string}; unit:{id:string;designation:string}|null; assignee:{id:string;name:string|null;email:string}|null; href:string };

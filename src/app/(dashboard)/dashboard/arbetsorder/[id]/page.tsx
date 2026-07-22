@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Banknote, Building2, CalendarClock, CheckCircle2, Clock3, FolderKanban, History, LockKeyhole, MapPin, PauseCircle, RefreshCw, ShieldAlert, UserRound, Wrench } from "lucide-react";
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
@@ -74,7 +74,7 @@ export default function WorkOrderDetailPage() {
   const [success, setSuccess] = useState("");
   const editLock = useWorkOrderEditLock(id, Boolean(transitions?.canManage));
 
-  async function load() {
+  const load = useCallback(async () => {
     setError("");
     try {
       const [workOrderResponse, optionsResponse, transitionResponse] = await Promise.all([
@@ -98,9 +98,9 @@ export default function WorkOrderDetailPage() {
       setStatusReason("");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte hämta arbetsordern"); }
     finally { setLoading(false); }
-  }
+  }, [id, router]);
 
-  useEffect(() => { void load(); }, [id]);
+  useEffect(() => { void load(); }, [load]);
 
   async function save(formData: FormData) {
     if (editLock.state.status !== "owned") {

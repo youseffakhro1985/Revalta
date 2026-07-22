@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Download, FileJson, FileSpreadsheet, Printer, RefreshCw } from "lucide-react";
 import { InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
@@ -11,8 +11,8 @@ type Data={workOrder:{id:string;title:string;property:{name:string;address:strin
 const money=new Intl.NumberFormat("sv-SE",{style:"currency",currency:"SEK"});
 export default function InvoiceExportPage({params}:{params:Promise<{id:string}>}){
  const {id}=use(params);const [data,setData]=useState<Data|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
- async function load(){setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/invoice-basis`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta faktureringsunderlaget");setData(b);}catch(e){setError(e instanceof Error?e.message:"Ett fel uppstod");}finally{setLoading(false);}}
- useEffect(()=>{void load();},[id]);
+ const load=useCallback(async()=>{setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/invoice-basis`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta faktureringsunderlaget");setData(b);}catch(e){setError(e instanceof Error?e.message:"Ett fel uppstod");}finally{setLoading(false);}},[id]);
+ useEffect(()=>{void load();},[load]);
  if(loading&&!data)return <div className="h-72 animate-pulse rounded-2xl bg-sand-100"/>;
  if(!data)return <InlineAlert>{error||"Underlaget kunde inte visas."}</InlineAlert>;
  const d=data.draft;

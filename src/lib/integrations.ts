@@ -1,5 +1,6 @@
 import db from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { hasStorageConfig } from "@/lib/storage";
 
 type IntegrationUser = {
   company_id: string | null;
@@ -9,7 +10,7 @@ const configured = {
   email: Boolean(process.env.EMAIL_PROVIDER_API_KEY && process.env.EMAIL_FROM),
   sms: Boolean(process.env.SMS_PROVIDER_API_KEY && process.env.SMS_PROVIDER_WEBHOOK_URL),
   stripe: Boolean(process.env.STRIPE_SECRET_KEY),
-  storage: Boolean(process.env.STORAGE_PROVIDER_KEY),
+  storage: hasStorageConfig(),
   ai: Boolean(process.env.AI_PROVIDER_API_KEY),
 };
 

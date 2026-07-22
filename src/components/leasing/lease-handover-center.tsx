@@ -52,10 +52,10 @@ export function LeaseHandoverCenter() {
   useEffect(() => { void loadLeases(); }, []);
   useEffect(() => { void loadDetail(leaseId); }, [leaseId]);
 
-  const required = detail?.handover.mode === "move_out"
+  const required = useMemo(() => detail?.handover.mode === "move_out"
     ? ["inspection_completed", "cleaning_approved", "keys_returned", "final_meter_reading_recorded"]
-    : ["identity_verified", "lease_signed", "contact_details_verified", "keys_handed_over", "inspection_completed"];
-  const progress = useMemo(() => !detail ? 0 : Math.round(((required || []).filter((key) => detail.handover.checklist[key as keyof HandoverChecklist]).length / (required?.length || 1)) * 100), [detail, required]);
+    : ["identity_verified", "lease_signed", "contact_details_verified", "keys_handed_over", "inspection_completed"], [detail?.handover.mode]);
+  const progress = useMemo(() => !detail ? 0 : Math.round((required.filter((key) => detail.handover.checklist[key as keyof HandoverChecklist]).length / required.length) * 100), [detail, required]);
 
   function update(patch: Partial<LeaseHandoverPayload>) { setDetail((current) => current ? { ...current, handover: { ...current.handover, ...patch } } : current); }
   function updateInspection(patch: Partial<HandoverInspection>) { if (detail) update({ inspection: { ...detail.handover.inspection, ...patch } }); }

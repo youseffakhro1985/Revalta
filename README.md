@@ -13,11 +13,12 @@ Revalta är en svensk plattform för fastighetsförvaltning. Applikationen samla
 
 ## Kom igång lokalt
 
-Förutsättningar: Node.js 20.9 eller senare samt PostgreSQL.
+Förutsättningar: Node.js 22 samt PostgreSQL.
 
 ```bash
 npm ci
 cp .env.example .env
+npm run db:validate
 npm run db:dev
 npm run dev
 ```
@@ -33,7 +34,7 @@ npm run typecheck
 npm run build:ci
 ```
 
-`build:ci` bygger utan produktionsmigrationer. Vercels produktionskommando kör `scripts/vercel-build.mjs`, som genererar Prisma-klienten, applicerar migrationer och stoppar releasen om databasen inte kan uppdateras säkert.
+Varken `build:ci` eller Vercels normala byggkommando applicerar produktionsmigrationer. Produktionsmigrationer körs separat genom det skyddade GitHub Actions-flödet `Database Release`, mot en uttryckligen verifierad commit, innan samma commit driftsätts.
 
 ## Miljövariabler
 

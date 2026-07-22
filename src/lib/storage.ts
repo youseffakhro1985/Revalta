@@ -2,8 +2,25 @@ import { put } from "@vercel/blob";
 
 export type StoredFile = {
   url: string;
-  provider: "vercel_blob" | "database_fallback";
+  provider: "vercel_blob";
 };
+
+export class StorageConfigurationError extends Error {
+  constructor() {
+    super("Fillagringen är inte konfigurerad");
+    this.name = "StorageConfigurationError";
+  }
+}
+
+export function getStorageToken() {
+  return process.env.BLOB_READ_WRITE_TOKEN?.trim()
+    || process.env.STORAGE_PROVIDER_KEY?.trim()
+    || null;
+}
+
+export function hasStorageConfig() {
+  return getStorageToken() !== null;
+}
 
 export async function storeAttachment(input: {
   fileName: string;
@@ -11,19 +28,15 @@ export async function storeAttachment(input: {
   buffer: Buffer;
   prefix: string;
 }): Promise<StoredFile> {
-  if (!process.env.STORAGE_PROVIDER_KEY) {
-    return {
-      provider: "database_fallback",
-      url: `data:${input.contentType};base64,${input.buffer.toString("base64")}`,
-    };
-  }
+  const token = getStorageToken();
+  if (!token) throw new StorageConfigurationError();
 
   const safeFileName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
   const pathname = `${input.prefix}/${Date.now()}-${safeFileName}`;
   const blob = await put(pathname, input.buffer, {
     access: "private",
     contentType: input.contentType,
-    token: process.env.STORAGE_PROVIDER_KEY,
+    token,
   });
 
   return {

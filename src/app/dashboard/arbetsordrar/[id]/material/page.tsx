@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Boxes, CheckCircle2, CircleDollarSign, PackageCheck, RefreshCw, Save, Trash2 } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
@@ -21,8 +21,8 @@ export default function WorkOrderMaterialsPage({params}:{params:Promise<{id:stri
   const [message,setMessage]=useState("");
   const [form,setForm]=useState({articleNumber:"",name:"",quantity:"1",unit:"st",unitPrice:"0",supplier:"",stockStatus:"used",billable:true,note:""});
 
-  async function load(){setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/materials`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta material");setData(b);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta material");}finally{setLoading(false);}}
-  useEffect(()=>{void load();},[id]);
+  const load=useCallback(async()=>{setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/materials`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta material");setData(b);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta material");}finally{setLoading(false);}},[id]);
+  useEffect(()=>{void load();},[load]);
   async function action(payload:Record<string,unknown>){setSaving(true);setError("");setMessage("");try{const r=await fetch(`/api/work-orders/${id}/materials`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const b=await r.json();if(!r.ok)throw new Error(b.error||"Åtgärden misslyckades");setMessage("Materialregistreringen har uppdaterats.");if(payload.action==="create")setForm({articleNumber:"",name:"",quantity:"1",unit:"st",unitPrice:"0",supplier:"",stockStatus:"used",billable:true,note:""});await load();}catch(e){setError(e instanceof Error?e.message:"Åtgärden misslyckades");}finally{setSaving(false);}}
   const rows=data?.materials??[];
   const preview=useMemo(()=>Math.max(0,Number(form.quantity)||0)*Math.max(0,Number(form.unitPrice)||0),[form.quantity,form.unitPrice]);

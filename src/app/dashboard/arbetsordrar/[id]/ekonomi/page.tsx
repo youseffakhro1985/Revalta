@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { ArrowLeft, BadgeDollarSign, CircleDollarSign, Percent, RefreshCw, Save, WalletCards } from "lucide-react";
 import { InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
@@ -20,8 +20,8 @@ export default function WorkOrderEconomyPage({params}:{params:Promise<{id:string
   const [data,setData]=useState<Data|null>(null);
   const [form,setForm]=useState({internalHourlyCost:"",customerHourlyRate:"",materialMarkupPercent:"",otherCost:"",fixedRevenue:""});
   const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);const [error,setError]=useState("");const [message,setMessage]=useState("");
-  async function load(){setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/profitability`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta ekonomin");setData(b);setForm(Object.fromEntries(Object.entries(b.settings).map(([k,v])=>[k,String(v)])) as typeof form);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta ekonomin");}finally{setLoading(false);}}
-  useEffect(()=>{void load();},[id]);
+  const load=useCallback(async()=>{setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/profitability`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta ekonomin");setData(b);setForm(Object.fromEntries(Object.entries(b.settings).map(([k,v])=>[k,String(v)])) as typeof form);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta ekonomin");}finally{setLoading(false);}},[id]);
+  useEffect(()=>{void load();},[load]);
   async function save(){setSaving(true);setError("");setMessage("");try{const r=await fetch(`/api/work-orders/${id}/profitability`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte spara ekonomin");setMessage("Ekonomiinställningarna har sparats.");await load();}catch(e){setError(e instanceof Error?e.message:"Kunde inte spara ekonomin");}finally{setSaving(false);}}
   const s=data?.summary;
   return <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">

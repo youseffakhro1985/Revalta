@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, CloudCog, RefreshCw, RotateCcw, Send, XCircle } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
@@ -21,7 +21,7 @@ export default function InvoiceIntegrationPage({ params }: { params: Promise<{ i
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/work-orders/${id}/invoice-integration`, { cache: "no-store" });
@@ -32,8 +32,8 @@ export default function InvoiceIntegrationPage({ params }: { params: Promise<{ i
       if (firstReady) setProvider(firstReady.id);
     } catch (e) { setError(e instanceof Error ? e.message : "Kunde inte hämta integrationscentret"); }
     finally { setLoading(false); }
-  }
-  useEffect(() => { void load(); }, [id]);
+  }, [id]);
+  useEffect(() => { void load(); }, [load]);
 
   async function action(payload: Record<string, unknown>) {
     setSaving(true); setError(""); setMessage("");

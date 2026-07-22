@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react";
 import { InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
@@ -40,7 +40,7 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}/maintenance-settings`, { cache: "no-store" });
@@ -51,9 +51,9 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
       setForm({ nextServiceAt: dateInput(value.next_service_at), serviceIntervalMonths: String(value.service_interval_months), serviceLeadDays: String(value.service_lead_days), autoCreateServiceWorkOrders: value.auto_create_service_work_orders });
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte hämta underhållsinställningar"); }
     finally { setLoading(false); }
-  }
+  }, [componentId, propertyId]);
 
-  useEffect(() => { void load(); }, [propertyId, componentId]);
+  useEffect(() => { void load(); }, [load]);
   const dirty = useMemo(() => settings ? JSON.stringify(form) !== JSON.stringify({ nextServiceAt: dateInput(settings.next_service_at), serviceIntervalMonths: String(settings.service_interval_months), serviceLeadDays: String(settings.service_lead_days), autoCreateServiceWorkOrders: settings.auto_create_service_work_orders }) : false, [form, settings]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {

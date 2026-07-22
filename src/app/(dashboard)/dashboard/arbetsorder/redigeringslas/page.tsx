@@ -52,7 +52,8 @@ export default function WorkOrderEditLocksPage() {
   const [releasing, setReleasing] = useState(false);
 
   const load = useCallback(async (quiet = false) => {
-    quiet ? setRefreshing(true) : setLoading(true);
+    if (quiet) setRefreshing(true);
+    else setLoading(true);
     setError("");
     try {
       const response = await fetch("/api/work-orders/edit-locks", { cache: "no-store" });

@@ -3,6 +3,10 @@ name: Database Release
 on:
   workflow_dispatch:
     inputs:
+      commit_sha:
+        description: Exact verified commit SHA from main to migrate
+        required: true
+        type: string
       confirmation:
         description: Type MIGRATE_PRODUCTION to confirm
         required: true
@@ -24,10 +28,19 @@ jobs:
     environment: production
 
     steps:
-      - name: Check out exact main revision
+      - name: Check out approved revision
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Verify approved main commit
+        env:
+          EXPECTED_SHA: ${{ inputs.commit_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA" || (echo "Checked out commit does not match commit_sha" && exit 1)
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$EXPECTED_SHA" origin/main || (echo "commit_sha is not contained in main" && exit 1)
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
