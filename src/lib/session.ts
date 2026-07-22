@@ -13,6 +13,7 @@ export type SessionPayload = {
   name?: string | null;
   jti?: string;
   issuedAt?: number;
+  passwordChangedAt?: number | null;
 };
 
 function getSecretKey() {
@@ -24,7 +25,11 @@ function getSecretKey() {
 }
 
 export async function signToken(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ email: payload.email, name: payload.name ?? undefined })
+  return new SignJWT({
+    email: payload.email,
+    name: payload.name ?? undefined,
+    passwordChangedAt: payload.passwordChangedAt ?? null,
+  })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(payload.sub)
     .setIssuer(SESSION_ISSUER)
@@ -49,7 +54,8 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
       typeof payload.sub !== "string" ||
       typeof payload.email !== "string" ||
       typeof payload.jti !== "string" ||
-      typeof payload.iat !== "number"
+      typeof payload.iat !== "number" ||
+      !(payload.passwordChangedAt === null || typeof payload.passwordChangedAt === "number")
     ) return null;
     return {
       sub: payload.sub,
@@ -57,6 +63,7 @@ export async function verifyToken(token: string): Promise<SessionPayload | null>
       name: typeof payload.name === "string" ? payload.name : null,
       jti: payload.jti,
       issuedAt: payload.iat,
+      passwordChangedAt: payload.passwordChangedAt,
     };
   } catch {
     return null;
