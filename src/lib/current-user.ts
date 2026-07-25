@@ -55,3 +55,15 @@ export async function getCurrentUser() {
 export function tenantWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
   return user.company_id ? { company_id: user.company_id } : { user_id: user.id };
 }
+
+export function companyScopedWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+  return user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" };
+}
+
+export function auditScopedWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+  return user.company_id ? { company_id: user.company_id } : { actor_user_id: user.id };
+}
+
+export function companyUserWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+  return user.company_id ? { company_id: user.company_id } : { id: user.id };
+}

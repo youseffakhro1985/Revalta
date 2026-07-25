@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { redirect } from "next/navigation";
 
 const closedStatuses = new Set(["done", "closed", "completed", "resolved"]);
@@ -52,7 +52,7 @@ export default async function ReportsPage() {
       },
     }),
     db.auditLog.findMany({
-      where: { company_id: user.company_id ?? undefined, created_at: { gte: thirtyDaysAgo } },
+      where: { ...auditScopedWhere(user), created_at: { gte: thirtyDaysAgo } },
       orderBy: { created_at: "desc" },
       take: 300,
       select: { action: true, metadata: true, created_at: true },

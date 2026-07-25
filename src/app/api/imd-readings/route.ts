@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
@@ -10,7 +10,7 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     const [logs, properties] = await Promise.all([
-      db.auditLog.findMany({ where: { company_id: user.company_id ?? undefined, action }, orderBy: { created_at: "desc" }, take: 500, select: { id: true, entity_id: true, metadata: true, created_at: true } }),
+      db.auditLog.findMany({ where: { ...auditScopedWhere(user), action }, orderBy: { created_at: "desc" }, take: 500, select: { id: true, entity_id: true, metadata: true, created_at: true } }),
       db.property.findMany({ where: tenantWhere(user), orderBy: { name: "asc" }, select: { id: true, name: true, address: true, city: true } }),
     ]);
     return NextResponse.json({ readings: logs.map((log) => ({ id: log.id, property_id: log.entity_id, ...(log.metadata as object), created_at: log.created_at })), properties });

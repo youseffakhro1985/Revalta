@@ -29,7 +29,7 @@ export async function GET() {
     }));
 
     const events = await db.integrationEvent.findMany({
-      where: user.company_id ? { company_id: user.company_id } : undefined,
+      where: user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" },
       orderBy: { created_at: "desc" },
       take: 50,
     });

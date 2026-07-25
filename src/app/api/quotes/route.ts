@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
@@ -14,13 +14,13 @@ export async function GET() {
 
     const [logs, decisions, properties] = await Promise.all([
       db.auditLog.findMany({
-        where: { company_id: user.company_id ?? undefined, action },
+        where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "desc" },
         take: 300,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       }),
       db.auditLog.findMany({
-        where: { company_id: user.company_id ?? undefined, action: decisionAction },
+        where: { ...auditScopedWhere(user), action: decisionAction },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
@@ -146,7 +146,7 @@ export async function PATCH(request: Request) {
     }
 
     const quote = await db.auditLog.findFirst({
-      where: { id: quoteId, company_id: user.company_id ?? undefined, action },
+      where: { id: quoteId, ...auditScopedWhere(user), action },
       select: { id: true, entity_id: true, metadata: true },
     });
     if (!quote) return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });

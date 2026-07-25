@@ -111,14 +111,13 @@ export async function POST(request: Request) {
 
     if (normalizedAssignedToId) {
       const assignee = await db.user.findFirst({
-        where: {
-          id: normalizedAssignedToId,
-          company_id: user.company_id ?? undefined,
-        },
+        where: user.company_id
+          ? { id: normalizedAssignedToId, company_id: user.company_id }
+          : { id: user.id },
         select: { id: true },
       });
 
-      if (!assignee) {
+      if (!assignee || assignee.id !== normalizedAssignedToId) {
         return NextResponse.json({ error: "Vald ansvarig hittades inte" }, { status: 400 });
       }
     }

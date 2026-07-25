@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { companyUserWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       }),
       db.ticket.findMany({
         where: {
-          company_id: user.company_id ?? undefined,
+          ...tenantWhere(user),
           OR: [
             { title: contains },
             { description: contains },
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
       }),
       db.user.findMany({
         where: {
-          company_id: user.company_id ?? undefined,
+          ...companyUserWhere(user),
           OR: [{ name: contains }, { email: contains }],
         },
         take: 5,
