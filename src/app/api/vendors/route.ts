@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { NextResponse } from "next/server";
 
 const entityType = "vendor_contract";
@@ -12,8 +12,7 @@ export async function GET() {
 
     const rows = await db.auditLog.findMany({
       where: {
-        company_id: user.company_id ?? undefined,
-        actor_user_id: user.company_id ? undefined : user.id,
+        ...auditScopedWhere(user),
         entity_type: entityType,
       },
       orderBy: { created_at: "desc" },

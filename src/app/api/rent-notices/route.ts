@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
@@ -12,7 +12,7 @@ export async function GET() {
 
     const [notices, leases, properties] = await Promise.all([
       db.auditLog.findMany({
-        where: { company_id: user.company_id ?? undefined, action: noticeAction },
+        where: { ...auditScopedWhere(user), action: noticeAction },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
