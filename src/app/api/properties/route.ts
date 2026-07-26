@@ -2,19 +2,27 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
+import {
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
+    const [propertyActive, ticketActive] = await Promise.all([
+      notDeletedFilter("Property"),
+      notDeletedFilter("Ticket"),
+    ]);
     const properties = await db.property.findMany({
-      where: { deleted_at: null, ...tenantWhere(user) },
+      where: { ...propertyActive, ...tenantWhere(user) },
       orderBy: { created_at: "desc" },
       include: {
         _count: {
-          select: { tickets: { where: { deleted_at: null } }, buildings: true, units: true },
+          select: { tickets: { where: ticketActive }, buildings: true, units: true },
         },
       },
     });
@@ -47,6 +55,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Namn, adress och ort krävs" }, { status: 400 });
     }
 
+    const ticketActive = await notDeletedFilter("Ticket");
     const property = await db.property.create({
       data: {
         name: normalizedName,
@@ -58,7 +67,7 @@ export async function POST(request: Request) {
       },
       include: {
         _count: {
-          select: { tickets: { where: { deleted_at: null } }, buildings: true, units: true },
+          select: { tickets: { where: ticketActive }, buildings: true, units: true },
         },
       },
     });

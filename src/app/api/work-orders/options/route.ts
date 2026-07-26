@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import {
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 export async function GET() {
   try {
@@ -13,9 +18,10 @@ export async function GET() {
       return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
 
+    const propertyActive = await notDeletedFilter("Property");
     const [properties, users] = await Promise.all([
       db.property.findMany({
-        where: { company_id: user.company_id, status: "active", deleted_at: null },
+        where: { company_id: user.company_id, status: "active", ...propertyActive },
         orderBy: [{ name: "asc" }, { address: "asc" }],
         select: {
           id: true,
@@ -46,6 +52,9 @@ export async function GET() {
     );
   } catch (error) {
     console.error("Get work-order options error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -16,6 +16,12 @@ import {
 import { setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { WORK_ORDER_PRIORITIES, WORK_ORDER_STATUSES, normalizeWorkOrderPriority, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
+import {
+  hasSoftDeleteColumn,
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 function parseOptionalDate(value: unknown) {
   if (!value) return null;
@@ -49,76 +55,93 @@ type EnterpriseListRow = {
 };
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-  const [workOrders, enterpriseRows] = await Promise.all([
-    db.workOrder.findMany({
-      where: { company_id: user.company_id, deleted_at: null },
-      orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
-      take: 500,
-      include: {
-        property: { select: { id: true, name: true, address: true, city: true } },
-        unit: { select: { id: true, designation: true, unit_type: true } },
-        ticket: { select: { id: true, public_reference: true, title: true } },
-        assigned_to: { select: { id: true, name: true, email: true } },
-        projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
-      },
-    }),
-    db.$queryRaw<EnterpriseListRow[]>(Prisma.sql`
-      SELECT w."id", w."work_order_number", w."work_type", w."source", w."sla_response_due_at", w."sla_resolution_due_at",
-             w."responded_at", w."paused_at", w."pause_reason", w."closed_at", w."building_id", b."name" AS "building_name",
-             w."technical_asset_id", a."name" AS "technical_asset_name", a."category" AS "technical_asset_category",
-             a."location" AS "technical_asset_location"
-      FROM "WorkOrder" w
-      LEFT JOIN "Building" b ON b."id" = w."building_id"
-      LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
-      WHERE w."company_id" = ${user.company_id}
-        AND w."deleted_at" IS NULL
-    `),
-  ]);
+    const [workOrderActive, projectActive, workOrderSoftDelete] = await Promise.all([
+      notDeletedFilter("WorkOrder"),
+      notDeletedFilter("Project"),
+      hasSoftDeleteColumn("WorkOrder"),
+    ]);
 
-  const now = new Date();
-  const enterpriseById = new Map(enterpriseRows.map((row) => [row.id, row]));
-  const enriched = workOrders.map((workOrder) => {
-    const enterprise = enterpriseById.get(workOrder.id) ?? null;
-    const sla = evaluateWorkOrderSla({
-      status: workOrder.status,
-      responseDueAt: enterprise?.sla_response_due_at,
-      resolutionDueAt: enterprise?.sla_resolution_due_at,
-      respondedAt: enterprise?.responded_at,
-      completedAt: workOrder.completed_at,
-      closedAt: enterprise?.closed_at,
-      pausedAt: enterprise?.paused_at,
-      pauseReason: enterprise?.pause_reason,
-    }, now);
-    return { ...workOrder, enterprise, sla };
-  });
+    const [workOrders, enterpriseRows] = await Promise.all([
+      db.workOrder.findMany({
+        where: { company_id: user.company_id, ...workOrderActive },
+        orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
+        take: 500,
+        include: {
+          property: { select: { id: true, name: true, address: true, city: true } },
+          unit: { select: { id: true, designation: true, unit_type: true } },
+          ticket: { select: { id: true, public_reference: true, title: true } },
+          assigned_to: { select: { id: true, name: true, email: true } },
+          projects: {
+            ...(Object.keys(projectActive).length > 0 ? { where: projectActive } : {}),
+            select: { id: true, name: true, status: true },
+          },
+        },
+      }),
+      db.$queryRaw<EnterpriseListRow[]>(Prisma.sql`
+        SELECT w."id", w."work_order_number", w."work_type", w."source", w."sla_response_due_at", w."sla_resolution_due_at",
+               w."responded_at", w."paused_at", w."pause_reason", w."closed_at", w."building_id", b."name" AS "building_name",
+               w."technical_asset_id", a."name" AS "technical_asset_name", a."category" AS "technical_asset_category",
+               a."location" AS "technical_asset_location"
+        FROM "WorkOrder" w
+        LEFT JOIN "Building" b ON b."id" = w."building_id"
+        LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
+        WHERE w."company_id" = ${user.company_id}
+          ${workOrderSoftDelete ? Prisma.sql`AND w."deleted_at" IS NULL` : Prisma.empty}
+      `),
+    ]);
 
-  const slaSummary = enriched.reduce((summary, workOrder) => {
-    summary.total += 1;
-    summary[workOrder.sla.risk] += 1;
-    if (workOrder.sla.phase === "response") summary.awaitingResponse += 1;
-    if (workOrder.sla.phase === "resolution") summary.awaitingResolution += 1;
-    return summary;
-  }, {
-    total: 0,
-    overdue: 0,
-    critical: 0,
-    soon: 0,
-    normal: 0,
-    fulfilled: 0,
-    paused: 0,
-    not_configured: 0,
-    awaitingResponse: 0,
-    awaitingResolution: 0,
-  });
+    const now = new Date();
+    const enterpriseById = new Map(enterpriseRows.map((row) => [row.id, row]));
+    const enriched = workOrders.map((workOrder) => {
+      const enterprise = enterpriseById.get(workOrder.id) ?? null;
+      const sla = evaluateWorkOrderSla({
+        status: workOrder.status,
+        responseDueAt: enterprise?.sla_response_due_at,
+        resolutionDueAt: enterprise?.sla_resolution_due_at,
+        respondedAt: enterprise?.responded_at,
+        completedAt: workOrder.completed_at,
+        closedAt: enterprise?.closed_at,
+        pausedAt: enterprise?.paused_at,
+        pauseReason: enterprise?.pause_reason,
+      }, now);
+      return { ...workOrder, enterprise, sla };
+    });
 
-  return NextResponse.json(
-    { workOrders: enriched, slaSummary, evaluatedAt: now.toISOString() },
-    { headers: { "Cache-Control": "private, no-store" } },
-  );
+    const slaSummary = enriched.reduce((summary, workOrder) => {
+      summary.total += 1;
+      summary[workOrder.sla.risk] += 1;
+      if (workOrder.sla.phase === "response") summary.awaitingResponse += 1;
+      if (workOrder.sla.phase === "resolution") summary.awaitingResolution += 1;
+      return summary;
+    }, {
+      total: 0,
+      overdue: 0,
+      critical: 0,
+      soon: 0,
+      normal: 0,
+      fulfilled: 0,
+      paused: 0,
+      not_configured: 0,
+      awaitingResponse: 0,
+      awaitingResolution: 0,
+    });
+
+    return NextResponse.json(
+      { workOrders: enriched, slaSummary, evaluatedAt: now.toISOString() },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  } catch (error) {
+    console.error("Get work orders error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {

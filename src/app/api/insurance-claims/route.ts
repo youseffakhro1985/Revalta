@@ -2,6 +2,12 @@ import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
+import {
+  activePropertyRelationFilter,
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
 const action = "insurance_claim.created";
@@ -11,10 +17,14 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
+    const [propertyActive, propertyRelation] = await Promise.all([
+      notDeletedFilter("Property"),
+      activePropertyRelationFilter(),
+    ]);
     const [rows, logs, properties] = await Promise.all([
       user.company_id
         ? db.insuranceClaim.findMany({
-            where: { company_id: user.company_id, property: { deleted_at: null } },
+            where: { company_id: user.company_id, ...propertyRelation },
             orderBy: { created_at: "desc" },
             take: 400,
             include: { property: { select: { name: true } } },
@@ -27,7 +37,7 @@ export async function GET() {
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       }),
       db.property.findMany({
-        where: { deleted_at: null, ...tenantWhere(user) },
+        where: { ...propertyActive, ...tenantWhere(user) },
         orderBy: { name: "asc" },
         select: { id: true, name: true, address: true, city: true },
       }),
@@ -71,6 +81,9 @@ export async function GET() {
     return NextResponse.json({ claims: mergeByCreatedAt(modern, legacy, 400), properties });
   } catch (error) {
     console.error("Get insurance claims error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -106,7 +119,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Kontrollera ekonomiska belopp" }, { status: 400 });
     }
 
-    const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true, name: true } });
+    const propertyActive = await notDeletedFilter("Property");
+    const property = await db.property.findFirst({
+      where: { id: propertyId, ...propertyActive, ...tenantWhere(user) },
+      select: { id: true, name: true },
+    });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
     const parsedIncident = incidentDate ? parseOptionalDate(incidentDate) : null;

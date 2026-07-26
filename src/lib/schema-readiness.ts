@@ -12,6 +12,7 @@ export const REQUIRED_SOFT_DELETE_COLUMNS = [
 ] as const;
 
 export type SchemaColumnRequirement = (typeof REQUIRED_SOFT_DELETE_COLUMNS)[number];
+export type SoftDeleteTable = SchemaColumnRequirement["table"];
 
 export type SchemaReadiness = {
   ready: boolean;
@@ -24,16 +25,28 @@ type ColumnRow = {
   column_name: string;
 };
 
+const CACHE_TTL_MS = 15_000;
+let readinessCache: { value: SchemaReadiness; expiresAt: number } | null = null;
+
 export function isMissingSchemaColumnError(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
-  if (error.code === "P2022") return true;
-  // Raw SQL / driver errors when a column is absent.
-  const message = typeof error.message === "string" ? error.message : "";
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2022") return true;
+    const metaText = error.meta ? JSON.stringify(error.meta) : "";
+    const combined = `${error.message} ${metaText}`;
+    if (/column .* does not exist/i.test(combined) || /does not exist in the current database/i.test(combined)) {
+      return true;
+    }
+  }
+  const message = error instanceof Error ? error.message : String(error ?? "");
   return /column .* does not exist/i.test(message) || /does not exist in the current database/i.test(message);
 }
 
 export function schemaMismatchUserMessage() {
-  return "Databasen saknar obligatoriska kolumner för den här versionen. Kör Database Release (prisma migrate deploy) för samma commit innan du testar inloggning på preview/produktion.";
+  return "Databasen saknar obligatoriska kolumner för den här versionen. Kör Database Release (prisma migrate deploy) för samma commit innan soft-delete och full preview fungerar mot produktionsdatabasen.";
+}
+
+export function schemaCompatibilityBannerMessage() {
+  return "Databasschema väntar på Database Release. Listor körs tillfälligt utan soft-delete-filter så att du kan arbeta vidare i preview.";
 }
 
 export async function getSchemaReadiness(
@@ -58,4 +71,35 @@ export async function getSchemaReadiness(
     missing,
     checkedAt: new Date().toISOString(),
   };
+}
+
+export function resetSchemaReadinessCache() {
+  readinessCache = null;
+}
+
+export async function getCachedSchemaReadiness(): Promise<SchemaReadiness> {
+  if (readinessCache && readinessCache.expiresAt > Date.now()) {
+    return readinessCache.value;
+  }
+  const value = await getSchemaReadiness();
+  readinessCache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+  return value;
+}
+
+export async function hasSoftDeleteColumn(table: SoftDeleteTable): Promise<boolean> {
+  const readiness = await getCachedSchemaReadiness();
+  return !readiness.missing.some((item) => item.table === table && item.column === "deleted_at");
+}
+
+/** Prisma where fragment: `{ deleted_at: null }` when the column exists, otherwise `{}`. */
+export async function notDeletedFilter(
+  table: SoftDeleteTable,
+): Promise<{ deleted_at: null } | Record<string, never>> {
+  return (await hasSoftDeleteColumn(table)) ? { deleted_at: null } : {};
+}
+
+export async function activePropertyRelationFilter(): Promise<
+  { property: { deleted_at: null } } | Record<string, never>
+> {
+  return (await hasSoftDeleteColumn("Property")) ? { property: { deleted_at: null } } : {};
 }

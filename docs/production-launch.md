@@ -53,13 +53,13 @@ Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview in
 
 ### Preview vs databas (vanligt inloggningsfel)
 
-Symptom: Vercel Preview är grön, `/api/auth/login` svarar `200`, men Safari visar "This page couldn’t load" / server error efter redirect till `/dashboard`.
+Symptom: Vercel Preview är grön, `/api/auth/login` svarar `200`, men listor/dashboard kraschar eller visar schemafel efter redirect.
 
-Orsak: Preview-koden filtrerar på soft-delete-kolumner (`Ticket.deleted_at`, `Property.deleted_at`, `WorkOrder.deleted_at`, …) medan databasen ännu inte har fått `prisma migrate deploy`.
+Orsak: Preview-koden förväntar soft-delete-kolumner (`Ticket.deleted_at`, `Property.deleted_at`, `WorkOrder.deleted_at`, …) medan databasen ännu inte har fått `prisma migrate deploy`.
 
-Kontroll (inloggad ops-användare): `GET /api/health` ska innehålla `schema.ready` och eventuellt `schema.missing`. Dashboard visar också ett tydligt meddelande i stället för en blank 500:a.
+Kompatibilitet: kritiska list-API:er och dashboard kör **utan** `deleted_at`-filter när kolumnerna saknas (amber “Kompatibilitetsläge”). Soft-delete-skrivningar kräver fortfarande Database Release. Ops: `GET /api/health` → `schema.ready` / `schema.missing`.
 
-Åtgärd: följ releaseordningen (merge → backup → Database Release → deploy). Testa full inloggning mot `www.revalta.se` först efter migration + deploy av samma commit.
+Åtgärd för full soft-delete: följ releaseordningen (merge → backup → Database Release → deploy). Testa därefter `BASE_URL=https://www.revalta.se node scripts/smoke-auth-dashboard.mjs`.
 
 ## 5. Efter migration: backfill och cron
 

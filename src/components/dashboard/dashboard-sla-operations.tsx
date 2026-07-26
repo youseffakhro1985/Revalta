@@ -3,7 +3,11 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, Clock3, ShieldCheck, UserRoundX } from "lucide-react";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
-import { isMissingSchemaColumnError } from "@/lib/schema-readiness";
+import {
+  hasSoftDeleteColumn,
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+} from "@/lib/schema-readiness";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 
@@ -55,9 +59,13 @@ export async function DashboardSlaOperations() {
   let enterpriseRows: EnterpriseRow[] = [];
 
   try {
+    const [workOrderActive, workOrderSoftDelete] = await Promise.all([
+      notDeletedFilter("WorkOrder"),
+      hasSoftDeleteColumn("WorkOrder"),
+    ]);
     [workOrders, enterpriseRows] = await Promise.all([
       db.workOrder.findMany({
-        where: { deleted_at: null, company_id: user.company_id },
+        where: { company_id: user.company_id, ...workOrderActive },
         take: 300,
         orderBy: { created_at: "desc" },
         select: {
@@ -76,7 +84,7 @@ export async function DashboardSlaOperations() {
                "responded_at", "paused_at", "pause_reason", "closed_at"
         FROM "WorkOrder"
         WHERE "company_id" = ${user.company_id}
-          AND "deleted_at" IS NULL
+          ${workOrderSoftDelete ? Prisma.sql`AND "deleted_at" IS NULL` : Prisma.empty}
         LIMIT 300
       `),
     ]);

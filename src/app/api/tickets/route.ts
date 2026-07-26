@@ -3,7 +3,11 @@ import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-use
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
-import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
+import {
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -16,8 +20,9 @@ export async function GET(request: Request) {
     const priority = searchParams.get("priority")?.trim();
     const propertyId = searchParams.get("propertyId")?.trim();
     const assignedToId = searchParams.get("assignedToId")?.trim();
+    const ticketActive = await notDeletedFilter("Ticket");
     const where = {
-      deleted_at: null,
+      ...ticketActive,
       ...tenantWhere(user),
       ...(status ? { status } : {}),
       ...(priority ? { priority } : {}),
@@ -101,10 +106,11 @@ export async function POST(request: Request) {
     }
 
     if (normalizedPropertyId) {
+      const propertyActive = await notDeletedFilter("Property");
       const property = await db.property.findFirst({
         where: {
           id: normalizedPropertyId,
-          deleted_at: null,
+          ...propertyActive,
           ...tenantWhere(user),
         },
         select: { id: true },
