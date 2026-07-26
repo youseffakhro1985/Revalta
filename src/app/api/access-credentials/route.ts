@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageAccessCredentials, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
@@ -9,6 +9,7 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageAccessCredentials(user.role)) return NextResponse.json({ error: "Du saknar behörighet att visa nycklar och passage" }, { status: 403 });
 
     const [logs, properties] = await Promise.all([
       db.auditLog.findMany({
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canManageAccessCredentials(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
 
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();

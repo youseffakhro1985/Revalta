@@ -8,6 +8,7 @@ export {
   canExportTickets,
   canManageBilling,
   canManageCompany,
+  canManageAccessCredentials,
   canManageIntegrations,
   canManageLeases,
   canManageTeam,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
 
@@ -19,7 +19,7 @@ export async function GET() {
 
     const [logs, properties, leases] = await Promise.all([
       db.auditLog.findMany({
-        where: { ...tenantWhere(user), entity_type: "document", action: "document.created" },
+        where: { ...auditScopedWhere(user), entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
@@ -82,7 +82,6 @@ export async function GET() {
         fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
         contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
         sizeBytes: typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : 0,
-        dataUrl: typeof metadata.dataUrl === "string" ? metadata.dataUrl : null,
         property,
         unit,
         lease: lease ? {

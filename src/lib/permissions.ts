@@ -1,4 +1,4 @@
-export const USER_ROLES = ["owner", "admin", "manager", "technician", "resident"] as const;
+export const USER_ROLES = ["owner", "admin", "manager", "technician", "viewer", "resident"] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
 
@@ -36,6 +36,10 @@ export function canManageBilling(role: string) {
 
 export function canManageIntegrations(role: string) {
   return hasRole(role, ["owner", "admin"]);
+}
+
+export function canManageAccessCredentials(role: string) {
+  return hasRole(role, ["owner", "admin", "manager"]);
 }
 
 export function canExportTickets(role: string) {

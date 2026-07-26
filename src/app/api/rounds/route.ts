@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 
 export async function GET() {
@@ -8,7 +8,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
   const logs = await db.auditLog.findMany({
-    where: { ...tenantWhere(user), entity_type: "round" },
+    where: { ...auditScopedWhere(user), entity_type: "round" },
     orderBy: { created_at: "desc" },
     take: 100,
   });
