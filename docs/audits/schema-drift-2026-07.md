@@ -118,6 +118,22 @@ Detta betyder att DB:n har skydd som inte syns fullt ut i Prisma Client.
 4. Nya migrationer kan missa befintliga constraints.
 5. `Tenant`-modellen behöver utredas innan tenantbegrepp standardiseras.
 
+## Praktiskt schema mirror-försök
+
+Ett fullständigt `prisma db pull` mot production genererar ett Prisma-valid schema med 42 modeller, men är inte säkert att landa som en enda kodändring.
+
+Efter generering passerade `prisma validate`, men `tsc --noEmit` föll brett. Felen visar att Prisma introspection byter flera relationfält till DB-nära relationnamn, exempelvis:
+
+- `property` → `Property`
+- `tickets` → `Ticket`
+- `assigned_to` → `User_Ticket_assigned_to_idToUser`
+- `lease_holder` → `LeaseHolder`
+- `actor` → relationnamn som inte matchar befintliga call sites
+
+Dessutom kräver flera introspekterade modeller explicit `id` i create-inputs där nuvarande kod förlitar sig på defaults, exempelvis `AuditLog`, `IntegrationEvent`, `PasswordResetToken` och `EmailVerificationToken`.
+
+Slutsats: schema mirror ska inte göras med en bred replacement av `schema.prisma`. Det måste delas upp per domängrupp och följas av call-site-migrering och tester.
+
 ### P1-risker
 
 1. Relationer mellan arbetsorder, tekniska assets, dokument och underhåll är delvis osynliga i schemafilen.
@@ -130,7 +146,7 @@ Detta betyder att DB:n har skydd som inte syns fullt ut i Prisma Client.
 
 Mål:
 
-- Lägg till saknade modeller och fält i `schema.prisma`.
+- Lägg till saknade modeller och fält i `schema.prisma` stegvis, inte via full replacement.
 - Ändra inte befintliga tabeller i migration.
 - Skapa ingen destruktiv migration.
 - Generera Prisma Client och säkerställ att build/test passerar.
@@ -141,6 +157,15 @@ Viktigt:
 - Inga tabeller ska droppas.
 - Inga fält ska byta namn.
 - Inga gamla migrationer ska ändras.
+- Relationnamn som används av befintlig kod måste bevaras manuellt.
+
+Rekommenderad uppdelning:
+
+1. WorkOrder enterprise-tabeller och fält.
+2. OperationalDocument parent-fält.
+3. Property component/maintenance-tabeller.
+4. Lease/tenant-relaterade tabeller.
+5. Övriga tekniska kostnads-/rapporttabeller.
 
 ### PR 2: Tenantrelationer och indexrapport
 
