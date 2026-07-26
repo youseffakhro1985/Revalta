@@ -14,6 +14,7 @@ import {
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
 import { OPERATIONS_STATUS_LABELS, PRIORITY_LABELS } from "@/lib/domain-labels";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type TeamMember = { id: string; name: string | null; email: string };
 type WorkOrder = {
@@ -175,7 +176,7 @@ export default function TicketDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, priority, assignedToId }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera ärendet");
       setTicket((current) => current ? {
@@ -199,7 +200,7 @@ export default function TicketDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assignedToId: assignedToId || null }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsordern");
       setSuccess(data.created ? "Arbetsordern skapades och ärendet kopplades automatiskt." : "Arbetsordern fanns redan och har öppnats.");
@@ -218,7 +219,7 @@ export default function TicketDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: comment }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte lägga till kommentaren");
       setTicket((current) => current ? { ...current, comments: [...current.comments, data.comment] } : current);
       setTimeline((current) => [{ id: data.comment.id, type: "comment", title: "Kommentar", description: data.comment.body, created_at: data.comment.created_at }, ...current]);
@@ -235,7 +236,7 @@ export default function TicketDetailPage() {
     try {
       const formData = new FormData(); formData.append("file", file);
       const response = await fetch(`/api/tickets/${params.id}/attachments`, { method: "POST", body: formData });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ladda upp bilagan");
       setTicket((current) => current ? { ...current, attachments: [data.attachment, ...current.attachments] } : current);
       setTimeline((current) => [{ id: data.attachment.id, type: "attachment", title: "Bilaga uppladdad", description: data.attachment.file_name, created_at: data.attachment.created_at }, ...current]);
@@ -249,7 +250,7 @@ export default function TicketDetailPage() {
     setError(""); setSuccess(""); setAnalyzing(true);
     try {
       const response = await fetch(`/api/tickets/${params.id}/ai`, { method: "POST" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte AI-analysera ärendet");
       setTicket((current) => current ? { ...current, ...data.ticket } : current);
       setPriority(data.ticket.priority);
@@ -274,7 +275,7 @@ export default function TicketDetailPage() {
           completed: operationCompleted,
         }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte spara registreringen");
       setOperations((current) => [data.operation, ...current].slice(0, 100));
@@ -303,7 +304,7 @@ export default function TicketDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ operationId: operation.id }),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort registreringen");
       setOperations((current) => current.filter((item) => item.id !== operation.id));
@@ -325,7 +326,7 @@ export default function TicketDetailPage() {
     setSuccess("");
     try {
       const response = await fetch(`/api/tickets/${params.id}`, { method: "DELETE" });
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort ärendet");
       router.push("/dashboard/felanmalan");

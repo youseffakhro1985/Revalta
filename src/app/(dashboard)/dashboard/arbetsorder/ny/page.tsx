@@ -13,6 +13,7 @@ import {
   premiumSecondaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type PropertyOption = {
   id: string;
@@ -61,7 +62,7 @@ export default function NewWorkOrderPage() {
     async function loadOptions() {
       try {
         const response = await fetch("/api/work-orders/options", { cache: "no-store" });
-        const data = (await response.json()) as OptionsResponse;
+        const data = (await readResponseJson(response)) as OptionsResponse;
         if (response.status === 401) {
           router.push("/login");
           return;
@@ -116,7 +117,7 @@ export default function NewWorkOrderPage() {
           estimatedCost: form.estimatedCost || null,
         }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsordern");
       router.push(`/dashboard/arbetsorder/${data.workOrder.id}`);
       router.refresh();

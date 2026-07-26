@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Building2, ClipboardList, DoorOpen, MapPin, Ruler, UserRound } from "lucide-react";
 import db from "@/lib/db";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { notDeletedFilter } from "@/lib/schema-readiness";
 import { PropertyRegistryManager } from "@/components/properties/property-registry-manager";
 import { PropertyComponentOverview } from "@/components/properties/property-component-overview";
 import { PropertyResidentRegister } from "@/components/properties/property-resident-register";
@@ -26,23 +27,29 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   if (!user) redirect("/login");
 
   const { id } = await params;
+  const [propertyActive, ticketActive] = await Promise.all([
+    notDeletedFilter("Property"),
+    notDeletedFilter("Ticket"),
+  ]);
   const property = await db.property.findFirst({
-    where: { id, deleted_at: null, ...tenantWhere(user) },
+    where: { id, ...propertyActive, ...tenantWhere(user) },
     include: {
       buildings: { orderBy: { name: "asc" }, include: { _count: { select: { units: true } } } },
       units: { orderBy: [{ unit_type: "asc" }, { designation: "asc" }], include: { building: { select: { name: true } } } },
       tickets: {
-        where: { deleted_at: null },
+        where: ticketActive,
         orderBy: { created_at: "desc" }, take: 8,
         select: { id: true, title: true, status: true, priority: true, created_at: true, assigned_to: { select: { name: true, email: true } } },
       },
-      _count: { select: { tickets: { where: { deleted_at: null } }, buildings: true, units: true } },
+      _count: { select: { tickets: { where: ticketActive }, buildings: true, units: true } },
     },
   });
 
   if (!property) notFound();
 
-  const openTickets = await db.ticket.count({ where: { property_id: property.id, deleted_at: null, status: { not: "closed" } } });
+  const openTickets = await db.ticket.count({
+    where: { property_id: property.id, ...ticketActive, status: { not: "closed" } },
+  });
   const apartmentCount = property.units.filter((unit) => unit.unit_type === "apartment").length;
   const commercialCount = property.units.filter((unit) => unit.unit_type === "commercial").length;
   const totalRegisteredArea = property.units.reduce((sum, unit) => sum + (unit.area || 0), 0);

@@ -118,6 +118,8 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Preview login diagnosis: Vercel green + login `200` but `/dashboard`/`/api/properties`/`/api/tickets` crash when soft-delete migrations are not deployed yet. Added `getSchemaReadiness` (ops `/api/health` → `schema.ready`/`missing`), graceful dashboard copy, and `503` on properties/tickets list when Prisma reports missing columns. Documented in `docs/production-launch.md`.
    - Preview compatibility mode: `notDeletedFilter` / `hasSoftDeleteColumn` omit `deleted_at` when columns are missing so dashboard, properties, tickets, work-orders and insurance-claims keep working before Database Release. Work-orders always return JSON (fixes Safari “The string did not match the expected pattern” on empty 500 bodies); client uses `readResponseJson`.
    - Global Prisma `$use` soft-delete sanitizer (`soft-delete-compat`): strips nested `deleted_at` filters and omits missing columns for all model queries; raw SQL helpers via `sqlSoftDeleteGuard`; readiness covers LeaseHolder/OperationalDocument/TicketOperation; backfill uses `fetchAll` (no `take: 5000` truncation); expanded auth/module smoke + `smoke-cron.mjs`; bookings/rounds amber legacy banners.
+   - Soft-delete middleware recursion fix: `$queryRaw` / raw actions bypass sanitizing so schema-readiness checks cannot re-enter middleware (previous `$use` crashed Vercel with HTML 500 even on `/api/health`). SSR `fastigheter/[id]` and `rapporter` use `notDeletedFilter` / `softDeleteOmit`.
+   - Access credentials field correction (`PATCH` identifier/type/holder/unit/area/dates/note) + Nycklar “Ändra” UI; critical dashboard clients use `readResponseJson`.
 
 ## Verification
 

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { shouldSanitizeSoftDeleteParams } from "@/lib/db";
 import { stripDeletedAtKeys } from "@/lib/soft-delete-compat";
 
 describe("soft-delete-compat", () => {
+  it("skips raw queries so readiness checks cannot recurse through middleware", () => {
+    expect(shouldSanitizeSoftDeleteParams({ model: "Ticket", action: "findMany" })).toBe(true);
+    expect(shouldSanitizeSoftDeleteParams({ action: "queryRaw" })).toBe(false);
+    expect(shouldSanitizeSoftDeleteParams({ model: "Ticket", action: "queryRaw" })).toBe(false);
+    expect(shouldSanitizeSoftDeleteParams({ action: "executeRaw" })).toBe(false);
+  });
+
   it("strips deleted_at from nested where trees", () => {
     const input = {
       where: {

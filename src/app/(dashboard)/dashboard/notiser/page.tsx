@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type NotificationItem = {
   id: string;
@@ -48,7 +49,7 @@ export default function NotificationsPage() {
   async function load() {
     const response = await fetch("/api/notifications", { cache: "no-store" });
     if (!response.ok) return;
-    const data = await response.json();
+    const data = await readResponseJson(response);
     setNotifications(data.notifications || []);
     setEvents(data.recentEvents || []);
   }
@@ -79,7 +80,7 @@ export default function NotificationsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notificationId }),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await readResponseJson(response);
     if (!response.ok) {
       setError(data.error || "Kunde inte markera notisen som läst");
       return;
@@ -95,7 +96,7 @@ export default function NotificationsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notificationId }),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await readResponseJson(response);
     if (!response.ok) {
       setError(data.error || "Kunde inte ta bort notisen");
       return;

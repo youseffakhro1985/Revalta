@@ -216,23 +216,82 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
     const credentialId = String(body.credentialId || body.id || "").trim();
-    const status = String(body.status || "").trim();
-    const holder = body.holder !== undefined ? String(body.holder || "").trim() : undefined;
-    const allowedStatuses = new Set(["in_stock", "issued", "returned", "blocked", "lost"]);
+    if (!credentialId) {
+      return NextResponse.json({ error: "Behörighets-id krävs" }, { status: 400 });
+    }
 
-    if (!credentialId || !allowedStatuses.has(status)) {
-      return NextResponse.json({ error: "Behörighets-id och giltig status krävs" }, { status: 400 });
+    const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
+    const status = hasStatus ? String(body.status).trim() : "";
+    const fieldKeys = [
+      "identifier",
+      "credentialType",
+      "holder",
+      "unit",
+      "accessArea",
+      "issuedAt",
+      "returnDue",
+      "note",
+    ] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!hasStatus && !hasFieldUpdate) {
+      return NextResponse.json({ error: "Status eller fält att uppdatera krävs" }, { status: 400 });
+    }
+
+    const allowedTypes = new Set(["key", "tag", "card", "code", "remote"]);
+    const allowedStatuses = new Set(["in_stock", "issued", "returned", "blocked", "lost"]);
+    if (hasStatus && !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
+    }
+
+    const holder = body.holder !== undefined ? String(body.holder || "").trim() : undefined;
+    const identifier = body.identifier !== undefined ? String(body.identifier || "").trim() : undefined;
+    const credentialType =
+      body.credentialType !== undefined ? String(body.credentialType || "").trim() : undefined;
+    const unit = body.unit !== undefined ? String(body.unit || "").trim() : undefined;
+    const accessArea = body.accessArea !== undefined ? String(body.accessArea || "").trim() : undefined;
+    const note = body.note !== undefined ? String(body.note || "").trim() : undefined;
+    const issuedAtRaw = body.issuedAt !== undefined ? String(body.issuedAt || "").trim() : undefined;
+    const returnDueRaw = body.returnDue !== undefined ? String(body.returnDue || "").trim() : undefined;
+
+    if (identifier !== undefined && (!identifier || identifier.length > 120)) {
+      return NextResponse.json({ error: "Identitet krävs och får vara max 120 tecken" }, { status: 400 });
+    }
+    if (credentialType !== undefined && !allowedTypes.has(credentialType)) {
+      return NextResponse.json({ error: "Ogiltig behörighetstyp" }, { status: 400 });
     }
     if (holder !== undefined && holder.length > 160) {
       return NextResponse.json({ error: "Mottagaren är för lång" }, { status: 400 });
     }
-    if (status === "issued" && holder !== undefined && !holder) {
-      return NextResponse.json({ error: "Mottagare krävs vid utlämning" }, { status: 400 });
+    if (unit !== undefined && unit.length > 80) {
+      return NextResponse.json({ error: "Lägenhet/lokal är för lång" }, { status: 400 });
+    }
+    if (accessArea !== undefined && accessArea.length > 160) {
+      return NextResponse.json({ error: "Behörighetsområdet är för långt" }, { status: 400 });
+    }
+    if (note !== undefined && note.length > 1000) {
+      return NextResponse.json({ error: "Anteckningen är för lång" }, { status: 400 });
+    }
+    if (issuedAtRaw !== undefined && issuedAtRaw && !parseOptionalDate(issuedAtRaw)) {
+      return NextResponse.json({ error: "Ogiltigt utlämningsdatum" }, { status: 400 });
+    }
+    if (returnDueRaw !== undefined && returnDueRaw && !parseOptionalDate(returnDueRaw)) {
+      return NextResponse.json({ error: "Ogiltigt återlämningsdatum" }, { status: 400 });
     }
 
     const existing = await db.accessCredential.findFirst({
       where: { id: credentialId, company_id: user.company_id, property: { deleted_at: null } },
-      select: { id: true, status: true, holder: true, identifier: true },
+      select: {
+        id: true,
+        status: true,
+        holder: true,
+        identifier: true,
+        credential_type: true,
+        unit: true,
+        access_area: true,
+        issued_at: true,
+        return_due: true,
+        note: true,
+      },
     });
     if (!existing) {
       const orphaned = await db.accessCredential.findFirst({
@@ -248,20 +307,51 @@ export async function PATCH(request: Request) {
       });
       if (legacy) {
         return NextResponse.json({
-          error: "Behörigheten finns kvar i äldre lagring. Kör backfill till AccessCredential innan status ändras.",
+          error: "Behörigheten finns kvar i äldre lagring. Kör backfill till AccessCredential innan den kan uppdateras.",
         }, { status: 409 });
       }
       return NextResponse.json({ error: "Behörigheten hittades inte" }, { status: 404 });
     }
 
+    const nextStatus = hasStatus ? status : existing.status;
+    const nextHolder = holder !== undefined ? holder : existing.holder || "";
+    if (nextStatus === "issued" && !nextHolder) {
+      return NextResponse.json({ error: "Mottagare krävs vid utlämning" }, { status: 400 });
+    }
+
+    const data: {
+      status?: string;
+      holder?: string | null;
+      identifier?: string;
+      credential_type?: string;
+      unit?: string | null;
+      access_area?: string | null;
+      issued_at?: Date | null;
+      return_due?: Date | null;
+      note?: string | null;
+    } = {};
+
+    if (hasStatus) {
+      data.status = status;
+      if (status === "issued" && existing.status !== "issued" && issuedAtRaw === undefined) {
+        data.issued_at = new Date();
+      }
+      if (status === "returned" || status === "in_stock") {
+        data.return_due = null;
+      }
+    }
+    if (holder !== undefined) data.holder = holder || null;
+    if (identifier !== undefined) data.identifier = identifier;
+    if (credentialType !== undefined) data.credential_type = credentialType;
+    if (unit !== undefined) data.unit = unit || null;
+    if (accessArea !== undefined) data.access_area = accessArea || null;
+    if (note !== undefined) data.note = note || null;
+    if (issuedAtRaw !== undefined) data.issued_at = parseOptionalDate(issuedAtRaw);
+    if (returnDueRaw !== undefined) data.return_due = parseOptionalDate(returnDueRaw);
+
     const updateResult = await db.accessCredential.updateMany({
       where: { id: existing.id, company_id: user.company_id },
-      data: {
-        status,
-        ...(holder !== undefined ? { holder: holder || null } : {}),
-        ...(status === "issued" ? { issued_at: new Date() } : {}),
-        ...(status === "returned" || status === "in_stock" ? { return_due: null } : {}),
-      },
+      data,
     });
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Behörigheten hittades inte" }, { status: 404 });
@@ -270,12 +360,13 @@ export async function PATCH(request: Request) {
     await writeAuditLog(user, {
       entityType: "access_credential",
       entityId: existing.id,
-      action: "access.credential.status_updated",
+      action: hasStatus && !hasFieldUpdate ? "access.credential.status_updated" : "access.credential.updated",
       metadata: {
         previousStatus: existing.status,
-        status,
-        holder: holder !== undefined ? holder : existing.holder,
-        identifier: existing.identifier,
+        status: nextStatus,
+        holder: nextHolder,
+        identifier: identifier ?? existing.identifier,
+        credential_type: credentialType ?? existing.credential_type,
         storage: "AccessCredential",
       },
     });

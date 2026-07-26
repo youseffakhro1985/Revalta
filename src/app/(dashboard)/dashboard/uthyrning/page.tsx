@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Building2, CircleDollarSign, DoorOpen, FileSignature, Pencil, Plus, Search, UsersRound, X } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Unit = { id: string; designation: string; unit_type: string; floor?: string | null; area?: number | null; rooms?: number | null; status: string };
 type Property = { id: string; name: string; address: string; city: string; units: Unit[] };
@@ -92,7 +93,7 @@ export default function LeasingPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/leases", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta uthyrningen");
       setLeases(data.leases || []);
       setProperties(data.properties || []);
@@ -200,7 +201,7 @@ export default function LeasingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara avtalet");
       const wasEditing = Boolean(form.id);
       setForm(emptyForm);
@@ -229,7 +230,7 @@ export default function LeasingPage() {
     setSuccess("");
     try {
       const response = await fetch(`/api/leases/${lease.id}`, { method: "DELETE" });
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort avtalet");
       if (form.id === lease.id) setForm(emptyForm);
       setSuccess("Avtalet har tagits bort.");
@@ -249,7 +250,7 @@ export default function LeasingPage() {
     setSuccess("");
     try {
       const response = await fetch(`/api/lease-holders/${holderId}`, { method: "DELETE" });
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort hyresparten");
       setForm((current) => (
         current.holderId === holderId

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, History, PauseCircle, PlayCircle, RefreshCw } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
 type Schedule = {
@@ -63,7 +64,7 @@ export default function RecurringWorkOrdersPage() {
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/work-orders/recurring", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta scheman");
       setSchedules(body.schedules || []); setProperties(body.properties || []); setRuns(body.runs || []);
       setHealth(body.health || { activeSchedules: 0, overdueSchedules: 0, lastRunStatus: null, lastRunAt: null });
@@ -82,7 +83,7 @@ export default function RecurringWorkOrdersPage() {
     event.preventDefault(); setSaving(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/work-orders/recurring", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte skapa schemat");
       setForm({ ...form, title: "", description: "", estimatedCost: "" });
       setMessage("Det återkommande schemat har skapats."); await load();
@@ -111,7 +112,7 @@ export default function RecurringWorkOrdersPage() {
     setBusyId(item.id); setError(""); setMessage("");
     try {
       const response = await fetch("/api/work-orders/recurring", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scheduleId: item.id, active: !item.active }) });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte ändra schemat");
       setMessage(item.active ? "Schemat har pausats." : "Schemat har aktiverats."); await load();
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte ändra schemat"); }
@@ -139,7 +140,7 @@ export default function RecurringWorkOrdersPage() {
           active: editForm.active,
         }),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte uppdatera schemat");
       setMessage("Schemat har uppdaterats.");
       setEditingId("");
@@ -156,7 +157,7 @@ export default function RecurringWorkOrdersPage() {
     setBusyId(item.id); setError(""); setMessage("");
     try {
       const response = await fetch("/api/work-orders/recurring", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "generate", scheduleId: item.id }) });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte generera arbetsordern");
       setMessage(`Arbetsorder ${body.workOrderNumber || ""} har genererats.`); await load();
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte generera arbetsordern"); }
@@ -167,7 +168,7 @@ export default function RecurringWorkOrdersPage() {
     setRunningAll(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/cron/recurring-work-orders", { method: "POST" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Körningen misslyckades");
       setMessage(`Körningen är klar. ${body.generated || 0} arbetsordrar skapades, ${body.failed || 0} misslyckades.`); await load();
     } catch (value) { setError(value instanceof Error ? value.message : "Körningen misslyckades"); }

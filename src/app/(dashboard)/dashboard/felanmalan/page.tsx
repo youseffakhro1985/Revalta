@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ClipboardList, Filter, Inbox, Search } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
 type TeamMember = { id: string; name: string | null; email: string };
@@ -86,7 +87,7 @@ export default function FelanmalanPage() {
     setError(""); setSuccess(""); setSubmitting(true);
     try {
       const response = await fetch("/api/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, description, propertyId, category, priority, assignedToId }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa ärendet");
       setTickets((current) => [data.ticket, ...current]);

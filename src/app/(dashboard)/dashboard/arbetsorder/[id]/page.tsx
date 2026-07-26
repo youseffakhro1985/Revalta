@@ -11,6 +11,7 @@ import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execu
 import { WorkOrderEconomicsPanel } from "@/components/dashboard/work-order-economics-panel";
 import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
 import { useWorkOrderEditLock } from "@/hooks/use-work-order-edit-lock";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type EnterpriseState = {
   work_order_number: string | null; work_type: string; source: string;
@@ -123,7 +124,7 @@ export default function WorkOrderDetailPage() {
         version: editLock.state.version,
       };
       const response = await fetch(`/api/work-orders/${id}/locked-update`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) {
         if (data.code === "version_conflict") {
           await load();
@@ -164,7 +165,7 @@ export default function WorkOrderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa projekt");
       setSuccess("Projektet har skapats från arbetsordern.");
       await load();
@@ -183,7 +184,7 @@ export default function WorkOrderDetailPage() {
     setSuccess("");
     try {
       const response = await fetch(`/api/work-orders/${id}`, { method: "DELETE" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort arbetsordern");
       router.push("/dashboard/arbetsorder");
     } catch (err) {
