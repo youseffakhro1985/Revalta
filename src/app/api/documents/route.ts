@@ -24,7 +24,10 @@ export async function GET() {
     const [rows, logs, properties, leases] = await Promise.all([
       user.company_id
         ? db.managedDocument.findMany({
-            where: { company_id: user.company_id },
+            where: {
+              company_id: user.company_id,
+              OR: [{ property_id: null }, { property: { deleted_at: null } }],
+            },
             orderBy: { created_at: "desc" },
             take: 500,
             include: { created_by: { select: { name: true, email: true } } },

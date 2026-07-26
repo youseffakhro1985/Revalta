@@ -24,6 +24,7 @@ export async function GET(request: Request) {
       where: {
         lifecycle_state: "active",
         valid_until: { not: null, lte: horizon, gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
       orderBy: { valid_until: "asc" },
       take: 500,

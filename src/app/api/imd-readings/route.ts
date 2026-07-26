@@ -14,7 +14,7 @@ export async function GET() {
     const [rows, logs, properties, leases] = await Promise.all([
       user.company_id
         ? db.imdReading.findMany({
-            where: { company_id: user.company_id, voided_at: null },
+            where: { company_id: user.company_id, voided_at: null, property: { deleted_at: null } },
             orderBy: { created_at: "desc" },
             take: 500,
             include: {

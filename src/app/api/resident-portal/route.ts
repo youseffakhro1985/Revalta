@@ -94,6 +94,7 @@ export async function GET() {
           company_id: user.company_id,
           lifecycle_state: "active",
           visibility: { in: [...residentDocumentVisibilities] },
+          OR: [{ property_id: null }, { property: { deleted_at: null } }],
         },
         orderBy: { created_at: "desc" },
         take: 500,
