@@ -56,6 +56,16 @@ model User {
   quote_decisions                      QuoteDecision[]
   bookings_created                     Booking[]            @relation("BookingCreatedBy")
   inspection_rounds_created            InspectionRound[]    @relation("InspectionRoundCreatedBy")
+  app_notifications_created            AppNotification[]    @relation("AppNotificationCreatedBy")
+  notification_reads                   NotificationRead[]
+  portfolio_maintenance_items_created  PortfolioMaintenanceItem[] @relation("PortfolioMaintenanceItemCreatedBy")
+  budget_entries_created               BudgetEntry[]        @relation("BudgetEntryCreatedBy")
+  energy_readings_created              EnergyReading[]      @relation("EnergyReadingCreatedBy")
+  vendor_contracts_created             VendorContract[]     @relation("VendorContractCreatedBy")
+  compliance_inspections_created       ComplianceInspection[] @relation("ComplianceInspectionCreatedBy")
+  insurance_claims_created             InsuranceClaim[]     @relation("InsuranceClaimCreatedBy")
+  rent_notices_created                 RentNotice[]         @relation("RentNoticeCreatedBy")
+  calendar_events_created              CalendarEvent[]      @relation("CalendarEventCreatedBy")
 }
 
 model Company {
@@ -104,6 +114,16 @@ model Company {
   quote_decisions             QuoteDecision[]
   bookings                    Booking[]
   inspection_rounds           InspectionRound[]
+  app_notifications           AppNotification[]
+  notification_reads          NotificationRead[]
+  portfolio_maintenance_items PortfolioMaintenanceItem[]
+  budget_entries              BudgetEntry[]
+  energy_readings             EnergyReading[]
+  vendor_contracts            VendorContract[]
+  compliance_inspections      ComplianceInspection[]
+  insurance_claims            InsuranceClaim[]
+  rent_notices                RentNotice[]
+  calendar_events             CalendarEvent[]
 }
 
 model Property {
@@ -150,6 +170,13 @@ model Property {
   quotes                   Quote[]
   bookings                 Booking[]
   inspection_rounds        InspectionRound[]
+  portfolio_maintenance_items PortfolioMaintenanceItem[]
+  budget_entries           BudgetEntry[]
+  energy_readings          EnergyReading[]
+  vendor_contracts         VendorContract[]
+  compliance_inspections   ComplianceInspection[]
+  insurance_claims         InsuranceClaim[]
+  rent_notices             RentNotice[]
 
   @@index([company_id])
   @@index([user_id])
@@ -1173,5 +1200,242 @@ model InspectionRound {
   @@index([company_id, created_at])
   @@index([company_id, property_id])
   @@index([company_id, next_due])
+  @@index([created_by_id])
+}
+
+model AppNotification {
+  id             String             @id @default(uuid())
+  company_id     String
+  title          String
+  message        String
+  priority       String             @default("normal")
+  audience       String             @default("Alla användare")
+  author_name    String?
+  created_by_id  String
+  created_at     DateTime           @default(now())
+  company        Company            @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  created_by     User               @relation("AppNotificationCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  reads          NotificationRead[]
+
+  @@index([company_id, created_at])
+  @@index([created_by_id])
+}
+
+model NotificationRead {
+  id              String          @id @default(uuid())
+  company_id      String
+  notification_id String
+  reader_user_id  String
+  read_at         DateTime        @default(now())
+  company         Company         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  notification    AppNotification @relation(fields: [notification_id], references: [id], onDelete: Cascade)
+  reader          User            @relation(fields: [reader_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([notification_id, reader_user_id])
+  @@index([company_id, reader_user_id])
+  @@index([reader_user_id])
+}
+
+model PortfolioMaintenanceItem {
+  id                String    @id @default(uuid())
+  company_id        String
+  property_id       String
+  component         String
+  measure           String
+  planned_year      Int
+  estimated_cost    Decimal   @default(0) @db.Decimal(14, 2)
+  priority          String    @default("normal")
+  interval_years    Int       @default(0)
+  status            String    @default("planned")
+  work_order_id     String?
+  work_order_number String?
+  created_by_id     String
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  company           Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property          Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by        User      @relation("PortfolioMaintenanceItemCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, status])
+  @@index([created_by_id])
+}
+
+model BudgetEntry {
+  id             String   @id @default(uuid())
+  company_id     String
+  property_id    String
+  year           Int
+  category       String
+  account        String
+  budget         Decimal  @default(0) @db.Decimal(14, 2)
+  forecast       Decimal  @default(0) @db.Decimal(14, 2)
+  actual         Decimal  @default(0) @db.Decimal(14, 2)
+  note           String?
+  created_by_id  String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  company        Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property       Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by     User     @relation("BudgetEntryCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, year])
+  @@index([company_id, property_id])
+  @@index([created_by_id])
+}
+
+model EnergyReading {
+  id             String   @id @default(uuid())
+  company_id     String
+  property_id    String
+  type           String
+  period         String
+  unit           String
+  value          Decimal  @default(0) @db.Decimal(14, 4)
+  cost           Decimal  @default(0) @db.Decimal(14, 2)
+  value_per_sqm  Decimal? @db.Decimal(14, 6)
+  cost_per_sqm   Decimal? @db.Decimal(14, 6)
+  note           String?
+  created_by_id  String
+  created_at     DateTime @default(now())
+  company        Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property       Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by     User     @relation("EnergyReadingCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id, type])
+  @@index([created_by_id])
+}
+
+model VendorContract {
+  id              String    @id @default(uuid())
+  company_id      String
+  property_id     String?
+  name            String
+  org_number      String?
+  category        String    @default("Övrigt")
+  contact_name    String?
+  email           String?
+  phone           String?
+  contract_title  String?
+  contract_value  Decimal   @default(0) @db.Decimal(14, 2)
+  start_date      DateTime?
+  end_date        DateTime?
+  notice_months   Int       @default(0)
+  status          String    @default("active")
+  created_by_id   String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property        Property? @relation(fields: [property_id], references: [id], onDelete: SetNull)
+  created_by      User      @relation("VendorContractCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([created_by_id])
+}
+
+model ComplianceInspection {
+  id               String    @id @default(uuid())
+  company_id       String
+  property_id      String
+  type             String
+  title            String
+  due_date         DateTime
+  responsible      String?
+  supplier         String?
+  interval_months  Int       @default(0)
+  status           String    @default("planned")
+  note             String?
+  created_by_id    String
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  company          Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property         Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by       User      @relation("ComplianceInspectionCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, due_date])
+  @@index([company_id, property_id])
+  @@index([created_by_id])
+}
+
+model InsuranceClaim {
+  id              String    @id @default(uuid())
+  company_id      String
+  property_id     String
+  title           String
+  damage_type     String
+  incident_date   DateTime?
+  location        String?
+  insurer         String?
+  claim_number    String?
+  responsible     String?
+  status          String    @default("reported")
+  estimated_cost  Decimal   @default(0) @db.Decimal(14, 2)
+  deductible      Decimal   @default(0) @db.Decimal(14, 2)
+  compensation    Decimal   @default(0) @db.Decimal(14, 2)
+  note            String?
+  created_by_id   String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property        Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by      User      @relation("InsuranceClaimCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, status])
+  @@index([created_by_id])
+}
+
+model RentNotice {
+  id             String    @id @default(uuid())
+  company_id     String
+  property_id    String
+  lease_id       String?
+  tenant_name    String
+  unit           String?
+  period         String
+  due_date       DateTime
+  status         String    @default("draft")
+  base_rent      Decimal   @default(0) @db.Decimal(14, 2)
+  index_percent  Decimal   @default(0) @db.Decimal(7, 3)
+  indexed_rent   Decimal   @default(0) @db.Decimal(14, 2)
+  additions      Decimal   @default(0) @db.Decimal(14, 2)
+  deductions     Decimal   @default(0) @db.Decimal(14, 2)
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  note           String?
+  created_by_id  String
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property       Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by     User      @relation("RentNoticeCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, lease_id])
+  @@index([created_by_id])
+}
+
+model CalendarEvent {
+  id             String   @id @default(uuid())
+  company_id     String
+  title          String
+  date           DateTime @db.Date
+  time           String?
+  type           String   @default("Aktivitet")
+  property_name  String?
+  responsible    String?
+  note           String?
+  status         String   @default("planned")
+  created_by_id  String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  company        Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  created_by     User     @relation("CalendarEventCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, date])
   @@index([created_by_id])
 }

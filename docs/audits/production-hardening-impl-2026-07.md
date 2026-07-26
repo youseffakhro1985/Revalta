@@ -42,6 +42,8 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Additional company-scoped mutations for ticket AI, ticket→work-order and lease holders.
    - Work-order document delete uses scoped `deleteMany` and best-effort blob cleanup.
    - `Quote`, `QuoteDecision`, `Booking`, `InspectionRound` tables with dual-read of legacy AuditLog rows.
+   - Remaining ops modules off AuditLog primary storage: notifications, portfolio maintenance, budget, energy, vendors, compliance inspections, insurance claims, rent notices, calendar.
+   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs`.
 
 ## Verification
 

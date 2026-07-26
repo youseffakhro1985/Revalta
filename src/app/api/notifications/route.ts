@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { mergeByCreatedAt } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const createdAction = "notification.created";
@@ -16,7 +17,20 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const scope = scopeFor(user);
-    const [notifications, readLogs, recentEvents] = await Promise.all([
+    const [modern, modernReads, notifications, readLogs, recentEvents] = await Promise.all([
+      user.company_id
+        ? db.appNotification.findMany({
+            where: { company_id: user.company_id },
+            orderBy: { created_at: "desc" },
+            take: 100,
+          })
+        : Promise.resolve([]),
+      user.company_id
+        ? db.notificationRead.findMany({
+            where: { company_id: user.company_id, reader_user_id: user.id },
+            select: { notification_id: true },
+          })
+        : Promise.resolve([]),
       db.auditLog.findMany({
         where: { ...scope, action: createdAction },
         orderBy: { created_at: "desc" },
@@ -37,21 +51,38 @@ export async function GET() {
       }),
     ]);
 
-    const readIds = new Set(
+    const modernReadIds = new Set(modernReads.map((row) => row.notification_id));
+    const legacyReadIds = new Set(
       readLogs
         .filter((log) => (log.metadata as Record<string, unknown> | null)?.reader_id === user.id)
         .map((log) => log.entity_id)
-        .filter((id): id is string => Boolean(id))
+        .filter((id): id is string => Boolean(id)),
     );
 
+    const modernRows = modern.map((row) => ({
+      id: row.id,
+      notificationId: row.id,
+      created_at: row.created_at,
+      read: modernReadIds.has(row.id),
+      title: row.title,
+      message: row.message,
+      priority: row.priority,
+      audience: row.audience,
+      author_name: row.author_name,
+      source: "table" as const,
+    }));
+
+    const legacyRows = notifications.map((row) => ({
+      id: row.id,
+      notificationId: row.entity_id || row.id,
+      created_at: row.created_at,
+      read: legacyReadIds.has(row.entity_id || row.id) || modernReadIds.has(row.entity_id || row.id),
+      ...(row.metadata as Record<string, unknown>),
+      source: "legacy" as const,
+    }));
+
     return NextResponse.json({
-      notifications: notifications.map((row) => ({
-        id: row.id,
-        notificationId: row.entity_id || row.id,
-        created_at: row.created_at,
-        read: readIds.has(row.entity_id || row.id),
-        ...(row.metadata as Record<string, unknown>),
-      })),
+      notifications: mergeByCreatedAt(modernRows, legacyRows, 100),
       recentEvents: recentEvents.map((row) => ({
         id: row.id,
         action: row.action,
@@ -72,6 +103,7 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const title = String(body.title || "").trim();
@@ -82,15 +114,27 @@ export async function POST(request: Request) {
     if (!title || !message) return NextResponse.json({ error: "Rubrik och meddelande krävs" }, { status: 400 });
     if (title.length > 120 || message.length > 2000) return NextResponse.json({ error: "Meddelandet är för långt" }, { status: 400 });
 
-    const notificationId = crypto.randomUUID();
-    await writeAuditLog(user, {
-      entityType: "notification",
-      entityId: notificationId,
-      action: createdAction,
-      metadata: { title, message, priority, audience, author_name: user.name || user.email },
+    const notification = await db.appNotification.create({
+      data: {
+        company_id: user.company_id,
+        title,
+        message,
+        priority,
+        audience,
+        author_name: user.name || user.email,
+        created_by_id: user.id,
+      },
+      select: { id: true },
     });
 
-    return NextResponse.json({ success: true, notificationId }, { status: 201 });
+    await writeAuditLog(user, {
+      entityType: "notification",
+      entityId: notification.id,
+      action: createdAction,
+      metadata: { title, message, priority, audience, author_name: user.name || user.email, storage: "AppNotification" },
+    });
+
+    return NextResponse.json({ success: true, notificationId: notification.id }, { status: 201 });
   } catch (error) {
     console.error("Create notification error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -105,6 +149,25 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const notificationId = String(body.notificationId || "").trim();
     if (!notificationId) return NextResponse.json({ error: "Notis-id krävs" }, { status: 400 });
+
+    if (user.company_id) {
+      const modern = await db.appNotification.findFirst({
+        where: { id: notificationId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (modern) {
+        await db.notificationRead.upsert({
+          where: { notification_id_reader_user_id: { notification_id: modern.id, reader_user_id: user.id } },
+          create: {
+            company_id: user.company_id,
+            notification_id: modern.id,
+            reader_user_id: user.id,
+          },
+          update: { read_at: new Date() },
+        });
+        return NextResponse.json({ success: true });
+      }
+    }
 
     const notification = await db.auditLog.findFirst({
       where: { ...scopeFor(user), action: createdAction, entity_id: notificationId },

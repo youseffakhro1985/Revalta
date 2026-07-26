@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { asNumber, mergeByCreatedAt } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const action = "budget.entry.created";
@@ -9,11 +10,50 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    const [logs, properties] = await Promise.all([
-      db.auditLog.findMany({ where: { ...auditScopedWhere(user), action }, orderBy: { created_at: "desc" }, take: 600, select: { id: true, entity_id: true, metadata: true, created_at: true } }),
+
+    const [rows, logs, properties] = await Promise.all([
+      user.company_id
+        ? db.budgetEntry.findMany({
+            where: { company_id: user.company_id },
+            orderBy: { created_at: "desc" },
+            take: 600,
+            include: { property: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
+      db.auditLog.findMany({
+        where: { ...auditScopedWhere(user), action },
+        orderBy: { created_at: "desc" },
+        take: 600,
+        select: { id: true, entity_id: true, metadata: true, created_at: true },
+      }),
       db.property.findMany({ where: tenantWhere(user), orderBy: { name: "asc" }, select: { id: true, name: true } }),
     ]);
-    return NextResponse.json({ entries: logs.map((log) => ({ id: log.id, property_id: log.entity_id, ...(log.metadata as object), created_at: log.created_at })), properties });
+
+    const modern = rows.map((row) => ({
+      id: row.id,
+      property_id: row.property_id,
+      property_name: row.property.name,
+      year: row.year,
+      category: row.category,
+      account: row.account,
+      budget: asNumber(row.budget),
+      forecast: asNumber(row.forecast),
+      actual: asNumber(row.actual),
+      variance_budget: asNumber(row.actual) - asNumber(row.budget),
+      variance_forecast: asNumber(row.actual) - asNumber(row.forecast),
+      note: row.note || "",
+      created_at: row.created_at,
+      source: "table" as const,
+    }));
+    const legacy = logs.map((log) => ({
+      id: log.id,
+      property_id: log.entity_id,
+      ...(log.metadata as object),
+      created_at: log.created_at,
+      source: "legacy" as const,
+    }));
+
+    return NextResponse.json({ entries: mergeByCreatedAt(modern, legacy, 600), properties });
   } catch (error) {
     console.error("Get budget error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -25,6 +65,7 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();
@@ -37,14 +78,52 @@ export async function POST(request: Request) {
     const note = String(body.note || "").trim();
     const allowed = new Set(["income", "operations", "maintenance", "energy", "administration", "finance", "investment", "other"]);
 
-    if (!propertyId || !account || !Number.isInteger(year) || year < 2000 || year > 2100 || !allowed.has(category)) return NextResponse.json({ error: "Fastighet, år, kostnadsslag och konto krävs" }, { status: 400 });
-    if ([budget, forecast, actual].some((value) => !Number.isFinite(value))) return NextResponse.json({ error: "Kontrollera beloppen" }, { status: 400 });
+    if (!propertyId || !account || !Number.isInteger(year) || year < 2000 || year > 2100 || !allowed.has(category)) {
+      return NextResponse.json({ error: "Fastighet, år, kostnadsslag och konto krävs" }, { status: 400 });
+    }
+    if ([budget, forecast, actual].some((value) => !Number.isFinite(value))) {
+      return NextResponse.json({ error: "Kontrollera beloppen" }, { status: 400 });
+    }
 
     const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
-    await writeAuditLog(user, { entityType: "property", entityId: property.id, action, metadata: { property_name: property.name, year, category, account, budget, forecast, actual, variance_budget: actual - budget, variance_forecast: actual - forecast, note } });
-    return NextResponse.json({ success: true }, { status: 201 });
+    const entry = await db.budgetEntry.create({
+      data: {
+        company_id: user.company_id,
+        property_id: property.id,
+        year,
+        category,
+        account,
+        budget,
+        forecast,
+        actual,
+        note: note || null,
+        created_by_id: user.id,
+      },
+      select: { id: true },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "budget_entry",
+      entityId: entry.id,
+      action,
+      metadata: {
+        property_id: property.id,
+        property_name: property.name,
+        year,
+        category,
+        account,
+        budget,
+        forecast,
+        actual,
+        variance_budget: actual - budget,
+        variance_forecast: actual - forecast,
+        note,
+        storage: "BudgetEntry",
+      },
+    });
+    return NextResponse.json({ success: true, entry }, { status: 201 });
   } catch (error) {
     console.error("Create budget error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
