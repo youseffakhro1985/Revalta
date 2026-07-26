@@ -4,6 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 
 function ResetPasswordForm() {
   const token = useSearchParams().get("token") || "";
@@ -28,16 +29,23 @@ function ResetPasswordForm() {
   }
 
   return (
-    <section className="w-full max-w-md rounded-2xl border border-sand-200 bg-white p-8 shadow-premium-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-600">Revalta</p>
-      <h1 className="mt-3 text-3xl font-semibold text-ink-950">Välj nytt lösenord</h1>
-      <p className="mt-3 text-sm text-ink-600">Länken gäller i 30 minuter och kan användas en gång.</p>
-      {error && <div className="mt-5 rounded-xl border border-danger-500 bg-danger-50 p-4 text-sm text-danger-600">{error}</div>}
-      {message && <div className="mt-5 rounded-xl border border-success-500 bg-success-50 p-4 text-sm text-success-600">{message}</div>}
-      <form onSubmit={submit} className="mt-6 space-y-4">
-        <label className="block text-sm font-medium text-ink-700">
-          Nytt lösenord
+    <AuthShell
+      eyebrow="Kontoåterställning"
+      title="Välj nytt lösenord"
+      description="Länken gäller i 30 minuter och kan användas en gång."
+      footer={
+        <Link href="/login" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+          Till inloggning
+        </Link>
+      }
+    >
+      {error ? <AuthAlert>{error}</AuthAlert> : null}
+      {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
+      <form onSubmit={submit} className="mt-7 space-y-5">
+        <div>
+          <label htmlFor="reset-password" className="block text-sm font-medium text-ink-700">Nytt lösenord</label>
           <input
+            id="reset-password"
             type="password"
             required
             minLength={10}
@@ -45,12 +53,13 @@ function ResetPasswordForm() {
             autoComplete="new-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-sand-200 p-3"
+            className={authInputClass}
           />
-        </label>
-        <label className="block text-sm font-medium text-ink-700">
-          Bekräfta lösenord
+        </div>
+        <div>
+          <label htmlFor="reset-password-confirm" className="block text-sm font-medium text-ink-700">Bekräfta lösenord</label>
           <input
+            id="reset-password-confirm"
             type="password"
             required
             minLength={10}
@@ -58,30 +67,25 @@ function ResetPasswordForm() {
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-sand-200 p-3"
+            className={authInputClass}
           />
-        </label>
+        </div>
         <p className="text-xs text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
         <button
           disabled={loading || !token || Boolean(message)}
-          className="w-full rounded-xl bg-petroleum-700 px-4 py-3 font-semibold text-white disabled:opacity-60"
+          className={authButtonClass}
         >
           {loading ? "Sparar..." : "Spara nytt lösenord"}
         </button>
       </form>
-      <Link href="/login" className="mt-6 block text-center text-sm font-medium text-petroleum-700">
-        Till inloggning
-      </Link>
-    </section>
+    </AuthShell>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sand-50 p-4">
-      <Suspense fallback={<div className="h-64 w-full max-w-md animate-pulse rounded-2xl bg-sand-100" />}>
+    <Suspense fallback={<main className="min-h-screen bg-sand-50 p-6"><div className="mx-auto mt-24 h-96 w-full max-w-4xl animate-pulse rounded-3xl bg-sand-100" /></main>}>
         <ResetPasswordForm />
-      </Suspense>
-    </main>
+    </Suspense>
   );
 }

@@ -23,6 +23,11 @@
 # misc
 .DS_Store
 *.pem
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+/.vercel-redeploy*
 
 # debug
 npm-debug.log*

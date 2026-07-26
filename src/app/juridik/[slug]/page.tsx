@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 const pages: Record<string, { title: string; intro: string; sections: Array<{ title: string; body: string }> }> = {
@@ -43,6 +44,27 @@ const pages: Record<string, { title: string; intro: string; sections: Array<{ ti
 
 export function generateStaticParams() {
   return Object.keys(pages).map((slug) => ({ slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const page = pages[slug];
+  if (!page) return {};
+
+  return {
+    title: page.title,
+    description: page.intro,
+    alternates: { canonical: `/juridik/${slug}` },
+    openGraph: {
+      url: `/juridik/${slug}`,
+      title: `${page.title} | Revalta`,
+      description: page.intro,
+    },
+  };
 }
 
 export default async function LegalPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -4,6 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { AuthAlert, AuthShell, authButtonClass } from "@/components/auth/auth-shell";
 
 function VerifyEmailForm() {
   const searchParams = useSearchParams();
@@ -37,29 +38,29 @@ function VerifyEmailForm() {
   }
 
   return (
-    <section className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-8 shadow-card-lg">
-      <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">Verifiering</p>
-      <h1 className="text-3xl font-extrabold text-slate-950">Verifiera e-post</h1>
-      <p className="mt-3 text-sm leading-6 text-slate-500">Bekräfta din e-postadress för högre säkerhet i organisationen.</p>
-      {(error || message) && (
-        <div className={`mt-6 rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-600" : "border-success-500 bg-success-50 text-success-600"}`}>
-          {error || message}
-        </div>
-      )}
-      <button disabled={loading || !token} onClick={verify} className="mt-6 w-full rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700 disabled:opacity-70">
+    <AuthShell
+      eyebrow="Verifiering"
+      title="Verifiera e-post"
+      description="Bekräfta din e-postadress för högre säkerhet i organisationen."
+      footer={
+        <Link href="/dashboard" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+          Till dashboard
+        </Link>
+      }
+    >
+      {error ? <AuthAlert>{error}</AuthAlert> : null}
+      {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
+      <button disabled={loading || !token} onClick={verify} className={`mt-7 ${authButtonClass}`}>
         {loading ? "Verifierar..." : "Verifiera e-post"}
       </button>
-      <Link href="/dashboard" className="mt-6 block text-center text-sm font-semibold text-brand-600">Till dashboard</Link>
-    </section>
+    </AuthShell>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <Suspense fallback={<div className="h-64 w-full max-w-md animate-pulse rounded-3xl bg-slate-100" />}>
+    <Suspense fallback={<main className="min-h-screen bg-sand-50 p-6"><div className="mx-auto mt-24 h-96 w-full max-w-4xl animate-pulse rounded-3xl bg-sand-100" /></main>}>
         <VerifyEmailForm />
-      </Suspense>
-    </main>
+    </Suspense>
   );
 }

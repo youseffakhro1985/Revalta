@@ -50,7 +50,7 @@ export function MarketingHeader() {
             href="/register"
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-petroleum-700 px-4 text-[13px] font-semibold text-white shadow-premium-sm transition-colors hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
           >
-            Boka visning
+            Skapa konto
             <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />
           </Link>
         </div>

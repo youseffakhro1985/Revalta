@@ -3,6 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useState } from "react";
+import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -24,5 +25,37 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  return <main className="flex min-h-screen items-center justify-center bg-sand-50 p-4"><section className="w-full max-w-md rounded-2xl border border-sand-200 bg-white p-8 shadow-premium-sm"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-600">Revalta</p><h1 className="mt-3 text-3xl font-semibold text-ink-950">Glömt lösenord</h1><p className="mt-3 text-sm text-ink-600">Ange e-postadressen till kontot. Av säkerhetsskäl visar vi aldrig om adressen finns registrerad.</p>{message && <div className="mt-5 rounded-xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-700">{message}</div>}<form onSubmit={submit} className="mt-6 space-y-4"><label className="block text-sm font-medium text-ink-700">E-post<input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-sand-200 p-3" /></label><button disabled={loading} className="w-full rounded-xl bg-petroleum-700 px-4 py-3 font-semibold text-white disabled:opacity-60">{loading ? "Skickar..." : "Skicka återställningslänk"}</button></form><Link href="/login" className="mt-6 block text-center text-sm font-medium text-petroleum-700">Tillbaka till inloggning</Link></section></main>;
+  return (
+    <AuthShell
+      eyebrow="Kontoåterställning"
+      title="Glömt lösenord"
+      description="Ange e-postadressen till kontot. Av säkerhetsskäl visar vi aldrig om adressen finns registrerad."
+      footer={
+        <Link href="/login" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+          Tillbaka till inloggning
+        </Link>
+      }
+    >
+      {message ? <AuthAlert tone="neutral">{message}</AuthAlert> : null}
+      <form onSubmit={submit} className="mt-7 space-y-5">
+        <div>
+          <label htmlFor="forgot-email" className="block text-sm font-medium text-ink-700">E-post</label>
+          <input
+            id="forgot-email"
+            type="email"
+            required
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className={authInputClass}
+            placeholder="namn@exempel.se"
+          />
+        </div>
+        <button disabled={loading} className={authButtonClass}>
+          {loading ? "Skickar..." : "Skicka återställningslänk"}
+        </button>
+      </form>
+    </AuthShell>
+  );
 }

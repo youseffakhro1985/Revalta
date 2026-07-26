@@ -4,6 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -38,77 +39,95 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 animate-fade-in p-4">
-      <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-card-lg border border-slate-100 animate-slide-up">
-        <div className="mb-8 text-center">
-          <h2 className="text-3xl font-bold text-slate-900 mb-2">Skapa konto</h2>
-          <p className="text-slate-500 text-sm">Bli medlem för att skapa felanmälningar</p>
-        </div>
-        {error && (
-          <div className="mb-6 p-3 bg-danger-50 border border-danger-500 text-danger-600 rounded-lg text-sm text-center animate-pulse-soft">
-            {error}
-          </div>
-        )}
-        <form onSubmit={handleRegister} className="space-y-5">
+    <AuthShell
+      eyebrow="Ny organisation"
+      title="Skapa er arbetsyta"
+      description="Registrera organisationens första administratör och börja konfigurera Revalta för er förvaltning."
+      footer={
+        <>
+          Har du redan ett konto?{" "}
+          <Link href="/login" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+            Logga in
+          </Link>
+        </>
+      }
+    >
+      {error ? <AuthAlert>{error}</AuthAlert> : null}
+      <form onSubmit={handleRegister} className="mt-7 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Namn</label>
-            <input 
-              type="text" 
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+            <label htmlFor="register-name" className="block text-sm font-medium text-ink-700">Ditt namn</label>
+            <input
+              id="register-name"
+              type="text"
+              required
+              minLength={2}
+              maxLength={100}
+              autoComplete="name"
+              autoFocus
+              className={authInputClass}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Förnamn Efternamn"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Företag</label>
+            <label htmlFor="register-company" className="block text-sm font-medium text-ink-700">Organisation</label>
             <input
+              id="register-company"
               type="text"
               required
               minLength={2}
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none"
+              maxLength={160}
+              autoComplete="organization"
+              className={authInputClass}
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Ex. Revalta Förvaltning AB"
+              placeholder="Exempel Fastighetsförvaltning"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">E-post</label>
-            <input 
-              type="email" 
+            <label htmlFor="register-email" className="block text-sm font-medium text-ink-700">E-post</label>
+            <input
+              id="register-email"
+              type="email"
               required
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+              autoComplete="email"
+              className={authInputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="namn@exempel.se"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Lösenord</label>
-            <input 
-              type="password" 
+            <label htmlFor="register-password" className="block text-sm font-medium text-ink-700">Lösenord</label>
+            <input
+              id="register-password"
+              type="password"
               required
               minLength={10}
               maxLength={128}
-              className="block w-full rounded-xl border-slate-200 border p-3 shadow-inner-sm focus:border-brand-500 focus:ring-brand-500 transition-colors outline-none" 
+              autoComplete="new-password"
+              className={authInputClass}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
-            <p className="mt-2 text-xs text-slate-500">Minst 10 tecken med både bokstav och siffra.</p>
+            <p className="mt-2 text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
           </div>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
-            className="w-full py-3 px-4 bg-brand-600 text-white font-medium rounded-xl hover:bg-brand-700 transition-all shadow-card hover:shadow-card-md active:scale-[0.98] disabled:opacity-70"
+            className={authButtonClass}
           >
-            {loading ? "Registrerar..." : "Registrera"}
+            {loading ? "Skapar arbetsyta..." : "Skapa konto"}
           </button>
         </form>
-        <p className="mt-8 text-center text-sm text-slate-500">
-          Har du redan ett konto? <Link href="/login" className="text-brand-600 font-medium hover:text-brand-700 hover:underline transition-colors">Logga in</Link>
+        <p className="mt-5 text-center text-xs leading-5 text-ink-500">
+          Genom att skapa kontot godkänner du Revaltas{" "}
+          <Link href="/juridik/villkor" className="font-medium text-petroleum-700 hover:underline">användarvillkor</Link>
+          {" "}och{" "}
+          <Link href="/juridik/integritet" className="font-medium text-petroleum-700 hover:underline">integritetspolicy</Link>.
         </p>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

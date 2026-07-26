@@ -4,6 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 
 function AcceptInviteForm() {
   const searchParams = useSearchParams();
@@ -44,44 +45,61 @@ function AcceptInviteForm() {
   }
 
   return (
-    <section className="w-full max-w-md rounded-3xl border border-sand-200 bg-white p-8 shadow-premium-lg">
-      <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">Teaminbjudan</p>
-      <h1 className="text-3xl font-semibold tracking-tight text-ink-950">Välkommen till Revalta</h1>
-      <p className="mt-3 text-sm leading-6 text-ink-500">Skapa ditt lösenord för att gå med i organisationens arbetsyta.</p>
-
-      {(error || message) && (
-        <div className={`mt-6 rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-600" : "border-success-500 bg-success-50 text-success-600"}`}>
-          {error || message}
-        </div>
-      )}
-
-      <form onSubmit={acceptInvite} className="mt-6 space-y-5">
+    <AuthShell
+      eyebrow="Teaminbjudan"
+      title="Välkommen till Revalta"
+      description="Skapa ditt lösenord för att gå med i organisationens arbetsyta."
+      footer={
+        <Link href="/login" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+          Till inloggning
+        </Link>
+      }
+    >
+      {error ? <AuthAlert>{error}</AuthAlert> : null}
+      {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
+      <form onSubmit={acceptInvite} className="mt-7 space-y-5">
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-700">Namn</label>
-          <input value={name} onChange={(event) => setName(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Förnamn Efternamn" />
+          <label htmlFor="invite-name" className="block text-sm font-medium text-ink-700">Namn</label>
+          <input
+            id="invite-name"
+            required
+            minLength={2}
+            maxLength={100}
+            autoComplete="name"
+            autoFocus
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className={authInputClass}
+            placeholder="Förnamn Efternamn"
+          />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-ink-700">Lösenord</label>
-          <input type="password" minLength={10} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500" placeholder="Minst 10 tecken med bokstav och siffra" />
+          <label htmlFor="invite-password" className="block text-sm font-medium text-ink-700">Lösenord</label>
+          <input
+            id="invite-password"
+            type="password"
+            minLength={10}
+            maxLength={128}
+            required
+            autoComplete="new-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            className={authInputClass}
+            placeholder="Minst 10 tecken med bokstav och siffra"
+          />
         </div>
-        <button disabled={loading || !token} className="w-full rounded-xl bg-petroleum-600 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70">
+        <button disabled={loading || !token} className={authButtonClass}>
           {loading ? "Skapar konto..." : "Acceptera inbjudan"}
         </button>
       </form>
-
-      <Link href="/login" className="mt-6 block text-center text-sm font-semibold text-petroleum-600">
-        Till inloggning
-      </Link>
-    </section>
+    </AuthShell>
   );
 }
 
 export default function AcceptInvitePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sand-50 p-4">
-      <Suspense fallback={<div className="h-64 w-full max-w-md animate-pulse rounded-3xl bg-sand-100" />}>
+    <Suspense fallback={<main className="min-h-screen bg-sand-50 p-6"><div className="mx-auto mt-24 h-96 w-full max-w-4xl animate-pulse rounded-3xl bg-sand-100" /></main>}>
         <AcceptInviteForm />
-      </Suspense>
-    </main>
+    </Suspense>
   );
 }

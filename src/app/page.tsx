@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   ArrowRight,
   BarChart3,
@@ -14,6 +15,26 @@ import {
 import { DashboardPreview } from "@/components/landing/dashboard-preview";
 import { MarketingHeader } from "@/components/marketing-header";
 import { SiteFooter } from "@/components/site-footer";
+
+const title = "Fastighetssystem för svensk förvaltning";
+const description =
+  "Samla fastigheter, felanmälningar, arbetsorder, avtal och ekonomi i Revalta – ett modernt fastighetssystem för svenska fastighetsägare, BRF:er och förvaltare.";
+
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: { canonical: "/" },
+  openGraph: {
+    url: "/",
+    title: `${title} | Revalta`,
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${title} | Revalta`,
+    description,
+  },
+};
 
 const modules = [
   {
@@ -85,7 +106,7 @@ export default function Home() {
                   href="/register"
                   className="inline-flex h-12 items-center justify-center gap-2.5 rounded-lg bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-colors hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
                 >
-                  Boka en personlig visning
+                  Skapa konto
                   <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
                 </Link>
                 <Link
@@ -191,7 +212,7 @@ export default function Home() {
               href="/register"
               className="inline-flex h-12 w-fit items-center gap-2.5 rounded-lg bg-petroleum-700 px-5 text-[14px] font-semibold text-white transition-colors hover:bg-petroleum-800"
             >
-              Boka personlig visning
+              Skapa konto
               <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
             </Link>
           </div>

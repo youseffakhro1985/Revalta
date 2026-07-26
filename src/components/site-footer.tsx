@@ -16,7 +16,7 @@ export function SiteFooter() {
             <h4 className="text-sm font-semibold text-ink-950 mb-4">Plattformen</h4>
             <nav className="flex flex-col gap-3 text-sm text-ink-500">
               <Link href="/portal" className="hover:text-petroleum-600 transition-colors">Boendeportal</Link>
-              <Link href="/register" className="hover:text-petroleum-600 transition-colors">Boka demo</Link>
+              <Link href="/register" className="hover:text-petroleum-600 transition-colors">Skapa konto</Link>
               <Link href="/login" className="hover:text-petroleum-600 transition-colors">Logga in</Link>
             </nav>
           </div>
@@ -33,7 +33,7 @@ export function SiteFooter() {
         </div>
       </div>
       <div className="mx-auto mt-16 max-w-7xl border-t border-sand-200 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-ink-400">
-        <p className="text-center sm:text-left">&copy; {new Date().getFullYear()} Revalta AB. Alla rättigheter reserverade.</p>
+        <p className="text-center sm:text-left">&copy; {new Date().getFullYear()} Revalta. Alla rättigheter reserverade.</p>
         <p className="font-medium">Svensk Proptech</p>
       </div>
     </footer>

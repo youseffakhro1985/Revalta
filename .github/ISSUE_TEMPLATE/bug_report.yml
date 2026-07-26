@@ -1,0 +1,38 @@
+name: Felrapport
+description: Rapportera ett reproducerbart fel i Revalta
+title: "[Fel] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Vad hände och vad förväntade du dig?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduktion
+      description: Ange exakta steg utan personuppgifter eller hemligheter.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Miljö
+      options:
+        - Produktion
+        - Preview
+        - Lokal utveckling
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Teknisk evidens
+      description: Felkod, tidpunkt, route och skärmbild. Maskera känsliga värden.
