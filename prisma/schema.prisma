@@ -85,6 +85,8 @@ model User {
   service_notification_assignments_changed ServiceNotificationAssignment[] @relation("ServiceNotificationAssignmentChangedBy")
   service_notification_assignments_assigned ServiceNotificationAssignment[] @relation("ServiceNotificationAssignmentAssignee")
   component_service_delivery_alert_acks ComponentServiceDeliveryAlertAck[]
+  notification_ux_states NotificationUxState[]
+  service_escalation_rules_updated ServiceEscalationRulesSettings[] @relation("ServiceEscalationRulesUpdatedBy")
 }
 
 model Company {
@@ -161,6 +163,8 @@ model Company {
   component_service_digest_runs ComponentServiceDigestRun[]
   component_service_delivery_alerts ComponentServiceDeliveryAlert[]
   component_service_delivery_alert_acks ComponentServiceDeliveryAlertAck[]
+  notification_ux_states NotificationUxState[]
+  service_escalation_rules_settings ServiceEscalationRulesSettings?
 }
 
 model Property {
@@ -1919,4 +1923,41 @@ model ComponentServiceDeliveryAlertAck {
 
   @@unique([alert_id, user_id])
   @@index([company_id, user_id])
+}
+
+model NotificationUxState {
+  id                String    @id @default(uuid())
+  company_id        String
+  user_id           String
+  channel           String
+  notification_key  String
+  read_at           DateTime?
+  snoozed_until     DateTime?
+  snooze_cleared_at DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  company           Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([company_id, user_id, channel, notification_key], map: "NotificationUxState_company_user_channel_key_uidx")
+  @@index([company_id, user_id, channel, snoozed_until], map: "NotificationUxState_company_user_channel_snooze_idx")
+}
+
+model ServiceEscalationRulesSettings {
+  id                 String   @id @default(uuid())
+  company_id         String   @unique
+  enabled            Boolean  @default(true)
+  escalate_blocked   Boolean  @default(true)
+  escalate_overdue   Boolean  @default(true)
+  grace_days         Int      @default(0)
+  repeat_days        Int      @default(1)
+  recipient_roles    Json
+  include_assignee   Boolean  @default(true)
+  updated_by_id      String
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  company            Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  updated_by         User     @relation("ServiceEscalationRulesUpdatedBy", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@index([updated_by_id])
 }

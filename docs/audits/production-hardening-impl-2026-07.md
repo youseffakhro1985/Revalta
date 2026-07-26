@@ -56,6 +56,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Project detail can assign project manager via `/api/team` and soft-delete projects.
    - Work-order ops off IntegrationEvent primary storage: `WorkOrderTimeEntry`, `WorkOrderMaterialEntry`, `WorkOrderProfitabilitySettings`, `WorkOrderInvoiceDraft`, `WorkOrderInvoiceExportJob` (dual-read + cron/export jobs).
    - Service ops state: `ServiceNotificationAssignment`, `ComponentServiceDigestRun`, `ComponentServiceDeliveryAlert` (+ acks) with dual-read and cron cutover.
+   - Notification UX state (`NotificationUxState`) for service-center and WO SLA reads/snoozes; escalation rules on `ServiceEscalationRulesSettings`.
    - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables).
 
 ## Verification

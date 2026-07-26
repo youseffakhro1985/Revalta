@@ -1016,6 +1016,90 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("NotificationUxState", async () => {
+    const readEvents = await prisma.integrationEvent.findMany({
+      where: { type: { in: ["service_notification_read", "work_order_sla_notification_read"] }, company_id: { not: null }, recipient: { not: null }, status: "read" },
+      orderBy: { created_at: "asc" },
+      take: 20000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of readEvents) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const key = payload.notificationKey ? String(payload.notificationKey) : "";
+      if (!event.company_id || !event.recipient || !key) { localSkipped += 1; continue; }
+      const channel = event.type === "work_order_sla_notification_read" ? "work_order_sla" : "service_center";
+      const existing = await prisma.notificationUxState.findUnique({
+        where: { company_id_user_id_channel_notification_key: { company_id: event.company_id, user_id: event.recipient, channel, notification_key: key } },
+      });
+      if (existing?.read_at) { localSkipped += 1; continue; }
+      if (existing) {
+        await prisma.notificationUxState.update({ where: { id: existing.id }, data: { read_at: event.created_at } });
+        localCreated += 1;
+        continue;
+      }
+      await prisma.notificationUxState.create({
+        data: {
+          company_id: event.company_id,
+          user_id: event.recipient,
+          channel,
+          notification_key: key,
+          read_at: event.created_at,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("ServiceEscalationRulesSettings", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "service_escalation_rules", status: "active", company_id: { not: null } },
+      orderBy: { created_at: "desc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const seen = new Set();
+    for (const event of events) {
+      if (!event.company_id || seen.has(event.company_id)) { localSkipped += 1; continue; }
+      seen.add(event.company_id);
+      if (await prisma.serviceEscalationRulesSettings.findUnique({ where: { company_id: event.company_id } })) {
+        localSkipped += 1; continue;
+      }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const rules = (payload.rules && typeof payload.rules === "object") ? payload.rules : payload;
+      const updatedById = payload.changedBy
+        ? String(payload.changedBy)
+        : (await prisma.user.findFirst({ where: { company_id: event.company_id, status: "active" }, select: { id: true } }))?.id;
+      if (!updatedById) { localSkipped += 1; continue; }
+      const roles = Array.isArray(rules.recipientRoles) ? rules.recipientRoles.map(String) : ["owner", "admin"];
+      await prisma.serviceEscalationRulesSettings.create({
+        data: {
+          company_id: event.company_id,
+          enabled: rules.enabled !== false,
+          escalate_blocked: rules.escalateBlocked !== false,
+          escalate_overdue: rules.escalateOverdue !== false,
+          grace_days: num(rules.graceDays, 0),
+          repeat_days: Math.max(1, num(rules.repeatDays, 1)),
+          recipient_roles: roles,
+          include_assignee: rules.includeAssignee !== false,
+          updated_by_id: updatedById,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   await backfill("ServiceNotificationAssignment", async () => {
     const events = await prisma.integrationEvent.findMany({
       where: { type: "service_notification_assignment", company_id: { not: null } },

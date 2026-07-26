@@ -4,6 +4,11 @@ import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
+import {
+  getNotificationUxState,
+  markNotificationsRead,
+  snoozeNotifications,
+} from "@/lib/notification-ux-state";
 
 export const dynamic = "force-dynamic";
 
@@ -26,18 +31,6 @@ type WorkOrderRow = {
   pause_reason: string | null;
   closed_at: Date | null;
 };
-
-type NotificationPayload = { notificationKey?: string; snoozedUntil?: string };
-
-function payloadFor(value: Prisma.JsonValue | null): NotificationPayload | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as NotificationPayload;
-}
-
-function notificationKey(value: Prisma.JsonValue | null) {
-  const key = payloadFor(value)?.notificationKey;
-  return typeof key === "string" ? key : null;
-}
 
 async function rowsFor(companyId: string) {
   return db.$queryRaw<WorkOrderRow[]>(Prisma.sql`
@@ -105,27 +98,16 @@ export async function GET(request: Request) {
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const filter = new URL(request.url).searchParams.get("filter") || "all";
-  const [base, reads, snoozeEvents] = await Promise.all([
+  const [base, ux] = await Promise.all([
     notificationsFor(user.company_id),
-    db.integrationEvent.findMany({ where: { company_id: user.company_id, type: "work_order_sla_notification_read", recipient: user.id, status: "read" }, select: { payload: true }, take: 1000 }),
-    db.integrationEvent.findMany({ where: { company_id: user.company_id, type: "work_order_sla_notification_snooze", recipient: user.id }, orderBy: { created_at: "desc" }, select: { status: true, payload: true }, take: 2000 }),
+    getNotificationUxState(user.company_id, user.id, "work_order_sla"),
   ]);
-
-  const read = new Set(reads.map((item) => notificationKey(item.payload)).filter((value): value is string => Boolean(value)));
-  const latestSnooze = new Map<string, { status: string; until: Date | null }>();
-  for (const event of snoozeEvents) {
-    const payload = payloadFor(event.payload);
-    const key = payload?.notificationKey;
-    if (!key || latestSnooze.has(key)) continue;
-    const parsed = payload.snoozedUntil ? new Date(payload.snoozedUntil) : null;
-    latestSnooze.set(key, { status: event.status, until: parsed && !Number.isNaN(parsed.getTime()) ? parsed : null });
-  }
 
   const now = new Date();
   const all = base.map((item) => {
-    const snooze = latestSnooze.get(item.key);
-    const snoozedUntil = snooze?.status === "active" && snooze.until && snooze.until > now ? snooze.until : null;
-    return { ...item, read: read.has(item.key), snoozedUntil: snoozedUntil?.toISOString() || null };
+    const snoozedUntilRaw = ux.snooze.get(item.key) ?? null;
+    const snoozedUntil = snoozedUntilRaw && snoozedUntilRaw > now ? snoozedUntilRaw : null;
+    return { ...item, read: ux.read.has(item.key), snoozedUntil: snoozedUntil?.toISOString() || null };
   });
   const active = all.filter((item) => !item.snoozedUntil);
   const notifications = all.filter((item) => {
@@ -156,19 +138,18 @@ export async function PATCH(request: Request) {
     const until = typeof body.snoozedUntil === "string" ? new Date(body.snoozedUntil) : null;
     const max = new Date(Date.now() + 30 * 86400000);
     if (!until || Number.isNaN(until.getTime()) || until <= new Date() || until > max) return NextResponse.json({ error: "SLA-aviseringen kan skjutas upp högst 30 dagar" }, { status: 400 });
-    await db.integrationEvent.createMany({ data: keys.map((key) => ({ company_id: user.company_id, type: "work_order_sla_notification_snooze", status: "active", recipient: user.id, payload: { notificationKey: key, snoozedUntil: until.toISOString(), changedBy: user.id } })) });
+    await snoozeNotifications(user.company_id, user.id, "work_order_sla", keys, until, false);
     return NextResponse.json({ success: true, snoozed: keys.length, snoozedUntil: until.toISOString() });
   }
 
   if (action === "unsnooze") {
-    await db.integrationEvent.createMany({ data: keys.map((key) => ({ company_id: user.company_id, type: "work_order_sla_notification_snooze", status: "cleared", recipient: user.id, payload: { notificationKey: key, changedBy: user.id } })) });
+    await snoozeNotifications(user.company_id, user.id, "work_order_sla", keys, null, true);
     return NextResponse.json({ success: true, reactivated: keys.length });
   }
   if (action !== "read") return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
 
-  const existing = await db.integrationEvent.findMany({ where: { company_id: user.company_id, type: "work_order_sla_notification_read", recipient: user.id, status: "read" }, select: { payload: true } });
-  const existingKeys = new Set(existing.map((item) => notificationKey(item.payload)).filter((value): value is string => Boolean(value)));
-  const missing = Array.from(new Set(keys)).filter((key) => !existingKeys.has(key));
-  if (missing.length) await db.integrationEvent.createMany({ data: missing.map((key) => ({ company_id: user.company_id, type: "work_order_sla_notification_read", status: "read", recipient: user.id, payload: { notificationKey: key } })) });
+  const ux = await getNotificationUxState(user.company_id, user.id, "work_order_sla");
+  const missing = Array.from(new Set(keys)).filter((key) => !ux.read.has(key));
+  if (missing.length) await markNotificationsRead(user.company_id, user.id, "work_order_sla", missing);
   return NextResponse.json({ success: true, marked: missing.length });
 }

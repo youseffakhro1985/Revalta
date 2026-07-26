@@ -47,6 +47,28 @@ export function normalizeEscalationRules(value: unknown): ServiceEscalationRules
 }
 
 export async function getServiceEscalationRules(companyId: string) {
+  const modern = await db.serviceEscalationRulesSettings.findUnique({
+    where: { company_id: companyId },
+  });
+  if (modern) {
+    const roles = Array.isArray(modern.recipient_roles)
+      ? modern.recipient_roles.filter((role): role is EscalationRole => typeof role === "string" && ESCALATION_ROLES.includes(role as EscalationRole))
+      : DEFAULT_ESCALATION_RULES.recipientRoles;
+    return {
+      rules: {
+        enabled: modern.enabled,
+        escalateBlocked: modern.escalate_blocked,
+        escalateOverdue: modern.escalate_overdue,
+        graceDays: modern.grace_days,
+        repeatDays: modern.repeat_days,
+        recipientRoles: roles.length ? roles : DEFAULT_ESCALATION_RULES.recipientRoles,
+        includeAssignee: modern.include_assignee,
+      } satisfies ServiceEscalationRules,
+      updatedAt: modern.updated_at.toISOString(),
+      source: "table" as const,
+    };
+  }
+
   const event = await db.integrationEvent.findFirst({
     where: { company_id: companyId, type: ESCALATION_RULE_EVENT, status: "active" },
     orderBy: { created_at: "desc" },
@@ -65,5 +87,37 @@ export async function getServiceEscalationRules(companyId: string) {
   }
 
   const rules = normalizeEscalationRules(rulesValue);
-  return { rules, updatedAt: event?.created_at.toISOString() ?? null };
+  return { rules, updatedAt: event?.created_at.toISOString() ?? null, source: "legacy" as const };
+}
+
+export async function upsertServiceEscalationRules(
+  companyId: string,
+  userId: string,
+  rules: ServiceEscalationRules,
+) {
+  const row = await db.serviceEscalationRulesSettings.upsert({
+    where: { company_id: companyId },
+    create: {
+      company_id: companyId,
+      enabled: rules.enabled,
+      escalate_blocked: rules.escalateBlocked,
+      escalate_overdue: rules.escalateOverdue,
+      grace_days: rules.graceDays,
+      repeat_days: rules.repeatDays,
+      recipient_roles: rules.recipientRoles,
+      include_assignee: rules.includeAssignee,
+      updated_by_id: userId,
+    },
+    update: {
+      enabled: rules.enabled,
+      escalate_blocked: rules.escalateBlocked,
+      escalate_overdue: rules.escalateOverdue,
+      grace_days: rules.graceDays,
+      repeat_days: rules.repeatDays,
+      recipient_roles: rules.recipientRoles,
+      include_assignee: rules.includeAssignee,
+      updated_by_id: userId,
+    },
+  });
+  return row.updated_at.toISOString();
 }
