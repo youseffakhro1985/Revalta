@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, auditFindManyMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, auditFindManyMock, inspectionRoundFindManyMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   auditFindManyMock: vi.fn(),
+  inspectionRoundFindManyMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -11,6 +12,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 }));
 vi.mock("@/lib/db", () => ({
   default: {
+    inspectionRound: { findMany: inspectionRoundFindManyMock },
     auditLog: { findMany: auditFindManyMock },
     property: { findFirst: vi.fn() },
   },
@@ -22,25 +24,27 @@ describe("rounds route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     auditFindManyMock.mockResolvedValue([]);
+    inspectionRoundFindManyMock.mockResolvedValue([]);
   });
 
-  it("uses audit scope for company users", async () => {
+  it("uses company-scoped table + legacy audit rows", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1" });
     const response = await GET();
 
     expect(response.status).toBe(200);
+    expect(inspectionRoundFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { company_id: "company-1" },
+    }));
     expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { company_id: "company-1", entity_type: "round" },
     }));
   });
 
-  it("uses actor scope for solo users", async () => {
+  it("requires organisation for rounds", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null });
     const response = await GET();
 
-    expect(response.status).toBe(200);
-    expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { actor_user_id: "user-1", entity_type: "round" },
-    }));
+    expect(response.status).toBe(400);
+    expect(inspectionRoundFindManyMock).not.toHaveBeenCalled();
   });
 });

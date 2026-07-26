@@ -52,6 +52,10 @@ model User {
   maintenance_actions                  MaintenanceAction[]
   time_reports                         TimeReport[]
   access_credentials                   AccessCredential[]
+  quotes_created                       Quote[]              @relation("QuoteCreatedBy")
+  quote_decisions                      QuoteDecision[]
+  bookings_created                     Booking[]            @relation("BookingCreatedBy")
+  inspection_rounds_created            InspectionRound[]    @relation("InspectionRoundCreatedBy")
 }
 
 model Company {
@@ -96,6 +100,10 @@ model Company {
   maintenance_actions         MaintenanceAction[]
   lease_contracts             LeaseContract[]
   access_credentials          AccessCredential[]
+  quotes                      Quote[]
+  quote_decisions             QuoteDecision[]
+  bookings                    Booking[]
+  inspection_rounds           InspectionRound[]
 }
 
 model Property {
@@ -139,6 +147,9 @@ model Property {
   maintenance_actions      MaintenanceAction[]
   lease_contracts          LeaseContract[]
   access_credentials       AccessCredential[]
+  quotes                   Quote[]
+  bookings                 Booking[]
+  inspection_rounds        InspectionRound[]
 
   @@index([company_id])
   @@index([user_id])
@@ -1063,5 +1074,104 @@ model AccessCredential {
   @@index([company_id, created_at])
   @@index([company_id, property_id])
   @@index([company_id, status])
+  @@index([created_by_id])
+}
+
+model Quote {
+  id                String          @id @default(uuid())
+  company_id        String
+  property_id       String
+  title             String
+  supplier          String?
+  status            String          @default("draft")
+  valid_until       DateTime?
+  labor             Decimal         @default(0) @db.Decimal(12, 2)
+  material          Decimal         @default(0) @db.Decimal(12, 2)
+  supplier_cost     Decimal         @default(0) @db.Decimal(12, 2)
+  other             Decimal         @default(0) @db.Decimal(12, 2)
+  subtotal          Decimal         @default(0) @db.Decimal(12, 2)
+  vat_rate          Decimal         @default(25) @db.Decimal(5, 2)
+  vat               Decimal         @default(0) @db.Decimal(12, 2)
+  total             Decimal         @default(0) @db.Decimal(12, 2)
+  note              String?
+  decision_comment  String?
+  decision_at       DateTime?
+  decision_by       String?
+  created_by_id     String
+  created_at        DateTime        @default(now())
+  updated_at        DateTime        @updatedAt
+  company           Company         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property          Property        @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by        User            @relation("QuoteCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  decisions         QuoteDecision[]
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, status])
+  @@index([created_by_id])
+}
+
+model QuoteDecision {
+  id              String   @id @default(uuid())
+  company_id      String
+  quote_id        String
+  previous_status String
+  status          String
+  comment         String?
+  actor_user_id   String
+  created_at      DateTime @default(now())
+  company         Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  quote           Quote    @relation(fields: [quote_id], references: [id], onDelete: Cascade)
+  actor           User     @relation(fields: [actor_user_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, quote_id, created_at])
+  @@index([quote_id, created_at])
+  @@index([actor_user_id])
+}
+
+model Booking {
+  id             String   @id @default(uuid())
+  company_id     String
+  property_id    String
+  resource       String
+  resident_name  String
+  unit           String?
+  start_at       DateTime
+  end_at         DateTime
+  note           String?
+  status         String   @default("confirmed")
+  created_by_id  String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  company        Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property       Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by     User     @relation("BookingCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id, start_at])
+  @@index([company_id, resource, start_at])
+  @@index([created_by_id])
+}
+
+model InspectionRound {
+  id             String   @id @default(uuid())
+  company_id     String
+  property_id    String
+  title          String
+  interval       String   @default("monthly")
+  status         String   @default("planned")
+  next_due       DateTime
+  checklist      Json
+  deviations     Int      @default(0)
+  created_by_id  String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  company        Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property       Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by     User     @relation("InspectionRoundCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, next_due])
   @@index([created_by_id])
 }

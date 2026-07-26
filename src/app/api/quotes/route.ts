@@ -7,12 +7,42 @@ const action = "quote.created";
 const decisionAction = "quote.status_changed";
 const allowedStatuses = new Set(["draft", "sent", "approved", "rejected", "invoiced"]);
 
+function money(value: { toString(): string } | number) {
+  return Number(value);
+}
+
+function parseOptionalDate(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-    const [logs, decisions, properties] = await Promise.all([
+    const [rows, decisions, legacyLogs, legacyDecisions, properties] = await Promise.all([
+      db.quote.findMany({
+        where: { company_id: user.company_id },
+        orderBy: { created_at: "desc" },
+        take: 300,
+        include: {
+          property: { select: { name: true } },
+          decisions: {
+            orderBy: { created_at: "desc" },
+            take: 20,
+            include: { actor: { select: { name: true, email: true } } },
+          },
+        },
+      }),
+      db.quoteDecision.findMany({
+        where: { company_id: user.company_id },
+        orderBy: { created_at: "desc" },
+        take: 500,
+        select: { quote_id: true },
+      }),
       db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "desc" },
@@ -31,30 +61,70 @@ export async function GET() {
         select: { id: true, name: true, address: true, city: true },
       }),
     ]);
+    void decisions;
 
-    const decisionMap = new Map<string, Array<Record<string, unknown>>>();
-    for (const decision of decisions) {
+    const modernIds = new Set(rows.map((row) => row.id));
+    const modern = rows.map((row) => ({
+      id: row.id,
+      property_id: row.property_id,
+      property_name: row.property.name,
+      title: row.title,
+      supplier: row.supplier || "",
+      status: row.status,
+      valid_until: row.valid_until?.toISOString().slice(0, 10) || null,
+      labor: money(row.labor),
+      material: money(row.material),
+      supplier_cost: money(row.supplier_cost),
+      other: money(row.other),
+      subtotal: money(row.subtotal),
+      vat_rate: money(row.vat_rate),
+      vat: money(row.vat),
+      total: money(row.total),
+      note: row.note || "",
+      decision_comment: row.decision_comment || null,
+      decision_at: row.decision_at?.toISOString() || null,
+      decision_by: row.decision_by || null,
+      history: row.decisions.map((decision) => ({
+        id: decision.id,
+        quote_id: row.id,
+        previous_status: decision.previous_status,
+        status: decision.status,
+        comment: decision.comment,
+        actor_name: decision.actor.name || decision.actor.email || "Användare",
+        created_at: decision.created_at,
+      })),
+      created_at: row.created_at,
+      source: "table" as const,
+    }));
+
+    const legacyDecisionMap = new Map<string, Array<Record<string, unknown>>>();
+    for (const decision of legacyDecisions) {
       const metadata = (decision.metadata || {}) as Record<string, unknown>;
       const quoteId = String(metadata.quote_id || "");
-      if (!quoteId) continue;
-      const items = decisionMap.get(quoteId) || [];
+      if (!quoteId || modernIds.has(quoteId)) continue;
+      const items = legacyDecisionMap.get(quoteId) || [];
       items.push({
         id: decision.id,
         ...metadata,
         actor_name: decision.actor?.name || decision.actor?.email || "Användare",
         created_at: decision.created_at,
       });
-      decisionMap.set(quoteId, items);
+      legacyDecisionMap.set(quoteId, items);
     }
 
-    return NextResponse.json({
-      quotes: logs.map((log) => ({
+    const legacy = legacyLogs
+      .filter((log) => !modernIds.has(log.id))
+      .map((log) => ({
         id: log.id,
         property_id: log.entity_id,
         ...(log.metadata as object),
-        history: decisionMap.get(log.id) || [],
+        history: legacyDecisionMap.get(log.id) || [],
         created_at: log.created_at,
-      })),
+        source: "legacy" as const,
+      }));
+
+    return NextResponse.json({
+      quotes: [...modern, ...legacy].sort((a, b) => b.created_at.getTime() - a.created_at.getTime()).slice(0, 300),
       properties,
     });
   } catch (error) {
@@ -68,6 +138,7 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();
@@ -101,11 +172,34 @@ export async function POST(request: Request) {
     const vat = subtotal * (vatRate / 100);
     const total = subtotal + vat;
 
+    const quote = await db.quote.create({
+      data: {
+        company_id: user.company_id,
+        property_id: property.id,
+        title,
+        supplier: supplier || null,
+        status,
+        valid_until: parseOptionalDate(validUntil),
+        labor,
+        material,
+        supplier_cost: supplierCost,
+        other,
+        subtotal,
+        vat_rate: vatRate,
+        vat,
+        total,
+        note: note || null,
+        created_by_id: user.id,
+      },
+      select: { id: true, created_at: true },
+    });
+
     await writeAuditLog(user, {
-      entityType: "property",
-      entityId: property.id,
+      entityType: "quote",
+      entityId: quote.id,
       action,
       metadata: {
+        property_id: property.id,
         property_name: property.name,
         title,
         supplier,
@@ -120,10 +214,11 @@ export async function POST(request: Request) {
         vat,
         total,
         note,
+        storage: "Quote",
       },
     });
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    return NextResponse.json({ success: true, quote }, { status: 201 });
   } catch (error) {
     console.error("Create quote error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -135,6 +230,7 @@ export async function PATCH(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const quoteId = String(body.quoteId || "").trim();
@@ -145,18 +241,66 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Offert och giltig status krävs" }, { status: 400 });
     }
 
-    const quote = await db.auditLog.findFirst({
+    const quote = await db.quote.findFirst({
+      where: { id: quoteId, company_id: user.company_id },
+      select: { id: true, property_id: true, title: true, status: true },
+    });
+
+    if (quote) {
+      const previousStatus = quote.status;
+      const changedAt = new Date();
+      const updateResult = await db.quote.updateMany({
+        where: { id: quote.id, company_id: user.company_id },
+        data: {
+          status,
+          decision_comment: comment || null,
+          decision_at: changedAt,
+          decision_by: user.name || user.email,
+        },
+      });
+      if (updateResult.count === 0) return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
+
+      await db.quoteDecision.create({
+        data: {
+          company_id: user.company_id,
+          quote_id: quote.id,
+          previous_status: previousStatus,
+          status,
+          comment: comment || null,
+          actor_user_id: user.id,
+        },
+      });
+
+      await writeAuditLog(user, {
+        entityType: "quote",
+        entityId: quote.id,
+        action: decisionAction,
+        metadata: {
+          quote_id: quote.id,
+          title: quote.title,
+          previous_status: previousStatus,
+          status,
+          comment: comment || null,
+          storage: "Quote",
+        },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Legacy AuditLog quotes still support status updates during transition.
+    const legacyQuote = await db.auditLog.findFirst({
       where: { id: quoteId, ...auditScopedWhere(user), action },
       select: { id: true, entity_id: true, metadata: true },
     });
-    if (!quote) return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
+    if (!legacyQuote) return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
 
-    const current = (quote.metadata || {}) as Record<string, unknown>;
+    const current = (legacyQuote.metadata || {}) as Record<string, unknown>;
     const previousStatus = String(current.status || "draft");
     const changedAt = new Date().toISOString();
 
     await db.auditLog.update({
-      where: { id: quote.id },
+      where: { id: legacyQuote.id },
       data: {
         metadata: {
           ...current,
@@ -170,10 +314,10 @@ export async function PATCH(request: Request) {
 
     await writeAuditLog(user, {
       entityType: "quote",
-      entityId: quote.entity_id || undefined,
+      entityId: legacyQuote.entity_id || undefined,
       action: decisionAction,
       metadata: {
-        quote_id: quote.id,
+        quote_id: legacyQuote.id,
         title: current.title,
         previous_status: previousStatus,
         status,

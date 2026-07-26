@@ -41,6 +41,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Stripe webhook resolves company via Stripe customer/subscription ids; metadata mismatch is ignored.
    - Additional company-scoped mutations for ticket AI, ticket→work-order and lease holders.
    - Work-order document delete uses scoped `deleteMany` and best-effort blob cleanup.
+   - `Quote`, `QuoteDecision`, `Booking`, `InspectionRound` tables with dual-read of legacy AuditLog rows.
 
 ## Verification
 
