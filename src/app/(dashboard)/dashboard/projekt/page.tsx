@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, CircleDollarSign, FolderKanban, TrendingUp, WalletCards } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Project = {
   id: string;
@@ -47,7 +48,7 @@ export default function ProjectsPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/projects", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson<{ error?: string; projects?: Project[]; properties?: Property[]; members?: Member[] }>(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta projekt");
       setProjects(data.projects || []);
       setProperties(data.properties || []);

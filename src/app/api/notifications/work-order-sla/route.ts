@@ -9,6 +9,7 @@ import {
   markNotificationsRead,
   snoozeNotifications,
 } from "@/lib/notification-ux-state";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,10 @@ type WorkOrderRow = {
 };
 
 async function rowsFor(companyId: string) {
+  const [propertyGuard, workOrderGuard] = await Promise.all([
+    sqlSoftDeleteGuard(db, "Property", "p"),
+    sqlSoftDeleteGuard(db, "WorkOrder", "w"),
+  ]);
   return db.$queryRaw<WorkOrderRow[]>(Prisma.sql`
     SELECT w."id", w."title", w."status", w."priority", w."assigned_to_id", w."completed_at", w."created_at",
       p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city",
@@ -40,9 +45,9 @@ async function rowsFor(companyId: string) {
       w."paused_at", w."pause_reason", w."closed_at"
     FROM "WorkOrder" w
     INNER JOIN "Property" p ON p."id" = w."property_id" AND p."company_id" = w."company_id"
-    WHERE p."deleted_at" IS NULL
-      AND w."company_id" = ${companyId}
-      AND w."deleted_at" IS NULL
+    WHERE w."company_id" = ${companyId}
+      ${propertyGuard}
+      ${workOrderGuard}
       AND w."status" NOT IN ('completed', 'invoiced', 'cancelled')
     LIMIT 500
   `);

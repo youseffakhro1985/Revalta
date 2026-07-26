@@ -55,11 +55,13 @@ async function main() {
   let skipped = 0;
 
   await backfill("AppNotification", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: { action: "notification.created", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      { action: "notification.created", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -287,11 +289,13 @@ async function main() {
 
   for (const job of simplePropertyModules) {
     await backfill(job.label, async () => {
-      const logs = await prisma.auditLog.findMany({
-        where: { action: job.action, company_id: { not: null } },
-        orderBy: { created_at: "asc" },
-        take: 5000,
-      });
+      const logs = await fetchAll(
+        (args) => prisma.auditLog.findMany(args),
+        { action: job.action, company_id: { not: null } },
+        { created_at: "asc" },
+        1000,
+        "logs",
+      );
       let localCreated = 0;
       let localSkipped = 0;
       for (const log of logs) {
@@ -310,11 +314,13 @@ async function main() {
   }
 
   await backfill("ComplianceInspection", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: { action: "inspection.created", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      { action: "inspection.created", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -348,11 +354,13 @@ async function main() {
   });
 
   await backfill("InsuranceClaim", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: { action: "insurance_claim.created", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      { action: "insurance_claim.created", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -389,11 +397,13 @@ async function main() {
   });
 
   await backfill("RentNotice", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: { action: "rent_notice.created", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      { action: "rent_notice.created", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -432,11 +442,13 @@ async function main() {
   });
 
   await backfill("CalendarEvent", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: { action: "calendar.event", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      { action: "calendar.event", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -470,11 +482,13 @@ async function main() {
   });
 
   await backfill("LeaseHandoverRecord", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: { type: "lease_handover_record", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      { type: "lease_handover_record", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const event of events) {
@@ -518,11 +532,13 @@ async function main() {
   });
 
   await backfill("LeaseInspectionRecord", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: { type: "lease_inspection_items", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      { type: "lease_inspection_items", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const event of events) {
@@ -565,11 +581,13 @@ async function main() {
   });
 
   await backfill("LeaseInspectionWorkOrderLink", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: { type: "lease_inspection_item_work_order", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      { type: "lease_inspection_item_work_order", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const event of events) {
@@ -609,11 +627,13 @@ async function main() {
   });
 
   await backfill("ImdReading", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: { action: "imd.reading.created", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      { action: "imd.reading.created", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -676,15 +696,17 @@ async function main() {
   });
 
   await backfill("TicketOperation", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: {
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      {
         entity_type: "ticket",
         action: { startsWith: "workorder." },
         company_id: { not: null },
       },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -1104,11 +1126,13 @@ async function main() {
   });
 
   await backfill("ServiceEscalationRulesSettings", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: { type: "service_escalation_rules", status: "active", company_id: { not: null } },
-      orderBy: { created_at: "desc" },
-      take: 5000,
-    });
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      { type: "service_escalation_rules", status: "active", company_id: { not: null } },
+      { created_at: "desc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     const seen = new Set();
@@ -1234,11 +1258,13 @@ async function main() {
   });
 
   await backfill("ComponentServiceDeliveryAlert", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: { type: "component_service_delivery_alert", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      { type: "component_service_delivery_alert", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const event of events) {
@@ -1274,11 +1300,13 @@ async function main() {
   });
 
   await backfill("ServiceNotificationSettings", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: { type: "component_service_settings", status: "active", company_id: { not: null } },
-      orderBy: { created_at: "desc" },
-      take: 5000,
-    });
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      { type: "component_service_settings", status: "active", company_id: { not: null } },
+      { created_at: "desc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     const seen = new Set();
@@ -1315,16 +1343,18 @@ async function main() {
   });
 
   await backfill("UserServiceNotificationPreference", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: {
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      {
         type: "user_service_notification_preferences",
         status: "active",
         company_id: { not: null },
         recipient: { not: null },
       },
-      orderBy: { created_at: "desc" },
-      take: 5000,
-    });
+      { created_at: "desc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     const seen = new Set();
@@ -1492,11 +1522,13 @@ async function main() {
   });
 
   await backfill("VendorContract", async () => {
-    const logs = await prisma.auditLog.findMany({
-      where: { entity_type: "vendor_contract", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const logs = await fetchAll(
+      (args) => prisma.auditLog.findMany(args),
+      { entity_type: "vendor_contract", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "logs",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const log of logs) {
@@ -1801,11 +1833,13 @@ async function main() {
   });
 
   await backfill("ServiceEscalationAdminAction", async () => {
-    const events = await prisma.integrationEvent.findMany({
-      where: { type: "service_escalation_admin_action", company_id: { not: null } },
-      orderBy: { created_at: "asc" },
-      take: 5000,
-    });
+    const events = await fetchAll(
+      (args) => prisma.integrationEvent.findMany(args),
+      { type: "service_escalation_admin_action", company_id: { not: null } },
+      { created_at: "asc" },
+      1000,
+      "events",
+    );
     let localCreated = 0;
     let localSkipped = 0;
     for (const event of events) {

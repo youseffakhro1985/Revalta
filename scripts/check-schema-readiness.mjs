@@ -14,7 +14,10 @@ const REQUIRED = [
   { table: "WorkOrder", column: "deleted_at" },
   { table: "Project", column: "deleted_at" },
   { table: "Lease", column: "deleted_at" },
+  { table: "LeaseHolder", column: "deleted_at" },
   { table: "AppNotification", column: "deleted_at" },
+  { table: "OperationalDocument", column: "deleted_at" },
+  { table: "TicketOperation", column: "deleted_at" },
 ];
 
 const db = new PrismaClient();

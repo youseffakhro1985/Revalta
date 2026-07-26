@@ -249,6 +249,11 @@ export default function RoundsPage() {
                       <div>
                         <h3 className="font-semibold text-ink-900">{r.title}</h3>
                         <p className="mt-1 text-sm text-ink-500">{r.propertyName} · {intervalLabels[r.interval || "monthly"]}</p>
+                        {r.source === "legacy" ? (
+                          <p className="mt-2 text-xs font-medium text-amber-800">
+                            Äldre rad – kör backfill innan checklista och status kan sparas.
+                          </p>
+                        ) : null}
                       </div>
                       <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">
                         {r.status === "completed" ? "Genomförd" : r.status === "in_progress" ? "Pågående" : "Planerad"}

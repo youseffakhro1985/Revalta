@@ -79,6 +79,7 @@ När releasen innehåller schema cutover (moderna tabeller / soft-delete / `Cron
 - `GET /api/health` svarar utan serverfel.
 - Inloggad ops: `GET /api/health` visar `schema.ready: true` (annars saknas soft-delete-migrationer).
 - Snabb rök: `BASE_URL=https://www.revalta.se node scripts/smoke-auth-dashboard.mjs`
+- Cron-rök: `BASE_URL=https://www.revalta.se CRON_SECRET=... node scripts/smoke-cron.mjs`
 - Schema-only: `DATABASE_URL=... DIRECT_URL=... node scripts/check-schema-readiness.mjs`
 - Registrering, inloggning, utloggning och lösenordsåterställning fungerar.
 - En användare kan endast se den egna organisationens fastigheter och ärenden.

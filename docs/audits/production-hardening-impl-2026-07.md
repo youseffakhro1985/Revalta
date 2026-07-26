@@ -117,6 +117,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Dual-read retirement kill-switch: `REVALTA_MODERN_STORAGE_ONLY=1` makes `mergeByCreatedAt` and WO ops storage skip AuditLog/IE product rows (default off until post-backfill).
    - Preview login diagnosis: Vercel green + login `200` but `/dashboard`/`/api/properties`/`/api/tickets` crash when soft-delete migrations are not deployed yet. Added `getSchemaReadiness` (ops `/api/health` → `schema.ready`/`missing`), graceful dashboard copy, and `503` on properties/tickets list when Prisma reports missing columns. Documented in `docs/production-launch.md`.
    - Preview compatibility mode: `notDeletedFilter` / `hasSoftDeleteColumn` omit `deleted_at` when columns are missing so dashboard, properties, tickets, work-orders and insurance-claims keep working before Database Release. Work-orders always return JSON (fixes Safari “The string did not match the expected pattern” on empty 500 bodies); client uses `readResponseJson`.
+   - Global Prisma `$use` soft-delete sanitizer (`soft-delete-compat`): strips nested `deleted_at` filters and omits missing columns for all model queries; raw SQL helpers via `sqlSoftDeleteGuard`; readiness covers LeaseHolder/OperationalDocument/TicketOperation; backfill uses `fetchAll` (no `take: 5000` truncation); expanded auth/module smoke + `smoke-cron.mjs`; bookings/rounds amber legacy banners.
 
 ## Verification
 

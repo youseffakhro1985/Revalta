@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type PortfolioRow = {
   property_id: string;
@@ -26,6 +27,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
   const rows = await db.$queryRaw<PortfolioRow[]>(Prisma.sql`
     SELECT p."id" AS "property_id", p."name" AS "property_name",
       mp."id" AS "plan_id", mp."name" AS "plan_name", mp."base_year", mp."horizon_years",
@@ -36,8 +38,8 @@ export async function GET() {
     FROM "MaintenancePlan" mp
     JOIN "Property" p ON p."id" = mp."property_id"
     LEFT JOIN "MaintenanceAction" ma ON ma."maintenance_plan_id" = mp."id"
-    WHERE p."deleted_at" IS NULL
-      AND mp."company_id" = ${user.company_id}
+    WHERE mp."company_id" = ${user.company_id}
+      ${propertyGuard}
       AND mp."status" = 'active'
       AND p."company_id" = ${user.company_id}
     ORDER BY p."name", ma."planned_year", ma."title"
