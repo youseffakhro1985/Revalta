@@ -167,7 +167,7 @@ export default function WorkOrdersPage() {
   }
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Operativ förvaltning" title="Arbetsordrar" description="Prioritera efter serverberäknad svarstid, lösningstid, ansvar och verklig SLA-risk." action={<Link href="/dashboard/felanmalan" className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200">Skapa från ärende</Link>} />
+    <PageHeader eyebrow="Operativ förvaltning" title="Arbetsordrar" description="Prioritera efter serverberäknad svarstid, lösningstid, ansvar och verklig SLA-risk." action={<div className="flex flex-wrap gap-2"><Link href="/dashboard/arbetsorder/ny" className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200">Ny arbetsorder</Link><Link href="/dashboard/felanmalan" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-5 text-sm font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800">Skapa från ärende</Link></div>} />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

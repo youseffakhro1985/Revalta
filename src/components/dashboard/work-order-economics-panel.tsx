@@ -339,6 +339,19 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel title="Attesterbar tid" description="Tid som ska godkännas innan den ingår i lönsamhet och faktura.">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {(["work", "travel", "break"] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                disabled={saving || times.some((entry) => entry.status === "running" && entry.source !== "legacy")}
+                onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "start", kind }, "Timern har startats.")}
+                className="rounded-lg border border-petroleum-200 bg-petroleum-50 px-3 py-2 text-xs font-semibold text-petroleum-900 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                Starta {kindLabels[kind] || kind}
+              </button>
+            ))}
+          </div>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -394,6 +407,18 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 </p>
                 {entry.source === "legacy" ? (
                   <p className="mt-2 text-[11px] font-medium text-amber-800">Äldre rad – kan inte attesteras innan backfill.</p>
+                ) : null}
+                {entry.status === "running" && entry.source !== "legacy" ? (
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "stop", entryId: entry.entryId }, "Timern har stoppats.")}
+                      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900"
+                    >
+                      Stoppa timer
+                    </button>
+                  </div>
                 ) : null}
                 {canManage && entry.status === "submitted" && entry.source !== "legacy" ? (
                   <div className="mt-3 flex gap-2">

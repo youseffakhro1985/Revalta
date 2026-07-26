@@ -42,6 +42,7 @@ export async function GET(
         public_reference: reference.toUpperCase(),
         reporter_email: authorizedEmail,
         deleted_at: null,
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
         ...(tracking ? { company_id: tracking.companyId } : {}),
       },
       select: {

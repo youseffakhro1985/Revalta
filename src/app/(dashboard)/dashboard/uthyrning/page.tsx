@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Building2, CircleDollarSign, DoorOpen, FileSignature, Pencil, Plus, Search, UsersRound, X } from "lucide-react";
+import { Building2, CircleDollarSign, ClipboardSignature, DoorOpen, FileSignature, Pencil, Plus, Search, UsersRound, X } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -271,7 +272,10 @@ export default function LeasingPage() {
       eyebrow="Uthyrning"
       title="Hyresparter och avtal"
       description="Hantera objekt, vakans, hyresparter och hela kontraktets livscykel med spårbar historik och säkra organisationsgränser."
-      action={canManage ? <button type="button" onClick={resetForm} className={premiumPrimaryButtonClass}><Plus className="mr-2 h-4 w-4" />Nytt avtal</button> : undefined}
+      action={<div className="flex flex-wrap gap-2">
+        <Link href="/dashboard/uthyrning/overlamning" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800"><ClipboardSignature className="h-4 w-4" />Överlämning & besiktning</Link>
+        {canManage ? <button type="button" onClick={resetForm} className={premiumPrimaryButtonClass}><Plus className="mr-2 h-4 w-4" />Nytt avtal</button> : null}
+      </div>}
     />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

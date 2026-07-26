@@ -210,7 +210,7 @@ export async function POST(request: Request) {
       resolvedPropertyId = lease.property_id;
       resolvedUnitId = lease.unit_id;
     } else if (unitId) {
-      const unit = await db.unit.findFirst({ where: { id: unitId, property: { company_id: user.company_id } }, select: { id: true, property_id: true } });
+      const unit = await db.unit.findFirst({ where: { id: unitId, property: { company_id: user.company_id, deleted_at: null } }, select: { id: true, property_id: true } });
       if (!unit) return NextResponse.json({ error: "Objektet hittades inte" }, { status: 404 });
       if (propertyId && propertyId !== unit.property_id) return NextResponse.json({ error: "Objektet tillhör inte den valda fastigheten" }, { status: 400 });
       resolvedUnitId = unit.id;

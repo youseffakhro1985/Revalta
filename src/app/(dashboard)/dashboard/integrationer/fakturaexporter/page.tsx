@@ -19,6 +19,7 @@ type Job = {
   error?: string | null;
   externalId?: string | null;
   invoiceVersionId?: string | null;
+  source?: "table" | "legacy";
   workOrder: WorkOrder | null;
 };
 type Data = { jobs: Job[]; counts: Record<string, number>; total: number; providers: Provider[]; canManage: boolean };
@@ -137,12 +138,13 @@ export default function InvoiceExportOperationsPage() {
                 <h2 className="mt-3 truncate text-base font-semibold text-ink-900">{job.workOrder?.title || "Arbetsorder saknas"}</h2>
                 <p className="mt-1 text-sm text-ink-600">{job.workOrder?.property ? `${job.workOrder.property.name} · ${job.workOrder.property.address}, ${job.workOrder.property.city}` : job.workOrderId}</p>
                 <p className="mt-2 text-xs text-ink-500">Senast uppdaterad {dt.format(new Date(job.updatedAt || job.createdAt))}{job.externalId ? ` · Externt ID ${job.externalId}` : ""}</p>
+                {job.source === "legacy" ? <p className="mt-3 text-xs font-medium text-amber-800">Äldre jobb – kör backfill till WorkOrderInvoiceExportJob innan omkörning eller avbryt.</p> : null}
                 {job.error ? <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{job.error}</p> : null}
               </div>
               <div className="flex shrink-0 flex-wrap items-start gap-2">
                 <Link href={`/dashboard/arbetsorder/${job.workOrderId}`} className="inline-flex items-center gap-1.5 rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink-700"><ExternalLink className="h-3.5 w-3.5" />Öppna</Link>
-                {data.canManage && job.status === "failed" ? <button onClick={() => void act(job, "retry")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Försök igen</button> : null}
-                {data.canManage && ["queued", "processing"].includes(job.status) ? <button onClick={() => void act(job, "cancel")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50"><XCircle className="h-3.5 w-3.5" />Avbryt</button> : null}
+                {data.canManage && job.source !== "legacy" && job.status === "failed" ? <button onClick={() => void act(job, "retry")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Försök igen</button> : null}
+                {data.canManage && job.source !== "legacy" && ["queued", "processing"].includes(job.status) ? <button onClick={() => void act(job, "cancel")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50"><XCircle className="h-3.5 w-3.5" />Avbryt</button> : null}
               </div>
             </div>
           </article>)}

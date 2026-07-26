@@ -41,6 +41,7 @@ async function latestJobs(companyId: string): Promise<InvoiceExportJobPayload[]>
       providerStatus: row.provider_status,
       externalId: row.external_id,
       providerResponse: row.provider_response,
+      source: "table" as const,
     }));
   }
 
