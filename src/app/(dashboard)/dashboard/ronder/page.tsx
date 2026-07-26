@@ -12,6 +12,7 @@ import {
   premiumPrimaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
 type ChecklistItem = {
@@ -55,6 +56,8 @@ export default function RoundsPage() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [editForm, setEditForm] = useState({ title: "", interval: "monthly", nextDue: "" });
 
   async function load() {
     setLoading(true);
@@ -64,7 +67,7 @@ export default function RoundsPage() {
         fetch("/api/rounds", { cache: "no-store" }),
         fetch("/api/properties", { cache: "no-store" }),
       ]);
-      const [rd, pd] = await Promise.all([rr.json(), pr.json()]);
+      const [rd, pd] = await Promise.all([readResponseJson(rr), readResponseJson(pr)]);
       if (!rr.ok) throw new Error(rd.error || "Kunde inte hämta ronder");
       if (!pr.ok) throw new Error(pd.error || "Kunde inte hämta fastigheter");
       setRounds(rd.rounds || []);
@@ -104,7 +107,7 @@ export default function RoundsPage() {
           checklist,
         }),
       });
-      const d = await r.json();
+      const d = await readResponseJson(r);
       if (!r.ok) throw new Error(d.error || "Kunde inte skapa rond");
       setForm({ ...form, title: "" });
       setMessage("Ronden har skapats.");
@@ -142,12 +145,56 @@ export default function RoundsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ checklist: round.checklist }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara ronden");
       setMessage("Ronden har uppdaterats.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunde inte spara ronden");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  function startEdit(round: Round) {
+    if (round.source === "legacy") {
+      setError("Äldre ronder måste migreras innan de kan ändras. Kör backfill och ladda om.");
+      return;
+    }
+    setEditingId(round.id);
+    setEditForm({
+      title: round.title || "",
+      interval: round.interval || "monthly",
+      nextDue: round.nextDue ? new Date(round.nextDue).toISOString().slice(0, 10) : "",
+    });
+    setError("");
+  }
+
+  async function saveFields(round: Round) {
+    if (round.source === "legacy") {
+      setError("Äldre ronder måste migreras innan de kan ändras.");
+      return;
+    }
+    setSavingId(round.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/rounds/${round.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editForm.title,
+          interval: editForm.interval,
+          nextDue: editForm.nextDue ? new Date(`${editForm.nextDue}T12:00:00`).toISOString() : undefined,
+        }),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera ronden");
+      setEditingId("");
+      setMessage("Rondens uppgifter är uppdaterade.");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kunde inte uppdatera ronden");
     } finally {
       setSavingId("");
     }
@@ -172,7 +219,7 @@ export default function RoundsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ checklist: round.checklist }),
       });
-      const saveData = await saveResponse.json();
+      const saveData = await readResponseJson(saveResponse);
       if (!saveResponse.ok) throw new Error(saveData.error || "Kunde inte spara ronden");
 
       const response = await fetch(`/api/rounds/${round.id}/work-orders`, {
@@ -180,7 +227,7 @@ export default function RoundsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ itemIds: open.map((item) => item.id) }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsorder");
       setMessage(`${data.created?.length || 0} arbetsorder skapades från rondavvikelser.`);
       await load();
@@ -255,10 +302,55 @@ export default function RoundsPage() {
                           </p>
                         ) : null}
                       </div>
-                      <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">
-                        {r.status === "completed" ? "Genomförd" : r.status === "in_progress" ? "Pågående" : "Planerad"}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">
+                          {r.status === "completed" ? "Genomförd" : r.status === "in_progress" ? "Pågående" : "Planerad"}
+                        </span>
+                        {r.source !== "legacy" ? (
+                          <button
+                            type="button"
+                            onClick={() => (editingId === r.id ? setEditingId("") : startEdit(r))}
+                            className="rounded-xl border border-sand-300 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-sand-50"
+                          >
+                            {editingId === r.id ? "Stäng" : "Ändra"}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
+                    {editingId === r.id ? (
+                      <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 sm:grid-cols-3">
+                        <input
+                          className={premiumFieldClass}
+                          value={editForm.title}
+                          onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                          placeholder="Titel"
+                        />
+                        <select
+                          className={premiumFieldClass}
+                          value={editForm.interval}
+                          onChange={(e) => setEditForm({ ...editForm, interval: e.target.value })}
+                        >
+                          <option value="weekly">Varje vecka</option>
+                          <option value="monthly">Varje månad</option>
+                          <option value="quarterly">Varje kvartal</option>
+                          <option value="yearly">Varje år</option>
+                        </select>
+                        <input
+                          type="date"
+                          className={premiumFieldClass}
+                          value={editForm.nextDue}
+                          onChange={(e) => setEditForm({ ...editForm, nextDue: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          disabled={savingId === r.id}
+                          onClick={() => void saveFields(r)}
+                          className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900 sm:col-span-3"
+                        >
+                          {savingId === r.id ? "Sparar…" : "Spara uppgifter"}
+                        </button>
+                      </div>
+                    ) : null}
                     <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
                       <Mini label="Nästa datum" value={r.nextDue ? new Date(r.nextDue).toLocaleDateString("sv-SE") : "Ej satt"} />
                       <Mini label="Kontrollpunkter" value={`${done}/${total}`} />

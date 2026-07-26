@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { CreditCard, Gauge, RadioTower } from "lucide-react";
 import {
   EmptyState,
@@ -11,6 +11,7 @@ import {
   premiumFieldClass,
   premiumPrimaryButtonClass,
 } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address?: string; city?: string };
 type Lease = { id: string; property_id: string; lease_number: string; unit: string; tenant_name: string };
@@ -23,9 +24,12 @@ type Reading = {
   meter_id?: string;
   meter_type?: string;
   period?: string;
+  previous_reading?: number;
+  current_reading?: number;
   consumption?: number;
   unit_price?: number;
   charge?: number;
+  note?: string;
   debit?: Debit | null;
   source?: string;
 };
@@ -44,6 +48,17 @@ export default function ImdPage() {
   const [saving, setSaving] = useState(false);
   const [linkingId, setLinkingId] = useState("");
   const [voidingId, setVoidingId] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
+  const [editForm, setEditForm] = useState({
+    unit: "",
+    meterId: "",
+    period: "",
+    previousReading: "",
+    currentReading: "",
+    unitPrice: "",
+    note: "",
+  });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -52,7 +67,7 @@ export default function ImdPage() {
     setError("");
     try {
       const response = await fetch("/api/imd-readings", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta mätvärden");
       setProperties(data.properties || []);
       setLeases(data.leases || []);
@@ -82,7 +97,7 @@ export default function ImdPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, propertyId, leaseId }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara avläsningen");
       setSuccess("Avläsningen har sparats och en öppen debiteringsrad skapades.");
       setLeaseId("");
@@ -91,6 +106,59 @@ export default function ImdPage() {
       setError(err instanceof Error ? err.message : "Kunde inte spara avläsningen");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function startEdit(reading: Reading) {
+    if (reading.source === "legacy") {
+      setError("Avläsningen finns i äldre lagring. Kör backfill till ImdReading innan den kan ändras.");
+      return;
+    }
+    if (reading.debit?.rent_notice_id) {
+      setError("Avläsningen är kopplad till en hyresavi och kan inte ändras.");
+      return;
+    }
+    setEditingId(reading.id);
+    setEditForm({
+      unit: reading.unit || "",
+      meterId: reading.meter_id || "",
+      period: reading.period || "",
+      previousReading: String(reading.previous_reading ?? ""),
+      currentReading: String(reading.current_reading ?? ""),
+      unitPrice: String(reading.unit_price ?? ""),
+      note: reading.note || "",
+    });
+    setError("");
+  }
+
+  async function saveEdit(reading: Reading) {
+    setUpdatingId(reading.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch("/api/imd-readings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          readingId: reading.id,
+          unit: editForm.unit,
+          meterId: editForm.meterId,
+          period: editForm.period,
+          previousReading: Number(editForm.previousReading),
+          currentReading: Number(editForm.currentReading),
+          unitPrice: Number(editForm.unitPrice),
+          note: editForm.note,
+        }),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera avläsningen");
+      setEditingId("");
+      setSuccess("Avläsningen har uppdaterats.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte uppdatera avläsningen");
+    } finally {
+      setUpdatingId("");
     }
   }
 
@@ -109,7 +177,7 @@ export default function ImdPage() {
           leaseId: reading.debit.lease_id || leaseId || undefined,
         }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte koppla debitering");
       setSuccess("Debiteringen är kopplad till hyresavi.");
       await load();
@@ -139,7 +207,7 @@ export default function ImdPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ readingId: reading.id, action: "void" }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte makulera avläsningen");
       setSuccess("Avläsningen har makulerats.");
       await load();
@@ -226,9 +294,11 @@ export default function ImdPage() {
               </thead>
               <tbody className="divide-y divide-sand-100">
                 {readings.map((item) => {
-                  const canVoid = item.source === "table" && !item.debit?.rent_notice_id;
+                  const canEdit = item.source === "table" && !item.debit?.rent_notice_id;
+                  const canVoid = canEdit;
                   return (
-                  <tr key={item.id} className="text-ink-700 transition-colors hover:bg-sand-50/60">
+                  <Fragment key={item.id}>
+                  <tr className="text-ink-700 transition-colors hover:bg-sand-50/60">
                     <td className="px-5 py-4 font-medium text-ink-900">{item.property_name}</td>
                     <td className="px-5 py-4">{item.unit}</td>
                     <td className="px-5 py-4">{item.meter_id}</td>
@@ -249,26 +319,61 @@ export default function ImdPage() {
                           {linkingId === item.id ? "Kopplar…" : "Skapa avi"}
                         </button>
                       ) : item.source === "legacy" ? (
-                        <span className="text-xs font-medium text-amber-800">Äldre rad – kör backfill innan makulering</span>
+                        <span className="text-xs font-medium text-amber-800">Äldre rad – kör backfill innan ändring</span>
                       ) : (
                         <span className="text-xs text-ink-400">Saknas</span>
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      {canVoid ? (
-                        <button
-                          type="button"
-                          disabled={voidingId === item.id}
-                          onClick={() => void voidReading(item)}
-                          className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
-                        >
-                          {voidingId === item.id ? "Makulerar…" : "Makulera"}
-                        </button>
-                      ) : item.source === "legacy" ? (
-                        <span className="text-xs text-ink-400">—</span>
-                      ) : null}
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => (editingId === item.id ? setEditingId("") : startEdit(item))}
+                            className="text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950"
+                          >
+                            {editingId === item.id ? "Stäng" : "Ändra"}
+                          </button>
+                        ) : null}
+                        {canVoid ? (
+                          <button
+                            type="button"
+                            disabled={voidingId === item.id}
+                            onClick={() => void voidReading(item)}
+                            className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+                          >
+                            {voidingId === item.id ? "Makulerar…" : "Makulera"}
+                          </button>
+                        ) : item.source === "legacy" ? (
+                          <span className="text-xs text-ink-400">—</span>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
+                  {editingId === item.id ? (
+                    <tr className="bg-sand-50/70">
+                      <td colSpan={9} className="px-5 py-4">
+                        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                          <input className={premiumFieldClass} value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} placeholder="Objekt" />
+                          <input className={premiumFieldClass} value={editForm.meterId} onChange={(e) => setEditForm({ ...editForm, meterId: e.target.value })} placeholder="Mätar-ID" />
+                          <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />
+                          <input className={premiumFieldClass} type="number" min="0" step="0.001" value={editForm.previousReading} onChange={(e) => setEditForm({ ...editForm, previousReading: e.target.value })} placeholder="Föregående" />
+                          <input className={premiumFieldClass} type="number" min="0" step="0.001" value={editForm.currentReading} onChange={(e) => setEditForm({ ...editForm, currentReading: e.target.value })} placeholder="Aktuell" />
+                          <input className={premiumFieldClass} type="number" min="0" step="0.01" value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} placeholder="Pris" />
+                          <input className={`${premiumFieldClass} md:col-span-2 xl:col-span-4`} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} placeholder="Anteckning" />
+                          <button
+                            type="button"
+                            disabled={updatingId === item.id}
+                            onClick={() => void saveEdit(item)}
+                            className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900 disabled:opacity-60"
+                          >
+                            {updatingId === item.id ? "Sparar…" : "Spara ändringar"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                  </Fragment>
                   );
                 })}
               </tbody>

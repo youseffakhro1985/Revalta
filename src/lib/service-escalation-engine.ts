@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { getServiceEscalationRules, type ServiceEscalationRules } from "@/lib/service-escalation-rules";
 import { listServiceNotificationAssignments } from "@/lib/service-notification-assignments";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type AssetRow = { id: string; company_id: string; property_id: string; component_name: string; next_service_at: Date; property_name: string; property_address: string; property_city: string };
 type Assignment = { notificationKey: string; assigneeId?: string | null; assigneeName?: string | null; status?: string; deadline?: string | null; note?: string | null; companyId: string; createdAt: Date };
@@ -95,8 +96,20 @@ export async function listServiceAssignmentEscalations(companyId: string, take =
 
 export async function runServiceEscalations(now = new Date()) {
   const dueBefore = new Date(now.getTime() + 30 * 86400000);
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
   const [assets, assignmentRows] = await Promise.all([
-    db.$queryRaw<AssetRow[]>(Prisma.sql`SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city" FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id" WHERE p."deleted_at" IS NULL AND a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${dueBefore} AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed') ORDER BY a."company_id", a."next_service_at" ASC LIMIT 5000`),
+    db.$queryRaw<AssetRow[]>(Prisma.sql`
+      SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."next_service_at",
+             p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
+      FROM "PropertyTechnicalAsset" a
+      INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
+      WHERE a."next_service_at" IS NOT NULL
+        ${propertyGuard}
+        AND a."next_service_at" <= ${dueBefore}
+        AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
+      ORDER BY a."company_id", a."next_service_at" ASC
+      LIMIT 5000
+    `),
     listServiceNotificationAssignments(),
   ]);
 

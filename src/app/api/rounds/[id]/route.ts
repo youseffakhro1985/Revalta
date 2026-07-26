@@ -5,6 +5,8 @@ import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/curren
 import { writeAuditLog } from "@/lib/audit";
 import { countDeviations, normalizeChecklist, parseChecklistUpdate } from "@/lib/inspection-round-checklist";
 
+const ALLOWED_INTERVALS = new Set(["weekly", "monthly", "quarterly", "yearly"]);
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -16,9 +18,30 @@ export async function PATCH(
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const { id } = await params;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Ogiltigt underlag" }, { status: 400 });
+    }
+    const payload = body as Record<string, unknown>;
+    const hasChecklist = Array.isArray(payload.checklist);
+    const hasFields =
+      payload.title !== undefined ||
+      payload.interval !== undefined ||
+      payload.nextDue !== undefined;
+    if (!hasChecklist && !hasFields) {
+      return NextResponse.json({ error: "Kontrollpunkter eller fält att uppdatera krävs" }, { status: 400 });
+    }
+
     const round = await db.inspectionRound.findFirst({
       where: { id, company_id: user.company_id },
-      select: { id: true, title: true, checklist: true, status: true },
+      select: {
+        id: true,
+        title: true,
+        checklist: true,
+        status: true,
+        interval: true,
+        next_due: true,
+      },
     });
     if (!round) {
       const legacy = await db.auditLog.findFirst({
@@ -34,34 +57,82 @@ export async function PATCH(
       return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
     }
 
-    const previous = normalizeChecklist(round.checklist);
-    const parsed = parseChecklistUpdate(await request.json().catch(() => null), previous);
-    if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+    const data: {
+      title?: string;
+      interval?: string;
+      next_due?: Date;
+      checklist?: Prisma.InputJsonValue;
+      deviations?: number;
+      status?: string;
+    } = {};
 
-    const deviations = countDeviations(parsed.data.checklist);
-    const status = parsed.data.status
-      || (parsed.data.checklist.every((item) => item.completed || item.hasDeviation) ? "completed" : "in_progress");
+    let title = round.title;
+    let interval = round.interval;
+    let nextDue = round.next_due;
+    let status = round.status;
+    let checklist = normalizeChecklist(round.checklist);
+    let deviations = countDeviations(checklist);
+
+    if (hasFields) {
+      if (payload.title !== undefined) {
+        const nextTitle = typeof payload.title === "string" ? payload.title.trim() : "";
+        if (!nextTitle || nextTitle.length > 200) {
+          return NextResponse.json({ error: "Titel krävs och får vara max 200 tecken" }, { status: 400 });
+        }
+        title = nextTitle;
+        data.title = nextTitle;
+      }
+      if (payload.interval !== undefined) {
+        const nextInterval = typeof payload.interval === "string" ? payload.interval.trim() : "";
+        if (!ALLOWED_INTERVALS.has(nextInterval)) {
+          return NextResponse.json({ error: "Ogiltigt intervall" }, { status: 400 });
+        }
+        interval = nextInterval;
+        data.interval = nextInterval;
+      }
+      if (payload.nextDue !== undefined) {
+        const raw = typeof payload.nextDue === "string" ? payload.nextDue.trim() : "";
+        const parsedDate = raw ? new Date(raw) : null;
+        if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+          return NextResponse.json({ error: "Ogiltigt nästa datum" }, { status: 400 });
+        }
+        nextDue = parsedDate;
+        data.next_due = parsedDate;
+      }
+    }
+
+    if (hasChecklist) {
+      const previous = normalizeChecklist(round.checklist);
+      const parsed = parseChecklistUpdate(payload, previous);
+      if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+      checklist = parsed.data.checklist;
+      deviations = countDeviations(checklist);
+      status =
+        parsed.data.status ||
+        (checklist.every((item) => item.completed || item.hasDeviation) ? "completed" : "in_progress");
+      data.checklist = checklist as unknown as Prisma.InputJsonValue;
+      data.deviations = deviations;
+      data.status = status;
+    }
 
     const updated = await db.inspectionRound.updateMany({
       where: { id: round.id, company_id: user.company_id },
-      data: {
-        checklist: parsed.data.checklist as unknown as Prisma.InputJsonValue,
-        deviations,
-        status,
-      },
+      data,
     });
     if (updated.count === 0) return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
 
     await writeAuditLog(user, {
       entityType: "round",
       entityId: round.id,
-      action: "round.updated",
+      action: hasChecklist ? "round.updated" : "round.fields_updated",
       metadata: {
-        title: round.title,
+        title,
         previousStatus: round.status,
         status,
+        interval,
+        nextDue: nextDue.toISOString(),
         deviations,
-        completedCount: parsed.data.checklist.filter((item) => item.completed).length,
+        completedCount: checklist.filter((item) => item.completed).length,
         storage: "InspectionRound",
       },
     });
@@ -70,9 +141,12 @@ export async function PATCH(
       success: true,
       round: {
         id: round.id,
+        title,
+        interval,
+        nextDue: nextDue.toISOString(),
         status,
         deviations,
-        checklist: parsed.data.checklist,
+        checklist,
       },
     });
   } catch (error) {

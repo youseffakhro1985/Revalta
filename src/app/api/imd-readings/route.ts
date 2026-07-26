@@ -247,8 +247,21 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const readingId = String(body.readingId || body.id || "").trim();
     const voidAction = body.action === "void" || body.void === true;
-    if (!readingId || !voidAction) {
-      return NextResponse.json({ error: "Avläsnings-id och åtgärden makulera krävs" }, { status: 400 });
+    const fieldKeys = [
+      "unit",
+      "meterId",
+      "period",
+      "previousReading",
+      "currentReading",
+      "unitPrice",
+      "note",
+    ] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!readingId || (!voidAction && !hasFieldUpdate)) {
+      return NextResponse.json({ error: "Avläsnings-id och åtgärd (makulera eller fält) krävs" }, { status: 400 });
+    }
+    if (voidAction && hasFieldUpdate) {
+      return NextResponse.json({ error: "Makulera och fältändring kan inte kombineras" }, { status: 400 });
     }
 
     const existing = await db.imdReading.findFirst({
@@ -256,8 +269,13 @@ export async function PATCH(request: Request) {
       select: {
         id: true,
         property_id: true,
+        unit: true,
         meter_id: true,
         period: true,
+        previous_reading: true,
+        current_reading: true,
+        unit_price: true,
+        note: true,
         debit_line: { select: { id: true, rent_notice_id: true, status: true } },
       },
     });
@@ -267,7 +285,9 @@ export async function PATCH(request: Request) {
         select: { id: true, voided_at: true },
       });
       if (alreadyVoided?.voided_at) {
-        return NextResponse.json({ error: "Avläsningen är redan makulerad" }, { status: 409 });
+        return NextResponse.json({
+          error: voidAction ? "Avläsningen är redan makulerad" : "Makulerade avläsningar kan inte ändras",
+        }, { status: 409 });
       }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: readingId },
@@ -276,7 +296,7 @@ export async function PATCH(request: Request) {
       const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
       if (legacy && metadata.storage !== "ImdReading") {
         return NextResponse.json({
-          error: "Avläsningen finns kvar i äldre lagring. Kör backfill till ImdReading innan den kan makuleras.",
+          error: "Avläsningen finns kvar i äldre lagring. Kör backfill till ImdReading innan den kan uppdateras.",
         }, { status: 409 });
       }
       return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
@@ -284,9 +304,104 @@ export async function PATCH(request: Request) {
 
     if (existing.debit_line?.rent_notice_id) {
       return NextResponse.json({
-        error: "Avläsningen är kopplad till en hyresavi och kan inte makuleras.",
+        error: voidAction
+          ? "Avläsningen är kopplad till en hyresavi och kan inte makuleras."
+          : "Avläsningen är kopplad till en hyresavi och kan inte ändras.",
         rentNoticeId: existing.debit_line.rent_notice_id,
       }, { status: 409 });
+    }
+
+    if (hasFieldUpdate) {
+      const unit = body.unit !== undefined ? String(body.unit || "").trim() : existing.unit;
+      const meterId = body.meterId !== undefined ? String(body.meterId || "").trim() : existing.meter_id;
+      const period = body.period !== undefined ? String(body.period || "").trim() : existing.period;
+      const previousReading =
+        body.previousReading !== undefined
+          ? Number(body.previousReading)
+          : Number(existing.previous_reading);
+      const currentReading =
+        body.currentReading !== undefined
+          ? Number(body.currentReading)
+          : Number(existing.current_reading);
+      const unitPrice =
+        body.unitPrice !== undefined ? Number(body.unitPrice) : Number(existing.unit_price);
+      const note = body.note !== undefined ? String(body.note || "").trim() : existing.note || "";
+
+      if (!unit || !meterId || !period) {
+        return NextResponse.json({ error: "Objekt, mätare och period krävs" }, { status: 400 });
+      }
+      if (unit.length > 80 || meterId.length > 120 || period.length > 40 || note.length > 1000) {
+        return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
+      }
+      if (
+        ![previousReading, currentReading, unitPrice].every((value) => Number.isFinite(value) && value >= 0) ||
+        currentReading < previousReading
+      ) {
+        return NextResponse.json({ error: "Kontrollera avläsningar och pris" }, { status: 400 });
+      }
+
+      const consumption = currentReading - previousReading;
+      const charge = consumption * unitPrice;
+
+      await db.$transaction(async (tx) => {
+        const updated = await tx.imdReading.updateMany({
+          where: { id: existing.id, company_id: companyId, voided_at: null },
+          data: {
+            unit,
+            meter_id: meterId,
+            period,
+            previous_reading: previousReading,
+            current_reading: currentReading,
+            consumption,
+            unit_price: unitPrice,
+            charge,
+            note: note || null,
+          },
+        });
+        if (updated.count !== 1) throw new Error("IMD_UPDATE_CONFLICT");
+        if (existing.debit_line) {
+          await tx.imdDebitLine.updateMany({
+            where: {
+              id: existing.debit_line.id,
+              company_id: companyId,
+              rent_notice_id: null,
+            },
+            data: {
+              unit,
+              meter_id: meterId,
+              period,
+              consumption,
+              unit_price: unitPrice,
+              charge,
+            },
+          });
+        }
+      });
+
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: existing.property_id,
+        action: "imd.reading.updated",
+        metadata: {
+          readingId: existing.id,
+          debitLineId: existing.debit_line?.id ?? null,
+          meter_id: meterId,
+          period,
+          previous_reading: previousReading,
+          current_reading: currentReading,
+          consumption,
+          unit_price: unitPrice,
+          charge,
+          storage: "ImdReading",
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        id: existing.id,
+        consumption,
+        charge,
+      });
     }
 
     const now = new Date();
@@ -325,10 +440,10 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, id: existing.id, voided_at: now.toISOString() });
   } catch (error) {
-    if (error instanceof Error && error.message === "IMD_VOID_CONFLICT") {
-      return NextResponse.json({ error: "Avläsningen kunde inte makuleras. Ladda om och försök igen." }, { status: 409 });
+    if (error instanceof Error && (error.message === "IMD_VOID_CONFLICT" || error.message === "IMD_UPDATE_CONFLICT")) {
+      return NextResponse.json({ error: "Avläsningen kunde inte uppdateras. Ladda om och försök igen." }, { status: 409 });
     }
-    console.error("Void IMD reading error:", error);
+    console.error("Update IMD reading error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

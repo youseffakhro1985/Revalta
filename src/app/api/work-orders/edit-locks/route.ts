@@ -123,16 +123,18 @@ export async function DELETE(request: Request) {
   const notificationKey = `work-order-lock-forced:${workOrderId}:${randomUUID()}`;
   const occurredAt = new Date();
   const actorName = user.name || user.email;
+  const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
 
   const result = await db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<ForceReleaseRow[]>(Prisma.sql`
       SELECT l."work_order_id", w."work_order_number", w."title", u."id" AS "user_id",
              u."name" AS "user_name", u."email" AS "user_email", l."expires_at"
       FROM "WorkOrderEditLock" l
-      INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id" AND w."deleted_at" IS NULL
+      INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id"
       INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
       WHERE l."work_order_id" = ${workOrderId}
         AND l."company_id" = ${companyId}
+        ${workOrderGuard}
       LIMIT 1
       FOR UPDATE
     `);
