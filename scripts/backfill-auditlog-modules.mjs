@@ -1788,6 +1788,83 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("NotificationRead", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: { action: "notification.read", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      const readerId = metadata.reader_id ? String(metadata.reader_id) : "";
+      const notificationId = log.entity_id ? String(log.entity_id) : "";
+      if (!log.company_id || !readerId || !notificationId) { localSkipped += 1; continue; }
+      const notification = await prisma.appNotification.findFirst({
+        where: { id: notificationId, company_id: log.company_id },
+        select: { id: true },
+      });
+      if (!notification) { localSkipped += 1; continue; }
+      const existing = await prisma.notificationRead.findUnique({
+        where: { notification_id_reader_user_id: { notification_id: notificationId, reader_user_id: readerId } },
+        select: { id: true },
+      });
+      if (existing) { localSkipped += 1; continue; }
+      await prisma.notificationRead.create({
+        data: {
+          company_id: log.company_id,
+          notification_id: notificationId,
+          reader_user_id: readerId,
+          read_at: log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("ComponentServiceDeliveryAlertAck", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "component_service_delivery_alert_acknowledgement", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const alertId = payload.alertId ? String(payload.alertId) : "";
+      const userId = event.recipient ? String(event.recipient) : "";
+      if (!event.company_id || !alertId || !userId) { localSkipped += 1; continue; }
+      const alert = await prisma.componentServiceDeliveryAlert.findFirst({
+        where: { id: alertId, company_id: event.company_id },
+        select: { id: true },
+      });
+      if (!alert) { localSkipped += 1; continue; }
+      const existing = await prisma.componentServiceDeliveryAlertAck.findUnique({
+        where: { alert_id_user_id: { alert_id: alertId, user_id: userId } },
+        select: { id: true },
+      });
+      if (existing) { localSkipped += 1; continue; }
+      await prisma.componentServiceDeliveryAlertAck.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          alert_id: alertId,
+          user_id: userId,
+          created_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   console.log(`Backfill complete: created=${created} skipped=${skipped}`);
 }
 

@@ -136,31 +136,6 @@ async function finalizeRun(input: {
           where: { id: { in: openModern.map((alert) => alert.id) } },
           data: { status: "resolved", resolved_at: new Date() },
         });
-      }
-
-      const openLegacy = await tx.integrationEvent.findMany({
-        where: { company_id: companyId, type: "component_service_delivery_alert", status: "open" },
-        select: { id: true },
-        take: 100,
-      });
-      if (openLegacy.length) {
-        await tx.integrationEvent.updateMany({
-          where: { id: { in: openLegacy.map((alert) => alert.id) } },
-          data: { status: "resolved" },
-        });
-      }
-
-      const resolvedAlertIds = [...openModern, ...openLegacy].map((alert) => alert.id);
-      if (resolvedAlertIds.length) {
-        await tx.integrationEvent.create({
-          data: {
-            company_id: companyId,
-            type: "component_service_delivery_recovery",
-            status: "resolved",
-            recipient: `company:${companyId}`,
-            payload: toJson({ recoveredByEventId: eventId, resolvedAlertIds }),
-          },
-        });
         await tx.auditLog.create({
           data: {
             company_id: companyId,
@@ -168,7 +143,11 @@ async function finalizeRun(input: {
             entity_type: "service_notification_delivery",
             entity_id: eventId,
             action: "component_service_delivery.recovered",
-            metadata: toJson({ resolvedAlertIds }),
+            metadata: toJson({
+              recoveredByEventId: eventId,
+              resolvedAlertIds: openModern.map((alert) => alert.id),
+              storage: "ComponentServiceDeliveryAlert",
+            }),
           },
         });
       }

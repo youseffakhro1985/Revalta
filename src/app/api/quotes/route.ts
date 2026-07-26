@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { isModernStorageMirror, mergeByCreatedAt } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const action = "quote.created";
@@ -63,7 +64,6 @@ export async function GET() {
     ]);
     void decisions;
 
-    const modernIds = new Set(rows.map((row) => row.id));
     const modern = rows.map((row) => ({
       id: row.id,
       property_id: row.property_id,
@@ -97,11 +97,12 @@ export async function GET() {
       source: "table" as const,
     }));
 
+    const modernIds = new Set(modern.map((row) => row.id));
     const legacyDecisionMap = new Map<string, Array<Record<string, unknown>>>();
     for (const decision of legacyDecisions) {
       const metadata = (decision.metadata || {}) as Record<string, unknown>;
       const quoteId = String(metadata.quote_id || "");
-      if (!quoteId || modernIds.has(quoteId)) continue;
+      if (!quoteId || modernIds.has(quoteId) || metadata.storage === "Quote") continue;
       const items = legacyDecisionMap.get(quoteId) || [];
       items.push({
         id: decision.id,
@@ -113,7 +114,7 @@ export async function GET() {
     }
 
     const legacy = legacyLogs
-      .filter((log) => !modernIds.has(log.id))
+      .filter((log) => !isModernStorageMirror(log.metadata, "Quote", modernIds, log.entity_id) && !modernIds.has(log.id))
       .map((log) => ({
         id: log.id,
         property_id: log.entity_id,
@@ -124,7 +125,7 @@ export async function GET() {
       }));
 
     return NextResponse.json({
-      quotes: [...modern, ...legacy].sort((a, b) => b.created_at.getTime() - a.created_at.getTime()).slice(0, 300),
+      quotes: mergeByCreatedAt(modern, legacy, 300),
       properties,
     });
   } catch (error) {

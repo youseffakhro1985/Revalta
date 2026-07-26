@@ -160,14 +160,6 @@ export async function PATCH(request: Request) {
     where: { id: alertId, company_id: user.company_id },
     select: { id: true },
   });
-  const legacyAlert = modernAlert
-    ? null
-    : await db.integrationEvent.findFirst({
-      where: { id: alertId, company_id: user.company_id, type: "component_service_delivery_alert" },
-      select: { id: true },
-    });
-  if (!modernAlert && !legacyAlert) return noStore({ error: "Driftlarmet hittades inte" }, { status: 404 });
-
   if (modernAlert) {
     const existing = await db.componentServiceDeliveryAlertAck.findUnique({
       where: { alert_id_user_id: { alert_id: alertId, user_id: user.id } },
@@ -192,41 +184,15 @@ export async function PATCH(request: Request) {
     return noStore({ success: true, acknowledged: true });
   }
 
-  const existingLegacy = await db.integrationEvent.findFirst({
-    where: {
-      company_id: user.company_id,
-      type: "component_service_delivery_alert_acknowledgement",
-      recipient: user.id,
-      status: "acknowledged",
-    },
-    orderBy: { created_at: "desc" },
-    select: { payload: true },
+  const legacyAlert = await db.integrationEvent.findFirst({
+    where: { id: alertId, company_id: user.company_id, type: "component_service_delivery_alert" },
+    select: { id: true },
   });
-  if (stringValue(record(existingLegacy?.payload)?.alertId) === alertId) {
-    return noStore({ success: true, acknowledged: false });
+  if (legacyAlert) {
+    return noStore({
+      error: "Driftlarmet finns kvar i äldre lagring. Kör backfill till ComponentServiceDeliveryAlert innan det kan kvitteras.",
+    }, { status: 409 });
   }
 
-  await db.$transaction([
-    db.integrationEvent.create({
-      data: {
-        company_id: user.company_id,
-        type: "component_service_delivery_alert_acknowledgement",
-        status: "acknowledged",
-        recipient: user.id,
-        payload: { alertId },
-      },
-    }),
-    db.auditLog.create({
-      data: {
-        company_id: user.company_id,
-        actor_user_id: user.id,
-        entity_type: "service_notification_delivery_alert",
-        entity_id: alertId,
-        action: "component_service_delivery_alert.acknowledged",
-        metadata: { alertId },
-      },
-    }),
-  ]);
-
-  return noStore({ success: true, acknowledged: true });
+  return noStore({ error: "Driftlarmet hittades inte" }, { status: 404 });
 }

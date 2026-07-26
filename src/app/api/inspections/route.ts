@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { mergeByCreatedAt, parseDateOnly } from "@/lib/dual-list";
+import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const action = "inspection.created";
@@ -49,13 +49,16 @@ export async function GET() {
       created_at: row.created_at,
       source: "table" as const,
     }));
-    const legacy = logs.map((log) => ({
-      id: log.id,
-      property_id: log.entity_id,
-      ...(log.metadata as object),
-      created_at: log.created_at,
-      source: "legacy" as const,
-    }));
+    const modernIds = new Set(modern.map((row) => row.id));
+    const legacy = logs
+      .filter((log) => !isModernStorageMirror(log.metadata, "ComplianceInspection", modernIds, log.entity_id) && !modernIds.has(log.id))
+      .map((log) => ({
+        id: log.id,
+        property_id: log.entity_id,
+        ...(log.metadata as object),
+        created_at: log.created_at,
+        source: "legacy" as const,
+      }));
 
     return NextResponse.json({ inspections: mergeByCreatedAt(modern, legacy, 300), properties });
   } catch (error) {

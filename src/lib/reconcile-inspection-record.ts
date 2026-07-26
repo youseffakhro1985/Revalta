@@ -23,18 +23,24 @@ export async function reconcileInspectionRecord(args: {
     where: { company_id_lease_id: { company_id: args.companyId, lease_id: args.leaseId } },
     select: { id: true, payload: true, version: true },
   });
-  const event = modern
-    ? null
-    : await db.integrationEvent.findFirst({
+  if (!modern) {
+    const legacy = await db.integrationEvent.findFirst({
       where: { company_id: args.companyId, type: inspectionRecordEventType, recipient: args.leaseId },
       orderBy: { created_at: "desc" },
+      select: { id: true },
     });
+    if (legacy) {
+      throw new InspectionRecordSyncError(
+        "Besiktningen finns kvar i äldre lagring. Kör backfill/migrera till LeaseInspectionRecord innan avstämning.",
+        409,
+      );
+    }
+    throw new InspectionRecordSyncError("Ingen sparad besiktning hittades", 404);
+  }
 
-  const current = modern?.payload && typeof modern.payload === "object"
+  const current = modern.payload && typeof modern.payload === "object"
     ? modern.payload as unknown as LeaseInspectionRecord
-    : event?.payload && typeof event.payload === "object"
-      ? event.payload as unknown as LeaseInspectionRecord
-      : null;
+    : null;
   if (!current) throw new InspectionRecordSyncError("Ingen sparad besiktning hittades", 404);
   if (current.version !== args.version) throw new InspectionRecordSyncError("Besiktningen har ändrats. Ladda om och försök igen.", 409);
 
@@ -53,22 +59,15 @@ export async function reconcileInspectionRecord(args: {
 
   const actionRequired = result.record.items.filter((item) => item.condition === "action_required" && !item.resolved).length;
   await db.$transaction(async (tx) => {
-    if (modern) {
-      await tx.leaseInspectionRecord.update({
-        where: { id: modern.id },
-        data: {
-          status: actionRequired > 0 ? "action_required" : "recorded",
-          version: result.record.version,
-          payload: result.record as unknown as Prisma.InputJsonValue,
-          updated_by_id: args.userId,
-        },
-      });
-    } else if (event) {
-      await tx.integrationEvent.update({
-        where: { id: event.id },
-        data: { status: actionRequired > 0 ? "action_required" : "recorded", payload: result.record as unknown as Prisma.InputJsonValue },
-      });
-    }
+    await tx.leaseInspectionRecord.update({
+      where: { id: modern.id },
+      data: {
+        status: actionRequired > 0 ? "action_required" : "recorded",
+        version: result.record.version,
+        payload: result.record as unknown as Prisma.InputJsonValue,
+        updated_by_id: args.userId,
+      },
+    });
     await tx.auditLog.create({
       data: {
         company_id: args.companyId,
@@ -82,7 +81,7 @@ export async function reconcileInspectionRecord(args: {
           version: result.record.version,
           changedIds: result.changedIds,
           remainingActionRequired: actionRequired,
-          storage: modern ? "LeaseInspectionRecord" : "IntegrationEvent",
+          storage: "LeaseInspectionRecord",
         },
       },
     });

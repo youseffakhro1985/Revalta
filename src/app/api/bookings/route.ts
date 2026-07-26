@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { isModernStorageMirror, mergeByCreatedAt } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const action = "booking.created";
@@ -31,7 +32,6 @@ export async function GET() {
       }),
     ]);
 
-    const modernIds = new Set(rows.map((row) => row.id));
     const modern = rows.map((row) => ({
       id: row.id,
       property_id: row.property_id,
@@ -47,8 +47,9 @@ export async function GET() {
       source: "table" as const,
     }));
 
+    const modernIds = new Set(modern.map((row) => row.id));
     const legacy = legacyLogs
-      .filter((log) => !modernIds.has(log.id))
+      .filter((log) => !isModernStorageMirror(log.metadata, "Booking", modernIds, log.entity_id) && !modernIds.has(log.id))
       .map((log) => ({
         id: log.id,
         property_id: log.entity_id,
@@ -58,7 +59,7 @@ export async function GET() {
       }));
 
     return NextResponse.json({
-      bookings: [...modern, ...legacy].sort((a, b) => b.created_at.getTime() - a.created_at.getTime()).slice(0, 250),
+      bookings: mergeByCreatedAt(modern, legacy, 250),
       properties,
     });
   } catch (error) {
@@ -165,6 +166,65 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, booking }, { status: 201 });
   } catch (error) {
     console.error("Create booking error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const bookingId = String(body.bookingId || body.id || "").trim();
+    const status = String(body.status || "").trim();
+    if (!bookingId) return NextResponse.json({ error: "Boknings-id krävs" }, { status: 400 });
+    if (status !== "cancelled") {
+      return NextResponse.json({ error: "Endast avbokning (cancelled) stöds" }, { status: 400 });
+    }
+
+    const modern = await db.booking.findFirst({
+      where: { id: bookingId, company_id: user.company_id },
+      select: { id: true, status: true, resource: true, resident_name: true },
+    });
+    if (modern) {
+      if (modern.status === "cancelled") return NextResponse.json({ success: true, alreadyCancelled: true });
+      const updateResult = await db.booking.updateMany({
+        where: { id: modern.id, company_id: user.company_id },
+        data: { status: "cancelled" },
+      });
+      if (updateResult.count === 0) return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+
+      await writeAuditLog(user, {
+        entityType: "booking",
+        entityId: modern.id,
+        action: "booking.cancelled",
+        metadata: {
+          previousStatus: modern.status,
+          status: "cancelled",
+          resource: modern.resource,
+          resident_name: modern.resident_name,
+          storage: "Booking",
+        },
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    const legacy = await db.auditLog.findFirst({
+      where: { ...auditScopedWhere(user), action, id: bookingId },
+      select: { id: true },
+    });
+    if (legacy) {
+      return NextResponse.json({
+        error: "Bokningen finns kvar i äldre lagring. Kör backfill till Booking innan den kan avbokas.",
+      }, { status: 409 });
+    }
+
+    return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+  } catch (error) {
+    console.error("Cancel booking error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -204,3 +204,78 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageAccessCredentials(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    }
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const credentialId = String(body.credentialId || body.id || "").trim();
+    const status = String(body.status || "").trim();
+    const holder = body.holder !== undefined ? String(body.holder || "").trim() : undefined;
+    const allowedStatuses = new Set(["in_stock", "issued", "returned", "blocked", "lost"]);
+
+    if (!credentialId || !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Behörighets-id och giltig status krävs" }, { status: 400 });
+    }
+    if (holder !== undefined && holder.length > 160) {
+      return NextResponse.json({ error: "Mottagaren är för lång" }, { status: 400 });
+    }
+    if (status === "issued" && holder !== undefined && !holder) {
+      return NextResponse.json({ error: "Mottagare krävs vid utlämning" }, { status: 400 });
+    }
+
+    const existing = await db.accessCredential.findFirst({
+      where: { id: credentialId, company_id: user.company_id },
+      select: { id: true, status: true, holder: true, identifier: true },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action: legacyAction, id: credentialId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Behörigheten finns kvar i äldre lagring. Kör backfill till AccessCredential innan status ändras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Behörigheten hittades inte" }, { status: 404 });
+    }
+
+    const updateResult = await db.accessCredential.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
+      data: {
+        status,
+        ...(holder !== undefined ? { holder: holder || null } : {}),
+        ...(status === "issued" ? { issued_at: new Date() } : {}),
+        ...(status === "returned" || status === "in_stock" ? { return_due: null } : {}),
+      },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Behörigheten hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "access_credential",
+      entityId: existing.id,
+      action: "access.credential.status_updated",
+      metadata: {
+        previousStatus: existing.status,
+        status,
+        holder: holder !== undefined ? holder : existing.holder,
+        identifier: existing.identifier,
+        storage: "AccessCredential",
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Update access credential error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

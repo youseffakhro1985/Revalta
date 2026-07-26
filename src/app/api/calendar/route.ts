@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { mergeByCreatedAt, parseDateOnly } from "@/lib/dual-list";
+import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const action = "calendar.event";
@@ -41,13 +41,16 @@ export async function GET() {
       created_at: row.created_at,
       source: "table" as const,
     }));
-    const legacy = events.map((event) => ({
-      id: event.id,
-      entity_id: event.entity_id,
-      ...(event.metadata as object),
-      created_at: event.created_at,
-      source: "legacy" as const,
-    }));
+    const modernIds = new Set(modern.map((row) => row.id));
+    const legacy = events
+      .filter((event) => !isModernStorageMirror(event.metadata, "CalendarEvent", modernIds, event.entity_id) && !modernIds.has(event.id))
+      .map((event) => ({
+        id: event.id,
+        entity_id: event.entity_id,
+        ...(event.metadata as object),
+        created_at: event.created_at,
+        source: "legacy" as const,
+      }));
 
     return NextResponse.json({
       events: mergeByCreatedAt(modern, legacy, 500).sort((left, right) => {

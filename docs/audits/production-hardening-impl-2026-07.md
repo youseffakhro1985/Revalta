@@ -63,7 +63,14 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Lease inspection helpers dual-read modern `LeaseInspectionRecord` / `LeaseInspectionWorkOrderLink`.
    - Lock force-release notifications on `WorkOrderLockNotification`; service escalation runs/admin actions on `ServiceAssignmentEscalation` / `ServiceEscalationAdminAction`.
    - Fail-closed legacy mutations for document lifecycle, quote status and portfolio maintenance (require modern tables after backfill).
-   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes AccessCredential, InspectionRound, QuoteDecision, ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables, recurring schedule/run/incident tables, lock notifications, service escalations, lock/recurring notification UX).
+   - Dual-read storage filter via `mergeByCreatedAt` options (`modernStorage` / `legacyEntityId` / `legacyStorage`) so AuditLog mirrors of modern writes are excluded from list APIs (e.g. notifications).
+   - Fail-closed notification read (`AppNotification` + `NotificationRead` only), alert acknowledgement (`ComponentServiceDeliveryAlertAck` only) and lease inspection reconcile (`LeaseInspectionRecord` only); legacy rows return `409` asking for backfill.
+   - Cron recovery for service digests resolves modern `ComponentServiceDeliveryAlert` only and logs via AuditLog (no `component_service_delivery_recovery` IntegrationEvent product writes).
+   - New backfills: `NotificationRead` from AuditLog `notification.read`, `ComponentServiceDeliveryAlertAck` from IE acknowledgements.
+   - Settings nav links to `/dashboard/installningar/eskaleringar` (+ regler).
+   - Access credential status lifecycle (`PATCH /api/access-credentials`) and booking cancel (`PATCH /api/bookings`, modern `Booking` only, fail-closed for legacy) with minimal UI actions.
+   - Work-order soft-delete (`DELETE /api/work-orders/[id]` sets `deleted_at`) with discreet manager control on detail page.
+   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes AccessCredential, InspectionRound, QuoteDecision, ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables, recurring schedule/run/incident tables, lock notifications, service escalations, lock/recurring notification UX, NotificationRead, ComponentServiceDeliveryAlertAck).
 
 ## Verification
 

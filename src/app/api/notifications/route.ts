@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { mergeByCreatedAt } from "@/lib/dual-list";
+import { isModernStorageMirror, mergeByCreatedAt } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const createdAction = "notification.created";
@@ -72,17 +72,27 @@ export async function GET() {
       source: "table" as const,
     }));
 
-    const legacyRows = notifications.map((row) => ({
-      id: row.id,
-      notificationId: row.entity_id || row.id,
-      created_at: row.created_at,
-      read: legacyReadIds.has(row.entity_id || row.id) || modernReadIds.has(row.entity_id || row.id),
-      ...(row.metadata as Record<string, unknown>),
-      source: "legacy" as const,
-    }));
+    const modernIds = new Set(modernRows.map((row) => row.id));
+    const legacyRows = notifications
+      .filter((row) => !isModernStorageMirror(row.metadata, "AppNotification", modernIds, row.entity_id) && !modernIds.has(row.id))
+      .map((row) => ({
+        id: row.id,
+        notificationId: row.entity_id || row.id,
+        created_at: row.created_at,
+        read: legacyReadIds.has(row.entity_id || row.id) || modernReadIds.has(row.entity_id || row.id),
+        ...(row.metadata as Record<string, unknown>),
+        source: "legacy" as const,
+      }));
 
     return NextResponse.json({
-      notifications: mergeByCreatedAt(modernRows, legacyRows, 100),
+      notifications: mergeByCreatedAt(modernRows, legacyRows, 100, {
+        modernStorage: "AppNotification",
+        legacyEntityId: (row) => row.notificationId,
+        legacyStorage: (row) => {
+          const storage = (row as { storage?: unknown }).storage;
+          return typeof storage === "string" ? storage : null;
+        },
+      }),
       recentEvents: recentEvents.map((row) => ({
         id: row.id,
         action: row.action,
@@ -169,27 +179,17 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const notification = await db.auditLog.findFirst({
+    const legacyNotification = await db.auditLog.findFirst({
       where: { ...scopeFor(user), action: createdAction, entity_id: notificationId },
       select: { id: true },
     });
-    if (!notification) return NextResponse.json({ error: "Notisen hittades inte" }, { status: 404 });
-
-    const existing = await db.auditLog.findFirst({
-      where: { ...scopeFor(user), action: readAction, entity_id: notificationId },
-      select: { metadata: true },
-    });
-    const existingReader = (existing?.metadata as Record<string, unknown> | null)?.reader_id;
-    if (existingReader !== user.id) {
-      await writeAuditLog(user, {
-        entityType: "notification",
-        entityId: notificationId,
-        action: readAction,
-        metadata: { reader_id: user.id },
-      });
+    if (legacyNotification) {
+      return NextResponse.json({
+        error: "Notisen finns kvar i äldre lagring. Kör backfill till AppNotification innan den kan markeras som läst.",
+      }, { status: 409 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ error: "Notisen hittades inte" }, { status: 404 });
   } catch (error) {
     console.error("Mark notification read error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

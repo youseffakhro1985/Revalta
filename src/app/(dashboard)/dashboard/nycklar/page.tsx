@@ -18,6 +18,7 @@ type Credential = {
   return_due?: string | null;
   registered_by?: string;
   created_at: string;
+  source?: "table" | "legacy";
 };
 
 const typeLabels: Record<string, string> = { key: "Nyckel", tag: "Tagg", card: "Passerkort", code: "Kod", remote: "Fjärrkontroll" };
@@ -28,6 +29,7 @@ export default function KeysPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [updatingId, setUpdatingId] = useState("");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [form, setForm] = useState({ propertyId: "", identifier: "", credentialType: "key", holder: "", unit: "", accessArea: "", status: "in_stock", issuedAt: "", returnDue: "", note: "" });
@@ -65,6 +67,24 @@ export default function KeysPage() {
     setSaving(false);
   }
 
+  async function updateStatus(credential: Credential, status: string) {
+    if (credential.source === "legacy") {
+      setError("Posten finns i äldre lagring. Kör backfill till AccessCredential innan status ändras.");
+      return;
+    }
+    setUpdatingId(credential.id);
+    setError("");
+    const response = await fetch("/api/access-credentials", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId: credential.id, status }),
+    });
+    const data = await response.json();
+    if (!response.ok) setError(data.error || "Kunde inte uppdatera status");
+    else await load();
+    setUpdatingId("");
+  }
+
   const field = "h-11 w-full rounded-lg border border-sand-200 bg-white px-3 text-sm text-ink-800 outline-none transition focus:border-petroleum-500";
 
   return <div className="space-y-8">
@@ -92,7 +112,7 @@ export default function KeysPage() {
 
       <div className="rounded-2xl border border-sand-200 bg-white shadow-[0_1px_2px_rgba(17,34,31,0.04)]">
         <div className="flex flex-col gap-4 border-b border-sand-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-display text-xl font-semibold text-ink-900">Nyckelregister</h2><p className="mt-1 text-sm text-ink-500">Spårbar översikt över samtliga behörigheter.</p></div><input className="h-10 rounded-lg border border-sand-200 px-3 text-sm outline-none focus:border-petroleum-500" placeholder="Sök nummer, mottagare eller fastighet" value={query} onChange={(e) => setQuery(e.target.value)}/></div>
-        <div className="divide-y divide-sand-200">{loading ? <p className="p-6 text-sm text-ink-500">Hämtar register…</p> : filtered.length === 0 ? <p className="p-10 text-center text-sm text-ink-500">Inga poster hittades.</p> : filtered.map((item) => <article key={item.id} className="p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{item.identifier}</h3><span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{typeLabels[item.credential_type || "key"]}</span><span className="rounded-full border border-sand-200 px-2.5 py-1 text-[10px] font-semibold text-ink-600">{statusLabels[item.status || "in_stock"]}</span></div><p className="mt-1 text-sm text-ink-500">{item.property_name}{item.unit ? ` · ${item.unit}` : ""}{item.access_area ? ` · ${item.access_area}` : ""}</p></div><div className="sm:text-right"><p className="text-sm font-semibold text-ink-800">{item.holder || "Ingen mottagare"}</p><p className="mt-1 text-xs text-ink-400">{item.return_due ? `Åter senast ${new Date(item.return_due).toLocaleDateString("sv-SE")}` : "Ingen återlämningsdag"}</p></div></div></article>)}</div>
+        <div className="divide-y divide-sand-200">{loading ? <p className="p-6 text-sm text-ink-500">Hämtar register…</p> : filtered.length === 0 ? <p className="p-10 text-center text-sm text-ink-500">Inga poster hittades.</p> : filtered.map((item) => <article key={item.id} className="p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{item.identifier}</h3><span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{typeLabels[item.credential_type || "key"]}</span><span className="rounded-full border border-sand-200 px-2.5 py-1 text-[10px] font-semibold text-ink-600">{statusLabels[item.status || "in_stock"]}</span></div><p className="mt-1 text-sm text-ink-500">{item.property_name}{item.unit ? ` · ${item.unit}` : ""}{item.access_area ? ` · ${item.access_area}` : ""}</p></div><div className="space-y-2 sm:text-right"><p className="text-sm font-semibold text-ink-800">{item.holder || "Ingen mottagare"}</p><p className="text-xs text-ink-400">{item.return_due ? `Åter senast ${new Date(item.return_due).toLocaleDateString("sv-SE")}` : "Ingen återlämningsdag"}</p>{item.source !== "legacy" ? <div className="flex flex-wrap gap-2 sm:justify-end"><select className="h-9 rounded-lg border border-sand-200 bg-white px-2 text-xs text-ink-700" defaultValue="" disabled={updatingId === item.id} onChange={(event) => { const value = event.target.value; if (value) void updateStatus(item, value); event.target.value = ""; }}><option value="" disabled>Ändra status</option>{Object.entries(statusLabels).filter(([value]) => value !== item.status).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div> : <p className="text-xs text-amber-700">Kräver backfill</p>}</div></div></article>)}</div>
       </div>
     </section>
   </div>;

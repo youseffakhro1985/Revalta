@@ -72,6 +72,7 @@ export default function WorkOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const editLock = useWorkOrderEditLock(id, Boolean(transitions?.canManage));
@@ -175,6 +176,22 @@ export default function WorkOrderDetailPage() {
     }
   }
 
+  async function softDeleteWorkOrder() {
+    if (!window.confirm("Ta bort arbetsordern? Den döljs från listor men behålls i historiken.")) return;
+    setDeleting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/work-orders/${id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort arbetsordern");
+      router.push("/dashboard/arbetsorder");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort arbetsordern");
+      setDeleting(false);
+    }
+  }
+
   return <div className="space-y-8">
     <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordrar</Link>
     <PageHeader eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder.title} description={workOrder.description} />
@@ -244,6 +261,16 @@ export default function WorkOrderDetailPage() {
             >
               <FolderKanban className="h-3.5 w-3.5" />
               {creatingProject ? "Skapar projekt…" : "Skapa projekt från arbetsorder"}
+            </button>
+          ) : null}
+          {transitions.canManage ? (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => void softDeleteWorkOrder()}
+              className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+            >
+              {deleting ? "Tar bort…" : "Ta bort arbetsorder"}
             </button>
           ) : null}
         </div>

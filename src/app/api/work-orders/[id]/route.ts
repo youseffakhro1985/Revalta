@@ -323,3 +323,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     ticketSync: transactionResult.ticketSync,
   });
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+  const { id } = await params;
+  const existing = await db.workOrder.findFirst({
+    where: { id, company_id: user.company_id, deleted_at: null },
+    select: { id: true, title: true, status: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+
+  const deleteResult = await db.workOrder.updateMany({
+    where: { id: existing.id, company_id: user.company_id, deleted_at: null },
+    data: { deleted_at: new Date() },
+  });
+  if (deleteResult.count === 0) {
+    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
+
+  await writeAuditLog(user, {
+    entityType: "work_order",
+    entityId: existing.id,
+    action: "work_order.deleted",
+    metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+  });
+  return NextResponse.json({ success: true });
+}

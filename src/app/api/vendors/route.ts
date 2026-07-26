@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
-import { asNumber, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
+import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const entityType = "vendor_contract";
@@ -46,12 +46,15 @@ export async function GET() {
       source: "table" as const,
     }));
 
-    const legacyRows = legacy.map((row) => ({
-      id: row.entity_id || row.id,
-      created_at: row.created_at,
-      ...(row.metadata as Record<string, unknown>),
-      source: "legacy" as const,
-    }));
+    const modernIds = new Set(modern.map((row) => row.id));
+    const legacyRows = legacy
+      .filter((row) => !isModernStorageMirror(row.metadata, "VendorContract", modernIds, row.entity_id) && !modernIds.has(row.id))
+      .map((row) => ({
+        id: row.entity_id || row.id,
+        created_at: row.created_at,
+        ...(row.metadata as Record<string, unknown>),
+        source: "legacy" as const,
+      }));
 
     return NextResponse.json({ vendors: mergeByCreatedAt(modern, legacyRows, 200) });
   } catch (error) {

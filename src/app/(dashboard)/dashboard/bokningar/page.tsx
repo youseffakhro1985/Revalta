@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 
 type Property = { id: string; name: string; city: string };
-type Booking = { id: string; property_name?: string; resource: string; resident_name: string; unit?: string; start: string; end: string; status: string };
+type Booking = { id: string; property_name?: string; resource: string; resident_name: string; unit?: string; start: string; end: string; status: string; source?: "table" | "legacy" };
 const resourceTypes = ["Tvättstuga", "Föreningslokal", "Gästlägenhet", "Parkering", "Bastu", "Övrigt"];
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [saving, setSaving] = useState(false);
+  const [cancellingId, setCancellingId] = useState("");
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({ propertyId: "", resource: "Tvättstuga", residentName: "", unit: "", start: "", end: "", note: "" });
 
@@ -35,6 +36,25 @@ export default function BookingsPage() {
     setSaving(false);
   }
 
+  async function cancelBooking(booking: Booking) {
+    if (booking.source === "legacy") {
+      setMessage("Bokningen finns i äldre lagring. Kör backfill till Booking innan den kan avbokas.");
+      return;
+    }
+    if (!window.confirm("Avboka den här bokningen?")) return;
+    setCancellingId(booking.id);
+    setMessage("");
+    const response = await fetch("/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: booking.id, status: "cancelled" }),
+    });
+    const data = await response.json();
+    if (!response.ok) setMessage(data.error || "Bokningen kunde inte avbokas");
+    else { setMessage("Bokningen är avbokad"); await load(); }
+    setCancellingId("");
+  }
+
   const upcoming = bookings.filter((booking) => new Date(booking.end).getTime() >= Date.now());
   const week = upcoming.filter((booking) => new Date(booking.start).getTime() <= Date.now() + 604800000).length;
 
@@ -54,7 +74,7 @@ export default function BookingsPage() {
         {message && <p className="text-sm text-petroleum-700">{message}</p>}
         <button disabled={saving} className="w-full rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Sparar…" : "Registrera bokning"}</button>
       </form>
-      <div className="rounded-2xl border border-sand-200 bg-white shadow-premium-sm"><div className="border-b border-sand-200 p-5"><h2 className="font-semibold text-ink-950">Bokningsöversikt</h2></div><div className="divide-y divide-sand-200">{bookings.length === 0 ? <p className="p-8 text-sm text-ink-400">Inga bokningar registrerade ännu.</p> : bookings.map((booking) => <article key={booking.id} className="grid gap-3 p-5 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{booking.resource}</p><h3 className="mt-1 font-semibold text-ink-950">{booking.resident_name}</h3><p className="text-sm text-ink-500">{booking.property_name || "Fastighet"}{booking.unit ? ` · ${booking.unit}` : ""}</p></div><div><p className="text-sm font-medium text-ink-800">{new Date(booking.start).toLocaleString("sv-SE")}</p><p className="text-xs text-ink-400">Till {new Date(booking.end).toLocaleString("sv-SE")}</p></div><span className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-700">Bekräftad</span></article>)}</div></div>
+      <div className="rounded-2xl border border-sand-200 bg-white shadow-premium-sm"><div className="border-b border-sand-200 p-5"><h2 className="font-semibold text-ink-950">Bokningsöversikt</h2></div><div className="divide-y divide-sand-200">{bookings.length === 0 ? <p className="p-8 text-sm text-ink-400">Inga bokningar registrerade ännu.</p> : bookings.map((booking) => <article key={booking.id} className="grid gap-3 p-5 md:grid-cols-[1.2fr_1fr_auto] md:items-center"><div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{booking.resource}</p><h3 className="mt-1 font-semibold text-ink-950">{booking.resident_name}</h3><p className="text-sm text-ink-500">{booking.property_name || "Fastighet"}{booking.unit ? ` · ${booking.unit}` : ""}</p></div><div><p className="text-sm font-medium text-ink-800">{new Date(booking.start).toLocaleString("sv-SE")}</p><p className="text-xs text-ink-400">Till {new Date(booking.end).toLocaleString("sv-SE")}</p></div><div className="flex flex-col items-start gap-2 md:items-end"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${booking.status === "cancelled" ? "bg-sand-100 text-ink-600" : "bg-petroleum-50 text-petroleum-700"}`}>{booking.status === "cancelled" ? "Avbokad" : "Bekräftad"}</span>{booking.status !== "cancelled" && booking.source !== "legacy" ? <button type="button" disabled={cancellingId === booking.id} onClick={() => void cancelBooking(booking)} className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{cancellingId === booking.id ? "Avbokar…" : "Avboka"}</button> : null}</div></article>)}</div></div>
     </section>
   </div>;
 }

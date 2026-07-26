@@ -67,9 +67,23 @@ type Ticket = {
   }>;
 };
 type TimelineItem = { id: string; type: string; title: string; description: string; created_at: string };
+type TicketOperation = {
+  id: string;
+  action: string;
+  created_at: string;
+  metadata?: {
+    type?: string;
+    description?: string | null;
+    minutes?: number | null;
+    amount?: number | null;
+    completed?: boolean | null;
+  } | null;
+  actor?: { name: string | null; email: string } | null;
+};
 
 const statusLabels = OPERATIONS_STATUS_LABELS;
 const priorityLabels = PRIORITY_LABELS;
+const operationTypeLabels: Record<string, string> = { time: "Tid", cost: "Kostnad", checklist: "Checklista", note: "Anteckning" };
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 
 export default function TicketDetailPage() {
@@ -91,27 +105,36 @@ export default function TicketDetailPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [operations, setOperations] = useState<TicketOperation[]>([]);
+  const [operationType, setOperationType] = useState("note");
+  const [operationDescription, setOperationDescription] = useState("");
+  const [operationMinutes, setOperationMinutes] = useState("");
+  const [operationAmount, setOperationAmount] = useState("");
+  const [operationCompleted, setOperationCompleted] = useState(false);
+  const [savingOperation, setSavingOperation] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     async function loadData() {
       setLoading(true);
       try {
-        const [ticketResponse, teamResponse, timelineResponse, workOrderResponse] = await Promise.all([
+        const [ticketResponse, teamResponse, timelineResponse, workOrderResponse, operationsResponse] = await Promise.all([
           fetch(`/api/tickets/${params.id}`, { cache: "no-store" }),
           fetch("/api/team", { cache: "no-store" }),
           fetch(`/api/tickets/${params.id}/timeline`, { cache: "no-store" }),
           fetch(`/api/tickets/${params.id}/work-order`, { cache: "no-store" }),
+          fetch(`/api/tickets/${params.id}/operations`, { cache: "no-store" }),
         ]);
         if ([ticketResponse, teamResponse, timelineResponse, workOrderResponse].some((response) => response.status === 401)) {
           router.push("/login");
           return;
         }
-        const [ticketData, teamData, timelineData, workOrderData] = await Promise.all([
+        const [ticketData, teamData, timelineData, workOrderData, operationsData] = await Promise.all([
           ticketResponse.json(),
           teamResponse.json(),
           timelineResponse.json(),
           workOrderResponse.json(),
+          operationsResponse.json().catch(() => ({ operations: [] })),
         ]);
         if (!mounted) return;
         if (!ticketResponse.ok) throw new Error(ticketData.error || "Kunde inte hämta ärendet");
@@ -126,6 +149,7 @@ export default function TicketDetailPage() {
         setTimeline(timelineData.timeline || []);
         setWorkOrder(workOrderData.workOrder || null);
         setCanCreateWorkOrder(Boolean(workOrderData.canCreate));
+        if (operationsResponse.ok) setOperations(operationsData.operations || []);
       } catch (caught) {
         if (mounted) setError(caught instanceof Error ? caught.message : "Kunde inte kontakta servern");
       } finally {
@@ -229,6 +253,35 @@ export default function TicketDetailPage() {
     } finally { setAnalyzing(false); }
   }
 
+  async function addOperation(event: React.FormEvent) {
+    event.preventDefault();
+    setError(""); setSuccess(""); setSavingOperation(true);
+    try {
+      const response = await fetch(`/api/tickets/${params.id}/operations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: operationType,
+          description: operationDescription,
+          minutes: operationMinutes ? Number(operationMinutes) : undefined,
+          amount: operationAmount ? Number(operationAmount) : undefined,
+          completed: operationCompleted,
+        }),
+      });
+      const data = await response.json();
+      if (response.status === 401) { router.push("/login"); return; }
+      if (!response.ok) throw new Error(data.error || "Kunde inte spara registreringen");
+      setOperations((current) => [data.operation, ...current].slice(0, 100));
+      setOperationDescription("");
+      setOperationMinutes("");
+      setOperationAmount("");
+      setOperationCompleted(false);
+      setSuccess("Operativ registrering sparad.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Kunde inte kontakta servern");
+    } finally { setSavingOperation(false); }
+  }
+
   if (loading) return <div className="h-72 animate-pulse rounded-3xl bg-sand-100" />;
   if (!ticket) return <InlineAlert>{error || "Ärendet hittades inte"}</InlineAlert>;
 
@@ -274,6 +327,30 @@ export default function TicketDetailPage() {
         <Panel title="Styr ärendet" description="Status, prioritet och ansvarig." bodyClassName="p-6"><form onSubmit={updateTicket} className="space-y-4"><SelectField label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} /><SelectField label="Prioritet" value={priority} onChange={setPriority} options={Object.entries(priorityLabels)} /><label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select></label><button disabled={saving} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button></form></Panel>
 
         <Panel title="Ny kommentar" description="Dokumentera nästa åtgärd." bodyClassName="p-6"><form onSubmit={addComment}><textarea required minLength={2} rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className={premiumTextareaClass} placeholder="Skriv en uppdatering…" /><button disabled={saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Send className="h-4 w-4" />Lägg till kommentar</button></form></Panel>
+
+        <Panel title="Operativa registreringar" description="Tid, kostnad, checklista eller anteckning." bodyClassName="space-y-4 p-6">
+          <form onSubmit={addOperation} className="space-y-3">
+            <select value={operationType} onChange={(event) => setOperationType(event.target.value)} className={premiumFieldClass}>
+              {Object.entries(operationTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            {operationType === "time" ? <input type="number" min="1" max="1440" required value={operationMinutes} onChange={(event) => setOperationMinutes(event.target.value)} placeholder="Minuter" className={premiumFieldClass} /> : null}
+            {operationType === "cost" ? <input type="number" min="0" step="0.01" required value={operationAmount} onChange={(event) => setOperationAmount(event.target.value)} placeholder="Belopp (SEK)" className={premiumFieldClass} /> : null}
+            {operationType === "checklist" ? <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={operationCompleted} onChange={(event) => setOperationCompleted(event.target.checked)} /> Markerad som klar</label> : null}
+            <textarea required={operationType === "checklist" || operationType === "note"} minLength={operationType === "checklist" || operationType === "note" ? 2 : 0} rows={3} value={operationDescription} onChange={(event) => setOperationDescription(event.target.value)} className={premiumTextareaClass} placeholder="Kort beskrivning" />
+            <button disabled={savingOperation} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{savingOperation ? "Sparar…" : "Spara registrering"}</button>
+          </form>
+          <div className="space-y-2 border-t border-sand-200 pt-4">
+            {operations.length === 0 ? <p className="text-sm text-ink-500">Inga registreringar ännu.</p> : operations.slice(0, 5).map((item) => {
+              const type = String(item.metadata?.type || "");
+              const detail = type === "time" && item.metadata?.minutes
+                ? `${item.metadata.minutes} min`
+                : type === "cost" && item.metadata?.amount != null
+                  ? `${item.metadata.amount} SEK`
+                  : item.metadata?.description || item.action;
+              return <div key={item.id} className="rounded-xl border border-sand-200 px-3 py-2"><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{operationTypeLabels[type] || type || "Registrering"}</p><p className="mt-1 text-sm text-ink-700">{detail}</p><p className="mt-1 text-[11px] text-ink-400">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p></div>;
+            })}
+          </div>
+        </Panel>
 
         <Panel title="Ladda upp bilaga" description="PNG, JPG, WebP, PDF eller TXT." bodyClassName="p-6"><form onSubmit={uploadAttachment}><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(event) => setFile(event.target.files?.[0] || null)} className="block w-full text-sm text-ink-500 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-2 file:font-semibold file:text-ink-700" /><button disabled={!file || saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Paperclip className="h-4 w-4" />Ladda upp</button></form></Panel>
       </aside>
