@@ -37,13 +37,13 @@ export async function GET() {
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       }),
       db.property.findMany({
-        where: tenantWhere(user),
+        where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
         select: { id: true, name: true, address: true, city: true },
       }),
       user.company_id
         ? db.lease.findMany({
-            where: { company_id: user.company_id, status: { in: ["active", "notice"] } },
+            where: { company_id: user.company_id, deleted_at: null, status: { in: ["active", "notice"] } },
             orderBy: { updated_at: "desc" },
             take: 500,
             select: {
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     }
 
     const property = await db.property.findFirst({
-      where: { id: propertyId, ...tenantWhere(user) },
+      where: { id: propertyId, deleted_at: null, ...tenantWhere(user) },
       select: { id: true, name: true },
     });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
@@ -152,7 +152,7 @@ export async function POST(request: Request) {
     let resolvedUnit = unit;
     if (leaseId) {
       const lease = await db.lease.findFirst({
-        where: { id: leaseId, company_id: user.company_id, property_id: property.id },
+        where: { id: leaseId, company_id: user.company_id, property_id: property.id, deleted_at: null },
         select: { id: true, unit: { select: { designation: true } } },
       });
       if (!lease) return NextResponse.json({ error: "Hyresavtalet hittades inte för fastigheten" }, { status: 404 });

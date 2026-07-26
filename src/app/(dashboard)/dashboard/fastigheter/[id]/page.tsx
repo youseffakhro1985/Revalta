@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Building2, ClipboardList, DoorOpen, MapPin, Ruler, UserRound } from "lucide-react";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { PropertyRegistryManager } from "@/components/properties/property-registry-manager";
 import { PropertyComponentOverview } from "@/components/properties/property-component-overview";
 import { PropertyResidentRegister } from "@/components/properties/property-resident-register";
@@ -27,7 +27,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
   const { id } = await params;
   const property = await db.property.findFirst({
-    where: { id, ...tenantWhere(user) },
+    where: { id, deleted_at: null, ...tenantWhere(user) },
     include: {
       buildings: { orderBy: { name: "asc" }, include: { _count: { select: { units: true } } } },
       units: { orderBy: [{ unit_type: "asc" }, { designation: "asc" }], include: { building: { select: { name: true } } } },
@@ -110,7 +110,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
       <PropertyResidentRegister propertyId={property.id} />
 
-      <PropertyRegistryManager propertyId={property.id} buildings={property.buildings.map(({ id, name }) => ({ id, name }))} initialValues={{ name: property.name, address: property.address, postalCode: property.postal_code || "", city: property.city, propertyIdentifier: property.property_identifier || "", propertyType: property.property_type, status: property.status, constructionYear: property.construction_year?.toString() || "", totalArea: property.total_area?.toString() || "", boa: property.boa?.toString() || "", loa: property.loa?.toString() || "", managerName: property.manager_name || "", contactName: property.contact_name || "", contactEmail: property.contact_email || "", contactPhone: property.contact_phone || "" }} />
+      <PropertyRegistryManager canManage={canCreateProperties(user.role)} propertyId={property.id} buildings={property.buildings.map(({ id, name }) => ({ id, name }))} initialValues={{ name: property.name, address: property.address, postalCode: property.postal_code || "", city: property.city, propertyIdentifier: property.property_identifier || "", propertyType: property.property_type, status: property.status, constructionYear: property.construction_year?.toString() || "", totalArea: property.total_area?.toString() || "", boa: property.boa?.toString() || "", loa: property.loa?.toString() || "", managerName: property.manager_name || "", contactName: property.contact_name || "", contactEmail: property.contact_email || "", contactPhone: property.contact_phone || "" }} />
     </div>
   );
 }

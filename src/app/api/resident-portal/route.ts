@@ -50,7 +50,7 @@ export async function GET() {
 
     const [leases, tickets, managedDocuments, documentLogs] = await Promise.all([
       db.lease.findMany({
-        where: { company_id: user.company_id, status: { in: activeLeaseStatuses } },
+        where: { company_id: user.company_id, deleted_at: null, status: { in: activeLeaseStatuses } },
         orderBy: [{ property: { name: "asc" } }, { unit: { designation: "asc" } }],
         take: 1000,
         select: {
@@ -224,7 +224,7 @@ export async function POST(request: Request) {
     if (!allowedCategories.has(category) || !allowedPriorities.has(priority)) return NextResponse.json({ error: "Ogiltig kategori eller prioritet" }, { status: 400 });
 
     const lease = await db.lease.findFirst({
-      where: { id: leaseId, company_id: user.company_id, status: { in: activeLeaseStatuses } },
+      where: { id: leaseId, company_id: user.company_id, deleted_at: null, status: { in: activeLeaseStatuses } },
       select: {
         id: true,
         lease_number: true,

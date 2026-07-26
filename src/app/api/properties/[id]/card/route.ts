@@ -34,7 +34,7 @@ function nullableNumber(value: unknown) {
 
 async function resolveProperty(id: string, user: Awaited<ReturnType<typeof getCurrentUser>>) {
   if (!user) return null;
-  return db.property.findFirst({ where: { id, ...tenantWhere(user) }, select: { id: true } });
+  return db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
 }
 
 async function validateBuilding(buildingId: string | null, propertyId: string) {
@@ -60,7 +60,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const property = await db.property.findFirst({
-    where: { id, ...tenantWhere(user) },
+    where: { id, deleted_at: null, ...tenantWhere(user) },
     include: {
       buildings: { orderBy: { name: "asc" }, include: { _count: { select: { units: true } } } },
       units: { orderBy: [{ unit_type: "asc" }, { designation: "asc" }], include: { building: { select: { id: true, name: true } } } },

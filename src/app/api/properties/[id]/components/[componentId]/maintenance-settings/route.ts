@@ -9,7 +9,7 @@ async function resolveContext(params: Promise<{ id: string; componentId: string 
   if (!user) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) };
   if (!user.company_id) return { error: NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 }) };
   const { id: propertyId, componentId } = await params;
-  const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true } });
+  const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
   if (!property) return { error: NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 }) };
   return { user, propertyId, componentId };
 }

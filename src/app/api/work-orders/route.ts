@@ -162,7 +162,7 @@ export async function POST(request: Request) {
   if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) return NextResponse.json({ error: "Sluttiden måste ligga efter starttiden" }, { status: 400 });
   if (body.estimatedCost !== undefined && body.estimatedCost !== "" && estimatedCost === null) return NextResponse.json({ error: "Beräknad kostnad måste vara ett positivt belopp" }, { status: 400 });
 
-  const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id }, select: { id: true } });
+  const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   if (unitId) {

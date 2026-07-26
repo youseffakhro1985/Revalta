@@ -86,6 +86,8 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Operational document soft-delete (`DELETE /api/operational-documents/[id]`) + panel action.
    - Ticket operations hide time/cost when a work order exists and deep-link to WO economics.
    - Cron product journals: `CronJobRun` for preventive maintenance and recurring incident escalations (no IE job envelopes).
+   - Lease soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update paths under `/api/leases/**` and uthyrning-related lease lists filter active rows; `DELETE /api/leases/[id]` for managers (draft/cancelled/ended only; active → Swedish `409`); uthyrning UI wires discreet remove for leases and lease holders (holder DELETE already on property kontaktregister).
+   - Property soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update/search/count and select paths filter active rows; `DELETE /api/properties/[id]` for managers blocks open leases/tickets/work orders; discreet “Ta bort fastighet” on fastighetskort.
 
 ## Verification
 

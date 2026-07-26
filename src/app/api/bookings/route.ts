@@ -26,7 +26,7 @@ export async function GET() {
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       }),
       db.property.findMany({
-        where: tenantWhere(user),
+        where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
         select: { id: true, name: true, address: true, city: true },
       }),
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     }
 
     const property = await db.property.findFirst({
-      where: { id: propertyId, ...tenantWhere(user) },
+      where: { id: propertyId, deleted_at: null, ...tenantWhere(user) },
       select: { id: true, name: true },
     });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });

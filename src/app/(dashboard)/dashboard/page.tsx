@@ -41,7 +41,7 @@ async function getDashboardData() {
     db.ticket.count({ where: { ...scope, assigned_to_id: null, status: { not: "closed" } } }),
     db.ticket.count({ where: { ...scope, due_date: { lt: now }, status: { not: "closed" } } }),
     db.ticket.count({ where: { ...scope, closed_at: { gte: monthStart } } }),
-    db.property.count({ where: scope }),
+    db.property.count({ where: { deleted_at: null, ...scope } }),
     db.user.count({ where: user.company_id ? { company_id: user.company_id } : { id: user.id } }),
     db.ticket.findMany({
       where: scope,
@@ -57,7 +57,7 @@ async function getDashboardData() {
       },
     }),
     db.property.findMany({
-      where: scope,
+      where: { deleted_at: null, ...scope },
       orderBy: { created_at: "desc" },
       take: 5,
       select: {

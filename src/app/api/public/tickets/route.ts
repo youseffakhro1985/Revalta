@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     let property = null;
     if (normalizedPropertyId) {
       property = await db.property.findFirst({
-        where: { id: normalizedPropertyId, company_id: portal.company.id, status: "active" },
+        where: { id: normalizedPropertyId, company_id: portal.company.id, status: "active", deleted_at: null },
         select: { id: true, name: true, address: true, city: true },
       });
       if (!property) {

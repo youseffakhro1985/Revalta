@@ -77,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
       where: { deleted_at: null, id: holderId, company_id: user.company_id },
       include: {
         leases: {
+          where: { deleted_at: null },
           orderBy: { updated_at: "desc" },
           take: 20,
           select: {
@@ -89,7 +90,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
             unit: { select: { id: true, designation: true, unit_type: true } },
           },
         },
-        _count: { select: { leases: true } },
+        _count: { select: { leases: { where: { deleted_at: null } } } },
       },
     });
     if (!holder) {
@@ -120,7 +121,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const { holderId } = await params;
     const holder = await db.leaseHolder.findFirst({
       where: { id: holderId, company_id: user.company_id, deleted_at: null },
-      include: { _count: { select: { leases: true } } },
+      include: { _count: { select: { leases: { where: { deleted_at: null } } } } },
     });
     if (!holder) return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
     if (holder._count.leases > 0) return NextResponse.json({ error: "Kontakten kan inte tas bort eftersom den är kopplad till avtal. Sätt status till inaktiv i stället." }, { status: 409 });

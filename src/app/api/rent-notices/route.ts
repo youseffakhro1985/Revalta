@@ -28,7 +28,7 @@ export async function GET() {
       }),
       user.company_id
         ? db.lease.findMany({
-            where: { company_id: user.company_id },
+            where: { company_id: user.company_id, deleted_at: null },
             orderBy: { updated_at: "desc" },
             take: 500,
             include: {
@@ -39,7 +39,7 @@ export async function GET() {
           })
         : Promise.resolve([]),
       db.property.findMany({
-        where: tenantWhere(user),
+        where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       }),
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     let resolvedPropertyId = propertyId;
     if (leaseId) {
       const lease = await db.lease.findFirst({
-        where: { id: leaseId, company_id: user.company_id },
+        where: { id: leaseId, company_id: user.company_id, deleted_at: null },
         include: { lease_holder: { select: { name: true } }, unit: { select: { designation: true } } },
       });
       if (!lease) return NextResponse.json({ error: "Kontraktet hittades inte" }, { status: 400 });
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     }
 
     if (!resolvedPropertyId) return NextResponse.json({ error: "Fastighet krävs" }, { status: 400 });
-    const property = await db.property.findFirst({ where: { id: resolvedPropertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
+    const property = await db.property.findFirst({ where: { id: resolvedPropertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true, name: true } });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
     const indexedRent = baseRent * (1 + indexPercent / 100);

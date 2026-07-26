@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!writableRoles.has(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ändra komponentregistret" }, { status: 403 });
 
   const { id: propertyId } = await params;
-  const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true } });
+  const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   try {

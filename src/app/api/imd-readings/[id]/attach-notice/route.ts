@@ -58,7 +58,7 @@ export async function POST(
     if (!notice && createNotice) {
       if (!leaseId) return NextResponse.json({ error: "Hyresavtal krävs för att skapa avi" }, { status: 400 });
       const lease = await db.lease.findFirst({
-        where: { id: leaseId, company_id: user.company_id, property_id: reading.property_id },
+        where: { id: leaseId, company_id: user.company_id, property_id: reading.property_id, deleted_at: null },
         include: {
           lease_holder: { select: { name: true } },
           unit: { select: { designation: true } },

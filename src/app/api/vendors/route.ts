@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     const propertyId = body.propertyId ? String(body.propertyId).trim() : "";
     if (propertyId) {
       const property = await db.property.findFirst({
-        where: { id: propertyId, company_id: user.company_id },
+        where: { id: propertyId, company_id: user.company_id, deleted_at: null },
         select: { id: true },
       });
       if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });

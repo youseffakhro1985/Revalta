@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const [properties, tickets, users, leaseHolders] = await Promise.all([
       db.property.findMany({
         where: {
+          deleted_at: null,
           ...tenantWhere(user),
           OR: [
             { name: contains },

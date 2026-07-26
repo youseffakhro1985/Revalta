@@ -133,7 +133,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
   }
 
   async function remove(holder: Holder) {
-    if (!canManage || !window.confirm(`Ta bort ${holder.name} från kontaktregistret?`)) return;
+    if (!canManage || !window.confirm(`Ta bort ${holder.name} från kontaktregistret? Kontakten döljs från listor men behålls i historiken.`)) return;
     setBusy(true);
     setError("");
     setMessage("");

@@ -9,7 +9,7 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const properties = await db.property.findMany({
-      where: tenantWhere(user),
+      where: { deleted_at: null, ...tenantWhere(user) },
       orderBy: { created_at: "desc" },
       include: {
         _count: {

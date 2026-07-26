@@ -45,7 +45,7 @@ async function wrapCompany(
 
   if (propertyId) {
     const property = await db.property.findFirst({
-      where: { id: propertyId, company_id: company.id, status: "active" },
+      where: { id: propertyId, company_id: company.id, status: "active", deleted_at: null },
       select: { id: true },
     });
     if (!property) return null;
@@ -115,7 +115,7 @@ export async function getPublicPortalCompany(propertyId?: string | null) {
 
   if (propertyId) {
     const property = await db.property.findFirst({
-      where: { id: propertyId, status: "active", company: { status: "active" } },
+      where: { id: propertyId, status: "active", deleted_at: null, company: { status: "active" } },
       select: {
         company: {
           select: companySelect,

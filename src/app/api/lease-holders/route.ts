@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
     const propertyId = new URL(request.url).searchParams.get("propertyId");
     if (propertyId) {
-      const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id }, select: { id: true } });
+      const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
       if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
     }
 
@@ -35,13 +35,13 @@ export async function GET(request: Request) {
       where: {
         company_id: user.company_id,
         deleted_at: null,
-        ...(propertyId ? { leases: { some: { property_id: propertyId } } } : {}),
+        ...(propertyId ? { leases: { some: { property_id: propertyId, deleted_at: null } } } : {}),
       },
       orderBy: [{ status: "asc" }, { name: "asc" }],
       take: 1_000,
       include: {
         leases: {
-          where: propertyId ? { property_id: propertyId } : undefined,
+          where: { deleted_at: null, ...(propertyId ? { property_id: propertyId } : {}) },
           orderBy: { updated_at: "desc" },
           take: 20,
           select: {
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
             unit: { select: { id: true, designation: true, unit_type: true } },
           },
         },
-        _count: { select: { leases: true } },
+        _count: { select: { leases: { where: { deleted_at: null } } } },
       },
     });
 

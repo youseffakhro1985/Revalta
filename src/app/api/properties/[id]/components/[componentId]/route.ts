@@ -40,7 +40,7 @@ async function resolveContext(params: Promise<{ id: string; componentId: string 
 
   const { id: propertyId, componentId } = await params;
   const property = await db.property.findFirst({
-    where: { id: propertyId, ...tenantWhere(user) },
+    where: { id: propertyId, deleted_at: null, ...tenantWhere(user) },
     select: { id: true, name: true },
   });
   if (!property) return { error: NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 }) };

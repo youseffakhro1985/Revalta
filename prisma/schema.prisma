@@ -200,6 +200,7 @@ model Property {
   user_id                  String
   created_at               DateTime                   @default(now())
   updated_at               DateTime                   @default(now()) @updatedAt
+  deleted_at               DateTime?
   company                  Company?                   @relation(fields: [company_id], references: [id])
   user                     User                       @relation(fields: [user_id], references: [id])
   tickets                  Ticket[]
@@ -235,6 +236,7 @@ model Property {
   imd_debit_lines          ImdDebitLine[]
 
   @@index([company_id])
+  @@index([company_id, deleted_at])
   @@index([user_id])
   @@index([city])
 }
@@ -1048,6 +1050,7 @@ model Lease {
   ended_at             DateTime?
   created_at           DateTime    @default(now())
   updated_at           DateTime    @default(now()) @updatedAt
+  deleted_at           DateTime?
   company              Company     @relation(fields: [company_id], references: [id], onDelete: Cascade)
   property             Property    @relation(fields: [property_id], references: [id], onDelete: Restrict)
   unit                 Unit        @relation(fields: [unit_id], references: [id], onDelete: Restrict)
@@ -1060,6 +1063,7 @@ model Lease {
 
   @@unique([company_id, lease_number])
   @@index([company_id, status])
+  @@index([company_id, deleted_at])
   @@index([property_id])
   @@index([unit_id, status])
   @@index([lease_holder_id])

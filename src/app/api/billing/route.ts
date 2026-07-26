@@ -17,7 +17,7 @@ export async function GET() {
     if (!user.company_id) return NextResponse.json({ error: "Företag saknas" }, { status: 400 });
 
     const [properties, teamMembers, openTickets] = await Promise.all([
-      db.property.count({ where: tenantWhere(user) }),
+      db.property.count({ where: { deleted_at: null, ...tenantWhere(user) } }),
       db.user.count({ where: { company_id: user.company_id } }),
       db.ticket.count({ where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" } } }),
     ]);

@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const { id } = await params;
-    const property = await db.property.findFirst({ where: { id, ...tenantWhere(user) } });
+    const property = await db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) } });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
     const body = await request.json();

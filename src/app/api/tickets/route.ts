@@ -100,6 +100,7 @@ export async function POST(request: Request) {
       const property = await db.property.findFirst({
         where: {
           id: normalizedPropertyId,
+          deleted_at: null,
           ...tenantWhere(user),
         },
         select: { id: true },

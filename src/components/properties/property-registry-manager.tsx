@@ -33,7 +33,17 @@ async function requestJson(url: string, options: RequestInit) {
   return data;
 }
 
-export function PropertyRegistryManager({ propertyId, initialValues, buildings }: { propertyId: string; initialValues: PropertyValues; buildings: Building[] }) {
+export function PropertyRegistryManager({
+  propertyId,
+  initialValues,
+  buildings,
+  canManage = false,
+}: {
+  propertyId: string;
+  initialValues: PropertyValues;
+  buildings: Building[];
+  canManage?: boolean;
+}) {
   const router = useRouter();
   const [values, setValues] = useState(initialValues);
   const [building, setBuilding] = useState({ name: "", address: "", constructionYear: "", floors: "" });
@@ -41,6 +51,7 @@ export function PropertyRegistryManager({ propertyId, initialValues, buildings }
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   function updateValue(field: keyof PropertyValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -81,6 +92,22 @@ export function PropertyRegistryManager({ propertyId, initialValues, buildings }
     finally { setBusy(null); }
   }
 
+  async function softDeleteProperty() {
+    if (!window.confirm("Ta bort fastigheten? Den döljs från listor men behålls i historiken.")) return;
+    setDeleting(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(`/api/properties/${propertyId}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort fastigheten");
+      router.push("/dashboard/fastigheter");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort fastigheten");
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {(message || error) && <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${error ? "border-danger-200 bg-danger-50 text-danger-700" : "border-success-200 bg-success-50 text-success-700"}`}>{error || message}</div>}
@@ -98,7 +125,19 @@ export function PropertyRegistryManager({ propertyId, initialValues, buildings }
           <label className={labelClass}>Fastighetstyp<select className={inputClass} value={values.propertyType} onChange={(event) => updateValue("propertyType", event.target.value)}><option value="residential">Bostäder</option><option value="commercial">Kommersiell</option><option value="mixed">Blandfastighet</option><option value="community">Samhällsfastighet</option><option value="industrial">Industri</option><option value="other">Övrig</option></select></label>
           <label className={labelClass}>Status<select className={inputClass} value={values.status} onChange={(event) => updateValue("status", event.target.value)}><option value="active">Aktiv</option><option value="planning">Planering</option><option value="inactive">Inaktiv</option><option value="sold">Avyttrad</option></select></label>
         </div>
-        <div className="mt-6 flex justify-end"><button disabled={busy === "property"} className="rounded-lg bg-petroleum-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-60">{busy === "property" ? "Sparar..." : "Spara fastighetsuppgifter"}</button></div>
+        <div className="mt-6 flex items-center justify-between gap-4">
+          {canManage ? (
+            <button
+              type="button"
+              disabled={deleting || busy !== null}
+              onClick={() => void softDeleteProperty()}
+              className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+            >
+              {deleting ? "Tar bort…" : "Ta bort fastighet"}
+            </button>
+          ) : <span />}
+          <button disabled={busy === "property"} className="rounded-lg bg-petroleum-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-60">{busy === "property" ? "Sparar..." : "Spara fastighetsuppgifter"}</button>
+        </div>
       </form>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     }
 
     const properties = await db.property.findMany({
-      where: { company_id: portal.company.id, status: "active" },
+      where: { company_id: portal.company.id, status: "active", deleted_at: null },
       orderBy: { name: "asc" },
       select: {
         id: true,

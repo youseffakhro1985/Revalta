@@ -41,7 +41,7 @@ async function context(params: Promise<{ id: string; componentId: string; kind: 
   const { id: propertyId, componentId, kind, entryId } = await params;
   if (kind !== "event" && kind !== "cost") return { error: NextResponse.json({ error: "Ogiltig posttyp" }, { status: 400 }) };
 
-  const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true } });
+  const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
   if (!property) return { error: NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 }) };
 
   const assets = await db.$queryRaw<Array<{ id: string }>>(Prisma.sql`

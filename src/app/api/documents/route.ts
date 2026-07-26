@@ -37,7 +37,7 @@ export async function GET() {
         select: { id: true, entity_id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
       }),
       db.property.findMany({
-        where: tenantWhere(user),
+        where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
         select: {
           id: true,
@@ -49,7 +49,7 @@ export async function GET() {
       }),
       user.company_id
         ? db.lease.findMany({
-            where: { company_id: user.company_id },
+            where: { company_id: user.company_id, deleted_at: null },
             orderBy: { lease_number: "asc" },
             take: 2000,
             select: {
@@ -201,7 +201,7 @@ export async function POST(request: Request) {
     if (visibility === "resident_lease" && !leaseId) return NextResponse.json({ error: "Hyresavtal krävs för denna synlighet" }, { status: 400 });
 
     if (leaseId) {
-      const lease = await db.lease.findFirst({ where: { id: leaseId, company_id: user.company_id }, select: { id: true, property_id: true, unit_id: true } });
+      const lease = await db.lease.findFirst({ where: { id: leaseId, company_id: user.company_id, deleted_at: null }, select: { id: true, property_id: true, unit_id: true } });
       if (!lease) return NextResponse.json({ error: "Hyresavtalet hittades inte" }, { status: 404 });
       resolvedLeaseId = lease.id;
       resolvedPropertyId = lease.property_id;
@@ -213,7 +213,7 @@ export async function POST(request: Request) {
       resolvedUnitId = unit.id;
       resolvedPropertyId = unit.property_id;
     } else if (propertyId) {
-      const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id }, select: { id: true } });
+      const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
       if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
       resolvedPropertyId = property.id;
     }

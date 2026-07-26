@@ -23,7 +23,7 @@ export async function createInspectionWorkOrders(args: {
   itemIds: string[];
 }) {
   const lease = await db.lease.findFirst({
-    where: { id: args.leaseId, company_id: args.companyId },
+    where: { id: args.leaseId, company_id: args.companyId, deleted_at: null },
     select: {
       lease_number: true,
       property_id: true,

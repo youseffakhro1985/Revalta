@@ -25,7 +25,7 @@ export default async function ReportsPage() {
 
   const [properties, tickets, recentAudit] = await Promise.all([
     db.property.findMany({
-      where,
+      where: { deleted_at: null, ...where },
       orderBy: { name: "asc" },
       select: {
         id: true,

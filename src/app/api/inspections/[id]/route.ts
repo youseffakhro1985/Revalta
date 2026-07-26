@@ -53,7 +53,7 @@ export async function PATCH(
     }
 
     await writeAuditLog(user, {
-      entityType: "inspection",
+      entityType: "compliance_inspection",
       entityId: inspection.id,
       action: "inspection.status_updated",
       metadata: {

@@ -333,7 +333,7 @@ export async function generateRecurringWorkOrder(input: {
     if (!input.force && dueAt > now) return { status: "skipped" as const, reason: "not_due" };
 
     const [property, actor] = await Promise.all([
-      tx.property.findFirst({ where: { id: schedule.property_id, company_id: input.companyId }, select: { id: true, name: true } }),
+      tx.property.findFirst({ where: { id: schedule.property_id, company_id: input.companyId, deleted_at: null }, select: { id: true, name: true } }),
       tx.user.findFirst({ where: { id: input.actorUserId, company_id: input.companyId, status: "active" }, select: { id: true } }),
     ]);
     if (!property || !actor) return { status: "failed" as const, reason: "property_or_actor_missing" };

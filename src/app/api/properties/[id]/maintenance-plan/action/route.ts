@@ -31,7 +31,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id: propertyId } = await params;
   const property = await db.property.findFirst({
-    where: { id: propertyId, ...tenantWhere(user) },
+    where: { id: propertyId, deleted_at: null, ...tenantWhere(user) },
     select: { id: true },
   });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });

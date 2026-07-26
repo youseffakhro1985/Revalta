@@ -26,7 +26,7 @@ export async function GET() {
         take: 600,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       }),
-      db.property.findMany({ where: tenantWhere(user), orderBy: { name: "asc" }, select: { id: true, name: true } }),
+      db.property.findMany({ where: { deleted_at: null, ...tenantWhere(user) }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     ]);
 
     const modern = rows.map((row) => ({
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Kontrollera beloppen" }, { status: 400 });
     }
 
-    const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true, name: true } });
+    const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true, name: true } });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
     const entry = await db.budgetEntry.create({

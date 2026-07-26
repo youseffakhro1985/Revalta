@@ -15,7 +15,7 @@ export async function GET() {
 
     const [properties, users] = await Promise.all([
       db.property.findMany({
-        where: { company_id: user.company_id, status: "active" },
+        where: { company_id: user.company_id, status: "active", deleted_at: null },
         orderBy: [{ name: "asc" }, { address: "asc" }],
         select: {
           id: true,

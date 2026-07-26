@@ -34,7 +34,7 @@ export async function GET() {
       },
     }),
     db.property.findMany({
-      where: { company_id: user.company_id },
+      where: { company_id: user.company_id, deleted_at: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   if (startDate && endDate && endDate < startDate) return NextResponse.json({ error: "Slutdatum kan inte vara före startdatum" }, { status: 400 });
 
   const property = await db.property.findFirst({
-    where: { id: propertyId, company_id: user.company_id },
+    where: { id: propertyId, company_id: user.company_id, deleted_at: null },
     select: { id: true, name: true },
   });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });

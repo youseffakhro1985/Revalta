@@ -95,6 +95,7 @@ export async function GET(
       where: {
         id: leaseId,
         company_id: user.company_id,
+        deleted_at: null,
         status: { in: activeLeaseStatuses },
       },
       select: { id: true, property_id: true, unit_id: true, lease_number: true },

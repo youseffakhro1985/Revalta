@@ -101,7 +101,7 @@ function calculateForecast(plan: PlanRow, actions: ActionRow[]) {
 
 async function loadProperty(companyId: string, id: string, user: Awaited<ReturnType<typeof getCurrentUser>>) {
   return db.property.findFirst({
-    where: { id, ...tenantWhere(user!) },
+    where: { id, deleted_at: null, ...tenantWhere(user!) },
     select: {
       id: true,
       name: true,
