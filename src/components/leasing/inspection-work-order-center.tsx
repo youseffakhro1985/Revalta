@@ -5,6 +5,7 @@ import { ExternalLink, RefreshCw, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import type { LeaseInspectionRecord } from "@/lib/lease-inspection-items";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/domain-labels";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Lease = { id: string; lease_number: string; status: string; property: { name: string }; unit: { designation: string }; lease_holder: { name: string } };
 type Link = { itemId: string; workOrderId: string; workOrder: { id: string; status: string; priority: string; title: string } | null };
@@ -24,7 +25,7 @@ export function InspectionWorkOrderCenter() {
 
   async function loadLeases() {
     const response = await fetch("/api/leases", { cache: "no-store" });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) throw new Error(data.error || "Kunde inte hämta avtal");
     const options = (data.leases || []).filter((lease: Lease) => ["reserved", "active", "notice", "ended"].includes(lease.status));
     setLeases(options); setLeaseId((current) => current || options[0]?.id || "");
@@ -65,7 +66,7 @@ export function InspectionWorkOrderCenter() {
     setSaving(true); setError(""); setSuccess("");
     try {
       const response = await fetch(`/api/leases/${leaseId}/inspection-work-orders`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ version: record.version, itemIds: pending.map((item) => item.id) }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsorder");
       setSuccess(`${data.created.length} arbetsorder skapades och kopplades till besiktningen.`);
       await load(leaseId);

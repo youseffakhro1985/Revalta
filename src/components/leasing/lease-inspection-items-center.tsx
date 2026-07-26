@@ -5,6 +5,7 @@ import { ClipboardCheck, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 import type { InspectionCondition, InspectionPriority, LeaseInspectionItem, LeaseInspectionRecord } from "@/lib/lease-inspection-items";
 import { PRIORITY_LABELS } from "@/lib/domain-labels";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type LeaseOption = { id: string; lease_number: string; property: { name: string }; unit: { designation: string }; lease_holder: { name: string } };
 type Detail = { lease: LeaseOption; record: LeaseInspectionRecord; source?: "table" | "legacy"; permissions: { canManage: boolean } };
@@ -29,7 +30,7 @@ export function LeaseInspectionItemsCenter() {
   async function loadLeases() {
     try {
       const response = await fetch("/api/leases", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta avtal");
       const options = (data.leases || []).filter((lease: LeaseOption & { status: string }) => ["reserved", "active", "notice", "ended"].includes(lease.status));
       setLeases(options);
@@ -44,7 +45,7 @@ export function LeaseInspectionItemsCenter() {
     setLoading(true); setError(""); setSuccess("");
     try {
       const response = await fetch(`/api/leases/${id}/inspection-items`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta besiktningspunkterna");
       setDetail(data);
     } catch (cause) {
@@ -94,7 +95,7 @@ export function LeaseInspectionItemsCenter() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(detail.record),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara besiktningspunkterna");
       setSuccess("Besiktningspunkterna har sparats med versionshistorik.");
       await loadDetail(detail.lease.id);

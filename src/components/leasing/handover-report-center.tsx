@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Lease = { id: string; lease_number: string; status: string; property: { name: string }; unit: { designation: string } };
 
@@ -13,7 +14,7 @@ export function HandoverReportCenter() {
 
   useEffect(() => {
     void fetch("/api/leases", { cache: "no-store" }).then(async (response) => {
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta avtal");
       const options = (data.leases || []).filter((lease: Lease) => ["reserved", "active", "notice", "ended"].includes(lease.status));
       setLeases(options);

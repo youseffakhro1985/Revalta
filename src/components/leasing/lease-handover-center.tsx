@@ -5,6 +5,7 @@ import { History, RefreshCw } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 import { HandoverKeyRegister } from "@/components/leasing/handover-key-register";
 import { handoverChecklistKeys, type HandoverChecklist, type HandoverInspection, type LeaseHandoverPayload } from "@/lib/lease-handover";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type LeaseOption = { id: string; lease_number: string; status: string; property: { name: string }; unit: { designation: string }; lease_holder: { name: string } };
 type AuditItem = { id: string; action: string; created_at: string; actor?: { name?: string | null; email?: string | null } | null };
@@ -32,7 +33,7 @@ export function LeaseHandoverCenter() {
     setLoading(true);
     try {
       const response = await fetch("/api/leases", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta avtal");
       const options = (data.leases || []).filter((item: LeaseOption) => ["reserved", "active", "notice", "ended"].includes(item.status));
       setLeases(options); setLeaseId((current) => current || options[0]?.id || "");
@@ -44,7 +45,7 @@ export function LeaseHandoverCenter() {
     setLoading(true); setError(""); setSuccess("");
     try {
       const response = await fetch(`/api/leases/${id}/handover`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta överlämningen");
       setDetail(data);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Kunde inte hämta överlämningen"); }
@@ -79,7 +80,7 @@ export function LeaseHandoverCenter() {
     setSaving(true); setError(""); setSuccess("");
     try {
       const response = await fetch(`/api/leases/${detail.lease.id}/handover`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...detail.handover, completed }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara överlämningen");
       setSuccess(completed ? "Överlämningen är slutförd och historiken har sparats." : "Överlämningen har sparats.");
       await loadDetail(detail.lease.id);
