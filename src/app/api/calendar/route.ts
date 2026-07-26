@@ -250,3 +250,57 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json().catch(() => ({} as Record<string, unknown>));
+    const eventId = String(body.eventId || body.id || "").trim();
+    if (!eventId) return NextResponse.json({ error: "Aktivitets-id krävs" }, { status: 400 });
+
+    const existing = await db.calendarEvent.findFirst({
+      where: { id: eventId, company_id: user.company_id },
+      select: { id: true, title: true, date: true, status: true },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: eventId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Aktiviteten finns kvar i äldre lagring. Kör backfill till CalendarEvent innan den kan tas bort.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
+    }
+
+    const deleteResult = await db.calendarEvent.deleteMany({
+      where: { id: existing.id, company_id: user.company_id },
+    });
+    if (deleteResult.count === 0) {
+      return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "calendar_event",
+      entityId: existing.id,
+      action: "calendar.event.deleted",
+      metadata: {
+        title: existing.title,
+        date: existing.date.toISOString().slice(0, 10),
+        status: existing.status,
+        storage: "CalendarEvent",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id });
+  } catch (error) {
+    console.error("Delete calendar event error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

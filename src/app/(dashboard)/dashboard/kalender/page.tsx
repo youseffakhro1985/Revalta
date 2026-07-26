@@ -24,6 +24,7 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState("");
+  const [removingId, setRemovingId] = useState("");
   const [editingId, setEditingId] = useState("");
   const [editForm, setEditForm] = useState({ title: "", date: "", time: "", responsible: "", note: "", propertyName: "" });
   const [error, setError] = useState("");
@@ -116,6 +117,28 @@ export default function CalendarPage() {
     setUpdatingId("");
   }
 
+  async function removeEvent(event: CalendarEvent) {
+    if (event.source === "legacy") {
+      setError("Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan tas bort.");
+      return;
+    }
+    if (!window.confirm("Ta bort den här aktiviteten?")) return;
+    setRemovingId(event.id);
+    setError("");
+    const response = await fetch("/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: event.id }),
+    });
+    const data = await readResponseJson(response);
+    if (!response.ok) setError(data.error || "Kunde inte ta bort aktiviteten");
+    else {
+      if (editingId === event.id) setEditingId("");
+      await load();
+    }
+    setRemovingId("");
+  }
+
   const visible = useMemo(() => events
     .filter((event) => filter === "Alla" || event.type === filter)
     .sort((a, b) => `${a.date}T${a.time || "00:00"}`.localeCompare(`${b.date}T${b.time || "00:00"}`)), [events, filter]);
@@ -186,7 +209,7 @@ export default function CalendarPage() {
                     <p className="mt-1 text-sm text-ink-500">{event.property_name || "Ingen fastighet"}{event.responsible ? ` · ${event.responsible}` : ""}</p>
                     {event.note ? <p className="mt-2 text-xs text-ink-400">{event.note}</p> : null}
                     {event.source === "legacy" ? (
-                      <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering.</p>
+                      <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering eller borttagning.</p>
                     ) : null}
                   </div>
                   <div className="space-y-2 md:text-right">
@@ -209,9 +232,17 @@ export default function CalendarPage() {
                         <button
                           type="button"
                           onClick={() => (editingId === event.id ? setEditingId("") : startEdit(event))}
-                          className="text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950"
+                          className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 md:ml-auto"
                         >
                           {editingId === event.id ? "Stäng" : "Ändra"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={removingId === event.id}
+                          onClick={() => void removeEvent(event)}
+                          className="block text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60 md:ml-auto"
+                        >
+                          {removingId === event.id ? "Tar bort…" : "Ta bort"}
                         </button>
                       </>
                     ) : null}
