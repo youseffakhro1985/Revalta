@@ -110,6 +110,8 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Quote status `cancelled` + Makulera action for draft/sent modern quotes.
    - Production launch checklist: post-migrate backfill + CronJobRun/invoice-export smoke checks.
 
+   - Preventive/service cron and escalation/service-center SQL exclude soft-deleted properties (`p."deleted_at" IS NULL`).
+
 ## Verification
 
 ```bash

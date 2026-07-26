@@ -173,7 +173,8 @@ export async function GET(request: Request) {
       SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."criticality", a."next_service_at",
         p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
       FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
-      WHERE a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${maxDueBefore}
+      WHERE p."deleted_at" IS NULL
+        AND a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${maxDueBefore}
         AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
       ORDER BY a."company_id", a."next_service_at" ASC, a."criticality" DESC
     `),

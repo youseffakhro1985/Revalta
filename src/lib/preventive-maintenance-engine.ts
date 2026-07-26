@@ -56,7 +56,8 @@ async function loadCandidates(now: Date, companyId?: string) {
            a."criticality", a."next_service_at", a."service_lead_days", p."name" AS "property_name"
     FROM "PropertyTechnicalAsset" a
     INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
-    WHERE a."next_service_at" IS NOT NULL
+    WHERE p."deleted_at" IS NULL
+      AND a."next_service_at" IS NOT NULL
       AND a."next_service_at" <= ${maxWindow}
       AND a."auto_create_service_work_orders" = TRUE
       AND COALESCE(a."status", 'active') IN ('active', 'planned')

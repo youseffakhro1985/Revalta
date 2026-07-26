@@ -96,7 +96,7 @@ export async function listServiceAssignmentEscalations(companyId: string, take =
 export async function runServiceEscalations(now = new Date()) {
   const dueBefore = new Date(now.getTime() + 30 * 86400000);
   const [assets, assignmentRows] = await Promise.all([
-    db.$queryRaw<AssetRow[]>(Prisma.sql`SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city" FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id" WHERE a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${dueBefore} AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed') ORDER BY a."company_id", a."next_service_at" ASC LIMIT 5000`),
+    db.$queryRaw<AssetRow[]>(Prisma.sql`SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city" FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id" WHERE p."deleted_at" IS NULL AND a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${dueBefore} AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed') ORDER BY a."company_id", a."next_service_at" ASC LIMIT 5000`),
     listServiceNotificationAssignments(),
   ]);
 
