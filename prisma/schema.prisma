@@ -51,6 +51,7 @@ model User {
   maintenance_plans_approved           MaintenancePlan[]          @relation("MaintenancePlanApprovedBy")
   maintenance_actions                  MaintenanceAction[]
   time_reports                         TimeReport[]
+  access_credentials                   AccessCredential[]
 }
 
 model Company {
@@ -94,6 +95,7 @@ model Company {
   maintenance_plans           MaintenancePlan[]
   maintenance_actions         MaintenanceAction[]
   lease_contracts             LeaseContract[]
+  access_credentials          AccessCredential[]
 }
 
 model Property {
@@ -136,6 +138,7 @@ model Property {
   maintenance_plans        MaintenancePlan[]
   maintenance_actions      MaintenanceAction[]
   lease_contracts          LeaseContract[]
+  access_credentials       AccessCredential[]
 
   @@index([company_id])
   @@index([user_id])
@@ -1035,4 +1038,30 @@ model RateLimitAttempt {
 
   @@index([key_hash, created_at])
   @@index([created_at])
+}
+
+model AccessCredential {
+  id              String    @id @default(uuid())
+  company_id      String
+  property_id     String
+  identifier      String
+  credential_type String
+  holder          String?
+  unit            String?
+  access_area     String?
+  status          String    @default("in_stock")
+  issued_at       DateTime?
+  return_due      DateTime?
+  note            String?
+  created_by_id   String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property        Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by      User      @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, status])
+  @@index([created_by_id])
 }

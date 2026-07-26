@@ -179,8 +179,8 @@ export async function POST(
         reason: "Skapad från felanmälan",
         metadata: { ticketId: ticket.id, workOrderNumber, unitId },
       });
-      await tx.ticket.update({
-        where: { id: ticket.id },
+      await tx.ticket.updateMany({
+        where: { id: ticket.id, company_id: user.company_id! },
         data: {
           status: ticket.status === "new" ? "received" : ticket.status,
           assigned_to_id: assignedToId || ticket.assigned_to_id,

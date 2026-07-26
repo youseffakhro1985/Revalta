@@ -61,8 +61,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       const holderId = input.holderId || existing.lease_holder_id;
       const holder = await tx.leaseHolder.findFirst({ where: { id: holderId, company_id: user.company_id! } });
       if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
-      await tx.leaseHolder.update({
-        where: { id: holder.id },
+      const holderUpdate = await tx.leaseHolder.updateMany({
+        where: { id: holder.id, company_id: user.company_id! },
         data: {
           party_type: input.holderType,
           name: input.holderName,
@@ -72,9 +72,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           organization_number: input.holderOrganizationNumber,
         },
       });
+      if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
 
       const updated = await tx.lease.updateMany({
-        where: { id: existing.id, updated_at: existing.updated_at },
+        where: { id: existing.id, company_id: user.company_id!, updated_at: existing.updated_at },
         data: {
           property_id: unit.property_id,
           unit_id: unit.id,

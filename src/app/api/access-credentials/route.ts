@@ -3,17 +3,47 @@ import { auditScopedWhere, canManageAccessCredentials, getCurrentUser, tenantWhe
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 
-const action = "access.credential.created";
+const legacyAction = "access.credential.created";
+
+function parseOptionalDate(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageAccessCredentials(user.role)) return NextResponse.json({ error: "Du saknar behörighet att visa nycklar och passage" }, { status: 403 });
+    if (!canManageAccessCredentials(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa nycklar och passage" }, { status: 403 });
+    }
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-    const [logs, properties] = await Promise.all([
+    const [rows, legacyLogs, properties] = await Promise.all([
+      db.accessCredential.findMany({
+        where: { company_id: user.company_id },
+        orderBy: { created_at: "desc" },
+        take: 400,
+        select: {
+          id: true,
+          property_id: true,
+          identifier: true,
+          credential_type: true,
+          holder: true,
+          unit: true,
+          access_area: true,
+          status: true,
+          issued_at: true,
+          return_due: true,
+          note: true,
+          created_at: true,
+          property: { select: { name: true } },
+          created_by: { select: { name: true, email: true } },
+        },
+      }),
       db.auditLog.findMany({
-        where: { ...auditScopedWhere(user), action },
+        where: { ...auditScopedWhere(user), action: legacyAction },
         orderBy: { created_at: "desc" },
         take: 400,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
@@ -25,15 +55,65 @@ export async function GET() {
       }),
     ]);
 
-    return NextResponse.json({
-      credentials: logs.map((log) => ({
-        id: log.id,
-        property_id: log.entity_id,
-        ...(log.metadata as object),
-        created_at: log.created_at,
-      })),
-      properties,
-    });
+    const modern = rows.map((row) => ({
+      id: row.id,
+      property_id: row.property_id,
+      property_name: row.property.name,
+      identifier: row.identifier,
+      credential_type: row.credential_type,
+      holder: row.holder || "",
+      unit: row.unit || "",
+      access_area: row.access_area || "",
+      status: row.status,
+      issued_at: row.issued_at?.toISOString().slice(0, 10) || null,
+      return_due: row.return_due?.toISOString().slice(0, 10) || null,
+      note: row.note || "",
+      registered_by: row.created_by.name || row.created_by.email,
+      created_at: row.created_at,
+      source: "table" as const,
+    }));
+
+    const modernKeys = new Set(
+      modern.map((row) => `${row.property_id}|${row.identifier}|${row.credential_type}|${row.created_at.toISOString()}`),
+    );
+
+    const legacy = legacyLogs
+      .map((log) => {
+        const metadata = (log.metadata || {}) as Record<string, unknown>;
+        const identifier = typeof metadata.identifier === "string" ? metadata.identifier : "";
+        const credentialType = typeof metadata.credential_type === "string" ? metadata.credential_type : "key";
+        const key = `${log.entity_id || ""}|${identifier}|${credentialType}|${log.created_at.toISOString()}`;
+        return {
+          id: log.id,
+          property_id: log.entity_id,
+          property_name: typeof metadata.property_name === "string" ? metadata.property_name : "",
+          identifier,
+          credential_type: credentialType,
+          holder: typeof metadata.holder === "string" ? metadata.holder : "",
+          unit: typeof metadata.unit === "string" ? metadata.unit : "",
+          access_area: typeof metadata.access_area === "string" ? metadata.access_area : "",
+          status: typeof metadata.status === "string" ? metadata.status : "in_stock",
+          issued_at: typeof metadata.issued_at === "string" ? metadata.issued_at : null,
+          return_due: typeof metadata.return_due === "string" ? metadata.return_due : null,
+          note: typeof metadata.note === "string" ? metadata.note : "",
+          registered_by: typeof metadata.registered_by === "string" ? metadata.registered_by : "Okänd",
+          created_at: log.created_at,
+          source: "legacy" as const,
+          _dedupeKey: key,
+        };
+      })
+      .filter((row) => row.identifier && !modernKeys.has(row._dedupeKey))
+      .map((row) => {
+        const { _dedupeKey, ...rest } = row;
+        void _dedupeKey;
+        return rest;
+      });
+
+    const credentials = [...modern, ...legacy]
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
+      .slice(0, 400);
+
+    return NextResponse.json({ credentials, properties });
   } catch (error) {
     console.error("Get access credentials error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -44,7 +124,10 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageAccessCredentials(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canManageAccessCredentials(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    }
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();
@@ -63,6 +146,9 @@ export async function POST(request: Request) {
     if (!propertyId || !identifier || !allowedTypes.has(credentialType) || !allowedStatuses.has(status)) {
       return NextResponse.json({ error: "Fastighet, identitet, typ och giltig status krävs" }, { status: 400 });
     }
+    if (identifier.length > 120 || holder.length > 160 || unit.length > 80 || accessArea.length > 160 || note.length > 1000) {
+      return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
+    }
     if (status === "issued" && !holder) {
       return NextResponse.json({ error: "Mottagare krävs vid utlämning" }, { status: 400 });
     }
@@ -73,11 +159,30 @@ export async function POST(request: Request) {
     });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
+    const credential = await db.accessCredential.create({
+      data: {
+        company_id: user.company_id,
+        property_id: property.id,
+        identifier,
+        credential_type: credentialType,
+        holder: holder || null,
+        unit: unit || null,
+        access_area: accessArea || null,
+        status,
+        issued_at: parseOptionalDate(issuedAt),
+        return_due: parseOptionalDate(returnDue),
+        note: note || null,
+        created_by_id: user.id,
+      },
+      select: { id: true, created_at: true },
+    });
+
     await writeAuditLog(user, {
-      entityType: "property",
-      entityId: property.id,
-      action,
+      entityType: "access_credential",
+      entityId: credential.id,
+      action: legacyAction,
       metadata: {
+        property_id: property.id,
         property_name: property.name,
         identifier,
         credential_type: credentialType,
@@ -89,10 +194,11 @@ export async function POST(request: Request) {
         return_due: returnDue || null,
         note,
         registered_by: user.name || user.email,
+        storage: "AccessCredential",
       },
     });
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    return NextResponse.json({ success: true, credential }, { status: 201 });
   } catch (error) {
     console.error("Create access credential error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

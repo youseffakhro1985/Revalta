@@ -3,6 +3,8 @@ import db from "@/lib/db";
 import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
+import { isProductionRuntime } from "@/lib/runtime-env";
+import { hasStorageConfig, storeAttachment, StorageConfigurationError } from "@/lib/storage";
 
 const allowedVisibilities = new Set([
   "internal",
@@ -166,7 +168,24 @@ export async function POST(request: Request) {
       resolvedLeaseId = null;
     }
 
-    const dataUrl = `data:${validation.contentType};base64,${bytes.toString("base64")}`;
+    let storageUrl: string | null = null;
+    let dataUrl: string | null = null;
+
+    if (hasStorageConfig()) {
+      const stored = await storeAttachment({
+        fileName: validation.fileName,
+        contentType: validation.contentType,
+        buffer: bytes,
+        prefix: `documents/${user.company_id}`,
+      });
+      storageUrl = stored.url;
+    } else if (isProductionRuntime()) {
+      return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
+    } else {
+      // Local/dev fallback only — never store file bytes in AuditLog in production.
+      dataUrl = `data:${validation.contentType};base64,${bytes.toString("base64")}`;
+    }
+
     const document = await db.auditLog.create({
       data: {
         company_id: user.company_id,
@@ -175,7 +194,7 @@ export async function POST(request: Request) {
         entity_id: resolvedLeaseId || resolvedUnitId || resolvedPropertyId,
         action: "document.created",
         metadata: {
-          schemaVersion: 3,
+          schemaVersion: 4,
           name,
           category,
           visibility,
@@ -186,6 +205,7 @@ export async function POST(request: Request) {
           fileName: validation.fileName,
           contentType: validation.contentType,
           sizeBytes: validation.sizeBytes,
+          storageUrl,
           dataUrl,
           signatureValidated: true,
         },
@@ -195,6 +215,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, document }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof StorageConfigurationError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
     console.error("Create document error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

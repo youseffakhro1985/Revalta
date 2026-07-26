@@ -104,8 +104,8 @@ export async function POST(request: Request) {
       if (input.holderId) {
         const existingHolder = await tx.leaseHolder.findFirst({ where: { id: input.holderId, company_id: user.company_id! } });
         if (!existingHolder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
-        holder = await tx.leaseHolder.update({
-          where: { id: existingHolder.id },
+        const holderUpdate = await tx.leaseHolder.updateMany({
+          where: { id: existingHolder.id, company_id: user.company_id! },
           data: {
             party_type: input.holderType,
             name: input.holderName,
@@ -115,6 +115,11 @@ export async function POST(request: Request) {
             organization_number: input.holderOrganizationNumber,
           },
         });
+        if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        holder = await tx.leaseHolder.findFirst({
+          where: { id: existingHolder.id, company_id: user.company_id! },
+        });
+        if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
       } else {
         holder = await tx.leaseHolder.create({
           data: {

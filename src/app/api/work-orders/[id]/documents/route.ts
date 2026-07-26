@@ -102,10 +102,15 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!documentId) return NextResponse.json({ error: "Dokument-ID saknas" }, { status: 400 });
   const document = await db.operationalDocument.findFirst({ where: { id: documentId, company_id: ctx.user.company_id!, work_order_id: id } });
   if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+  const deleteResult = await db.operationalDocument.deleteMany({
+    where: { id: document.id, company_id: ctx.user.company_id!, work_order_id: id },
+  });
+  if (deleteResult.count === 0) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+
   const token = getStorageToken();
-  if (!token) return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
-  await del(document.storage_url, { token });
-  await db.operationalDocument.delete({ where: { id: document.id } });
+  if (token) {
+    await del(document.storage_url, { token }).catch(() => undefined);
+  }
   await writeAuditLog(ctx.user, { entityType: "work_order", entityId: id, action: "work_order.document_deleted", metadata: { documentId: document.id, fileName: document.file_name, category: document.category } });
   return NextResponse.json({ success: true });
 }

@@ -27,8 +27,12 @@ export async function POST(
     }
 
     const analysis = await analyzeTicket(existing.description);
-    const ticket = await db.ticket.update({
-      where: { id: existing.id },
+    if (!user.company_id) {
+      return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    }
+
+    const updateResult = await db.ticket.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
       data: {
         category: analysis.category,
         priority: analysis.priority,
@@ -37,6 +41,13 @@ export async function POST(
         ai_confidence: analysis.confidence,
         ai_processed_at: new Date(),
       },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    }
+
+    const ticket = await db.ticket.findFirst({
+      where: { id: existing.id, company_id: user.company_id },
       select: {
         id: true,
         category: true,
@@ -47,6 +58,9 @@ export async function POST(
         ai_processed_at: true,
       },
     });
+    if (!ticket) {
+      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    }
 
     await writeAuditLog(user, {
       entityType: "ticket",

@@ -139,7 +139,7 @@ export default function InvoiceExportOperationsPage() {
                 {job.error ? <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{job.error}</p> : null}
               </div>
               <div className="flex shrink-0 flex-wrap items-start gap-2">
-                <Link href={`/dashboard/arbetsordrar/${job.workOrderId}/fakturaunderlag/integrationer`} className="inline-flex items-center gap-1.5 rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink-700"><ExternalLink className="h-3.5 w-3.5" />Öppna</Link>
+                <Link href={`/dashboard/arbetsorder/${job.workOrderId}`} className="inline-flex items-center gap-1.5 rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink-700"><ExternalLink className="h-3.5 w-3.5" />Öppna</Link>
                 {data.canManage && job.status === "failed" ? <button onClick={() => void act(job, "retry")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Försök igen</button> : null}
                 {data.canManage && ["queued", "processing"].includes(job.status) ? <button onClick={() => void act(job, "cancel")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50"><XCircle className="h-3.5 w-3.5" />Avbryt</button> : null}
               </div>

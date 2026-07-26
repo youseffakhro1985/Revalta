@@ -42,7 +42,7 @@ export async function GET() {
       assignee: row.assigned_to,
       estimatedCost: row.estimated_cost?.toString() ?? null,
       actualCost: row.actual_cost?.toString() ?? null,
-      href: `/dashboard/arbetsordrar/${row.id}`,
+      href: `/dashboard/arbetsorder/${row.id}`,
     };
   });
 

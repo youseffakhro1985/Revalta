@@ -34,6 +34,14 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Work-order report snapshots store proxy download URLs (no raw `storage_url`).
    - Legal/marketing copy is honest (draft legal pages, no overstated GDPR claims).
 
+6. **Continued hardening (P0/P1)**
+   - Tenant portal routes: `/portal/[companySlug]` + slug-aware public APIs.
+   - Document archive stores private blob URLs in production (no `dataUrl` bytes in AuditLog).
+   - `AccessCredential` table with dual-read of legacy AuditLog rows.
+   - Stripe webhook resolves company via Stripe customer/subscription ids; metadata mismatch is ignored.
+   - Additional company-scoped mutations for ticket AI, ticket→work-order and lease holders.
+   - Work-order document delete uses scoped `deleteMany` and best-effort blob cleanup.
+
 ## Verification
 
 ```bash
