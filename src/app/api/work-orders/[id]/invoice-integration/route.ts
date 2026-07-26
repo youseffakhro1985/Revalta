@@ -4,6 +4,8 @@ import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getLatestInvoiceDraft,
+  getModernInvoiceExportJob,
+  getModernLatestInvoiceDraft,
   listInvoiceExportJobs,
   upsertInvoiceExportJob,
   type InvoiceExportJobPayload,
@@ -44,6 +46,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     jobs: rows,
     hasInvoiceBasis: Boolean(invoice),
     invoiceStatus: typeof invoice?.status === "string" ? invoice.status : null,
+    invoiceSource: invoice?.source ?? null,
     canManage: canManageTickets(user.role),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -67,8 +70,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!providers.has(provider)) return NextResponse.json({ error: "Ogiltig integrationsleverantör" }, { status: 400 });
     if (!configured(provider)) return NextResponse.json({ error: "Integrationen saknar endpoint eller åtkomstnyckel" }, { status: 400 });
 
-    const invoice = await getLatestInvoiceDraft(user.company_id, id);
+    const modernInvoice = await getModernLatestInvoiceDraft(user.company_id, id);
+    const invoice = modernInvoice ?? await getLatestInvoiceDraft(user.company_id, id);
     if (!invoice) return NextResponse.json({ error: "Faktureringsunderlag saknas" }, { status: 400 });
+    if (!modernInvoice) {
+      return NextResponse.json({
+        error: "Faktureringsunderlaget finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceDraft innan det kan exporteras.",
+      }, { status: 409 });
+    }
     if (!["ready", "exported"].includes(String(invoice.status ?? ""))) {
       return NextResponse.json({ error: "Faktureringsunderlaget måste markeras som redo före export" }, { status: 400 });
     }
@@ -94,9 +103,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     };
   } else {
     const jobId = String(body.jobId ?? "");
-    const jobs = await listInvoiceExportJobs(user.company_id, id);
-    const existing = jobs.find((job) => job.jobId === jobId);
+    const modern = await getModernInvoiceExportJob(user.company_id, id, jobId);
+    const jobs = modern ? null : await listInvoiceExportJobs(user.company_id, id);
+    const existing = modern ?? jobs?.find((job) => job.jobId === jobId) ?? null;
     if (!existing) return NextResponse.json({ error: "Exportjobbet hittades inte" }, { status: 404 });
+    if (!modern) {
+      return NextResponse.json({
+        error: "Exportjobbet finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceExportJob innan det kan uppdateras.",
+      }, { status: 409 });
+    }
 
     const currentStatus = String(existing.status ?? "");
     const provider = String(existing.provider ?? "");
@@ -132,5 +147,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       storage: "WorkOrderInvoiceExportJob",
     },
   });
-  return NextResponse.json({ job }, { status: 201 });
+  return NextResponse.json({ job: { ...job, source: "table" as const } }, { status: 201 });
 }

@@ -50,6 +50,8 @@ export type MaterialEntryPayload = {
   createdAt?: string;
 };
 
+export type OpsStorageSource = "table" | "legacy";
+
 export type ProfitabilitySettingsPayload = {
   internalHourlyCost: number;
   customerHourlyRate: number;
@@ -58,6 +60,7 @@ export type ProfitabilitySettingsPayload = {
   fixedRevenue: number;
   updatedById?: string;
   updatedAt?: string;
+  source?: OpsStorageSource;
 };
 
 export type InvoiceDraftPayload = {
@@ -80,6 +83,7 @@ export type InvoiceDraftPayload = {
   total: number;
   updatedById: string;
   updatedAt: string;
+  source?: OpsStorageSource;
 };
 
 export type InvoiceExportJobPayload = {
@@ -100,6 +104,7 @@ export type InvoiceExportJobPayload = {
   providerStatus?: number | null;
   externalId?: string | null;
   providerResponse?: string | null;
+  source?: OpsStorageSource;
 };
 
 function asObject(value: unknown): Record<string, unknown> | null {
@@ -451,9 +456,15 @@ export async function upsertMaterialEntry(companyId: string, payload: MaterialEn
   }).then(mapMaterialRow);
 }
 
-export async function getProfitabilitySettings(companyId: string, workOrderId: string, client: DbClient = db) {
+export async function getModernProfitabilitySettings(companyId: string, workOrderId: string, client: DbClient = db) {
   const modern = await client.workOrderProfitabilitySettings.findUnique({ where: { work_order_id: workOrderId } });
-  if (modern && modern.company_id === companyId) return mapProfitRow(modern);
+  if (!modern || modern.company_id !== companyId) return null;
+  return { ...mapProfitRow(modern), source: "table" as const };
+}
+
+export async function getProfitabilitySettings(companyId: string, workOrderId: string, client: DbClient = db) {
+  const modern = await getModernProfitabilitySettings(companyId, workOrderId, client);
+  if (modern) return modern;
 
   const event = await client.integrationEvent.findFirst({
     where: { company_id: companyId, type: "work_order.profitability_settings", recipient: workOrderId },
@@ -477,6 +488,7 @@ export async function getProfitabilitySettings(companyId: string, workOrderId: s
     fixedRevenue: num(payload.fixedRevenue),
     updatedById: typeof payload.updatedById === "string" ? payload.updatedById : undefined,
     updatedAt: typeof payload.updatedAt === "string" ? payload.updatedAt : event?.created_at.toISOString(),
+    source: "legacy" as const,
   };
 }
 
@@ -511,22 +523,27 @@ export async function upsertProfitabilitySettings(
   return mapProfitRow(row);
 }
 
-export async function getLatestInvoiceDraft(companyId: string, workOrderId: string, client: DbClient = db) {
+export async function getModernLatestInvoiceDraft(companyId: string, workOrderId: string, client: DbClient = db) {
   const modern = await client.workOrderInvoiceDraft.findFirst({
     where: { company_id: companyId, work_order_id: workOrderId },
     orderBy: { created_at: "desc" },
   });
-  if (modern) return mapDraftRow(modern);
+  return modern ? { ...mapDraftRow(modern), source: "table" as const } : null;
+}
+
+export async function getLatestInvoiceDraft(companyId: string, workOrderId: string, client: DbClient = db) {
+  const modern = await getModernLatestInvoiceDraft(companyId, workOrderId, client);
+  if (modern) return modern;
 
   const event = await client.integrationEvent.findFirst({
     where: { company_id: companyId, type: "work_order.invoice_basis", recipient: workOrderId },
     orderBy: { created_at: "desc" },
   });
   const payload = asObject(event?.payload);
-  return payload ? payload as unknown as InvoiceDraftPayload : null;
+  return payload ? { ...(payload as unknown as InvoiceDraftPayload), source: "legacy" as const } : null;
 }
 
-export async function getInvoiceDraftByVersion(
+export async function getModernInvoiceDraftByVersion(
   companyId: string,
   workOrderId: string,
   versionId: string,
@@ -535,7 +552,17 @@ export async function getInvoiceDraftByVersion(
   const modern = await client.workOrderInvoiceDraft.findFirst({
     where: { company_id: companyId, work_order_id: workOrderId, version_id: versionId },
   });
-  if (modern) return mapDraftRow(modern);
+  return modern ? { ...mapDraftRow(modern), source: "table" as const } : null;
+}
+
+export async function getInvoiceDraftByVersion(
+  companyId: string,
+  workOrderId: string,
+  versionId: string,
+  client: DbClient = db,
+) {
+  const modern = await getModernInvoiceDraftByVersion(companyId, workOrderId, versionId, client);
+  if (modern) return modern;
 
   const events = await client.integrationEvent.findMany({
     where: { company_id: companyId, type: "work_order.invoice_basis", recipient: workOrderId },
@@ -544,7 +571,9 @@ export async function getInvoiceDraftByVersion(
   });
   for (const event of events) {
     const payload = asObject(event.payload);
-    if (payload && payload.versionId === versionId) return payload as unknown as InvoiceDraftPayload;
+    if (payload && payload.versionId === versionId) {
+      return { ...(payload as unknown as InvoiceDraftPayload), source: "legacy" as const };
+    }
   }
   return null;
 }
@@ -576,6 +605,18 @@ export async function createInvoiceDraft(companyId: string, payload: InvoiceDraf
   return mapDraftRow(row);
 }
 
+export async function getModernInvoiceExportJob(
+  companyId: string,
+  workOrderId: string,
+  jobId: string,
+  client: DbClient = db,
+) {
+  const modern = await client.workOrderInvoiceExportJob.findFirst({
+    where: { id: jobId, company_id: companyId, work_order_id: workOrderId },
+  });
+  return modern ? { ...mapJobRow(modern), source: "table" as const } : null;
+}
+
 export async function listInvoiceExportJobs(companyId: string, workOrderId: string, client: DbClient = db) {
   const [modern, events] = await Promise.all([
     client.workOrderInvoiceExportJob.findMany({
@@ -598,9 +639,10 @@ export async function listInvoiceExportJobs(companyId: string, workOrderId: stri
       ...(previous ?? {}),
       ...(payload as unknown as InvoiceExportJobPayload),
       createdAt: previous?.createdAt ?? event.created_at.toISOString(),
+      source: "legacy",
     });
   }
-  for (const row of modern) jobs.set(row.id, mapJobRow(row));
+  for (const row of modern) jobs.set(row.id, { ...mapJobRow(row), source: "table" });
   return [...jobs.values()];
 }
 
@@ -673,6 +715,7 @@ export async function listQueuedInvoiceExportJobs(take = 25, client: DbClient = 
         ...(previous?.job ?? {}),
         ...(payload as unknown as InvoiceExportJobPayload),
         createdAt: previous?.job.createdAt ?? event.created_at.toISOString(),
+        source: "legacy",
       },
       createdAt: previous?.createdAt ?? event.created_at,
     });
@@ -681,7 +724,7 @@ export async function listQueuedInvoiceExportJobs(take = 25, client: DbClient = 
     latest.set(`${row.company_id}:${row.id}`, {
       companyId: row.company_id,
       workOrderId: row.work_order_id,
-      job: mapJobRow(row),
+      job: { ...mapJobRow(row), source: "table" },
       createdAt: row.created_at,
     });
   }

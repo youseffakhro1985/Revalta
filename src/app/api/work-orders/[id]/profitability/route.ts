@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
+  getModernProfitabilitySettings,
   getProfitabilitySettings,
   listMaterialEntries,
   listTimeEntries,
@@ -71,7 +72,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       estimated_cost: order.estimated_cost?.toString() ?? null,
       actual_cost: order.actual_cost?.toString() ?? null,
     },
-    settings: { internalHourlyCost, customerHourlyRate, materialMarkupPercent, otherCost, fixedRevenue },
+    settings: {
+      internalHourlyCost,
+      customerHourlyRate,
+      materialMarkupPercent,
+      otherCost,
+      fixedRevenue,
+      ...(settings.source ? { source: settings.source } : {}),
+    },
     summary: {
       approvedMinutes,
       billableMinutes,
@@ -99,6 +107,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!(await getOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
+  const modern = await getModernProfitabilitySettings(user.company_id, id);
+  if (!modern) {
+    const existing = await getProfitabilitySettings(user.company_id, id);
+    if (existing.source === "legacy") {
+      return NextResponse.json({
+        error: "Lönsamhetsinställningarna finns kvar i äldre lagring. Kör backfill till WorkOrderProfitabilitySettings innan de kan uppdateras.",
+      }, { status: 409 });
+    }
+  }
+
   const body = await request.json();
   const settings = {
     internalHourlyCost: numberValue(body.internalHourlyCost),
@@ -124,5 +142,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     action: "work_order.profitability_updated",
     metadata: { ...settings, storage: "WorkOrderProfitabilitySettings" },
   });
-  return NextResponse.json({ settings: saved }, { status: 201 });
+  return NextResponse.json({ settings: { ...saved, source: "table" as const } }, { status: 201 });
 }

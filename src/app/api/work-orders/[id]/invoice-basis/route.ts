@@ -139,7 +139,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const draft = source.saved
-    ? { ...source.saved, lines: Array.isArray(source.saved.lines) ? source.saved.lines : [] }
+    ? {
+      ...source.saved,
+      lines: Array.isArray(source.saved.lines) ? source.saved.lines : [],
+      ...(source.saved.source ? { source: source.saved.source } : {}),
+    }
     : {
       status: "draft",
       customerName: "",

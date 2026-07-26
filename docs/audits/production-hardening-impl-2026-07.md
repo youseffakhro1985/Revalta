@@ -85,7 +85,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Report `invoice.create` builds canonical `WorkOrderInvoiceDraft` from approved time/material (plus archival `WorkOrderInvoiceBasis` snapshot); UI clarifies export via Ekonomi.
    - Compliance inspection status lifecycle (`PATCH /api/inspections/[id]`) with UI; fail-closed for legacy.
    - Operational document soft-delete (`DELETE /api/operational-documents/[id]`) + panel action.
-   - Ticket operations hide time/cost when a work order exists and deep-link to WO economics.
+   - Ticket operations hide time/cost when a work order exists and deep-link to WO economics; `POST /api/tickets/[id]/operations` returns Swedish `409` for time/cost when a linked work order exists.
    - Cron product journals: `CronJobRun` for preventive maintenance and recurring incident escalations (no IE job envelopes).
    - Lease soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update paths under `/api/leases/**` and uthyrning-related lease lists filter active rows; `DELETE /api/leases/[id]` for managers (draft/cancelled/ended only; active → Swedish `409`); uthyrning UI wires discreet remove for leases and lease holders (holder DELETE already on property kontaktregister).
    - Property soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update/search/count and select paths filter active rows; `DELETE /api/properties/[id]` for managers blocks open leases/tickets/work orders; discreet “Ta bort fastighet” on fastighetskort.
@@ -93,6 +93,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Calendar status lifecycle (`PATCH /api/calendar`, statuses `planned|done|cancelled`) on modern `CalendarEvent` only; legacy AuditLog rows return Swedish `409` asking for backfill; kalender UI status select + legacy banner; audit `calendar.event.status_updated` with `storage: "CalendarEvent"`.
    - Energy hard-safe delete (`DELETE /api/energy`) on modern `EnergyReading` only; legacy → Swedish `409` backfill; energi UI “Ta bort” + legacy banner; audit `energy.reading.deleted` with `storage: "EnergyReading"`.
    - Budget hard-safe delete (`DELETE /api/budget`) on modern `BudgetEntry` only; legacy → Swedish `409` backfill; budget UI “Ta bort” + legacy banner; audit `budget.entry.deleted` with `storage: "BudgetEntry"`.
+   - Work-order economics fail-closed for IE-only dual-read: profitability update, invoice export queue (legacy draft), and export job retry/cancel require modern tables (`WorkOrderProfitabilitySettings` / `WorkOrderInvoiceDraft` / `WorkOrderInvoiceExportJob`); Swedish `409` asks for backfill (same style as time/materials). New draft/settings creates still write modern. GET dual-read marks `source: "legacy"`; economics panel banners + hides legacy mutations. Cron skips IE-only queued jobs (no rematerialize).
 
 ## Verification
 

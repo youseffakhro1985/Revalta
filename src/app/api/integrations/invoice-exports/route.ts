@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
+  getModernInvoiceExportJob,
   listInvoiceExportJobs,
   upsertInvoiceExportJob,
   type InvoiceExportJobPayload,
@@ -117,17 +118,23 @@ export async function POST(request: Request) {
   const jobs = await latestJobs(user.company_id);
   const existing = jobs.find((job) => job.jobId === jobId);
   if (!existing) return NextResponse.json({ error: "Exportjobbet hittades inte" }, { status: 404 });
-  const currentStatus = String(existing.status ?? "");
+  const modern = await getModernInvoiceExportJob(user.company_id, existing.workOrderId, jobId);
+  if (!modern) {
+    return NextResponse.json({
+      error: "Exportjobbet finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceExportJob innan det kan uppdateras.",
+    }, { status: 409 });
+  }
+  const currentStatus = String(modern.status ?? "");
   if (action === "retry" && currentStatus !== "failed") return NextResponse.json({ error: "Endast misslyckade jobb kan köras om" }, { status: 409 });
   if (action === "cancel" && !["queued", "processing"].includes(currentStatus)) return NextResponse.json({ error: "Jobbet kan inte avbrytas i nuvarande status" }, { status: 409 });
-  const provider = String(existing.provider ?? "");
+  const provider = String(modern.provider ?? "");
   if (action === "retry" && !configured(provider)) return NextResponse.json({ error: "Integrationen är inte fullständigt konfigurerad" }, { status: 400 });
 
   const now = new Date().toISOString();
   const payload: InvoiceExportJobPayload = {
-    ...existing,
+    ...modern,
     status: action === "retry" ? "queued" : "cancelled",
-    attempt: Number(existing.attempt ?? 0) + (action === "retry" ? 1 : 0),
+    attempt: Number(modern.attempt ?? 0) + (action === "retry" ? 1 : 0),
     error: null,
     updatedAt: now,
     actedById: user.id,
@@ -136,9 +143,9 @@ export async function POST(request: Request) {
   const job = await upsertInvoiceExportJob(user.company_id, payload);
   await writeAuditLog(user, {
     entityType: "work_order",
-    entityId: existing.workOrderId,
+    entityId: modern.workOrderId,
     action: `work_order.invoice_integration_${action}`,
     metadata: { jobId, provider, previousStatus: currentStatus, source: "operations_center", storage: "WorkOrderInvoiceExportJob" },
   });
-  return NextResponse.json({ job }, { status: 201 });
+  return NextResponse.json({ job: { ...job, source: "table" as const } }, { status: 201 });
 }

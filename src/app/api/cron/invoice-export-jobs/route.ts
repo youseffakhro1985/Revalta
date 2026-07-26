@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import {
   getInvoiceDraftByVersion,
+  getModernInvoiceDraftByVersion,
+  getModernInvoiceExportJob,
   listQueuedInvoiceExportJobs,
   upsertInvoiceExportJob,
   type InvoiceExportJobPayload,
@@ -231,7 +233,15 @@ export async function GET(request: Request) {
       continue;
     }
 
-    await saveJob(companyId, job, "processing", { processingStartedAt: new Date().toISOString() });
+    // Fail-closed: never rematerialize IE-only jobs into WorkOrderInvoiceExportJob.
+    const modernRaw = await getModernInvoiceExportJob(companyId, workOrderId, job.jobId);
+    const modernJob = modernRaw ? asJob(modernRaw) : null;
+    if (!modernJob) {
+      result.skipped += 1;
+      continue;
+    }
+
+    await saveJob(companyId, modernJob, "processing", { processingStartedAt: new Date().toISOString() });
 
     try {
       const workOrder = await db.workOrder.findFirst({
@@ -246,16 +256,24 @@ export async function GET(request: Request) {
       });
 
       if (!workOrder) throw new Error("Arbetsordern hittades inte längre");
-      if (!job.invoiceVersionId) throw new Error("Exportjobbet saknar fakturaversion");
-      const invoiceRaw = await getInvoiceDraftByVersion(companyId, workOrderId, job.invoiceVersionId);
-      const invoice = asInvoice(invoiceRaw);
+      if (!modernJob.invoiceVersionId) throw new Error("Exportjobbet saknar fakturaversion");
+      const modernInvoice = await getModernInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
+      if (!modernInvoice) {
+        const legacyInvoice = await getInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
+        throw new Error(
+          legacyInvoice
+            ? "Faktureringsunderlaget finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceDraft innan export."
+            : "Den kopplade fakturaversionen hittades inte",
+        );
+      }
+      const invoice = asInvoice(modernInvoice);
       if (!invoice) throw new Error("Den kopplade fakturaversionen hittades inte");
       if (!["ready", "exported"].includes(invoice.status)) throw new Error("Faktureringsunderlaget måste vara markerat som redo före export");
 
-      const payload = exportPayload({ job, invoice, workOrder });
-      const providerResult = await send(job, payload);
+      const payload = exportPayload({ job: modernJob, invoice, workOrder });
+      const providerResult = await send(modernJob, payload);
       // Receipt fields live on WorkOrderInvoiceExportJob (sent_at/external_id/provider_response).
-      await saveJob(companyId, job, "sent", {
+      await saveJob(companyId, modernJob, "sent", {
         sentAt: new Date().toISOString(),
         providerStatus: providerResult.status,
         externalId: providerResult.externalId,
@@ -265,7 +283,7 @@ export async function GET(request: Request) {
       result.sent += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Okänt integrationsfel";
-      await saveJob(companyId, job, "failed", {
+      await saveJob(companyId, modernJob, "failed", {
         failedAt: new Date().toISOString(),
         error: message.slice(0, 2000),
       });

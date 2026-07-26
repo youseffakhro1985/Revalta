@@ -51,6 +51,7 @@ type ProfitSettings = {
   materialMarkupPercent: number;
   otherCost: number;
   fixedRevenue: number;
+  source?: "table" | "legacy";
 };
 
 type InvoiceLine = {
@@ -80,6 +81,7 @@ type InvoiceDraft = {
   vat?: number;
   total?: number;
   versionId?: string;
+  source?: "table" | "legacy";
 };
 
 type IntegrationProvider = { id: string; name: string; configured: boolean };
@@ -91,6 +93,7 @@ type IntegrationJob = {
   error?: string | null;
   updatedAt?: string | null;
   createdAt?: string | null;
+  source?: "table" | "legacy";
 };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
@@ -182,12 +185,17 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         supplier: typeof entry.supplier === "string" ? entry.supplier : null,
       })).filter((entry: MaterialEntry) => entry.entryId));
       setProfit(profitData.summary || null);
-      setSettings(profitData.settings || {
-        internalHourlyCost: 350,
-        customerHourlyRate: 650,
-        materialMarkupPercent: 15,
-        otherCost: 0,
-        fixedRevenue: 0,
+      setSettings({
+        ...(profitData.settings || {
+          internalHourlyCost: 350,
+          customerHourlyRate: 650,
+          materialMarkupPercent: 15,
+          otherCost: 0,
+          fixedRevenue: 0,
+        }),
+        source: profitData.settings?.source === "legacy" || profitData.settings?.source === "table"
+          ? profitData.settings.source
+          : undefined,
       });
       setDraft({
         status: invoiceData.draft?.status || "draft",
@@ -206,6 +214,9 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         vat: invoiceData.draft?.vat,
         total: invoiceData.draft?.total,
         versionId: invoiceData.draft?.versionId,
+        source: invoiceData.draft?.source === "legacy" || invoiceData.draft?.source === "table"
+          ? invoiceData.draft.source
+          : undefined,
       });
       setProviders(integrationData.providers || []);
       setExportJobs((integrationData.jobs || []).map((job: Record<string, unknown>) => ({
@@ -216,6 +227,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         error: typeof job.error === "string" ? job.error : null,
         updatedAt: typeof job.updatedAt === "string" ? job.updatedAt : null,
         createdAt: typeof job.createdAt === "string" ? job.createdAt : null,
+        source: job.source === "legacy" || job.source === "table" ? job.source : undefined,
       })));
       const configured = (integrationData.providers || []).find((provider: IntegrationProvider) => provider.configured);
       if (configured?.id) setSelectedProvider(configured.id);
@@ -474,28 +486,31 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
       </div>
 
       <Panel title="Lönsamhet" description="Intern kostnad och kundpris för attesterad tid och material.">
+        {settings.source === "legacy" ? (
+          <p className="mb-4 text-xs font-medium text-amber-800">Äldre lönsamhetsinställningar – kör backfill innan de kan sparas om.</p>
+        ) : null}
         <form onSubmit={saveProfit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <label className="space-y-2 text-sm">
             <span className="font-semibold text-ink-700">Intern timkostnad</span>
-            <input name="internalHourlyCost" type="number" min="0" step="0.01" defaultValue={settings.internalHourlyCost} disabled={!canManage} className={premiumFieldClass} />
+            <input name="internalHourlyCost" type="number" min="0" step="0.01" defaultValue={settings.internalHourlyCost} disabled={!canManage || settings.source === "legacy"} className={premiumFieldClass} />
           </label>
           <label className="space-y-2 text-sm">
             <span className="font-semibold text-ink-700">Kundtimpris</span>
-            <input name="customerHourlyRate" type="number" min="0" step="0.01" defaultValue={settings.customerHourlyRate} disabled={!canManage} className={premiumFieldClass} />
+            <input name="customerHourlyRate" type="number" min="0" step="0.01" defaultValue={settings.customerHourlyRate} disabled={!canManage || settings.source === "legacy"} className={premiumFieldClass} />
           </label>
           <label className="space-y-2 text-sm">
             <span className="font-semibold text-ink-700">Materialpåslag %</span>
-            <input name="materialMarkupPercent" type="number" min="0" step="0.1" defaultValue={settings.materialMarkupPercent} disabled={!canManage} className={premiumFieldClass} />
+            <input name="materialMarkupPercent" type="number" min="0" step="0.1" defaultValue={settings.materialMarkupPercent} disabled={!canManage || settings.source === "legacy"} className={premiumFieldClass} />
           </label>
           <label className="space-y-2 text-sm">
             <span className="font-semibold text-ink-700">Övrig kostnad</span>
-            <input name="otherCost" type="number" min="0" step="0.01" defaultValue={settings.otherCost} disabled={!canManage} className={premiumFieldClass} />
+            <input name="otherCost" type="number" min="0" step="0.01" defaultValue={settings.otherCost} disabled={!canManage || settings.source === "legacy"} className={premiumFieldClass} />
           </label>
           <label className="space-y-2 text-sm">
             <span className="font-semibold text-ink-700">Fast ersättning</span>
-            <input name="fixedRevenue" type="number" min="0" step="0.01" defaultValue={settings.fixedRevenue} disabled={!canManage} className={premiumFieldClass} />
+            <input name="fixedRevenue" type="number" min="0" step="0.01" defaultValue={settings.fixedRevenue} disabled={!canManage || settings.source === "legacy"} className={premiumFieldClass} />
           </label>
-          {canManage ? (
+          {canManage && settings.source !== "legacy" ? (
             <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2 lg:col-span-5`}>
               {saving ? "Sparar…" : "Spara lönsamhetsinställningar"}
             </button>
@@ -508,6 +523,9 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
           <EmptyState title="Inget underlag" description="Spara tid och material för att skapa fakturarader." />
         ) : (
           <div className="space-y-4">
+            {draft.source === "legacy" ? (
+              <p className="text-xs font-medium text-amber-800">Äldre underlag – spara ett nytt utkast (modern tabell) innan export. Kör backfill för att behålla samma version-ID.</p>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <input
                 value={draft.customerName}
@@ -586,7 +604,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
               ))}
             </select>
           </label>
-          {canManage ? (
+          {canManage && draft?.source !== "legacy" ? (
             <button
               type="button"
               disabled={saving || !providers.some((provider) => provider.id === selectedProvider && provider.configured)}
@@ -597,6 +615,9 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             </button>
           ) : null}
         </div>
+        {draft?.source === "legacy" ? (
+          <p className="mt-3 text-xs font-medium text-amber-800">Äldre fakturaunderlag – spara ett nytt underlag eller kör backfill innan export.</p>
+        ) : null}
         <div className="mt-4 space-y-3">
           {exportJobs.length === 0 ? (
             <EmptyState title="Inga exportjobb" description="När underlaget är klart kan du köa en export till ekonomisystemet." />
@@ -612,8 +633,11 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 {job.updatedAt || job.createdAt ? dateTime.format(new Date(String(job.updatedAt || job.createdAt))) : "—"}
                 {job.attempt ? ` · Försök ${job.attempt}` : ""}
               </p>
+              {job.source === "legacy" ? (
+                <p className="mt-2 text-xs font-medium text-amber-800">Äldre jobb – kör backfill innan omkörning eller avbryt.</p>
+              ) : null}
               {job.error ? <p className="mt-2 text-xs text-red-700">{job.error}</p> : null}
-              {canManage && (job.status === "failed" || job.status === "queued") ? (
+              {canManage && job.source !== "legacy" && (job.status === "failed" || job.status === "queued") ? (
                 <div className="mt-3 flex gap-2">
                   {job.status === "failed" ? (
                     <button
