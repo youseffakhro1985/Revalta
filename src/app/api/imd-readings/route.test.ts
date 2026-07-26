@@ -93,7 +93,7 @@ describe("imd-readings route", () => {
 
     expect(response.status).toBe(200);
     expect(imdFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: "company-1", voided_at: null },
+      where: { company_id: "company-1", voided_at: null, property: { deleted_at: null } },
     }));
     expect(body.readings).toHaveLength(1);
     expect(body.readings[0].debit.status).toBe("open");

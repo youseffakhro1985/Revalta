@@ -104,7 +104,10 @@ describe("documents route", () => {
 
     expect(response.status).toBe(200);
     expect(managedFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: "company-1" },
+      where: {
+        company_id: "company-1",
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
+      },
     }));
     expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { company_id: "company-1", entity_type: "document", action: "document.created" },
