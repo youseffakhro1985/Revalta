@@ -197,3 +197,66 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+const patchAllowedStatuses = new Set(["draft", "sent", "paid", "overdue", "credited"]);
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const noticeId = String(body.noticeId || body.id || "").trim();
+    const status = String(body.status || "").trim();
+    if (!noticeId || !patchAllowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Avi-id och giltig status krävs" }, { status: 400 });
+    }
+
+    const existing = await db.rentNotice.findFirst({
+      where: { id: noticeId, company_id: user.company_id },
+      select: { id: true, tenant_name: true, period: true, status: true },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action: noticeAction, id: noticeId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Hyresavin finns kvar i äldre lagring. Kör backfill till RentNotice innan status ändras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Hyresavin hittades inte" }, { status: 404 });
+    }
+
+    if (existing.status === status) return NextResponse.json({ success: true, id: existing.id, status });
+
+    const updateResult = await db.rentNotice.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
+      data: { status },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Hyresavin hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "rent_notice",
+      entityId: existing.id,
+      action: "rent_notice.status_updated",
+      metadata: {
+        tenant_name: existing.tenant_name,
+        period: existing.period,
+        previousStatus: existing.status,
+        status,
+        storage: "RentNotice",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id, status });
+  } catch (error) {
+    console.error("Update rent notice status error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

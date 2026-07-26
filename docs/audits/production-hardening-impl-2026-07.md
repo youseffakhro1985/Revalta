@@ -53,6 +53,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Compliance inspections (`action_required`) can spawn corrective work orders.
    - Soft delete (`deleted_at`) for work orders, projects, operational documents and lease holders; list/get/update paths filter active rows.
    - Service notification company/user preferences moved to `ServiceNotificationSettings` / `UserServiceNotificationPreference` (dual-read + cron prefers modern tables).
+   - Service notification settings reads are modern-only: cron + settings APIs use `ServiceNotificationSettings` / `UserServiceNotificationPreference` exclusively; missing rows use create-time safe defaults (no `component_service_settings` / `user_service_notification_preferences` IntegrationEvent product reads). Writes remain modern tables + AuditLog.
    - Project detail can assign project manager via `/api/team` and soft-delete projects.
    - Work-order ops off IntegrationEvent primary storage: `WorkOrderTimeEntry`, `WorkOrderMaterialEntry`, `WorkOrderProfitabilitySettings`, `WorkOrderInvoiceDraft`, `WorkOrderInvoiceExportJob` (dual-read + cron/export jobs).
    - Service ops state: `ServiceNotificationAssignment`, `ComponentServiceDigestRun`, `ComponentServiceDeliveryAlert` (+ acks) with dual-read and cron cutover.
@@ -88,6 +89,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Cron product journals: `CronJobRun` for preventive maintenance and recurring incident escalations (no IE job envelopes).
    - Lease soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update paths under `/api/leases/**` and uthyrning-related lease lists filter active rows; `DELETE /api/leases/[id]` for managers (draft/cancelled/ended only; active → Swedish `409`); uthyrning UI wires discreet remove for leases and lease holders (holder DELETE already on property kontaktregister).
    - Property soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update/search/count and select paths filter active rows; `DELETE /api/properties/[id]` for managers blocks open leases/tickets/work orders; discreet “Ta bort fastighet” on fastighetskort.
+   - Fail-closed status lifecycle for create-only dual-read modules: insurance claims (`PATCH /api/insurance-claims`, statuses `reported|investigating|awaiting_insurer|repairing|settled|closed`), rent notices (`PATCH /api/rent-notices`, `draft|sent|paid|overdue|credited`), and vendors (`PATCH /api/vendors`, `active|ended|cancelled`). Modern table `updateMany` only; legacy AuditLog rows return Swedish `409` asking for backfill; list UI status select + legacy banner. Energy/budget skipped (no status field); calendar deferred (only create default `planned`).
 
 ## Verification
 

@@ -19,6 +19,7 @@ type Claim = {
   deductible?: number;
   compensation?: number;
   net_cost?: number;
+  source?: "table" | "legacy";
 };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
@@ -30,6 +31,7 @@ export default function InsuranceClaimsPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [updatingId, setUpdatingId] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
@@ -60,6 +62,25 @@ export default function InsuranceClaimsPage() {
     setSaving(false);
   }
 
+  async function updateStatus(claim: Claim, status: string) {
+    if (claim.source === "legacy") {
+      setError("Skadeärendet finns i äldre lagring. Kör backfill till InsuranceClaim innan status ändras.");
+      return;
+    }
+    if (status === claim.status) return;
+    setUpdatingId(claim.id);
+    setError("");
+    const response = await fetch("/api/insurance-claims", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimId: claim.id, status }),
+    });
+    const data = await response.json();
+    if (!response.ok) setError(data.error || "Kunde inte uppdatera status");
+    else await load();
+    setUpdatingId("");
+  }
+
   const field = "h-11 w-full rounded-lg border border-sand-200 bg-white px-3 text-sm text-ink-800 outline-none transition focus:border-petroleum-500";
 
   return <div className="space-y-8">
@@ -87,6 +108,49 @@ export default function InsuranceClaimsPage() {
       <div className="mt-4 flex items-center justify-between gap-4">{error ? <p className="text-sm text-red-700">{error}</p> : <span />}<button disabled={saving} className="rounded-lg bg-petroleum-800 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{saving ? "Sparar…" : "Registrera skadeärende"}</button></div>
     </form>
 
-    <div className="overflow-hidden rounded-xl border border-sand-200 bg-white shadow-[0_1px_2px_rgba(17,34,31,0.04)]"><div className="border-b border-sand-200 px-6 py-5"><h2 className="font-display text-xl font-semibold text-ink-900">Ärendeöversikt</h2></div>{loading ? <p className="p-6 text-sm text-ink-500">Läser skadeärenden…</p> : claims.length === 0 ? <p className="p-6 text-sm text-ink-500">Inga skadeärenden registrerade ännu.</p> : <div className="divide-y divide-sand-100">{claims.map((claim) => <div key={claim.id} className="grid gap-4 px-6 py-5 lg:grid-cols-[1.5fr_1fr_1fr_auto]"><div><p className="font-semibold text-ink-900">{claim.title}</p><p className="mt-1 text-xs text-ink-500">{claim.property_name} · {typeLabel[claim.damage_type || "other"]} · {claim.location || "Plats saknas"}</p></div><div><p className="text-xs text-ink-400">Försäkringsbolag</p><p className="mt-1 text-sm text-ink-700">{claim.insurer || "Ej angivet"}</p></div><div><p className="text-xs text-ink-400">Ekonomi</p><p className="mt-1 text-sm text-ink-700">Netto {money.format(Number(claim.net_cost || 0))}</p></div><span className="h-fit rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-medium text-ink-600">{statusLabel[claim.status || "reported"]}</span></div>)}</div>}</div>
+    <div className="overflow-hidden rounded-xl border border-sand-200 bg-white shadow-[0_1px_2px_rgba(17,34,31,0.04)]">
+      <div className="border-b border-sand-200 px-6 py-5"><h2 className="font-display text-xl font-semibold text-ink-900">Ärendeöversikt</h2></div>
+      {loading ? <p className="p-6 text-sm text-ink-500">Läser skadeärenden…</p> : claims.length === 0 ? <p className="p-6 text-sm text-ink-500">Inga skadeärenden registrerade ännu.</p> : (
+        <div className="divide-y divide-sand-100">
+          {claims.map((claim) => (
+            <div key={claim.id} className="grid gap-4 px-6 py-5 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
+              <div>
+                <p className="font-semibold text-ink-900">{claim.title}</p>
+                <p className="mt-1 text-xs text-ink-500">{claim.property_name} · {typeLabel[claim.damage_type || "other"]} · {claim.location || "Plats saknas"}</p>
+                {claim.source === "legacy" ? (
+                  <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan status kan ändras.</p>
+                ) : null}
+              </div>
+              <div>
+                <p className="text-xs text-ink-400">Försäkringsbolag</p>
+                <p className="mt-1 text-sm text-ink-700">{claim.insurer || "Ej angivet"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-400">Ekonomi</p>
+                <p className="mt-1 text-sm text-ink-700">Netto {money.format(Number(claim.net_cost || 0))}</p>
+              </div>
+              <div className="space-y-2">
+                <span className="inline-flex h-fit rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-medium text-ink-600">
+                  {statusLabel[claim.status || "reported"]}
+                </span>
+                {claim.source !== "legacy" ? (
+                  <select
+                    disabled={updatingId === claim.id}
+                    value={claim.status || "reported"}
+                    onChange={(event) => void updateStatus(claim, event.target.value)}
+                    className="block h-9 w-full min-w-[9.5rem] rounded-lg border border-sand-200 bg-white px-2 text-xs text-ink-700 outline-none focus:border-petroleum-500"
+                    aria-label={`Ändra status för ${claim.title || "skadeärende"}`}
+                  >
+                    {Object.entries(statusLabel).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   </div>;
 }

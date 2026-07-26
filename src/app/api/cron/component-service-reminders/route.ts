@@ -22,23 +22,7 @@ function noStore(body: unknown, init?: ResponseInit) { return NextResponse.json(
 function dateKey(date = new Date()) { return date.toISOString().slice(0, 10); }
 function authorized(request: Request) { const secret = process.env.CRON_SECRET; return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`; }
 function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
-function record(value: unknown): Record<string, unknown> | null { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 function toJson(value: unknown): Prisma.InputJsonValue { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
-
-function parsePreferences(payload: unknown): Preferences {
-  const value = record(payload);
-  if (!value) return defaults;
-  const roles = Array.isArray(value.roles) ? Array.from(new Set(value.roles.map(String).filter((role) => allowedRoles.includes(role)))) : defaults.roles;
-  const emails = Array.isArray(value.additionalEmails) ? Array.from(new Set(value.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)))).slice(0, 20) : [];
-  const days = Number(value.daysAhead);
-  return { enabled: value.enabled !== false, daysAhead: Number.isInteger(days) && days >= 1 && days <= 90 ? days : 30, roles: roles.length ? roles : defaults.roles, additionalEmails: emails };
-}
-
-function parseUserPreferences(payload: unknown): UserPreferences {
-  const value = record(payload);
-  if (!value) return userDefaults;
-  return { enabled: value.enabled !== false, overdueOnly: value.overdueOnly === true };
-}
 
 async function claimRun(companyId: string, dedupeKey: string, payload: Record<string, unknown>) {
   return db.$transaction(async (tx) => {
@@ -184,7 +168,7 @@ export async function GET(request: Request) {
   if (!authorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
   const now = new Date();
   const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
-  const [components, modernSettings, modernUserPreferences, settingsEvents, userPreferenceEvents] = await Promise.all([
+  const [components, modernSettings, modernUserPreferences] = await Promise.all([
     db.$queryRaw<DueComponent[]>(Prisma.sql`
       SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."criticality", a."next_service_at",
         p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
@@ -199,8 +183,6 @@ export async function GET(request: Request) {
     db.userServiceNotificationPreference.findMany({
       select: { company_id: true, user_id: true, enabled: true, overdue_only: true },
     }),
-    db.integrationEvent.findMany({ where: { type: "component_service_settings", status: "active", company_id: { not: null } }, orderBy: { created_at: "desc" }, select: { company_id: true, payload: true } }),
-    db.integrationEvent.findMany({ where: { type: "user_service_notification_preferences", status: "active", company_id: { not: null }, recipient: { not: null } }, orderBy: { created_at: "desc" }, select: { company_id: true, recipient: true, payload: true } }),
   ]);
 
   const settings = new Map<string, Preferences>();
@@ -212,15 +194,9 @@ export async function GET(request: Request) {
       additionalEmails: Array.isArray(row.additional_emails) ? row.additional_emails.map(String) : [],
     });
   }
-  for (const event of settingsEvents) if (event.company_id && !settings.has(event.company_id)) settings.set(event.company_id, parsePreferences(event.payload));
   const userSettings = new Map<string, UserPreferences>();
   for (const row of modernUserPreferences) {
     userSettings.set(`${row.company_id}:${row.user_id}`, { enabled: row.enabled, overdueOnly: row.overdue_only });
-  }
-  for (const event of userPreferenceEvents) {
-    if (!event.company_id || !event.recipient) continue;
-    const key = `${event.company_id}:${event.recipient}`;
-    if (!userSettings.has(key)) userSettings.set(key, parseUserPreferences(event.payload));
   }
 
   const grouped = new Map<string, DueComponent[]>();

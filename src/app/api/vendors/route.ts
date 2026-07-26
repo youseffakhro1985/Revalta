@@ -144,3 +144,70 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+const allowedStatuses = new Set(["active", "ended", "cancelled"]);
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const vendorId = String(body.vendorId || body.id || "").trim();
+    const status = String(body.status || "").trim();
+    if (!vendorId || !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Leverantörs-id och giltig status krävs" }, { status: 400 });
+    }
+
+    const existing = await db.vendorContract.findFirst({
+      where: { id: vendorId, company_id: user.company_id },
+      select: { id: true, name: true, status: true },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: {
+          ...auditScopedWhere(user),
+          entity_type: entityType,
+          OR: [{ id: vendorId }, { entity_id: vendorId }],
+        },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "VendorContract") {
+        return NextResponse.json({
+          error: "Leverantören finns kvar i äldre lagring. Kör backfill till VendorContract innan status ändras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 404 });
+    }
+
+    if (existing.status === status) return NextResponse.json({ success: true, id: existing.id, status });
+
+    const updateResult = await db.vendorContract.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
+      data: { status },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType,
+      entityId: existing.id,
+      action: "vendor_contract.status_updated",
+      metadata: {
+        name: existing.name,
+        previousStatus: existing.status,
+        status,
+        storage: "VendorContract",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id, status });
+  } catch (error) {
+    console.error("Update vendor status error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

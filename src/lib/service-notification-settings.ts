@@ -97,15 +97,10 @@ export async function getCompanyServicePreferences(companyId: string) {
     };
   }
 
-  const event = await db.integrationEvent.findFirst({
-    where: { company_id: companyId, type: "component_service_settings", status: "active" },
-    orderBy: { created_at: "desc" },
-    select: { payload: true, created_at: true },
-  });
   return {
-    preferences: parseCompanyServicePreferences(event?.payload),
-    updatedAt: event?.created_at ?? null,
-    source: "legacy" as const,
+    preferences: { ...defaultCompanyServicePreferences, roles: [...defaultCompanyServicePreferences.roles], additionalEmails: [] },
+    updatedAt: null,
+    source: "defaults" as const,
   };
 }
 
@@ -156,20 +151,10 @@ export async function getUserServicePreferences(companyId: string, userId: strin
     };
   }
 
-  const latest = await db.integrationEvent.findFirst({
-    where: {
-      company_id: companyId,
-      type: "user_service_notification_preferences",
-      status: "active",
-      recipient: userId,
-    },
-    orderBy: { created_at: "desc" },
-    select: { payload: true, created_at: true },
-  });
   return {
-    preferences: parseUserServicePreferences(latest?.payload),
-    updatedAt: latest?.created_at ?? null,
-    source: "legacy" as const,
+    preferences: { ...defaultUserServicePreferences },
+    updatedAt: null,
+    source: "defaults" as const,
   };
 }
 
