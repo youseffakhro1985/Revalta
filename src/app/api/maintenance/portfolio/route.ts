@@ -36,7 +36,8 @@ export async function GET() {
     FROM "MaintenancePlan" mp
     JOIN "Property" p ON p."id" = mp."property_id"
     LEFT JOIN "MaintenanceAction" ma ON ma."maintenance_plan_id" = mp."id"
-    WHERE mp."company_id" = ${user.company_id}
+    WHERE p."deleted_at" IS NULL
+      AND mp."company_id" = ${user.company_id}
       AND mp."status" = 'active'
       AND p."company_id" = ${user.company_id}
     ORDER BY p."name", ma."planned_year", ma."title"

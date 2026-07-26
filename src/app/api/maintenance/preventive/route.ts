@@ -53,7 +53,8 @@ export async function GET() {
       ORDER BY COALESCE(wo."maintenance_cycle_advanced_at", wo."created_at") DESC
       LIMIT 1
     ) w ON TRUE
-    WHERE a."company_id" = ${user.company_id}
+    WHERE p."deleted_at" IS NULL
+      AND a."company_id" = ${user.company_id}
       AND COALESCE(a."status", 'active') IN ('active', 'planned')
     ORDER BY a."next_service_at" ASC NULLS LAST, a."criticality" DESC, a."name" ASC
     LIMIT 1000

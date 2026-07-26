@@ -7,6 +7,15 @@ export type DualListOptions<U> = {
   legacyStorage?: (row: U) => string | null | undefined;
 };
 
+/**
+ * After production backfill is verified, set REVALTA_MODERN_STORAGE_ONLY=1
+ * to stop merging AuditLog/IntegrationEvent product rows into list APIs.
+ * Default remains dual-read so unrebacked tenants keep visibility.
+ */
+export function isModernStorageOnly() {
+  return process.env.REVALTA_MODERN_STORAGE_ONLY === "1";
+}
+
 export function isModernStorageMirror(
   metadata: unknown,
   modernStorage: string,
@@ -27,6 +36,12 @@ export function mergeByCreatedAt<T extends { id: string; created_at: Date }, U e
   limit: number,
   options: DualListOptions<U> = {},
 ): Array<T | U> {
+  if (isModernStorageOnly()) {
+    return [...modern]
+      .sort((left, right) => right.created_at.getTime() - left.created_at.getTime())
+      .slice(0, limit);
+  }
+
   const modernIds = new Set(modern.map((row) => row.id));
   const filtered = legacy.filter((row) => {
     if (modernIds.has(row.id)) return false;

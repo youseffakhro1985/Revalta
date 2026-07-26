@@ -161,7 +161,7 @@ Detta blir referensarkitekturen för övriga moduler.
 - Ticket time/cost blockeras när arbetsorder finns; ticket operations kan soft-deletas.
 - Soft-delete för tickets, work orders, projects, properties, leases, lease holders, operational documents, notifications; IMD void.
 - Cron-produktjournaler på `CronJobRun` (preventive/recurring escalations).
-- Kvarstår efter prod-backfill: ta bort kvarvarande dual-read-listgrenar.
+- Efter prod-backfill: sätt `REVALTA_MODERN_STORAGE_ONLY=1` för att stänga dual-read via `mergeByCreatedAt` och WO-ops-storage (migreringssteg 6). Full borttagning av legacy-kodgrenar kan ske i en senare städ-PR.
 
 ## Kvalitetskrav före merge
 

@@ -172,57 +172,148 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
 
-    const itemId = String(body.itemId || "").trim();
-    const status = String(body.status || "").trim() as MaintenanceStatus;
-    const workOrderId = body.workOrderId ? String(body.workOrderId).trim() : null;
-    if (!itemId || !statuses.includes(status)) return NextResponse.json({ error: "Åtgärd och giltig status krävs" }, { status: 400 });
+    const itemId = String(body.itemId || body.id || "").trim();
+    if (!itemId) return NextResponse.json({ error: "Åtgärds-id krävs" }, { status: 400 });
 
-    const modern = await db.portfolioMaintenanceItem.findFirst({
-      where: { id: itemId, company_id: user.company_id },
-      select: { id: true, property_id: true, work_order_id: true, work_order_number: true },
-    });
-
-    if (modern) {
-      let workOrderNumber: string | null = modern.work_order_number;
-      if (workOrderId) {
-        const workOrder = await db.workOrder.findFirst({
-          where: { deleted_at: null, id: workOrderId, company_id: user.company_id, property_id: modern.property_id },
-          select: { id: true },
-        });
-        if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });
-        const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} AND "deleted_at" IS NULL LIMIT 1`;
-        workOrderNumber = rows[0]?.work_order_number ?? null;
-      }
-
-      const updateResult = await db.portfolioMaintenanceItem.updateMany({
-        where: { id: modern.id, company_id: user.company_id },
-        data: {
-          status,
-          work_order_id: workOrderId ?? modern.work_order_id,
-          work_order_number: workOrderNumber,
-        },
-      });
-      if (updateResult.count === 0) return NextResponse.json({ error: "Underhållsåtgärden hittades inte" }, { status: 404 });
-
-      await writeAuditLog(user, {
-        entityType: "property",
-        entityId: modern.property_id,
-        action,
-        metadata: {
-          item_id: modern.id,
-          status,
-          work_order_id: workOrderId ?? modern.work_order_id,
-          work_order_number: workOrderNumber,
-          updated_at: new Date().toISOString(),
-          storage: "PortfolioMaintenanceItem",
-        },
-      });
-      return NextResponse.json({ success: true });
+    const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
+    const status = (hasStatus ? String(body.status).trim() : "") as MaintenanceStatus;
+    if (hasStatus && !statuses.includes(status)) {
+      return NextResponse.json({ error: "Giltig status krävs" }, { status: 400 });
     }
 
-    return NextResponse.json({
-      error: "Underhållsåtgärden finns kvar i äldre lagring. Kör backfill till PortfolioMaintenanceItem innan status ändras.",
-    }, { status: 409 });
+    const fieldKeys = ["component", "measure", "plannedYear", "estimatedCost", "priority", "intervalYears"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    const workOrderId = body.workOrderId ? String(body.workOrderId).trim() : null;
+
+    if (!hasStatus && !hasFieldUpdate && !workOrderId) {
+      return NextResponse.json({ error: "Status eller fält att uppdatera krävs" }, { status: 400 });
+    }
+
+    const modern = await db.portfolioMaintenanceItem.findFirst({
+      where: { id: itemId, company_id: user.company_id, property: { deleted_at: null } },
+      select: {
+        id: true,
+        property_id: true,
+        component: true,
+        measure: true,
+        planned_year: true,
+        estimated_cost: true,
+        priority: true,
+        interval_years: true,
+        status: true,
+        work_order_id: true,
+        work_order_number: true,
+      },
+    });
+
+    if (!modern) {
+      const orphaned = await db.portfolioMaintenanceItem.findFirst({
+        where: { id: itemId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Underhållsåtgärden hittades inte" }, { status: 404 });
+      }
+
+      const logs = await db.auditLog.findMany({
+        where: { ...auditScopedWhere(user), action },
+        select: { id: true, metadata: true },
+        take: 1000,
+      });
+      const legacy = logs.some((log) => {
+        const metadata = (log.metadata ?? {}) as MaintenanceMetadata;
+        return metadata.item_id === itemId || log.id === itemId;
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Underhållsåtgärden finns kvar i äldre lagring. Kör backfill till PortfolioMaintenanceItem innan den kan uppdateras.",
+        }, { status: 409 });
+      }
+
+      return NextResponse.json({ error: "Underhållsåtgärden hittades inte" }, { status: 404 });
+    }
+
+    let component = modern.component;
+    let measure = modern.measure;
+    let plannedYear = modern.planned_year;
+    let estimatedCost = asNumber(modern.estimated_cost);
+    let priority = modern.priority;
+    let intervalYears = modern.interval_years;
+    const nextStatus = hasStatus ? status : (modern.status as MaintenanceStatus);
+
+    if (hasFieldUpdate) {
+      if (body.component !== undefined) component = String(body.component || "").trim();
+      if (body.measure !== undefined) measure = String(body.measure || "").trim();
+      if (body.plannedYear !== undefined) plannedYear = Number(body.plannedYear);
+      if (body.estimatedCost !== undefined) estimatedCost = Number(body.estimatedCost);
+      if (body.priority !== undefined) priority = String(body.priority || "normal").trim();
+      if (body.intervalYears !== undefined) intervalYears = Number(body.intervalYears);
+
+      if (!component || !measure || !Number.isInteger(plannedYear) || plannedYear < 2020 || !Number.isFinite(estimatedCost) || estimatedCost < 0 || !Number.isInteger(intervalYears) || intervalYears < 0) {
+        return NextResponse.json({ error: "Kontrollera byggnadsdel, åtgärd, år, intervall och kostnad" }, { status: 400 });
+      }
+      if (component.length > 180 || measure.length > 5000) {
+        return NextResponse.json({ error: "Byggnadsdel eller åtgärdsbeskrivning är för lång" }, { status: 400 });
+      }
+    }
+
+    let workOrderNumber: string | null = modern.work_order_number;
+    let nextWorkOrderId = modern.work_order_id;
+    if (workOrderId) {
+      const workOrder = await db.workOrder.findFirst({
+        where: { deleted_at: null, id: workOrderId, company_id: user.company_id, property_id: modern.property_id },
+        select: { id: true },
+      });
+      if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });
+      const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} AND "deleted_at" IS NULL LIMIT 1`;
+      workOrderNumber = rows[0]?.work_order_number ?? null;
+      nextWorkOrderId = workOrderId;
+    }
+
+    const updateResult = await db.portfolioMaintenanceItem.updateMany({
+      where: { id: modern.id, company_id: user.company_id },
+      data: {
+        ...(hasStatus || workOrderId
+          ? {
+              status: nextStatus,
+              work_order_id: nextWorkOrderId,
+              work_order_number: workOrderNumber,
+            }
+          : {}),
+        ...(hasFieldUpdate
+          ? {
+              component,
+              measure,
+              planned_year: plannedYear,
+              estimated_cost: estimatedCost,
+              priority,
+              interval_years: intervalYears,
+            }
+          : {}),
+      },
+    });
+    if (updateResult.count === 0) return NextResponse.json({ error: "Underhållsåtgärden hittades inte" }, { status: 404 });
+
+    await writeAuditLog(user, {
+      entityType: "property",
+      entityId: modern.property_id,
+      action: hasFieldUpdate ? "maintenance.plan.item.updated" : action,
+      metadata: {
+        item_id: modern.id,
+        component,
+        measure,
+        planned_year: plannedYear,
+        estimated_cost: estimatedCost,
+        priority,
+        interval_years: intervalYears,
+        status: nextStatus,
+        work_order_id: nextWorkOrderId,
+        work_order_number: workOrderNumber,
+        updated_at: new Date().toISOString(),
+        storage: "PortfolioMaintenanceItem",
+      },
+    });
+    return NextResponse.json({ success: true, id: modern.id, status: nextStatus });
   } catch (error) {
     console.error("Update maintenance item error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

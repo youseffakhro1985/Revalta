@@ -52,7 +52,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Round deviations can be marked and converted to work orders (`PATCH /api/rounds/[id]`, `POST /api/rounds/[id]/work-orders`).
    - Compliance inspections (`action_required`) can spawn corrective work orders.
    - Soft delete (`deleted_at`) for work orders, projects, operational documents and lease holders; list/get/update paths filter active rows.
-   - Service notification company/user preferences moved to `ServiceNotificationSettings` / `UserServiceNotificationPreference` (dual-read + cron prefers modern tables).
+   - Service notification company/user preferences moved to `ServiceNotificationSettings` / `UserServiceNotificationPreference` (modern-only reads; cron + settings APIs use these tables exclusively).
    - Service notification settings reads are modern-only: cron + settings APIs use `ServiceNotificationSettings` / `UserServiceNotificationPreference` exclusively; missing rows use create-time safe defaults (no `component_service_settings` / `user_service_notification_preferences` IntegrationEvent product reads). Writes remain modern tables + AuditLog.
    - Project detail can assign project manager via `/api/team` and soft-delete projects.
    - Work-order ops off IntegrationEvent primary storage: `WorkOrderTimeEntry`, `WorkOrderMaterialEntry`, `WorkOrderProfitabilitySettings`, `WorkOrderInvoiceDraft`, `WorkOrderInvoiceExportJob` (dual-read + cron/export jobs).
@@ -94,6 +94,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Energy hard-safe delete (`DELETE /api/energy`) on modern `EnergyReading` only; legacy → Swedish `409` backfill; energi UI “Ta bort” + legacy banner; audit `energy.reading.deleted` with `storage: "EnergyReading"`.
    - Budget hard-safe delete (`DELETE /api/budget`) on modern `BudgetEntry` only; legacy → Swedish `409` backfill; budget UI “Ta bort” + legacy banner; audit `budget.entry.deleted` with `storage: "BudgetEntry"`.
    - Field correction (modern-only, fail-closed) for dual-read list modules: rent notices (draft: base_rent/additions/deductions/index/period/due/note + totals recalc; non-draft status-only), insurance claims (title/costs/claim_number/insurer/location/note when not settled/closed; closed status-only), vendors (contact always; contract fields while active), budget (`PATCH` amount/category/year/account/note), energy (`PATCH` value/cost/period + per-m² recalc), calendar (title/date/time/responsible/note alongside status). Legacy AuditLog → Swedish `409` backfill; audits `*.updated` with `storage` metadata; list UI “Ändra” expand on modern rows.
+   - Field correction (modern-only, fail-closed) for quotes, portfolio maintenance and recurring schedules: quotes `PATCH` allows title/supplier/amounts/VAT/note/valid_until when status is `draft|sent` (status lifecycle + Makulera unchanged; audit `quote.updated` with `storage: "Quote"`); maintenance `PATCH` beyond status for component/measure/planned_year/estimated_cost/priority/interval_years (audit `maintenance.plan.item.updated` with `storage: "PortfolioMaintenanceItem"`); recurring `PATCH` for title/description/frequency/priority/next_run_at/estimated_cost/active via company-scoped `updateMany` (legacy still `409`). List UI “Ändra” expand on modern rows; legacy banners/disabled mutations kept.
    - Work-order economics fail-closed for IE-only dual-read: profitability update, invoice export queue (legacy draft), and export job retry/cancel require modern tables (`WorkOrderProfitabilitySettings` / `WorkOrderInvoiceDraft` / `WorkOrderInvoiceExportJob`); Swedish `409` asks for backfill (same style as time/materials). New draft/settings creates still write modern. GET dual-read marks `source: "legacy"`; economics panel banners + hides legacy mutations. Cron skips IE-only queued jobs (no rematerialize).
    - Soft-delete filter holes closed for manager lists/counts: dashboard ticket KPIs/`_count.tickets`, property detail tickets/`openTickets`, property card work_orders/projects/`_count`, properties API `_count.tickets`, rapporter ticket findMany/`_count`, work-orders list projects include, team `assigned_tickets` count, search nested leases, and WO execution before/after photo counts (`deleted_at: null`); ticket operations GET 404 copy → "Ärendet hittades inte".
    - Component entry corrections fetch `/link-options` (aligned with create-form options route).
@@ -111,6 +112,9 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Production launch checklist: post-migrate backfill + CronJobRun/invoice-export smoke checks.
 
    - Preventive/service cron and escalation/service-center SQL exclude soft-deleted properties (`p."deleted_at" IS NULL`).
+   - Soft-delete property filters on remaining API SQL paths: preventive overview, portfolio maintenance, service-center assignment key validation, work-order SLA notifications, and edit-locks list (`p."deleted_at" IS NULL`).
+   - Field correction PATCH for quotes (draft/sent), portfolio maintenance items, and recurring schedules (+ UI “Ändra”).
+   - Dual-read retirement kill-switch: `REVALTA_MODERN_STORAGE_ONLY=1` makes `mergeByCreatedAt` and WO ops storage skip AuditLog/IE product rows (default off until post-backfill).
 
 ## Verification
 

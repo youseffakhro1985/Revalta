@@ -72,7 +72,8 @@ export async function GET() {
     INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id" AND w."deleted_at" IS NULL
     INNER JOIN "Property" p ON p."id" = w."property_id" AND p."company_id" = l."company_id"
     INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
-    WHERE l."company_id" = ${user.company_id}
+    WHERE p."deleted_at" IS NULL
+      AND l."company_id" = ${user.company_id}
       AND l."expires_at" > CURRENT_TIMESTAMP
     ORDER BY l."expires_at" ASC, l."acquired_at" ASC
     LIMIT 500

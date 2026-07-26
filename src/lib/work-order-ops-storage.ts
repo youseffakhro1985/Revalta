@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import db from "@/lib/db";
+import { isModernStorageOnly } from "@/lib/dual-list";
 
 type DbClient = Pick<
   typeof db,
@@ -309,28 +310,28 @@ function mapJobRow(row: {
 }
 
 export async function listTimeEntries(companyId: string, workOrderId: string, client: DbClient = db) {
-  const [modern, events] = await Promise.all([
-    client.workOrderTimeEntry.findMany({
-      where: { company_id: companyId, work_order_id: workOrderId },
-      orderBy: { created_at: "asc" },
-      take: 2000,
-    }),
-    client.integrationEvent.findMany({
+  const modern = await client.workOrderTimeEntry.findMany({
+    where: { company_id: companyId, work_order_id: workOrderId },
+    orderBy: { created_at: "asc" },
+    take: 2000,
+  });
+  const entries = new Map<string, TimeEntryPayload>();
+  if (!isModernStorageOnly()) {
+    const events = await client.integrationEvent.findMany({
       where: { company_id: companyId, type: "work_order.time_entry", recipient: workOrderId },
       orderBy: { created_at: "asc" },
       take: 2000,
-    }),
-  ]);
-  const entries = new Map<string, TimeEntryPayload>();
-  for (const event of events) {
-    const payload = asObject(event.payload);
-    if (!payload || typeof payload.entryId !== "string" || payload.workOrderId !== workOrderId) continue;
-    const previous = entries.get(payload.entryId);
-    entries.set(payload.entryId, {
-      ...(previous ?? {}),
-      ...(payload as unknown as TimeEntryPayload),
-      createdAt: previous?.createdAt ?? event.created_at.toISOString(),
     });
+    for (const event of events) {
+      const payload = asObject(event.payload);
+      if (!payload || typeof payload.entryId !== "string" || payload.workOrderId !== workOrderId) continue;
+      const previous = entries.get(payload.entryId);
+      entries.set(payload.entryId, {
+        ...(previous ?? {}),
+        ...(payload as unknown as TimeEntryPayload),
+        createdAt: previous?.createdAt ?? event.created_at.toISOString(),
+      });
+    }
   }
   for (const row of modern) entries.set(row.id, mapTimeRow(row));
   return [...entries.values()];
@@ -375,28 +376,28 @@ export async function upsertTimeEntry(companyId: string, payload: TimeEntryPaylo
 }
 
 export async function listMaterialEntries(companyId: string, workOrderId: string, client: DbClient = db) {
-  const [modern, events] = await Promise.all([
-    client.workOrderMaterialEntry.findMany({
-      where: { company_id: companyId, work_order_id: workOrderId },
-      orderBy: { created_at: "asc" },
-      take: 3000,
-    }),
-    client.integrationEvent.findMany({
+  const modern = await client.workOrderMaterialEntry.findMany({
+    where: { company_id: companyId, work_order_id: workOrderId },
+    orderBy: { created_at: "asc" },
+    take: 3000,
+  });
+  const latest = new Map<string, MaterialEntryPayload>();
+  if (!isModernStorageOnly()) {
+    const events = await client.integrationEvent.findMany({
       where: { company_id: companyId, type: "work_order.material_entry", recipient: workOrderId },
       orderBy: { created_at: "asc" },
       take: 3000,
-    }),
-  ]);
-  const latest = new Map<string, MaterialEntryPayload>();
-  for (const event of events) {
-    const payload = asObject(event.payload);
-    if (!payload || typeof payload.entryId !== "string" || payload.workOrderId !== workOrderId) continue;
-    const previous = latest.get(payload.entryId);
-    latest.set(payload.entryId, {
-      ...(previous ?? {}),
-      ...(payload as unknown as MaterialEntryPayload),
-      createdAt: previous?.createdAt ?? event.created_at.toISOString(),
     });
+    for (const event of events) {
+      const payload = asObject(event.payload);
+      if (!payload || typeof payload.entryId !== "string" || payload.workOrderId !== workOrderId) continue;
+      const previous = latest.get(payload.entryId);
+      latest.set(payload.entryId, {
+        ...(previous ?? {}),
+        ...(payload as unknown as MaterialEntryPayload),
+        createdAt: previous?.createdAt ?? event.created_at.toISOString(),
+      });
+    }
   }
   for (const row of modern) latest.set(row.id, mapMaterialRow(row));
   return [...latest.values()];
@@ -466,6 +467,16 @@ export async function getProfitabilitySettings(companyId: string, workOrderId: s
   const modern = await getModernProfitabilitySettings(companyId, workOrderId, client);
   if (modern) return modern;
 
+  if (isModernStorageOnly()) {
+    return {
+      internalHourlyCost: 350,
+      customerHourlyRate: 650,
+      materialMarkupPercent: 15,
+      otherCost: 0,
+      fixedRevenue: 0,
+    } satisfies ProfitabilitySettingsPayload;
+  }
+
   const event = await client.integrationEvent.findFirst({
     where: { company_id: companyId, type: "work_order.profitability_settings", recipient: workOrderId },
     orderBy: { created_at: "desc" },
@@ -534,6 +545,7 @@ export async function getModernLatestInvoiceDraft(companyId: string, workOrderId
 export async function getLatestInvoiceDraft(companyId: string, workOrderId: string, client: DbClient = db) {
   const modern = await getModernLatestInvoiceDraft(companyId, workOrderId, client);
   if (modern) return modern;
+  if (isModernStorageOnly()) return null;
 
   const event = await client.integrationEvent.findFirst({
     where: { company_id: companyId, type: "work_order.invoice_basis", recipient: workOrderId },
@@ -563,6 +575,7 @@ export async function getInvoiceDraftByVersion(
 ) {
   const modern = await getModernInvoiceDraftByVersion(companyId, workOrderId, versionId, client);
   if (modern) return modern;
+  if (isModernStorageOnly()) return null;
 
   const events = await client.integrationEvent.findMany({
     where: { company_id: companyId, type: "work_order.invoice_basis", recipient: workOrderId },
@@ -618,29 +631,29 @@ export async function getModernInvoiceExportJob(
 }
 
 export async function listInvoiceExportJobs(companyId: string, workOrderId: string, client: DbClient = db) {
-  const [modern, events] = await Promise.all([
-    client.workOrderInvoiceExportJob.findMany({
-      where: { company_id: companyId, work_order_id: workOrderId },
-      orderBy: { created_at: "asc" },
-      take: 3000,
-    }),
-    client.integrationEvent.findMany({
+  const modern = await client.workOrderInvoiceExportJob.findMany({
+    where: { company_id: companyId, work_order_id: workOrderId },
+    orderBy: { created_at: "asc" },
+    take: 3000,
+  });
+  const jobs = new Map<string, InvoiceExportJobPayload>();
+  if (!isModernStorageOnly()) {
+    const events = await client.integrationEvent.findMany({
       where: { company_id: companyId, type: "work_order.invoice_integration_job", recipient: workOrderId },
       orderBy: { created_at: "asc" },
       take: 3000,
-    }),
-  ]);
-  const jobs = new Map<string, InvoiceExportJobPayload>();
-  for (const event of events) {
-    const payload = asObject(event.payload);
-    if (!payload || typeof payload.jobId !== "string") continue;
-    const previous = jobs.get(payload.jobId);
-    jobs.set(payload.jobId, {
-      ...(previous ?? {}),
-      ...(payload as unknown as InvoiceExportJobPayload),
-      createdAt: previous?.createdAt ?? event.created_at.toISOString(),
-      source: "legacy",
     });
+    for (const event of events) {
+      const payload = asObject(event.payload);
+      if (!payload || typeof payload.jobId !== "string") continue;
+      const previous = jobs.get(payload.jobId);
+      jobs.set(payload.jobId, {
+        ...(previous ?? {}),
+        ...(payload as unknown as InvoiceExportJobPayload),
+        createdAt: previous?.createdAt ?? event.created_at.toISOString(),
+        source: "legacy",
+      });
+    }
   }
   for (const row of modern) jobs.set(row.id, { ...mapJobRow(row), source: "table" });
   return [...jobs.values()];
@@ -690,19 +703,19 @@ export async function upsertInvoiceExportJob(companyId: string, payload: Invoice
 }
 
 export async function listQueuedInvoiceExportJobs(take = 25, client: DbClient = db) {
-  const [modern, events] = await Promise.all([
-    client.workOrderInvoiceExportJob.findMany({
-      where: { status: "queued" },
-      orderBy: { created_at: "asc" },
-      take: 10_000,
-    }),
-    client.integrationEvent.findMany({
+  const modern = await client.workOrderInvoiceExportJob.findMany({
+    where: { status: "queued" },
+    orderBy: { created_at: "asc" },
+    take: 10_000,
+  });
+  const events = isModernStorageOnly()
+    ? []
+    : await client.integrationEvent.findMany({
       where: { type: "work_order.invoice_integration_job" },
       orderBy: { created_at: "asc" },
       take: 10_000,
       select: { company_id: true, recipient: true, payload: true, created_at: true },
-    }),
-  ]);
+    });
   const latest = new Map<string, { companyId: string; workOrderId: string; job: InvoiceExportJobPayload; createdAt: Date }>();
   for (const event of events) {
     const payload = asObject(event.payload);
