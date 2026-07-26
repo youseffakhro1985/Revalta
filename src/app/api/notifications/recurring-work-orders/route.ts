@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { getNotificationUxState, markNotificationsRead } from "@/lib/notification-ux-state";
 import { listRecurringIncidentEvents } from "@/lib/recurring-incident-storage";
