@@ -1,25 +1,13 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-
-const JOB_TYPE = "work_order.invoice_integration_job";
-type Obj = Record<string, unknown>;
-type ExportJob = Obj & {
-  jobId: string;
-  workOrderId: string;
-  createdAt: string;
-  updatedAt?: unknown;
-  status?: unknown;
-  provider?: unknown;
-  error?: unknown;
-  externalId?: unknown;
-};
-
-function object(value: unknown): Obj | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Obj : null;
-}
+import {
+  getModernInvoiceExportJob,
+  listInvoiceExportJobs,
+  upsertInvoiceExportJob,
+  type InvoiceExportJobPayload,
+} from "@/lib/work-order-ops-storage";
 
 function configured(provider: string) {
   if (provider === "fortnox") return Boolean(process.env.FORTNOX_ACCESS_TOKEN && process.env.FORTNOX_INVOICE_ENDPOINT);
@@ -28,27 +16,44 @@ function configured(provider: string) {
   return false;
 }
 
-async function latestJobs(companyId: string): Promise<ExportJob[]> {
-  const events = await db.integrationEvent.findMany({
-    where: { company_id: companyId, type: JOB_TYPE },
+async function latestJobs(companyId: string): Promise<InvoiceExportJobPayload[]> {
+  const modern = await db.workOrderInvoiceExportJob.findMany({
+    where: { company_id: companyId },
     orderBy: { created_at: "asc" },
-    take: 10000,
-    select: { recipient: true, payload: true, created_at: true },
+    take: 10_000,
   });
-  const jobs = new Map<string, ExportJob>();
-  for (const event of events) {
-    const payload = object(event.payload);
-    if (!payload || typeof payload.jobId !== "string" || !event.recipient) continue;
-    const previous = jobs.get(payload.jobId);
-    jobs.set(payload.jobId, {
-      ...previous,
-      ...payload,
-      jobId: payload.jobId,
-      workOrderId: event.recipient,
-      createdAt: previous?.createdAt ?? event.created_at.toISOString(),
-    });
+  if (modern.length) {
+    return modern.map((row) => ({
+      jobId: row.id,
+      workOrderId: row.work_order_id,
+      provider: row.provider,
+      status: row.status,
+      attempt: row.attempt,
+      invoiceVersionId: row.invoice_version_id,
+      createdById: row.created_by_id,
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+      error: row.error,
+      actedById: row.acted_by_id,
+      processingStartedAt: row.processing_started_at?.toISOString() ?? null,
+      sentAt: row.sent_at?.toISOString() ?? null,
+      failedAt: row.failed_at?.toISOString() ?? null,
+      providerStatus: row.provider_status,
+      externalId: row.external_id,
+      providerResponse: row.provider_response,
+    }));
   }
-  return [...jobs.values()];
+
+  const workOrders = await db.workOrder.findMany({
+    where: { company_id: companyId, deleted_at: null },
+    select: { id: true },
+    take: 2000,
+  });
+  const jobs: InvoiceExportJobPayload[] = [];
+  for (const workOrder of workOrders) {
+    jobs.push(...await listInvoiceExportJobs(companyId, workOrder.id));
+  }
+  return jobs;
 }
 
 export async function GET(request: Request) {
@@ -61,18 +66,18 @@ export async function GET(request: Request) {
   const provider = url.searchParams.get("provider")?.trim();
   const query = url.searchParams.get("q")?.trim().toLowerCase();
   const allJobs = await latestJobs(user.company_id);
-  const workOrderIds = [...new Set(allJobs.map(job => job.workOrderId))];
+  const workOrderIds = [...new Set(allJobs.map((job) => job.workOrderId))];
   const orders = await db.workOrder.findMany({
-    where: { company_id: user.company_id, id: { in: workOrderIds } },
+    where: { deleted_at: null, company_id: user.company_id, id: { in: workOrderIds } },
     select: { id: true, title: true, status: true, property: { select: { name: true, address: true, city: true } } },
   });
-  const orderMap = new Map(orders.map(order => [order.id, order]));
+  const orderMap = new Map(orders.map((order) => [order.id, order]));
 
   const jobs = allJobs
-    .map(job => ({ ...job, workOrder: orderMap.get(job.workOrderId) ?? null }))
-    .filter(job => !status || String(job.status ?? "") === status)
-    .filter(job => !provider || String(job.provider ?? "") === provider)
-    .filter(job => {
+    .map((job) => ({ ...job, workOrder: orderMap.get(job.workOrderId) ?? null }))
+    .filter((job) => !status || String(job.status ?? "") === status)
+    .filter((job) => !provider || String(job.provider ?? "") === provider)
+    .filter((job) => {
       if (!query) return true;
       const haystack = [job.jobId, job.provider, job.status, job.workOrderId, job.workOrder?.title, job.workOrder?.property?.name, job.error, job.externalId].join(" ").toLowerCase();
       return haystack.includes(query);
@@ -111,40 +116,36 @@ export async function POST(request: Request) {
   if (!jobId || !["retry", "cancel"].includes(action)) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
 
   const jobs = await latestJobs(user.company_id);
-  const existing = jobs.find(job => job.jobId === jobId);
+  const existing = jobs.find((job) => job.jobId === jobId);
   if (!existing) return NextResponse.json({ error: "Exportjobbet hittades inte" }, { status: 404 });
-  const currentStatus = String(existing.status ?? "");
-  if (action === "retry" && currentStatus !== "failed") return NextResponse.json({ error: "Endast misslyckade jobb kan köras om" }, { status: 409 });
-  if (action === "cancel" && !["queued", "processing"].includes(currentStatus)) return NextResponse.json({ error: "Jobbet kan inte avbrytas i nuvarande status" }, { status: 409 });
-  const provider = String(existing.provider ?? "");
+  const modern = await getModernInvoiceExportJob(user.company_id, existing.workOrderId, jobId);
+  if (!modern) {
+    return NextResponse.json({
+      error: "Exportjobbet finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceExportJob innan det kan uppdateras.",
+    }, { status: 409 });
+  }
+  const currentStatus = String(modern.status ?? "");
+  if (action === "retry" && currentStatus !== "failed") return NextResponse.json({ error: "Endast misslyckade jobb kan återförsökas" }, { status: 409 });
+  if (action === "cancel" && !["queued", "processing"].includes(currentStatus)) return NextResponse.json({ error: "Endast köade eller pågående jobb kan avbrytas" }, { status: 409 });
+  const provider = String(modern.provider ?? "");
   if (action === "retry" && !configured(provider)) return NextResponse.json({ error: "Integrationen är inte fullständigt konfigurerad" }, { status: 400 });
 
   const now = new Date().toISOString();
-  const payload: Obj = {
-    ...existing,
+  const payload: InvoiceExportJobPayload = {
+    ...modern,
     status: action === "retry" ? "queued" : "cancelled",
-    attempt: Number(existing.attempt ?? 0) + (action === "retry" ? 1 : 0),
+    attempt: Number(modern.attempt ?? 0) + (action === "retry" ? 1 : 0),
     error: null,
     updatedAt: now,
     actedById: user.id,
-    actionSource: "operations_center",
   };
-  delete payload.workOrder;
 
-  await db.integrationEvent.create({
-    data: {
-      company_id: user.company_id,
-      type: JOB_TYPE,
-      status: String(payload.status),
-      recipient: existing.workOrderId,
-      payload: JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue,
-    },
-  });
+  const job = await upsertInvoiceExportJob(user.company_id, payload);
   await writeAuditLog(user, {
     entityType: "work_order",
-    entityId: existing.workOrderId,
+    entityId: modern.workOrderId,
     action: `work_order.invoice_integration_${action}`,
-    metadata: { jobId, provider, previousStatus: currentStatus, source: "operations_center" },
+    metadata: { jobId, provider, previousStatus: currentStatus, source: "operations_center", storage: "WorkOrderInvoiceExportJob" },
   });
-  return NextResponse.json({ job: payload }, { status: 201 });
+  return NextResponse.json({ job: { ...job, source: "table" as const } }, { status: 201 });
 }

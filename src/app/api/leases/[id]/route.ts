@@ -1,8 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { writeAuditLog } from "@/lib/audit";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
 import { isOccupyingLeaseStatus, parseLeaseInput } from "@/lib/leasing";
+
+const softDeletableLeaseStatuses = new Set(["draft", "cancelled", "ended"]);
 
 const leasableUnitTypes = ["apartment", "commercial", "storage", "garage", "parking", "other"];
 
@@ -35,7 +38,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const input = parsed.data;
 
     const existing = await db.lease.findFirst({
-      where: { id, company_id: user.company_id },
+      where: { id, company_id: user.company_id, deleted_at: null },
       include: { lease_holder: true },
     });
     if (!existing) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
@@ -45,24 +48,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const lease = await db.$transaction(async (tx) => {
       const unit = await tx.unit.findFirst({
-        where: { id: input.unitId, status: "active", property: { company_id: user.company_id! } },
+        where: { id: input.unitId, status: "active", property: { company_id: user.company_id!, deleted_at: null } },
         include: { property: { select: { id: true, name: true, address: true, city: true } } },
       });
       if (!unit || !leasableUnitTypes.includes(unit.unit_type)) throw new LeaseRequestError("Objektet hittades inte", 404);
 
       if (isOccupyingLeaseStatus(input.status)) {
         const conflict = await tx.lease.findFirst({
-          where: { id: { not: existing.id }, unit_id: unit.id, company_id: user.company_id!, status: { in: ["reserved", "active", "notice"] } },
+          where: { deleted_at: null, id: { not: existing.id }, unit_id: unit.id, company_id: user.company_id!, status: { in: ["reserved", "active", "notice"] } },
           select: { lease_number: true },
         });
         if (conflict) throw new LeaseRequestError(`Objektet har redan ett pågående avtal (${conflict.lease_number})`, 409);
       }
 
       const holderId = input.holderId || existing.lease_holder_id;
-      const holder = await tx.leaseHolder.findFirst({ where: { id: holderId, company_id: user.company_id! } });
+      const holder = await tx.leaseHolder.findFirst({ where: { deleted_at: null, id: holderId, company_id: user.company_id! } });
       if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
-      await tx.leaseHolder.update({
-        where: { id: holder.id },
+      const holderUpdate = await tx.leaseHolder.updateMany({
+        where: { deleted_at: null, id: holder.id, company_id: user.company_id! },
         data: {
           party_type: input.holderType,
           name: input.holderName,
@@ -72,9 +75,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           organization_number: input.holderOrganizationNumber,
         },
       });
+      if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
 
       const updated = await tx.lease.updateMany({
-        where: { id: existing.id, updated_at: existing.updated_at },
+        where: { id: existing.id, company_id: user.company_id!, deleted_at: null, updated_at: existing.updated_at },
         data: {
           property_id: unit.property_id,
           unit_id: unit.id,
@@ -132,6 +136,49 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (error instanceof SyntaxError) return NextResponse.json({ error: "Ogiltigt JSON-underlag" }, { status: 400 });
     console.error("Update lease error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ta bort avtal" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const { id } = await params;
+    const existing = await db.lease.findFirst({
+      where: { id, company_id: user.company_id, deleted_at: null },
+      select: { id: true, lease_number: true, status: true },
+    });
+    if (!existing) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
+
+    if (existing.status === "active") {
+      return NextResponse.json({ error: "Aktiva avtal kan inte tas bort. Avsluta eller makulera avtalet först." }, { status: 409 });
+    }
+    if (!softDeletableLeaseStatuses.has(existing.status)) {
+      return NextResponse.json({ error: "Endast utkast, avslutade eller makulerade avtal kan tas bort." }, { status: 409 });
+    }
+
+    const deleteResult = await db.lease.updateMany({
+      where: { id: existing.id, company_id: user.company_id, deleted_at: null },
+      data: { deleted_at: new Date() },
+    });
+    if (deleteResult.count === 0) {
+      return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "lease",
+      entityId: existing.id,
+      action: "lease.deleted",
+      metadata: { leaseNumber: existing.lease_number, previousStatus: existing.status, softDelete: true },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete lease error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

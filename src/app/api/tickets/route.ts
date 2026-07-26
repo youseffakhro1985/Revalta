@@ -3,6 +3,11 @@ import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-use
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
+import {
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -15,20 +20,25 @@ export async function GET(request: Request) {
     const priority = searchParams.get("priority")?.trim();
     const propertyId = searchParams.get("propertyId")?.trim();
     const assignedToId = searchParams.get("assignedToId")?.trim();
+    const ticketActive = await notDeletedFilter("Ticket");
     const where = {
+      ...ticketActive,
       ...tenantWhere(user),
       ...(status ? { status } : {}),
       ...(priority ? { priority } : {}),
       ...(propertyId ? { property_id: propertyId } : {}),
       ...(assignedToId ? { assigned_to_id: assignedToId } : {}),
-      ...(q
-        ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" as const } },
-              { description: { contains: q, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
+      AND: [
+        { OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+        ...(q
+          ? [{
+              OR: [
+                { title: { contains: q, mode: "insensitive" as const } },
+                { description: { contains: q, mode: "insensitive" as const } },
+              ],
+            }]
+          : []),
+      ],
     };
 
     const tickets = await db.ticket.findMany({
@@ -71,6 +81,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ tickets });
   } catch (error) {
     console.error("Get tickets error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -96,9 +109,11 @@ export async function POST(request: Request) {
     }
 
     if (normalizedPropertyId) {
+      const propertyActive = await notDeletedFilter("Property");
       const property = await db.property.findFirst({
         where: {
           id: normalizedPropertyId,
+          ...propertyActive,
           ...tenantWhere(user),
         },
         select: { id: true },

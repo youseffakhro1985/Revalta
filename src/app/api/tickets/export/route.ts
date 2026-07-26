@@ -16,7 +16,7 @@ export async function GET() {
     }
 
     const tickets = await db.ticket.findMany({
-      where: tenantWhere(user),
+      where: { deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       orderBy: { created_at: "desc" },
       select: {
         public_reference: true,

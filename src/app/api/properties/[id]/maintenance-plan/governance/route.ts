@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const property = await db.property.findFirst({ where: { id, ...tenantWhere(user) }, select: { id: true, name: true } });
+  const property = await db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) }, select: { id: true, name: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   const plans = await db.$queryRaw<Array<{
@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const property = await db.property.findFirst({ where: { id, ...tenantWhere(user) }, select: { id: true } });
+  const property = await db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   const body = await request.json();

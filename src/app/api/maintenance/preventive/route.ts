@@ -4,6 +4,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { runPreventiveMaintenanceEngine } from "@/lib/preventive-maintenance-engine";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,10 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
+  const [propertyGuard, workOrderGuard] = await Promise.all([
+    sqlSoftDeleteGuard(db, "Property", "p"),
+    sqlSoftDeleteGuard(db, "WorkOrder", "wo"),
+  ]);
   const rows = await db.$queryRaw<OverviewRow[]>(Prisma.sql`
     SELECT a."id", a."property_id", p."name" AS "property_name", b."name" AS "building_name",
            a."name", a."category", a."location", a."criticality", a."next_service_at",
@@ -49,10 +54,12 @@ export async function GET() {
       WHERE wo."company_id" = a."company_id"
         AND wo."technical_asset_id" = a."id"
         AND wo."source" = 'maintenance_plan'
+        ${workOrderGuard}
       ORDER BY COALESCE(wo."maintenance_cycle_advanced_at", wo."created_at") DESC
       LIMIT 1
     ) w ON TRUE
     WHERE a."company_id" = ${user.company_id}
+      ${propertyGuard}
       AND COALESCE(a."status", 'active') IN ('active', 'planned')
     ORDER BY a."next_service_at" ASC NULLS LAST, a."criticality" DESC, a."name" ASC
     LIMIT 1000

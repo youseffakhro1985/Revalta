@@ -34,7 +34,7 @@ function nullableNumber(value: unknown) {
 
 async function resolveProperty(id: string, user: Awaited<ReturnType<typeof getCurrentUser>>) {
   if (!user) return null;
-  return db.property.findFirst({ where: { id, ...tenantWhere(user) }, select: { id: true } });
+  return db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
 }
 
 async function validateBuilding(buildingId: string | null, propertyId: string) {
@@ -60,19 +60,29 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const property = await db.property.findFirst({
-    where: { id, ...tenantWhere(user) },
+    where: { id, deleted_at: null, ...tenantWhere(user) },
     include: {
       buildings: { orderBy: { name: "asc" }, include: { _count: { select: { units: true } } } },
       units: { orderBy: [{ unit_type: "asc" }, { designation: "asc" }], include: { building: { select: { id: true, name: true } } } },
       work_orders: {
+        where: { deleted_at: null },
         orderBy: { updated_at: "desc" }, take: 12,
         select: { id: true, title: true, status: true, priority: true, scheduled_end: true, actual_cost: true, updated_at: true },
       },
       projects: {
+        where: { deleted_at: null },
         orderBy: { updated_at: "desc" }, take: 12,
         select: { id: true, name: true, status: true, risk: true, budget: true, forecast: true, actual: true, end_date: true, updated_at: true },
       },
-      _count: { select: { tickets: true, buildings: true, units: true, work_orders: true, projects: true } },
+      _count: {
+        select: {
+          tickets: { where: { deleted_at: null } },
+          buildings: true,
+          units: true,
+          work_orders: { where: { deleted_at: null } },
+          projects: { where: { deleted_at: null } },
+        },
+      },
     },
   });
 

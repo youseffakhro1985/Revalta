@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
@@ -7,7 +8,7 @@ const EVENT_TYPE = "lease_inspection_items";
 
 async function getLease(id: string, companyId: string) {
   return db.lease.findFirst({
-    where: { id, company_id: companyId },
+    where: { id, company_id: companyId, deleted_at: null, property: { deleted_at: null } },
     select: {
       id: true,
       lease_number: true,
@@ -17,6 +18,49 @@ async function getLease(id: string, companyId: string) {
       lease_holder: { select: { id: true, name: true } },
     },
   });
+}
+
+async function loadRecordForRead(companyId: string, leaseId: string, actor: { id: string; name: string | null; email: string }) {
+  const modern = await db.leaseInspectionRecord.findUnique({
+    where: { company_id_lease_id: { company_id: companyId, lease_id: leaseId } },
+    select: { payload: true },
+  });
+  if (modern?.payload && typeof modern.payload === "object") {
+    return { record: modern.payload as unknown as LeaseInspectionRecord, source: "table" as const };
+  }
+
+  const event = await db.integrationEvent.findFirst({
+    where: { company_id: companyId, type: EVENT_TYPE, recipient: leaseId },
+    orderBy: { created_at: "desc" },
+  });
+  if (event?.payload && typeof event.payload === "object") {
+    return { record: event.payload as unknown as LeaseInspectionRecord, source: "legacy" as const };
+  }
+  return { record: emptyInspectionRecord(actor), source: "table" as const };
+}
+
+/** Mutation path: modern first; IE-only → 409 (no rematerialize); neither → empty for first create. */
+async function loadRecordForMutation(companyId: string, leaseId: string, actor: { id: string; name: string | null; email: string }) {
+  const modern = await db.leaseInspectionRecord.findUnique({
+    where: { company_id_lease_id: { company_id: companyId, lease_id: leaseId } },
+    select: { payload: true },
+  });
+  if (modern?.payload && typeof modern.payload === "object") {
+    return { record: modern.payload as unknown as LeaseInspectionRecord } as const;
+  }
+
+  const legacy = await db.integrationEvent.findFirst({
+    where: { company_id: companyId, type: EVENT_TYPE, recipient: leaseId },
+    orderBy: { created_at: "desc" },
+    select: { id: true },
+  });
+  if (legacy) {
+    return {
+      error: "Besiktningen finns kvar i äldre lagring. Kör backfill till LeaseInspectionRecord innan den kan uppdateras.",
+      status: 409 as const,
+    };
+  }
+  return { record: emptyInspectionRecord(actor) } as const;
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -29,15 +73,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const lease = await getLease(id, user.company_id);
     if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
 
-    const event = await db.integrationEvent.findFirst({
-      where: { company_id: user.company_id, type: EVENT_TYPE, recipient: id },
-      orderBy: { created_at: "desc" },
-    });
-    const record = event?.payload && typeof event.payload === "object"
-      ? event.payload as unknown as LeaseInspectionRecord
-      : emptyInspectionRecord({ id: user.id, name: user.name, email: user.email });
-
-    return NextResponse.json({ lease, record, permissions: { canManage: canManageLeases(user.role) } });
+    const { record, source } = await loadRecordForRead(user.company_id, id, { id: user.id, name: user.name, email: user.email });
+    return NextResponse.json({ lease, record, source, permissions: { canManage: canManageLeases(user.role) } });
   } catch (error) {
     console.error("Get lease inspection items error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -55,29 +92,37 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const lease = await getLease(id, user.company_id);
     if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
 
-    const existing = await db.integrationEvent.findFirst({
-      where: { company_id: user.company_id, type: EVENT_TYPE, recipient: id },
-      orderBy: { created_at: "desc" },
-    });
-    const previous = existing?.payload && typeof existing.payload === "object"
-      ? existing.payload as unknown as LeaseInspectionRecord
-      : emptyInspectionRecord({ id: user.id, name: user.name, email: user.email });
+    const loaded = await loadRecordForMutation(user.company_id, id, { id: user.id, name: user.name, email: user.email });
+    if ("error" in loaded) return NextResponse.json({ error: loaded.error }, { status: loaded.status });
+
+    const previous = loaded.record;
     const parsed = parseInspectionRecord(await request.json().catch(() => null), previous, { id: user.id, name: user.name, email: user.email });
     if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
 
     const record = parsed.data;
     const actionRequired = record.items.filter((item) => item.condition === "action_required" && !item.resolved).length;
+    const status = actionRequired > 0 ? "action_required" : "recorded";
+
     await db.$transaction(async (tx) => {
-      if (existing) {
-        await tx.integrationEvent.update({
-          where: { id: existing.id },
-          data: { status: actionRequired > 0 ? "action_required" : "recorded", payload: record },
-        });
-      } else {
-        await tx.integrationEvent.create({
-          data: { company_id: user.company_id!, type: EVENT_TYPE, recipient: id, status: actionRequired > 0 ? "action_required" : "recorded", payload: record },
-        });
-      }
+      await tx.leaseInspectionRecord.upsert({
+        where: { company_id_lease_id: { company_id: user.company_id!, lease_id: id } },
+        create: {
+          company_id: user.company_id!,
+          lease_id: id,
+          status,
+          version: record.version,
+          payload: record as unknown as Prisma.InputJsonValue,
+          created_by_id: user.id,
+          updated_by_id: user.id,
+        },
+        update: {
+          status,
+          version: record.version,
+          payload: record as unknown as Prisma.InputJsonValue,
+          updated_by_id: user.id,
+        },
+      });
+
       await tx.auditLog.create({
         data: {
           company_id: user.company_id!,
@@ -91,6 +136,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             itemCount: record.items.length,
             actionRequired,
             selectedForWorkOrder: record.items.filter((item) => item.selectedForWorkOrder && !item.resolved).length,
+            storage: "LeaseInspectionRecord",
           },
         },
       });

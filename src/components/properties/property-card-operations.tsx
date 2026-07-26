@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, ClipboardCheck, FileBadge2, Gauge, ShieldCheck, Wrench } from "lucide-react";
@@ -47,7 +48,7 @@ export function PropertyCardOperations({ propertyId }: Props) {
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/card`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta fastighetskortet");
       setData(payload);
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte hämta fastighetskortet"); }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Rules = {
   enabled: boolean;
@@ -34,7 +35,7 @@ export default function EscalationRulesPage() {
     void (async () => {
       try {
         const response = await fetch("/api/settings/service-escalation-rules", { cache: "no-store" });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error || "Kunde inte hämta reglerna");
         setData(body);
         setRules(body.rules);
@@ -55,7 +56,7 @@ export default function EscalationRulesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rules),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte spara reglerna");
       setData(body); setRules(body.rules); setMessage("Eskaleringsreglerna har sparats.");
     } catch (value) {

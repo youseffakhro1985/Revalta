@@ -44,16 +44,43 @@ Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview in
 1. Öppna en pull request från en avgränsad branch.
 2. Låt CI validera Prisma-schemat och applicera samtliga migrationer mot ren PostgreSQL.
 3. Kräv grönt lint, tester, typkontroll och produktionsbuild.
-4. Verifiera Vercel Preview utan produktionsmigrationer.
+4. Verifiera Vercel Preview **build** (CI/Vercel grönt). Förvänta dig **inte** fungerande inloggning/dashboard på preview om preview delar produktionsdatabas och PR:n innehåller nya kolumner/tabeller — applikationen frågar då kolumner som inte finns ännu.
 5. Mergea pull requesten till `main`.
 6. Ta en verifierad databasbackup när releasen innehåller migrationer.
-7. Kör `Database Release` för exakt merge-commit.
+7. Kör `Database Release` för exakt merge-commit (additive soft-delete-kolumner är bakåtkompatibla med föregående app-version).
 8. Driftsätt exakt samma commit till Vercel.
 9. Kör smoke tests och rulla tillbaka applikationen vid fel.
 
-## 5. Verifiering efter driftsättning
+### Preview vs databas (vanligt inloggningsfel)
+
+Symptom: Vercel Preview är grön, `/api/auth/login` svarar `200`, men listor/dashboard kraschar eller visar schemafel efter redirect.
+
+Orsak: Preview-koden förväntar soft-delete-kolumner (`Ticket.deleted_at`, `Property.deleted_at`, `WorkOrder.deleted_at`, …) medan databasen ännu inte har fått `prisma migrate deploy`.
+
+Kompatibilitet: kritiska list-API:er och dashboard kör **utan** `deleted_at`-filter när kolumnerna saknas (amber “Kompatibilitetsläge”). Soft-delete-skrivningar kräver fortfarande Database Release. Ops: `GET /api/health` → `schema.ready` / `schema.missing`.
+
+Åtgärd för full soft-delete: följ releaseordningen (merge → backup → Database Release → deploy). Testa därefter `BASE_URL=https://www.revalta.se node scripts/smoke-auth-dashboard.mjs`.
+
+## 5. Efter migration: backfill och cron
+
+När releasen innehåller schema cutover (moderna tabeller / soft-delete / `CronJobRun`):
+
+1. Kör `node scripts/backfill-auditlog-modules.mjs` mot produktionsdatabasen (idempotent).
+2. Verifiera att kritiska moduler inte längre returnerar `409` för backfill på vanliga arbetsflöden.
+3. Smoke-testa cron med `CRON_SECRET`:
+   - `/api/cron/preventive-maintenance` → journal i `CronJobRun`
+   - `/api/cron/recurring-incident-escalations` → journal i `CronJobRun`
+   - `/api/cron/invoice-export-jobs` → jobb i `WorkOrderInvoiceExportJob`
+4. Kontrollera att soft-deletade tickets/fastigheter/avtal och makulerade IMD-avläsningar inte syns i listor.
+5. När backfill och smoke är godkända: sätt `REVALTA_MODERN_STORAGE_ONLY=1` i Vercel Production för att stänga dual-read-listor (migreringssteg 6). Verifiera att kritiska listor fortfarande visar förväntade antal innan flaggan lämnas på.
+
+## 6. Verifiering efter driftsättning
 
 - `GET /api/health` svarar utan serverfel.
+- Inloggad ops: `GET /api/health` visar `schema.ready: true` (annars saknas soft-delete-migrationer).
+- Snabb rök: `BASE_URL=https://www.revalta.se node scripts/smoke-auth-dashboard.mjs`
+- Cron-rök: `BASE_URL=https://www.revalta.se CRON_SECRET=... node scripts/smoke-cron.mjs`
+- Schema-only: `DATABASE_URL=... DIRECT_URL=... node scripts/check-schema-readiness.mjs`
 - Registrering, inloggning, utloggning och lösenordsåterställning fungerar.
 - En användare kan endast se den egna organisationens fastigheter och ärenden.
 - Boendeportalen visar endast fastigheter för `PUBLIC_PORTAL_COMPANY_ID`.
@@ -61,6 +88,6 @@ Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview in
 - Kontrollera att `/dashboard` och `/api/*` skickar `Cache-Control: private, no-store`.
 - Kontrollera CSP, HSTS och övriga säkerhetsheaders på `https://www.revalta.se`.
 
-## 6. Återställning
+## 7. Återställning
 
 Vid applikationsfel: rulla tillbaka till föregående verifierad Vercel-deployment. Vid datafel: stoppa skrivtrafik, dokumentera tidpunkten och återställ från den verifierade backupen. Ändra aldrig en redan applicerad migration; skapa en ny korrigerande migration.

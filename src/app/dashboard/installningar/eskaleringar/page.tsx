@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertOctagon, CheckCircle2, Clock3, MailWarning, RefreshCw, ShieldCheck, SlidersHorizontal, Users } from "lucide-react";
 import { EscalationAdminActions } from "@/components/dashboard/escalation-admin-actions";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Assignment = {
   notificationKey: string;
@@ -94,7 +95,7 @@ export default function EscalationAdminPage() {
     setError("");
     try {
       const response = await fetch("/api/settings/service-escalations", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta eskaleringsstatus");
       setData(body);
     } catch (value) {

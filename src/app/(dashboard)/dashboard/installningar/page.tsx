@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Profile = {
   id: string;
@@ -39,8 +40,8 @@ export default function SettingsPage() {
         fetch("/api/settings/profile", { cache: "no-store" }),
         fetch("/api/settings/company", { cache: "no-store" }),
       ]);
-      const profileData = await profileResponse.json();
-      const companyData = await companyResponse.json();
+      const profileData = await readResponseJson(profileResponse);
+      const companyData = await readResponseJson(companyResponse);
 
       if (profileResponse.ok) {
         setProfile(profileData.user);
@@ -68,7 +69,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) return setError(data.error || "Kunde inte spara profilen");
       setProfile(data.user);
       setSuccess("Profilen är sparad.");
@@ -90,7 +91,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: companyName, orgNumber }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) return setError(data.error || "Kunde inte spara organisationen");
       setCompany(data.company);
       setSuccess("Organisationen är sparad.");
@@ -116,7 +117,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) return setError(data.error || "Kunde inte byta lösenord");
       setCurrentPassword("");
       setNewPassword("");

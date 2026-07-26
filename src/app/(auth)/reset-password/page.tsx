@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -19,7 +20,7 @@ function ResetPasswordForm() {
     setLoading(true);
     try {
       const response = await fetch("/api/auth/password-reset/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, password, confirmPassword }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) setError(data.error || "Kunde inte återställa lösenordet");
       else { setMessage(data.message || "Lösenordet är återställt."); setPassword(""); setConfirmPassword(""); }
     } catch { setError("Kunde inte kontakta servern"); }

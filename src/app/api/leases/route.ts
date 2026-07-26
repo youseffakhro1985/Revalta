@@ -29,7 +29,7 @@ export async function GET() {
 
     const [leases, properties, holders] = await Promise.all([
       db.lease.findMany({
-        where: { company_id: user.company_id },
+        where: { company_id: user.company_id, deleted_at: null },
         orderBy: [{ status: "asc" }, { updated_at: "desc" }],
         take: 1_000,
         include: {
@@ -40,7 +40,7 @@ export async function GET() {
         },
       }),
       db.property.findMany({
-        where: { company_id: user.company_id, status: { not: "sold" } },
+        where: { company_id: user.company_id, status: { not: "sold" }, deleted_at: null },
         orderBy: { name: "asc" },
         select: {
           id: true,
@@ -55,7 +55,7 @@ export async function GET() {
         },
       }),
       db.leaseHolder.findMany({
-        where: { company_id: user.company_id, status: "active" },
+        where: { deleted_at: null, company_id: user.company_id, status: "active" },
         orderBy: { name: "asc" },
         take: 1_000,
       }),
@@ -87,14 +87,14 @@ export async function POST(request: Request) {
 
     const lease = await db.$transaction(async (tx) => {
       const unit = await tx.unit.findFirst({
-        where: { id: input.unitId, status: "active", property: { company_id: user.company_id! } },
+        where: { id: input.unitId, status: "active", property: { company_id: user.company_id!, deleted_at: null } },
         include: { property: { select: { id: true, name: true, address: true, city: true } } },
       });
       if (!unit || !leasableUnitTypes.includes(unit.unit_type)) throw new LeaseRequestError("Objektet hittades inte", 404);
 
       if (isOccupyingLeaseStatus(input.status)) {
         const conflict = await tx.lease.findFirst({
-          where: { unit_id: unit.id, company_id: user.company_id!, status: { in: ["reserved", "active", "notice"] } },
+          where: { deleted_at: null, unit_id: unit.id, company_id: user.company_id!, status: { in: ["reserved", "active", "notice"] } },
           select: { lease_number: true },
         });
         if (conflict) throw new LeaseRequestError(`Objektet har redan ett pågående avtal (${conflict.lease_number})`, 409);
@@ -102,10 +102,10 @@ export async function POST(request: Request) {
 
       let holder;
       if (input.holderId) {
-        const existingHolder = await tx.leaseHolder.findFirst({ where: { id: input.holderId, company_id: user.company_id! } });
+        const existingHolder = await tx.leaseHolder.findFirst({ where: { deleted_at: null, id: input.holderId, company_id: user.company_id! } });
         if (!existingHolder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
-        holder = await tx.leaseHolder.update({
-          where: { id: existingHolder.id },
+        const holderUpdate = await tx.leaseHolder.updateMany({
+          where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
           data: {
             party_type: input.holderType,
             name: input.holderName,
@@ -115,6 +115,11 @@ export async function POST(request: Request) {
             organization_number: input.holderOrganizationNumber,
           },
         });
+        if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        holder = await tx.leaseHolder.findFirst({
+          where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
+        });
+        if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
       } else {
         holder = await tx.leaseHolder.create({
           data: {

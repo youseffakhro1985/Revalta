@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Check, Pencil, Save, X } from "lucide-react";
 import { EmptyState, InlineAlert, Panel } from "@/components/dashboard/premium-ui";
@@ -29,10 +30,10 @@ export function ComponentEntryCorrections({ propertyId, componentId }: { propert
     try {
       const [detailResponse, optionsResponse] = await Promise.all([
         fetch(`/api/properties/${propertyId}/components/${componentId}`, { cache: "no-store" }),
-        fetch(`/api/properties/${propertyId}/components/${componentId}/options`, { cache: "no-store" }),
+        fetch(`/api/properties/${propertyId}/components/${componentId}/link-options`, { cache: "no-store" }),
       ]);
-      const detail = await detailResponse.json();
-      const options = await optionsResponse.json();
+      const detail = await readResponseJson(detailResponse);
+      const options = await readResponseJson(optionsResponse);
       if (!detailResponse.ok) throw new Error(detail.error || "Kunde inte hämta historiken");
       if (!optionsResponse.ok) throw new Error(options.error || "Kunde inte hämta kopplingsalternativ");
       setEvents(detail.events || []); setCosts(detail.costs || []);
@@ -52,7 +53,7 @@ export function ComponentEntryCorrections({ propertyId, componentId }: { propert
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}/entries/${editing.kind}/${text(editing.row, "id")}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte spara korrigeringen");
       setEditing(null); setSaved("Korrigeringen har sparats och registrerats i revisionsloggen.");
       await load(); window.setTimeout(() => setSaved(""), 5000);

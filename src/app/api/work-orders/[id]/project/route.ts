@@ -25,10 +25,10 @@ export async function POST(
 
   const { id } = await params;
   const workOrder = await db.workOrder.findFirst({
-    where: { id, company_id: user.company_id },
+    where: { deleted_at: null, id, company_id: user.company_id },
     include: {
       property: { select: { id: true, name: true } },
-      projects: { select: { id: true, name: true, status: true } },
+      projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
     },
   });
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });

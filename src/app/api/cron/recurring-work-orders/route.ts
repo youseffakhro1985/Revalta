@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
-import { runRecurringWorkOrderEngine } from "@/lib/recurring-work-order-engine";
+import {
+  createRecurringRun,
+  runRecurringWorkOrderEngine,
+  updateRecurringRun,
+} from "@/lib/recurring-work-order-engine";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,31 +16,25 @@ function cronAuthorized(request: Request) {
 }
 
 async function execute(companyId?: string) {
-  const event = await db.integrationEvent.create({
-    data: {
-      company_id: companyId ?? null,
-      type: "recurring_work_orders_run",
-      status: "processing",
-      recipient: companyId ? `company:${companyId}` : "all-companies",
-      payload: { companyId: companyId ?? null, startedAt: new Date().toISOString() },
-    },
+  const run = await createRecurringRun({
+    companyId: companyId ?? null,
+    status: "processing",
+    recipient: companyId ? `company:${companyId}` : "all-companies",
+    payload: { companyId: companyId ?? null, startedAt: new Date().toISOString() },
   });
 
   try {
     const result = await runRecurringWorkOrderEngine({ companyId });
-    await db.integrationEvent.update({
-      where: { id: event.id },
-      data: {
-        status: result.failed > 0 ? "partial" : "sent",
-        payload: { ...result, companyId: companyId ?? null, completedAt: new Date().toISOString() },
-      },
+    await updateRecurringRun(run.id, {
+      status: result.failed > 0 ? "partial" : "sent",
+      payload: { ...result, companyId: companyId ?? null, completedAt: new Date().toISOString() },
     });
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Okänt fel";
-    await db.integrationEvent.update({
-      where: { id: event.id },
-      data: { status: "failed", payload: { companyId: companyId ?? null, error: message, completedAt: new Date().toISOString() } },
+    await updateRecurringRun(run.id, {
+      status: "failed",
+      payload: { companyId: companyId ?? null, error: message, completedAt: new Date().toISOString() },
     });
     throw error;
   }

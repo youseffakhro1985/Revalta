@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Building2, CircleDollarSign, DoorOpen, FileSignature, Pencil, Plus, Search, UsersRound, X } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Unit = { id: string; designation: string; unit_type: string; floor?: string | null; area?: number | null; rooms?: number | null; status: string };
 type Property = { id: string; name: string; address: string; city: string; units: Unit[] };
@@ -62,6 +63,7 @@ const statusLabels: Record<string, string> = { draft: "Utkast", reserved: "Reser
 const typeLabels: Record<string, string> = { apartment: "Lägenhet", commercial: "Lokal", parking: "Parkering", garage: "Garage", storage: "Förråd", other: "Övrigt" };
 const holderTypeLabels: Record<string, string> = { individual: "Privatperson", company: "Företag", association: "Förening" };
 const occupyingStatuses = new Set(["reserved", "active", "notice"]);
+const softDeletableLeaseStatuses = new Set(["draft", "cancelled", "ended"]);
 
 function dateValue(value?: string | null) {
   return value ? value.slice(0, 10) : "";
@@ -78,6 +80,8 @@ export default function LeasingPage() {
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingLease, setDeletingLease] = useState(false);
+  const [deletingHolder, setDeletingHolder] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [query, setQuery] = useState("");
@@ -89,7 +93,7 @@ export default function LeasingPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/leases", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta uthyrningen");
       setLeases(data.leases || []);
       setProperties(data.properties || []);
@@ -197,7 +201,7 @@ export default function LeasingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara avtalet");
       const wasEditing = Boolean(form.id);
       setForm(emptyForm);
@@ -207,6 +211,58 @@ export default function LeasingPage() {
       setError(saveError instanceof Error ? saveError.message : "Kunde inte spara avtalet");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function softDeleteLease(lease: Pick<Lease, "id" | "lease_number" | "status">) {
+    if (!canManage) return;
+    if (lease.status === "active") {
+      setError("Aktiva avtal kan inte tas bort. Avsluta eller makulera avtalet först.");
+      return;
+    }
+    if (!softDeletableLeaseStatuses.has(lease.status)) {
+      setError("Endast utkast, avslutade eller makulerade avtal kan tas bort.");
+      return;
+    }
+    if (!window.confirm(`Ta bort avtalet ${lease.lease_number}? Det döljs från listor men behålls i historiken.`)) return;
+    setDeletingLease(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/leases/${lease.id}`, { method: "DELETE" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort avtalet");
+      if (form.id === lease.id) setForm(emptyForm);
+      setSuccess("Avtalet har tagits bort.");
+      await load();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Kunde inte ta bort avtalet");
+    } finally {
+      setDeletingLease(false);
+    }
+  }
+
+  async function softDeleteHolder(holderId: string, holderName: string) {
+    if (!canManage || !holderId) return;
+    if (!window.confirm(`Ta bort hyresparten ${holderName}? Den döljs från registret men behålls i historiken.`)) return;
+    setDeletingHolder(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/lease-holders/${holderId}`, { method: "DELETE" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort hyresparten");
+      setForm((current) => (
+        current.holderId === holderId
+          ? { ...current, holderId: "", holderName: "", holderContactName: "", holderEmail: "", holderPhone: "", holderOrganizationNumber: "", holderType: "individual" }
+          : current
+      ));
+      setSuccess("Hyresparten har tagits bort.");
+      await load();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Kunde inte ta bort hyresparten");
+    } finally {
+      setDeletingHolder(false);
     }
   }
 
@@ -248,6 +304,18 @@ export default function LeasingPage() {
           <div className="border-t border-sand-200 pt-5">
             <h3 className="text-sm font-semibold text-ink-900">Hyrespart</h3>
             <label className="mt-3 block"><FieldLabel>Befintlig hyrespart</FieldLabel><select className={premiumFieldClass} value={form.holderId} onChange={(event) => selectHolder(event.target.value)}><option value="">Skapa ny hyrespart</option>{holders.map((holder) => <option key={holder.id} value={holder.id}>{holder.name}{holder.organization_number ? ` · ${holder.organization_number}` : ""}</option>)}</select></label>
+            {form.holderId ? (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  disabled={deletingHolder}
+                  onClick={() => void softDeleteHolder(form.holderId, form.holderName || "hyresparten")}
+                  className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+                >
+                  {deletingHolder ? "Tar bort…" : "Ta bort hyrespart"}
+                </button>
+              </div>
+            ) : null}
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label><FieldLabel>Typ</FieldLabel><select className={premiumFieldClass} value={form.holderType} onChange={(event) => setForm({ ...form, holderType: event.target.value })}>{Object.entries(holderTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label><FieldLabel>Namn / firma</FieldLabel><input required className={premiumFieldClass} value={form.holderName} onChange={(event) => setForm({ ...form, holderName: event.target.value })} /></label>
@@ -275,6 +343,18 @@ export default function LeasingPage() {
           </div>
 
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : form.id ? "Spara ändringar" : "Skapa avtal"}</button>
+          {form.id && softDeletableLeaseStatuses.has(form.status) ? (
+            <div className="border-t border-sand-100 pt-4">
+              <button
+                type="button"
+                disabled={deletingLease}
+                onClick={() => void softDeleteLease({ id: form.id, lease_number: form.leaseNumber || form.id, status: form.status })}
+                className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+              >
+                {deletingLease ? "Tar bort…" : "Ta bort avtal"}
+              </button>
+            </div>
+          ) : null}
         </form>
       </Panel> : null}
 
@@ -307,7 +387,7 @@ export default function LeasingPage() {
     </section>
 
     <Panel title="Avtalshistorik" description="Alla utkast, pågående, avslutade och makulerade avtal i organisationen." bodyClassName="p-0">
-      {loading ? <p className="p-6 text-sm text-ink-500">Hämtar avtal…</p> : leases.length === 0 ? <EmptyState title="Inga avtal registrerade" description="Skapa det första avtalet från formuläret ovan." /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="border-b border-sand-200 bg-sand-50/70 text-[11px] uppercase tracking-[0.08em] text-ink-500"><tr><th className="px-5 py-3 font-semibold">Avtal</th><th className="px-5 py-3 font-semibold">Hyrespart</th><th className="px-5 py-3 font-semibold">Objekt</th><th className="px-5 py-3 font-semibold">Period</th><th className="px-5 py-3 font-semibold">Hyra</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"><span className="sr-only">Åtgärd</span></th></tr></thead><tbody className="divide-y divide-sand-100">{leases.map((lease) => <tr key={lease.id} className="hover:bg-sand-50/60"><td className="whitespace-nowrap px-5 py-4 font-semibold text-ink-900">{lease.lease_number}</td><td className="px-5 py-4 text-ink-700">{lease.lease_holder.name}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{lease.property.name} · {lease.unit.designation}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{dateValue(lease.start_date) || "–"} – {dateValue(lease.end_date) || "Löpande"}</td><td className="whitespace-nowrap px-5 py-4 text-ink-700">{money.format(lease.monthly_rent)}</td><td className="px-5 py-4"><span className="rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-700">{statusLabels[lease.status] || lease.status}</span></td><td className="px-5 py-4 text-right">{canManage ? <button type="button" onClick={() => editLease(lease)} className="font-semibold text-petroleum-700 hover:text-petroleum-900">Redigera</button> : null}</td></tr>)}</tbody></table></div>}
+      {loading ? <p className="p-6 text-sm text-ink-500">Hämtar avtal…</p> : leases.length === 0 ? <EmptyState title="Inga avtal registrerade" description="Skapa det första avtalet från formuläret ovan." /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="border-b border-sand-200 bg-sand-50/70 text-[11px] uppercase tracking-[0.08em] text-ink-500"><tr><th className="px-5 py-3 font-semibold">Avtal</th><th className="px-5 py-3 font-semibold">Hyrespart</th><th className="px-5 py-3 font-semibold">Objekt</th><th className="px-5 py-3 font-semibold">Period</th><th className="px-5 py-3 font-semibold">Hyra</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"><span className="sr-only">Åtgärd</span></th></tr></thead><tbody className="divide-y divide-sand-100">{leases.map((lease) => <tr key={lease.id} className="hover:bg-sand-50/60"><td className="whitespace-nowrap px-5 py-4 font-semibold text-ink-900">{lease.lease_number}</td><td className="px-5 py-4 text-ink-700">{lease.lease_holder.name}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{lease.property.name} · {lease.unit.designation}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{dateValue(lease.start_date) || "–"} – {dateValue(lease.end_date) || "Löpande"}</td><td className="whitespace-nowrap px-5 py-4 text-ink-700">{money.format(lease.monthly_rent)}</td><td className="px-5 py-4"><span className="rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-700">{statusLabels[lease.status] || lease.status}</span></td><td className="px-5 py-4 text-right">{canManage ? <div className="flex items-center justify-end gap-3"><button type="button" onClick={() => editLease(lease)} className="font-semibold text-petroleum-700 hover:text-petroleum-900">Redigera</button>{softDeletableLeaseStatuses.has(lease.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease(lease)} className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort"}</button> : null}</div> : null}</td></tr>)}</tbody></table></div>}
     </Panel>
   </div>;
 }

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Building2, ClipboardList, DoorOpen, MapPin, Ruler, UserRound } from "lucide-react";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { notDeletedFilter } from "@/lib/schema-readiness";
 import { PropertyRegistryManager } from "@/components/properties/property-registry-manager";
 import { PropertyComponentOverview } from "@/components/properties/property-component-overview";
 import { PropertyResidentRegister } from "@/components/properties/property-resident-register";
@@ -26,22 +27,29 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   if (!user) redirect("/login");
 
   const { id } = await params;
+  const [propertyActive, ticketActive] = await Promise.all([
+    notDeletedFilter("Property"),
+    notDeletedFilter("Ticket"),
+  ]);
   const property = await db.property.findFirst({
-    where: { id, ...tenantWhere(user) },
+    where: { id, ...propertyActive, ...tenantWhere(user) },
     include: {
       buildings: { orderBy: { name: "asc" }, include: { _count: { select: { units: true } } } },
       units: { orderBy: [{ unit_type: "asc" }, { designation: "asc" }], include: { building: { select: { name: true } } } },
       tickets: {
+        where: ticketActive,
         orderBy: { created_at: "desc" }, take: 8,
         select: { id: true, title: true, status: true, priority: true, created_at: true, assigned_to: { select: { name: true, email: true } } },
       },
-      _count: { select: { tickets: true, buildings: true, units: true } },
+      _count: { select: { tickets: { where: ticketActive }, buildings: true, units: true } },
     },
   });
 
   if (!property) notFound();
 
-  const openTickets = await db.ticket.count({ where: { property_id: property.id, status: { not: "closed" } } });
+  const openTickets = await db.ticket.count({
+    where: { property_id: property.id, ...ticketActive, status: { not: "closed" } },
+  });
   const apartmentCount = property.units.filter((unit) => unit.unit_type === "apartment").length;
   const commercialCount = property.units.filter((unit) => unit.unit_type === "commercial").length;
   const totalRegisteredArea = property.units.reduce((sum, unit) => sum + (unit.area || 0), 0);
@@ -110,7 +118,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
       <PropertyResidentRegister propertyId={property.id} />
 
-      <PropertyRegistryManager propertyId={property.id} buildings={property.buildings.map(({ id, name }) => ({ id, name }))} initialValues={{ name: property.name, address: property.address, postalCode: property.postal_code || "", city: property.city, propertyIdentifier: property.property_identifier || "", propertyType: property.property_type, status: property.status, constructionYear: property.construction_year?.toString() || "", totalArea: property.total_area?.toString() || "", boa: property.boa?.toString() || "", loa: property.loa?.toString() || "", managerName: property.manager_name || "", contactName: property.contact_name || "", contactEmail: property.contact_email || "", contactPhone: property.contact_phone || "" }} />
+      <PropertyRegistryManager canManage={canCreateProperties(user.role)} propertyId={property.id} buildings={property.buildings.map(({ id, name }) => ({ id, name }))} initialValues={{ name: property.name, address: property.address, postalCode: property.postal_code || "", city: property.city, propertyIdentifier: property.property_identifier || "", propertyType: property.property_type, status: property.status, constructionYear: property.construction_year?.toString() || "", totalArea: property.total_area?.toString() || "", boa: property.boa?.toString() || "", loa: property.loa?.toString() || "", managerName: property.manager_name || "", contactName: property.contact_name || "", contactEmail: property.contact_email || "", contactPhone: property.contact_phone || "" }} />
     </div>
   );
 }

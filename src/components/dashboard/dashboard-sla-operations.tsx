@@ -3,6 +3,11 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, Clock3, ShieldCheck, UserRoundX } from "lucide-react";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import {
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+} from "@/lib/schema-readiness";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 
@@ -41,30 +46,52 @@ export async function DashboardSlaOperations() {
   const user = await getCurrentUser();
   if (!user?.company_id) return null;
 
-  const [workOrders, enterpriseRows] = await Promise.all([
-    db.workOrder.findMany({
-      where: { company_id: user.company_id },
-      take: 300,
-      orderBy: { created_at: "desc" },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        priority: true,
-        completed_at: true,
-        assigned_to_id: true,
-        assigned_to: { select: { name: true, email: true } },
-        property: { select: { name: true } },
-      },
-    }),
-    db.$queryRaw<EnterpriseRow[]>(Prisma.sql`
-      SELECT "id", "work_order_number", "sla_response_due_at", "sla_resolution_due_at",
-             "responded_at", "paused_at", "pause_reason", "closed_at"
-      FROM "WorkOrder"
-      WHERE "company_id" = ${user.company_id}
-      LIMIT 300
-    `),
-  ]);
+  let workOrders: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    completed_at: Date | null;
+    assigned_to_id: string | null;
+    assigned_to: { name: string | null; email: string } | null;
+    property: { name: string } | null;
+  }> = [];
+  let enterpriseRows: EnterpriseRow[] = [];
+
+  try {
+    const [workOrderActive, workOrderGuard] = await Promise.all([
+      notDeletedFilter("WorkOrder"),
+      sqlSoftDeleteGuard(db, "WorkOrder", "w"),
+    ]);
+    [workOrders, enterpriseRows] = await Promise.all([
+      db.workOrder.findMany({
+        where: { company_id: user.company_id, ...workOrderActive },
+        take: 300,
+        orderBy: { created_at: "desc" },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          completed_at: true,
+          assigned_to_id: true,
+          assigned_to: { select: { name: true, email: true } },
+          property: { select: { name: true } },
+        },
+      }),
+      db.$queryRaw<EnterpriseRow[]>(Prisma.sql`
+        SELECT w."id", w."work_order_number", w."sla_response_due_at", w."sla_resolution_due_at",
+               w."responded_at", w."paused_at", w."pause_reason", w."closed_at"
+        FROM "WorkOrder" w
+        WHERE w."company_id" = ${user.company_id}
+          ${workOrderGuard}
+        LIMIT 300
+      `),
+    ]);
+  } catch (error) {
+    if (isMissingSchemaColumnError(error)) return null;
+    throw error;
+  }
 
   const now = new Date();
   const enterpriseById = new Map(enterpriseRows.map((row) => [row.id, row]));
@@ -138,7 +165,7 @@ export async function DashboardSlaOperations() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-petroleum-700">{item.workOrderNumber || `AO-${item.id.slice(0, 8)}`}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${riskStyle(item.sla.risk)}`}>{item.sla.label}</span>{!item.assigned_to_id ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">Ej tilldelad</span> : null}</div>
                   <p className="mt-1 truncate font-semibold text-ink-900">{item.title}</p>
-                  <p className="mt-1 text-xs text-ink-500">{item.property.name} · {item.assigned_to?.name || item.assigned_to?.email || "Saknar ansvarig"}</p>
+                  <p className="mt-1 text-xs text-ink-500">{item.property?.name || "Ingen fastighet"} · {item.assigned_to?.name || item.assigned_to?.email || "Saknar ansvarig"}</p>
                 </div>
                 <div className="sm:text-right"><p className={`text-sm font-semibold ${item.sla.risk === "overdue" ? "text-red-700" : item.sla.risk === "critical" ? "text-orange-700" : "text-amber-700"}`}>{timeText}</p>{item.sla.dueAt ? <p className="mt-1 text-[11px] text-ink-400">{dateTime.format(new Date(item.sla.dueAt))}</p> : null}</div>
               </Link>

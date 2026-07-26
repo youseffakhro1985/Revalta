@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckCircle2, ExternalLink, RefreshCw } from "lucide-react";
@@ -44,7 +45,7 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}/maintenance-settings`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta underhållsinställningar");
       const value = payload.settings as Settings;
       setSettings(value);
@@ -60,7 +61,7 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
     event.preventDefault(); setSaving(true); setError(""); setSaved(false);
     try {
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}/maintenance-settings`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte spara underhållsinställningar");
       await load();
       setSaved(true); window.setTimeout(() => setSaved(false), 4000);

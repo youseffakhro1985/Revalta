@@ -3,9 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CircleDollarSign, TrendingUp } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string };
-type Entry = { id: string; property_name?: string; year?: number; category?: string; account?: string; budget?: number; forecast?: number; actual?: number; variance_budget?: number; created_at: string };
+type Entry = {
+  id: string;
+  property_name?: string;
+  year?: number;
+  category?: string;
+  account?: string;
+  budget?: number;
+  forecast?: number;
+  actual?: number;
+  variance_budget?: number;
+  note?: string;
+  created_at: string;
+  source?: "table" | "legacy";
+};
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 const categories: Record<string, string> = { income: "Intäkter", operations: "Drift", maintenance: "Underhåll", energy: "Energi", administration: "Administration", finance: "Finans", investment: "Investering", other: "Övrigt" };
@@ -15,6 +29,10 @@ export default function BudgetPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [removingId, setRemovingId] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [editForm, setEditForm] = useState({ year: "", category: "operations", account: "", budget: "", forecast: "", actual: "", note: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({ propertyId: "", year: String(new Date().getFullYear()), category: "operations", account: "", budget: "", forecast: "", actual: "", note: "" });
@@ -22,7 +40,7 @@ export default function BudgetPage() {
   async function load() {
     setLoading(true);
     const response = await fetch("/api/budget", { cache: "no-store" });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (response.ok) { setEntries(data.entries || []); setProperties(data.properties || []); }
     else setError(data.error || "Kunde inte hämta budget");
     setLoading(false);
@@ -37,13 +55,78 @@ export default function BudgetPage() {
   }), [entries]);
   const variance = totals.actual - totals.budget;
 
+  function startEdit(item: Entry) {
+    setEditingId(item.id);
+    setEditForm({
+      year: String(item.year || new Date().getFullYear()),
+      category: item.category || "other",
+      account: item.account || "",
+      budget: String(item.budget ?? ""),
+      forecast: String(item.forecast ?? ""),
+      actual: String(item.actual ?? ""),
+      note: item.note || "",
+    });
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(""); setSuccess("");
     const response = await fetch("/api/budget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte spara budgetraden");
     else { setForm({ propertyId: "", year: String(new Date().getFullYear()), category: "operations", account: "", budget: "", forecast: "", actual: "", note: "" }); setSuccess("Budgetraden har sparats."); await load(); }
     setSaving(false);
+  }
+
+  async function saveEdit(item: Entry) {
+    if (item.source === "legacy") {
+      setError("Budgetraden finns i äldre lagring. Kör backfill till BudgetEntry innan den kan uppdateras.");
+      return;
+    }
+    setUpdatingId(item.id);
+    setError("");
+    setSuccess("");
+    const response = await fetch("/api/budget", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        entryId: item.id,
+        year: editForm.year,
+        category: editForm.category,
+        account: editForm.account,
+        budget: editForm.budget,
+        forecast: editForm.forecast,
+        actual: editForm.actual,
+        note: editForm.note,
+      }),
+    });
+    const data = await readResponseJson(response);
+    if (!response.ok) setError(data.error || "Kunde inte uppdatera budgetraden");
+    else {
+      setSuccess("Budgetraden har uppdaterats.");
+      setEditingId("");
+      await load();
+    }
+    setUpdatingId("");
+  }
+
+  async function removeEntry(entry: Entry) {
+    if (entry.source === "legacy") {
+      setError("Budgetraden finns i äldre lagring. Kör backfill till BudgetEntry innan den kan tas bort.");
+      return;
+    }
+    if (!window.confirm("Ta bort den här budgetraden?")) return;
+    setRemovingId(entry.id);
+    setError("");
+    setSuccess("");
+    const response = await fetch("/api/budget", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId: entry.id }),
+    });
+    const data = await readResponseJson(response);
+    if (!response.ok) setError(data.error || "Kunde inte ta bort budgetraden");
+    else { setSuccess("Budgetraden har tagits bort."); await load(); }
+    setRemovingId("");
   }
 
   return <div className="space-y-8">
@@ -73,7 +156,54 @@ export default function BudgetPage() {
       <Panel title="Ekonomiskt utfall" description="Budget, prognos och utfall per fastighet och kostnadsslag." bodyClassName="p-0">
         {loading ? <p className="p-6 text-sm text-ink-500">Hämtar ekonomi…</p> : entries.length === 0 ? <EmptyState title="Inga budgetrader registrerade" description="Lägg till den första budgetraden för att börja följa ekonomiskt utfall." /> : <div className="divide-y divide-sand-100">{entries.map((item) => {
           const itemVariance = Number(item.variance_budget || 0);
-          return <article key={item.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><h3 className="font-semibold text-ink-900">{item.account}</h3><p className="mt-1 text-sm text-ink-500">{item.property_name} · {categories[item.category || "other"]} · {item.year}</p><div className="mt-4 grid grid-cols-3 gap-4 text-xs text-ink-500"><span>Budget<strong className="mt-1 block text-ink-800">{money.format(Number(item.budget || 0))}</strong></span><span>Prognos<strong className="mt-1 block text-ink-800">{money.format(Number(item.forecast || 0))}</strong></span><span>Utfall<strong className="mt-1 block text-ink-800">{money.format(Number(item.actual || 0))}</strong></span></div></div><div className="sm:text-right"><p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(itemVariance)}</p><p className="text-xs text-ink-400">Avvikelse mot budget</p></div></div></article>;
+          return <article key={item.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div>
+                <h3 className="font-semibold text-ink-900">{item.account}</h3>
+                <p className="mt-1 text-sm text-ink-500">{item.property_name} · {categories[item.category || "other"]} · {item.year}</p>
+                {item.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering eller borttagning.</p> : null}
+                <div className="mt-4 grid grid-cols-3 gap-4 text-xs text-ink-500">
+                  <span>Budget<strong className="mt-1 block text-ink-800">{money.format(Number(item.budget || 0))}</strong></span>
+                  <span>Prognos<strong className="mt-1 block text-ink-800">{money.format(Number(item.forecast || 0))}</strong></span>
+                  <span>Utfall<strong className="mt-1 block text-ink-800">{money.format(Number(item.actual || 0))}</strong></span>
+                </div>
+              </div>
+              <div className="space-y-2 sm:text-right">
+                <p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(itemVariance)}</p>
+                <p className="text-xs text-ink-400">Avvikelse mot budget</p>
+                {item.source !== "legacy" ? (
+                  <>
+                    <button type="button" onClick={() => (editingId === item.id ? setEditingId("") : startEdit(item))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">
+                      {editingId === item.id ? "Stäng" : "Ändra"}
+                    </button>
+                    <button type="button" disabled={removingId === item.id} onClick={() => void removeEntry(item)} className="block text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60 sm:ml-auto">
+                      {removingId === item.id ? "Tar bort…" : "Ta bort"}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+            {editingId === item.id && item.source !== "legacy" ? (
+              <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input className={premiumFieldClass} type="number" value={editForm.year} onChange={(e) => setEditForm({ ...editForm, year: e.target.value })} />
+                  <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                    {Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <input className={premiumFieldClass} placeholder="Konto" value={editForm.account} onChange={(e) => setEditForm({ ...editForm, account: e.target.value })} />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input className={premiumFieldClass} type="number" placeholder="Budget" value={editForm.budget} onChange={(e) => setEditForm({ ...editForm, budget: e.target.value })} />
+                  <input className={premiumFieldClass} type="number" placeholder="Prognos" value={editForm.forecast} onChange={(e) => setEditForm({ ...editForm, forecast: e.target.value })} />
+                  <input className={premiumFieldClass} type="number" placeholder="Utfall" value={editForm.actual} onChange={(e) => setEditForm({ ...editForm, actual: e.target.value })} />
+                </div>
+                <textarea className={premiumTextareaClass} placeholder="Kommentar" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                <button type="button" disabled={updatingId === item.id} onClick={() => void saveEdit(item)} className={`${premiumPrimaryButtonClass} sm:w-auto`}>
+                  {updatingId === item.id ? "Sparar…" : "Spara ändringar"}
+                </button>
+              </div>
+            ) : null}
+          </article>;
         })}</div>}
       </Panel>
     </section>

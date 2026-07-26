@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -27,7 +28,7 @@ export default function LoginPage() {
         const nextPath = params.get("next");
         router.push(safeInternalPath(nextPath));
       } else {
-        const data = await res.json();
+        const data = await readResponseJson(res);
         setError(data.error || "Inloggningen misslyckades");
       }
     } catch {

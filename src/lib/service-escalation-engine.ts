@@ -1,16 +1,14 @@
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { getServiceEscalationRules, type ServiceEscalationRules } from "@/lib/service-escalation-rules";
+import { listServiceNotificationAssignments } from "@/lib/service-notification-assignments";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type AssetRow = { id: string; company_id: string; property_id: string; component_name: string; next_service_at: Date; property_name: string; property_address: string; property_city: string };
-type AssignmentPayload = { notificationKey?: string; assigneeId?: string | null; assigneeName?: string | null; status?: string; deadline?: string | null; note?: string | null };
-type Assignment = Omit<AssignmentPayload, "notificationKey"> & { notificationKey: string; companyId: string; createdAt: Date };
+type Assignment = { notificationKey: string; assigneeId?: string | null; assigneeName?: string | null; status?: string; deadline?: string | null; note?: string | null; companyId: string; createdAt: Date };
 type CompanyRules = { rules: ServiceEscalationRules; updatedAt: string | null };
 type Candidate = { notificationKey: string; asset: AssetRow; assignment: Assignment; reason: "blocked" | "overdue_deadline"; companyRules: CompanyRules; graceAt: Date | null };
 
-function payloadFor(value: Prisma.JsonValue | null): AssignmentPayload | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as AssignmentPayload : null;
-}
 function keyFor(row: AssetRow) { return `component-service:${row.id}:${row.next_service_at.toISOString().slice(0, 10)}`; }
 function escapeHtml(value: unknown) { return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;"); }
 function appBaseUrl() { const value = process.env.NEXT_PUBLIC_APP_URL?.trim(); if (value) return value.replace(/\/$/, ""); const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim(); return host ? `https://${host}` : "https://www.revalta.se"; }
@@ -40,11 +38,79 @@ async function sendEscalation(candidate: Candidate, emails: string[]) {
   return body;
 }
 
+async function hasExistingEscalation(companyId: string, dedupeKey: string) {
+  const modern = await db.serviceAssignmentEscalation.findUnique({
+    where: { company_id_dedupe_key: { company_id: companyId, dedupe_key: dedupeKey } },
+    select: { id: true, status: true },
+  });
+  if (modern && ["processing", "sent"].includes(modern.status)) return true;
+  const legacy = await db.integrationEvent.findFirst({
+    where: {
+      company_id: companyId,
+      type: "service_assignment_escalation",
+      recipient: dedupeKey,
+      status: { in: ["processing", "sent"] },
+    },
+    select: { id: true },
+  });
+  return Boolean(legacy);
+}
+
+export async function listServiceAssignmentEscalations(companyId: string, take = 100) {
+  const [modern, legacy] = await Promise.all([
+    db.serviceAssignmentEscalation.findMany({
+      where: { company_id: companyId },
+      orderBy: { created_at: "desc" },
+      take,
+    }),
+    db.integrationEvent.findMany({
+      where: { company_id: companyId, type: "service_assignment_escalation" },
+      orderBy: { created_at: "desc" },
+      take,
+    }),
+  ]);
+  const modernIds = new Set(modern.map((row) => row.id));
+  return [
+    ...modern.map((row) => ({
+      id: row.id,
+      status: row.status,
+      recipient: row.dedupe_key,
+      payload: row.payload,
+      created_at: row.created_at,
+      source: "table" as const,
+    })),
+    ...legacy
+      .filter((row) => !modernIds.has(row.id))
+      .map((row) => ({
+        id: row.id,
+        status: row.status,
+        recipient: row.recipient,
+        payload: row.payload,
+        created_at: row.created_at,
+        source: "legacy" as const,
+      })),
+  ]
+    .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
+    .slice(0, take);
+}
+
 export async function runServiceEscalations(now = new Date()) {
   const dueBefore = new Date(now.getTime() + 30 * 86400000);
-  const [assets, assignmentEvents] = await Promise.all([
-    db.$queryRaw<AssetRow[]>(Prisma.sql`SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city" FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id" WHERE a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${dueBefore} AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed') ORDER BY a."company_id", a."next_service_at" ASC LIMIT 5000`),
-    db.integrationEvent.findMany({ where: { type: "service_notification_assignment" }, orderBy: { created_at: "desc" }, take: 10000, select: { company_id: true, payload: true, created_at: true } }),
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
+  const [assets, assignmentRows] = await Promise.all([
+    db.$queryRaw<AssetRow[]>(Prisma.sql`
+      SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."next_service_at",
+             p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
+      FROM "PropertyTechnicalAsset" a
+      INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
+      WHERE a."next_service_at" IS NOT NULL
+        ${propertyGuard}
+        AND a."next_service_at" <= ${dueBefore}
+        AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
+      ORDER BY a."company_id", a."next_service_at" ASC
+      LIMIT 5000
+    `),
+    listServiceNotificationAssignments(),
   ]);
 
   const companyIds = Array.from(new Set(assets.map((asset) => asset.company_id)));
@@ -55,11 +121,18 @@ export async function runServiceEscalations(now = new Date()) {
   }));
   const assetsByKey = new Map(assets.map((asset) => [keyFor(asset), asset]));
   const latest = new Map<string, Assignment>();
-  for (const event of assignmentEvents) {
-    const payload = payloadFor(event.payload);
-    if (!payload?.notificationKey || !event.company_id) continue;
-    const compound = `${event.company_id}:${payload.notificationKey}`;
-    if (!latest.has(compound)) latest.set(compound, { ...payload, notificationKey: payload.notificationKey, companyId: event.company_id, createdAt: event.created_at });
+  for (const row of assignmentRows) {
+    if (!row.companyId) continue;
+    latest.set(`${row.companyId}:${row.notificationKey}`, {
+      notificationKey: row.notificationKey,
+      assigneeId: row.assigneeId,
+      assigneeName: row.assigneeName,
+      status: row.status,
+      deadline: row.deadline,
+      note: row.note,
+      companyId: row.companyId,
+      createdAt: row.createdAt ?? new Date(row.updatedAt),
+    });
   }
 
   const candidates: Candidate[] = [];
@@ -81,8 +154,10 @@ export async function runServiceEscalations(now = new Date()) {
     const rules = candidate.companyRules.rules;
     const bucket = repeatBucket(now, rules.repeatDays);
     const dedupeKey = `service-escalation:${candidate.notificationKey}:${candidate.reason}:${bucket}`;
-    const existing = await db.integrationEvent.findFirst({ where: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", recipient: dedupeKey, status: { in: ["processing", "sent"] } }, select: { id: true } });
-    if (existing) { result.skipped += 1; continue; }
+    if (await hasExistingEscalation(candidate.asset.company_id, dedupeKey)) {
+      result.skipped += 1;
+      continue;
+    }
 
     const orFilters: Array<{ id: string } | { role: { in: string[] } }> = [];
     if (rules.includeAssignee && candidate.assignment.assigneeId) orFilters.push({ id: candidate.assignment.assigneeId });
@@ -116,14 +191,44 @@ export async function runServiceEscalations(now = new Date()) {
         updatedAt: candidate.companyRules.updatedAt,
       },
     };
-    if (!emails.length) { await db.integrationEvent.create({ data: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", status: "skipped", recipient: dedupeKey, payload: { ...basePayload, reasonCode: "no_recipients" } } }); result.skipped += 1; continue; }
-    const event = await db.integrationEvent.create({ data: { company_id: candidate.asset.company_id, type: "service_assignment_escalation", status: "processing", recipient: dedupeKey, payload: basePayload } });
+
+    if (!emails.length) {
+      await db.serviceAssignmentEscalation.create({
+        data: {
+          company_id: candidate.asset.company_id,
+          dedupe_key: dedupeKey,
+          notification_key: candidate.notificationKey,
+          status: "skipped",
+          reason: candidate.reason,
+          payload: { ...basePayload, reasonCode: "no_recipients" },
+        },
+      });
+      result.skipped += 1;
+      continue;
+    }
+
+    const event = await db.serviceAssignmentEscalation.create({
+      data: {
+        company_id: candidate.asset.company_id,
+        dedupe_key: dedupeKey,
+        notification_key: candidate.notificationKey,
+        status: "processing",
+        reason: candidate.reason,
+        payload: basePayload,
+      },
+    });
     try {
       const providerResponse = await sendEscalation(candidate, emails);
-      await db.integrationEvent.update({ where: { id: event.id }, data: { status: "sent", payload: { ...basePayload, providerResponse } } });
+      await db.serviceAssignmentEscalation.update({
+        where: { id: event.id },
+        data: { status: "sent", payload: { ...basePayload, providerResponse } },
+      });
       result.sent += 1;
     } catch (error) {
-      await db.integrationEvent.update({ where: { id: event.id }, data: { status: "failed", payload: { ...basePayload, error: error instanceof Error ? error.message : "Okänt fel" } } });
+      await db.serviceAssignmentEscalation.update({
+        where: { id: event.id },
+        data: { status: "failed", payload: { ...basePayload, error: error instanceof Error ? error.message : "Okänt fel" } },
+      });
       result.failed += 1;
     }
   }

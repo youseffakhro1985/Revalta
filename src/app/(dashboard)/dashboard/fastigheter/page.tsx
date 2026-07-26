@@ -1,4 +1,5 @@
 "use client";
+import { readResponseJson } from "@/lib/fetch-json";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,11 +16,11 @@ export default function PropertiesPage() {
   const [loading,setLoading]=useState(true); const [submitting,setSubmitting]=useState(false);
   const [error,setError]=useState(""); const [success,setSuccess]=useState(""); const router=useRouter();
 
-  useEffect(()=>{let mounted=true;(async()=>{try{const r=await fetch("/api/properties",{cache:"no-store"});if(r.status===401){router.push("/login");return;}const d=await r.json();if(!mounted)return;if(!r.ok)throw new Error(d.error||"Kunde inte hämta fastigheter");setProperties(d.properties||[]);}catch(e){if(mounted)setError(e instanceof Error?e.message:"Kunde inte kontakta servern");}finally{if(mounted)setLoading(false);}})();return()=>{mounted=false};},[router]);
+  useEffect(()=>{let mounted=true;(async()=>{try{const r=await fetch("/api/properties",{cache:"no-store"});if(r.status===401){router.push("/login");return;}const d=await readResponseJson(r);if(!mounted)return;if(!r.ok)throw new Error(d.error||"Kunde inte hämta fastigheter");setProperties(d.properties||[]);}catch(e){if(mounted)setError(e instanceof Error?e.message:"Kunde inte kontakta servern");}finally{if(mounted)setLoading(false);}})();return()=>{mounted=false};},[router]);
 
   const totals=useMemo(()=>({buildings:properties.reduce((s,p)=>s+p._count.buildings,0),units:properties.reduce((s,p)=>s+p._count.units,0),tickets:properties.reduce((s,p)=>s+p._count.tickets,0)}),[properties]);
 
-  async function submit(e:React.FormEvent){e.preventDefault();setError("");setSuccess("");setSubmitting(true);try{const r=await fetch("/api/properties",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const d=await r.json();if(r.status===401){router.push("/login");return;}if(!r.ok)throw new Error(d.error||"Kunde inte skapa fastigheten");setProperties(c=>[d.property,...c]);setForm({name:"",address:"",postalCode:"",city:""});setSuccess("Fastigheten är skapad och redo för byggnader, objekt och förvaltningsdata.");}catch(e){setError(e instanceof Error?e.message:"Kunde inte kontakta servern");}finally{setSubmitting(false);}}
+  async function submit(e:React.FormEvent){e.preventDefault();setError("");setSuccess("");setSubmitting(true);try{const r=await fetch("/api/properties",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const d=await readResponseJson(r);if(r.status===401){router.push("/login");return;}if(!r.ok)throw new Error(d.error||"Kunde inte skapa fastigheten");setProperties(c=>[d.property,...c]);setForm({name:"",address:"",postalCode:"",city:""});setSuccess("Fastigheten är skapad och redo för byggnader, objekt och förvaltningsdata.");}catch(e){setError(e instanceof Error?e.message:"Kunde inte kontakta servern");}finally{setSubmitting(false);}}
 
   return <div className="space-y-8">
     <PageHeader eyebrow="Bestånd och struktur" title="Fastighetsregister" description="Samla fastigheter, byggnader, lägenheter, lokaler och ärenden i en tydlig och enhetlig förvaltningsstruktur." />

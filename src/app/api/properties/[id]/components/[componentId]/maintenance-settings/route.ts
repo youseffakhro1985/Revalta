@@ -3,13 +3,14 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 async function resolveContext(params: Promise<{ id: string; componentId: string }>) {
   const user = await getCurrentUser();
   if (!user) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) };
   if (!user.company_id) return { error: NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 }) };
   const { id: propertyId, componentId } = await params;
-  const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true } });
+  const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
   if (!property) return { error: NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 }) };
   return { user, propertyId, componentId };
 }
@@ -17,6 +18,7 @@ async function resolveContext(params: Promise<{ id: string; componentId: string 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string; componentId: string }> }) {
   const context = await resolveContext(params);
   if ("error" in context) return context.error;
+  const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "wo");
   const rows = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
     SELECT a."id", a."name", a."next_service_at", a."service_interval_months", a."service_lead_days",
            a."auto_create_service_work_orders", a."criticality", a."status",
@@ -31,6 +33,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         AND wo."technical_asset_id" = a."id"
         AND wo."source" = 'maintenance_plan'
         AND wo."maintenance_cycle_advanced_at" IS NOT NULL
+        ${workOrderGuard}
       ORDER BY wo."maintenance_cycle_advanced_at" DESC
       LIMIT 1
     ) w ON TRUE

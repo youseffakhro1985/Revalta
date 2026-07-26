@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Plan = {
   label: string;
@@ -44,7 +45,7 @@ export default function BillingPage() {
           router.push("/login");
           return;
         }
-        const data = await response.json();
+        const data = await readResponseJson(response);
         if (!isMounted) return;
         if (!response.ok) {
           setError(data.error || "Kunde inte hämta billing");
@@ -74,7 +75,7 @@ export default function BillingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
 
       if (!response.ok) {
         setError(data.error || "Kunde inte ändra plan");
@@ -101,7 +102,7 @@ export default function BillingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) {
         setError(data.error || "Kunde inte starta checkout");
         return;
@@ -129,7 +130,7 @@ export default function BillingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) {
         setError(data.error || "Kunde inte öppna kundportal");
         return;

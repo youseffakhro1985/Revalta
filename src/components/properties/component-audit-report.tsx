@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useState } from "react";
 import { Download, History, RefreshCw } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
@@ -33,7 +34,7 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}/report`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta revisionshistoriken");
       setData(body);
     } catch (value) {

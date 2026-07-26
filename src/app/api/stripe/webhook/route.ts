@@ -15,13 +15,70 @@ function getPlanFromMetadata(object: StripeObject) {
   return plan === "start" || plan === "professional" || plan === "enterprise" ? plan : undefined;
 }
 
+async function resolveCompanyForStripeObject(object: StripeObject) {
+  const customerId = typeof object.customer === "string" ? object.customer : null;
+  const subscriptionId =
+    typeof object.subscription === "string"
+      ? object.subscription
+      : typeof object.id === "string" && object.id.startsWith("sub_")
+        ? object.id
+        : null;
+  const metadataCompanyId = object.metadata?.companyId?.trim() || null;
+
+  if (subscriptionId) {
+    const bySubscription = await db.company.findFirst({
+      where: { stripe_subscription_id: subscriptionId },
+      select: { id: true, stripe_customer_id: true, stripe_subscription_id: true },
+    });
+    if (bySubscription) {
+      if (customerId && bySubscription.stripe_customer_id && bySubscription.stripe_customer_id !== customerId) {
+        return null;
+      }
+      if (metadataCompanyId && metadataCompanyId !== bySubscription.id) {
+        return null;
+      }
+      return bySubscription;
+    }
+  }
+
+  if (customerId) {
+    const byCustomer = await db.company.findFirst({
+      where: { stripe_customer_id: customerId },
+      select: { id: true, stripe_customer_id: true, stripe_subscription_id: true },
+    });
+    if (byCustomer) {
+      if (metadataCompanyId && metadataCompanyId !== byCustomer.id) {
+        return null;
+      }
+      return byCustomer;
+    }
+  }
+
+  // First binding only: accept metadata companyId when no Stripe ids are mapped yet.
+  if (metadataCompanyId && (customerId || subscriptionId)) {
+    const byMetadata = await db.company.findFirst({
+      where: {
+        id: metadataCompanyId,
+        OR: [
+          { stripe_customer_id: null },
+          ...(customerId ? [{ stripe_customer_id: customerId }] : []),
+        ],
+      },
+      select: { id: true, stripe_customer_id: true, stripe_subscription_id: true },
+    });
+    if (byMetadata) return byMetadata;
+  }
+
+  return null;
+}
+
 async function updateCompanyFromStripeObject(object: StripeObject) {
-  const companyId = object.metadata?.companyId;
-  if (!companyId) return null;
+  const company = await resolveCompanyForStripeObject(object);
+  if (!company) return null;
 
   const plan = getPlanFromMetadata(object);
   return db.company.update({
-    where: { id: companyId },
+    where: { id: company.id },
     data: {
       ...(plan ? { plan } : {}),
       stripe_customer_id: typeof object.customer === "string" ? object.customer : undefined,
@@ -57,13 +114,15 @@ export async function POST(request: Request) {
         data: {
           company_id: company?.id,
           type: "stripe",
-          status: "received",
+          status: company ? "received" : "ignored",
           payload: {
             eventType: event.type,
             objectId: object.id,
             customer: object.customer,
             subscription: object.subscription,
             status: object.status,
+            matchedCompany: Boolean(company),
+            metadataCompanyId: object.metadata?.companyId || null,
           },
         },
       });
@@ -72,6 +131,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Stripe webhook error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    return NextResponse.json({ error: "Ogiltig Stripe-payload" }, { status: 400 });
   }
 }

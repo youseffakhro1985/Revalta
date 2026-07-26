@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useEffect, useState } from "react";
 import { CalendarPlus, CircleDollarSign, Save } from "lucide-react";
 import { InlineAlert, Panel } from "@/components/dashboard/premium-ui";
@@ -34,7 +35,7 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
       setLoadingLinks(true); setLinkError("");
       try {
         const response = await fetch(`/api/properties/${propertyId}/components/${componentId}/link-options`, { cache: "no-store" });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error || "Kunde inte hämta arbetsordrar och projekt");
         if (!cancelled) { setWorkOrders(body.workOrders || []); setProjects(body.projects || []); }
       } catch (value) {
@@ -55,7 +56,7 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}/actions`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte registrera uppgifterna");
       setSuccess(tab === "event" ? "Händelsen har registrerats." : "Kostnaden har registrerats.");
       event.currentTarget.reset();

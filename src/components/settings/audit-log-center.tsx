@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Filter, RefreshCw, ShieldCheck } from "lucide-react";
 import {
@@ -104,7 +105,7 @@ export function AuditLogCenter() {
     setError("");
     try {
       const response = await fetch(`/api/audit?${query}`, { cache: "no-store" });
-      const data = (await response.json()) as AuditResponse;
+      const data = (await readResponseJson(response)) as AuditResponse;
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta systemloggen");
       setLogs(data.auditLogs || []);
       setEntityTypes(data.filters?.entityTypes || []);

@@ -13,6 +13,11 @@ import {
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
+import {
+  getCachedSchemaReadiness,
+  notDeletedFilter,
+  schemaCompatibilityBannerMessage,
+} from "@/lib/schema-readiness";
 
 async function getDashboardData() {
   const user = await getCurrentUser();
@@ -22,6 +27,12 @@ async function getDashboardData() {
   const scope = tenantWhere(user);
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const schema = await getCachedSchemaReadiness();
+  const [ticketActive, propertyActive] = await Promise.all([
+    notDeletedFilter("Ticket"),
+    notDeletedFilter("Property"),
+  ]);
+  const ticketScope = { ...ticketActive, ...scope };
 
   const [
     totalTickets,
@@ -35,16 +46,16 @@ async function getDashboardData() {
     latestTickets,
     propertyWorkload,
   ] = await Promise.all([
-    db.ticket.count({ where: scope }),
-    db.ticket.count({ where: { ...scope, status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, priority: "urgent", status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, assigned_to_id: null, status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, due_date: { lt: now }, status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, closed_at: { gte: monthStart } } }),
-    db.property.count({ where: scope }),
+    db.ticket.count({ where: ticketScope }),
+    db.ticket.count({ where: { ...ticketScope, status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, priority: "urgent", status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, assigned_to_id: null, status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, due_date: { lt: now }, status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, closed_at: { gte: monthStart } } }),
+    db.property.count({ where: { ...propertyActive, ...scope } }),
     db.user.count({ where: user.company_id ? { company_id: user.company_id } : { id: user.id } }),
     db.ticket.findMany({
-      where: scope,
+      where: ticketScope,
       orderBy: { created_at: "desc" },
       take: 5,
       select: {
@@ -57,14 +68,14 @@ async function getDashboardData() {
       },
     }),
     db.property.findMany({
-      where: scope,
+      where: { ...propertyActive, ...scope },
       orderBy: { created_at: "desc" },
       take: 5,
       select: {
         id: true,
         name: true,
         city: true,
-        _count: { select: { tickets: true } },
+        _count: { select: { tickets: { where: ticketActive } } },
       },
     }),
   ]);
@@ -81,6 +92,9 @@ async function getDashboardData() {
     totalMembers,
     latestTickets,
     propertyWorkload,
+    schemaCompatibility: schema.ready
+      ? null
+      : { message: schemaCompatibilityBannerMessage(), missing: schema.missing },
   };
 }
 
@@ -141,6 +155,18 @@ export default async function Dashboard() {
           </div>
         </div>
       </header>
+
+      {data.schemaCompatibility && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
+          <p className="font-semibold">Kompatibilitetsläge</p>
+          <p className="mt-1 text-sm leading-6">{data.schemaCompatibility.message}</p>
+          {data.schemaCompatibility.missing.length > 0 && (
+            <p className="mt-2 text-xs text-amber-800/80">
+              Saknas: {data.schemaCompatibility.missing.map((item) => `${item.table}.${item.column}`).join(", ")}
+            </p>
+          )}
+        </div>
+      )}
 
       {!data.user.email_verified_at && (
         <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-warning-700 shadow-sm">

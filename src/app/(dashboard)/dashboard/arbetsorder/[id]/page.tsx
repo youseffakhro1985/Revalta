@@ -8,8 +8,10 @@ import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumP
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
+import { WorkOrderEconomicsPanel } from "@/components/dashboard/work-order-economics-panel";
 import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
 import { useWorkOrderEditLock } from "@/hooks/use-work-order-edit-lock";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type EnterpriseState = {
   work_order_number: string | null; work_type: string; source: string;
@@ -70,6 +72,8 @@ export default function WorkOrderDetailPage() {
   const [assignedToId, setAssignedToId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const editLock = useWorkOrderEditLock(id, Boolean(transitions?.canManage));
@@ -83,7 +87,7 @@ export default function WorkOrderDetailPage() {
         fetch(`/api/work-orders/${id}/transitions`, { cache: "no-store" }),
       ]);
       if ([workOrderResponse, optionsResponse, transitionResponse].some((response) => response.status === 401)) { router.push("/login"); return; }
-      const [workOrderData, optionsData, transitionData] = await Promise.all([workOrderResponse.json(), optionsResponse.json(), transitionResponse.json()]);
+      const [workOrderData, optionsData, transitionData] = await Promise.all([readResponseJson(workOrderResponse), readResponseJson(optionsResponse), readResponseJson(transitionResponse)]);
       if (!workOrderResponse.ok) throw new Error(workOrderData.error || "Kunde inte hämta arbetsordern");
       if (!optionsResponse.ok) throw new Error(optionsData.error || "Kunde inte hämta komponentregistret");
       if (!transitionResponse.ok) throw new Error(transitionData.error || "Kunde inte hämta styrningsalternativ");
@@ -120,7 +124,7 @@ export default function WorkOrderDetailPage() {
         version: editLock.state.version,
       };
       const response = await fetch(`/api/work-orders/${id}/locked-update`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) {
         if (data.code === "version_conflict") {
           await load();
@@ -149,6 +153,45 @@ export default function WorkOrderDetailPage() {
   const estimated = Number(workOrder.estimated_cost || 0);
   const actual = Number(workOrder.actual_cost || 0);
   const enterprise = workOrder.enterprise;
+
+  async function createProjectFromWorkOrder() {
+    if (!window.confirm("Skapa ett projekt från den här arbetsordern?")) return;
+    setCreatingProject(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/work-orders/${id}/project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte skapa projekt");
+      setSuccess("Projektet har skapats från arbetsordern.");
+      await load();
+      if (data.project?.id) router.push(`/dashboard/projekt/${data.project.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte skapa projekt");
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
+  async function softDeleteWorkOrder() {
+    if (!window.confirm("Ta bort arbetsordern? Den döljs från listor men behålls i historiken.")) return;
+    setDeleting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/work-orders/${id}`, { method: "DELETE" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort arbetsordern");
+      router.push("/dashboard/arbetsorder");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort arbetsordern");
+      setDeleting(false);
+    }
+  }
 
   return <div className="space-y-8">
     <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordrar</Link>
@@ -206,10 +249,31 @@ export default function WorkOrderDetailPage() {
           <input name="actualCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={actual || ""} placeholder="Faktisk kostnad" className={premiumFieldClass} />
           {transitions.canManage ? <button disabled={!editable || saving || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : editable ? "Spara låst och validerad ändring" : "Väntar på redigeringslås"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
         </form>
-        <div className="mt-5 space-y-2 border-t border-sand-100 pt-5 text-sm text-ink-500">
+        <div className="mt-5 space-y-3 border-t border-sand-100 pt-5 text-sm text-ink-500">
           {workOrder.unit ? <p>Enhet: <strong className="text-ink-800">{workOrder.unit.designation}</strong></p> : null}
           {workOrder.ticket ? <p>Ursprungsärende: <strong className="text-ink-800">{workOrder.ticket.public_reference || workOrder.ticket.title}</strong></p> : null}
           {workOrder.projects.map((project) => <Link key={project.id} href={`/dashboard/projekt/${project.id}`} className="flex items-center gap-2 font-semibold text-petroleum-700 hover:text-petroleum-900"><FolderKanban className="h-4 w-4" />{project.name}</Link>)}
+          {transitions.canManage && workOrder.projects.length === 0 ? (
+            <button
+              type="button"
+              disabled={creatingProject}
+              onClick={() => void createProjectFromWorkOrder()}
+              className="inline-flex items-center gap-2 rounded-xl border border-petroleum-200 bg-petroleum-50 px-3 py-2 text-xs font-semibold text-petroleum-900 hover:bg-petroleum-100"
+            >
+              <FolderKanban className="h-3.5 w-3.5" />
+              {creatingProject ? "Skapar projekt…" : "Skapa projekt från arbetsorder"}
+            </button>
+          ) : null}
+          {transitions.canManage ? (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => void softDeleteWorkOrder()}
+              className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+            >
+              {deleting ? "Tar bort…" : "Ta bort arbetsorder"}
+            </button>
+          ) : null}
         </div>
       </Panel>
       <OperationalActivityPanel entityType="work_order" entityId={workOrder.id} />
@@ -220,6 +284,13 @@ export default function WorkOrderDetailPage() {
     </Panel>
 
     <WorkOrderExecutionPanel workOrderId={workOrder.id} />
+    <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
+      <div>
+        <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>
+        <p className="mt-1 text-sm text-ink-500">Kanonisk väg för attesterad tid, material, lönsamhet och exportbart fakturaunderlag (Fortnox/Visma). Fältregistreringen ovan är driftunderlag, inte fakturarader.</p>
+      </div>
+      <WorkOrderEconomicsPanel workOrderId={workOrder.id} />
+    </section>
     <WorkOrderReportingPanel workOrderId={workOrder.id} />
     <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
   </div>;

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CircleDollarSign, ClipboardCheck, Save, Settings2 } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
@@ -34,7 +35,7 @@ export function ComponentRegistryManager({ propertyId }: { propertyId: string })
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/components`, { cache: "no-store" });
-      const payload: Data & { error?: string } = await response.json();
+      const payload: Data & { error?: string } = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta komponenterna");
       setAssets(payload.assets || []);
       setAssetId((current) => current || String(payload.assets?.[0]?.id || ""));
@@ -54,7 +55,7 @@ export function ComponentRegistryManager({ propertyId }: { propertyId: string })
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...values, action: mode, assetId }),
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte spara");
       setSuccess(mode === "update" ? "Komponentuppgifterna har uppdaterats." : mode === "event" ? "Livscykelhändelsen har registrerats." : "Kostnaden har registrerats.");
       if (mode !== "update") event.currentTarget.reset();

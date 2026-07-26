@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarRange, CircleDollarSign, Filter, Landmark, RotateCcw } from "lucide-react";
@@ -55,7 +56,7 @@ export function MaintenancePortfolioPanel() {
     let active = true;
     fetch("/api/maintenance/portfolio", { cache: "no-store" })
       .then(async (response) => {
-        const payload = await response.json();
+        const payload = await readResponseJson(response);
         if (!response.ok) throw new Error(payload.error || "Kunde inte hämta portföljbudgeten");
         if (active) setRows(payload.rows || []);
       })

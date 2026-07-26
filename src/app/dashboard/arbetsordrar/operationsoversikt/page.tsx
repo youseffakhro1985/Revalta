@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Clock3, RefreshCw, UserRoundX, Wrench } from "lucide-react";
@@ -12,7 +13,7 @@ const riskLabel:Record<string,string> = { critical:"Kritisk", overdue:"Försenad
 
 export default function WorkOrderOperationsPage() {
   const [data,setData] = useState<Data|null>(null); const [loading,setLoading]=useState(true); const [error,setError]=useState(""); const [filter,setFilter]=useState("open");
-  async function load(){ setLoading(true); setError(""); try { const r=await fetch("/api/work-orders/operations-overview",{cache:"no-store"}); const b=await r.json(); if(!r.ok) throw new Error(b.error||"Kunde inte hämta arbetsorderöversikten"); setData(b);} catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta arbetsorderöversikten");} finally{setLoading(false);} }
+  async function load(){ setLoading(true); setError(""); try { const r=await fetch("/api/work-orders/operations-overview",{cache:"no-store"}); const b=await readResponseJson(r); if(!r.ok) throw new Error(b.error||"Kunde inte hämta arbetsorderöversikten"); setData(b);} catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta arbetsorderöversikten");} finally{setLoading(false);} }
   useEffect(()=>{void load();},[]);
   const items=useMemo(()=>{const rows=data?.workOrders??[]; if(filter==="risk") return rows.filter(x=>["critical","overdue","high"].includes(x.risk)); if(filter==="unassigned") return rows.filter(x=>!x.assignee && x.risk!=="closed"); if(filter==="all") return rows; return rows.filter(x=>x.risk!=="closed");},[data,filter]);
   return <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
@@ -25,6 +26,6 @@ export default function WorkOrderOperationsPage() {
       {!loading&&items.length===0?<EmptyState title="Inga arbetsorder i filtret" description="När arbetsorder matchar filtret visas de här."/>:null}
       {items.length?<div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{items.map(item=><div key={item.id} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px_190px_auto] lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink-950">{item.title}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.risk==="critical"||item.risk==="overdue"?"bg-red-50 text-red-700":item.risk==="high"||item.risk==="medium"?"bg-amber-50 text-amber-800":"bg-emerald-50 text-emerald-800"}`}>{riskLabel[item.risk]||item.risk}</span></div><p className="mt-1 text-sm text-ink-500">{item.property.name} · {item.property.address}, {item.property.city}{item.unit?` · ${item.unit.designation}`:""}</p></div><div className="text-sm text-ink-600"><p><span className="font-semibold text-ink-800">Status:</span> {item.statusLabel}</p><p className="mt-1"><span className="font-semibold text-ink-800">Prioritet:</span> {item.priorityLabel}</p></div><div className="text-sm text-ink-600"><p><span className="font-semibold text-ink-800">SLA:</span> {dt.format(new Date(item.slaDeadline))}</p><p className="mt-1 truncate"><span className="font-semibold text-ink-800">Ansvarig:</span> {item.assignee?.name||item.assignee?.email||"Ej tilldelad"}</p></div><Link href={item.href} className="rounded-lg bg-petroleum-800 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-petroleum-900">Öppna</Link></div>)}</div>:null}
     </Panel>
-    <div className="flex justify-end"><Link href="/dashboard/arbetsordrar" className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Till alla arbetsorder →</Link></div>
+    <div className="flex justify-end"><Link href="/dashboard/arbetsorder" className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Till alla arbetsorder →</Link></div>
   </div>;
 }

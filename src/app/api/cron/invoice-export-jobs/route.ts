@@ -1,25 +1,23 @@
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import {
+  getInvoiceDraftByVersion,
+  getModernInvoiceDraftByVersion,
+  getModernInvoiceExportJob,
+  listQueuedInvoiceExportJobs,
+  upsertInvoiceExportJob,
+  type InvoiceExportJobPayload,
+} from "@/lib/work-order-ops-storage";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const JOB_TYPE = "work_order.invoice_integration_job";
-const INVOICE_TYPE = "work_order.invoice_basis";
 const MAX_JOBS_PER_RUN = 20;
 const REQUEST_TIMEOUT_MS = 20_000;
 
 type Obj = Record<string, unknown>;
-type Job = Obj & {
-  jobId: string;
-  workOrderId: string;
+type Job = InvoiceExportJobPayload & {
   provider: "fortnox" | "visma" | "webhook";
-  status: string;
-  attempt: number;
-  invoiceVersionId?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
 };
 
 type InvoiceLine = {
@@ -70,19 +68,12 @@ function number(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function asJob(value: unknown): Job | null {
-  const row = object(value);
-  if (!row) return null;
-  const provider = text(row.provider);
-  if (!text(row.jobId) || !text(row.workOrderId) || !["fortnox", "visma", "webhook"].includes(provider)) return null;
+function asJob(value: InvoiceExportJobPayload): Job | null {
+  if (!["fortnox", "visma", "webhook"].includes(value.provider)) return null;
   return {
-    ...row,
-    jobId: text(row.jobId),
-    workOrderId: text(row.workOrderId),
-    provider: provider as Job["provider"],
-    status: text(row.status, "queued"),
-    attempt: Math.max(1, Math.round(number(row.attempt, 1))),
-    invoiceVersionId: typeof row.invoiceVersionId === "string" ? row.invoiceVersionId : null,
+    ...value,
+    provider: value.provider as Job["provider"],
+    attempt: Math.max(1, Math.round(number(value.attempt, 1))),
   };
 }
 
@@ -213,120 +204,86 @@ async function send(job: Job, payload: ReturnType<typeof exportPayload>) {
   }
 }
 
-async function appendJobEvent(companyId: string, workOrderId: string, job: Job, status: string, extra: Obj = {}) {
-  const payload = {
+async function saveJob(companyId: string, job: Job, status: string, extra: Partial<InvoiceExportJobPayload> = {}) {
+  return upsertInvoiceExportJob(companyId, {
     ...job,
     ...extra,
     status,
     updatedAt: new Date().toISOString(),
-  } as Prisma.InputJsonValue;
-  return db.integrationEvent.create({
-    data: {
-      company_id: companyId,
-      recipient: workOrderId,
-      type: JOB_TYPE,
-      status,
-      payload,
-    },
   });
 }
 
 export async function GET(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-  const events = await db.integrationEvent.findMany({
-    where: { type: JOB_TYPE },
-    orderBy: { created_at: "asc" },
-    take: 10_000,
-    select: { company_id: true, recipient: true, payload: true, created_at: true },
-  });
-
-  const latest = new Map<string, { companyId: string; workOrderId: string; job: Job; createdAt: Date }>();
-  for (const event of events) {
-    const job = asJob(event.payload);
-    if (!job || !event.company_id || !event.recipient) continue;
-    latest.set(`${event.company_id}:${job.jobId}`, {
-      companyId: event.company_id,
-      workOrderId: event.recipient,
-      job,
-      createdAt: event.created_at,
-    });
-  }
-
-  const queued = [...latest.values()]
-    .filter((item) => item.job.status === "queued")
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-    .slice(0, MAX_JOBS_PER_RUN);
+  const queuedRaw = await listQueuedInvoiceExportJobs(MAX_JOBS_PER_RUN);
+  const queued = queuedRaw
+    .map((item) => {
+      const job = asJob(item.job);
+      return job ? { ...item, job } : null;
+    })
+    .filter((item): item is { companyId: string; workOrderId: string; job: Job; createdAt: Date } => Boolean(item));
 
   const result = { queued: queued.length, sent: 0, failed: 0, skipped: 0 };
 
   for (const item of queued) {
     const { companyId, workOrderId, job } = item;
-    const lockKey = `${companyId}:${job.jobId}`;
-    const newest = latest.get(lockKey)?.job;
-    if (!newest || newest.status !== "queued") {
+    if (job.status !== "queued") {
       result.skipped += 1;
       continue;
     }
 
-    await appendJobEvent(companyId, workOrderId, job, "processing", { processingStartedAt: new Date().toISOString() });
+    // Fail-closed: never rematerialize IE-only jobs into WorkOrderInvoiceExportJob.
+    const modernRaw = await getModernInvoiceExportJob(companyId, workOrderId, job.jobId);
+    const modernJob = modernRaw ? asJob(modernRaw) : null;
+    if (!modernJob) {
+      result.skipped += 1;
+      continue;
+    }
+
+    await saveJob(companyId, modernJob, "processing", { processingStartedAt: new Date().toISOString() });
 
     try {
-      const [workOrder, invoiceEvents] = await Promise.all([
-        db.workOrder.findFirst({
-          where: { id: workOrderId, company_id: companyId },
-          select: {
-            id: true,
-            title: true,
-            property: { select: { name: true, address: true, postal_code: true, city: true } },
-            unit: { select: { designation: true } },
-            company: { select: { name: true, org_number: true } },
-          },
-        }),
-        db.integrationEvent.findMany({
-          where: { company_id: companyId, recipient: workOrderId, type: INVOICE_TYPE },
-          orderBy: { created_at: "desc" },
-          take: 100,
-          select: { payload: true },
-        }),
-      ]);
+      const workOrder = await db.workOrder.findFirst({
+        where: { deleted_at: null, id: workOrderId, company_id: companyId },
+        select: {
+          id: true,
+          title: true,
+          property: { select: { name: true, address: true, postal_code: true, city: true } },
+          unit: { select: { designation: true } },
+          company: { select: { name: true, org_number: true } },
+        },
+      });
 
       if (!workOrder) throw new Error("Arbetsordern hittades inte längre");
-      const invoices = invoiceEvents.map((event) => asInvoice(event.payload)).filter((invoice): invoice is InvoicePayload => Boolean(invoice));
-      const invoice = job.invoiceVersionId
-        ? invoices.find((candidate) => candidate.versionId === job.invoiceVersionId)
-        : invoices[0];
+      if (!modernJob.invoiceVersionId) throw new Error("Exportjobbet saknar fakturaversion");
+      const modernInvoice = await getModernInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
+      if (!modernInvoice) {
+        const legacyInvoice = await getInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
+        throw new Error(
+          legacyInvoice
+            ? "Faktureringsunderlaget finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceDraft innan export."
+            : "Den kopplade fakturaversionen hittades inte",
+        );
+      }
+      const invoice = asInvoice(modernInvoice);
       if (!invoice) throw new Error("Den kopplade fakturaversionen hittades inte");
       if (!["ready", "exported"].includes(invoice.status)) throw new Error("Faktureringsunderlaget måste vara markerat som redo före export");
 
-      const payload = exportPayload({ job, invoice, workOrder });
-      const providerResult = await send(job, payload);
-      await appendJobEvent(companyId, workOrderId, job, "sent", {
+      const payload = exportPayload({ job: modernJob, invoice, workOrder });
+      const providerResult = await send(modernJob, payload);
+      // Receipt fields live on WorkOrderInvoiceExportJob (sent_at/external_id/provider_response).
+      await saveJob(companyId, modernJob, "sent", {
         sentAt: new Date().toISOString(),
         providerStatus: providerResult.status,
         externalId: providerResult.externalId,
         providerResponse: providerResult.response,
         error: null,
       });
-      await db.integrationEvent.create({
-        data: {
-          company_id: companyId,
-          recipient: workOrderId,
-          type: "work_order.invoice_export_receipt",
-          status: "sent",
-          payload: {
-            jobId: job.jobId,
-            provider: job.provider,
-            invoiceVersionId: invoice.versionId,
-            externalId: providerResult.externalId,
-            sentAt: new Date().toISOString(),
-          },
-        },
-      });
       result.sent += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Okänt integrationsfel";
-      await appendJobEvent(companyId, workOrderId, job, "failed", {
+      await saveJob(companyId, modernJob, "failed", {
         failedAt: new Date().toISOString(),
         error: message.slice(0, 2000),
       });

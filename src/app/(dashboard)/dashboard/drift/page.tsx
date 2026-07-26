@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useEffect, useState } from "react";
 
 type Health = {
@@ -30,7 +31,7 @@ export default function OperationsPage() {
     async function loadHealth() {
       try {
         const response = await fetch("/api/health", { cache: "no-store" });
-        const data = await response.json();
+        const data = await readResponseJson(response);
         if (!response.ok) {
           setError(data.error || "Kunde inte hämta driftstatus");
           return;

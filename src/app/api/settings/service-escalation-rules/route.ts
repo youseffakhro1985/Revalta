@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import {
-  ESCALATION_RULE_EVENT,
   getServiceEscalationRules,
   normalizeEscalationRules,
+  upsertServiceEscalationRules,
 } from "@/lib/service-escalation-rules";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,8 @@ export async function GET() {
 
   const current = await getServiceEscalationRules(user.company_id);
   return NextResponse.json({
-    ...current,
+    rules: current.rules,
+    updatedAt: current.updatedAt,
     canManage: canManage(user.role),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -46,25 +47,25 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Minst en mottagare måste vara vald" }, { status: 400 });
   }
 
-  const event = await db.integrationEvent.create({
+  const updatedAt = await upsertServiceEscalationRules(user.company_id, user.id, rules);
+  await db.auditLog.create({
     data: {
       company_id: user.company_id,
-      type: ESCALATION_RULE_EVENT,
-      status: "active",
-      recipient: user.email,
-      payload: {
-        rules,
-        previousRules: previous.rules,
-        changedBy: user.id,
-        changedByEmail: user.email,
-        version: 1,
+      actor_user_id: user.id,
+      entity_type: "service_escalation_rules",
+      entity_id: user.company_id,
+      action: "service_escalation_rules.updated",
+      metadata: {
+        before: previous.rules,
+        after: rules,
+        storage: "ServiceEscalationRulesSettings",
       },
     },
   });
 
   return NextResponse.json({
     rules,
-    updatedAt: event.created_at.toISOString(),
+    updatedAt,
     canManage: true,
   });
 }

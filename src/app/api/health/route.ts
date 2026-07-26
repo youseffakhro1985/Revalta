@@ -1,5 +1,6 @@
 import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { getSchemaReadiness } from "@/lib/schema-readiness";
 import { hasStorageConfig } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
@@ -37,14 +38,17 @@ export async function GET() {
     if (!canViewOperations(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa driftstatus" }, { status: 403 });
     }
+
+    const schema = await getSchemaReadiness();
     return NextResponse.json({
-      status: "ok",
+      status: schema.ready ? "ok" : "degraded",
       database: "ok",
+      schema,
       latencyMs: Date.now() - startedAt,
       release,
       env,
       checkedAt: new Date().toISOString(),
-    });
+    }, { status: schema.ready ? 200 : 503 });
   } catch (error) {
     console.error("Health check error:", error);
     return NextResponse.json({

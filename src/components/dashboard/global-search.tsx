@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Building2, ClipboardList, FileSignature, Search, UserRound, X } from "lucide-react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type SearchResult = {
   id: string;
@@ -52,7 +53,7 @@ export function GlobalSearch() {
       setLoading(true);
       try {
         const response = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
-        const data = await response.json();
+        const data = await readResponseJson<{ results?: SearchResult[] }>(response);
         setResults(response.ok ? data.results || [] : []);
       } catch (error) {
         if ((error as Error).name !== "AbortError") setResults([]);

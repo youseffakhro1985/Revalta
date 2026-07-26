@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, Mail, Phone, RefreshCw, Search, UserRound } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -63,7 +64,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
     setError("");
     try {
       const response = await fetch(`/api/lease-holders?propertyId=${encodeURIComponent(propertyId)}`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta boenderegistret");
       setHolders(data.holders || []);
       setCanManage(Boolean(data.permissions?.canManage));
@@ -120,7 +121,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara kontakten");
       setMessage(editingId ? "Kontakten har uppdaterats." : "Kontakten har lagts till i registret.");
       resetForm();
@@ -133,13 +134,13 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
   }
 
   async function remove(holder: Holder) {
-    if (!canManage || !window.confirm(`Ta bort ${holder.name} från kontaktregistret?`)) return;
+    if (!canManage || !window.confirm(`Ta bort ${holder.name} från kontaktregistret? Kontakten döljs från listor men behålls i historiken.`)) return;
     setBusy(true);
     setError("");
     setMessage("");
     try {
       const response = await fetch(`/api/lease-holders/${holder.id}`, { method: "DELETE" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort kontakten");
       setMessage("Kontakten har tagits bort.");
       if (editingId === holder.id) resetForm();

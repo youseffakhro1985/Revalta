@@ -1,26 +1,10 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import Link from "next/link";
-import { use, useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Download, FileJson, FileSpreadsheet, Printer, RefreshCw } from "lucide-react";
-import { InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
-
-type Line={id:string;type:string;description:string;quantity:number;unit:string;unitPrice:number;total:number};
-type Draft={status:string;customerName:string;customerOrgNumber:string;customerReference:string;invoiceDate:string;dueDays:number;discountPercent:number;vatPercent:number;note:string;lines:Line[];subtotal:number;discount:number;net:number;vat:number;total:number};
-type Data={workOrder:{id:string;title:string;property:{name:string;address:string;postal_code:string|null;city:string};company:{name:string;org_number:string|null}};draft:Draft};
-const money=new Intl.NumberFormat("sv-SE",{style:"currency",currency:"SEK"});
-export default function InvoiceExportPage({params}:{params:Promise<{id:string}>}){
- const {id}=use(params);const [data,setData]=useState<Data|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
- const load=useCallback(async()=>{setLoading(true);setError("");try{const r=await fetch(`/api/work-orders/${id}/invoice-basis`,{cache:"no-store"});const b=await r.json();if(!r.ok)throw new Error(b.error||"Kunde inte hämta faktureringsunderlaget");setData(b);}catch(e){setError(e instanceof Error?e.message:"Ett fel uppstod");}finally{setLoading(false);}},[id]);
- useEffect(()=>{void load();},[load]);
- if(loading&&!data)return <div className="h-72 animate-pulse rounded-2xl bg-sand-100"/>;
- if(!data)return <InlineAlert>{error||"Underlaget kunde inte visas."}</InlineAlert>;
- const d=data.draft;
- return <div className="mx-auto max-w-6xl space-y-6 animate-fade-in-soft">
-  <header className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm print:border-0 print:shadow-none"><Link href={`/dashboard/arbetsordrar/${id}/fakturaunderlag`} className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700 print:hidden"><ArrowLeft className="h-4 w-4"/>Till faktureringsunderlaget</Link><div className="mt-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-[11px] font-semibold uppercase tracking-[.16em] text-petroleum-600">Exportcenter</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink-950">{data.workOrder.title}</h1><p className="mt-2 text-ink-600">{data.workOrder.property.name} · {data.workOrder.property.address}, {data.workOrder.property.city}</p></div><button onClick={()=>void load()} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 px-4 py-2.5 text-sm font-semibold print:hidden"><RefreshCw className="h-4 w-4"/>Uppdatera</button></div></header>
-  {error?<InlineAlert>{error}</InlineAlert>:null}
-  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 print:hidden"><MetricCard icon={FileSpreadsheet} label="Rader" value={d.lines.length}/><MetricCard icon={FileJson} label="Status" value={d.status}/><MetricCard icon={Download} label="Netto" value={money.format(d.net||0)}/><MetricCard icon={Printer} label="Totalt" value={money.format(d.total||0)}/></div>
-  <Panel title="Exportformat" description="Ladda ner underlaget eller öppna utskriftsdialogen."><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:hidden"><a href={`/api/work-orders/${id}/invoice-basis/export?format=csv`} className="rounded-xl border border-sand-200 p-4 font-semibold text-ink-900 hover:border-petroleum-300"><FileSpreadsheet className="mb-3 h-5 w-5"/>CSV för Excel</a><a href={`/api/work-orders/${id}/invoice-basis/export?format=fortnox`} className="rounded-xl border border-sand-200 p-4 font-semibold text-ink-900 hover:border-petroleum-300"><FileJson className="mb-3 h-5 w-5"/>Fortnox JSON</a><a href={`/api/work-orders/${id}/invoice-basis/export?format=visma`} className="rounded-xl border border-sand-200 p-4 font-semibold text-ink-900 hover:border-petroleum-300"><FileJson className="mb-3 h-5 w-5"/>Visma JSON</a><button onClick={()=>window.print()} className="rounded-xl border border-sand-200 p-4 text-left font-semibold text-ink-900 hover:border-petroleum-300"><Printer className="mb-3 h-5 w-5"/>Skriv ut / spara PDF</button></div>
-  <div className="mt-8 rounded-2xl border border-sand-200 bg-white p-8 print:border-0 print:p-0"><div className="flex justify-between gap-6"><div><h2 className="text-2xl font-semibold text-ink-950">Faktureringsunderlag</h2><p className="mt-2 text-sm text-ink-600">{data.workOrder.company.name}{data.workOrder.company.org_number?` · ${data.workOrder.company.org_number}`:""}</p></div><div className="text-right text-sm text-ink-600"><p>Datum: {d.invoiceDate}</p><p>Betalningsvillkor: {d.dueDays} dagar</p></div></div><div className="mt-8 grid gap-6 sm:grid-cols-2"><div><p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Kund</p><p className="mt-2 font-semibold text-ink-900">{d.customerName||"Ej angiven kund"}</p><p className="text-sm text-ink-600">{d.customerOrgNumber||""}</p><p className="text-sm text-ink-600">{d.customerReference||""}</p></div><div><p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Arbetsorder</p><p className="mt-2 font-semibold text-ink-900">{data.workOrder.title}</p><p className="text-sm text-ink-600">{data.workOrder.property.address}, {data.workOrder.property.city}</p></div></div><div className="mt-8 overflow-hidden rounded-xl border border-sand-200"><table className="w-full text-sm"><thead className="bg-sand-50 text-left text-ink-600"><tr><th className="p-3">Beskrivning</th><th className="p-3 text-right">Antal</th><th className="p-3 text-right">Pris</th><th className="p-3 text-right">Belopp</th></tr></thead><tbody>{d.lines.map(l=><tr key={l.id} className="border-t border-sand-200"><td className="p-3">{l.description}</td><td className="p-3 text-right">{l.quantity} {l.unit}</td><td className="p-3 text-right">{money.format(l.unitPrice)}</td><td className="p-3 text-right font-semibold">{money.format(l.total)}</td></tr>)}</tbody></table></div><div className="mt-6 ml-auto max-w-sm space-y-2 text-sm"><div className="flex justify-between"><span>Netto</span><span>{money.format(d.net||0)}</span></div><div className="flex justify-between"><span>Moms</span><span>{money.format(d.vat||0)}</span></div><div className="flex justify-between border-t border-sand-300 pt-3 text-lg font-semibold"><span>Totalt</span><span>{money.format(d.total||0)}</span></div></div>{d.note?<p className="mt-8 whitespace-pre-wrap text-sm text-ink-700">{d.note}</p>:null}</div></Panel>
- </div>;
+export default async function LegacyWorkOrderInvoiceExportPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  redirect(`/dashboard/arbetsorder/${id}`);
 }

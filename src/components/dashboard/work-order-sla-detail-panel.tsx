@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, History, LockKeyhole, PauseCircle, ShieldAlert } from "lucide-react";
 import { InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -75,7 +76,7 @@ export function WorkOrderSlaDetailPanel({ workOrderId }: Props) {
     setError("");
     try {
       const response = await fetch(`/api/work-orders/${workOrderId}/sla`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta SLA-bedömningen");
       setSla(data.sla);
       setEvaluatedAt(data.evaluatedAt || null);
@@ -96,7 +97,7 @@ export function WorkOrderSlaDetailPanel({ workOrderId }: Props) {
     setSaving(true); setError(""); setSuccess("");
     try {
       const response = await fetch(`/api/work-orders/${workOrderId}/sla`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ responseDueAt, resolutionDueAt, reason }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera SLA-deadlines");
       setReason("");
       setSuccess("SLA-deadlines har uppdaterats, omberäknats och registrerats i revisionsloggen.");

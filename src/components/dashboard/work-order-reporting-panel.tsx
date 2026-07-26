@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { BadgeCheck, CheckCircle2, ExternalLink, FileCheck2, FileText, ReceiptText, Signature } from "lucide-react";
@@ -67,7 +68,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
     setError("");
     try {
       const response = await fetch(endpoint, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta rapportflödet");
       setSignatures(data.signatures || []);
       setReports(data.reports || []);
@@ -91,7 +92,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara");
       reset?.();
       setSuccess(message);
@@ -120,7 +121,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
           <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Godkända rapporter</p><p className="mt-2 text-2xl font-semibold text-ink-950">{approvedReports}/{reports.length}</p><p className="mt-1 text-xs text-ink-400">Frysta och spårbara underlag</p></div><FileCheck2 className="h-5 w-5 text-petroleum-700" /></div>
         </article>
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Klara för fakturering</p><p className="mt-2 text-2xl font-semibold text-ink-950">{approvedInvoices}/{invoiceBases.length}</p><p className="mt-1 text-xs text-ink-400">Godkända ekonomiska underlag</p></div><ReceiptText className="h-5 w-5 text-petroleum-700" /></div>
+          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Arkiverade underlag</p><p className="mt-2 text-2xl font-semibold text-ink-950">{approvedInvoices}/{invoiceBases.length}</p><p className="mt-1 text-xs text-ink-400">Rapportsnapshots – export sker via Ekonomi</p></div><ReceiptText className="h-5 w-5 text-petroleum-700" /></div>
         </article>
       </section>
 
@@ -162,8 +163,8 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
               <button type="button" disabled={saving} onClick={() => void post({ action: "report.create" }, "En ny arbetsrapport har skapats.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa arbetsrapport"}</button>
             </div>
             <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
-              <div className="flex items-start gap-3"><ReceiptText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Fakturaunderlag</h3><p className="mt-1 text-sm leading-6 text-ink-500">Summerar registrerade kostnader och räknar moms och totalbelopp automatiskt.</p></div></div>
-              <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.create" }, "Ett nytt fakturaunderlag har skapats.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa fakturaunderlag"}</button>
+              <div className="flex items-start gap-3"><ReceiptText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Fakturaunderlag</h3><p className="mt-1 text-sm leading-6 text-ink-500">Bygger exportbart underlag från attesterad tid och material (samma källa som Ekonomi och fakturering) och arkiverar en rapportsnapshot.</p></div></div>
+              <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.create" }, "Exportbart fakturaunderlag har skapats från attesterade rader.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa fakturaunderlag"}</button>
             </div>
           </div>
         </Panel>
@@ -174,8 +175,8 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
           {reports.length === 0 ? <EmptyState title="Ingen arbetsrapport skapad" description="Skapa en rapport när arbetsordern är redo för granskning." /> : <div className="divide-y divide-sand-100">{reports.map((report) => <article key={report.id} className="p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-ink-900">{report.title}</p><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${report.status === "approved" ? "bg-petroleum-50 text-petroleum-800" : "bg-sand-100 text-ink-600"}`}>{statusLabels[report.status] || report.status}</span></div><p className="mt-1 text-xs text-ink-400">Version {report.version} · {dateTime.format(new Date(report.created_at))}</p>{report.approved_at ? <p className="mt-1 text-xs font-medium text-petroleum-700">Godkänd {dateTime.format(new Date(report.approved_at))}</p> : null}</div><div className="flex flex-wrap gap-2"><Link href={`/arbetsrapport/${report.id}`} target="_blank" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-3 text-xs font-semibold text-ink-700 hover:border-petroleum-300 hover:text-petroleum-800"><ExternalLink className="h-3.5 w-3.5" />Öppna rapport</Link>{report.status !== "approved" ? <button type="button" disabled={saving} onClick={() => void post({ action: "report.approve", reportId: report.id }, "Arbetsrapporten har godkänts.")} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-3 text-xs font-semibold text-white hover:bg-petroleum-900 disabled:opacity-60"><BadgeCheck className="h-3.5 w-3.5" />Godkänn</button> : null}</div></div></article>)}</div>}
         </Panel>
 
-        <Panel title="Fakturaunderlag" description="Granska och godkänn ekonomiska underlag för fakturering." bodyClassName="p-0">
-          {invoiceBases.length === 0 ? <EmptyState title="Inget fakturaunderlag skapat" description="Skapa underlag när tid och kostnader är färdigregistrerade." /> : <div className="divide-y divide-sand-100">{invoiceBases.map((invoice) => <article key={invoice.id} className="p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-ink-900">{invoice.reference}</p><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${invoice.status === "approved" || invoice.status === "exported" ? "bg-petroleum-50 text-petroleum-800" : "bg-sand-100 text-ink-600"}`}>{statusLabels[invoice.status] || invoice.status}</span></div><p className="mt-1 text-xs text-ink-400">{dateTime.format(new Date(invoice.created_at))} · Moms {invoice.vat_rate}%</p>{invoice.approved_at ? <p className="mt-1 text-xs font-medium text-petroleum-700">Godkänt {dateTime.format(new Date(invoice.approved_at))}</p> : null}</div><p className="text-lg font-semibold text-petroleum-800">{money.format(invoice.total)}</p></div><div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-sand-50 p-3 text-xs"><div><p className="text-ink-400">Exkl. moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.subtotal)}</p></div><div><p className="text-ink-400">Moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.vat_amount)}</p></div><div><p className="text-ink-400">Totalt</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.total)}</p></div></div>{invoice.status === "draft" ? <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.approve", invoiceId: invoice.id }, "Fakturaunderlaget är godkänt för fakturering.")} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 text-xs font-semibold text-white hover:bg-petroleum-900 disabled:opacity-60"><BadgeCheck className="h-3.5 w-3.5" />Godkänn för fakturering</button> : null}</article>)}</div>}
+        <Panel title="Arkiverade fakturaunderlag" description="Rapportsnapshots. Fortnox/Visma-export sker från Ekonomi och fakturering." bodyClassName="p-0">
+          {invoiceBases.length === 0 ? <EmptyState title="Inget fakturaunderlag skapat" description="Attestera tid och material under Ekonomi, eller skapa underlag här när raderna är godkända." /> : <div className="divide-y divide-sand-100">{invoiceBases.map((invoice) => <article key={invoice.id} className="p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-ink-900">{invoice.reference}</p><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${invoice.status === "approved" || invoice.status === "exported" ? "bg-petroleum-50 text-petroleum-800" : "bg-sand-100 text-ink-600"}`}>{statusLabels[invoice.status] || invoice.status}</span></div><p className="mt-1 text-xs text-ink-400">{dateTime.format(new Date(invoice.created_at))} · Moms {invoice.vat_rate}%</p>{invoice.approved_at ? <p className="mt-1 text-xs font-medium text-petroleum-700">Godkänt {dateTime.format(new Date(invoice.approved_at))}</p> : null}</div><p className="text-lg font-semibold text-petroleum-800">{money.format(invoice.total)}</p></div><div className="mt-4 grid grid-cols-3 gap-3 rounded-xl bg-sand-50 p-3 text-xs"><div><p className="text-ink-400">Exkl. moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.subtotal)}</p></div><div><p className="text-ink-400">Moms</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.vat_amount)}</p></div><div><p className="text-ink-400">Totalt</p><p className="mt-1 font-semibold text-ink-800">{money.format(invoice.total)}</p></div></div>{invoice.status === "draft" ? <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.approve", invoiceId: invoice.id }, "Rapportsnapshoten är godkänd.")} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 text-xs font-semibold text-white hover:bg-petroleum-900 disabled:opacity-60"><BadgeCheck className="h-3.5 w-3.5" />Godkänn snapshot</button> : null}</article>)}</div>}
         </Panel>
       </div>
     </div>

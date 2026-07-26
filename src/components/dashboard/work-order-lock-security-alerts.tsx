@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCheck, ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
@@ -31,7 +32,7 @@ export function WorkOrderLockSecurityAlerts() {
     setError("");
     try {
       const response = await fetch("/api/notifications/work-order-locks", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta säkerhetsaviseringar");
       setData(body);
     } catch (value) {
@@ -73,7 +74,7 @@ export function WorkOrderLockSecurityAlerts() {
         keepalive: options?.navigate === true,
       });
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
+        const body = await readResponseJson(response).catch(() => ({}));
         throw new Error(body.error || "Aviseringen kunde inte markeras som läst");
       }
       if (!options?.navigate) await load();

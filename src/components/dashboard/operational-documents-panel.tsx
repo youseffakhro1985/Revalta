@@ -3,6 +3,7 @@
 import { FileText, UploadCloud } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type DocumentItem = {
   id: string;
@@ -62,7 +63,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
     try {
       const params = new URLSearchParams({ entityType, entityId });
       const response = await fetch(`/api/operational-documents?${params.toString()}`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta dokument");
       setDocuments(data.documents || []);
     } catch (err) {
@@ -85,13 +86,31 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
       formData.set("entityType", entityType);
       formData.set("entityId", entityId);
       const response = await fetch("/api/operational-documents", { method: "POST", body: formData });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ladda upp dokumentet");
       setSuccess("Dokumentet har laddats upp.");
       form.reset();
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte ladda upp dokumentet");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeDocument(documentId: string) {
+    if (!window.confirm("Ta bort dokumentet? Det döljs från listan men behålls i historiken.")) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/operational-documents/${documentId}`, { method: "DELETE" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort dokumentet");
+      setSuccess("Dokumentet har tagits bort.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort dokumentet");
     } finally {
       setSaving(false);
     }
@@ -125,18 +144,28 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
         ) : (
           <div className="divide-y divide-sand-100 rounded-2xl border border-sand-200 bg-white">
             {documents.map((document) => (
-              <a key={document.id} href={document.storage_url} target="_blank" rel="noreferrer" className="flex items-start gap-4 p-4 transition hover:bg-sand-50 sm:p-5">
-                <div className="rounded-xl bg-petroleum-50 p-2.5 text-petroleum-700"><FileText className="h-5 w-5" /></div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate font-semibold text-ink-900">{document.file_name}</p>
-                    <span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{categoryLabels[document.category] || document.category}</span>
-                    <span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{document.visibility === "shared" ? "Delat" : "Internt"}</span>
+              <div key={document.id} className="flex items-start gap-4 p-4 sm:p-5">
+                <a href={document.storage_url} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-start gap-4 transition hover:opacity-90">
+                  <div className="rounded-xl bg-petroleum-50 p-2.5 text-petroleum-700"><FileText className="h-5 w-5" /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-semibold text-ink-900">{document.file_name}</p>
+                      <span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{categoryLabels[document.category] || document.category}</span>
+                      <span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{document.visibility === "shared" ? "Delat" : "Internt"}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-ink-500">{formatBytes(document.size_bytes)} · Version {document.version} · {document.uploaded_by.name || document.uploaded_by.email}</p>
+                    <p className="mt-1 text-xs text-ink-400">{formatDate(document.created_at)}</p>
                   </div>
-                  <p className="mt-1 text-xs text-ink-500">{formatBytes(document.size_bytes)} · Version {document.version} · {document.uploaded_by.name || document.uploaded_by.email}</p>
-                  <p className="mt-1 text-xs text-ink-400">{formatDate(document.created_at)}</p>
-                </div>
-              </a>
+                </a>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void removeDocument(document.id)}
+                  className="shrink-0 text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+                >
+                  Ta bort
+                </button>
+              </div>
             ))}
           </div>
         )}

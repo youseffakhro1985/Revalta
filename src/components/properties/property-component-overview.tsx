@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, CircleDollarSign, Gauge, RefreshCw, Wrench } from "lucide-react";
@@ -40,7 +41,7 @@ export function PropertyComponentOverview({ propertyId }: { propertyId: string }
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/components/overview`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta komponentöversikten");
       setData(body);
     } catch (value) {

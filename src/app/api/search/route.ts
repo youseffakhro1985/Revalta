@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const [properties, tickets, users, leaseHolders] = await Promise.all([
       db.property.findMany({
         where: {
+          deleted_at: null,
           ...tenantWhere(user),
           OR: [
             { name: contains },
@@ -29,6 +30,7 @@ export async function GET(request: Request) {
       }),
       db.ticket.findMany({
         where: {
+          deleted_at: null,
           ...tenantWhere(user),
           OR: [
             { title: contains },
@@ -52,6 +54,7 @@ export async function GET(request: Request) {
       }),
       user.company_id ? db.leaseHolder.findMany({
         where: {
+          deleted_at: null,
           company_id: user.company_id,
           status: "active",
           OR: [{ name: contains }, { contact_name: contains }, { email: contains }, { organization_number: contains }],
@@ -64,7 +67,7 @@ export async function GET(request: Request) {
           email: true,
           organization_number: true,
           leases: {
-            where: { status: { in: ["reserved", "active", "notice"] } },
+            where: { deleted_at: null, status: { in: ["reserved", "active", "notice"] } },
             orderBy: { updated_at: "desc" },
             take: 1,
             select: { lease_number: true, unit: { select: { designation: true } }, property: { select: { name: true } } },

@@ -5,10 +5,12 @@ import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   generateRecurringWorkOrder,
+  listRecurringRuns,
   readRecurringSchedules,
   RECURRING_FREQUENCIES,
   RECURRING_PRIORITIES,
-  RECURRING_SCHEDULE_ACTION,
+  RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR,
+  upsertRecurringSchedule,
   type RecurringFrequency,
   type RecurringPriority,
 } from "@/lib/recurring-work-order-engine";
@@ -21,16 +23,11 @@ export async function GET() {
   const [schedules, properties, runs] = await Promise.all([
     readRecurringSchedules(user.company_id),
     db.property.findMany({
-      where: { company_id: user.company_id },
+      where: { company_id: user.company_id, deleted_at: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, address: true, city: true },
     }),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "recurring_work_orders_run" },
-      orderBy: { created_at: "desc" },
-      take: 20,
-      select: { id: true, status: true, payload: true, created_at: true },
-    }),
+    listRecurringRuns(user.company_id, { take: 20 }),
   ]);
 
   const now = Date.now();
@@ -63,9 +60,18 @@ export async function POST(request: Request) {
   if (body.action === "generate") {
     const scheduleId = String(body.scheduleId || "").trim();
     if (!scheduleId) return NextResponse.json({ error: "Schema krävs" }, { status: 400 });
+    const schedules = await readRecurringSchedules(user.company_id);
+    const existing = schedules.find((item) => item.id === scheduleId);
+    if (!existing) return NextResponse.json({ error: "Aktivt schema hittades inte" }, { status: 404 });
+    if (existing.source === "legacy") {
+      return NextResponse.json({ error: RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR }, { status: 409 });
+    }
     const result = await generateRecurringWorkOrder({ companyId: user.company_id, scheduleId, actorUserId: user.id, force: true });
     if (result.status === "generated") return NextResponse.json(result, { status: 201 });
     if (result.status === "locked") return NextResponse.json({ error: "Schemat körs redan" }, { status: 409 });
+    if (result.status === "failed" && result.reason === "legacy_requires_backfill") {
+      return NextResponse.json({ error: RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR }, { status: 409 });
+    }
     if (result.status === "failed") return NextResponse.json({ error: "Schemat kunde inte generera en arbetsorder", reason: result.reason }, { status: 400 });
     return NextResponse.json({ error: "Aktivt schema hittades inte" }, { status: 404 });
   }
@@ -85,29 +91,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Rubrik, beskrivning eller kostnad är ogiltig" }, { status: 400 });
   }
 
-  const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id }, select: { id: true, name: true } });
+  const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true, name: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   const scheduleId = randomUUID();
+  await upsertRecurringSchedule({
+    id: scheduleId,
+    companyId: user.company_id,
+    propertyId: property.id,
+    propertyName: property.name,
+    title,
+    description,
+    frequency,
+    priority,
+    estimatedCost,
+    nextRunAt,
+    active: true,
+    actorUserId: user.id,
+  });
   await writeAuditLog(user, {
     entityType: "recurring_work_order",
     entityId: scheduleId,
-    action: RECURRING_SCHEDULE_ACTION,
+    action: "work_order.recurring.schedule_created",
     metadata: {
-      schedule_id: scheduleId,
-      property_id: property.id,
-      property_name: property.name,
+      scheduleId,
+      propertyId: property.id,
       title,
-      description,
       frequency,
       priority,
-      estimated_cost: estimatedCost,
-      next_run_at: nextRunAt.toISOString(),
-      active: true,
-      last_generated_at: null,
-      last_work_order_id: null,
-      last_work_order_number: null,
-      updated_at: new Date().toISOString(),
+      nextRunAt: nextRunAt.toISOString(),
+      storage: "RecurringWorkOrderSchedule",
     },
   });
   return NextResponse.json({ scheduleId }, { status: 201 });
@@ -120,18 +133,82 @@ export async function PATCH(request: Request) {
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const body = await request.json().catch(() => null);
-  const scheduleId = String(body?.scheduleId || "").trim();
-  if (!scheduleId || typeof body?.active !== "boolean") return NextResponse.json({ error: "Schema och aktiv status krävs" }, { status: 400 });
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
+
+  const scheduleId = String(body.scheduleId || body.id || "").trim();
+  if (!scheduleId) return NextResponse.json({ error: "Schema-id krävs" }, { status: 400 });
+
+  const hasActive = typeof body.active === "boolean";
+  const fieldKeys = ["title", "description", "frequency", "priority", "estimatedCost", "nextRunAt"] as const;
+  const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+  if (!hasActive && !hasFieldUpdate) {
+    return NextResponse.json({ error: "Aktiv status eller fält att uppdatera krävs" }, { status: 400 });
+  }
 
   const schedules = await readRecurringSchedules(user.company_id);
   const schedule = schedules.find((item) => item.id === scheduleId);
   if (!schedule) return NextResponse.json({ error: "Schemat hittades inte" }, { status: 404 });
+  if (schedule.source === "legacy") {
+    return NextResponse.json({ error: RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR }, { status: 409 });
+  }
+
+  let title = schedule.title;
+  let description = schedule.description;
+  let frequency = schedule.frequency;
+  let priority = schedule.priority;
+  let estimatedCost = schedule.estimated_cost;
+  let nextRunAt = new Date(schedule.next_run_at);
+  let active = schedule.active;
+
+  if (hasActive) active = body.active;
+  if (body.title !== undefined) title = String(body.title || "").trim();
+  if (body.description !== undefined) description = String(body.description || "").trim();
+  if (body.frequency !== undefined) frequency = String(body.frequency || "") as RecurringFrequency;
+  if (body.priority !== undefined) priority = String(body.priority || "normal") as RecurringPriority;
+  if (body.estimatedCost !== undefined) {
+    estimatedCost = body.estimatedCost === "" || body.estimatedCost == null ? null : Number(body.estimatedCost);
+  }
+  if (body.nextRunAt !== undefined) nextRunAt = new Date(String(body.nextRunAt || ""));
+
+  if (!title || !description || !RECURRING_FREQUENCIES.includes(frequency) || !RECURRING_PRIORITIES.includes(priority) || Number.isNaN(nextRunAt.getTime())) {
+    return NextResponse.json({ error: "Kontrollera innehåll, frekvens, prioritet och nästa körning" }, { status: 400 });
+  }
+  if (title.length > 180 || description.length > 10000 || (estimatedCost !== null && (!Number.isFinite(estimatedCost) || estimatedCost < 0))) {
+    return NextResponse.json({ error: "Rubrik, beskrivning eller kostnad är ogiltig" }, { status: 400 });
+  }
+
+  const updateResult = await db.recurringWorkOrderSchedule.updateMany({
+    where: { id: scheduleId, company_id: user.company_id },
+    data: {
+      title,
+      description,
+      frequency,
+      priority,
+      estimated_cost: estimatedCost,
+      next_run_at: nextRunAt,
+      active,
+      updated_by_id: user.id,
+    },
+  });
+  if (updateResult.count === 0) return NextResponse.json({ error: "Schemat hittades inte" }, { status: 404 });
 
   await writeAuditLog(user, {
     entityType: "recurring_work_order",
     entityId: scheduleId,
-    action: RECURRING_SCHEDULE_ACTION,
-    metadata: { ...schedule, schedule_id: scheduleId, active: body.active, updated_at: new Date().toISOString() },
+    action: "work_order.recurring.schedule_updated",
+    metadata: {
+      scheduleId,
+      title,
+      description,
+      frequency,
+      priority,
+      estimated_cost: estimatedCost,
+      nextRunAt: nextRunAt.toISOString(),
+      active,
+      storage: "RecurringWorkOrderSchedule",
+    },
   });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, id: scheduleId, active });
 }

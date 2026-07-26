@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const allowedStatuses = new Set(["planned", "active", "paused", "completed", "cancelled"]);
 const allowedRisks = new Set(["low", "medium", "high"]);
@@ -18,48 +19,56 @@ function parseMoney(value: unknown) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-  const [projects, properties, members] = await Promise.all([
-    db.project.findMany({
-      where: { company_id: user.company_id },
-      orderBy: [{ status: "asc" }, { start_date: "asc" }, { created_at: "desc" }],
-      take: 500,
-      include: {
-        property: { select: { id: true, name: true } },
-        manager: { select: { id: true, name: true, email: true } },
-        source_work_order: { select: { id: true, title: true, status: true } },
-      },
-    }),
-    db.property.findMany({
-      where: { company_id: user.company_id },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    db.user.findMany({
-      where: { company_id: user.company_id, status: "active" },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true },
-    }),
-  ]);
+    const [projects, properties, members] = await Promise.all([
+      db.project.findMany({
+        where: { company_id: user.company_id, deleted_at: null },
+        orderBy: [{ status: "asc" }, { start_date: "asc" }, { created_at: "desc" }],
+        take: 500,
+        include: {
+          property: { select: { id: true, name: true } },
+          manager: { select: { id: true, name: true, email: true } },
+          source_work_order: { select: { id: true, title: true, status: true } },
+        },
+      }),
+      db.property.findMany({
+        where: { company_id: user.company_id, deleted_at: null },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      db.user.findMany({
+        where: { company_id: user.company_id, status: "active" },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, email: true },
+      }),
+    ]);
 
-  return NextResponse.json({
-    projects: projects.map((project) => ({
-      ...project,
-      property_name: project.property.name,
-      project_manager: project.manager?.name || project.manager?.email || "",
-      start_date: project.start_date,
-      end_date: project.end_date,
-      budget: Number(project.budget),
-      forecast: Number(project.forecast),
-      actual: Number(project.actual),
-      deviation: Number(project.forecast) - Number(project.budget),
-    })),
-    properties,
-    members,
-  });
+    return NextResponse.json({
+      projects: projects.map((project) => ({
+        ...project,
+        property_name: project.property.name,
+        project_manager: project.manager?.name || project.manager?.email || "",
+        start_date: project.start_date,
+        end_date: project.end_date,
+        budget: Number(project.budget),
+        forecast: Number(project.forecast),
+        actual: Number(project.actual),
+        deviation: Number(project.forecast) - Number(project.budget),
+      })),
+      properties,
+      members,
+    });
+  } catch (error) {
+    console.error("Get projects error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
@@ -93,7 +102,7 @@ export async function POST(request: Request) {
   if (startDate && endDate && endDate < startDate) return NextResponse.json({ error: "Slutdatum kan inte vara före startdatum" }, { status: 400 });
 
   const property = await db.property.findFirst({
-    where: { id: propertyId, company_id: user.company_id },
+    where: { id: propertyId, company_id: user.company_id, deleted_at: null },
     select: { id: true, name: true },
   });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
@@ -108,7 +117,7 @@ export async function POST(request: Request) {
 
   if (sourceWorkOrderId) {
     const source = await db.workOrder.findFirst({
-      where: { id: sourceWorkOrderId, company_id: user.company_id, property_id: propertyId },
+      where: { deleted_at: null, id: sourceWorkOrderId, company_id: user.company_id, property_id: propertyId },
       select: { id: true },
     });
     if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 400 });

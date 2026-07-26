@@ -6,7 +6,7 @@ Revalta ska gå från en fungerande SaaS-prototyp med många separata moduler ti
 
 ## Viktig nulägesobservation
 
-Kärnmodellerna för företag, användare, fastigheter, byggnader, enheter och ärenden finns i Prisma. Flera senare moduler använder däremot AuditLog som primär lagring. AuditLog ska endast användas för revisionshistorik, inte som huvuddatabas för affärsobjekt.
+Kärnmodellerna för företag, användare, fastigheter, byggnader, enheter och ärenden finns i Prisma. Affärsobjekt skrivs till normaliserade tabeller; AuditLog är revisionshistorik. Äldre AuditLog-/IntegrationEvent-rader kan fortfarande dual-läsas tills backfill är verifierad i produktion, men nya mutationer fail-closar mot moderna tabeller.
 
 ## Prioriterad vertikal leverans
 
@@ -143,39 +143,25 @@ Detta blir referensarkitekturen för övriga moduler.
 6. Stäng av AuditLog som primär lagring.
 7. Behåll historiken som revisionsspår.
 
-## Kommande leveranser
+## Leveransstatus
 
-### Leverans A – Ärende till arbetsorder
+### Leverans A–D – levererade
 
-- Skapa arbetsorder från ärende.
-- Koppla ansvarig, fastighet och enhet.
-- Statushistorik.
-- Kostnadsuppföljning.
-- Stäng ärende när arbetsorder slutförs, valbart.
+- **A** Ärende → arbetsorder (skapande, koppling, statushistorik, ticket-sync).
+- **B** Arbetsorder → projekt (skapande från WO-detalj, projektledare, dokument).
+- **C** Besiktning/rond → åtgärd (avvikelser till arbetsorder, compliance corrective WO).
+- **D** IMD → debiteringsunderlag (`ImdDebitLine` + koppling till hyresavi).
 
-### Leverans B – Arbetsorder till projekt
+### Leverans E – Ekonomi och rapportering (levererad, dual-read-retirement kvar)
 
-- Skapa projekt från större arbetsorder.
-- Budget, prognos och utfall.
-- Entreprenör och projektledare.
-- Dokument och projektkostnader.
-
-### Leverans C – Besiktning och rond till åtgärd
-
-- Avvikelse skapar ärende eller arbetsorder.
-- Spårbar relation till ursprungskontrollen.
-
-### Leverans D – IMD till debiteringsunderlag
-
-- Avläsning skapar förbrukning.
-- Förbrukning skapar debiteringsrad.
-- Debiteringsrad kan kopplas till hyresavi.
-
-### Leverans E – Ekonomi och rapportering
-
-- Projekt och arbetsordrar påverkar budgetutfall.
-- Rapporter hämtar från normaliserade tabeller.
-- Export till CSV, Excel och PDF.
+- Attesterbar tid/material/lönsamhet/fakturaunderlag på arbetsorder.
+- Fakturaexport-UI till Fortnox/Visma/webhook (`WorkOrderInvoiceExportJob` + integrationsöversikt).
+- Kanonisk fakturaväg: godkänd tid/material → `WorkOrderInvoiceDraft` → export. Rapportflödet skapar samma draft och arkiverar `WorkOrderInvoiceBasis` som snapshot.
+- Fältavslut (`completion.finalize`) sätter driftkostnad och promoverar tid/material till attesterbara rader.
+- Ticket time/cost blockeras när arbetsorder finns; ticket operations kan soft-deletas.
+- Soft-delete för tickets, work orders, projects, properties, leases, lease holders, operational documents, notifications; IMD void.
+- Cron-produktjournaler på `CronJobRun` (preventive/recurring escalations).
+- Efter prod-backfill: sätt `REVALTA_MODERN_STORAGE_ONLY=1` för att stänga dual-read via `mergeByCreatedAt` och WO-ops-storage (migreringssteg 6). Full borttagning av legacy-kodgrenar kan ske i en senare städ-PR.
 
 ## Kvalitetskrav före merge
 

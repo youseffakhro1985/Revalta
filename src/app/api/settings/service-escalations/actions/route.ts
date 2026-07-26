@@ -7,8 +7,6 @@ import { getCurrentUser } from "@/lib/current-user";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ACTION_EVENT = "service_escalation_admin_action";
-
 type AdminAction = "test" | "retry";
 
 function canManage(role: string) {
@@ -79,19 +77,20 @@ export async function POST(request: Request) {
   const action: AdminAction | null = body?.action === "test" || body?.action === "retry" ? body.action : null;
   if (!action) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
 
-  const event = await db.integrationEvent.create({
+  const event = await db.serviceEscalationAdminAction.create({
     data: {
       company_id: user.company_id,
-      type: ACTION_EVENT,
+      action,
       status: "processing",
-      recipient: user.email,
+      requested_by_id: user.id,
+      requested_by_email: user.email,
       payload: { action, requestedBy: user.id, requestedByEmail: user.email },
     },
   });
 
   try {
     const result = action === "test" ? await sendTestEmail(user.email) : await runEscalationEngine();
-    await db.integrationEvent.update({
+    await db.serviceEscalationAdminAction.update({
       where: { id: event.id },
       data: {
         status: "sent",
@@ -102,12 +101,12 @@ export async function POST(request: Request) {
       entityType: "service_escalation",
       entityId: event.id,
       action: action === "test" ? "service_escalation.test_email" : "service_escalation.manual_run",
-      metadata: { action, eventId: event.id },
+      metadata: { action, eventId: event.id, storage: "ServiceEscalationAdminAction" },
     });
     return NextResponse.json({ success: true, action, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Okänt fel";
-    await db.integrationEvent.update({
+    await db.serviceEscalationAdminAction.update({
       where: { id: event.id },
       data: {
         status: "failed",
@@ -118,8 +117,8 @@ export async function POST(request: Request) {
       entityType: "service_escalation",
       entityId: event.id,
       action: "service_escalation.admin_action_failed",
-      metadata: { action, eventId: event.id, error: message },
+      metadata: { action, eventId: event.id, error: message, storage: "ServiceEscalationAdminAction" },
     });
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }

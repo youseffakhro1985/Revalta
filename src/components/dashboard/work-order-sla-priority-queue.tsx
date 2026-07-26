@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Clock3, ShieldAlert, UserRoundX } from "lucide-react";
 import { InlineAlert, Panel } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
 import type { WorkOrderSlaEvaluation } from "@/lib/work-order-sla";
 
@@ -48,7 +49,7 @@ export function WorkOrderSlaPriorityQueue() {
     async function load() {
       try {
         const response = await fetch("/api/work-orders", { cache: "no-store" });
-        const data = await response.json();
+        const data = await readResponseJson<{ error?: string; workOrders?: WorkOrder[] }>(response);
         if (!response.ok) throw new Error(data.error || "Kunde inte hämta SLA-prioriteringen");
         if (mounted) setItems(Array.isArray(data.workOrders) ? data.workOrders : []);
       } catch (cause) {

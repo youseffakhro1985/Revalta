@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, RefreshCw, ShieldAlert } from "lucide-react";
 
@@ -35,7 +36,7 @@ export function ServiceNotificationAlertCenter() {
     setError("");
     try {
       const response = await fetch("/api/settings/service-notifications/alerts", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta driftlarmen");
       setData(body);
     } catch (value) {
@@ -65,7 +66,7 @@ export function ServiceNotificationAlertCenter() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ alertId }),
       });
-      const body = await response.json().catch(() => ({}));
+      const body = await readResponseJson(response).catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Driftlarmet kunde inte kvitteras");
     } catch (value) {
       setError(value instanceof Error ? value.message : "Driftlarmet kunde inte kvitteras");

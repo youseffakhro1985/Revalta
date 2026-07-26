@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, BadgeCheck, ClipboardList, Clock3, FolderKanban, Gauge, Search, UserRound } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type SlaRisk = "overdue" | "critical" | "soon" | "normal" | "fulfilled" | "paused" | "not_configured";
 type SlaPhase = "response" | "resolution" | "fulfilled" | "paused" | "not_configured";
@@ -117,7 +118,12 @@ export default function WorkOrdersPage() {
       try {
         const response = await fetch("/api/work-orders", { cache: "no-store" });
         if (response.status === 401) { router.push("/login"); return; }
-        const data = await response.json();
+        const data = await readResponseJson<{
+          error?: string;
+          workOrders?: WorkOrder[];
+          slaSummary?: SlaSummary | null;
+          evaluatedAt?: string | null;
+        }>(response);
         if (!response.ok) throw new Error(data.error || "Kunde inte hämta arbetsordrar");
         if (!mounted) return;
         setWorkOrders(data.workOrders || []);

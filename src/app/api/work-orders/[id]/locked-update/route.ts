@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { PATCH as updateWorkOrder } from "../route";
 
 function noStore(body: unknown, init?: ResponseInit) {
@@ -40,6 +41,7 @@ export async function PATCH(
     return noStore({ error: "Ogiltig arbetsorderversion", code: "invalid_version" }, { status: 400 });
   }
 
+  const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
   const rows = await db.$queryRaw<Array<{ updated_at: Date; lock_valid: boolean }>>(Prisma.sql`
     SELECT w."updated_at",
            EXISTS (
@@ -53,6 +55,7 @@ export async function PATCH(
            ) AS "lock_valid"
     FROM "WorkOrder" w
     WHERE w."id" = ${id} AND w."company_id" = ${user.company_id}
+      ${workOrderGuard}
     LIMIT 1
   `);
 

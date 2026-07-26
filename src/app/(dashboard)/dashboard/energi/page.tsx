@@ -12,9 +12,10 @@ import {
   premiumPrimaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string; total_area?: number | null };
-type Reading = { id: string; property_id?: string; property_name?: string; type?: string; period?: string; unit?: string; value?: number; cost?: number; value_per_sqm?: number | null; cost_per_sqm?: number | null; note?: string; created_at: string };
+type Reading = { id: string; property_id?: string; property_name?: string; type?: string; period?: string; unit?: string; value?: number; cost?: number; value_per_sqm?: number | null; cost_per_sqm?: number | null; note?: string; created_at: string; source?: "table" | "legacy" };
 
 const labels: Record<string, string> = { electricity: "El", heating: "Värme", water: "Vatten" };
 const icons = { electricity: Zap, heating: Flame, water: Droplets };
@@ -26,6 +27,10 @@ export default function EnergyPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [removingId, setRemovingId] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [editForm, setEditForm] = useState({ period: "", value: "", cost: "", note: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({ propertyId: "", type: "electricity", period: new Date().toISOString().slice(0, 7), unit: "kWh", value: "", cost: "", note: "" });
@@ -35,7 +40,7 @@ export default function EnergyPage() {
     setError("");
     try {
       const response = await fetch("/api/energy", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta förbrukning");
       setReadings(data.readings || []);
       setProperties(data.properties || []);
@@ -55,6 +60,16 @@ export default function EnergyPage() {
     water: readings.filter((row) => row.type === "water").reduce((sum, row) => sum + Number(row.value || 0), 0),
   }), [readings]);
 
+  function startEdit(reading: Reading) {
+    setEditingId(reading.id);
+    setEditForm({
+      period: reading.period || "",
+      value: String(reading.value ?? ""),
+      cost: String(reading.cost ?? ""),
+      note: reading.note || "",
+    });
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -62,7 +77,7 @@ export default function EnergyPage() {
     setSuccess("");
     try {
       const response = await fetch("/api/energy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara avläsningen");
       setForm({ ...form, propertyId: "", value: "", cost: "", note: "" });
       setSuccess("Avläsningen har sparats.");
@@ -71,6 +86,64 @@ export default function EnergyPage() {
       setError(err instanceof Error ? err.message : "Kunde inte spara avläsningen");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveEdit(reading: Reading) {
+    if (reading.source === "legacy") {
+      setError("Avläsningen finns i äldre lagring. Kör backfill till EnergyReading innan den kan uppdateras.");
+      return;
+    }
+    setUpdatingId(reading.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch("/api/energy", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          readingId: reading.id,
+          period: editForm.period,
+          value: editForm.value,
+          cost: editForm.cost,
+          note: editForm.note,
+        }),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera avläsningen");
+      setSuccess("Avläsningen har uppdaterats.");
+      setEditingId("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte uppdatera avläsningen");
+    } finally {
+      setUpdatingId("");
+    }
+  }
+
+  async function removeReading(reading: Reading) {
+    if (reading.source === "legacy") {
+      setError("Avläsningen finns i äldre lagring. Kör backfill till EnergyReading innan den kan tas bort.");
+      return;
+    }
+    if (!window.confirm("Ta bort den här avläsningen?")) return;
+    setRemovingId(reading.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch("/api/energy", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ readingId: reading.id }),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort avläsningen");
+      setSuccess("Avläsningen har tagits bort.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte ta bort avläsningen");
+    } finally {
+      setRemovingId("");
     }
   }
 
@@ -84,6 +157,8 @@ export default function EnergyPage() {
       <MetricCard icon={Droplets} label="Vatten" value={`${number.format(summary.water)} m³`} />
     </section>
 
+    {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
+
     <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
       <Panel title="Ny avläsning" description="Registrera en månadsvis förbrukning och kostnad.">
         <form onSubmit={submit} className="space-y-4">
@@ -92,14 +167,57 @@ export default function EnergyPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} required /><input className={premiumFieldClass} value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} required /></div>
           <input className={premiumFieldClass} type="number" min="0" step="1" placeholder="Kostnad i SEK" value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} />
           <textarea className={premiumTextareaClass} placeholder="Anteckning" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
-          {error ? <InlineAlert>{error}</InlineAlert> : null}
-          {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara avläsning"}</button>
         </form>
       </Panel>
 
       <Panel title="Förbrukningshistorik" description="Senaste registrerade värden per fastighet och period." bodyClassName="p-0">
-        {loading ? <div className="p-6 text-sm text-ink-500">Hämtar data…</div> : readings.length === 0 ? <EmptyState title="Inga avläsningar registrerade" description="När den första avläsningen sparas visas historiken här." /> : <div className="divide-y divide-sand-200">{readings.map((row) => { const Icon = icons[row.type as keyof typeof icons] || Gauge; return <article key={row.id} className="p-5 sm:p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row"><div className="flex gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-petroleum-50 text-petroleum-700"><Icon className="h-5 w-5" strokeWidth={1.6}/></div><div><h3 className="font-semibold text-ink-900">{labels[row.type || ""] || row.type}</h3><p className="mt-1 text-sm text-ink-500">{row.property_name} · {row.period}</p></div></div><div className="sm:text-right"><p className="text-xl font-semibold text-ink-900">{number.format(Number(row.value || 0))} {row.unit}</p><p className="text-xs text-ink-400">{money.format(Number(row.cost || 0))}</p></div></div><div className="mt-4 flex flex-wrap gap-4 text-xs text-ink-500">{row.value_per_sqm != null ? <span>{number.format(row.value_per_sqm)} {row.unit}/m²</span> : null}{row.cost_per_sqm != null ? <span>{money.format(row.cost_per_sqm)}/m²</span> : null}</div></article>; })}</div>}
+        {loading ? <div className="p-6 text-sm text-ink-500">Hämtar data…</div> : readings.length === 0 ? <EmptyState title="Inga avläsningar registrerade" description="När den första avläsningen sparas visas historiken här." /> : <div className="divide-y divide-sand-200">{readings.map((row) => {
+          const Icon = icons[row.type as keyof typeof icons] || Gauge;
+          return <article key={row.id} className="p-5 sm:p-6">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row">
+              <div className="flex gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-petroleum-50 text-petroleum-700"><Icon className="h-5 w-5" strokeWidth={1.6}/></div>
+                <div>
+                  <h3 className="font-semibold text-ink-900">{labels[row.type || ""] || row.type}</h3>
+                  <p className="mt-1 text-sm text-ink-500">{row.property_name} · {row.period}</p>
+                  {row.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering eller borttagning.</p> : null}
+                </div>
+              </div>
+              <div className="space-y-2 sm:text-right">
+                <p className="text-xl font-semibold text-ink-900">{number.format(Number(row.value || 0))} {row.unit}</p>
+                <p className="text-xs text-ink-400">{money.format(Number(row.cost || 0))}</p>
+                {row.source !== "legacy" ? (
+                  <>
+                    <button type="button" onClick={() => (editingId === row.id ? setEditingId("") : startEdit(row))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">
+                      {editingId === row.id ? "Stäng" : "Ändra"}
+                    </button>
+                    <button type="button" disabled={removingId === row.id} onClick={() => void removeReading(row)} className="block text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60 sm:ml-auto">
+                      {removingId === row.id ? "Tar bort…" : "Ta bort"}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4 text-xs text-ink-500">
+              {row.value_per_sqm != null ? <span>{number.format(row.value_per_sqm)} {row.unit}/m²</span> : null}
+              {row.cost_per_sqm != null ? <span>{money.format(row.cost_per_sqm)}/m²</span> : null}
+            </div>
+            {editingId === row.id && row.source !== "legacy" ? (
+              <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />
+                  <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} />
+                  <input className={premiumFieldClass} type="number" min="0" placeholder="Kostnad" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} />
+                </div>
+                <textarea className={premiumTextareaClass} placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                <button type="button" disabled={updatingId === row.id} onClick={() => void saveEdit(row)} className={`${premiumPrimaryButtonClass} sm:w-auto`}>
+                  {updatingId === row.id ? "Sparar…" : "Spara ändringar"}
+                </button>
+              </div>
+            ) : null}
+          </article>;
+        })}</div>}
       </Panel>
     </section>
   </div>;

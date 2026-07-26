@@ -7,16 +7,18 @@ import { runPreventiveMaintenanceEngine } from "@/lib/preventive-maintenance-eng
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const JOB_TYPE = "preventive_maintenance_run";
+
 function cronAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
   return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 async function execute(companyId?: string) {
-  const event = await db.integrationEvent.create({
+  const run = await db.cronJobRun.create({
     data: {
       company_id: companyId ?? null,
-      type: "preventive_maintenance_run",
+      job_type: JOB_TYPE,
       status: "processing",
       recipient: companyId ? `company:${companyId}` : "all-companies",
       payload: { companyId: companyId ?? null, startedAt: new Date().toISOString() },
@@ -25,16 +27,22 @@ async function execute(companyId?: string) {
 
   try {
     const result = await runPreventiveMaintenanceEngine({ companyId });
-    await db.integrationEvent.update({
-      where: { id: event.id },
-      data: { status: result.failed > 0 ? "partial" : "sent", payload: { ...result, companyId: companyId ?? null, completedAt: new Date().toISOString() } },
+    await db.cronJobRun.update({
+      where: { id: run.id },
+      data: {
+        status: result.failed > 0 ? "partial" : "sent",
+        payload: { ...result, companyId: companyId ?? null, completedAt: new Date().toISOString() },
+      },
     });
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Okänt fel";
-    await db.integrationEvent.update({
-      where: { id: event.id },
-      data: { status: "failed", payload: { companyId: companyId ?? null, error: message, completedAt: new Date().toISOString() } },
+    await db.cronJobRun.update({
+      where: { id: run.id },
+      data: {
+        status: "failed",
+        payload: { companyId: companyId ?? null, error: message, completedAt: new Date().toISOString() },
+      },
     });
     throw error;
   }
@@ -57,7 +65,7 @@ export async function POST() {
     entityType: "preventive_maintenance",
     entityId: user.company_id,
     action: "preventive_maintenance.manual_run",
-    metadata: result,
+    metadata: { ...result, storage: "CronJobRun" },
   });
   return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
 }

@@ -25,32 +25,34 @@ export async function GET(
 
   const { id } = await params;
   const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id },
+    where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
     select: {
       id: true,
       property_id: true,
       assigned_to_id: true,
-      work_order: {
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          scheduled_start: true,
-          scheduled_end: true,
-          created_at: true,
-          assigned_to: {
-            select: { id: true, name: true, email: true },
-          },
-        },
-      },
     },
   });
 
   if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
 
+  const workOrder = await db.workOrder.findFirst({
+    where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      priority: true,
+      scheduled_start: true,
+      scheduled_end: true,
+      created_at: true,
+      assigned_to: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+  });
+
   return NextResponse.json({
-    workOrder: ticket.work_order,
+    workOrder,
     canCreate: Boolean(ticket.property_id),
     suggestedAssignedToId: ticket.assigned_to_id,
   });
@@ -93,8 +95,16 @@ export async function POST(
   }
 
   const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id },
-    include: { work_order: { select: { id: true } } },
+    where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+    select: {
+      id: true,
+      property_id: true,
+      assigned_to_id: true,
+      status: true,
+      title: true,
+      description: true,
+      priority: true,
+    },
   });
   if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
   if (!ticket.property_id) {
@@ -103,8 +113,12 @@ export async function POST(
       { status: 409 },
     );
   }
-  if (ticket.work_order) {
-    return NextResponse.json({ workOrderId: ticket.work_order.id, created: false });
+  const activeWorkOrder = await db.workOrder.findFirst({
+    where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
+    select: { id: true },
+  });
+  if (activeWorkOrder) {
+    return NextResponse.json({ workOrderId: activeWorkOrder.id, created: false });
   }
 
   if (unitId) {
@@ -135,9 +149,18 @@ export async function POST(
     const result = await db.$transaction(async (tx) => {
       const existing = await tx.workOrder.findUnique({
         where: { ticket_id: ticket.id },
-        select: { id: true },
+        select: { id: true, deleted_at: true },
       });
-      if (existing) return { id: existing.id, created: false, workOrderNumber: null };
+      if (existing && !existing.deleted_at) {
+        return { id: existing.id, created: false, workOrderNumber: null };
+      }
+      if (existing?.deleted_at) {
+        // Free unique ticket_id so a new work order can be created after soft-delete.
+        await tx.workOrder.update({
+          where: { id: existing.id },
+          data: { ticket_id: null },
+        });
+      }
 
       const workOrderNumber = await allocateWorkOrderNumber(tx, user.company_id!, createdAt);
       const status = assignedToId || ticket.assigned_to_id ? "planned" : "new";
@@ -179,8 +202,8 @@ export async function POST(
         reason: "Skapad från felanmälan",
         metadata: { ticketId: ticket.id, workOrderNumber, unitId },
       });
-      await tx.ticket.update({
-        where: { id: ticket.id },
+      await tx.ticket.updateMany({
+        where: { id: ticket.id, company_id: user.company_id! },
         data: {
           status: ticket.status === "new" ? "received" : ticket.status,
           assigned_to_id: assignedToId || ticket.assigned_to_id,
@@ -209,8 +232,8 @@ export async function POST(
       { status: result.created ? 201 : 200 },
     );
   } catch (error) {
-    const concurrent = await db.workOrder.findUnique({
-      where: { ticket_id: ticket.id },
+    const concurrent = await db.workOrder.findFirst({
+      where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
       select: { id: true },
     });
     if (concurrent) {

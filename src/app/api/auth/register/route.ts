@@ -81,9 +81,10 @@ export async function POST(request: Request) {
       });
 
       const verifyUrl = `${new URL(request.url).origin}/verify-email?token=${verifyToken}`;
+      const canExposeVerifyUrl = !process.env.EMAIL_PROVIDER_API_KEY && process.env.NODE_ENV !== "production";
       return NextResponse.json({
         success: true,
-        verifyUrl: process.env.EMAIL_PROVIDER_API_KEY ? undefined : verifyUrl,
+        verifyUrl: canExposeVerifyUrl ? verifyUrl : undefined,
       }, { status: 201 });
     }
 

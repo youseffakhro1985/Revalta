@@ -24,7 +24,7 @@ export async function GET() {
         created_at: true,
         _count: {
           select: {
-            assigned_tickets: true,
+            assigned_tickets: { where: { deleted_at: null } },
           },
         },
       },
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         created_at: true,
         _count: {
           select: {
-            assigned_tickets: true,
+            assigned_tickets: { where: { deleted_at: null } },
           },
         },
       },

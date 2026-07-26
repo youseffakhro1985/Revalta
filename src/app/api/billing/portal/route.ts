@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageBilling, getCurrentUser } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
+import { allowIntegrationMocks } from "@/lib/runtime-env";
 import { createCustomerPortalSession, isStripeReady } from "@/lib/stripe";
 
 export async function POST(request: Request) {
@@ -21,6 +22,9 @@ export async function POST(request: Request) {
 
     if (!isStripeReady() || !customerId) {
       await recordPaymentEvent(user, { mode: "customer_portal_mock", reason: "stripe_not_configured_or_customer_missing" });
+      if (!allowIntegrationMocks()) {
+        return NextResponse.json({ error: "Stripe-kundportal är inte tillgänglig i produktion" }, { status: 503 });
+      }
       return NextResponse.json({
         success: true,
         mode: "mock",

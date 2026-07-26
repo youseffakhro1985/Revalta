@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { getPrismaBaseClient } from "@/lib/db";
+import { calculateResolutionDueAt, calculateResponseDueAt } from "@/lib/sla-policy";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import type { WorkOrderPriority, WorkOrderStatus } from "@/lib/work-order-workflow";
 
 export const WORK_ORDER_TYPES = ["corrective", "preventive", "inspection", "emergency", "project", "warranty"] as const;
@@ -32,13 +35,6 @@ export type WorkOrderStatusEventRow = {
   actor_email: string;
 };
 
-const SLA: Record<WorkOrderPriority, { responseHours: number; resolutionHours: number }> = {
-  urgent: { responseHours: 1, resolutionHours: 4 },
-  high: { responseHours: 4, resolutionHours: 24 },
-  normal: { responseHours: 24, resolutionHours: 72 },
-  low: { responseHours: 48, resolutionHours: 168 },
-};
-
 const TRANSITIONS: Record<WorkOrderStatus, readonly WorkOrderStatus[]> = {
   new: ["planned", "in_progress", "cancelled"],
   planned: ["new", "in_progress", "waiting_material", "blocked", "cancelled"],
@@ -59,10 +55,9 @@ export function normalizeWorkOrderSource(value: unknown): WorkOrderSource {
 }
 
 export function calculateWorkOrderSla(createdAt: Date, priority: WorkOrderPriority) {
-  const policy = SLA[priority];
   return {
-    responseDueAt: new Date(createdAt.getTime() + policy.responseHours * 60 * 60 * 1000),
-    resolutionDueAt: new Date(createdAt.getTime() + policy.resolutionHours * 60 * 60 * 1000),
+    responseDueAt: calculateResponseDueAt(priority, createdAt),
+    resolutionDueAt: calculateResolutionDueAt(priority, createdAt),
   };
 }
 
@@ -127,11 +122,13 @@ export async function addWorkOrderStatusEvent(tx: Prisma.TransactionClient, args
 }
 
 export async function getWorkOrderEnterpriseState(client: Prisma.TransactionClient | typeof import("@/lib/db").default, companyId: string, workOrderId: string) {
+  const workOrderGuard = await sqlSoftDeleteGuard(getPrismaBaseClient(), "WorkOrder", "w");
   const rows = await client.$queryRaw<EnterpriseRow[]>(Prisma.sql`
-    SELECT "id", "work_order_number", "work_type", "source", "sla_response_due_at", "sla_resolution_due_at",
-           "responded_at", "paused_at", "pause_reason", "closed_at"
-    FROM "WorkOrder"
-    WHERE "id" = ${workOrderId} AND "company_id" = ${companyId}
+    SELECT w."id", w."work_order_number", w."work_type", w."source", w."sla_response_due_at", w."sla_resolution_due_at",
+           w."responded_at", w."paused_at", w."pause_reason", w."closed_at"
+    FROM "WorkOrder" w
+    WHERE w."id" = ${workOrderId} AND w."company_id" = ${companyId}
+      ${workOrderGuard}
     LIMIT 1
   `);
   return rows[0] ?? null;

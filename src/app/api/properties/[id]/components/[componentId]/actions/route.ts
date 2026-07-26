@@ -38,10 +38,10 @@ async function optionalLink(companyId: string, propertyId: string, kind: "work_o
   const value = text(id, 80);
   if (!value) return null;
   if (kind === "work_order") {
-    const row = await db.workOrder.findFirst({ where: { id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
+    const row = await db.workOrder.findFirst({ where: { deleted_at: null, id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
     if (!row) throw new Error("Arbetsordern hittades inte i denna fastighet");
   } else {
-    const row = await db.project.findFirst({ where: { id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
+    const row = await db.project.findFirst({ where: { deleted_at: null, id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
     if (!row) throw new Error("Projektet hittades inte i denna fastighet");
   }
   return value;
@@ -54,7 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!canCreateProperties(user.role)) return NextResponse.json({ error: "Du saknar behörighet att registrera komponenthistorik" }, { status: 403 });
 
   const { id: propertyId, componentId } = await params;
-  const property = await db.property.findFirst({ where: { id: propertyId, ...tenantWhere(user) }, select: { id: true } });
+  const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   const assets = await db.$queryRaw<Array<{ id: string }>>(Prisma.sql`

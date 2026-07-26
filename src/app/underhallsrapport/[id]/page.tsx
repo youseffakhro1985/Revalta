@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Printer } from "lucide-react";
 
@@ -16,7 +17,7 @@ export default function MaintenanceReportPage({params}:{params:Promise<{id:strin
   const [error,setError]=useState("");
 
   useEffect(()=>{void params.then(value=>setId(value.id));},[params]);
-  const load=useCallback(async()=>{if(!id)return;try{const response=await fetch(`/api/properties/${id}/maintenance-plan`,{cache:"no-store"});const payload=await response.json();if(!response.ok)throw new Error(payload.error||"Kunde inte hämta rapporten");setData(payload);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta rapporten");}},[id]);
+  const load=useCallback(async()=>{if(!id)return;try{const response=await fetch(`/api/properties/${id}/maintenance-plan`,{cache:"no-store"});const payload=await readResponseJson(response);if(!response.ok)throw new Error(payload.error||"Kunde inte hämta rapporten");setData(payload);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta rapporten");}},[id]);
   useEffect(()=>{void load();},[load]);
   const total=useMemo(()=>data?.forecast?.yearly.reduce((sum,item)=>sum+item.amount,0)||0,[data]);
 

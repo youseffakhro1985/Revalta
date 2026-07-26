@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageBilling, getCurrentUser } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
+import { allowIntegrationMocks } from "@/lib/runtime-env";
 import { createCheckoutSession, isStripeReady } from "@/lib/stripe";
 
 const allowedPlans = new Set(["start", "professional", "enterprise"]);
@@ -22,6 +23,9 @@ export async function POST(request: Request) {
     const origin = new URL(request.url).origin;
     if (!isStripeReady(plan)) {
       await recordPaymentEvent(user, { plan, mode: "checkout_mock", reason: "stripe_not_configured" });
+      if (!allowIntegrationMocks()) {
+        return NextResponse.json({ error: "Stripe är inte konfigurerad i produktion" }, { status: 503 });
+      }
       return NextResponse.json({
         success: true,
         mode: "mock",

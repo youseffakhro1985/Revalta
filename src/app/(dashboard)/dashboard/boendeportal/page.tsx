@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, FileText, Inbox, MessageSquareText, RefreshCw, UsersRound } from "lucide-react";
@@ -13,6 +14,7 @@ import {
   premiumPrimaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { OPERATIONS_STATUS_LABELS, PRIORITY_LABELS } from "@/lib/domain-labels";
 
 type Lease = {
   id: string;
@@ -46,16 +48,8 @@ type Ticket = {
 
 type Payload = { leases: Lease[]; tickets: Ticket[]; canManage: boolean };
 
-const statusLabels: Record<string, string> = {
-  new: "Ny",
-  open: "Öppen",
-  assigned: "Tilldelad",
-  in_progress: "Pågår",
-  waiting: "Väntar",
-  resolved: "Löst",
-  closed: "Stängd",
-};
-const priorityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
+const statusLabels = OPERATIONS_STATUS_LABELS;
+const priorityLabels = PRIORITY_LABELS;
 const categoryLabels: Record<string, string> = {
   maintenance: "Underhåll",
   plumbing: "Vatten och avlopp",
@@ -82,7 +76,7 @@ export default function ResidentPortalPage() {
     setError("");
     try {
       const response = await fetch("/api/resident-portal", { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta boendeportalen");
       setData(payload);
       setForm((current) => ({ ...current, leaseId: current.leaseId || payload.leases?.[0]?.id || "" }));
@@ -106,7 +100,7 @@ export default function ResidentPortalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte skapa boendeärendet");
       setForm((current) => ({ ...current, category: "other", priority: "normal", subject: "", message: "" }));
       setSuccess(`Ärendet har skapats${payload.ticket?.public_reference ? ` med referens ${payload.ticket.public_reference}` : ""}.`);

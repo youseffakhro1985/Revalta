@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
-import db from "@/lib/db";
+import db, { getPrismaBaseClient } from "@/lib/db";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type Client = Prisma.TransactionClient | typeof db;
 
@@ -18,6 +19,17 @@ export async function validateWorkOrderAssetLinks(client: Client, args: {
   buildingId?: string | null;
   technicalAssetId?: string | null;
 }) {
+  const propertyGuard = await sqlSoftDeleteGuard(getPrismaBaseClient(), "Property", "p");
+  const propertyRows = await client.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT p."id"
+    FROM "Property" p
+    WHERE p."id" = ${args.propertyId}
+      AND p."company_id" = ${args.companyId}
+      ${propertyGuard}
+    LIMIT 1
+  `);
+  if (!propertyRows[0]) throw new Error("Fastigheten hittades inte");
+
   if (args.buildingId) {
     const rows = await client.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT b."id"
@@ -26,6 +38,7 @@ export async function validateWorkOrderAssetLinks(client: Client, args: {
       WHERE b."id" = ${args.buildingId}
         AND b."property_id" = ${args.propertyId}
         AND p."company_id" = ${args.companyId}
+        ${propertyGuard}
       LIMIT 1
     `);
     if (!rows[0]) throw new Error("Byggnaden tillhör inte vald fastighet");
@@ -33,11 +46,13 @@ export async function validateWorkOrderAssetLinks(client: Client, args: {
 
   if (args.technicalAssetId) {
     const rows = await client.$queryRaw<Array<{ id: string; building_id: string | null }>>(Prisma.sql`
-      SELECT "id", "building_id"
-      FROM "PropertyTechnicalAsset"
-      WHERE "id" = ${args.technicalAssetId}
-        AND "property_id" = ${args.propertyId}
-        AND "company_id" = ${args.companyId}
+      SELECT a."id", a."building_id"
+      FROM "PropertyTechnicalAsset" a
+      INNER JOIN "Property" p ON p."id" = a."property_id"
+      WHERE a."id" = ${args.technicalAssetId}
+        AND a."property_id" = ${args.propertyId}
+        AND a."company_id" = ${args.companyId}
+        ${propertyGuard}
       LIMIT 1
     `);
     const asset = rows[0];
@@ -63,6 +78,7 @@ export async function setWorkOrderAssetLinks(tx: Prisma.TransactionClient, args:
 }
 
 export async function getWorkOrderAssetLink(client: Client, companyId: string, workOrderId: string) {
+  const workOrderGuard = await sqlSoftDeleteGuard(getPrismaBaseClient(), "WorkOrder", "w");
   const rows = await client.$queryRaw<WorkOrderAssetLink[]>(Prisma.sql`
     SELECT w."building_id", b."name" AS "building_name",
       w."technical_asset_id", a."name" AS "technical_asset_name",
@@ -71,6 +87,7 @@ export async function getWorkOrderAssetLink(client: Client, companyId: string, w
     LEFT JOIN "Building" b ON b."id" = w."building_id"
     LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
     WHERE w."id" = ${workOrderId} AND w."company_id" = ${companyId}
+      ${workOrderGuard}
     LIMIT 1
   `);
   return rows[0] ?? null;

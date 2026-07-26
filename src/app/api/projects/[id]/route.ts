@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const project = await db.project.findFirst({
-    where: { id, company_id: user.company_id },
+    where: { id, company_id: user.company_id, deleted_at: null },
     include: {
       property: { select: { id: true, name: true, address: true, city: true } },
       manager: { select: { id: true, name: true, email: true } },
@@ -45,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const existing = await db.project.findFirst({ where: { id, company_id: user.company_id }, select: { id: true, status: true } });
+  const existing = await db.project.findFirst({ where: { id, company_id: user.company_id, deleted_at: null }, select: { id: true, status: true } });
   if (!existing) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
 
   const body = await request.json();
@@ -72,8 +72,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body[bodyKey] !== undefined) { const value = parseOptionalMoney(body[bodyKey]); if (value === undefined) return NextResponse.json({ error: `Ogiltigt ${label}` }, { status: 400 }); data[dataKey] = value ?? 0; }
   }
 
-  const project = await db.project.update({
-    where: { id: existing.id }, data,
+  const updateResult = await db.project.updateMany({
+    where: { deleted_at: null, id: existing.id, company_id: user.company_id },
+    data,
+  });
+  if (updateResult.count === 0) {
+    return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
+  }
+
+  const project = await db.project.findFirst({
+    where: { deleted_at: null, id: existing.id, company_id: user.company_id },
     include: {
       property: { select: { id: true, name: true, address: true, city: true } },
       manager: { select: { id: true, name: true, email: true } },
@@ -81,7 +89,40 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       source_work_order: { select: { id: true, title: true, status: true } },
     },
   });
+  if (!project) {
+    return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
+  }
 
   await writeAuditLog(user, { entityType: "project", entityId: project.id, action: "project.updated", metadata: { previousStatus: existing.status, status: project.status, managerId: project.manager_id, budget: project.budget.toString(), forecast: project.forecast.toString(), actual: project.actual.toString(), deviation: (Number(project.forecast) - Number(project.budget)).toString() } });
   return NextResponse.json({ project });
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+  const { id } = await params;
+  const existing = await db.project.findFirst({
+    where: { id, company_id: user.company_id, deleted_at: null },
+    select: { id: true, name: true, status: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
+
+  const deleteResult = await db.project.updateMany({
+    where: { id: existing.id, company_id: user.company_id, deleted_at: null },
+    data: { deleted_at: new Date(), status: existing.status === "completed" ? existing.status : "cancelled" },
+  });
+  if (deleteResult.count === 0) {
+    return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
+  }
+
+  await writeAuditLog(user, {
+    entityType: "project",
+    entityId: existing.id,
+    action: "project.deleted",
+    metadata: { name: existing.name, previousStatus: existing.status, softDelete: true },
+  });
+  return NextResponse.json({ success: true });
 }

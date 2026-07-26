@@ -23,7 +23,7 @@ export async function POST(
     }
 
     const ticket = await db.ticket.findFirst({
-      where: { id, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: { id: true, title: true },
     });
 
@@ -31,18 +31,25 @@ export async function POST(
       return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
     }
 
+    const authorName = user.name || user.email;
     const comment = await db.ticketComment.create({
       data: {
         ticket_id: ticket.id,
         user_id: user.id,
         body: normalizedBody,
         is_internal: Boolean(isInternal),
+        author_type: "staff",
+        author_name: authorName,
+        author_email: user.email,
       },
       select: {
         id: true,
         body: true,
         is_internal: true,
         created_at: true,
+        author_type: true,
+        author_name: true,
+        author_email: true,
         user: {
           select: {
             name: true,

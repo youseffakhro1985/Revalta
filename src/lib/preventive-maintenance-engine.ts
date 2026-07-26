@@ -8,6 +8,7 @@ import {
 } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import type { WorkOrderPriority } from "@/lib/work-order-workflow";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type Candidate = {
   id: string;
@@ -51,12 +52,14 @@ function serviceWindowEnd(now: Date, days: number) {
 
 async function loadCandidates(now: Date, companyId?: string) {
   const maxWindow = serviceWindowEnd(now, 90);
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
   return db.$queryRaw<Candidate[]>(Prisma.sql`
     SELECT a."id", a."company_id", a."property_id", a."building_id", a."name", a."category", a."location",
            a."criticality", a."next_service_at", a."service_lead_days", p."name" AS "property_name"
     FROM "PropertyTechnicalAsset" a
     INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
     WHERE a."next_service_at" IS NOT NULL
+      ${propertyGuard}
       AND a."next_service_at" <= ${maxWindow}
       AND a."auto_create_service_work_orders" = TRUE
       AND COALESCE(a."status", 'active') IN ('active', 'planned')
@@ -113,11 +116,13 @@ export async function runPreventiveMaintenanceEngine(options: { companyId?: stri
     const sla = calculateWorkOrderSla(createdAt, priority);
 
     try {
+      const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
       const created = await db.$transaction(async (tx) => {
         await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${`${component.company_id}:${cycleKey}`}))`);
         const existing = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-          SELECT "id" FROM "WorkOrder"
-          WHERE "company_id" = ${component.company_id} AND "maintenance_cycle_key" = ${cycleKey}
+          SELECT w."id" FROM "WorkOrder" w
+          WHERE w."company_id" = ${component.company_id} AND w."maintenance_cycle_key" = ${cycleKey}
+            ${workOrderGuard}
           LIMIT 1
         `);
         if (existing[0]) return { id: existing[0].id, wasCreated: false };

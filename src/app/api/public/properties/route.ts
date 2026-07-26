@@ -1,16 +1,17 @@
 import db from "@/lib/db";
-import { getPublicPortalCompany } from "@/lib/public-portal";
+import { extractPortalCompanySlug, resolvePublicPortalCompany, toPortalSlug } from "@/lib/public-portal";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const portal = await getPublicPortalCompany();
+    const companySlug = extractPortalCompanySlug(request);
+    const portal = await resolvePublicPortalCompany({ companySlug });
     if (!portal) {
       return NextResponse.json({ error: "Boendeportalen är inte konfigurerad ännu" }, { status: 503 });
     }
 
     const properties = await db.property.findMany({
-      where: { company_id: portal.company.id, status: "active" },
+      where: { company_id: portal.company.id, status: "active", deleted_at: null },
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -23,7 +24,11 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      company: { id: portal.company.id, name: portal.company.name },
+      company: {
+        id: portal.company.id,
+        name: portal.company.name,
+        slug: toPortalSlug(portal.company.name, portal.company.id),
+      },
       properties,
     });
   } catch (error) {

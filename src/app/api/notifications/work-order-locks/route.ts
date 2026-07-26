@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { getNotificationUxState, markNotificationsRead } from "@/lib/notification-ux-state";
 
 export const dynamic = "force-dynamic";
 
 const MAX_NOTIFICATIONS = 200;
-const MAX_READ_MARKERS = 1000;
 
 type Payload = {
   notificationKey?: unknown;
@@ -30,34 +30,53 @@ function notificationKeyFrom(value: unknown) {
   return key && key.length <= 300 ? key : null;
 }
 
-function safeNotification(value: unknown, readKeys: Set<string>) {
-  const payload = payloadFor(value);
-  const key = notificationKeyFrom(value);
-  const title = stringValue(payload?.title);
-  const description = stringValue(payload?.description);
-  const hrefValue = stringValue(payload?.href);
-  const href = hrefValue.startsWith("/dashboard/") ? hrefValue : "";
-  const dueAtValue = stringValue(payload?.dueAt);
-  const occurredAt = dueAtValue ? new Date(dueAtValue) : null;
-
-  if (!key || !title || !description || !href || !occurredAt || Number.isNaN(occurredAt.getTime())) return null;
-
+function buildNotification(input: {
+  key: string;
+  title: string;
+  description: string;
+  href: string;
+  dueAt: Date;
+  high: boolean;
+  readKeys: Set<string>;
+}) {
+  if (!input.key || !input.title || !input.description || !input.href.startsWith("/dashboard/")) return null;
+  if (Number.isNaN(input.dueAt.getTime())) return null;
   return {
-    key,
-    title,
-    description,
-    dueAt: occurredAt.toISOString(),
+    key: input.key,
+    title: input.title,
+    description: input.description,
+    dueAt: input.dueAt.toISOString(),
     overdue: false,
-    high: payload?.high !== false,
-    read: readKeys.has(key),
+    high: input.high,
+    read: input.readKeys.has(input.key),
     snoozedUntil: null,
-    href,
+    href: input.href,
     kind: "security" as const,
     snoozable: false,
     assignable: false,
     dateLabel: "Händelse",
     openLabel: "Öppna arbetsorder",
   };
+}
+
+function safeLegacyNotification(value: unknown, readKeys: Set<string>) {
+  const payload = payloadFor(value);
+  const key = notificationKeyFrom(value);
+  const title = stringValue(payload?.title);
+  const description = stringValue(payload?.description);
+  const hrefValue = stringValue(payload?.href);
+  const dueAtValue = stringValue(payload?.dueAt);
+  const occurredAt = dueAtValue ? new Date(dueAtValue) : null;
+  if (!key || !occurredAt) return null;
+  return buildNotification({
+    key,
+    title,
+    description,
+    href: hrefValue,
+    dueAt: occurredAt,
+    high: payload?.high !== false,
+    readKeys,
+  });
 }
 
 function noStore(body: unknown, init?: ResponseInit) {
@@ -67,32 +86,51 @@ function noStore(body: unknown, init?: ResponseInit) {
   });
 }
 
+async function listNotifications(companyId: string, userId: string, readKeys: Set<string>) {
+  const [modern, legacy] = await Promise.all([
+    db.workOrderLockNotification.findMany({
+      where: { company_id: companyId, recipient_user_id: userId },
+      orderBy: { created_at: "desc" },
+      take: MAX_NOTIFICATIONS,
+    }),
+    db.integrationEvent.findMany({
+      where: { company_id: companyId, type: "work_order_edit_lock_forced_release", recipient: userId },
+      orderBy: { created_at: "desc" },
+      select: { payload: true },
+      take: MAX_NOTIFICATIONS,
+    }),
+  ]);
+
+  const byKey = new Map<string, NonNullable<ReturnType<typeof buildNotification>>>();
+  for (const event of legacy) {
+    const item = safeLegacyNotification(event.payload, readKeys);
+    if (item) byKey.set(item.key, item);
+  }
+  for (const row of modern) {
+    const item = buildNotification({
+      key: row.notification_key,
+      title: row.title,
+      description: row.description,
+      href: row.href,
+      dueAt: row.occurred_at,
+      high: row.high,
+      readKeys,
+    });
+    if (item) byKey.set(item.key, item);
+  }
+
+  return [...byKey.values()]
+    .sort((a, b) => new Date(b.dueAt).getTime() - new Date(a.dueAt).getTime())
+    .slice(0, MAX_NOTIFICATIONS);
+}
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
-  const [events, reads] = await Promise.all([
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "work_order_edit_lock_forced_release", recipient: user.id },
-      orderBy: { created_at: "desc" },
-      select: { payload: true },
-      take: MAX_NOTIFICATIONS,
-    }),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "work_order_lock_notification_read", recipient: user.id, status: "read" },
-      orderBy: { created_at: "desc" },
-      select: { payload: true },
-      take: MAX_READ_MARKERS,
-    }),
-  ]);
-
-  const readKeys = new Set(
-    reads.map((event) => notificationKeyFrom(event.payload)).filter((value): value is string => value !== null),
-  );
-  const notifications = events
-    .map((event) => safeNotification(event.payload, readKeys))
-    .filter((item): item is NonNullable<typeof item> => item !== null);
+  const ux = await getNotificationUxState(user.company_id, user.id, "work_order_lock");
+  const notifications = await listNotifications(user.company_id, user.id, ux.read);
 
   return noStore({
     notifications,
@@ -110,15 +148,9 @@ export async function PATCH(request: Request) {
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const body = await request.json().catch(() => ({})) as { key?: unknown; all?: unknown };
-  const events = await db.integrationEvent.findMany({
-    where: { company_id: user.company_id, type: "work_order_edit_lock_forced_release", recipient: user.id },
-    orderBy: { created_at: "desc" },
-    select: { payload: true },
-    take: MAX_NOTIFICATIONS,
-  });
-  const validKeys = new Set(
-    events.map((event) => notificationKeyFrom(event.payload)).filter((value): value is string => value !== null),
-  );
+  const ux = await getNotificationUxState(user.company_id, user.id, "work_order_lock");
+  const current = await listNotifications(user.company_id, user.id, ux.read);
+  const validKeys = new Set(current.map((item) => item.key));
   const requestedKey = stringValue(body.key);
   const keys: string[] = body.all === true ? Array.from(validKeys) : requestedKey ? [requestedKey] : [];
 
@@ -126,28 +158,8 @@ export async function PATCH(request: Request) {
     return noStore({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
   }
 
-  const existing = await db.integrationEvent.findMany({
-    where: { company_id: user.company_id, type: "work_order_lock_notification_read", recipient: user.id, status: "read" },
-    orderBy: { created_at: "desc" },
-    select: { payload: true },
-    take: MAX_READ_MARKERS,
-  });
-  const existingKeys = new Set(
-    existing.map((event) => notificationKeyFrom(event.payload)).filter((value): value is string => value !== null),
-  );
-  const missing = Array.from(new Set(keys)).filter((key) => !existingKeys.has(key));
-
-  if (missing.length) {
-    await db.integrationEvent.createMany({
-      data: missing.map((key) => ({
-        company_id: user.company_id,
-        type: "work_order_lock_notification_read",
-        status: "read",
-        recipient: user.id,
-        payload: { notificationKey: key },
-      })),
-    });
-  }
+  const missing = Array.from(new Set(keys)).filter((key) => !ux.read.has(key));
+  if (missing.length) await markNotificationsRead(user.company_id, user.id, "work_order_lock", missing);
 
   return noStore({ success: true, marked: missing.length });
 }

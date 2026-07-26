@@ -1,114 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { extractPortalCompanySlug, toPortalSlug } from "./public-portal";
 
-const { companyFindFirst, companyFindMany, propertyFindFirst } = vi.hoisted(() => ({
-  companyFindFirst: vi.fn(),
-  companyFindMany: vi.fn(),
-  propertyFindFirst: vi.fn(),
-}));
-
-vi.mock("@/lib/db", () => ({
-  default: {
-    company: { findFirst: companyFindFirst, findMany: companyFindMany },
-    property: { findFirst: propertyFindFirst },
-  },
-}));
-
-import { getPublicPortalCompany, REVALTA_PORTAL_COMPANY_ID } from "@/lib/public-portal";
-
-const activeCompany = {
-  id: "company-1",
-  name: "Revalta Test",
-  users: [{ id: "owner-1", email: "owner@example.se" }],
-};
-
-describe("public portal tenant resolution", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    delete process.env.PUBLIC_PORTAL_COMPANY_ID;
-    delete process.env.VERCEL;
-    companyFindMany.mockResolvedValue([]);
+describe("public-portal helpers", () => {
+  it("skapar stabila sluggar från bolagsnamn", () => {
+    expect(toPortalSlug("Åkermans Fastigheter AB", "abc12345-xxxx")).toBe("akermans-fastigheter-ab");
+    expect(toPortalSlug("!!!", "abc12345-xxxx")).toBe("abc12345");
   });
 
-  afterEach(() => {
-    delete process.env.PUBLIC_PORTAL_COMPANY_ID;
-    delete process.env.VERCEL;
-  });
-
-  it("does not resolve an ambiguous or empty shared portal", async () => {
-    await expect(getPublicPortalCompany()).resolves.toBeNull();
-    expect(companyFindFirst).not.toHaveBeenCalled();
-    expect(propertyFindFirst).not.toHaveBeenCalled();
-    expect(companyFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 2, where: { status: "active", users: { some: { status: "active" } } } })
-    );
-  });
-
-  it("safely resolves a single-company installation", async () => {
-    companyFindMany.mockResolvedValue([activeCompany]);
-    await expect(getPublicPortalCompany()).resolves.toEqual({
-      company: activeCompany,
-      owner: activeCompany.users[0],
+  it("läser companySlug från query, header eller body", () => {
+    const request = new Request("https://www.revalta.se/api/public/properties?companySlug=demo-bolag", {
+      headers: { "x-portal-company-slug": "header-bolag" },
     });
-  });
-
-  it("requires explicit configuration when several companies are active", async () => {
-    companyFindMany.mockResolvedValue([
-      activeCompany,
-      { ...activeCompany, id: "company-2", name: "Annan organisation" },
-    ]);
-    await expect(getPublicPortalCompany()).resolves.toBeNull();
-  });
-
-  it("resolves only the explicitly configured active company", async () => {
-    process.env.PUBLIC_PORTAL_COMPANY_ID = "company-1";
-    companyFindFirst.mockResolvedValue(activeCompany);
-
-    await expect(getPublicPortalCompany()).resolves.toEqual({
-      company: activeCompany,
-      owner: activeCompany.users[0],
-    });
-    expect(companyFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "company-1", status: "active" } })
-    );
-  });
-
-  it("uses the public Revalta tenant configuration on Vercel", async () => {
-    process.env.VERCEL = "1";
-    companyFindFirst.mockResolvedValue(activeCompany);
-
-    await expect(getPublicPortalCompany()).resolves.toEqual({
-      company: activeCompany,
-      owner: activeCompany.users[0],
-    });
-    expect(companyFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: REVALTA_PORTAL_COMPANY_ID, status: "active" } })
-    );
-  });
-
-  it("rejects a property outside the configured company", async () => {
-    process.env.PUBLIC_PORTAL_COMPANY_ID = "company-1";
-    companyFindFirst.mockResolvedValue(activeCompany);
-    propertyFindFirst.mockResolvedValue(null);
-
-    await expect(getPublicPortalCompany("property-other")).resolves.toBeNull();
-    expect(propertyFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "property-other", company_id: "company-1", status: "active" },
-      })
-    );
-  });
-
-  it("can derive the tenant from an active property", async () => {
-    propertyFindFirst.mockResolvedValue({ company: activeCompany });
-
-    await expect(getPublicPortalCompany("property-1")).resolves.toEqual({
-      company: activeCompany,
-      owner: activeCompany.users[0],
-    });
-    expect(propertyFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "property-1", status: "active", company: { status: "active" } },
-      })
-    );
+    expect(extractPortalCompanySlug(request)).toBe("header-bolag");
+    expect(extractPortalCompanySlug(new Request("https://www.revalta.se/api/public/properties?companySlug=demo-bolag"))).toBe("demo-bolag");
+    expect(extractPortalCompanySlug(new Request("https://www.revalta.se/api/public/properties"), "body-bolag")).toBe("body-bolag");
   });
 });

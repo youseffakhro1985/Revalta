@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, UserRoundX } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type SlaRisk = "overdue" | "critical" | "soon" | "normal" | "fulfilled" | "paused" | "not_configured";
 type WorkOrder = {
@@ -62,7 +63,7 @@ export default function TechnicianPlanningPage() {
     setError("");
     try {
       const response = await fetch("/api/work-orders", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta arbetsordrar");
       setOrders(body.workOrders || []);
     } catch (value) {

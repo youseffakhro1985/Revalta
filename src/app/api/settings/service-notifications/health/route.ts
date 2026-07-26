@@ -47,20 +47,48 @@ export async function GET() {
     return noStore({ error: "Endast ägare och administratörer kan visa leveranshälsan" }, { status: 403 });
   }
 
-  const events = await db.integrationEvent.findMany({
-    where: {
-      company_id: user.company_id,
-      type: "component_service_digest",
-    },
-    orderBy: { created_at: "desc" },
-    take: HISTORY_LIMIT,
-    select: {
-      id: true,
-      status: true,
-      payload: true,
-      created_at: true,
-    },
-  });
+  const [modernRuns, legacyRuns] = await Promise.all([
+    db.componentServiceDigestRun.findMany({
+      where: { company_id: user.company_id },
+      orderBy: { created_at: "desc" },
+      take: HISTORY_LIMIT,
+      select: { id: true, status: true, payload: true, created_at: true, sent_count: true, failed_count: true },
+    }),
+    db.integrationEvent.findMany({
+      where: {
+        company_id: user.company_id,
+        type: "component_service_digest",
+      },
+      orderBy: { created_at: "desc" },
+      take: HISTORY_LIMIT,
+      select: {
+        id: true,
+        status: true,
+        payload: true,
+        created_at: true,
+      },
+    }),
+  ]);
+
+  const byId = new Map<string, { id: string; status: string; payload: unknown; created_at: Date }>();
+  for (const run of modernRuns) {
+    byId.set(run.id, {
+      id: run.id,
+      status: run.status,
+      payload: run.payload ?? {
+        deliverySummary: {
+          total: run.sent_count + run.failed_count,
+          sent: run.sent_count,
+          failed: run.failed_count,
+        },
+      },
+      created_at: run.created_at,
+    });
+  }
+  for (const event of legacyRuns) {
+    if (!byId.has(event.id)) byId.set(event.id, event);
+  }
+  const events = [...byId.values()].sort((a, b) => b.created_at.getTime() - a.created_at.getTime()).slice(0, HISTORY_LIMIT);
 
   const now = Date.now();
   const latest = events[0] ?? null;

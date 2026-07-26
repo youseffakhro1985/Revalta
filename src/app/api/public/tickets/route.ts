@@ -2,7 +2,8 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, queueSmsNotification } from "@/lib/integrations";
 import { analyzeTicket } from "@/lib/ai";
-import { getPublicPortalCompany, generatePublicReference } from "@/lib/public-portal";
+import { createPortalTrackingToken } from "@/lib/portal-tracking";
+import { extractPortalCompanySlug, generatePublicReference, resolvePublicPortalCompany } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { calculateDueDate } from "@/lib/sla";
 import { NextResponse } from "next/server";
@@ -15,7 +16,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
     }
 
-    const { reporterName, reporterEmail, reporterPhone, reporterUnit, propertyId, title, description } = await request.json();
+    const body = await request.json();
+    const { reporterName, reporterEmail, reporterPhone, reporterUnit, propertyId, title, description } = body;
     const normalizedReporterName = typeof reporterName === "string" ? reporterName.trim() : "";
     const normalizedReporterEmail = typeof reporterEmail === "string" ? reporterEmail.trim().toLowerCase() : "";
     const normalizedReporterPhone = typeof reporterPhone === "string" ? reporterPhone.trim() : "";
@@ -23,8 +25,12 @@ export async function POST(request: Request) {
     const normalizedTitle = typeof title === "string" ? title.trim() : "";
     const normalizedDescription = typeof description === "string" ? description.trim() : "";
     const normalizedPropertyId = typeof propertyId === "string" && propertyId.trim() ? propertyId.trim() : null;
+    const companySlug = extractPortalCompanySlug(request, body?.companySlug);
 
-    const portal = await getPublicPortalCompany(normalizedPropertyId);
+    const portal = await resolvePublicPortalCompany({
+      propertyId: normalizedPropertyId,
+      companySlug,
+    });
     if (!portal) {
       return NextResponse.json({ error: "Boendeportalen är inte konfigurerad ännu" }, { status: 503 });
     }
@@ -46,7 +52,7 @@ export async function POST(request: Request) {
     let property = null;
     if (normalizedPropertyId) {
       property = await db.property.findFirst({
-        where: { id: normalizedPropertyId, company_id: portal.company.id, status: "active" },
+        where: { id: normalizedPropertyId, company_id: portal.company.id, status: "active", deleted_at: null },
         select: { id: true, name: true, address: true, city: true },
       });
       if (!property) {
@@ -121,7 +127,13 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, ticket }, { status: 201 });
+    const trackingToken = createPortalTrackingToken({
+      reference: publicReference,
+      email: normalizedReporterEmail,
+      companyId: portal.company.id,
+    });
+
+    return NextResponse.json({ success: true, ticket, trackingToken }, { status: 201 });
   } catch (error) {
     console.error("Create public ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

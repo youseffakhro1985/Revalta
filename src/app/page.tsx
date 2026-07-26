@@ -49,9 +49,9 @@ const modules = [
 ];
 
 const assurances = [
-  { icon: ShieldCheck, label: "Svensk datahantering" },
+  { icon: ShieldCheck, label: "Rollstyrning och auditlogg" },
   { icon: Users, label: "Byggt för hela förvaltningsteamet" },
-  { icon: Check, label: "GDPR-anpassade arbetsflöden" },
+  { icon: Check, label: "Arbetsflöden med spårbarhet" },
 ];
 
 export default function Home() {

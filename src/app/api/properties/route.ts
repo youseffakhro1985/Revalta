@@ -2,25 +2,50 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import {
+  isMissingSchemaColumnError,
+  notDeletedFilter,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
+
+/** Explicit select avoids querying soft-delete columns that may not exist yet. */
+const propertyListSelect = (ticketActive: { deleted_at: null } | Record<string, never>) => ({
+  id: true,
+  name: true,
+  address: true,
+  postal_code: true,
+  city: true,
+  property_identifier: true,
+  property_type: true,
+  status: true,
+  created_at: true,
+  updated_at: true,
+  _count: {
+    select: { tickets: { where: ticketActive }, buildings: true, units: true },
+  },
+} as const);
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
+    const [propertyActive, ticketActive] = await Promise.all([
+      notDeletedFilter("Property"),
+      notDeletedFilter("Ticket"),
+    ]);
     const properties = await db.property.findMany({
-      where: tenantWhere(user),
+      where: { ...propertyActive, ...tenantWhere(user) },
       orderBy: { created_at: "desc" },
-      include: {
-        _count: {
-          select: { tickets: true, buildings: true, units: true },
-        },
-      },
+      select: propertyListSelect(ticketActive),
     });
 
     return NextResponse.json({ properties });
   } catch (error) {
     console.error("Get properties error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -43,6 +68,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Namn, adress och ort krävs" }, { status: 400 });
     }
 
+    const ticketActive = await notDeletedFilter("Ticket");
     const property = await db.property.create({
       data: {
         name: normalizedName,
@@ -52,11 +78,7 @@ export async function POST(request: Request) {
         company_id: user.company_id,
         user_id: user.id,
       },
-      include: {
-        _count: {
-          select: { tickets: true, buildings: true, units: true },
-        },
-      },
+      select: propertyListSelect(ticketActive),
     });
 
     await writeAuditLog(user, {

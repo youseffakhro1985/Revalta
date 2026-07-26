@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ClipboardList, Filter, Inbox, Search } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
 type TeamMember = { id: string; name: string | null; email: string };
@@ -15,8 +17,8 @@ type Ticket = {
 };
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
-const statusLabels: Record<string, string> = { new: "Ny", received: "Mottagen", in_progress: "Pågår", waiting: "Väntar", completed: "Klar", closed: "Stängd" };
-const priorityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
+const statusLabels = TICKET_STATUS_LABELS;
+const priorityLabels = PRIORITY_LABELS;
 
 export default function FelanmalanPage() {
   const router = useRouter();
@@ -55,7 +57,7 @@ export default function FelanmalanPage() {
           fetch("/api/team", { cache: "no-store" }),
         ]);
         if ([ticketsResponse, propertiesResponse, teamResponse].some((response) => response.status === 401)) { router.push("/login"); return; }
-        const [ticketsData, propertiesData, teamData] = await Promise.all([ticketsResponse.json(), propertiesResponse.json(), teamResponse.json()]);
+        const [ticketsData, propertiesData, teamData] = await Promise.all([readResponseJson(ticketsResponse), readResponseJson(propertiesResponse), readResponseJson(teamResponse)]);
         if (!mounted) return;
         if (!ticketsResponse.ok) throw new Error(ticketsData.error || "Kunde inte hämta ärenden");
         if (!propertiesResponse.ok) throw new Error(propertiesData.error || "Kunde inte hämta fastigheter");
@@ -85,7 +87,7 @@ export default function FelanmalanPage() {
     setError(""); setSuccess(""); setSubmitting(true);
     try {
       const response = await fetch("/api/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title, description, propertyId, category, priority, assignedToId }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa ärendet");
       setTickets((current) => [data.ticket, ...current]);

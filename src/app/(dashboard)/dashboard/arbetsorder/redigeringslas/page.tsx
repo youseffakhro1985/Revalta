@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, ExternalLink, LockKeyhole, RefreshCw, Search, ShieldCheck, UnlockKeyhole, UserRound } from "lucide-react";
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type ActiveLock = {
   workOrderId: string;
@@ -57,7 +58,7 @@ export default function WorkOrderEditLocksPage() {
     setError("");
     try {
       const response = await fetch("/api/work-orders/edit-locks", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta redigeringslåsen");
       setData(body);
     } catch (err) {
@@ -92,7 +93,7 @@ export default function WorkOrderEditLocksPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workOrderId: selected.workOrderId, reason: reason.trim() }),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Låset kunde inte frigöras");
       setSuccess(`Redigeringslåset för ${selected.workOrderNumber || selected.title} har frigjorts och åtgärden är revisionsloggad.`);
       setSelected(null); setReason("");

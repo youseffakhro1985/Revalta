@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTeam, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type ActiveLockRow = {
   work_order_id: string;
@@ -53,6 +54,10 @@ export async function GET() {
   if (!canViewOperations(user.role)) return noStore({ error: "Du saknar behörighet att visa driftläget" }, { status: 403 });
 
   const removedExpired = await clearExpiredLocks(user.company_id);
+  const [workOrderGuard, propertyGuard] = await Promise.all([
+    sqlSoftDeleteGuard(db, "WorkOrder", "w"),
+    sqlSoftDeleteGuard(db, "Property", "p"),
+  ]);
   const rows = await db.$queryRaw<ActiveLockRow[]>(Prisma.sql`
     SELECT l."work_order_id",
            w."work_order_number",
@@ -73,6 +78,8 @@ export async function GET() {
     INNER JOIN "Property" p ON p."id" = w."property_id" AND p."company_id" = l."company_id"
     INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
     WHERE l."company_id" = ${user.company_id}
+      ${propertyGuard}
+      ${workOrderGuard}
       AND l."expires_at" > CURRENT_TIMESTAMP
     ORDER BY l."expires_at" ASC, l."acquired_at" ASC
     LIMIT 500
@@ -116,6 +123,7 @@ export async function DELETE(request: Request) {
   const notificationKey = `work-order-lock-forced:${workOrderId}:${randomUUID()}`;
   const occurredAt = new Date();
   const actorName = user.name || user.email;
+  const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
 
   const result = await db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<ForceReleaseRow[]>(Prisma.sql`
@@ -126,6 +134,7 @@ export async function DELETE(request: Request) {
       INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
       WHERE l."work_order_id" = ${workOrderId}
         AND l."company_id" = ${companyId}
+        ${workOrderGuard}
       LIMIT 1
       FOR UPDATE
     `);
@@ -156,13 +165,22 @@ export async function DELETE(request: Request) {
       reason,
     };
 
-    await tx.integrationEvent.create({
+    await tx.workOrderLockNotification.create({
       data: {
         company_id: companyId,
-        type: "work_order_edit_lock_forced_release",
-        status: "unread",
-        recipient: lock.user_id,
-        payload: notificationPayload,
+        work_order_id: workOrderId,
+        recipient_user_id: lock.user_id,
+        notification_key: notificationKey,
+        title: notificationPayload.title,
+        description: notificationPayload.description,
+        href: notificationPayload.href,
+        high: true,
+        work_order_number: lock.work_order_number,
+        work_order_title: lock.title,
+        released_by_id: user.id,
+        released_by_name: actorName,
+        reason,
+        occurred_at: occurredAt,
       },
     });
 
@@ -182,6 +200,7 @@ export async function DELETE(request: Request) {
           previousExpiresAt: lock.expires_at.toISOString(),
           notificationKey,
           reason,
+          storage: "WorkOrderLockNotification",
         },
       },
     });

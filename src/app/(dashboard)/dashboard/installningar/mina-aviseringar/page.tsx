@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BellOff, BellRing, CheckCircle2, Clock3, Mail } from "lucide-react";
 import { InlineAlert, Panel } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Preferences = { enabled: boolean; overdueOnly: boolean };
 
@@ -27,7 +28,7 @@ export default function MyServiceNotificationsPage() {
     async function load() {
       try {
         const response = await fetch("/api/settings/my-service-notifications", { cache: "no-store" });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error || "Kunde inte hämta dina aviseringsval");
         setData(body);
         setPreferences(body.preferences);
@@ -50,7 +51,7 @@ export default function MyServiceNotificationsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(preferences),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte spara dina aviseringsval");
       setSuccess(body.message || "Dina aviseringsval är sparade.");
       setData((current) => current ? { ...current, preferences: body.preferences, updatedAt: new Date().toISOString() } : current);

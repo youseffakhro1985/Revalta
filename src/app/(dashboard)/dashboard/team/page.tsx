@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, ShieldCheck, UsersRound } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type TeamMember = { id: string; name: string | null; email: string; role: string; status: string; created_at: string; _count: { assigned_tickets: number } };
 type TeamInvite = { id: string; email: string; name: string | null; role: string; expires_at: string; accepted_at: string | null; created_at: string };
@@ -29,7 +30,7 @@ export default function TeamPage() {
     try {
       const [response, invitesResponse] = await Promise.all([fetch("/api/team", { cache: "no-store" }), fetch("/api/team/invites", { cache: "no-store" })]);
       if (response.status === 401 || invitesResponse.status === 401) { router.push("/login"); return; }
-      const [data, invitesData] = await Promise.all([response.json(), invitesResponse.json()]);
+      const [data, invitesData] = await Promise.all([readResponseJson(response), readResponseJson(invitesResponse)]);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta teamet");
       setMembers(data.members || []); setCompanyName(data.company?.name || "Organisation"); setCanManage(Boolean(data.canManage));
       if (invitesResponse.ok) setInvites(invitesData.invites || []);
@@ -43,7 +44,7 @@ export default function TeamPage() {
     event.preventDefault(); setError(""); setSuccess(""); setSubmitting(true);
     try {
       const response = await fetch("/api/team/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, email, role }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa inbjudan");
       setInvites((current) => [data.invite, ...current]); setInviteUrl(data.inviteUrl || ""); setName(""); setEmail(""); setRole("technician"); setSuccess("Inbjudan är skapad och redo att skickas.");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte kontakta servern"); }

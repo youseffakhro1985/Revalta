@@ -40,7 +40,7 @@ const include = {
   ticket: { select: { id: true, public_reference: true, title: true } },
   assigned_to: { select: { id: true, name: true, email: true } },
   created_by: { select: { id: true, name: true, email: true } },
-  projects: { select: { id: true, name: true, status: true } },
+  projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
   comments: {
     orderBy: { created_at: "desc" as const },
     take: 100,
@@ -55,7 +55,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const [workOrder, users, enterprise, statusEvents, assetLink] = await Promise.all([
-    db.workOrder.findFirst({ where: { id, company_id: user.company_id }, include }),
+    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include }),
     db.user.findMany({
       where: { company_id: user.company_id, status: "active" },
       orderBy: [{ name: "asc" }, { email: "asc" }],
@@ -81,7 +81,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
-      where: { id, company_id: user.company_id },
+      where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         ticket_id: true,
@@ -197,7 +197,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const now = new Date();
   const transactionResult = await db.$transaction(async (tx) => {
-    const updated = await tx.workOrder.update({ where: { id: existing.id }, data, include });
+    const updateResult = await tx.workOrder.updateMany({
+      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+      data,
+    });
+    if (updateResult.count === 0) {
+      throw new Error("WORK_ORDER_NOT_FOUND");
+    }
+    const updated = await tx.workOrder.findFirst({
+      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+      include,
+    });
+    if (!updated) {
+      throw new Error("WORK_ORDER_NOT_FOUND");
+    }
 
     if (assetLinksChanged) {
       await setWorkOrderAssetLinks(tx, { workOrderId: existing.id, companyId: user.company_id!, buildingId, technicalAssetId });
@@ -270,7 +283,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
 
     return { workOrder: updated, componentSync, ticketSync };
+  }).catch((error) => {
+    if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") {
+      return null;
+    }
+    throw error;
   });
+
+  if (!transactionResult) {
+    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
 
   const workOrder = transactionResult.workOrder;
   const [enterprise, statusEvents, assetLink] = await Promise.all([
@@ -300,4 +322,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
     ticketSync: transactionResult.ticketSync,
   });
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+  const { id } = await params;
+  const existing = await db.workOrder.findFirst({
+    where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
+    select: { id: true, title: true, status: true },
+  });
+  if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+
+  const deleteResult = await db.workOrder.updateMany({
+    where: { id: existing.id, company_id: user.company_id, deleted_at: null },
+    data: { deleted_at: new Date() },
+  });
+  if (deleteResult.count === 0) {
+    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
+
+  await writeAuditLog(user, {
+    entityType: "work_order",
+    entityId: existing.id,
+    action: "work_order.deleted",
+    metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+  });
+  return NextResponse.json({ success: true });
 }

@@ -22,7 +22,25 @@ type DocumentMetadata = {
   contentType?: unknown;
   sizeBytes?: unknown;
   dataUrl?: unknown;
+  storageUrl?: unknown;
+  storage?: unknown;
 };
+
+function accessibleLeaseIdsForDocument(
+  leases: Array<{ id: string; property_id: string; unit_id: string }>,
+  visibility: string,
+  propertyId: string | null,
+  unitId: string | null,
+  leaseId: string | null,
+) {
+  return leases.filter((lease) => {
+    if (visibility === "resident_all") return true;
+    if (visibility === "resident_property") return Boolean(propertyId && lease.property_id === propertyId);
+    if (visibility === "resident_unit") return Boolean(unitId && lease.unit_id === unitId);
+    if (visibility === "resident_lease") return Boolean(leaseId && lease.id === leaseId);
+    return false;
+  }).map((lease) => lease.id);
+}
 
 export async function GET() {
   try {
@@ -30,9 +48,9 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-    const [leases, tickets, documentLogs] = await Promise.all([
+    const [leases, tickets, managedDocuments, documentLogs] = await Promise.all([
       db.lease.findMany({
-        where: { company_id: user.company_id, status: { in: activeLeaseStatuses } },
+        where: { company_id: user.company_id, deleted_at: null, status: { in: activeLeaseStatuses } },
         orderBy: [{ property: { name: "asc" } }, { unit: { designation: "asc" } }],
         take: 1000,
         select: {
@@ -50,7 +68,7 @@ export async function GET() {
         },
       }),
       db.ticket.findMany({
-        where: { company_id: user.company_id, source: "resident_portal" },
+        where: { company_id: user.company_id, source: "resident_portal", deleted_at: null },
         orderBy: { created_at: "desc" },
         take: 500,
         select: {
@@ -71,36 +89,81 @@ export async function GET() {
           assigned_to: { select: { id: true, name: true, email: true } },
         },
       }),
+      db.managedDocument.findMany({
+        where: {
+          company_id: user.company_id,
+          lifecycle_state: "active",
+          visibility: { in: [...residentDocumentVisibilities] },
+          OR: [{ property_id: null }, { property: { deleted_at: null } }],
+        },
+        orderBy: { created_at: "desc" },
+        take: 500,
+        include: { created_by: { select: { name: true, email: true } } },
+      }),
       db.auditLog.findMany({
         where: { company_id: user.company_id, entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
-        select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
+        select: { id: true, entity_id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
       }),
     ]);
 
-    const lifecycleMap = await getDocumentLifecycleMap(user.company_id, documentLogs.map((log) => log.id));
-    const residentDocuments = documentLogs.flatMap((log) => {
-      if (lifecycleMap.get(log.id)?.state !== "active") return [];
+    const modernIds = new Set(managedDocuments.map((row) => row.id));
+    const lifecycleMap = await getDocumentLifecycleMap(
+      user.company_id,
+      documentLogs.map((log) => log.id).filter((id) => !modernIds.has(id)),
+    );
+
+    const modernDocuments = managedDocuments.flatMap((row) => {
+      const accessibleLeaseIds = accessibleLeaseIdsForDocument(
+        leases,
+        row.visibility,
+        row.property_id,
+        row.unit_id,
+        row.lease_id,
+      );
+      if (accessibleLeaseIds.length === 0) return [];
+      return [{
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        visibility: row.visibility,
+        validUntil: row.valid_until?.toISOString().slice(0, 10) || null,
+        fileName: row.file_name,
+        contentType: row.content_type,
+        sizeBytes: row.size_bytes,
+        downloadable: Boolean(row.storage_url || row.data_url?.startsWith("data:")),
+        propertyId: row.property_id,
+        unitId: row.unit_id,
+        leaseId: row.lease_id,
+        accessibleLeaseIds,
+        uploadedBy: row.created_by?.name || row.created_by?.email || "Förvaltningen",
+        createdAt: row.created_at,
+        source: "table" as const,
+      }];
+    });
+
+    const legacyDocuments = documentLogs.flatMap((log) => {
       const metadata = (log.metadata || {}) as DocumentMetadata;
+      if (metadata.storage === "ManagedDocument") return [];
+      if (modernIds.has(log.id) || (log.entity_id && modernIds.has(log.entity_id))) return [];
+      if (lifecycleMap.get(log.id)?.state !== "active") return [];
       const visibility = typeof metadata.visibility === "string" ? metadata.visibility : "internal";
       if (!residentDocumentVisibilities.has(visibility)) return [];
 
       const propertyId = typeof metadata.propertyId === "string" ? metadata.propertyId : null;
       const unitId = typeof metadata.unitId === "string" ? metadata.unitId : null;
       const leaseId = typeof metadata.leaseId === "string" ? metadata.leaseId : null;
-      const accessibleLeaseIds = leases.filter((lease) => {
-        if (visibility === "resident_all") return true;
-        if (visibility === "resident_property") return Boolean(propertyId && lease.property_id === propertyId);
-        if (visibility === "resident_unit") return Boolean(unitId && lease.unit_id === unitId);
-        if (visibility === "resident_lease") return Boolean(leaseId && lease.id === leaseId);
-        return false;
-      }).map((lease) => lease.id);
-
+      const accessibleLeaseIds = accessibleLeaseIdsForDocument(leases, visibility, propertyId, unitId, leaseId);
       if (accessibleLeaseIds.length === 0) return [];
+
       const contentType = typeof metadata.contentType === "string" ? metadata.contentType : null;
       const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : null;
-      const downloadable = Boolean(contentType && dataUrl?.startsWith(`data:${contentType};base64,`));
+      const storageUrl = typeof metadata.storageUrl === "string" ? metadata.storageUrl : null;
+      const downloadable = Boolean(
+        storageUrl
+        || (contentType && dataUrl?.startsWith(`data:${contentType};base64,`)),
+      );
 
       return [{
         id: log.id,
@@ -118,14 +181,19 @@ export async function GET() {
         accessibleLeaseIds,
         uploadedBy: log.actor?.name || log.actor?.email || "Förvaltningen",
         createdAt: log.created_at,
+        source: "legacy" as const,
       }];
     });
+
+    const documents = [...modernDocuments, ...legacyDocuments]
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, 500);
 
     return NextResponse.json(
       {
         leases: leases.map((lease) => ({ ...lease, monthly_rent: Number(lease.monthly_rent) })),
         tickets,
-        documents: residentDocuments,
+        documents,
         canManage: canManageTickets(user.role),
       },
       { headers: { "Cache-Control": "private, no-store" } },
@@ -157,7 +225,7 @@ export async function POST(request: Request) {
     if (!allowedCategories.has(category) || !allowedPriorities.has(priority)) return NextResponse.json({ error: "Ogiltig kategori eller prioritet" }, { status: 400 });
 
     const lease = await db.lease.findFirst({
-      where: { id: leaseId, company_id: user.company_id, status: { in: activeLeaseStatuses } },
+      where: { id: leaseId, company_id: user.company_id, deleted_at: null, status: { in: activeLeaseStatuses } },
       select: {
         id: true,
         lease_number: true,

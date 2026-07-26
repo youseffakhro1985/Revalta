@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronLeft, Clock3, RefreshCw, RotateCcw, ShieldCheck, Siren, UserRoundCheck, Users } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type AlertItem = { key: string; title: string; description: string; dueAt: string; overdue: boolean; high: boolean; read: boolean; href: string };
 type TimelineEntry = { id: string; kind?: "action" | "escalation" | "assignment" | "sla"; status: string; level?: number; comment: string; changedBy: string; changedByName: string; changedAt: string };
@@ -71,7 +72,7 @@ export default function RecurringIncidentsPage() {
         fetch("/api/notifications/recurring-work-orders", { cache: "no-store" }),
         fetch("/api/work-orders/recurring/incidents", { cache: "no-store" }),
       ]);
-      const [alertsBody, incidentsBody] = await Promise.all([alertsResponse.json(), incidentsResponse.json()]);
+      const [alertsBody, incidentsBody] = await Promise.all([readResponseJson(alertsResponse), readResponseJson(incidentsResponse)]);
       if (!alertsResponse.ok) throw new Error(alertsBody.error || "Kunde inte hämta schemavarningar");
       if (!incidentsResponse.ok) throw new Error(incidentsBody.error || "Kunde inte hämta incidenter");
       setAlerts(alertsBody.notifications || []); setIncidents(incidentsBody.incidents || []); setUsers(incidentsBody.users || []);
@@ -100,7 +101,7 @@ export default function RecurringIncidentsPage() {
     setBusyKey(notificationKey); setError(""); setMessage("");
     try {
       const response = await fetch("/api/work-orders/recurring/incidents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notificationKey, status, comment: comments[notificationKey] || "" }) });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Incidenten kunde inte uppdateras");
       setComments((current) => ({ ...current, [notificationKey]: "" }));
       setMessage(status === "resolved" ? "Incidenten har lösts." : status === "reopened" ? "Incidenten har återöppnats." : "Incidenten har kvitterats.");
@@ -114,7 +115,7 @@ export default function RecurringIncidentsPage() {
     try {
       const assignedTo = assignments[notificationKey] || null;
       const response = await fetch("/api/work-orders/recurring/incidents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign", notificationKey, assignedTo }) });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Ansvarig kunde inte uppdateras");
       setMessage(assignedTo ? `Incidenten har tilldelats ${body.assignedUser?.name || "ansvarig"}.` : "Ansvarig har tagits bort.");
       await load();
@@ -127,7 +128,7 @@ export default function RecurringIncidentsPage() {
     try {
       const form = slaForms[notificationKey] || { responseDueAt: "", resolutionDueAt: "" };
       const response = await fetch("/api/work-orders/recurring/incidents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sla", notificationKey, responseDueAt: form.responseDueAt ? new Date(form.responseDueAt).toISOString() : null, resolutionDueAt: form.resolutionDueAt ? new Date(form.resolutionDueAt).toISOString() : null }) });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "SLA kunde inte uppdateras");
       setMessage("Incidentens SLA-mål har uppdaterats."); await load();
     } catch (value) { setError(value instanceof Error ? value.message : "SLA kunde inte uppdateras"); }
@@ -138,7 +139,7 @@ export default function RecurringIncidentsPage() {
     setRunningEscalation(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/cron/recurring-incident-escalations", { method: "POST" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Eskaleringen kunde inte köras");
       setMessage(`Eskaleringen är klar. ${body.escalated || 0} incidenter eskalerades.`); await load();
     } catch (value) { setError(value instanceof Error ? value.message : "Eskaleringen kunde inte köras"); }

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useState } from "react";
 import { RefreshCcw, Send, ShieldAlert } from "lucide-react";
 
@@ -28,7 +29,7 @@ export function EscalationAdminActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Åtgärden misslyckades");
       setMessage(action === "test" ? "Testutskicket skickades till din e-postadress." : "Eskaleringsmotorn kördes manuellt och resultatet har loggats.");
       await onComplete();

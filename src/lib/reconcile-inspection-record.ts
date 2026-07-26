@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import type { LeaseInspectionRecord } from "@/lib/lease-inspection-items";
 import { inspectionRecordEventType } from "@/lib/inspection-work-order-links";
@@ -13,19 +14,34 @@ export async function reconcileInspectionRecord(args: {
   version: number;
 }) {
   const lease = await db.lease.findFirst({
-    where: { id: args.leaseId, company_id: args.companyId },
+    where: { id: args.leaseId, company_id: args.companyId, deleted_at: null },
     select: { lease_number: true },
   });
   if (!lease) throw new InspectionRecordSyncError("Avtalet hittades inte", 404);
 
-  const event = await db.integrationEvent.findFirst({
-    where: { company_id: args.companyId, type: inspectionRecordEventType, recipient: args.leaseId },
-    orderBy: { created_at: "desc" },
+  const modern = await db.leaseInspectionRecord.findUnique({
+    where: { company_id_lease_id: { company_id: args.companyId, lease_id: args.leaseId } },
+    select: { id: true, payload: true, version: true },
   });
-  const current = event?.payload && typeof event.payload === "object"
-    ? event.payload as unknown as LeaseInspectionRecord
+  if (!modern) {
+    const legacy = await db.integrationEvent.findFirst({
+      where: { company_id: args.companyId, type: inspectionRecordEventType, recipient: args.leaseId },
+      orderBy: { created_at: "desc" },
+      select: { id: true },
+    });
+    if (legacy) {
+      throw new InspectionRecordSyncError(
+        "Besiktningen finns kvar i äldre lagring. Kör backfill till LeaseInspectionRecord innan avstämning.",
+        409,
+      );
+    }
+    throw new InspectionRecordSyncError("Ingen sparad besiktning hittades", 404);
+  }
+
+  const current = modern.payload && typeof modern.payload === "object"
+    ? modern.payload as unknown as LeaseInspectionRecord
     : null;
-  if (!event || !current) throw new InspectionRecordSyncError("Ingen sparad besiktning hittades", 404);
+  if (!current) throw new InspectionRecordSyncError("Ingen sparad besiktning hittades", 404);
   if (current.version !== args.version) throw new InspectionRecordSyncError("Besiktningen har ändrats. Ladda om och försök igen.", 409);
 
   const links = await readInspectionWorkOrders(args.companyId, args.leaseId);
@@ -43,9 +59,14 @@ export async function reconcileInspectionRecord(args: {
 
   const actionRequired = result.record.items.filter((item) => item.condition === "action_required" && !item.resolved).length;
   await db.$transaction(async (tx) => {
-    await tx.integrationEvent.update({
-      where: { id: event.id },
-      data: { status: actionRequired > 0 ? "action_required" : "recorded", payload: result.record },
+    await tx.leaseInspectionRecord.update({
+      where: { id: modern.id },
+      data: {
+        status: actionRequired > 0 ? "action_required" : "recorded",
+        version: result.record.version,
+        payload: result.record as unknown as Prisma.InputJsonValue,
+        updated_by_id: args.userId,
+      },
     });
     await tx.auditLog.create({
       data: {
@@ -60,6 +81,7 @@ export async function reconcileInspectionRecord(args: {
           version: result.record.version,
           changedIds: result.changedIds,
           remainingActionRequired: actionRequired,
+          storage: "LeaseInspectionRecord",
         },
       },
     });

@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { deliverServiceEmail, type ServiceEmailDelivery } from "@/lib/component-service-email";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,39 +23,58 @@ function noStore(body: unknown, init?: ResponseInit) { return NextResponse.json(
 function dateKey(date = new Date()) { return date.toISOString().slice(0, 10); }
 function authorized(request: Request) { const secret = process.env.CRON_SECRET; return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`; }
 function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
-function record(value: unknown): Record<string, unknown> | null { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 function toJson(value: unknown): Prisma.InputJsonValue { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
-
-function parsePreferences(payload: unknown): Preferences {
-  const value = record(payload);
-  if (!value) return defaults;
-  const roles = Array.isArray(value.roles) ? Array.from(new Set(value.roles.map(String).filter((role) => allowedRoles.includes(role)))) : defaults.roles;
-  const emails = Array.isArray(value.additionalEmails) ? Array.from(new Set(value.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)))).slice(0, 20) : [];
-  const days = Number(value.daysAhead);
-  return { enabled: value.enabled !== false, daysAhead: Number.isInteger(days) && days >= 1 && days <= 90 ? days : 30, roles: roles.length ? roles : defaults.roles, additionalEmails: emails };
-}
-
-function parseUserPreferences(payload: unknown): UserPreferences {
-  const value = record(payload);
-  if (!value) return userDefaults;
-  return { enabled: value.enabled !== false, overdueOnly: value.overdueOnly === true };
-}
 
 async function claimRun(companyId: string, dedupeKey: string, payload: Record<string, unknown>) {
   return db.$transaction(async (tx) => {
     const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`SELECT pg_try_advisory_xact_lock(hashtext(${dedupeKey})) AS "locked"`);
     if (!lock[0]?.locked) return { claimed: false as const, reason: "concurrent_run" };
-    const existing = await tx.integrationEvent.findFirst({
-      where: { company_id: companyId, type: "component_service_digest", recipient: dedupeKey, OR: [
-        { status: "sent" },
-        { status: "processing", created_at: { gte: new Date(Date.now() - PROCESSING_LEASE_MS) } },
-      ] },
+
+    const modernExisting = await tx.componentServiceDigestRun.findUnique({
+      where: { company_id_dedupe_key: { company_id: companyId, dedupe_key: dedupeKey } },
+      select: { id: true, status: true, updated_at: true, created_at: true },
+    });
+    if (modernExisting?.status === "sent") return { claimed: false as const, reason: "already_sent" };
+    if (
+      modernExisting?.status === "processing"
+      && modernExisting.updated_at.getTime() >= Date.now() - PROCESSING_LEASE_MS
+    ) {
+      return { claimed: false as const, reason: "already_processing" };
+    }
+
+    const legacyExisting = await tx.integrationEvent.findFirst({
+      where: {
+        company_id: companyId,
+        type: "component_service_digest",
+        recipient: dedupeKey,
+        OR: [
+          { status: "sent" },
+          { status: "processing", created_at: { gte: new Date(Date.now() - PROCESSING_LEASE_MS) } },
+        ],
+      },
       orderBy: { created_at: "desc" },
       select: { id: true, status: true },
     });
-    if (existing) return { claimed: false as const, reason: existing.status === "sent" ? "already_sent" : "already_processing" };
-    const event = await tx.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "processing", recipient: dedupeKey, payload: toJson(payload) }, select: { id: true } });
-    return { claimed: true as const, eventId: event.id };
+    if (legacyExisting) {
+      return { claimed: false as const, reason: legacyExisting.status === "sent" ? "already_sent" : "already_processing" };
+    }
+
+    const run = modernExisting
+      ? await tx.componentServiceDigestRun.update({
+        where: { id: modernExisting.id },
+        data: { status: "processing", payload: toJson(payload), sent_count: 0, failed_count: 0 },
+        select: { id: true },
+      })
+      : await tx.componentServiceDigestRun.create({
+        data: {
+          company_id: companyId,
+          dedupe_key: dedupeKey,
+          status: "processing",
+          payload: toJson(payload),
+        },
+        select: { id: true },
+      });
+    return { claimed: true as const, eventId: run.id };
   });
 }
 
@@ -69,9 +89,14 @@ async function finalizeRun(input: {
 }) {
   const { companyId, eventId, dedupeKey, status, payload, sentCount, failedCount } = input;
   await db.$transaction(async (tx) => {
-    await tx.integrationEvent.update({
+    await tx.componentServiceDigestRun.update({
       where: { id: eventId },
-      data: { status, payload: toJson(payload) },
+      data: {
+        status,
+        payload: toJson(payload),
+        sent_count: sentCount,
+        failed_count: failedCount,
+      },
     });
 
     await tx.auditLog.create({
@@ -81,29 +106,20 @@ async function finalizeRun(input: {
         entity_type: "service_notification_run",
         entity_id: eventId,
         action: `component_service_digest.${status}`,
-        metadata: toJson({ dedupeKey, status, sentCount, failedCount }),
+        metadata: toJson({ dedupeKey, status, sentCount, failedCount, storage: "ComponentServiceDigestRun" }),
       },
     });
 
     if (status === "sent") {
-      const openAlerts = await tx.integrationEvent.findMany({
-        where: { company_id: companyId, type: "component_service_delivery_alert", status: "open" },
+      const openModern = await tx.componentServiceDeliveryAlert.findMany({
+        where: { company_id: companyId, status: "open" },
         select: { id: true },
         take: 100,
       });
-      if (openAlerts.length) {
-        await tx.integrationEvent.updateMany({
-          where: { id: { in: openAlerts.map((alert) => alert.id) } },
-          data: { status: "resolved" },
-        });
-        await tx.integrationEvent.create({
-          data: {
-            company_id: companyId,
-            type: "component_service_delivery_recovery",
-            status: "resolved",
-            recipient: `company:${companyId}`,
-            payload: toJson({ recoveredByEventId: eventId, resolvedAlertIds: openAlerts.map((alert) => alert.id) }),
-          },
+      if (openModern.length) {
+        await tx.componentServiceDeliveryAlert.updateMany({
+          where: { id: { in: openModern.map((alert) => alert.id) } },
+          data: { status: "resolved", resolved_at: new Date() },
         });
         await tx.auditLog.create({
           data: {
@@ -112,26 +128,37 @@ async function finalizeRun(input: {
             entity_type: "service_notification_delivery",
             entity_id: eventId,
             action: "component_service_delivery.recovered",
-            metadata: toJson({ resolvedAlertIds: openAlerts.map((alert) => alert.id) }),
+            metadata: toJson({
+              recoveredByEventId: eventId,
+              resolvedAlertIds: openModern.map((alert) => alert.id),
+              storage: "ComponentServiceDeliveryAlert",
+            }),
           },
         });
       }
       return;
     }
 
-    const existingAlert = await tx.integrationEvent.findFirst({
+    const existingModern = await tx.componentServiceDeliveryAlert.findFirst({
+      where: { company_id: companyId, status: "open" },
+      orderBy: { created_at: "desc" },
+      select: { id: true },
+    });
+    const existingLegacy = await tx.integrationEvent.findFirst({
       where: { company_id: companyId, type: "component_service_delivery_alert", status: "open" },
       orderBy: { created_at: "desc" },
       select: { id: true },
     });
-    if (!existingAlert) {
-      await tx.integrationEvent.create({
+    if (!existingModern && !existingLegacy) {
+      await tx.componentServiceDeliveryAlert.create({
         data: {
           company_id: companyId,
-          type: "component_service_delivery_alert",
+          source_run_id: eventId,
           status: "open",
-          recipient: `company:${companyId}`,
-          payload: toJson({ sourceEventId: eventId, severity: status === "failed" ? "critical" : "warning", sentCount, failedCount, dedupeKey }),
+          severity: status === "failed" ? "critical" : "warning",
+          sent_count: sentCount,
+          failed_count: failedCount,
+          dedupe_key: dedupeKey,
         },
       });
     }
@@ -142,26 +169,38 @@ export async function GET(request: Request) {
   if (!authorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
   const now = new Date();
   const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
-  const [components, settingsEvents, userPreferenceEvents] = await Promise.all([
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
+  const [components, modernSettings, modernUserPreferences] = await Promise.all([
     db.$queryRaw<DueComponent[]>(Prisma.sql`
       SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."criticality", a."next_service_at",
         p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
       FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
-      WHERE a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${maxDueBefore}
+      WHERE a."next_service_at" IS NOT NULL
+        ${propertyGuard}
+        AND a."next_service_at" <= ${maxDueBefore}
         AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
       ORDER BY a."company_id", a."next_service_at" ASC, a."criticality" DESC
     `),
-    db.integrationEvent.findMany({ where: { type: "component_service_settings", status: "active", company_id: { not: null } }, orderBy: { created_at: "desc" }, select: { company_id: true, payload: true } }),
-    db.integrationEvent.findMany({ where: { type: "user_service_notification_preferences", status: "active", company_id: { not: null }, recipient: { not: null } }, orderBy: { created_at: "desc" }, select: { company_id: true, recipient: true, payload: true } }),
+    db.serviceNotificationSettings.findMany({
+      select: { company_id: true, enabled: true, days_ahead: true, roles: true, additional_emails: true },
+    }),
+    db.userServiceNotificationPreference.findMany({
+      select: { company_id: true, user_id: true, enabled: true, overdue_only: true },
+    }),
   ]);
 
   const settings = new Map<string, Preferences>();
-  for (const event of settingsEvents) if (event.company_id && !settings.has(event.company_id)) settings.set(event.company_id, parsePreferences(event.payload));
+  for (const row of modernSettings) {
+    settings.set(row.company_id, {
+      enabled: row.enabled,
+      daysAhead: row.days_ahead,
+      roles: Array.isArray(row.roles) ? row.roles.map(String).filter((role) => allowedRoles.includes(role)) : defaults.roles,
+      additionalEmails: Array.isArray(row.additional_emails) ? row.additional_emails.map(String) : [],
+    });
+  }
   const userSettings = new Map<string, UserPreferences>();
-  for (const event of userPreferenceEvents) {
-    if (!event.company_id || !event.recipient) continue;
-    const key = `${event.company_id}:${event.recipient}`;
-    if (!userSettings.has(key)) userSettings.set(key, parseUserPreferences(event.payload));
+  for (const row of modernUserPreferences) {
+    userSettings.set(`${row.company_id}:${row.user_id}`, { enabled: row.enabled, overdueOnly: row.overdue_only });
   }
 
   const grouped = new Map<string, DueComponent[]>();
@@ -194,7 +233,19 @@ export async function GET(request: Request) {
     const overdueComponents = companyComponents.filter((item) => item.next_service_at < now);
     const basePayload = { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference };
     if (!allEmails.size && (!overdueOnlyEmails.size || !overdueComponents.length)) {
-      await db.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "skipped", recipient: dedupeKey, payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }) } });
+      await db.componentServiceDigestRun.upsert({
+        where: { company_id_dedupe_key: { company_id: companyId, dedupe_key: dedupeKey } },
+        create: {
+          company_id: companyId,
+          dedupe_key: dedupeKey,
+          status: "skipped",
+          payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
+        },
+        update: {
+          status: "skipped",
+          payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
+        },
+      });
       result.skipped += 1;
       continue;
     }

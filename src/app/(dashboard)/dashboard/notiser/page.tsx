@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type NotificationItem = {
   id: string;
@@ -12,6 +13,7 @@ type NotificationItem = {
   author_name?: string;
   created_at: string;
   read: boolean;
+  source?: "table" | "legacy";
 };
 
 type EventItem = {
@@ -40,13 +42,14 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "urgent">("all");
   const [form, setForm] = useState({ title: "", message: "", priority: "normal", audience: "Alla användare" });
 
   async function load() {
     const response = await fetch("/api/notifications", { cache: "no-store" });
     if (!response.ok) return;
-    const data = await response.json();
+    const data = await readResponseJson(response);
     setNotifications(data.notifications || []);
     setEvents(data.recentEvents || []);
   }
@@ -71,14 +74,34 @@ export default function NotificationsPage() {
   }
 
   async function markRead(notificationId: string) {
+    setError("");
     const response = await fetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notificationId }),
     });
-    if (response.ok) {
-      setNotifications((items) => items.map((item) => (item.notificationId === notificationId ? { ...item, read: true } : item)));
+    const data = await readResponseJson(response);
+    if (!response.ok) {
+      setError(data.error || "Kunde inte markera notisen som läst");
+      return;
     }
+    setNotifications((items) => items.map((item) => (item.notificationId === notificationId ? { ...item, read: true } : item)));
+  }
+
+  async function recallNotification(notificationId: string) {
+    if (!window.confirm("Ta bort notisen? Den döljs för alla men behålls i historiken.")) return;
+    setError("");
+    const response = await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId }),
+    });
+    const data = await readResponseJson(response);
+    if (!response.ok) {
+      setError(data.error || "Kunde inte ta bort notisen");
+      return;
+    }
+    setNotifications((items) => items.filter((item) => item.notificationId !== notificationId));
   }
 
   const visible = useMemo(() => {
@@ -104,6 +127,8 @@ export default function NotificationsPage() {
           ))}
         </div>
       </header>
+
+      {error ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{error}</p> : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         {[['Olästa notiser', unread], ['Brådskande', urgent], ['Senaste händelser', events.length]].map(([label, value]) => (
@@ -160,7 +185,20 @@ export default function NotificationsPage() {
                         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-600">{item.message}</p>
                         <p className="mt-3 text-xs text-ink-400">{item.audience || "Alla användare"} · {item.author_name || "Revalta"} · {new Date(item.created_at).toLocaleString("sv-SE")}</p>
                       </div>
-                      {!item.read ? <button onClick={() => markRead(item.notificationId)} className="shrink-0 rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">Markera som läst</button> : null}
+                      <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                        {item.source === "legacy" ? (
+                          <p className="max-w-xs text-xs font-medium text-amber-700">Äldre notis – kör backfill innan den kan markeras som läst eller tas bort.</p>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => void recallNotification(item.notificationId)} className="text-xs font-semibold text-red-700 hover:text-red-900">Ta bort</button>
+                            {!item.read ? (
+                              <button type="button" onClick={() => void markRead(item.notificationId)} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">
+                                Markera som läst
+                              </button>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </article>
                 );
