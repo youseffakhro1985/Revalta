@@ -35,6 +35,16 @@ model User {
   project_comments          ProjectComment[]
   uploaded_documents        OperationalDocument[]    @relation("UploadedOperationalDocuments")
   created_leases            Lease[]                  @relation("CreatedLeases")
+  work_order_checklist_items_created   WorkOrderChecklistItem[]  @relation("WorkOrderChecklistItemCreatedBy")
+  work_order_checklist_items_completed WorkOrderChecklistItem[]  @relation("WorkOrderChecklistItemCompletedBy")
+  work_order_edit_locks                WorkOrderEditLock[]
+  work_order_execution_entries         WorkOrderExecutionEntry[]
+  work_order_invoice_bases_created     WorkOrderInvoiceBasis[]    @relation("WorkOrderInvoiceBasisCreatedBy")
+  work_order_invoice_bases_approved    WorkOrderInvoiceBasis[]    @relation("WorkOrderInvoiceBasisApprovedBy")
+  work_order_reports_created           WorkOrderReport[]          @relation("WorkOrderReportCreatedBy")
+  work_order_reports_approved          WorkOrderReport[]          @relation("WorkOrderReportApprovedBy")
+  work_order_signatures                WorkOrderSignature[]
+  work_order_status_events             WorkOrderStatusEvent[]
 }
 
 model Company {
@@ -60,6 +70,14 @@ model Company {
   operational_documents  OperationalDocument[]
   lease_holders          LeaseHolder[]
   leases                 Lease[]
+  work_order_checklist_items  WorkOrderChecklistItem[]
+  work_order_edit_locks       WorkOrderEditLock[]
+  work_order_execution_entries WorkOrderExecutionEntry[]
+  work_order_invoice_bases    WorkOrderInvoiceBasis[]
+  work_order_number_counters  WorkOrderNumberCounter[]
+  work_order_reports          WorkOrderReport[]
+  work_order_signatures       WorkOrderSignature[]
+  work_order_status_events    WorkOrderStatusEvent[]
 }
 
 model Property {
@@ -98,16 +116,17 @@ model Property {
 }
 
 model Building {
-  id                String   @id @default(uuid())
+  id                String      @id @default(uuid())
   property_id       String
   name              String
   address           String?
   construction_year Int?
   floors            Int?
-  created_at        DateTime @default(now())
-  updated_at        DateTime @default(now()) @updatedAt
-  property          Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @default(now()) @updatedAt
+  property          Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
   units             Unit[]
+  work_orders       WorkOrder[]
 
   @@index([property_id])
 }
@@ -169,39 +188,74 @@ model Ticket {
 }
 
 model WorkOrder {
-  id              String                @id @default(uuid())
-  company_id      String
-  ticket_id       String?               @unique
-  property_id     String
-  unit_id         String?
-  assigned_to_id  String?
-  created_by_id   String
-  title           String
-  description     String
-  status          String                @default("planned")
-  priority        String                @default("normal")
-  scheduled_start DateTime?
-  scheduled_end   DateTime?
-  estimated_cost  Decimal?              @db.Decimal(14, 2)
-  actual_cost     Decimal?              @db.Decimal(14, 2)
-  completed_at    DateTime?
-  created_at      DateTime              @default(now())
-  updated_at      DateTime              @default(now()) @updatedAt
-  company         Company               @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  ticket          Ticket?               @relation(fields: [ticket_id], references: [id], onDelete: SetNull)
-  property        Property              @relation(fields: [property_id], references: [id], onDelete: Restrict)
-  unit            Unit?                 @relation(fields: [unit_id], references: [id], onDelete: SetNull)
-  assigned_to     User?                 @relation("AssignedWorkOrders", fields: [assigned_to_id], references: [id], onDelete: SetNull)
-  created_by      User                  @relation("CreatedWorkOrders", fields: [created_by_id], references: [id], onDelete: Restrict)
-  projects        Project[]
-  comments        WorkOrderComment[]
-  documents       OperationalDocument[]
+  id                            String                    @id @default(uuid())
+  company_id                    String
+  ticket_id                     String?                   @unique
+  property_id                   String
+  building_id                   String?
+  unit_id                       String?
+  /// FK till PropertyTechnicalAsset i production; modell speglas i separat PR.
+  technical_asset_id            String?
+  assigned_to_id                String?
+  created_by_id                 String
+  title                         String
+  description                   String
+  notes                         String?
+  status                        String                    @default("planned")
+  priority                      String                    @default("normal")
+  work_order_number             String?
+  work_type                     String                    @default("corrective")
+  source                        String                    @default("internal")
+  scheduled_start               DateTime?
+  scheduled_end                 DateTime?
+  estimated_cost                Decimal?                  @db.Decimal(14, 2)
+  actual_cost                   Decimal?                  @db.Decimal(14, 2)
+  response_due_at               DateTime?
+  completion_due_at             DateTime?
+  sla_response_due_at           DateTime?
+  sla_resolution_due_at         DateTime?
+  responded_at                  DateTime?
+  paused_at                     DateTime?
+  pause_reason                  String?
+  completed_at                  DateTime?
+  closed_at                     DateTime?
+  sla_status                    String                    @default("not_set")
+  maintenance_cycle_key         String?
+  maintenance_cycle_advanced_at DateTime?
+  created_at                    DateTime                  @default(now())
+  updated_at                    DateTime                  @default(now()) @updatedAt
+  company                       Company                   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  ticket                        Ticket?                   @relation(fields: [ticket_id], references: [id], onDelete: SetNull)
+  property                      Property                  @relation(fields: [property_id], references: [id], onDelete: Restrict)
+  building                      Building?                 @relation(fields: [building_id], references: [id], onDelete: SetNull)
+  unit                          Unit?                     @relation(fields: [unit_id], references: [id], onDelete: SetNull)
+  assigned_to                   User?                     @relation("AssignedWorkOrders", fields: [assigned_to_id], references: [id], onDelete: SetNull)
+  created_by                    User                      @relation("CreatedWorkOrders", fields: [created_by_id], references: [id], onDelete: Restrict)
+  projects                      Project[]
+  comments                      WorkOrderComment[]
+  documents                     OperationalDocument[]
+  checklist_items               WorkOrderChecklistItem[]
+  edit_lock                     WorkOrderEditLock?
+  execution_entries             WorkOrderExecutionEntry[]
+  invoice_bases                 WorkOrderInvoiceBasis[]
+  reports                       WorkOrderReport[]
+  signatures                    WorkOrderSignature[]
+  status_events                 WorkOrderStatusEvent[]
 
   @@index([company_id, status])
   @@index([property_id])
   @@index([unit_id])
   @@index([assigned_to_id])
   @@index([scheduled_start])
+  @@index([building_id])
+  @@index([technical_asset_id])
+  @@index([company_id, technical_asset_id, status], map: "WorkOrder_company_asset_status_idx")
+  @@index([company_id, maintenance_cycle_advanced_at])
+  @@index([company_id, sla_status])
+  @@index([company_id, sla_resolution_due_at], map: "WorkOrder_company_sla_resolution_idx")
+  @@index([company_id, sla_response_due_at], map: "WorkOrder_company_sla_response_idx")
+  @@index([completion_due_at])
+  @@index([response_due_at])
 }
 
 model Project {
@@ -253,6 +307,162 @@ model WorkOrderComment {
 
   @@index([company_id, work_order_id, created_at])
   @@index([user_id])
+}
+
+model WorkOrderChecklistItem {
+  id              String    @id @default(uuid())
+  company_id      String
+  work_order_id   String
+  created_by_id   String
+  completed_by_id String?
+  title           String
+  description     String?
+  is_required     Boolean   @default(true)
+  sort_order      Int       @default(0)
+  completed_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+  company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order      WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by      User      @relation("WorkOrderChecklistItemCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  completed_by    User?     @relation("WorkOrderChecklistItemCompletedBy", fields: [completed_by_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id, work_order_id])
+  @@index([work_order_id, sort_order])
+}
+
+model WorkOrderEditLock {
+  work_order_id String    @id
+  company_id    String
+  user_id       String
+  token_hash    String
+  acquired_at   DateTime  @default(now())
+  expires_at    DateTime
+  updated_at    DateTime  @default(now()) @updatedAt
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id, expires_at])
+  @@index([user_id])
+}
+
+model WorkOrderExecutionEntry {
+  id            String    @id @default(uuid())
+  company_id    String
+  work_order_id String
+  created_by_id String
+  entry_type    String
+  description   String
+  quantity      Decimal   @default(1) @db.Decimal(14, 3)
+  unit          String?
+  unit_cost     Decimal?  @db.Decimal(14, 2)
+  total_amount  Decimal   @default(0) @db.Decimal(14, 2)
+  minutes       Int?
+  distance_km   Decimal?  @db.Decimal(10, 2)
+  supplier      String?
+  occurred_at   DateTime  @default(now())
+  created_at    DateTime  @default(now())
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by    User      @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, work_order_id])
+  @@index([occurred_at])
+  @@index([work_order_id, entry_type])
+}
+
+model WorkOrderInvoiceBasis {
+  id             String    @id @default(uuid())
+  company_id     String
+  work_order_id  String
+  created_by_id  String
+  status         String    @default("draft")
+  reference      String    @unique
+  currency       String    @default("SEK")
+  subtotal       Decimal   @default(0) @db.Decimal(14, 2)
+  vat_rate       Decimal   @default(25) @db.Decimal(5, 2)
+  vat_amount     Decimal   @default(0) @db.Decimal(14, 2)
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  snapshot       Json
+  approved_by_id String?
+  approved_at    DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now()) @updatedAt
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order     WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by     User      @relation("WorkOrderInvoiceBasisCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  approved_by    User?     @relation("WorkOrderInvoiceBasisApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id, status])
+}
+
+model WorkOrderNumberCounter {
+  company_id  String
+  year        Int
+  last_number Int      @default(0)
+  updated_at  DateTime @default(now()) @updatedAt
+  company     Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@id([company_id, year])
+}
+
+model WorkOrderReport {
+  id             String    @id @default(uuid())
+  company_id     String
+  work_order_id  String
+  created_by_id  String
+  version        Int
+  status         String    @default("draft")
+  title          String
+  snapshot       Json
+  approved_by_id String?
+  approved_at    DateTime?
+  created_at     DateTime  @default(now())
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order     WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by     User      @relation("WorkOrderReportCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  approved_by    User?     @relation("WorkOrderReportApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
+
+  @@unique([work_order_id, version])
+  @@index([company_id, work_order_id])
+}
+
+model WorkOrderSignature {
+  id                String    @id @default(uuid())
+  company_id        String
+  work_order_id     String
+  created_by_id     String
+  signer_role       String
+  signer_name       String
+  signer_email      String?
+  confirmation_text String
+  signed_at         DateTime  @default(now())
+  created_at        DateTime  @default(now())
+  company           Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order        WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by        User      @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([work_order_id, signer_role])
+  @@index([company_id, work_order_id])
+}
+
+model WorkOrderStatusEvent {
+  id            String    @id @default(uuid())
+  company_id    String
+  work_order_id String
+  actor_user_id String
+  from_status   String?
+  to_status     String
+  reason        String?
+  metadata      Json?
+  created_at    DateTime  @default(now())
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  actor         User      @relation(fields: [actor_user_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at], map: "WorkOrderStatusEvent_company_created_idx")
+  @@index([work_order_id, created_at], map: "WorkOrderStatusEvent_work_order_created_idx")
 }
 
 model ProjectComment {
