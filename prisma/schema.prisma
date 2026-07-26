@@ -77,6 +77,11 @@ model User {
   imd_debit_lines_created              ImdDebitLine[]       @relation("ImdDebitLineCreatedBy")
   service_notification_settings_updated ServiceNotificationSettings[] @relation("ServiceNotificationSettingsUpdatedBy")
   user_service_notification_preferences UserServiceNotificationPreference[]
+  work_order_time_entries               WorkOrderTimeEntry[]
+  work_order_material_entries_created   WorkOrderMaterialEntry[] @relation("WorkOrderMaterialEntryCreatedBy")
+  work_order_profitability_settings_updated WorkOrderProfitabilitySettings[] @relation("WorkOrderProfitabilitySettingsUpdatedBy")
+  work_order_invoice_drafts_updated     WorkOrderInvoiceDraft[] @relation("WorkOrderInvoiceDraftUpdatedBy")
+  work_order_invoice_export_jobs_created WorkOrderInvoiceExportJob[] @relation("WorkOrderInvoiceExportJobCreatedBy")
 }
 
 model Company {
@@ -144,6 +149,11 @@ model Company {
   imd_debit_lines             ImdDebitLine[]
   service_notification_settings ServiceNotificationSettings?
   user_service_notification_preferences UserServiceNotificationPreference[]
+  work_order_time_entries       WorkOrderTimeEntry[]
+  work_order_material_entries   WorkOrderMaterialEntry[]
+  work_order_profitability_settings WorkOrderProfitabilitySettings[]
+  work_order_invoice_drafts     WorkOrderInvoiceDraft[]
+  work_order_invoice_export_jobs WorkOrderInvoiceExportJob[]
 }
 
 model Property {
@@ -347,6 +357,11 @@ model WorkOrder {
   time_reports                  TimeReport[]
   lease_inspection_links        LeaseInspectionWorkOrderLink[]
   compliance_inspections        ComplianceInspection[]
+  time_entries                  WorkOrderTimeEntry[]
+  material_entries              WorkOrderMaterialEntry[]
+  profitability_settings        WorkOrderProfitabilitySettings?
+  invoice_drafts                WorkOrderInvoiceDraft[]
+  invoice_export_jobs           WorkOrderInvoiceExportJob[]
 
   @@index([company_id, status])
   @@index([company_id, deleted_at])
@@ -1686,4 +1701,142 @@ model UserServiceNotificationPreference {
 
   @@unique([company_id, user_id])
   @@index([user_id])
+}
+
+model WorkOrderTimeEntry {
+  id            String    @id @default(uuid())
+  company_id    String
+  work_order_id String
+  user_id       String
+  user_name     String?
+  user_email    String
+  kind          String    @default("work")
+  action        String    @default("manual")
+  started_at    DateTime?
+  ended_at      DateTime?
+  minutes       Int?
+  billable      Boolean   @default(true)
+  note          String?
+  status        String    @default("submitted")
+  actor_id      String
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, work_order_id, status])
+  @@index([work_order_id, created_at])
+  @@index([user_id])
+}
+
+model WorkOrderMaterialEntry {
+  id              String    @id @default(uuid())
+  company_id      String
+  work_order_id   String
+  article_number  String?
+  name            String
+  quantity        Decimal   @db.Decimal(14, 3)
+  unit            String    @default("st")
+  unit_price      Decimal   @db.Decimal(14, 2)
+  total           Decimal   @db.Decimal(14, 2)
+  supplier        String?
+  stock_status    String    @default("used")
+  billable        Boolean   @default(true)
+  note            String?
+  status          String    @default("submitted")
+  created_by_id   String
+  created_by_name String?
+  created_by_email String
+  actor_id        String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order      WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by      User      @relation("WorkOrderMaterialEntryCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, work_order_id, status])
+  @@index([work_order_id, created_at])
+  @@index([created_by_id])
+}
+
+model WorkOrderProfitabilitySettings {
+  id                      String    @id @default(uuid())
+  company_id              String
+  work_order_id           String    @unique
+  internal_hourly_cost    Decimal   @default(350) @db.Decimal(14, 2)
+  customer_hourly_rate    Decimal   @default(650) @db.Decimal(14, 2)
+  material_markup_percent Decimal   @default(15) @db.Decimal(7, 2)
+  other_cost              Decimal   @default(0) @db.Decimal(14, 2)
+  fixed_revenue           Decimal   @default(0) @db.Decimal(14, 2)
+  updated_by_id           String
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+  company                 Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order              WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  updated_by              User      @relation("WorkOrderProfitabilitySettingsUpdatedBy", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id])
+  @@index([updated_by_id])
+}
+
+model WorkOrderInvoiceDraft {
+  id                   String    @id @default(uuid())
+  company_id           String
+  work_order_id        String
+  version_id           String    @unique
+  status               String    @default("draft")
+  customer_name        String    @default("")
+  customer_org_number  String    @default("")
+  customer_reference   String    @default("")
+  invoice_date         String
+  due_days             Int       @default(30)
+  discount_percent     Decimal   @default(0) @db.Decimal(7, 2)
+  vat_percent          Decimal   @default(25) @db.Decimal(7, 2)
+  note                 String    @default("")
+  lines                Json
+  subtotal             Decimal   @default(0) @db.Decimal(14, 2)
+  discount             Decimal   @default(0) @db.Decimal(14, 2)
+  net                  Decimal   @default(0) @db.Decimal(14, 2)
+  vat                  Decimal   @default(0) @db.Decimal(14, 2)
+  total                Decimal   @default(0) @db.Decimal(14, 2)
+  updated_by_id        String
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+  company              Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order           WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  updated_by           User      @relation("WorkOrderInvoiceDraftUpdatedBy", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, work_order_id, created_at])
+  @@index([work_order_id, status])
+  @@index([updated_by_id])
+}
+
+model WorkOrderInvoiceExportJob {
+  id                  String    @id @default(uuid())
+  company_id          String
+  work_order_id       String
+  provider            String
+  status              String    @default("queued")
+  attempt             Int       @default(1)
+  invoice_version_id  String
+  error               String?
+  provider_status     Int?
+  external_id         String?
+  provider_response   String?
+  processing_started_at DateTime?
+  sent_at             DateTime?
+  failed_at           DateTime?
+  created_by_id       String
+  acted_by_id         String?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  company             Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order          WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by          User      @relation("WorkOrderInvoiceExportJobCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, work_order_id, status])
+  @@index([status, created_at])
+  @@index([invoice_version_id])
+  @@index([created_by_id])
 }

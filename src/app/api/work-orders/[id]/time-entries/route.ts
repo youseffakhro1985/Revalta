@@ -2,32 +2,15 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import {
+  getTimeEntry,
+  listTimeEntries,
+  upsertTimeEntry,
+  type TimeEntryPayload,
+} from "@/lib/work-order-ops-storage";
 
-const TYPE = "work_order.time_entry";
 const allowedKinds = new Set(["work", "travel", "break"]);
 const allowedActions = new Set(["manual", "start", "stop", "approve", "reject"]);
-
-type Payload = {
-  entryId: string;
-  workOrderId: string;
-  userId: string;
-  userName?: string | null;
-  userEmail: string;
-  kind: "work" | "travel" | "break";
-  action: "manual" | "start" | "stop" | "approve" | "reject";
-  startedAt?: string | null;
-  endedAt?: string | null;
-  minutes?: number | null;
-  billable?: boolean;
-  note?: string | null;
-  status?: "running" | "submitted" | "approved" | "rejected";
-  actorId: string;
-};
-
-function objectPayload(value: unknown): Payload | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Payload;
-}
 
 async function ensureOrder(id: string, companyId: string) {
   return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId }, select: { id: true, title: true } });
@@ -40,20 +23,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!(await ensureOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const events = await db.integrationEvent.findMany({
-    where: { company_id: user.company_id, type: TYPE, recipient: id },
-    orderBy: { created_at: "asc" },
-    take: 2000,
-  });
-
-  const entries = new Map<string, Payload & { createdAt: string }>();
-  for (const event of events) {
-    const payload = objectPayload(event.payload);
-    if (!payload?.entryId || payload.workOrderId !== id) continue;
-    const previous = entries.get(payload.entryId);
-    entries.set(payload.entryId, { ...previous, ...payload, createdAt: previous?.createdAt ?? event.created_at.toISOString() });
-  }
-  const rows = [...entries.values()].sort((a, b) => String(b.startedAt ?? b.createdAt).localeCompare(String(a.startedAt ?? a.createdAt)));
+  const rows = (await listTimeEntries(user.company_id, id))
+    .sort((a, b) => String(b.startedAt ?? b.createdAt).localeCompare(String(a.startedAt ?? a.createdAt)));
   const summary = rows.reduce((acc, row) => {
     const minutes = row.minutes ?? (row.startedAt && row.endedAt ? Math.max(0, Math.round((new Date(row.endedAt).getTime() - new Date(row.startedAt).getTime()) / 60000)) : 0);
     if (row.kind === "work") acc.work += minutes;
@@ -88,7 +59,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let startedAt: string | null = null;
   let endedAt: string | null = null;
   let minutes: number | null = null;
-  let status: Payload["status"] = "submitted";
+  let status: TimeEntryPayload["status"] = "submitted";
+  let userId = user.id;
+  let userName = user.name;
+  let userEmail = user.email;
 
   if (action === "start") {
     startedAt = new Date().toISOString();
@@ -100,9 +74,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (end.getTime() - start.getTime() > 24 * 60 * 60 * 1000) return NextResponse.json({ error: "En tidsrad får vara högst 24 timmar" }, { status: 400 });
     startedAt = start.toISOString(); endedAt = end.toISOString(); minutes = Math.round((end.getTime() - start.getTime()) / 60000);
   } else {
-    const prior = await db.integrationEvent.findMany({ where: { company_id: user.company_id, type: TYPE, recipient: id }, orderBy: { created_at: "desc" }, take: 500 });
-    const latest = prior.map(e => objectPayload(e.payload)).find(p => p?.entryId === entryId);
+    const latest = await getTimeEntry(user.company_id, id, entryId);
     if (!latest) return NextResponse.json({ error: "Tidsraden hittades inte" }, { status: 404 });
+    userId = latest.userId;
+    userName = latest.userName ?? null;
+    userEmail = latest.userEmail;
     if (action === "stop") {
       if (latest.userId !== user.id && !canManageTickets(user.role)) return NextResponse.json({ error: "Du kan bara stoppa din egen timer" }, { status: 403 });
       if (!latest.startedAt || latest.status !== "running") return NextResponse.json({ error: "Tidsraden är inte aktiv" }, { status: 400 });
@@ -112,8 +88,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  const payload: Payload = { entryId, workOrderId: id, userId: user.id, userName: user.name, userEmail: user.email, kind: kind as Payload["kind"], action: action as Payload["action"], startedAt, endedAt, minutes, billable, note, status, actorId: user.id };
-  await db.integrationEvent.create({ data: { company_id: user.company_id, type: TYPE, status: status ?? "submitted", recipient: id, payload } });
-  await writeAuditLog(user, { entityType: "work_order", entityId: id, action: `work_order.time_${action}`, metadata: { entryId, kind, minutes, billable, status } });
-  return NextResponse.json({ entry: payload }, { status: 201 });
+  const payload: TimeEntryPayload = {
+    entryId,
+    workOrderId: id,
+    userId,
+    userName,
+    userEmail,
+    kind: kind as TimeEntryPayload["kind"],
+    action: action as TimeEntryPayload["action"],
+    startedAt,
+    endedAt,
+    minutes,
+    billable,
+    note,
+    status,
+    actorId: user.id,
+  };
+  const entry = await upsertTimeEntry(user.company_id, payload);
+  await writeAuditLog(user, {
+    entityType: "work_order",
+    entityId: id,
+    action: `work_order.time_${action}`,
+    metadata: { entryId, kind, minutes, billable, status, storage: "WorkOrderTimeEntry" },
+  });
+  return NextResponse.json({ entry }, { status: 201 });
 }

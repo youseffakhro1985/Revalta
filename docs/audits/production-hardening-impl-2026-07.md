@@ -54,7 +54,8 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Soft delete (`deleted_at`) for work orders, projects, operational documents and lease holders; list/get/update paths filter active rows.
    - Service notification company/user preferences moved to `ServiceNotificationSettings` / `UserServiceNotificationPreference` (dual-read + cron prefers modern tables).
    - Project detail can assign project manager via `/api/team` and soft-delete projects.
-   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings).
+   - Work-order ops off IntegrationEvent primary storage: `WorkOrderTimeEntry`, `WorkOrderMaterialEntry`, `WorkOrderProfitabilitySettings`, `WorkOrderInvoiceDraft`, `WorkOrderInvoiceExportJob` (dual-read + cron/export jobs).
+   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables).
 
 ## Verification
 

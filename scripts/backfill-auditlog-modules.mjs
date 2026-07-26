@@ -769,6 +769,253 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("WorkOrderTimeEntry", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "work_order.time_entry", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 20000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const latest = new Map();
+    for (const event of events) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : null;
+      if (!payload?.entryId || !event.company_id || !event.recipient) { localSkipped += 1; continue; }
+      latest.set(`${event.company_id}:${payload.entryId}`, { event, payload });
+    }
+    for (const { event, payload } of latest.values()) {
+      if (await prisma.workOrderTimeEntry.findUnique({ where: { id: String(payload.entryId) } })) { localSkipped += 1; continue; }
+      const workOrder = await prisma.workOrder.findFirst({
+        where: { id: event.recipient, company_id: event.company_id },
+        select: { id: true },
+      });
+      if (!workOrder || !payload.userId || !payload.userEmail) { localSkipped += 1; continue; }
+      await prisma.workOrderTimeEntry.create({
+        data: {
+          id: String(payload.entryId),
+          company_id: event.company_id,
+          work_order_id: event.recipient,
+          user_id: String(payload.userId),
+          user_name: payload.userName ? String(payload.userName) : null,
+          user_email: String(payload.userEmail),
+          kind: String(payload.kind || "work"),
+          action: String(payload.action || "manual"),
+          started_at: dateOrNull(payload.startedAt),
+          ended_at: dateOrNull(payload.endedAt),
+          minutes: payload.minutes == null ? null : num(payload.minutes),
+          billable: payload.billable !== false,
+          note: payload.note ? String(payload.note) : null,
+          status: String(payload.status || "submitted"),
+          actor_id: String(payload.actorId || payload.userId),
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("WorkOrderMaterialEntry", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "work_order.material_entry", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 20000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const latest = new Map();
+    for (const event of events) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : null;
+      if (!payload?.entryId || !event.company_id || !event.recipient) { localSkipped += 1; continue; }
+      latest.set(`${event.company_id}:${payload.entryId}`, { event, payload });
+    }
+    for (const { event, payload } of latest.values()) {
+      if (await prisma.workOrderMaterialEntry.findUnique({ where: { id: String(payload.entryId) } })) { localSkipped += 1; continue; }
+      if (!payload.name || !payload.createdById || !payload.createdByEmail) { localSkipped += 1; continue; }
+      const workOrder = await prisma.workOrder.findFirst({
+        where: { id: event.recipient, company_id: event.company_id },
+        select: { id: true },
+      });
+      if (!workOrder) { localSkipped += 1; continue; }
+      await prisma.workOrderMaterialEntry.create({
+        data: {
+          id: String(payload.entryId),
+          company_id: event.company_id,
+          work_order_id: event.recipient,
+          article_number: payload.articleNumber ? String(payload.articleNumber) : null,
+          name: String(payload.name),
+          quantity: num(payload.quantity, 1),
+          unit: String(payload.unit || "st"),
+          unit_price: num(payload.unitPrice),
+          total: num(payload.total),
+          supplier: payload.supplier ? String(payload.supplier) : null,
+          stock_status: String(payload.stockStatus || "used"),
+          billable: payload.billable !== false,
+          note: payload.note ? String(payload.note) : null,
+          status: String(payload.status || "submitted"),
+          created_by_id: String(payload.createdById),
+          created_by_name: payload.createdByName ? String(payload.createdByName) : null,
+          created_by_email: String(payload.createdByEmail),
+          actor_id: String(payload.actorId || payload.createdById),
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("WorkOrderProfitabilitySettings", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "work_order.profitability_settings", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "desc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const seen = new Set();
+    for (const event of events) {
+      if (!event.company_id || !event.recipient || seen.has(event.recipient)) { localSkipped += 1; continue; }
+      seen.add(event.recipient);
+      if (await prisma.workOrderProfitabilitySettings.findUnique({ where: { work_order_id: event.recipient } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const updatedById = payload.updatedById
+        ? String(payload.updatedById)
+        : (await prisma.user.findFirst({ where: { company_id: event.company_id, status: "active" }, select: { id: true } }))?.id;
+      if (!updatedById) { localSkipped += 1; continue; }
+      await prisma.workOrderProfitabilitySettings.create({
+        data: {
+          company_id: event.company_id,
+          work_order_id: event.recipient,
+          internal_hourly_cost: num(payload.internalHourlyCost, 350),
+          customer_hourly_rate: num(payload.customerHourlyRate, 650),
+          material_markup_percent: num(payload.materialMarkupPercent, 15),
+          other_cost: num(payload.otherCost),
+          fixed_revenue: num(payload.fixedRevenue),
+          updated_by_id: updatedById,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("WorkOrderInvoiceDraft", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "work_order.invoice_basis", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : null;
+      if (!payload?.versionId || !event.company_id || !event.recipient) { localSkipped += 1; continue; }
+      if (await prisma.workOrderInvoiceDraft.findUnique({ where: { version_id: String(payload.versionId) } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const updatedById = payload.updatedById
+        ? String(payload.updatedById)
+        : (await prisma.user.findFirst({ where: { company_id: event.company_id, status: "active" }, select: { id: true } }))?.id;
+      if (!updatedById) { localSkipped += 1; continue; }
+      await prisma.workOrderInvoiceDraft.create({
+        data: {
+          company_id: event.company_id,
+          work_order_id: event.recipient,
+          version_id: String(payload.versionId),
+          status: String(payload.status || "draft"),
+          customer_name: String(payload.customerName || ""),
+          customer_org_number: String(payload.customerOrgNumber || ""),
+          customer_reference: String(payload.customerReference || ""),
+          invoice_date: String(payload.invoiceDate || event.created_at.toISOString().slice(0, 10)),
+          due_days: num(payload.dueDays, 30),
+          discount_percent: num(payload.discountPercent),
+          vat_percent: num(payload.vatPercent, 25),
+          note: String(payload.note || ""),
+          lines: Array.isArray(payload.lines) ? payload.lines : [],
+          subtotal: num(payload.subtotal),
+          discount: num(payload.discount),
+          net: num(payload.net),
+          vat: num(payload.vat),
+          total: num(payload.total),
+          updated_by_id: updatedById,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("WorkOrderInvoiceExportJob", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "work_order.invoice_integration_job", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 20000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const latest = new Map();
+    for (const event of events) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : null;
+      if (!payload?.jobId || !event.company_id || !event.recipient) { localSkipped += 1; continue; }
+      latest.set(`${event.company_id}:${payload.jobId}`, { event, payload });
+    }
+    for (const { event, payload } of latest.values()) {
+      if (await prisma.workOrderInvoiceExportJob.findUnique({ where: { id: String(payload.jobId) } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const createdById = payload.createdById
+        ? String(payload.createdById)
+        : (await prisma.user.findFirst({ where: { company_id: event.company_id, status: "active" }, select: { id: true } }))?.id;
+      if (!createdById || !payload.invoiceVersionId) { localSkipped += 1; continue; }
+      await prisma.workOrderInvoiceExportJob.create({
+        data: {
+          id: String(payload.jobId),
+          company_id: event.company_id,
+          work_order_id: event.recipient,
+          provider: String(payload.provider || "webhook"),
+          status: String(payload.status || "queued"),
+          attempt: Math.max(1, num(payload.attempt, 1)),
+          invoice_version_id: String(payload.invoiceVersionId),
+          error: payload.error ? String(payload.error) : null,
+          provider_status: payload.providerStatus == null ? null : num(payload.providerStatus),
+          external_id: payload.externalId ? String(payload.externalId) : null,
+          provider_response: payload.providerResponse ? String(payload.providerResponse) : null,
+          processing_started_at: dateOrNull(payload.processingStartedAt),
+          sent_at: dateOrNull(payload.sentAt),
+          failed_at: dateOrNull(payload.failedAt),
+          created_by_id: createdById,
+          acted_by_id: payload.actedById ? String(payload.actedById) : null,
+          created_at: dateOrNull(payload.createdAt) || event.created_at,
+          updated_at: dateOrNull(payload.updatedAt) || event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   await backfill("ServiceNotificationSettings", async () => {
     const events = await prisma.integrationEvent.findMany({
       where: { type: "component_service_settings", status: "active", company_id: { not: null } },
