@@ -12,7 +12,7 @@ export async function readInspectionWorkOrders(companyId: string, leaseId: strin
     .filter((link) => link?.leaseId === leaseId && Boolean(link.workOrderId));
   const ids = links.map((link) => link.workOrderId);
   const orders = ids.length ? await db.workOrder.findMany({
-    where: { company_id: companyId, id: { in: ids } },
+    where: { deleted_at: null, company_id: companyId, id: { in: ids } },
     select: { id: true, status: true, priority: true, title: true, created_at: true, completed_at: true },
   }) : [];
   const byId = new Map(orders.map((order) => [order.id, order]));

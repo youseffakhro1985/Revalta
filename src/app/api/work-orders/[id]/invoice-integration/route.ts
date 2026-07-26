@@ -21,7 +21,7 @@ function configured(provider: string) {
 }
 
 async function getOrder(id: string, companyId: string) {
-  return db.workOrder.findFirst({ where: { id, company_id: companyId }, select: { id: true, title: true } });
+  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId }, select: { id: true, title: true } });
 }
 
 async function latestInvoice(id: string, companyId: string) {

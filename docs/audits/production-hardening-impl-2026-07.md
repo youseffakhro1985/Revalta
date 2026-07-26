@@ -50,7 +50,11 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Document expiry cron (`/api/cron/document-expiry-reminders`) creates AppNotifications.
    - Work-order detail exposes “Skapa projekt från arbetsorder”.
    - Round deviations can be marked and converted to work orders (`PATCH /api/rounds/[id]`, `POST /api/rounds/[id]/work-orders`).
-   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables).
+   - Compliance inspections (`action_required`) can spawn corrective work orders.
+   - Soft delete (`deleted_at`) for work orders, projects, operational documents and lease holders; list/get/update paths filter active rows.
+   - Service notification company/user preferences moved to `ServiceNotificationSettings` / `UserServiceNotificationPreference` (dual-read + cron prefers modern tables).
+   - Project detail can assign project manager via `/api/team` and soft-delete projects.
+   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings).
 
 ## Verification
 

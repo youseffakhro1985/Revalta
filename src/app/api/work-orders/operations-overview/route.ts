@@ -11,7 +11,7 @@ export async function GET() {
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const rows = await db.workOrder.findMany({
-    where: { company_id: user.company_id },
+    where: { deleted_at: null, company_id: user.company_id },
     orderBy: [{ scheduled_start: "asc" }, { created_at: "desc" }],
     take: 1000,
     include: {

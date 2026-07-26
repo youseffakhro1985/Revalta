@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const { holderId } = await params;
-    const existing = await db.leaseHolder.findFirst({ where: { id: holderId, company_id: user.company_id } });
+    const existing = await db.leaseHolder.findFirst({ where: { deleted_at: null, id: holderId, company_id: user.company_id } });
     if (!existing) return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
 
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -45,6 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
 
     const duplicate = await db.leaseHolder.findFirst({
       where: {
+        deleted_at: null,
         company_id: user.company_id,
         id: { not: holderId },
         OR: [
@@ -57,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
     if (duplicate) return NextResponse.json({ error: `Kontakten finns redan som ${duplicate.name}` }, { status: 409 });
 
     const updateResult = await db.leaseHolder.updateMany({
-      where: { id: holderId, company_id: user.company_id },
+      where: { deleted_at: null, id: holderId, company_id: user.company_id },
       data: {
         party_type: partyType,
         name,
@@ -73,7 +74,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
     }
 
     const holder = await db.leaseHolder.findFirst({
-      where: { id: holderId, company_id: user.company_id },
+      where: { deleted_at: null, id: holderId, company_id: user.company_id },
       include: {
         leases: {
           orderBy: { updated_at: "desc" },
@@ -118,14 +119,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     const { holderId } = await params;
     const holder = await db.leaseHolder.findFirst({
-      where: { id: holderId, company_id: user.company_id },
+      where: { id: holderId, company_id: user.company_id, deleted_at: null },
       include: { _count: { select: { leases: true } } },
     });
     if (!holder) return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
     if (holder._count.leases > 0) return NextResponse.json({ error: "Kontakten kan inte tas bort eftersom den är kopplad till avtal. Sätt status till inaktiv i stället." }, { status: 409 });
 
-    const deleteResult = await db.leaseHolder.deleteMany({
-      where: { id: holderId, company_id: user.company_id },
+    const deleteResult = await db.leaseHolder.updateMany({
+      where: { id: holderId, company_id: user.company_id, deleted_at: null },
+      data: { deleted_at: new Date(), status: "inactive" },
     });
     if (deleteResult.count === 0) {
       return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
@@ -134,7 +136,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       entityType: "lease_holder",
       entityId: holderId,
       action: "lease_holder.deleted",
-      metadata: { name: holder.name, partyType: holder.party_type },
+      metadata: { name: holder.name, partyType: holder.party_type, softDelete: true },
     });
 
     return NextResponse.json({ success: true });

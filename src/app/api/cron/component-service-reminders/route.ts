@@ -142,7 +142,7 @@ export async function GET(request: Request) {
   if (!authorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
   const now = new Date();
   const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
-  const [components, settingsEvents, userPreferenceEvents] = await Promise.all([
+  const [components, modernSettings, modernUserPreferences, settingsEvents, userPreferenceEvents] = await Promise.all([
     db.$queryRaw<DueComponent[]>(Prisma.sql`
       SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."criticality", a."next_service_at",
         p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
@@ -151,13 +151,30 @@ export async function GET(request: Request) {
         AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
       ORDER BY a."company_id", a."next_service_at" ASC, a."criticality" DESC
     `),
+    db.serviceNotificationSettings.findMany({
+      select: { company_id: true, enabled: true, days_ahead: true, roles: true, additional_emails: true },
+    }),
+    db.userServiceNotificationPreference.findMany({
+      select: { company_id: true, user_id: true, enabled: true, overdue_only: true },
+    }),
     db.integrationEvent.findMany({ where: { type: "component_service_settings", status: "active", company_id: { not: null } }, orderBy: { created_at: "desc" }, select: { company_id: true, payload: true } }),
     db.integrationEvent.findMany({ where: { type: "user_service_notification_preferences", status: "active", company_id: { not: null }, recipient: { not: null } }, orderBy: { created_at: "desc" }, select: { company_id: true, recipient: true, payload: true } }),
   ]);
 
   const settings = new Map<string, Preferences>();
+  for (const row of modernSettings) {
+    settings.set(row.company_id, {
+      enabled: row.enabled,
+      daysAhead: row.days_ahead,
+      roles: Array.isArray(row.roles) ? row.roles.map(String).filter((role) => allowedRoles.includes(role)) : defaults.roles,
+      additionalEmails: Array.isArray(row.additional_emails) ? row.additional_emails.map(String) : [],
+    });
+  }
   for (const event of settingsEvents) if (event.company_id && !settings.has(event.company_id)) settings.set(event.company_id, parsePreferences(event.payload));
   const userSettings = new Map<string, UserPreferences>();
+  for (const row of modernUserPreferences) {
+    userSettings.set(`${row.company_id}:${row.user_id}`, { enabled: row.enabled, overdueOnly: row.overdue_only });
+  }
   for (const event of userPreferenceEvents) {
     if (!event.company_id || !event.recipient) continue;
     const key = `${event.company_id}:${event.recipient}`;

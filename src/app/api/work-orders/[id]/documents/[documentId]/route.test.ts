@@ -42,6 +42,7 @@ describe("work-order document download", () => {
     expect(response.status).toBe(404);
     expect(findFirstMock).toHaveBeenCalledWith(expect.objectContaining({
       where: {
+        deleted_at: null,
         id: "document-1",
         work_order_id: "work-order-1",
         company_id: "company-1",

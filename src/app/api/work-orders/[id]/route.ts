@@ -40,7 +40,7 @@ const include = {
   ticket: { select: { id: true, public_reference: true, title: true } },
   assigned_to: { select: { id: true, name: true, email: true } },
   created_by: { select: { id: true, name: true, email: true } },
-  projects: { select: { id: true, name: true, status: true } },
+  projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
   comments: {
     orderBy: { created_at: "desc" as const },
     take: 100,
@@ -55,7 +55,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const [workOrder, users, enterprise, statusEvents, assetLink] = await Promise.all([
-    db.workOrder.findFirst({ where: { id, company_id: user.company_id }, include }),
+    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id }, include }),
     db.user.findMany({
       where: { company_id: user.company_id, status: "active" },
       orderBy: [{ name: "asc" }, { email: "asc" }],
@@ -81,7 +81,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
-      where: { id, company_id: user.company_id },
+      where: { deleted_at: null, id, company_id: user.company_id },
       select: {
         id: true,
         ticket_id: true,
@@ -198,14 +198,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const now = new Date();
   const transactionResult = await db.$transaction(async (tx) => {
     const updateResult = await tx.workOrder.updateMany({
-      where: { id: existing.id, company_id: user.company_id! },
+      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
       data,
     });
     if (updateResult.count === 0) {
       throw new Error("WORK_ORDER_NOT_FOUND");
     }
     const updated = await tx.workOrder.findFirst({
-      where: { id: existing.id, company_id: user.company_id! },
+      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
       include,
     });
     if (!updated) {

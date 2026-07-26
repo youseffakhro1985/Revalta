@@ -274,7 +274,7 @@ export async function GET(request: Request) {
     try {
       const [workOrder, invoiceEvents] = await Promise.all([
         db.workOrder.findFirst({
-          where: { id: workOrderId, company_id: companyId },
+          where: { deleted_at: null, id: workOrderId, company_id: companyId },
           select: {
             id: true,
             title: true,

@@ -2,15 +2,18 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import {
+  getCompanyServicePreferences,
+  normalizeEmail,
+  parseCompanyServicePreferences,
+  serviceNotificationAllowedRoles,
+  upsertCompanyServicePreferences,
+  type ServiceNotificationRole,
+} from "@/lib/service-notification-settings";
 
 export const dynamic = "force-dynamic";
 
-const allowedRoles = ["owner", "admin", "manager", "property_manager"] as const;
-type AllowedRole = (typeof allowedRoles)[number];
 type ServiceCount = { total: bigint; overdue: bigint };
-type Preferences = { enabled: boolean; daysAhead: number; roles: AllowedRole[]; additionalEmails: string[] };
-
-const defaults: Preferences = { enabled: true, daysAhead: 30, roles: [...allowedRoles], additionalEmails: [] };
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function noStore(body: unknown, init?: ResponseInit) {
@@ -31,35 +34,9 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-function normalizeEmail(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
-}
-
-function parsePreferences(payload: unknown): Preferences {
-  const value = record(payload);
-  if (!value) return defaults;
-  const roles = Array.isArray(value.roles)
-    ? Array.from(new Set(value.roles.filter((role): role is AllowedRole => typeof role === "string" && allowedRoles.includes(role as AllowedRole))))
-    : defaults.roles;
-  const additionalEmails = Array.isArray(value.additionalEmails)
-    ? Array.from(new Set(value.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)))).slice(0, 20)
-    : [];
-  const days = Number(value.daysAhead);
-  return {
-    enabled: value.enabled !== false,
-    daysAhead: Number.isInteger(days) && days >= 1 && days <= 90 ? days : defaults.daysAhead,
-    roles: roles.length ? roles : defaults.roles,
-    additionalEmails,
-  };
-}
-
 async function getPreferences(companyId: string) {
-  const event = await db.integrationEvent.findFirst({
-    where: { company_id: companyId, type: "component_service_settings", status: "active" },
-    orderBy: { created_at: "desc" },
-    select: { payload: true, created_at: true },
-  });
-  return { preferences: parsePreferences(event?.payload), updatedAt: event?.created_at ?? null };
+  const stored = await getCompanyServicePreferences(companyId);
+  return { preferences: stored.preferences, updatedAt: stored.updatedAt };
 }
 
 export async function GET() {
@@ -128,7 +105,7 @@ export async function PATCH(request: Request) {
   if (!Number.isInteger(daysAhead) || daysAhead < 1 || daysAhead > 90) {
     return noStore({ error: "Aviseringsperioden måste vara mellan 1 och 90 dagar" }, { status: 400 });
   }
-  if (!Array.isArray(raw.roles) || !raw.roles.some((role) => typeof role === "string" && allowedRoles.includes(role as AllowedRole))) {
+  if (!Array.isArray(raw.roles) || !raw.roles.some((role) => typeof role === "string" && serviceNotificationAllowedRoles.includes(role as ServiceNotificationRole))) {
     return noStore({ error: "Minst en giltig mottagarroll måste väljas" }, { status: 400 });
   }
   if (Array.isArray(raw.additionalEmails)) {
@@ -138,22 +115,13 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const preferences = parsePreferences(raw);
+  const preferences = parseCompanyServicePreferences(raw);
   const previous = await getPreferences(user.company_id);
-  const created = await db.$transaction(async (tx) => {
+  const updated = await db.$transaction(async (tx) => {
+    const row = await upsertCompanyServicePreferences(user.company_id!, user.id, preferences, tx);
     await tx.integrationEvent.updateMany({
       where: { company_id: user.company_id, type: "component_service_settings", status: "active" },
       data: { status: "superseded" },
-    });
-    const event = await tx.integrationEvent.create({
-      data: {
-        company_id: user.company_id,
-        type: "component_service_settings",
-        status: "active",
-        recipient: `company:${user.company_id}`,
-        payload: { ...preferences, updatedBy: user.id },
-      },
-      select: { created_at: true },
     });
     await tx.auditLog.create({
       data: {
@@ -162,13 +130,13 @@ export async function PATCH(request: Request) {
         entity_type: "service_notification_settings",
         entity_id: user.company_id,
         action: "component_service_notifications.updated",
-        metadata: { before: previous.preferences, after: preferences },
+        metadata: { before: previous.preferences, after: preferences, storage: "ServiceNotificationSettings" },
       },
     });
-    return event;
+    return row;
   });
 
-  return noStore({ success: true, preferences, updatedAt: created.created_at });
+  return noStore({ success: true, preferences, updatedAt: updated.updated_at });
 }
 
 export async function POST() {

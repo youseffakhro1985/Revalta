@@ -769,6 +769,92 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("ServiceNotificationSettings", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "component_service_settings", status: "active", company_id: { not: null } },
+      orderBy: { created_at: "desc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const seen = new Set();
+    for (const event of events) {
+      if (!event.company_id || seen.has(event.company_id)) { localSkipped += 1; continue; }
+      seen.add(event.company_id);
+      const existing = await prisma.serviceNotificationSettings.findUnique({ where: { company_id: event.company_id } });
+      if (existing) { localSkipped += 1; continue; }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const roles = Array.isArray(payload.roles) ? payload.roles.map(String) : ["owner", "admin", "manager", "property_manager"];
+      const additionalEmails = Array.isArray(payload.additionalEmails) ? payload.additionalEmails.map(String) : [];
+      const daysAhead = Number(payload.daysAhead);
+      const updatedById = payload.updatedBy ? String(payload.updatedBy) : null;
+      const actor = updatedById
+        || (await prisma.user.findFirst({ where: { company_id: event.company_id, status: "active" }, orderBy: { created_at: "asc" }, select: { id: true } }))?.id;
+      if (!actor) { localSkipped += 1; continue; }
+      await prisma.serviceNotificationSettings.create({
+        data: {
+          company_id: event.company_id,
+          enabled: payload.enabled !== false,
+          days_ahead: Number.isInteger(daysAhead) && daysAhead >= 1 && daysAhead <= 90 ? daysAhead : 30,
+          roles,
+          additional_emails: additionalEmails,
+          updated_by_id: actor,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("UserServiceNotificationPreference", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: {
+        type: "user_service_notification_preferences",
+        status: "active",
+        company_id: { not: null },
+        recipient: { not: null },
+      },
+      orderBy: { created_at: "desc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const seen = new Set();
+    for (const event of events) {
+      const key = `${event.company_id}:${event.recipient}`;
+      if (!event.company_id || !event.recipient || seen.has(key)) { localSkipped += 1; continue; }
+      seen.add(key);
+      const existing = await prisma.userServiceNotificationPreference.findUnique({
+        where: { company_id_user_id: { company_id: event.company_id, user_id: event.recipient } },
+      });
+      if (existing) { localSkipped += 1; continue; }
+      const user = await prisma.user.findFirst({
+        where: { id: event.recipient, company_id: event.company_id },
+        select: { id: true },
+      });
+      if (!user) { localSkipped += 1; continue; }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      await prisma.userServiceNotificationPreference.create({
+        data: {
+          company_id: event.company_id,
+          user_id: event.recipient,
+          enabled: payload.enabled !== false,
+          overdue_only: payload.overdueOnly === true,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   await backfill("VendorContract", async () => {
     const logs = await prisma.auditLog.findMany({
       where: { entity_type: "vendor_contract", company_id: { not: null } },

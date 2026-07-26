@@ -8,7 +8,7 @@ const signerRoles = new Set(["executor", "contractor", "customer"]);
 
 async function resolveWorkOrder(id: string, companyId: string) {
   return db.workOrder.findFirst({
-    where: { id, company_id: companyId },
+    where: { deleted_at: null, id, company_id: companyId },
     include: {
       property: { select: { id: true, name: true, address: true, city: true } },
       unit: { select: { id: true, designation: true } },
@@ -16,6 +16,7 @@ async function resolveWorkOrder(id: string, companyId: string) {
     },
   });
 }
+
 
 async function buildSnapshot(id: string, companyId: string) {
   const workOrder = await resolveWorkOrder(id, companyId);
@@ -38,7 +39,7 @@ async function buildSnapshot(id: string, companyId: string) {
       ORDER BY "occurred_at" ASC, "created_at" ASC
     `),
     db.operationalDocument.findMany({
-      where: { company_id: companyId, work_order_id: id },
+      where: { deleted_at: null, company_id: companyId, work_order_id: id },
       select: { id: true, file_name: true, category: true, created_at: true },
       orderBy: { created_at: "asc" },
     }),

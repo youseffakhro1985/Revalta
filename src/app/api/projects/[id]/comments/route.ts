@@ -13,7 +13,7 @@ export async function GET(
 
   const { id } = await params;
   const project = await db.project.findFirst({
-    where: { id, company_id: user.company_id },
+    where: { deleted_at: null, id, company_id: user.company_id },
     select: { id: true },
   });
   if (!project) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
@@ -58,7 +58,7 @@ export async function POST(
 
   const { id } = await params;
   const project = await db.project.findFirst({
-    where: { id, company_id: user.company_id },
+    where: { deleted_at: null, id, company_id: user.company_id },
     select: { id: true, name: true },
   });
   if (!project) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });

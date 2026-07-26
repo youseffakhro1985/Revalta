@@ -24,7 +24,7 @@ export async function GET() {
 
   const [projects, properties, members] = await Promise.all([
     db.project.findMany({
-      where: { company_id: user.company_id },
+      where: { company_id: user.company_id, deleted_at: null },
       orderBy: [{ status: "asc" }, { start_date: "asc" }, { created_at: "desc" }],
       take: 500,
       include: {
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
 
   if (sourceWorkOrderId) {
     const source = await db.workOrder.findFirst({
-      where: { id: sourceWorkOrderId, company_id: user.company_id, property_id: propertyId },
+      where: { deleted_at: null, id: sourceWorkOrderId, company_id: user.company_id, property_id: propertyId },
       select: { id: true },
     });
     if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 400 });

@@ -38,10 +38,10 @@ async function optionalLink(companyId: string, propertyId: string, kind: "work_o
   const value = text(id, 80);
   if (!value) return null;
   if (kind === "work_order") {
-    const row = await db.workOrder.findFirst({ where: { id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
+    const row = await db.workOrder.findFirst({ where: { deleted_at: null, id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
     if (!row) throw new Error("Arbetsordern hittades inte i denna fastighet");
   } else {
-    const row = await db.project.findFirst({ where: { id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
+    const row = await db.project.findFirst({ where: { deleted_at: null, id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
     if (!row) throw new Error("Projektet hittades inte i denna fastighet");
   }
   return value;

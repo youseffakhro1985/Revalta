@@ -43,7 +43,7 @@ export async function DashboardSlaOperations() {
 
   const [workOrders, enterpriseRows] = await Promise.all([
     db.workOrder.findMany({
-      where: { company_id: user.company_id },
+      where: { deleted_at: null, company_id: user.company_id },
       take: 300,
       orderBy: { created_at: "desc" },
       select: {

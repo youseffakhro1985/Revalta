@@ -59,10 +59,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
 
       const holderId = input.holderId || existing.lease_holder_id;
-      const holder = await tx.leaseHolder.findFirst({ where: { id: holderId, company_id: user.company_id! } });
+      const holder = await tx.leaseHolder.findFirst({ where: { deleted_at: null, id: holderId, company_id: user.company_id! } });
       if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
       const holderUpdate = await tx.leaseHolder.updateMany({
-        where: { id: holder.id, company_id: user.company_id! },
+        where: { deleted_at: null, id: holder.id, company_id: user.company_id! },
         data: {
           party_type: input.holderType,
           name: input.holderName,

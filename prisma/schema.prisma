@@ -75,6 +75,8 @@ model User {
   lease_inspections_updated            LeaseInspectionRecord[] @relation("LeaseInspectionUpdatedBy")
   lease_inspection_links_created       LeaseInspectionWorkOrderLink[] @relation("LeaseInspectionLinkCreatedBy")
   imd_debit_lines_created              ImdDebitLine[]       @relation("ImdDebitLineCreatedBy")
+  service_notification_settings_updated ServiceNotificationSettings[] @relation("ServiceNotificationSettingsUpdatedBy")
+  user_service_notification_preferences UserServiceNotificationPreference[]
 }
 
 model Company {
@@ -140,6 +142,8 @@ model Company {
   lease_inspection_records    LeaseInspectionRecord[]
   lease_inspection_work_order_links LeaseInspectionWorkOrderLink[]
   imd_debit_lines             ImdDebitLine[]
+  service_notification_settings ServiceNotificationSettings?
+  user_service_notification_preferences UserServiceNotificationPreference[]
 }
 
 model Property {
@@ -317,6 +321,7 @@ model WorkOrder {
   maintenance_cycle_advanced_at DateTime?
   created_at                    DateTime                  @default(now())
   updated_at                    DateTime                  @default(now()) @updatedAt
+  deleted_at                    DateTime?
   company                       Company                   @relation(fields: [company_id], references: [id], onDelete: Cascade)
   ticket                        Ticket?                   @relation(fields: [ticket_id], references: [id], onDelete: SetNull)
   property                      Property                  @relation(fields: [property_id], references: [id], onDelete: Restrict)
@@ -344,6 +349,7 @@ model WorkOrder {
   compliance_inspections        ComplianceInspection[]
 
   @@index([company_id, status])
+  @@index([company_id, deleted_at])
   @@index([property_id])
   @@index([unit_id])
   @@index([assigned_to_id])
@@ -379,6 +385,7 @@ model Project {
   created_at           DateTime              @default(now())
   updated_at           DateTime              @default(now()) @updatedAt
   completed_at         DateTime?
+  deleted_at           DateTime?
   company              Company               @relation(fields: [company_id], references: [id], onDelete: Cascade)
   property             Property              @relation(fields: [property_id], references: [id], onDelete: Restrict)
   source_work_order    WorkOrder?            @relation(fields: [source_work_order_id], references: [id], onDelete: SetNull)
@@ -391,6 +398,7 @@ model Project {
   maintenance_actions        MaintenanceAction[]
 
   @@index([company_id, status])
+  @@index([company_id, deleted_at])
   @@index([property_id])
   @@index([source_work_order_id])
   @@index([manager_id])
@@ -601,6 +609,7 @@ model OperationalDocument {
   visibility         String                  @default("internal")
   version            Int                     @default(1)
   created_at         DateTime                @default(now())
+  deleted_at         DateTime?
   company            Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
   work_order         WorkOrder?              @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
   project            Project?                @relation(fields: [project_id], references: [id], onDelete: Cascade)
@@ -611,6 +620,7 @@ model OperationalDocument {
   @@index([company_id, work_order_id, created_at])
   @@index([company_id, project_id, created_at])
   @@index([company_id, property_id, created_at])
+  @@index([company_id, deleted_at])
   @@index([technical_asset_id, created_at], map: "OperationalDocument_technical_asset_created_idx")
   @@index([uploaded_by_id])
   @@index([storage_url])
@@ -955,23 +965,25 @@ model TimeReport {
 }
 
 model LeaseHolder {
-  id                  String   @id @default(uuid())
+  id                  String    @id @default(uuid())
   company_id          String
-  party_type          String   @default("individual")
+  party_type          String    @default("individual")
   name                String
   contact_name        String?
   email               String?
   phone               String?
   organization_number String?
-  status              String   @default("active")
-  created_at          DateTime @default(now())
-  updated_at          DateTime @default(now()) @updatedAt
-  company             Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  status              String    @default("active")
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @default(now()) @updatedAt
+  deleted_at          DateTime?
+  company             Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
   leases              Lease[]
 
   @@index([company_id, name])
   @@index([company_id, email])
   @@index([company_id, status])
+  @@index([company_id, deleted_at])
 }
 
 model Lease {
@@ -1643,4 +1655,35 @@ model ImdDebitLine {
   @@index([company_id, lease_id])
   @@index([rent_notice_id])
   @@index([created_by_id])
+}
+
+model ServiceNotificationSettings {
+  id                 String   @id @default(uuid())
+  company_id         String   @unique
+  enabled            Boolean  @default(true)
+  days_ahead         Int      @default(30)
+  roles              Json
+  additional_emails  Json
+  updated_by_id      String
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  company            Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  updated_by         User     @relation("ServiceNotificationSettingsUpdatedBy", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@index([updated_by_id])
+}
+
+model UserServiceNotificationPreference {
+  id            String   @id @default(uuid())
+  company_id    String
+  user_id       String
+  enabled       Boolean  @default(true)
+  overdue_only  Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  company       Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([company_id, user_id])
+  @@index([user_id])
 }

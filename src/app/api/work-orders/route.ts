@@ -55,7 +55,7 @@ export async function GET() {
 
   const [workOrders, enterpriseRows] = await Promise.all([
     db.workOrder.findMany({
-      where: { company_id: user.company_id },
+      where: { company_id: user.company_id, deleted_at: null },
       orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
       take: 500,
       include: {

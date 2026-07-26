@@ -52,6 +52,7 @@ export async function GET(request: Request) {
       }),
       user.company_id ? db.leaseHolder.findMany({
         where: {
+          deleted_at: null,
           company_id: user.company_id,
           status: "active",
           OR: [{ name: contains }, { contact_name: contains }, { email: contains }, { organization_number: contains }],

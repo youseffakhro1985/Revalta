@@ -10,8 +10,8 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const ENTITY_TYPES = new Set(["work_order", "project", "property", "technical_asset"]);
 
 async function resolveEntity(companyId: string, entityType: string, entityId: string) {
-  if (entityType === "work_order") return db.workOrder.findFirst({ where: { id: entityId, company_id: companyId }, select: { id: true } });
-  if (entityType === "project") return db.project.findFirst({ where: { id: entityId, company_id: companyId }, select: { id: true } });
+  if (entityType === "work_order") return db.workOrder.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId }, select: { id: true } });
+  if (entityType === "project") return db.project.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId }, select: { id: true } });
   if (entityType === "property") return db.property.findFirst({ where: { id: entityId, company_id: companyId }, select: { id: true } });
   if (entityType === "technical_asset") {
     const rows = await db.$queryRaw<Array<{ id: string }>>(Prisma.sql`
@@ -53,6 +53,7 @@ export async function GET(request: Request) {
       FROM "OperationalDocument" d
       JOIN "User" u ON u."id" = d."uploaded_by_id"
       WHERE d."company_id" = ${user.company_id}
+        AND d."deleted_at" IS NULL
         AND ${entityType === "property" ? Prisma.sql`d."property_id" = ${entityId}` : Prisma.sql`d."technical_asset_id" = ${entityId}`}
       ORDER BY d."created_at" DESC
       LIMIT 100
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
   const documents = await db.operationalDocument.findMany({
     where: {
       company_id: user.company_id,
+      deleted_at: null,
       ...(entityType === "work_order" ? { work_order_id: entityId } : { project_id: entityId }),
     },
     orderBy: { created_at: "desc" },

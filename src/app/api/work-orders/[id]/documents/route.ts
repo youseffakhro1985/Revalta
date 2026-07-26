@@ -15,7 +15,10 @@ async function context(id: string) {
   const user = await getCurrentUser();
   if (!user) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) } as const;
   if (!user.company_id) return { error: NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 }) } as const;
-  const workOrder = await db.workOrder.findFirst({ where: { id, company_id: user.company_id }, select: { id: true, title: true } });
+  const workOrder = await db.workOrder.findFirst({
+    where: { id, company_id: user.company_id, deleted_at: null },
+    select: { id: true, title: true },
+  });
   if (!workOrder) return { error: NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 }) } as const;
   return { user, workOrder } as const;
 }
@@ -25,7 +28,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const ctx = await context(id);
   if ("error" in ctx) return ctx.error;
   const storedDocuments = await db.operationalDocument.findMany({
-    where: { company_id: ctx.user.company_id!, work_order_id: id },
+    where: { company_id: ctx.user.company_id!, work_order_id: id, deleted_at: null },
     orderBy: { created_at: "desc" },
     select: { id: true, file_name: true, storage_url: true, content_type: true, size_bytes: true, category: true, visibility: true, version: true, created_at: true, uploaded_by: { select: { id: true, name: true, email: true } } },
   });
@@ -100,17 +103,21 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!canManageTickets(ctx.user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   const documentId = new URL(request.url).searchParams.get("documentId");
   if (!documentId) return NextResponse.json({ error: "Dokument-ID saknas" }, { status: 400 });
-  const document = await db.operationalDocument.findFirst({ where: { id: documentId, company_id: ctx.user.company_id!, work_order_id: id } });
+  const document = await db.operationalDocument.findFirst({
+    where: { id: documentId, company_id: ctx.user.company_id!, work_order_id: id, deleted_at: null },
+  });
   if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
-  const deleteResult = await db.operationalDocument.deleteMany({
-    where: { id: document.id, company_id: ctx.user.company_id!, work_order_id: id },
+  const deleteResult = await db.operationalDocument.updateMany({
+    where: { id: document.id, company_id: ctx.user.company_id!, work_order_id: id, deleted_at: null },
+    data: { deleted_at: new Date() },
   });
   if (deleteResult.count === 0) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
 
-  const token = getStorageToken();
-  if (token) {
-    await del(document.storage_url, { token }).catch(() => undefined);
-  }
-  await writeAuditLog(ctx.user, { entityType: "work_order", entityId: id, action: "work_order.document_deleted", metadata: { documentId: document.id, fileName: document.file_name, category: document.category } });
+  await writeAuditLog(ctx.user, {
+    entityType: "work_order",
+    entityId: id,
+    action: "work_order.document_deleted",
+    metadata: { documentId: document.id, fileName: document.file_name, category: document.category, softDelete: true },
+  });
   return NextResponse.json({ success: true });
 }

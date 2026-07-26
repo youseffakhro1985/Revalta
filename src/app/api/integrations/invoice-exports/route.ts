@@ -63,7 +63,7 @@ export async function GET(request: Request) {
   const allJobs = await latestJobs(user.company_id);
   const workOrderIds = [...new Set(allJobs.map(job => job.workOrderId))];
   const orders = await db.workOrder.findMany({
-    where: { company_id: user.company_id, id: { in: workOrderIds } },
+    where: { deleted_at: null, company_id: user.company_id, id: { in: workOrderIds } },
     select: { id: true, title: true, status: true, property: { select: { name: true, address: true, city: true } } },
   });
   const orderMap = new Map(orders.map(order => [order.id, order]));

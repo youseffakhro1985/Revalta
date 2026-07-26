@@ -44,7 +44,7 @@ export async function acquireWorkOrderEditLock(args: {
 
   return db.$transaction(async (tx) => {
     const workOrder = await tx.workOrder.findFirst({
-      where: { id: args.workOrderId, company_id: args.companyId },
+      where: { deleted_at: null, id: args.workOrderId, company_id: args.companyId },
       select: { id: true, updated_at: true },
     });
     if (!workOrder) return { ok: false as const, code: "not_found" as const };

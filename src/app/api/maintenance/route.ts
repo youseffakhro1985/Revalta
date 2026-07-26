@@ -186,7 +186,7 @@ export async function PATCH(request: Request) {
       let workOrderNumber: string | null = modern.work_order_number;
       if (workOrderId) {
         const workOrder = await db.workOrder.findFirst({
-          where: { id: workOrderId, company_id: user.company_id, property_id: modern.property_id },
+          where: { deleted_at: null, id: workOrderId, company_id: user.company_id, property_id: modern.property_id },
           select: { id: true },
         });
         if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });
@@ -238,7 +238,7 @@ export async function PATCH(request: Request) {
     let workOrderNumber: string | null = snapshot.work_order_number || null;
     if (workOrderId) {
       const workOrder = await db.workOrder.findFirst({
-        where: { id: workOrderId, company_id: user.company_id, property_id: propertyId },
+        where: { deleted_at: null, id: workOrderId, company_id: user.company_id, property_id: propertyId },
         select: { id: true },
       });
       if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });

@@ -34,6 +34,7 @@ export async function GET(request: Request) {
     const holders = await db.leaseHolder.findMany({
       where: {
         company_id: user.company_id,
+        deleted_at: null,
         ...(propertyId ? { leases: { some: { property_id: propertyId } } } : {}),
       },
       orderBy: [{ status: "asc" }, { name: "asc" }],
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
 
     const duplicate = await db.leaseHolder.findFirst({
       where: {
+        deleted_at: null,
         company_id: user.company_id,
         OR: [
           ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),

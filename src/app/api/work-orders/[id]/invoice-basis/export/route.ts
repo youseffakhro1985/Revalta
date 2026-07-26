@@ -12,7 +12,7 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
  const user=await getCurrentUser();if(!user)return NextResponse.json({error:"Obehörig"},{status:401});
  if(!user.company_id)return NextResponse.json({error:"Användaren saknar organisation"},{status:400});
  const {id}=await params;
- const order=await db.workOrder.findFirst({where:{id,company_id:user.company_id},select:{id:true,title:true,property:{select:{name:true,address:true,postal_code:true,city:true}},company:{select:{name:true,org_number:true}}}});
+ const order=await db.workOrder.findFirst({where:{ deleted_at: null, id,company_id:user.company_id },select:{id:true,title:true,property:{select:{name:true,address:true,postal_code:true,city:true}},company:{select:{name:true,org_number:true}}}});
  if(!order)return NextResponse.json({error:"Arbetsordern hittades inte"},{status:404});
  const event=await db.integrationEvent.findFirst({where:{company_id:user.company_id,type:TYPE,recipient:id},orderBy:{created_at:"desc"}});
  const draft=asObject(event?.payload);if(!draft)return NextResponse.json({error:"Faktureringsunderlag saknas"},{status:404});

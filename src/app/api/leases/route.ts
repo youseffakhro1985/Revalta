@@ -55,7 +55,7 @@ export async function GET() {
         },
       }),
       db.leaseHolder.findMany({
-        where: { company_id: user.company_id, status: "active" },
+        where: { deleted_at: null, company_id: user.company_id, status: "active" },
         orderBy: { name: "asc" },
         take: 1_000,
       }),
@@ -102,10 +102,10 @@ export async function POST(request: Request) {
 
       let holder;
       if (input.holderId) {
-        const existingHolder = await tx.leaseHolder.findFirst({ where: { id: input.holderId, company_id: user.company_id! } });
+        const existingHolder = await tx.leaseHolder.findFirst({ where: { deleted_at: null, id: input.holderId, company_id: user.company_id! } });
         if (!existingHolder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
         const holderUpdate = await tx.leaseHolder.updateMany({
-          where: { id: existingHolder.id, company_id: user.company_id! },
+          where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
           data: {
             party_type: input.holderType,
             name: input.holderName,
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         });
         if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
         holder = await tx.leaseHolder.findFirst({
-          where: { id: existingHolder.id, company_id: user.company_id! },
+          where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
         });
         if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
       } else {

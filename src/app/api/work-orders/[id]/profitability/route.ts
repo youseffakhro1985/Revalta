@@ -18,7 +18,7 @@ function numberValue(value: unknown, fallback = 0) {
 
 async function getOrder(id: string, companyId: string) {
   return db.workOrder.findFirst({
-    where: { id, company_id: companyId },
+    where: { deleted_at: null, id, company_id: companyId },
     select: { id: true, title: true, estimated_cost: true, actual_cost: true },
   });
 }

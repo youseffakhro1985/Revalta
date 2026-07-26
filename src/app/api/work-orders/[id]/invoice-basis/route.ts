@@ -23,7 +23,7 @@ function cleanLine(value: unknown): Line | null {
   return { id: typeof row.id === "string" ? row.id : crypto.randomUUID(), type, description, quantity, unit: String(row.unit ?? "st").trim().slice(0, 30) || "st", unitPrice, total: round(quantity * unitPrice) };
 }
 async function order(id: string, companyId: string) {
-  return db.workOrder.findFirst({ where: { id, company_id: companyId }, select: { id: true, title: true, status: true, property: { select: { name: true, address: true, postal_code: true, city: true } }, unit: { select: { designation: true } }, company: { select: { name: true, org_number: true } } } });
+  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId }, select: { id: true, title: true, status: true, property: { select: { name: true, address: true, postal_code: true, city: true } }, unit: { select: { designation: true } }, company: { select: { name: true, org_number: true } } } });
 }
 
 async function sourceData(id: string, companyId: string) {
