@@ -16,7 +16,14 @@ vi.mock("@/lib/db", () => ({
   default: { user: { findUnique }, auditLog: { findFirst } },
 }));
 
-import { auditScopedWhere, companyScopedWhere, companyUserWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import {
+  auditScopedWhere,
+  companyScopedWhere,
+  companyUserWhere,
+  getCurrentUser,
+  requireCompanyUser,
+  tenantWhere,
+} from "@/lib/current-user";
 
 const activeUser = {
   id: "user-1",
@@ -120,6 +127,7 @@ describe("tenant scoping helpers", () => {
     expect(companyScopedWhere(activeUser)).toEqual({ company_id: "company-1" });
     expect(auditScopedWhere(activeUser)).toEqual({ company_id: "company-1" });
     expect(companyUserWhere(activeUser)).toEqual({ company_id: "company-1" });
+    expect(requireCompanyUser(activeUser)?.company_id).toBe("company-1");
   });
 
   it("never returns an undefined company filter for users without a company", () => {
@@ -128,5 +136,7 @@ describe("tenant scoping helpers", () => {
     expect(companyScopedWhere(soloUser)).toEqual({ company_id: "__no_company_scope__" });
     expect(auditScopedWhere(soloUser)).toEqual({ actor_user_id: "user-1" });
     expect(companyUserWhere(soloUser)).toEqual({ id: "user-1" });
+    expect(requireCompanyUser(soloUser)).toBeNull();
+    expect(requireCompanyUser(null)).toBeNull();
   });
 });
