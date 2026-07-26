@@ -13,7 +13,7 @@ type LinkPayload = { leaseId: string; itemId: string; recordVersion: number; wor
 
 async function getLease(id: string, companyId: string) {
   return db.lease.findFirst({
-    where: { id, company_id: companyId, deleted_at: null },
+    where: { id, company_id: companyId, deleted_at: null, property: { deleted_at: null } },
     select: {
       id: true,
       lease_number: true,

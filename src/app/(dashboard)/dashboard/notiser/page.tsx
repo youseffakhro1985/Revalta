@@ -187,11 +187,17 @@ export default function NotificationsPage() {
                       </div>
                       <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                         {item.source === "legacy" ? (
-                          <p className="max-w-xs text-xs font-medium text-amber-700">Äldre notis – kör backfill innan den kan tas bort.</p>
+                          <p className="max-w-xs text-xs font-medium text-amber-700">Äldre notis – kör backfill innan den kan markeras som läst eller tas bort.</p>
                         ) : (
-                          <button type="button" onClick={() => void recallNotification(item.notificationId)} className="text-xs font-semibold text-red-700 hover:text-red-900">Ta bort</button>
+                          <>
+                            <button type="button" onClick={() => void recallNotification(item.notificationId)} className="text-xs font-semibold text-red-700 hover:text-red-900">Ta bort</button>
+                            {!item.read ? (
+                              <button type="button" onClick={() => void markRead(item.notificationId)} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">
+                                Markera som läst
+                              </button>
+                            ) : null}
+                          </>
                         )}
-                        {!item.read ? <button type="button" onClick={() => void markRead(item.notificationId)} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">Markera som läst</button> : null}
                       </div>
                     </div>
                   </article>

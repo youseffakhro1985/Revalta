@@ -55,7 +55,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const [workOrder, users, enterprise, statusEvents, assetLink] = await Promise.all([
-    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id }, include }),
+    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include }),
     db.user.findMany({
       where: { company_id: user.company_id, status: "active" },
       orderBy: [{ name: "asc" }, { email: "asc" }],
@@ -81,7 +81,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params;
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
-      where: { deleted_at: null, id, company_id: user.company_id },
+      where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         ticket_id: true,
@@ -332,7 +332,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   const { id } = await params;
   const existing = await db.workOrder.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null },
+    where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
     select: { id: true, title: true, status: true },
   });
   if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });

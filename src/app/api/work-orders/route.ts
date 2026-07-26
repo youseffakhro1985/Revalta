@@ -60,15 +60,16 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-    const [workOrderActive, projectActive, workOrderGuard] = await Promise.all([
+    const [workOrderActive, projectActive, workOrderGuard, propertyGuard] = await Promise.all([
       notDeletedFilter("WorkOrder"),
       notDeletedFilter("Project"),
       sqlSoftDeleteGuard(db, "WorkOrder", "w"),
+      sqlSoftDeleteGuard(db, "Property", "p"),
     ]);
 
     const [workOrders, enterpriseRows] = await Promise.all([
       db.workOrder.findMany({
-        where: { company_id: user.company_id, ...workOrderActive },
+        where: { company_id: user.company_id, ...workOrderActive, property: { deleted_at: null } },
         orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
         take: 500,
         // Explicit select omits deleted_at so preview works before soft-delete migrate.
@@ -97,10 +98,12 @@ export async function GET() {
                w."technical_asset_id", a."name" AS "technical_asset_name", a."category" AS "technical_asset_category",
                a."location" AS "technical_asset_location"
         FROM "WorkOrder" w
+        INNER JOIN "Property" p ON p."id" = w."property_id"
         LEFT JOIN "Building" b ON b."id" = w."building_id"
         LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
         WHERE w."company_id" = ${user.company_id}
           ${workOrderGuard}
+          ${propertyGuard}
       `),
     ]);
 
