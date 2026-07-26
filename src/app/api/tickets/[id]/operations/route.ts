@@ -129,12 +129,25 @@ export async function POST(
       where: { id, deleted_at: null, ...tenantWhere(user) },
       select: { id: true, title: true },
     });
-    if (!ticket) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
 
     const body = await request.json();
     const type = typeof body.type === "string" ? body.type.trim() : "";
     if (!allowedTypes.has(type)) {
       return NextResponse.json({ error: "Ogiltig registreringstyp" }, { status: 400 });
+    }
+
+    if (type === "time" || type === "cost") {
+      const linkedWorkOrder = await db.workOrder.findFirst({
+        where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
+        select: { id: true },
+      });
+      if (linkedWorkOrder) {
+        return NextResponse.json({
+          error: "Ärendet har en arbetsorder. Registrera tid och kostnad under Ekonomi och fakturering på arbetsordern.",
+          workOrderId: linkedWorkOrder.id,
+        }, { status: 409 });
+      }
     }
 
     const description = typeof body.description === "string" ? body.description.trim() : "";

@@ -6,7 +6,7 @@ Revalta ska gå från en fungerande SaaS-prototyp med många separata moduler ti
 
 ## Viktig nulägesobservation
 
-Kärnmodellerna för företag, användare, fastigheter, byggnader, enheter och ärenden finns i Prisma. Flera senare moduler använder däremot AuditLog som primär lagring. AuditLog ska endast användas för revisionshistorik, inte som huvuddatabas för affärsobjekt.
+Kärnmodellerna för företag, användare, fastigheter, byggnader, enheter och ärenden finns i Prisma. Affärsobjekt skrivs till normaliserade tabeller; AuditLog är revisionshistorik. Äldre AuditLog-/IntegrationEvent-rader kan fortfarande dual-läsas tills backfill är verifierad i produktion, men nya mutationer fail-closar mot moderna tabeller.
 
 ## Prioriterad vertikal leverans
 
@@ -156,8 +156,11 @@ Detta blir referensarkitekturen för övriga moduler.
 
 - Attesterbar tid/material/lönsamhet/fakturaunderlag på arbetsorder.
 - Fakturaexport-UI till Fortnox/Visma/webhook är levererad (`WorkOrderInvoiceExportJob` + integrationsöversikt).
-- Kvarstår: konsolidera till en enda kostnads-/faktureringspipeline (field ops `WorkOrderExecutionEntry` vs billable `WorkOrderTimeEntry` / `MaterialEntry` / `InvoiceDraft`).
-- Rapporter och CSV/PDF-export byggs vidare mot normaliserade tabeller.
+- Kanonisk fakturaväg: godkänd tid/material → `WorkOrderInvoiceDraft` → export. Rapportflödet skapar samma draft och arkiverar `WorkOrderInvoiceBasis` som snapshot.
+- Fältregistrering (`WorkOrderExecutionEntry`) är driftunderlag; ticket time/cost blockeras när arbetsorder finns.
+- Soft-delete för tickets, work orders, projects, properties, leases, lease holders och operational documents.
+- Cron-produktjournaler på `CronJobRun` (preventive/recurring escalations).
+- Kvarstår efter prod-backfill: ta bort kvarvarande dual-read-grenar och eventuellt pensionera `WorkOrderInvoiceBasis` som separat skapandeyta.
 
 ## Kvalitetskrav före merge
 
