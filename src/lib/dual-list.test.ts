@@ -1,7 +1,43 @@
-import { describe, expect, it } from "vitest";
-import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseDateOnly, parseOptionalDate } from "./dual-list";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  asNumber,
+  isModernStorageMirror,
+  isModernStorageOnly,
+  mergeByCreatedAt,
+  parseDateOnly,
+  parseOptionalDate,
+} from "./dual-list";
 
 describe("dual-list helpers", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("isModernStorageOnly respects explicit flag and production default", () => {
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "1");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(isModernStorageOnly()).toBe(true);
+
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "0");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(isModernStorageOnly()).toBe(false);
+
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(isModernStorageOnly()).toBe(true);
+
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(isModernStorageOnly()).toBe(false);
+  });
+
+  it("mergeByCreatedAt returns only modern rows when modern-storage-only is on", () => {
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "1");
+    const modern = [{ id: "a", created_at: new Date("2026-07-20T10:00:00.000Z") }];
+    const legacy = [{ id: "b", created_at: new Date("2026-07-21T10:00:00.000Z") }];
+    expect(mergeByCreatedAt(modern, legacy, 10).map((row) => row.id)).toEqual(["a"]);
+  });
+
   it("mergeByCreatedAt prioriterar moderna rader och sorterar nyast först", () => {
     const modern = [{ id: "a", created_at: new Date("2026-07-20T10:00:00.000Z") }];
     const legacy = [

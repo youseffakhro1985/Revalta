@@ -93,7 +93,11 @@ När releasen innehåller schema cutover (moderna tabeller / soft-delete / `Cron
    - `/api/cron/recurring-incident-escalations` → journal i `CronJobRun`
    - `/api/cron/invoice-export-jobs` → jobb i `WorkOrderInvoiceExportJob`
 4. Kontrollera att soft-deletade tickets/fastigheter/avtal och makulerade IMD-avläsningar inte syns i listor.
-5. När backfill och smoke är godkända: sätt `REVALTA_MODERN_STORAGE_ONLY=1` i Vercel Production för att stänga dual-read-listor (migreringssteg 6). Verifiera att kritiska listor fortfarande visar förväntade antal innan flaggan lämnas på.
+5. När backfill och smoke är godkända: stäng dual-read (migreringssteg 6).
+   - Production defaultar till modern-only när `VERCEL_ENV=production` (efter cutover).
+   - Valfritt: sätt `REVALTA_MODERN_STORAGE_ONLY=1` i Vercel Production för explicit lås.
+   - Rollback: sätt `REVALTA_MODERN_STORAGE_ONLY=0` och redeploy.
+   - Verifiera via `GET /api/health` → `modernStorageOnly: true` och att kritiska listor visar förväntade antal.
 
 ## 6. Verifiering efter driftsättning
 

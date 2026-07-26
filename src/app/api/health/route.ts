@@ -1,5 +1,6 @@
 import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { isModernStorageOnly } from "@/lib/dual-list";
 import { getSchemaReadiness } from "@/lib/schema-readiness";
 import { hasStorageConfig } from "@/lib/storage";
 import { NextResponse } from "next/server";
@@ -12,6 +13,7 @@ export async function GET() {
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local",
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
   };
+  const modernStorageOnly = isModernStorageOnly();
   const env = {
     databaseUrl: Boolean(process.env.DATABASE_URL),
     directUrl: Boolean(process.env.DIRECT_URL),
@@ -22,6 +24,7 @@ export async function GET() {
     stripe: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
     storage: hasStorageConfig(),
     ai: Boolean(process.env.AI_PROVIDER_API_KEY),
+    modernStorageOnly,
   };
 
   try {
@@ -32,6 +35,7 @@ export async function GET() {
         database: "ok",
         latencyMs: Date.now() - startedAt,
         release,
+        modernStorageOnly,
         checkedAt: new Date().toISOString(),
       });
     }
