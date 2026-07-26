@@ -19,6 +19,28 @@ function isTrustedLegacyBlobUrl(value: string) {
   }
 }
 
+async function streamFromStorage(storageUrl: string, headers: Record<string, string>) {
+  const token = getStorageToken();
+  if (!token) return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
+
+  try {
+    const blob = await get(storageUrl, { access: "private", token });
+    if (blob) return new Response(blob.stream, { headers });
+  } catch (error) {
+    if (!isTrustedLegacyBlobUrl(storageUrl)) throw error;
+  }
+
+  if (!isTrustedLegacyBlobUrl(storageUrl)) {
+    return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+  }
+
+  const legacyResponse = await fetch(storageUrl, { cache: "no-store" });
+  if (!legacyResponse.ok || !legacyResponse.body) {
+    return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+  }
+  return new Response(legacyResponse.body, { headers });
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -28,6 +50,36 @@ export async function GET(
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const { id } = await params;
+    if (user.company_id) {
+      const modern = await db.managedDocument.findFirst({
+        where: { id, company_id: user.company_id },
+        select: {
+          file_name: true,
+          content_type: true,
+          storage_url: true,
+          data_url: true,
+        },
+      });
+      if (modern) {
+        const headers = {
+          "Content-Type": modern.content_type,
+          "Content-Disposition": contentDisposition(safeDocumentFileName(modern.file_name)),
+          "Cache-Control": "private, no-store, max-age=0",
+          "X-Content-Type-Options": "nosniff",
+        };
+        if (modern.storage_url) return streamFromStorage(modern.storage_url, headers);
+        if (modern.data_url?.startsWith("data:")) {
+          const match = /^data:([^;]+);base64,([\s\S]+)$/.exec(modern.data_url);
+          if (!match) return NextResponse.json({ error: "Dokumentfilen är ogiltig" }, { status: 404 });
+          const bytes = Buffer.from(match[2], "base64");
+          return new Response(bytes, {
+            headers: { ...headers, "Content-Length": String(bytes.length) },
+          });
+        }
+        return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+      }
+    }
+
     const log = await db.auditLog.findFirst({
       where: {
         id,
@@ -52,27 +104,7 @@ export async function GET(
     };
 
     const storageUrl = typeof metadata.storageUrl === "string" ? metadata.storageUrl : null;
-    if (storageUrl) {
-      const token = getStorageToken();
-      if (!token) return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
-
-      try {
-        const blob = await get(storageUrl, { access: "private", token });
-        if (blob) return new Response(blob.stream, { headers });
-      } catch (error) {
-        if (!isTrustedLegacyBlobUrl(storageUrl)) throw error;
-      }
-
-      if (!isTrustedLegacyBlobUrl(storageUrl)) {
-        return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
-      }
-
-      const legacyResponse = await fetch(storageUrl, { cache: "no-store" });
-      if (!legacyResponse.ok || !legacyResponse.body) {
-        return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
-      }
-      return new Response(legacyResponse.body, { headers });
-    }
+    if (storageUrl) return streamFromStorage(storageUrl, headers);
 
     const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : null;
     if (!dataUrl?.startsWith("data:")) {

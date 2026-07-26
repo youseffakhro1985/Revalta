@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
+import { writeAuditLog } from "@/lib/audit";
 
 const allowedTransitions = new Set(["archive", "unpublish", "restore"]);
 
@@ -25,6 +26,50 @@ export async function PATCH(
       return NextResponse.json({ error: "Ogiltig dokumentåtgärd" }, { status: 400 });
     }
 
+    const modern = await db.managedDocument.findFirst({
+      where: { id, company_id: user.company_id },
+      select: { id: true, name: true, visibility: true, lifecycle_state: true },
+    });
+
+    const nextState = transition === "archive" ? "archived" : transition === "unpublish" ? "unpublished" : "active";
+    const action = transition === "archive"
+      ? "document.archived"
+      : transition === "unpublish"
+        ? "document.unpublished"
+        : "document.restored";
+
+    if (modern) {
+      if (modern.lifecycle_state === nextState) {
+        return NextResponse.json({ success: true, state: modern.lifecycle_state, unchanged: true });
+      }
+      if (transition === "unpublish" && modern.lifecycle_state === "archived") {
+        return NextResponse.json({ error: "Återställ det arkiverade dokumentet innan det avpubliceras" }, { status: 409 });
+      }
+
+      const updateResult = await db.managedDocument.updateMany({
+        where: { id: modern.id, company_id: user.company_id },
+        data: { lifecycle_state: nextState },
+      });
+      if (updateResult.count === 0) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+
+      await writeAuditLog(user, {
+        entityType: "document",
+        entityId: modern.id,
+        action,
+        metadata: {
+          documentId: modern.id,
+          previousState: modern.lifecycle_state,
+          nextState,
+          reason: reason || null,
+          documentName: modern.name,
+          previousVisibility: modern.visibility,
+          storage: "ManagedDocument",
+        },
+      });
+
+      return NextResponse.json({ success: true, state: nextState });
+    }
+
     const document = await db.auditLog.findFirst({
       where: {
         id,
@@ -37,19 +82,12 @@ export async function PATCH(
     if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
 
     const current = await getDocumentLifecycleState(user.company_id, document.id);
-    const nextState = transition === "archive" ? "archived" : transition === "unpublish" ? "unpublished" : "active";
     if (current.state === nextState) {
       return NextResponse.json({ success: true, state: current.state, unchanged: true });
     }
     if (transition === "unpublish" && current.state === "archived") {
       return NextResponse.json({ error: "Återställ det arkiverade dokumentet innan det avpubliceras" }, { status: 409 });
     }
-
-    const action = transition === "archive"
-      ? "document.archived"
-      : transition === "unpublish"
-        ? "document.unpublished"
-        : "document.restored";
 
     const metadata = (document.metadata || {}) as Record<string, unknown>;
     await db.auditLog.create({

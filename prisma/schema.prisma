@@ -66,6 +66,9 @@ model User {
   insurance_claims_created             InsuranceClaim[]     @relation("InsuranceClaimCreatedBy")
   rent_notices_created                 RentNotice[]         @relation("RentNoticeCreatedBy")
   calendar_events_created              CalendarEvent[]      @relation("CalendarEventCreatedBy")
+  managed_documents_created            ManagedDocument[]    @relation("ManagedDocumentCreatedBy")
+  imd_readings_created                 ImdReading[]         @relation("ImdReadingCreatedBy")
+  ticket_operations_created            TicketOperation[]    @relation("TicketOperationCreatedBy")
 }
 
 model Company {
@@ -124,6 +127,9 @@ model Company {
   insurance_claims            InsuranceClaim[]
   rent_notices                RentNotice[]
   calendar_events             CalendarEvent[]
+  managed_documents           ManagedDocument[]
+  imd_readings                ImdReading[]
+  ticket_operations           TicketOperation[]
 }
 
 model Property {
@@ -177,6 +183,8 @@ model Property {
   compliance_inspections   ComplianceInspection[]
   insurance_claims         InsuranceClaim[]
   rent_notices             RentNotice[]
+  managed_documents        ManagedDocument[]
+  imd_readings             ImdReading[]
 
   @@index([company_id])
   @@index([user_id])
@@ -259,6 +267,7 @@ model Ticket {
   comments              TicketComment[]
   attachments           TicketAttachment[]
   work_order            WorkOrder?
+  operations            TicketOperation[]
 }
 
 model WorkOrder {
@@ -1437,5 +1446,83 @@ model CalendarEvent {
   created_by     User     @relation("CalendarEventCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
 
   @@index([company_id, date])
+  @@index([created_by_id])
+}
+
+model ManagedDocument {
+  id             String    @id @default(uuid())
+  company_id     String
+  property_id    String?
+  unit_id        String?
+  lease_id       String?
+  name           String
+  category       String    @default("other")
+  visibility     String    @default("internal")
+  valid_until    DateTime?
+  file_name      String
+  content_type   String
+  size_bytes     Int
+  storage_url    String?
+  data_url       String?
+  lifecycle_state String   @default("active")
+  created_by_id  String
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property       Property? @relation(fields: [property_id], references: [id], onDelete: SetNull)
+  created_by     User      @relation("ManagedDocumentCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, visibility])
+  @@index([company_id, lifecycle_state])
+  @@index([created_by_id])
+  @@index([storage_url])
+}
+
+model ImdReading {
+  id                String   @id @default(uuid())
+  company_id        String
+  property_id       String
+  property_name     String
+  unit              String
+  meter_id          String
+  meter_type        String
+  period            String
+  previous_reading  Decimal  @default(0) @db.Decimal(14, 4)
+  current_reading   Decimal  @default(0) @db.Decimal(14, 4)
+  consumption       Decimal  @default(0) @db.Decimal(14, 4)
+  unit_price        Decimal  @default(0) @db.Decimal(14, 4)
+  charge            Decimal  @default(0) @db.Decimal(14, 2)
+  note              String?
+  created_by_id     String
+  created_at        DateTime @default(now())
+  company           Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property          Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by        User     @relation("ImdReadingCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at])
+  @@index([company_id, property_id, meter_type])
+  @@index([created_by_id])
+}
+
+model TicketOperation {
+  id            String   @id @default(uuid())
+  company_id    String
+  ticket_id     String
+  operation_type String
+  description   String?
+  minutes       Int?
+  amount        Decimal? @db.Decimal(14, 2)
+  completed     Boolean?
+  ticket_title  String?
+  created_by_id String
+  created_at    DateTime @default(now())
+  company       Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  ticket        Ticket   @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  created_by    User     @relation("TicketOperationCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, ticket_id, created_at])
+  @@index([ticket_id, operation_type])
   @@index([created_by_id])
 }

@@ -446,6 +446,170 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("ImdReading", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: { action: "imd.reading.created", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      if (metadata.storage === "ImdReading") { localSkipped += 1; continue; }
+      if (!log.company_id || !log.actor_user_id || !log.entity_id) { localSkipped += 1; continue; }
+      if (!metadata.unit || !metadata.meter_id || !metadata.period) { localSkipped += 1; continue; }
+      const id = typeof metadata.readingId === "string" ? metadata.readingId : log.id;
+      if (await prisma.imdReading.findUnique({ where: { id } })) { localSkipped += 1; continue; }
+      const property = await prisma.property.findFirst({
+        where: { id: log.entity_id, company_id: log.company_id },
+        select: { id: true, name: true },
+      });
+      if (!property) { localSkipped += 1; continue; }
+      await prisma.imdReading.create({
+        data: {
+          id,
+          company_id: log.company_id,
+          property_id: property.id,
+          property_name: String(metadata.property_name || property.name),
+          unit: String(metadata.unit),
+          meter_id: String(metadata.meter_id),
+          meter_type: String(metadata.meter_type || "electricity"),
+          period: String(metadata.period),
+          previous_reading: num(metadata.previous_reading),
+          current_reading: num(metadata.current_reading),
+          consumption: num(metadata.consumption),
+          unit_price: num(metadata.unit_price),
+          charge: num(metadata.charge),
+          note: metadata.note ? String(metadata.note) : null,
+          created_by_id: log.actor_user_id,
+          created_at: log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("TicketOperation", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        entity_type: "ticket",
+        action: { startsWith: "workorder." },
+        company_id: { not: null },
+      },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      if (metadata.storage === "TicketOperation") { localSkipped += 1; continue; }
+      if (!log.company_id || !log.actor_user_id || !log.entity_id) { localSkipped += 1; continue; }
+      const match = /^workorder\.(time|cost|checklist|note)\.added$/.exec(log.action || "");
+      if (!match) { localSkipped += 1; continue; }
+      const operationType = match[1];
+      const id = typeof metadata.operationId === "string" ? metadata.operationId : log.id;
+      if (await prisma.ticketOperation.findUnique({ where: { id } })) { localSkipped += 1; continue; }
+      const ticket = await prisma.ticket.findFirst({
+        where: { id: log.entity_id, company_id: log.company_id },
+        select: { id: true, title: true },
+      });
+      if (!ticket) { localSkipped += 1; continue; }
+      await prisma.ticketOperation.create({
+        data: {
+          id,
+          company_id: log.company_id,
+          ticket_id: ticket.id,
+          operation_type: operationType,
+          description: metadata.description ? String(metadata.description) : null,
+          minutes: metadata.minutes == null ? null : Math.round(num(metadata.minutes)),
+          amount: metadata.amount == null ? null : num(metadata.amount),
+          completed: typeof metadata.completed === "boolean" ? metadata.completed : null,
+          ticket_title: metadata.ticketTitle ? String(metadata.ticketTitle) : ticket.title,
+          created_by_id: log.actor_user_id,
+          created_at: log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("ManagedDocument", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: { entity_type: "document", action: "document.created", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      if (metadata.storage === "ManagedDocument") { localSkipped += 1; continue; }
+      if (!log.company_id || !log.actor_user_id) { localSkipped += 1; continue; }
+      const id = log.id;
+      if (await prisma.managedDocument.findUnique({ where: { id } })) { localSkipped += 1; continue; }
+
+      const lifecycleLogs = await prisma.auditLog.findMany({
+        where: {
+          company_id: log.company_id,
+          entity_type: "document",
+          entity_id: id,
+          action: { in: ["document.archived", "document.unpublished", "document.restored"] },
+        },
+        orderBy: { created_at: "desc" },
+        take: 1,
+        select: { action: true },
+      });
+      const latestLifecycle = lifecycleLogs[0]?.action;
+      const lifecycleState = latestLifecycle === "document.archived"
+        ? "archived"
+        : latestLifecycle === "document.unpublished"
+          ? "unpublished"
+          : "active";
+
+      const fileName = String(metadata.fileName || metadata.name || "dokument");
+      const contentType = String(metadata.contentType || "application/octet-stream");
+      const sizeBytes = num(metadata.sizeBytes, 0);
+      const storageUrl = metadata.storageUrl ? String(metadata.storageUrl) : null;
+      const dataUrl = metadata.dataUrl ? String(metadata.dataUrl) : null;
+      if (!storageUrl && !dataUrl) { localSkipped += 1; continue; }
+
+      await prisma.managedDocument.create({
+        data: {
+          id,
+          company_id: log.company_id,
+          property_id: metadata.propertyId ? String(metadata.propertyId) : null,
+          unit_id: metadata.unitId ? String(metadata.unitId) : null,
+          lease_id: metadata.leaseId ? String(metadata.leaseId) : null,
+          name: String(metadata.name || "Dokument"),
+          category: String(metadata.category || "other"),
+          visibility: String(metadata.visibility || "internal"),
+          valid_until: dateOnly(metadata.validUntil),
+          file_name: fileName,
+          content_type: contentType,
+          size_bytes: sizeBytes,
+          storage_url: storageUrl,
+          data_url: dataUrl,
+          lifecycle_state: lifecycleState,
+          created_by_id: log.actor_user_id,
+          created_at: log.created_at,
+          updated_at: log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   await backfill("VendorContract", async () => {
     const logs = await prisma.auditLog.findMany({
       where: { entity_type: "vendor_contract", company_id: { not: null } },

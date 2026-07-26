@@ -3,8 +3,10 @@ import db from "@/lib/db";
 import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
+import { parseOptionalDate } from "@/lib/dual-list";
 import { isProductionRuntime } from "@/lib/runtime-env";
 import { hasStorageConfig, storeAttachment, StorageConfigurationError } from "@/lib/storage";
+import { writeAuditLog } from "@/lib/audit";
 
 const allowedVisibilities = new Set([
   "internal",
@@ -19,12 +21,20 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-    const [logs, properties, leases] = await Promise.all([
+    const [rows, logs, properties, leases] = await Promise.all([
+      user.company_id
+        ? db.managedDocument.findMany({
+            where: { company_id: user.company_id },
+            orderBy: { created_at: "desc" },
+            take: 500,
+            include: { created_by: { select: { name: true, email: true } } },
+          })
+        : Promise.resolve([]),
       db.auditLog.findMany({
         where: { ...auditScopedWhere(user), entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
-        select: { id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
+        select: { id: true, entity_id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
       }),
       db.property.findMany({
         where: tenantWhere(user),
@@ -55,36 +65,29 @@ export async function GET() {
         : Promise.resolve([]),
     ]);
 
+    const modernIds = new Set(rows.map((row) => row.id));
     const lifecycleMap = user.company_id
-      ? await getDocumentLifecycleMap(user.company_id, logs.map((log) => log.id))
+      ? await getDocumentLifecycleMap(user.company_id, logs.map((log) => log.id).filter((id) => !modernIds.has(id)))
       : new Map();
     const propertyMap = new Map(properties.map((property) => [property.id, property]));
     const leaseMap = new Map(leases.map((lease) => [lease.id, lease]));
-    const documents = logs.map((log) => {
-      const metadata = (log.metadata || {}) as Record<string, unknown>;
-      const propertyId = typeof metadata.propertyId === "string" ? metadata.propertyId : null;
-      const unitId = typeof metadata.unitId === "string" ? metadata.unitId : null;
-      const leaseId = typeof metadata.leaseId === "string" ? metadata.leaseId : null;
-      const visibility = typeof metadata.visibility === "string" && allowedVisibilities.has(metadata.visibility)
-        ? metadata.visibility
-        : "internal";
-      const property = propertyId ? propertyMap.get(propertyId) || null : null;
-      const unit = unitId ? property?.units.find((candidate) => candidate.id === unitId) || null : null;
-      const lease = leaseId ? leaseMap.get(leaseId) || null : null;
-      const lifecycle = lifecycleMap.get(log.id) || { state: "active", changedAt: null };
 
+    const modern = rows.map((row) => {
+      const property = row.property_id ? propertyMap.get(row.property_id) || null : null;
+      const unit = row.unit_id ? property?.units.find((candidate) => candidate.id === row.unit_id) || null : null;
+      const lease = row.lease_id ? leaseMap.get(row.lease_id) || null : null;
       return {
-        id: log.id,
-        name: typeof metadata.name === "string" ? metadata.name : "Dokument",
-        category: typeof metadata.category === "string" ? metadata.category : "other",
-        visibility,
-        lifecycleState: lifecycle.state,
-        lifecycleChangedAt: lifecycle.changedAt,
-        validUntil: typeof metadata.validUntil === "string" ? metadata.validUntil : null,
-        fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
-        contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
-        sizeBytes: typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : 0,
-        downloadUrl: `/api/documents/${log.id}/download`,
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        visibility: row.visibility,
+        lifecycleState: row.lifecycle_state,
+        lifecycleChangedAt: row.updated_at,
+        validUntil: row.valid_until?.toISOString().slice(0, 10) || null,
+        fileName: row.file_name,
+        contentType: row.content_type,
+        sizeBytes: row.size_bytes,
+        downloadUrl: `/api/documents/${row.id}/download`,
         property,
         unit,
         lease: lease ? {
@@ -94,10 +97,63 @@ export async function GET() {
           holder: lease.lease_holder.contact_name || lease.lease_holder.name,
           unit: lease.unit.designation,
         } : null,
-        uploadedBy: log.actor?.name || log.actor?.email || "Okänd",
-        createdAt: log.created_at,
+        uploadedBy: row.created_by?.name || row.created_by?.email || "Okänd",
+        createdAt: row.created_at,
+        source: "table" as const,
       };
     });
+
+    const legacy = logs
+      .filter((log) => {
+        const metadata = (log.metadata || {}) as Record<string, unknown>;
+        if (metadata.storage === "ManagedDocument") return false;
+        if (modernIds.has(log.id)) return false;
+        if (log.entity_id && modernIds.has(log.entity_id)) return false;
+        return true;
+      })
+      .map((log) => {
+        const metadata = (log.metadata || {}) as Record<string, unknown>;
+        const propertyId = typeof metadata.propertyId === "string" ? metadata.propertyId : null;
+        const unitId = typeof metadata.unitId === "string" ? metadata.unitId : null;
+        const leaseId = typeof metadata.leaseId === "string" ? metadata.leaseId : null;
+        const visibility = typeof metadata.visibility === "string" && allowedVisibilities.has(metadata.visibility)
+          ? metadata.visibility
+          : "internal";
+        const property = propertyId ? propertyMap.get(propertyId) || null : null;
+        const unit = unitId ? property?.units.find((candidate) => candidate.id === unitId) || null : null;
+        const lease = leaseId ? leaseMap.get(leaseId) || null : null;
+        const lifecycle = lifecycleMap.get(log.id) || { state: "active", changedAt: null };
+
+        return {
+          id: log.id,
+          name: typeof metadata.name === "string" ? metadata.name : "Dokument",
+          category: typeof metadata.category === "string" ? metadata.category : "other",
+          visibility,
+          lifecycleState: lifecycle.state,
+          lifecycleChangedAt: lifecycle.changedAt,
+          validUntil: typeof metadata.validUntil === "string" ? metadata.validUntil : null,
+          fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
+          contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
+          sizeBytes: typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : 0,
+          downloadUrl: `/api/documents/${log.id}/download`,
+          property,
+          unit,
+          lease: lease ? {
+            id: lease.id,
+            leaseNumber: lease.lease_number,
+            status: lease.status,
+            holder: lease.lease_holder.contact_name || lease.lease_holder.name,
+            unit: lease.unit.designation,
+          } : null,
+          uploadedBy: log.actor?.name || log.actor?.email || "Okänd",
+          createdAt: log.created_at,
+          source: "legacy" as const,
+        };
+      });
+
+    const documents = [...modern, ...legacy]
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, 500);
 
     return NextResponse.json(
       { documents, properties, leases, canManageLifecycle: Boolean(user.company_id && ["owner", "admin", "manager"].includes(user.role)) },
@@ -182,35 +238,48 @@ export async function POST(request: Request) {
     } else if (isProductionRuntime()) {
       return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
     } else {
-      // Local/dev fallback only — never store file bytes in AuditLog in production.
       dataUrl = `data:${validation.contentType};base64,${bytes.toString("base64")}`;
     }
 
-    const document = await db.auditLog.create({
+    const document = await db.managedDocument.create({
       data: {
         company_id: user.company_id,
-        actor_user_id: user.id,
-        entity_type: "document",
-        entity_id: resolvedLeaseId || resolvedUnitId || resolvedPropertyId,
-        action: "document.created",
-        metadata: {
-          schemaVersion: 4,
-          name,
-          category,
-          visibility,
-          propertyId: resolvedPropertyId,
-          unitId: resolvedUnitId,
-          leaseId: resolvedLeaseId,
-          validUntil: validUntil || null,
-          fileName: validation.fileName,
-          contentType: validation.contentType,
-          sizeBytes: validation.sizeBytes,
-          storageUrl,
-          dataUrl,
-          signatureValidated: true,
-        },
+        property_id: resolvedPropertyId,
+        unit_id: resolvedUnitId,
+        lease_id: resolvedLeaseId,
+        name,
+        category,
+        visibility,
+        valid_until: parseOptionalDate(validUntil),
+        file_name: validation.fileName,
+        content_type: validation.contentType,
+        size_bytes: validation.sizeBytes,
+        storage_url: storageUrl,
+        data_url: dataUrl,
+        lifecycle_state: "active",
+        created_by_id: user.id,
       },
       select: { id: true, created_at: true },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "document",
+      entityId: document.id,
+      action: "document.created",
+      metadata: {
+        schemaVersion: 5,
+        name,
+        category,
+        visibility,
+        propertyId: resolvedPropertyId,
+        unitId: resolvedUnitId,
+        leaseId: resolvedLeaseId,
+        validUntil: validUntil || null,
+        fileName: validation.fileName,
+        contentType: validation.contentType,
+        sizeBytes: validation.sizeBytes,
+        storage: "ManagedDocument",
+      },
     });
 
     return NextResponse.json({ success: true, document }, { status: 201, headers: { "Cache-Control": "no-store" } });
