@@ -8,7 +8,7 @@ type IntegrationUser = {
 
 const configured = {
   email: Boolean(process.env.EMAIL_PROVIDER_API_KEY && process.env.EMAIL_FROM),
-  sms: Boolean(process.env.SMS_PROVIDER_API_KEY && process.env.SMS_PROVIDER_WEBHOOK_URL),
+  sms: Boolean(process.env.SMS_PROVIDER_API_KEY && (process.env.SMS_PROVIDER_WEBHOOK_URL || process.env.SMS_PROVIDER_API_KEY.startsWith("46elks:"))),
   stripe: Boolean(process.env.STRIPE_SECRET_KEY),
   storage: hasStorageConfig(),
   ai: Boolean(process.env.AI_PROVIDER_API_KEY),
@@ -48,6 +48,29 @@ async function sendEmail(payload: {
 async function sendSms(payload: { recipient?: string; message: string }) {
   if (!configured.sms || !payload.recipient) {
     return { status: "mocked", providerId: null };
+  }
+
+  if (process.env.SMS_PROVIDER_API_KEY?.startsWith("46elks:")) {
+    const [, username, password, from = "Revalta"] = process.env.SMS_PROVIDER_API_KEY.split(":");
+    const response = await fetch(process.env.SMS_PROVIDER_WEBHOOK_URL || "https://api.46elks.com/a1/sms", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        from,
+        to: payload.recipient,
+        message: payload.message,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return { status: "failed", providerId: null, providerResponse: data };
+    }
+
+    return { status: "sent", providerId: typeof data.id === "string" ? data.id : null, providerResponse: data };
   }
 
   const response = await fetch(process.env.SMS_PROVIDER_WEBHOOK_URL as string, {

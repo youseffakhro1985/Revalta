@@ -21,7 +21,7 @@ När dessa finns skickar Revalta e-post via Resend för:
 
 ## SMS
 
-SMS skickas via en konfigurerbar webhook. Om webhook saknas kan `SMS_PROVIDER_API_KEY` senare anpassas till en specifik leverantör i kod, men rekommenderad produktionsväg är webhook via Make/Zapier/eget API eller en tunn serverless endpoint framför Twilio/46elks.
+SMS kan skickas via en konfigurerbar webhook eller direkt via 46elks.
 
 Miljövariabler:
 
@@ -37,6 +37,18 @@ Revalta skickar JSON:
 }
 ```
 
+För 46elks kan `SMS_PROVIDER_API_KEY` sättas i formatet:
+
+```text
+46elks:USERNAME:PASSWORD:AVSÄNDARE
+```
+
+och `SMS_PROVIDER_WEBHOOK_URL` kan sättas till:
+
+```text
+https://api.46elks.com/a1/sms
+```
+
 ## Stripe
 
 Miljövariabler:
@@ -48,6 +60,12 @@ Miljövariabler:
 - `STRIPE_PRICE_ENTERPRISE`
 
 När dessa finns kan Revalta starta Stripe Checkout för planerna. Customer Portal kan öppnas när ett Stripe customer-id finns tillgängligt. Utan nycklar loggas checkout och customer portal i mockläge.
+
+Nuvarande planmappning:
+
+- `STRIPE_PRICE_START` → Revalta Start
+- `STRIPE_PRICE_PROFESSIONAL` → Revalta Standard
+- `STRIPE_PRICE_ENTERPRISE` → Revalta Professional
 
 Webhook endpoint:
 

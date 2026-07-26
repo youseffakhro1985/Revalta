@@ -5,9 +5,9 @@ import { recordPaymentEvent } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 
 const plans = {
-  start: { label: "Start", price: 990, propertyLimit: 10, teamLimit: 3 },
-  professional: { label: "Professional", price: 2490, propertyLimit: 75, teamLimit: 15 },
-  enterprise: { label: "Enterprise", price: 6990, propertyLimit: 999, teamLimit: 100 },
+  start: { label: "Start", price: 495, propertyLimit: 10, teamLimit: 3 },
+  professional: { label: "Standard", price: 995, propertyLimit: 75, teamLimit: 15 },
+  enterprise: { label: "Professional", price: 1995, propertyLimit: 999, teamLimit: 100 },
 };
 
 export async function GET() {
