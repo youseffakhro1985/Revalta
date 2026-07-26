@@ -46,6 +46,11 @@ describe("work-order document download", () => {
         id: "document-1",
         work_order_id: "work-order-1",
         company_id: "company-1",
+        work_order: {
+          deleted_at: null,
+          company_id: "company-1",
+          property: { deleted_at: null },
+        },
       },
     }));
     expect(getBlobMock).not.toHaveBeenCalled();
