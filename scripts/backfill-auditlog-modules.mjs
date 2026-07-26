@@ -1016,6 +1016,132 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("ServiceNotificationAssignment", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "service_notification_assignment", company_id: { not: null } },
+      orderBy: { created_at: "desc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const seen = new Set();
+    for (const event of events) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : null;
+      const key = payload?.notificationKey ? String(payload.notificationKey) : "";
+      if (!event.company_id || !key || seen.has(`${event.company_id}:${key}`)) { localSkipped += 1; continue; }
+      seen.add(`${event.company_id}:${key}`);
+      const existing = await prisma.serviceNotificationAssignment.findUnique({
+        where: { company_id_notification_key: { company_id: event.company_id, notification_key: key } },
+      });
+      if (existing) { localSkipped += 1; continue; }
+      const changedById = payload.changedBy
+        ? String(payload.changedBy)
+        : (await prisma.user.findFirst({ where: { company_id: event.company_id, status: "active" }, select: { id: true } }))?.id;
+      if (!changedById) { localSkipped += 1; continue; }
+      const assetId = key.startsWith("component-service:") ? key.split(":")[1] || null : null;
+      await prisma.serviceNotificationAssignment.create({
+        data: {
+          company_id: event.company_id,
+          notification_key: key,
+          asset_id: assetId,
+          assignee_user_id: payload.assigneeId ? String(payload.assigneeId) : null,
+          assignee_name: payload.assigneeName ? String(payload.assigneeName) : null,
+          status: String(payload.status || "assigned"),
+          deadline_at: dateOrNull(payload.deadline),
+          note: payload.note ? String(payload.note) : null,
+          changed_by_id: changedById,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("ComponentServiceDigestRun", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "component_service_digest", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "desc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const seen = new Set();
+    for (const event of events) {
+      if (!event.company_id || !event.recipient || seen.has(`${event.company_id}:${event.recipient}`)) {
+        localSkipped += 1;
+        continue;
+      }
+      seen.add(`${event.company_id}:${event.recipient}`);
+      const existing = await prisma.componentServiceDigestRun.findUnique({
+        where: { company_id_dedupe_key: { company_id: event.company_id, dedupe_key: event.recipient } },
+      });
+      if (existing) { localSkipped += 1; continue; }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const delivery = (payload.deliverySummary && typeof payload.deliverySummary === "object") ? payload.deliverySummary : {};
+      await prisma.componentServiceDigestRun.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          dedupe_key: event.recipient,
+          status: String(event.status || "processing"),
+          payload,
+          sent_count: num(delivery.sent),
+          failed_count: num(delivery.failed),
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("ComponentServiceDeliveryAlert", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "component_service_delivery_alert", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      if (!event.company_id) { localSkipped += 1; continue; }
+      if (await prisma.componentServiceDeliveryAlert.findUnique({ where: { id: event.id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const sourceRunId = payload.sourceEventId ? String(payload.sourceEventId) : null;
+      const sourceExists = sourceRunId
+        ? await prisma.componentServiceDigestRun.findUnique({ where: { id: sourceRunId }, select: { id: true } })
+        : null;
+      await prisma.componentServiceDeliveryAlert.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          source_run_id: sourceExists ? sourceRunId : null,
+          status: event.status === "resolved" ? "resolved" : "open",
+          severity: String(payload.severity || "warning") === "critical" ? "critical" : "warning",
+          sent_count: num(payload.sentCount),
+          failed_count: num(payload.failedCount),
+          dedupe_key: payload.dedupeKey ? String(payload.dedupeKey) : null,
+          created_at: event.created_at,
+          resolved_at: event.status === "resolved" ? event.created_at : null,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   await backfill("ServiceNotificationSettings", async () => {
     const events = await prisma.integrationEvent.findMany({
       where: { type: "component_service_settings", status: "active", company_id: { not: null } },

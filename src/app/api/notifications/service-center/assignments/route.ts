@@ -2,26 +2,16 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import {
+  listServiceNotificationAssignments,
+  upsertServiceNotificationAssignment,
+} from "@/lib/service-notification-assignments";
 
 export const dynamic = "force-dynamic";
 
 type AssetRow = { id: string; next_service_at: Date };
-type AssignmentPayload = {
-  notificationKey?: string;
-  assigneeId?: string | null;
-  assigneeName?: string | null;
-  status?: string;
-  deadline?: string | null;
-  note?: string | null;
-  changedBy?: string;
-};
 
 const allowedStatuses = ["assigned", "in_progress", "completed", "blocked"];
-
-function payloadFor(value: Prisma.JsonValue | null): AssignmentPayload | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as AssignmentPayload;
-}
 
 function keyFor(row: AssetRow) {
   return `component-service:${row.id}:${row.next_service_at.toISOString().slice(0, 10)}`;
@@ -46,26 +36,34 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-  const [users, events] = await Promise.all([
+  const [users, rows] = await Promise.all([
     db.user.findMany({
       where: { company_id: user.company_id, status: "active" },
       orderBy: [{ name: "asc" }, { email: "asc" }],
       select: { id: true, name: true, email: true, role: true },
     }),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "service_notification_assignment" },
-      orderBy: { created_at: "desc" },
-      take: 3000,
-      select: { payload: true, created_at: true },
-    }),
+    listServiceNotificationAssignments(user.company_id),
   ]);
 
-  const assignments: Record<string, AssignmentPayload & { updatedAt: string }> = {};
-  for (const event of events) {
-    const payload = payloadFor(event.payload);
-    const key = payload?.notificationKey;
-    if (!key || assignments[key]) continue;
-    assignments[key] = { ...payload, updatedAt: event.created_at.toISOString() };
+  const assignments: Record<string, {
+    notificationKey: string;
+    assigneeId: string | null;
+    assigneeName: string | null;
+    status: string;
+    deadline: string | null;
+    note: string | null;
+    updatedAt: string;
+  }> = {};
+  for (const row of rows) {
+    assignments[row.notificationKey] = {
+      notificationKey: row.notificationKey,
+      assigneeId: row.assigneeId,
+      assigneeName: row.assigneeName,
+      status: row.status,
+      deadline: row.deadline,
+      note: row.note,
+      updatedAt: row.updatedAt,
+    };
   }
 
   return NextResponse.json({ users, assignments }, { headers: { "Cache-Control": "private, no-store" } });
@@ -107,34 +105,32 @@ export async function POST(request: Request) {
     if (!assignee) return NextResponse.json({ error: "Den ansvariga användaren hittades inte" }, { status: 400 });
   }
 
-  const event = await db.integrationEvent.create({
-    data: {
-      company_id: user.company_id,
-      type: "service_notification_assignment",
-      status,
-      recipient: assignee?.id || null,
-      payload: {
-        notificationKey,
-        assigneeId: assignee?.id || null,
-        assigneeName: assignee?.name || assignee?.email || null,
-        status,
-        deadline: deadline?.toISOString() || null,
-        note: note || null,
-        changedBy: user.id,
-      },
-    },
+  const assetId = notificationKey.startsWith("component-service:")
+    ? notificationKey.split(":")[1] || null
+    : null;
+
+  const assignment = await upsertServiceNotificationAssignment({
+    companyId: user.company_id,
+    notificationKey,
+    assetId,
+    assigneeId: assignee?.id || null,
+    assigneeName: assignee?.name || assignee?.email || null,
+    status,
+    deadline,
+    note: note || null,
+    changedById: user.id,
   });
 
   return NextResponse.json({
     success: true,
     assignment: {
-      notificationKey,
-      assigneeId: assignee?.id || null,
-      assigneeName: assignee?.name || assignee?.email || null,
-      status,
-      deadline: deadline?.toISOString() || null,
-      note: note || null,
-      updatedAt: event.created_at.toISOString(),
+      notificationKey: assignment.notificationKey,
+      assigneeId: assignment.assigneeId,
+      assigneeName: assignment.assigneeName,
+      status: assignment.status,
+      deadline: assignment.deadline,
+      note: assignment.note,
+      updatedAt: assignment.updatedAt,
     },
   }, { status: 201 });
 }

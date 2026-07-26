@@ -3,17 +3,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { getServiceEscalationRules } from "@/lib/service-escalation-rules";
+import { listServiceNotificationAssignments } from "@/lib/service-notification-assignments";
 
 export const dynamic = "force-dynamic";
-
-type AssignmentPayload = {
-  notificationKey?: string;
-  assigneeId?: string | null;
-  assigneeName?: string | null;
-  status?: string;
-  deadline?: string | null;
-  note?: string | null;
-};
 
 type AssetRow = {
   id: string;
@@ -22,11 +14,6 @@ type AssetRow = {
   property_name: string;
   next_service_at: Date;
 };
-
-function payloadFor(value: Prisma.JsonValue | null): AssignmentPayload | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as AssignmentPayload;
-}
 
 function keyFor(row: AssetRow) {
   return `component-service:${row.id}:${row.next_service_at.toISOString().slice(0, 10)}`;
@@ -45,7 +32,7 @@ export async function GET() {
   const dueBefore = new Date(now.getTime() + 30 * 86400000);
   const { rules, updatedAt: rulesUpdatedAt } = await getServiceEscalationRules(user.company_id);
 
-  const [assets, assignmentEvents, escalationEvents, recipients] = await Promise.all([
+  const [assets, assignmentRows, escalationEvents, recipients] = await Promise.all([
     db.$queryRaw<AssetRow[]>(Prisma.sql`
       SELECT a."id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name"
       FROM "PropertyTechnicalAsset" a
@@ -57,12 +44,7 @@ export async function GET() {
       ORDER BY a."next_service_at" ASC
       LIMIT 1000
     `),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "service_notification_assignment" },
-      orderBy: { created_at: "desc" },
-      take: 3000,
-      select: { payload: true, created_at: true },
-    }),
+    listServiceNotificationAssignments(user.company_id),
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "service_assignment_escalation" },
       orderBy: { created_at: "desc" },
@@ -80,12 +62,26 @@ export async function GET() {
   ]);
 
   const assetsByKey = new Map(assets.map((asset) => [keyFor(asset), asset]));
-  const latest = new Map<string, AssignmentPayload & { updatedAt: string }>();
-  for (const event of assignmentEvents) {
-    const payload = payloadFor(event.payload);
-    const key = payload?.notificationKey;
-    if (!key || latest.has(key)) continue;
-    latest.set(key, { ...payload, updatedAt: event.created_at.toISOString() });
+  const latest = new Map<string, {
+    notificationKey: string;
+    assigneeId: string | null;
+    assigneeName: string | null;
+    status: string;
+    deadline: string | null;
+    note: string | null;
+    updatedAt: string;
+  }>();
+  for (const row of assignmentRows) {
+    if (latest.has(row.notificationKey)) continue;
+    latest.set(row.notificationKey, {
+      notificationKey: row.notificationKey,
+      assigneeId: row.assigneeId,
+      assigneeName: row.assigneeName,
+      status: row.status,
+      deadline: row.deadline,
+      note: row.note,
+      updatedAt: row.updatedAt,
+    });
   }
 
   const graceMs = rules.graceDays * 86400000;

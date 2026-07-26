@@ -82,6 +82,9 @@ model User {
   work_order_profitability_settings_updated WorkOrderProfitabilitySettings[] @relation("WorkOrderProfitabilitySettingsUpdatedBy")
   work_order_invoice_drafts_updated     WorkOrderInvoiceDraft[] @relation("WorkOrderInvoiceDraftUpdatedBy")
   work_order_invoice_export_jobs_created WorkOrderInvoiceExportJob[] @relation("WorkOrderInvoiceExportJobCreatedBy")
+  service_notification_assignments_changed ServiceNotificationAssignment[] @relation("ServiceNotificationAssignmentChangedBy")
+  service_notification_assignments_assigned ServiceNotificationAssignment[] @relation("ServiceNotificationAssignmentAssignee")
+  component_service_delivery_alert_acks ComponentServiceDeliveryAlertAck[]
 }
 
 model Company {
@@ -154,6 +157,10 @@ model Company {
   work_order_profitability_settings WorkOrderProfitabilitySettings[]
   work_order_invoice_drafts     WorkOrderInvoiceDraft[]
   work_order_invoice_export_jobs WorkOrderInvoiceExportJob[]
+  service_notification_assignments ServiceNotificationAssignment[]
+  component_service_digest_runs ComponentServiceDigestRun[]
+  component_service_delivery_alerts ComponentServiceDeliveryAlert[]
+  component_service_delivery_alert_acks ComponentServiceDeliveryAlertAck[]
 }
 
 model Property {
@@ -1839,4 +1846,77 @@ model WorkOrderInvoiceExportJob {
   @@index([status, created_at])
   @@index([invoice_version_id])
   @@index([created_by_id])
+}
+
+model ServiceNotificationAssignment {
+  id               String    @id @default(uuid())
+  company_id       String
+  notification_key String
+  asset_id         String?
+  assignee_user_id String?
+  assignee_name    String?
+  status           String    @default("assigned")
+  deadline_at      DateTime?
+  note             String?
+  changed_by_id    String
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  company          Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  assignee         User?     @relation("ServiceNotificationAssignmentAssignee", fields: [assignee_user_id], references: [id], onDelete: SetNull)
+  changed_by       User      @relation("ServiceNotificationAssignmentChangedBy", fields: [changed_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([company_id, notification_key])
+  @@index([company_id, status, deadline_at])
+  @@index([assignee_user_id])
+  @@index([changed_by_id])
+}
+
+model ComponentServiceDigestRun {
+  id           String   @id @default(uuid())
+  company_id   String
+  dedupe_key   String
+  status       String   @default("processing")
+  payload      Json?
+  sent_count   Int      @default(0)
+  failed_count Int      @default(0)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  company      Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  alerts       ComponentServiceDeliveryAlert[]
+
+  @@unique([company_id, dedupe_key])
+  @@index([company_id, status, created_at])
+}
+
+model ComponentServiceDeliveryAlert {
+  id            String    @id @default(uuid())
+  company_id    String
+  source_run_id String?
+  status        String    @default("open")
+  severity      String    @default("warning")
+  sent_count    Int       @default(0)
+  failed_count  Int       @default(0)
+  dedupe_key    String?
+  created_at    DateTime  @default(now())
+  resolved_at   DateTime?
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  source_run    ComponentServiceDigestRun? @relation(fields: [source_run_id], references: [id], onDelete: SetNull)
+  acknowledgements ComponentServiceDeliveryAlertAck[]
+
+  @@index([company_id, status, created_at])
+  @@index([source_run_id])
+}
+
+model ComponentServiceDeliveryAlertAck {
+  id         String   @id @default(uuid())
+  company_id String
+  alert_id   String
+  user_id    String
+  created_at DateTime @default(now())
+  company    Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  alert      ComponentServiceDeliveryAlert @relation(fields: [alert_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([alert_id, user_id])
+  @@index([company_id, user_id])
 }

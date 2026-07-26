@@ -44,17 +44,52 @@ async function claimRun(companyId: string, dedupeKey: string, payload: Record<st
   return db.$transaction(async (tx) => {
     const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`SELECT pg_try_advisory_xact_lock(hashtext(${dedupeKey})) AS "locked"`);
     if (!lock[0]?.locked) return { claimed: false as const, reason: "concurrent_run" };
-    const existing = await tx.integrationEvent.findFirst({
-      where: { company_id: companyId, type: "component_service_digest", recipient: dedupeKey, OR: [
-        { status: "sent" },
-        { status: "processing", created_at: { gte: new Date(Date.now() - PROCESSING_LEASE_MS) } },
-      ] },
+
+    const modernExisting = await tx.componentServiceDigestRun.findUnique({
+      where: { company_id_dedupe_key: { company_id: companyId, dedupe_key: dedupeKey } },
+      select: { id: true, status: true, updated_at: true, created_at: true },
+    });
+    if (modernExisting?.status === "sent") return { claimed: false as const, reason: "already_sent" };
+    if (
+      modernExisting?.status === "processing"
+      && modernExisting.updated_at.getTime() >= Date.now() - PROCESSING_LEASE_MS
+    ) {
+      return { claimed: false as const, reason: "already_processing" };
+    }
+
+    const legacyExisting = await tx.integrationEvent.findFirst({
+      where: {
+        company_id: companyId,
+        type: "component_service_digest",
+        recipient: dedupeKey,
+        OR: [
+          { status: "sent" },
+          { status: "processing", created_at: { gte: new Date(Date.now() - PROCESSING_LEASE_MS) } },
+        ],
+      },
       orderBy: { created_at: "desc" },
       select: { id: true, status: true },
     });
-    if (existing) return { claimed: false as const, reason: existing.status === "sent" ? "already_sent" : "already_processing" };
-    const event = await tx.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "processing", recipient: dedupeKey, payload: toJson(payload) }, select: { id: true } });
-    return { claimed: true as const, eventId: event.id };
+    if (legacyExisting) {
+      return { claimed: false as const, reason: legacyExisting.status === "sent" ? "already_sent" : "already_processing" };
+    }
+
+    const run = modernExisting
+      ? await tx.componentServiceDigestRun.update({
+        where: { id: modernExisting.id },
+        data: { status: "processing", payload: toJson(payload), sent_count: 0, failed_count: 0 },
+        select: { id: true },
+      })
+      : await tx.componentServiceDigestRun.create({
+        data: {
+          company_id: companyId,
+          dedupe_key: dedupeKey,
+          status: "processing",
+          payload: toJson(payload),
+        },
+        select: { id: true },
+      });
+    return { claimed: true as const, eventId: run.id };
   });
 }
 
@@ -69,9 +104,14 @@ async function finalizeRun(input: {
 }) {
   const { companyId, eventId, dedupeKey, status, payload, sentCount, failedCount } = input;
   await db.$transaction(async (tx) => {
-    await tx.integrationEvent.update({
+    await tx.componentServiceDigestRun.update({
       where: { id: eventId },
-      data: { status, payload: toJson(payload) },
+      data: {
+        status,
+        payload: toJson(payload),
+        sent_count: sentCount,
+        failed_count: failedCount,
+      },
     });
 
     await tx.auditLog.create({
@@ -81,28 +121,44 @@ async function finalizeRun(input: {
         entity_type: "service_notification_run",
         entity_id: eventId,
         action: `component_service_digest.${status}`,
-        metadata: toJson({ dedupeKey, status, sentCount, failedCount }),
+        metadata: toJson({ dedupeKey, status, sentCount, failedCount, storage: "ComponentServiceDigestRun" }),
       },
     });
 
     if (status === "sent") {
-      const openAlerts = await tx.integrationEvent.findMany({
+      const openModern = await tx.componentServiceDeliveryAlert.findMany({
+        where: { company_id: companyId, status: "open" },
+        select: { id: true },
+        take: 100,
+      });
+      if (openModern.length) {
+        await tx.componentServiceDeliveryAlert.updateMany({
+          where: { id: { in: openModern.map((alert) => alert.id) } },
+          data: { status: "resolved", resolved_at: new Date() },
+        });
+      }
+
+      const openLegacy = await tx.integrationEvent.findMany({
         where: { company_id: companyId, type: "component_service_delivery_alert", status: "open" },
         select: { id: true },
         take: 100,
       });
-      if (openAlerts.length) {
+      if (openLegacy.length) {
         await tx.integrationEvent.updateMany({
-          where: { id: { in: openAlerts.map((alert) => alert.id) } },
+          where: { id: { in: openLegacy.map((alert) => alert.id) } },
           data: { status: "resolved" },
         });
+      }
+
+      const resolvedAlertIds = [...openModern, ...openLegacy].map((alert) => alert.id);
+      if (resolvedAlertIds.length) {
         await tx.integrationEvent.create({
           data: {
             company_id: companyId,
             type: "component_service_delivery_recovery",
             status: "resolved",
             recipient: `company:${companyId}`,
-            payload: toJson({ recoveredByEventId: eventId, resolvedAlertIds: openAlerts.map((alert) => alert.id) }),
+            payload: toJson({ recoveredByEventId: eventId, resolvedAlertIds }),
           },
         });
         await tx.auditLog.create({
@@ -112,26 +168,33 @@ async function finalizeRun(input: {
             entity_type: "service_notification_delivery",
             entity_id: eventId,
             action: "component_service_delivery.recovered",
-            metadata: toJson({ resolvedAlertIds: openAlerts.map((alert) => alert.id) }),
+            metadata: toJson({ resolvedAlertIds }),
           },
         });
       }
       return;
     }
 
-    const existingAlert = await tx.integrationEvent.findFirst({
+    const existingModern = await tx.componentServiceDeliveryAlert.findFirst({
+      where: { company_id: companyId, status: "open" },
+      orderBy: { created_at: "desc" },
+      select: { id: true },
+    });
+    const existingLegacy = await tx.integrationEvent.findFirst({
       where: { company_id: companyId, type: "component_service_delivery_alert", status: "open" },
       orderBy: { created_at: "desc" },
       select: { id: true },
     });
-    if (!existingAlert) {
-      await tx.integrationEvent.create({
+    if (!existingModern && !existingLegacy) {
+      await tx.componentServiceDeliveryAlert.create({
         data: {
           company_id: companyId,
-          type: "component_service_delivery_alert",
+          source_run_id: eventId,
           status: "open",
-          recipient: `company:${companyId}`,
-          payload: toJson({ sourceEventId: eventId, severity: status === "failed" ? "critical" : "warning", sentCount, failedCount, dedupeKey }),
+          severity: status === "failed" ? "critical" : "warning",
+          sent_count: sentCount,
+          failed_count: failedCount,
+          dedupe_key: dedupeKey,
         },
       });
     }
@@ -211,7 +274,19 @@ export async function GET(request: Request) {
     const overdueComponents = companyComponents.filter((item) => item.next_service_at < now);
     const basePayload = { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference };
     if (!allEmails.size && (!overdueOnlyEmails.size || !overdueComponents.length)) {
-      await db.integrationEvent.create({ data: { company_id: companyId, type: "component_service_digest", status: "skipped", recipient: dedupeKey, payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }) } });
+      await db.componentServiceDigestRun.upsert({
+        where: { company_id_dedupe_key: { company_id: companyId, dedupe_key: dedupeKey } },
+        create: {
+          company_id: companyId,
+          dedupe_key: dedupeKey,
+          status: "skipped",
+          payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
+        },
+        update: {
+          status: "skipped",
+          payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
+        },
+      });
       result.skipped += 1;
       continue;
     }
