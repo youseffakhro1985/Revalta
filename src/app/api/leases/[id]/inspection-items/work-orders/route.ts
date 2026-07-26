@@ -87,7 +87,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const ids = [...new Set(payloads.map((item) => item.workOrderId))];
   const workOrders = ids.length
     ? await db.workOrder.findMany({
-        where: { deleted_at: null, company_id: user.company_id, id: { in: ids } },
+        where: { deleted_at: null, company_id: user.company_id, id: { in: ids }, property: { deleted_at: null } },
         select: {
           id: true,
           title: true,

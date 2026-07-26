@@ -32,11 +32,16 @@ export async function GET(request: Request) {
         where: {
           deleted_at: null,
           ...tenantWhere(user),
-          OR: [
-            { title: contains },
-            { description: contains },
-            { public_reference: contains },
-            { reporter_name: contains },
+          AND: [
+            { OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+            {
+              OR: [
+                { title: contains },
+                { description: contains },
+                { public_reference: contains },
+                { reporter_name: contains },
+              ],
+            },
           ],
         },
         take: 8,
@@ -67,7 +72,7 @@ export async function GET(request: Request) {
           email: true,
           organization_number: true,
           leases: {
-            where: { deleted_at: null, status: { in: ["reserved", "active", "notice"] } },
+            where: { deleted_at: null, status: { in: ["reserved", "active", "notice"] }, property: { deleted_at: null } },
             orderBy: { updated_at: "desc" },
             take: 1,
             select: { lease_number: true, unit: { select: { designation: true } }, property: { select: { name: true } } },

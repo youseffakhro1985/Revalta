@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const workOrder = await db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: user.company_id },
+    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
     select: { id: true, property_id: true },
   });
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });

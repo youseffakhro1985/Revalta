@@ -132,6 +132,9 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Projects/documents lifecycle require active parent property; economics materials UI wires Ta bort for modern submitted rows.
    - Ticket list/detail/export and ticket child routes hide rows tied to soft-deleted properties (`OR property_id null | property.deleted_at null`).
    - Ticket operations field correction (`PATCH /api/tickets/[id]/operations` for description/minutes/amount/completed) + felanmälan detail “Ändra”; modern-only fail-closed for legacy AuditLog rows.
+   - Follow-through orphan guards: WO satellites (comments/docs/execution/SLA/reports/transitions/project/invoice export/asset-options/ops-overview/edit-lock), leases list/PATCH/DELETE/handover helpers, operational-document download/delete + technical_asset Property join, resident-portal/documents/IMD/search/billing/team/dashboard/rapporter/SLA widgets, invoice-export list+cron.
+   - Service delivery alerts expose `source: table|legacy`; UI hides Kvittera for legacy; PATCH already fail-closed with `409`.
+   - Canonical nav + page for `/dashboard/arbetsorder/operationsoversikt` (legacy `/dashboard/arbetsordrar/operationsoversikt` redirects).
 
 ## Verification
 

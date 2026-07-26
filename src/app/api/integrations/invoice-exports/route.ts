@@ -41,11 +41,12 @@ async function latestJobs(companyId: string): Promise<InvoiceExportJobPayload[]>
       providerStatus: row.provider_status,
       externalId: row.external_id,
       providerResponse: row.provider_response,
+      source: "table" as const,
     }));
   }
 
   const workOrders = await db.workOrder.findMany({
-    where: { company_id: companyId, deleted_at: null },
+    where: { company_id: companyId, deleted_at: null, property: { deleted_at: null } },
     select: { id: true },
     take: 2000,
   });
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
   const allJobs = await latestJobs(user.company_id);
   const workOrderIds = [...new Set(allJobs.map((job) => job.workOrderId))];
   const orders = await db.workOrder.findMany({
-    where: { deleted_at: null, company_id: user.company_id, id: { in: workOrderIds } },
+    where: { deleted_at: null, company_id: user.company_id, id: { in: workOrderIds }, property: { deleted_at: null } },
     select: { id: true, title: true, status: true, property: { select: { name: true, address: true, city: true } } },
   });
   const orderMap = new Map(orders.map((order) => [order.id, order]));

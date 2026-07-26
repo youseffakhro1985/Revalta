@@ -87,6 +87,7 @@ export async function GET() {
     acknowledged: boolean;
     title: string;
     description: string;
+    source: "table" | "legacy";
   }>();
 
   for (const alert of modernAlerts) {
@@ -104,6 +105,7 @@ export async function GET() {
       description: alert.failed_count > 0
         ? `${alert.failed_count} leveranser misslyckades och ${alert.sent_count} leveranser lyckades.`
         : "Leveransutfallet behöver följas upp.",
+      source: "table",
     });
   }
 
@@ -126,6 +128,7 @@ export async function GET() {
       description: failedCount > 0
         ? `${failedCount} leveranser misslyckades och ${sentCount} leveranser lyckades.`
         : "Leveransutfallet behöver följas upp.",
+      source: "legacy",
     });
   }
 

@@ -15,7 +15,7 @@ function optionalDate(value: unknown) {
 async function resolveSla(id: string, companyId: string) {
   const [workOrder, enterprise] = await Promise.all([
     db.workOrder.findFirst({
-      where: { deleted_at: null, id, company_id: companyId },
+      where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
       select: {
         id: true,
         status: true,

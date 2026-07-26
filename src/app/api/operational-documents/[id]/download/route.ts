@@ -2,6 +2,7 @@ import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { isOperationalDocumentParentActive } from "@/lib/operational-document-access";
 import { getStorageToken } from "@/lib/storage";
 
 function contentDisposition(fileName: string) {
@@ -30,9 +31,20 @@ export async function GET(
     const { id } = await params;
     const document = await db.operationalDocument.findFirst({
       where: { id, company_id: user.company_id, deleted_at: null },
-      select: { file_name: true, storage_url: true, content_type: true },
+      select: {
+        file_name: true,
+        storage_url: true,
+        content_type: true,
+        work_order_id: true,
+        project_id: true,
+        property_id: true,
+        technical_asset_id: true,
+      },
     });
     if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    if (!(await isOperationalDocumentParentActive(user.company_id, document))) {
+      return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    }
 
     const token = getStorageToken();
     if (!token) return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });

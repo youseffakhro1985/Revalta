@@ -16,7 +16,7 @@ async function context(id: string) {
   if (!user) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) } as const;
   if (!user.company_id) return { error: NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 }) } as const;
   const workOrder = await db.workOrder.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null },
+    where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
     select: { id: true, title: true },
   });
   if (!workOrder) return { error: NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 }) } as const;

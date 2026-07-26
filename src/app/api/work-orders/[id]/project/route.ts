@@ -25,7 +25,7 @@ export async function POST(
 
   const { id } = await params;
   const workOrder = await db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: user.company_id },
+    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
     include: {
       property: { select: { id: true, name: true } },
       projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },

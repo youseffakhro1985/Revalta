@@ -29,7 +29,13 @@ export async function GET(
 
     const { id, documentId } = await params;
     const document = await db.operationalDocument.findFirst({
-      where: { id: documentId, work_order_id: id, company_id: user.company_id, deleted_at: null },
+      where: {
+        id: documentId,
+        work_order_id: id,
+        company_id: user.company_id,
+        deleted_at: null,
+        work_order: { deleted_at: null, company_id: user.company_id, property: { deleted_at: null } },
+      },
       select: { file_name: true, storage_url: true, content_type: true },
     });
     if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });

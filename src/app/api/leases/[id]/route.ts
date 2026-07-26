@@ -38,7 +38,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const input = parsed.data;
 
     const existing = await db.lease.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: null },
+      where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
       include: { lease_holder: true },
     });
     if (!existing) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
@@ -149,7 +149,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const existing = await db.lease.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: null },
+      where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
       select: { id: true, lease_number: true, status: true },
     });
     if (!existing) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
@@ -162,7 +162,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     }
 
     const deleteResult = await db.lease.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: null },
+      where: { id: existing.id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
       data: { deleted_at: new Date() },
     });
     if (deleteResult.count === 0) {

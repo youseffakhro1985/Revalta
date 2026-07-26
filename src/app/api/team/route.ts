@@ -24,7 +24,12 @@ export async function GET() {
         created_at: true,
         _count: {
           select: {
-            assigned_tickets: { where: { deleted_at: null } },
+            assigned_tickets: {
+              where: {
+                deleted_at: null,
+                OR: [{ property_id: null }, { property: { deleted_at: null } }],
+              },
+            },
           },
         },
       },
@@ -83,7 +88,12 @@ export async function POST(request: Request) {
         created_at: true,
         _count: {
           select: {
-            assigned_tickets: { where: { deleted_at: null } },
+            assigned_tickets: {
+              where: {
+                deleted_at: null,
+                OR: [{ property_id: null }, { property: { deleted_at: null } }],
+              },
+            },
           },
         },
       },

@@ -15,7 +15,7 @@ const signerRoles = new Set(["executor", "contractor", "customer"]);
 
 async function resolveWorkOrder(id: string, companyId: string) {
   return db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: companyId },
+    where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
     include: {
       property: { select: { id: true, name: true, address: true, city: true } },
       unit: { select: { id: true, designation: true } },

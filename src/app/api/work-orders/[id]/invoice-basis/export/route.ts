@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const { id } = await params;
   const order = await db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: user.company_id },
+    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
     select: {
       id: true,
       title: true,

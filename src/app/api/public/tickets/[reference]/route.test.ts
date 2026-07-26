@@ -62,7 +62,12 @@ describe("public ticket tracking", () => {
     expect(response.status).toBe(200);
     expect(typeof body.trackingToken).toBe("string");
     expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { public_reference: "RV-2026-TEST", reporter_email: "boende@example.se", deleted_at: null },
+      where: {
+        public_reference: "RV-2026-TEST",
+        reporter_email: "boende@example.se",
+        deleted_at: null,
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
+      },
       select: expect.objectContaining({
         comments: expect.objectContaining({
           where: { is_internal: false },

@@ -53,6 +53,7 @@ export async function POST(
         public_reference: reference.toUpperCase(),
         reporter_email: authorizedEmail,
         deleted_at: null,
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
         ...(tracking ? { company_id: tracking.companyId } : {}),
       },
       select: { id: true, company_id: true, user_id: true, title: true },
