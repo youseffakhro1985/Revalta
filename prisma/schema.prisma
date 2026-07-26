@@ -341,6 +341,7 @@ model WorkOrder {
   material_costs                MaterialCost[]
   time_reports                  TimeReport[]
   lease_inspection_links        LeaseInspectionWorkOrderLink[]
+  compliance_inspections        ComplianceInspection[]
 
   @@index([company_id, status])
   @@index([property_id])
@@ -1373,11 +1374,13 @@ model ComplianceInspection {
   interval_months  Int       @default(0)
   status           String    @default("planned")
   note             String?
+  work_order_id    String?   @unique
   created_by_id    String
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
   company          Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
   property         Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  work_order       WorkOrder? @relation(fields: [work_order_id], references: [id], onDelete: SetNull)
   created_by       User      @relation("ComplianceInspectionCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
 
   @@index([company_id, due_date])

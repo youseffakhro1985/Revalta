@@ -45,6 +45,7 @@ export async function GET() {
       interval_months: row.interval_months,
       status: row.status,
       note: row.note || "",
+      work_order_id: row.work_order_id,
       created_at: row.created_at,
       source: "table" as const,
     }));
