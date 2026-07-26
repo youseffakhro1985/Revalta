@@ -128,7 +128,8 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Recurring schedules and service-notification due counts exclude soft-deleted properties; `validateWorkOrderAssetLinks` requires an active property.
    - Work-order time/material dual-read marks `source: table|legacy`; economics UI hides Godkänn/Avvisa for legacy rows with amber backfill banner.
    - Calendar hard-safe delete (`DELETE /api/calendar`) on modern `CalendarEvent` only; legacy → Swedish `409` backfill; kalender UI “Ta bort”; route tests for field PATCH/delete fail-closed.
-   - Lease handover/inspection + work-order list/detail require active parent property; notiser hides mark-read/delete for legacy rows; expanded fail-closed route tests (energy/quotes/budget/claims/notices/vendors/maintenance/notifications).
+   - Lease handover/inspection + work-order list/detail require active parent property; notiser hides mark-read/delete for legacy rows; expanded fail-closed route tests (energy/quotes/budget/claims/notices/vendors/maintenance/notifications/rounds/inspections/recurring).
+   - Ticket list/detail/export and ticket child routes hide rows tied to soft-deleted properties (`OR property_id null | property.deleted_at null`).
    - Ticket operations field correction (`PATCH /api/tickets/[id]/operations` for description/minutes/amount/completed) + felanmälan detail “Ändra”; modern-only fail-closed for legacy AuditLog rows.
 
 ## Verification
