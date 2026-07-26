@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import {
   isMissingSchemaColumnError,
+  isMissingTableError,
   schemaCompatibilityBannerMessage,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
@@ -26,6 +27,19 @@ describe("schema-readiness", () => {
       },
     );
     expect(isMissingSchemaColumnError(error)).toBe(true);
+  });
+
+  it("does not treat missing tables as missing columns", () => {
+    const error = new Prisma.PrismaClientKnownRequestError(
+      "The table `public.InsuranceClaim` does not exist in the current database.",
+      {
+        code: "P2021",
+        clientVersion: "test",
+        meta: { table: "public.InsuranceClaim" },
+      },
+    );
+    expect(isMissingSchemaColumnError(error)).toBe(false);
+    expect(isMissingTableError(error, "InsuranceClaim")).toBe(true);
   });
 
   it("ignores unrelated Prisma errors", () => {

@@ -5,12 +5,29 @@ import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate } 
 import {
   activePropertyRelationFilter,
   isMissingSchemaColumnError,
+  isMissingTableError,
   notDeletedFilter,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
 const action = "insurance_claim.created";
+
+async function listInsuranceClaimRows(companyId: string, propertyRelation: Record<string, unknown>) {
+  try {
+    return await db.insuranceClaim.findMany({
+      where: { company_id: companyId, ...propertyRelation },
+      orderBy: { created_at: "desc" },
+      take: 400,
+      include: { property: { select: { name: true } } },
+    });
+  } catch (error) {
+    if (isMissingTableError(error, "InsuranceClaim")) {
+      return [];
+    }
+    throw error;
+  }
+}
 
 export async function GET() {
   try {
@@ -22,14 +39,7 @@ export async function GET() {
       activePropertyRelationFilter(),
     ]);
     const [rows, logs, properties] = await Promise.all([
-      user.company_id
-        ? db.insuranceClaim.findMany({
-            where: { company_id: user.company_id, ...propertyRelation },
-            orderBy: { created_at: "desc" },
-            take: 400,
-            include: { property: { select: { name: true } } },
-          })
-        : Promise.resolve([]),
+      user.company_id ? listInsuranceClaimRows(user.company_id, propertyRelation) : Promise.resolve([]),
       db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "desc" },
@@ -129,26 +139,34 @@ export async function POST(request: Request) {
     const parsedIncident = incidentDate ? parseOptionalDate(incidentDate) : null;
     if (incidentDate && !parsedIncident) return NextResponse.json({ error: "Ogiltigt skadedatum" }, { status: 400 });
 
-    const claim = await db.insuranceClaim.create({
-      data: {
-        company_id: user.company_id,
-        property_id: property.id,
-        title,
-        damage_type: damageType,
-        incident_date: parsedIncident,
-        location: location || null,
-        insurer: insurer || null,
-        claim_number: claimNumber || null,
-        responsible: responsible || null,
-        status,
-        estimated_cost: estimatedCost,
-        deductible,
-        compensation,
-        note: note || null,
-        created_by_id: user.id,
-      },
-      select: { id: true },
-    });
+    let claim: { id: string };
+    try {
+      claim = await db.insuranceClaim.create({
+        data: {
+          company_id: user.company_id,
+          property_id: property.id,
+          title,
+          damage_type: damageType,
+          incident_date: parsedIncident,
+          location: location || null,
+          insurer: insurer || null,
+          claim_number: claimNumber || null,
+          responsible: responsible || null,
+          status,
+          estimated_cost: estimatedCost,
+          deductible,
+          compensation,
+          note: note || null,
+          created_by_id: user.id,
+        },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (isMissingTableError(error, "InsuranceClaim")) {
+        return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+      }
+      throw error;
+    }
 
     await writeAuditLog(user, {
       entityType: "insurance_claim",

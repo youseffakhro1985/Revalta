@@ -71,7 +71,16 @@ export async function GET() {
         where: { company_id: user.company_id, ...workOrderActive },
         orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
         take: 500,
-        include: {
+        // Explicit select omits deleted_at so preview works before soft-delete migrate.
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          estimated_cost: true,
+          completed_at: true,
+          scheduled_start: true,
+          created_at: true,
           property: { select: { id: true, name: true, address: true, city: true } },
           unit: { select: { id: true, designation: true, unit_type: true } },
           ticket: { select: { id: true, public_reference: true, title: true } },

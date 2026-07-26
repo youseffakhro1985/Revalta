@@ -28,17 +28,32 @@ type ColumnRow = {
 const CACHE_TTL_MS = 15_000;
 let readinessCache: { value: SchemaReadiness; expiresAt: number } | null = null;
 
-export function isMissingSchemaColumnError(error: unknown): boolean {
+function errorText(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2022") return true;
-    const metaText = error.meta ? JSON.stringify(error.meta) : "";
-    const combined = `${error.message} ${metaText}`;
-    if (/column .* does not exist/i.test(combined) || /does not exist in the current database/i.test(combined)) {
-      return true;
-    }
+    return `${error.message} ${error.meta ? JSON.stringify(error.meta) : ""}`;
   }
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return /column .* does not exist/i.test(message) || /does not exist in the current database/i.test(message);
+  return error instanceof Error ? error.message : String(error ?? "");
+}
+
+export function isMissingSchemaColumnError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") {
+    return true;
+  }
+  const combined = errorText(error);
+  // Require "column" so missing *tables* (P2021) are not misclassified.
+  return /column .+ does not exist/i.test(combined);
+}
+
+export function isMissingTableError(error: unknown, table?: string): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2021") {
+    if (!table) return true;
+    return errorText(error).toLowerCase().includes(table.toLowerCase());
+  }
+  const combined = errorText(error);
+  if (/column .+ does not exist/i.test(combined)) return false;
+  if (!/does not exist/i.test(combined)) return false;
+  if (!table) return /table .+ does not exist/i.test(combined) || /relation .+ does not exist/i.test(combined);
+  return combined.toLowerCase().includes(table.toLowerCase());
 }
 
 export function schemaMismatchUserMessage() {
@@ -96,6 +111,16 @@ export async function notDeletedFilter(
   table: SoftDeleteTable,
 ): Promise<{ deleted_at: null } | Record<string, never>> {
   return (await hasSoftDeleteColumn(table)) ? { deleted_at: null } : {};
+}
+
+/**
+ * When soft-delete columns are missing, Prisma must not SELECT them
+ * (schema includes the field even if the DB column is absent).
+ */
+export async function softDeleteOmit(
+  table: SoftDeleteTable,
+): Promise<{ deleted_at: true } | undefined> {
+  return (await hasSoftDeleteColumn(table)) ? undefined : { deleted_at: true };
 }
 
 export async function activePropertyRelationFilter(): Promise<

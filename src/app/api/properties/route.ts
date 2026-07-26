@@ -8,6 +8,23 @@ import {
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
 
+/** Explicit select avoids querying soft-delete columns that may not exist yet. */
+const propertyListSelect = (ticketActive: { deleted_at: null } | Record<string, never>) => ({
+  id: true,
+  name: true,
+  address: true,
+  postal_code: true,
+  city: true,
+  property_identifier: true,
+  property_type: true,
+  status: true,
+  created_at: true,
+  updated_at: true,
+  _count: {
+    select: { tickets: { where: ticketActive }, buildings: true, units: true },
+  },
+} as const);
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -20,11 +37,7 @@ export async function GET() {
     const properties = await db.property.findMany({
       where: { ...propertyActive, ...tenantWhere(user) },
       orderBy: { created_at: "desc" },
-      include: {
-        _count: {
-          select: { tickets: { where: ticketActive }, buildings: true, units: true },
-        },
-      },
+      select: propertyListSelect(ticketActive),
     });
 
     return NextResponse.json({ properties });
@@ -65,11 +78,7 @@ export async function POST(request: Request) {
         company_id: user.company_id,
         user_id: user.id,
       },
-      include: {
-        _count: {
-          select: { tickets: { where: ticketActive }, buildings: true, units: true },
-        },
-      },
+      select: propertyListSelect(ticketActive),
     });
 
     await writeAuditLog(user, {
