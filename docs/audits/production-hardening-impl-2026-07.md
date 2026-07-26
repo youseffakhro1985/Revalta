@@ -136,6 +136,8 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Service delivery alerts expose `source: table|legacy`; UI hides Kvittera for legacy; PATCH already fail-closed with `409`.
    - Canonical nav + page for `/dashboard/arbetsorder/operationsoversikt` (legacy `/dashboard/arbetsordrar/operationsoversikt` redirects).
 
+   - P0 ops package: full 7-job `smoke:cron`, authenticated `smoke:ops` for schema/secrets, Driftstatus UI with critical env checklist, and GitHub **Production Uptime** workflow against `/api/health`.
+
 ## Verification
 
 ```bash

@@ -88,10 +88,14 @@ När releasen innehåller schema cutover (moderna tabeller / soft-delete / `Cron
 
 1. Kör `node scripts/backfill-auditlog-modules.mjs` mot produktionsdatabasen (idempotent).
 2. Verifiera att kritiska moduler inte längre returnerar `409` för backfill på vanliga arbetsflöden.
-3. Smoke-testa cron med `CRON_SECRET`:
+3. Smoke-testa **alla** cron-jobb med `CRON_SECRET` via `npm run smoke:cron`:
+   - `/api/cron/component-service-reminders`
    - `/api/cron/preventive-maintenance` → journal i `CronJobRun`
-   - `/api/cron/recurring-incident-escalations` → journal i `CronJobRun`
+   - `/api/cron/service-assignment-escalations`
    - `/api/cron/invoice-export-jobs` → jobb i `WorkOrderInvoiceExportJob`
+   - `/api/cron/recurring-work-orders`
+   - `/api/cron/recurring-incident-escalations` → journal i `CronJobRun`
+   - `/api/cron/document-expiry-reminders`
 4. Kontrollera att soft-deletade tickets/fastigheter/avtal och makulerade IMD-avläsningar inte syns i listor.
 5. När backfill och smoke är godkända: stäng dual-read (migreringssteg 6).
    - Production defaultar till modern-only när `VERCEL_ENV=production` (efter cutover).
@@ -101,11 +105,14 @@ När releasen innehåller schema cutover (moderna tabeller / soft-delete / `Cron
 
 ## 6. Verifiering efter driftsättning
 
-- `GET /api/health` svarar utan serverfel.
-- Inloggad ops: `GET /api/health` visar `schema.ready: true` (annars saknas soft-delete-migrationer).
-- Snabb rök: `BASE_URL=https://www.revalta.se node scripts/smoke-auth-dashboard.mjs`
-- Cron-rök: `BASE_URL=https://www.revalta.se CRON_SECRET=... node scripts/smoke-cron.mjs`
+- `GET /api/health` svarar utan serverfel (`status=ok`, `database=ok`, gärna `modernStorageOnly=true` i production).
+- Inloggad ops: `GET /api/health` visar `schema.ready: true` och `env`-flaggor för kritiska secrets (annars saknas soft-delete-migrationer / env).
+- Drift-UI: `/dashboard/drift` visar schema, modern storage, kritiska secrets och cron-lista.
+- Snabb rök: `BASE_URL=https://www.revalta.se npm run smoke:auth`
+- Ops-rök (secrets + schema): `BASE_URL=https://www.revalta.se npm run smoke:ops`
+- Cron-rök (alla 7 jobb i `vercel.json`): `BASE_URL=https://www.revalta.se CRON_SECRET=... npm run smoke:cron`
 - Schema-only: `DATABASE_URL=... DIRECT_URL=... node scripts/check-schema-readiness.mjs`
+- Extern övervakning: GitHub Actions-workflow **Production Uptime** pingar `/api/health` var 15:e minut. Komplettera gärna med UptimeRobot/Better Stack för SMS/e-post.
 - Registrering, inloggning, utloggning och lösenordsåterställning fungerar.
 - En användare kan endast se den egna organisationens fastigheter och ärenden.
 - Boendeportalen visar endast fastigheter för `PUBLIC_PORTAL_COMPANY_ID`.
