@@ -132,3 +132,58 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const entryId = String(body.entryId || body.id || "").trim();
+    if (!entryId) return NextResponse.json({ error: "Budgetrad-id krävs" }, { status: 400 });
+
+    const existing = await db.budgetEntry.findFirst({
+      where: { id: entryId, company_id: user.company_id },
+      select: { id: true, account: true, year: true, category: true, property_id: true },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: entryId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Budgetraden finns kvar i äldre lagring. Kör backfill till BudgetEntry innan den kan tas bort.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Budgetraden hittades inte" }, { status: 404 });
+    }
+
+    const deleteResult = await db.budgetEntry.deleteMany({
+      where: { id: existing.id, company_id: user.company_id },
+    });
+    if (deleteResult.count === 0) {
+      return NextResponse.json({ error: "Budgetraden hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "budget_entry",
+      entityId: existing.id,
+      action: "budget.entry.deleted",
+      metadata: {
+        property_id: existing.property_id,
+        year: existing.year,
+        category: existing.category,
+        account: existing.account,
+        storage: "BudgetEntry",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id });
+  } catch (error) {
+    console.error("Delete budget entry error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

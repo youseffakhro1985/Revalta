@@ -125,3 +125,65 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+const allowedStatuses = new Set(["planned", "done", "cancelled"]);
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const eventId = String(body.eventId || body.id || "").trim();
+    const status = String(body.status || "").trim();
+    if (!eventId || !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Aktivitets-id och giltig status krävs" }, { status: 400 });
+    }
+
+    const existing = await db.calendarEvent.findFirst({
+      where: { id: eventId, company_id: user.company_id },
+      select: { id: true, title: true, status: true },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: eventId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Aktiviteten finns kvar i äldre lagring. Kör backfill till CalendarEvent innan status ändras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
+    }
+
+    if (existing.status === status) return NextResponse.json({ success: true, id: existing.id, status });
+
+    const updateResult = await db.calendarEvent.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
+      data: { status },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "calendar_event",
+      entityId: existing.id,
+      action: "calendar.event.status_updated",
+      metadata: {
+        title: existing.title,
+        previousStatus: existing.status,
+        status,
+        storage: "CalendarEvent",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id, status });
+  } catch (error) {
+    console.error("Update calendar event status error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

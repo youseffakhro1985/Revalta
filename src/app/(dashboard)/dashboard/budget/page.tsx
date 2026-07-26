@@ -5,7 +5,7 @@ import { BarChart3, CircleDollarSign, TrendingUp } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 
 type Property = { id: string; name: string };
-type Entry = { id: string; property_name?: string; year?: number; category?: string; account?: string; budget?: number; forecast?: number; actual?: number; variance_budget?: number; created_at: string };
+type Entry = { id: string; property_name?: string; year?: number; category?: string; account?: string; budget?: number; forecast?: number; actual?: number; variance_budget?: number; created_at: string; source?: "table" | "legacy" };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 const categories: Record<string, string> = { income: "Intäkter", operations: "Drift", maintenance: "Underhåll", energy: "Energi", administration: "Administration", finance: "Finans", investment: "Investering", other: "Övrigt" };
@@ -15,6 +15,7 @@ export default function BudgetPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [removingId, setRemovingId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({ propertyId: "", year: String(new Date().getFullYear()), category: "operations", account: "", budget: "", forecast: "", actual: "", note: "" });
@@ -46,6 +47,26 @@ export default function BudgetPage() {
     setSaving(false);
   }
 
+  async function removeEntry(entry: Entry) {
+    if (entry.source === "legacy") {
+      setError("Budgetraden finns i äldre lagring. Kör backfill till BudgetEntry innan den kan tas bort.");
+      return;
+    }
+    if (!window.confirm("Ta bort den här budgetraden?")) return;
+    setRemovingId(entry.id);
+    setError("");
+    setSuccess("");
+    const response = await fetch("/api/budget", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId: entry.id }),
+    });
+    const data = await response.json();
+    if (!response.ok) setError(data.error || "Kunde inte ta bort budgetraden");
+    else { setSuccess("Budgetraden har tagits bort."); await load(); }
+    setRemovingId("");
+  }
+
   return <div className="space-y-8">
     <PageHeader eyebrow="Ekonomisk styrning" title="Budget, prognos och utfall" description="Följ ekonomin per fastighet, år och kostnadsslag med tydliga avvikelser och en samlad styrningsbild." />
 
@@ -73,7 +94,7 @@ export default function BudgetPage() {
       <Panel title="Ekonomiskt utfall" description="Budget, prognos och utfall per fastighet och kostnadsslag." bodyClassName="p-0">
         {loading ? <p className="p-6 text-sm text-ink-500">Hämtar ekonomi…</p> : entries.length === 0 ? <EmptyState title="Inga budgetrader registrerade" description="Lägg till den första budgetraden för att börja följa ekonomiskt utfall." /> : <div className="divide-y divide-sand-100">{entries.map((item) => {
           const itemVariance = Number(item.variance_budget || 0);
-          return <article key={item.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><h3 className="font-semibold text-ink-900">{item.account}</h3><p className="mt-1 text-sm text-ink-500">{item.property_name} · {categories[item.category || "other"]} · {item.year}</p><div className="mt-4 grid grid-cols-3 gap-4 text-xs text-ink-500"><span>Budget<strong className="mt-1 block text-ink-800">{money.format(Number(item.budget || 0))}</strong></span><span>Prognos<strong className="mt-1 block text-ink-800">{money.format(Number(item.forecast || 0))}</strong></span><span>Utfall<strong className="mt-1 block text-ink-800">{money.format(Number(item.actual || 0))}</strong></span></div></div><div className="sm:text-right"><p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(itemVariance)}</p><p className="text-xs text-ink-400">Avvikelse mot budget</p></div></div></article>;
+          return <article key={item.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><h3 className="font-semibold text-ink-900">{item.account}</h3><p className="mt-1 text-sm text-ink-500">{item.property_name} · {categories[item.category || "other"]} · {item.year}</p>{item.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan borttagning.</p> : null}<div className="mt-4 grid grid-cols-3 gap-4 text-xs text-ink-500"><span>Budget<strong className="mt-1 block text-ink-800">{money.format(Number(item.budget || 0))}</strong></span><span>Prognos<strong className="mt-1 block text-ink-800">{money.format(Number(item.forecast || 0))}</strong></span><span>Utfall<strong className="mt-1 block text-ink-800">{money.format(Number(item.actual || 0))}</strong></span></div></div><div className="sm:text-right"><p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(itemVariance)}</p><p className="text-xs text-ink-400">Avvikelse mot budget</p>{item.source !== "legacy" ? <button type="button" disabled={removingId === item.id} onClick={() => void removeEntry(item)} className="mt-3 text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{removingId === item.id ? "Tar bort…" : "Ta bort"}</button> : null}</div></div></article>;
         })}</div>}
       </Panel>
     </section>

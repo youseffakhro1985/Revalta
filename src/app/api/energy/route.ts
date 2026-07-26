@@ -142,3 +142,57 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const readingId = String(body.readingId || body.id || "").trim();
+    if (!readingId) return NextResponse.json({ error: "Avläsnings-id krävs" }, { status: 400 });
+
+    const existing = await db.energyReading.findFirst({
+      where: { id: readingId, company_id: user.company_id },
+      select: { id: true, type: true, period: true, property_id: true },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: readingId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Avläsningen finns kvar i äldre lagring. Kör backfill till EnergyReading innan den kan tas bort.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+    }
+
+    const deleteResult = await db.energyReading.deleteMany({
+      where: { id: existing.id, company_id: user.company_id },
+    });
+    if (deleteResult.count === 0) {
+      return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "energy_reading",
+      entityId: existing.id,
+      action: "energy.reading.deleted",
+      metadata: {
+        property_id: existing.property_id,
+        type: existing.type,
+        period: existing.period,
+        storage: "EnergyReading",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id });
+  } catch (error) {
+    console.error("Delete energy reading error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
