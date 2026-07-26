@@ -45,7 +45,11 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Remaining ops modules off AuditLog primary storage: notifications, portfolio maintenance, budget, energy, vendors, compliance inspections, insurance claims, rent notices, calendar.
    - `ManagedDocument` table for document archive with dual-read of legacy AuditLog rows; resident portal reads modern + legacy and downloads via controlled routes.
    - `ImdReading` and `TicketOperation` tables with dual-read of legacy AuditLog rows (final AuditLog-primary API modules).
-   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation).
+   - Lease handover/inspection moved off IntegrationEvent primary storage (`LeaseHandoverRecord`, `LeaseInspectionRecord`, `LeaseInspectionWorkOrderLink`) with dual-read.
+   - IMD → debit flow: `ImdDebitLine` auto-created on reading; attach to/create rent notice.
+   - Document expiry cron (`/api/cron/document-expiry-reminders`) creates AppNotifications.
+   - Work-order detail exposes “Skapa projekt från arbetsorder”.
+   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables).
 
 ## Verification
 

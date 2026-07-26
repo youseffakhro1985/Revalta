@@ -70,6 +70,7 @@ export default function WorkOrderDetailPage() {
   const [assignedToId, setAssignedToId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const editLock = useWorkOrderEditLock(id, Boolean(transitions?.canManage));
@@ -150,6 +151,29 @@ export default function WorkOrderDetailPage() {
   const actual = Number(workOrder.actual_cost || 0);
   const enterprise = workOrder.enterprise;
 
+  async function createProjectFromWorkOrder() {
+    if (!window.confirm("Skapa ett projekt från den här arbetsordern?")) return;
+    setCreatingProject(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/work-orders/${id}/project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Kunde inte skapa projekt");
+      setSuccess("Projektet har skapats från arbetsordern.");
+      await load();
+      if (data.project?.id) router.push(`/dashboard/projekt/${data.project.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte skapa projekt");
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
   return <div className="space-y-8">
     <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordrar</Link>
     <PageHeader eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder.title} description={workOrder.description} />
@@ -206,10 +230,21 @@ export default function WorkOrderDetailPage() {
           <input name="actualCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={actual || ""} placeholder="Faktisk kostnad" className={premiumFieldClass} />
           {transitions.canManage ? <button disabled={!editable || saving || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : editable ? "Spara låst och validerad ändring" : "Väntar på redigeringslås"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
         </form>
-        <div className="mt-5 space-y-2 border-t border-sand-100 pt-5 text-sm text-ink-500">
+        <div className="mt-5 space-y-3 border-t border-sand-100 pt-5 text-sm text-ink-500">
           {workOrder.unit ? <p>Enhet: <strong className="text-ink-800">{workOrder.unit.designation}</strong></p> : null}
           {workOrder.ticket ? <p>Ursprungsärende: <strong className="text-ink-800">{workOrder.ticket.public_reference || workOrder.ticket.title}</strong></p> : null}
           {workOrder.projects.map((project) => <Link key={project.id} href={`/dashboard/projekt/${project.id}`} className="flex items-center gap-2 font-semibold text-petroleum-700 hover:text-petroleum-900"><FolderKanban className="h-4 w-4" />{project.name}</Link>)}
+          {transitions.canManage && workOrder.projects.length === 0 ? (
+            <button
+              type="button"
+              disabled={creatingProject}
+              onClick={() => void createProjectFromWorkOrder()}
+              className="inline-flex items-center gap-2 rounded-xl border border-petroleum-200 bg-petroleum-50 px-3 py-2 text-xs font-semibold text-petroleum-900 hover:bg-petroleum-100"
+            >
+              <FolderKanban className="h-3.5 w-3.5" />
+              {creatingProject ? "Skapar projekt…" : "Skapa projekt från arbetsorder"}
+            </button>
+          ) : null}
         </div>
       </Panel>
       <OperationalActivityPanel entityType="work_order" entityId={workOrder.id} />

@@ -69,6 +69,12 @@ model User {
   managed_documents_created            ManagedDocument[]    @relation("ManagedDocumentCreatedBy")
   imd_readings_created                 ImdReading[]         @relation("ImdReadingCreatedBy")
   ticket_operations_created            TicketOperation[]    @relation("TicketOperationCreatedBy")
+  lease_handovers_created              LeaseHandoverRecord[] @relation("LeaseHandoverCreatedBy")
+  lease_handovers_updated              LeaseHandoverRecord[] @relation("LeaseHandoverUpdatedBy")
+  lease_inspections_created            LeaseInspectionRecord[] @relation("LeaseInspectionCreatedBy")
+  lease_inspections_updated            LeaseInspectionRecord[] @relation("LeaseInspectionUpdatedBy")
+  lease_inspection_links_created       LeaseInspectionWorkOrderLink[] @relation("LeaseInspectionLinkCreatedBy")
+  imd_debit_lines_created              ImdDebitLine[]       @relation("ImdDebitLineCreatedBy")
 }
 
 model Company {
@@ -130,6 +136,10 @@ model Company {
   managed_documents           ManagedDocument[]
   imd_readings                ImdReading[]
   ticket_operations           TicketOperation[]
+  lease_handover_records      LeaseHandoverRecord[]
+  lease_inspection_records    LeaseInspectionRecord[]
+  lease_inspection_work_order_links LeaseInspectionWorkOrderLink[]
+  imd_debit_lines             ImdDebitLine[]
 }
 
 model Property {
@@ -185,6 +195,7 @@ model Property {
   rent_notices             RentNotice[]
   managed_documents        ManagedDocument[]
   imd_readings             ImdReading[]
+  imd_debit_lines          ImdDebitLine[]
 
   @@index([company_id])
   @@index([user_id])
@@ -329,6 +340,7 @@ model WorkOrder {
   maintenance_actions           MaintenanceAction[]
   material_costs                MaterialCost[]
   time_reports                  TimeReport[]
+  lease_inspection_links        LeaseInspectionWorkOrderLink[]
 
   @@index([company_id, status])
   @@index([property_id])
@@ -986,6 +998,10 @@ model Lease {
   unit                 Unit        @relation(fields: [unit_id], references: [id], onDelete: Restrict)
   lease_holder         LeaseHolder @relation(fields: [lease_holder_id], references: [id], onDelete: Restrict)
   created_by           User        @relation("CreatedLeases", fields: [created_by_id], references: [id], onDelete: Restrict)
+  handover_record      LeaseHandoverRecord?
+  inspection_record    LeaseInspectionRecord?
+  inspection_work_order_links LeaseInspectionWorkOrderLink[]
+  imd_debit_lines      ImdDebitLine[]
 
   @@unique([company_id, lease_number])
   @@index([company_id, status])
@@ -1421,6 +1437,7 @@ model RentNotice {
   company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
   property       Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
   created_by     User      @relation("RentNoticeCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  imd_debit_lines ImdDebitLine[]
 
   @@index([company_id, created_at])
   @@index([company_id, property_id])
@@ -1500,6 +1517,7 @@ model ImdReading {
   company           Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
   property          Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
   created_by        User     @relation("ImdReadingCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  debit_line        ImdDebitLine?
 
   @@index([company_id, created_at])
   @@index([company_id, property_id, meter_type])
@@ -1524,5 +1542,102 @@ model TicketOperation {
 
   @@index([company_id, ticket_id, created_at])
   @@index([ticket_id, operation_type])
+  @@index([created_by_id])
+}
+
+model LeaseHandoverRecord {
+  id             String    @id @default(uuid())
+  company_id     String
+  lease_id       String    @unique
+  status         String    @default("in_progress")
+  version        Int       @default(1)
+  payload        Json
+  completed_at   DateTime?
+  created_by_id  String
+  updated_by_id  String
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  lease          Lease     @relation(fields: [lease_id], references: [id], onDelete: Cascade)
+  created_by     User      @relation("LeaseHandoverCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  updated_by     User      @relation("LeaseHandoverUpdatedBy", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([company_id, lease_id])
+  @@index([company_id, status])
+  @@index([created_by_id])
+  @@index([updated_by_id])
+}
+
+model LeaseInspectionRecord {
+  id             String   @id @default(uuid())
+  company_id     String
+  lease_id       String   @unique
+  status         String   @default("recorded")
+  version        Int      @default(1)
+  payload        Json
+  created_by_id  String
+  updated_by_id  String
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  company        Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  lease          Lease    @relation(fields: [lease_id], references: [id], onDelete: Cascade)
+  created_by     User     @relation("LeaseInspectionCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  updated_by     User     @relation("LeaseInspectionUpdatedBy", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([company_id, lease_id])
+  @@index([company_id, status])
+  @@index([created_by_id])
+  @@index([updated_by_id])
+}
+
+model LeaseInspectionWorkOrderLink {
+  id              String    @id @default(uuid())
+  company_id      String
+  lease_id        String
+  item_id         String
+  record_version  Int
+  work_order_id   String
+  created_by_id   String
+  created_at      DateTime  @default(now())
+  company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  lease           Lease     @relation(fields: [lease_id], references: [id], onDelete: Cascade)
+  work_order      WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by      User      @relation("LeaseInspectionLinkCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([company_id, lease_id, item_id])
+  @@index([company_id, lease_id])
+  @@index([work_order_id])
+  @@index([created_by_id])
+}
+
+model ImdDebitLine {
+  id              String      @id @default(uuid())
+  company_id      String
+  imd_reading_id  String      @unique
+  property_id     String
+  lease_id        String?
+  rent_notice_id  String?
+  unit            String
+  meter_id        String
+  meter_type      String
+  period          String
+  consumption     Decimal     @default(0) @db.Decimal(14, 4)
+  unit_price      Decimal     @default(0) @db.Decimal(14, 4)
+  charge          Decimal     @default(0) @db.Decimal(14, 2)
+  status          String      @default("open")
+  created_by_id   String
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  company         Company     @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  reading         ImdReading  @relation(fields: [imd_reading_id], references: [id], onDelete: Cascade)
+  property        Property    @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  lease           Lease?      @relation(fields: [lease_id], references: [id], onDelete: SetNull)
+  rent_notice     RentNotice? @relation(fields: [rent_notice_id], references: [id], onDelete: SetNull)
+  created_by      User        @relation("ImdDebitLineCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, status, created_at])
+  @@index([company_id, property_id])
+  @@index([company_id, lease_id])
+  @@index([rent_notice_id])
   @@index([created_by_id])
 }

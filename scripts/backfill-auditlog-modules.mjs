@@ -446,6 +446,145 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("LeaseHandoverRecord", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "lease_handover_record", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      if (!event.company_id || !event.recipient) { localSkipped += 1; continue; }
+      const lease = await prisma.lease.findFirst({
+        where: { id: event.recipient, company_id: event.company_id },
+        select: { id: true },
+      });
+      if (!lease) { localSkipped += 1; continue; }
+      if (await prisma.leaseHandoverRecord.findUnique({
+        where: { company_id_lease_id: { company_id: event.company_id, lease_id: lease.id } },
+      })) { localSkipped += 1; continue; }
+      const payload = event.payload && typeof event.payload === "object" ? event.payload : null;
+      if (!payload) { localSkipped += 1; continue; }
+      const actorId = await prisma.user.findFirst({
+        where: { company_id: event.company_id },
+        orderBy: { created_at: "asc" },
+        select: { id: true },
+      });
+      if (!actorId) { localSkipped += 1; continue; }
+      const version = Number(payload.version || 1);
+      await prisma.leaseHandoverRecord.create({
+        data: {
+          company_id: event.company_id,
+          lease_id: lease.id,
+          status: event.status || (payload.completedAt ? "completed" : "in_progress"),
+          version: Number.isFinite(version) ? version : 1,
+          payload,
+          completed_at: payload.completedAt ? new Date(String(payload.completedAt)) : null,
+          created_by_id: actorId.id,
+          updated_by_id: actorId.id,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("LeaseInspectionRecord", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "lease_inspection_items", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      if (!event.company_id || !event.recipient) { localSkipped += 1; continue; }
+      const lease = await prisma.lease.findFirst({
+        where: { id: event.recipient, company_id: event.company_id },
+        select: { id: true },
+      });
+      if (!lease) { localSkipped += 1; continue; }
+      if (await prisma.leaseInspectionRecord.findUnique({
+        where: { company_id_lease_id: { company_id: event.company_id, lease_id: lease.id } },
+      })) { localSkipped += 1; continue; }
+      const payload = event.payload && typeof event.payload === "object" ? event.payload : null;
+      if (!payload) { localSkipped += 1; continue; }
+      const actorId = await prisma.user.findFirst({
+        where: { company_id: event.company_id },
+        orderBy: { created_at: "asc" },
+        select: { id: true },
+      });
+      if (!actorId) { localSkipped += 1; continue; }
+      const version = Number(payload.version || 1);
+      await prisma.leaseInspectionRecord.create({
+        data: {
+          company_id: event.company_id,
+          lease_id: lease.id,
+          status: event.status || "recorded",
+          version: Number.isFinite(version) ? version : 1,
+          payload,
+          created_by_id: actorId.id,
+          updated_by_id: actorId.id,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("LeaseInspectionWorkOrderLink", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "lease_inspection_item_work_order", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      const payload = event.payload && typeof event.payload === "object" ? event.payload : {};
+      if (!event.company_id || !payload.leaseId || !payload.itemId || !payload.workOrderId) { localSkipped += 1; continue; }
+      if (await prisma.leaseInspectionWorkOrderLink.findUnique({
+        where: {
+          company_id_lease_id_item_id: {
+            company_id: event.company_id,
+            lease_id: String(payload.leaseId),
+            item_id: String(payload.itemId),
+          },
+        },
+      })) { localSkipped += 1; continue; }
+      const [lease, workOrder, actor] = await Promise.all([
+        prisma.lease.findFirst({ where: { id: String(payload.leaseId), company_id: event.company_id }, select: { id: true } }),
+        prisma.workOrder.findFirst({ where: { id: String(payload.workOrderId), company_id: event.company_id }, select: { id: true } }),
+        prisma.user.findFirst({ where: { company_id: event.company_id }, orderBy: { created_at: "asc" }, select: { id: true } }),
+      ]);
+      if (!lease || !workOrder || !actor) { localSkipped += 1; continue; }
+      await prisma.leaseInspectionWorkOrderLink.create({
+        data: {
+          company_id: event.company_id,
+          lease_id: lease.id,
+          item_id: String(payload.itemId),
+          record_version: num(payload.recordVersion, 1),
+          work_order_id: workOrder.id,
+          created_by_id: actor.id,
+          created_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   await backfill("ImdReading", async () => {
     const logs = await prisma.auditLog.findMany({
       where: { action: "imd.reading.created", company_id: { not: null } },
@@ -486,6 +625,26 @@ async function main() {
           created_at: log.created_at,
         },
       });
+      if (!(await prisma.imdDebitLine.findUnique({ where: { imd_reading_id: id } }))) {
+        await prisma.imdDebitLine.create({
+          data: {
+            company_id: log.company_id,
+            imd_reading_id: id,
+            property_id: property.id,
+            unit: String(metadata.unit),
+            meter_id: String(metadata.meter_id),
+            meter_type: String(metadata.meter_type || "electricity"),
+            period: String(metadata.period),
+            consumption: num(metadata.consumption),
+            unit_price: num(metadata.unit_price),
+            charge: num(metadata.charge),
+            status: "open",
+            created_by_id: log.actor_user_id,
+            created_at: log.created_at,
+            updated_at: log.created_at,
+          },
+        });
+      }
       localCreated += 1;
     }
     created += localCreated;

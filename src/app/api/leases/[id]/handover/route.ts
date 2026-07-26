@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
@@ -23,6 +24,25 @@ async function getLease(id: string, companyId: string) {
   });
 }
 
+async function loadHandover(companyId: string, leaseId: string, actor: { id: string; name: string | null; email: string }) {
+  const modern = await db.leaseHandoverRecord.findUnique({
+    where: { company_id_lease_id: { company_id: companyId, lease_id: leaseId } },
+    select: { payload: true, status: true, version: true },
+  });
+  if (modern?.payload && typeof modern.payload === "object") {
+    return modern.payload as unknown as LeaseHandoverPayload;
+  }
+
+  const event = await db.integrationEvent.findFirst({
+    where: { company_id: companyId, type: EVENT_TYPE, recipient: leaseId },
+    orderBy: { created_at: "desc" },
+  });
+  if (event?.payload && typeof event.payload === "object") {
+    return event.payload as unknown as LeaseHandoverPayload;
+  }
+  return emptyHandover(actor);
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
@@ -33,13 +53,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const lease = await getLease(id, user.company_id);
     if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
 
-    const event = await db.integrationEvent.findFirst({
-      where: { company_id: user.company_id, type: EVENT_TYPE, recipient: id },
-      orderBy: { created_at: "desc" },
-    });
-    const handover = event?.payload && typeof event.payload === "object"
-      ? event.payload as unknown as LeaseHandoverPayload
-      : emptyHandover({ id: user.id, name: user.name, email: user.email });
+    const handover = await loadHandover(user.company_id, id, { id: user.id, name: user.name, email: user.email });
     const history = await db.auditLog.findMany({
       where: { company_id: user.company_id, entity_type: "lease_handover", entity_id: id },
       orderBy: { created_at: "desc" },
@@ -65,28 +79,36 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const lease = await getLease(id, user.company_id);
     if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
 
-    const existing = await db.integrationEvent.findFirst({
-      where: { company_id: user.company_id, type: EVENT_TYPE, recipient: id },
-      orderBy: { created_at: "desc" },
-    });
-    const previous = existing?.payload && typeof existing.payload === "object"
-      ? existing.payload as unknown as LeaseHandoverPayload
-      : emptyHandover({ id: user.id, name: user.name, email: user.email });
+    const previous = await loadHandover(user.company_id, id, { id: user.id, name: user.name, email: user.email });
     const parsed = parseHandoverInput(await request.json().catch(() => null), previous, { id: user.id, name: user.name, email: user.email });
     if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
 
     const handover = parsed.data;
+    const status = handover.completedAt ? "completed" : "in_progress";
+    const completedAt = handover.completedAt ? new Date(handover.completedAt) : null;
+
     await db.$transaction(async (tx) => {
-      if (existing) {
-        await tx.integrationEvent.update({
-          where: { id: existing.id },
-          data: { status: handover.completedAt ? "completed" : "in_progress", payload: handover },
-        });
-      } else {
-        await tx.integrationEvent.create({
-          data: { company_id: user.company_id!, type: EVENT_TYPE, recipient: id, status: handover.completedAt ? "completed" : "in_progress", payload: handover },
-        });
-      }
+      await tx.leaseHandoverRecord.upsert({
+        where: { company_id_lease_id: { company_id: user.company_id!, lease_id: id } },
+        create: {
+          company_id: user.company_id!,
+          lease_id: id,
+          status,
+          version: handover.version,
+          payload: handover as unknown as Prisma.InputJsonValue,
+          completed_at: completedAt,
+          created_by_id: user.id,
+          updated_by_id: user.id,
+        },
+        update: {
+          status,
+          version: handover.version,
+          payload: handover as unknown as Prisma.InputJsonValue,
+          completed_at: completedAt,
+          updated_by_id: user.id,
+        },
+      });
+
       await tx.auditLog.create({
         data: {
           company_id: user.company_id!,
@@ -101,6 +123,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             completedAt: handover.completedAt,
             keyRecords: handover.keys.length,
             inspectionStatus: handover.inspection.status,
+            storage: "LeaseHandoverRecord",
           },
         },
       });
