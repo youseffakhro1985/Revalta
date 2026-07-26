@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BadgeCheck, CalendarClock, CircleDollarSign } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Lease = { id: string; property_id?: string; property_name?: string; tenant_name?: string; unit?: string; monthly_rent?: number; status?: string };
 type Property = { id: string; name: string };
@@ -42,7 +43,7 @@ export default function RentNoticesPage() {
   async function load() {
     setLoading(true);
     const response = await fetch("/api/rent-notices", { cache: "no-store" });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (response.ok) {
       setNotices(data.notices || []);
       setLeases(data.leases || []);
@@ -93,7 +94,7 @@ export default function RentNoticesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte skapa hyresavin");
     else {
       setForm({ propertyId: "", leaseId: "", tenantName: "", unit: "", period: "", dueDate: "", status: "draft", baseRent: "", additions: "", deductions: "", indexPercent: "0", note: "" });
@@ -117,7 +118,7 @@ export default function RentNoticesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ noticeId: notice.id, status }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera status");
     else {
       setSuccess("Avis status har uppdaterats.");
@@ -148,7 +149,7 @@ export default function RentNoticesPage() {
         note: editForm.note,
       }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera avin");
     else {
       setSuccess("Hyresavin har uppdaterats.");

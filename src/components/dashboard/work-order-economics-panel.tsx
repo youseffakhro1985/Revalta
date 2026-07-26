@@ -1,4 +1,5 @@
 "use client";
+import { readResponseJson } from "@/lib/fetch-json";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Banknote, Clock3, Package, Percent, ReceiptText } from "lucide-react";
@@ -148,11 +149,11 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         fetch(`/api/work-orders/${workOrderId}/invoice-integration`, { cache: "no-store" }),
       ]);
       const [timeData, materialData, profitData, invoiceData, integrationData] = await Promise.all([
-        timeRes.json(),
-        materialRes.json(),
-        profitRes.json(),
-        invoiceRes.json(),
-        integrationRes.json(),
+        readResponseJson(timeRes),
+        readResponseJson(materialRes),
+        readResponseJson(profitRes),
+        readResponseJson(invoiceRes),
+        readResponseJson(integrationRes),
       ]);
       if (!timeRes.ok) throw new Error(timeData.error || "Kunde inte hämta tid");
       if (!materialRes.ok) throw new Error(materialData.error || "Kunde inte hämta material");
@@ -251,7 +252,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara");
       setSuccess(message);
       await load();

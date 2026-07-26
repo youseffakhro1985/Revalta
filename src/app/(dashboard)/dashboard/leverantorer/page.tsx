@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, CalendarClock, CircleDollarSign } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Vendor = {
   id: string;
@@ -47,7 +48,7 @@ export default function VendorsPage() {
   async function load() {
     setLoading(true);
     const response = await fetch("/api/vendors", { cache: "no-store" });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (response.ok) setVendors(data.vendors || []);
     else setError(data.error || "Kunde inte hämta leverantörer");
     setLoading(false);
@@ -73,7 +74,7 @@ export default function VendorsPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(""); setSuccess("");
     const response = await fetch("/api/vendors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte spara leverantören");
     else { setForm({ name: "", category: "Teknisk service", contactName: "", email: "", phone: "", contractTitle: "", contractValue: "", endDate: "", noticeMonths: "3" }); setSuccess("Leverantören har registrerats."); await load(); }
     setSaving(false);
@@ -93,7 +94,7 @@ export default function VendorsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ vendorId: vendor.id, status }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera status");
     else {
       setSuccess("Leverantörens status har uppdaterats.");
@@ -130,7 +131,7 @@ export default function VendorsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera leverantören");
     else {
       setSuccess("Leverantören har uppdaterats.");

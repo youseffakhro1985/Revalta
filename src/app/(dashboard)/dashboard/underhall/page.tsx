@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarRange, CheckCircle2, ClipboardPlus, WalletCards } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
 type Item = { id: string; property_id: string; property_name: string; component: string; measure: string; planned_year: number; estimated_cost: number; priority: string; interval_years: number; status: string; work_order_id?: string | null; work_order_number?: string | null; source?: "table" | "legacy" };
@@ -27,7 +28,7 @@ export default function MaintenancePage() {
     setLoading(true); setError("");
     try {
       const response = await fetch("/api/maintenance", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta underhållsplanen");
       setItems(body.items || []); setProperties(body.properties || []);
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte hämta underhållsplanen"); }
@@ -46,7 +47,7 @@ export default function MaintenancePage() {
     event.preventDefault(); setSaving(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/maintenance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, plannedYear: Number(form.plannedYear), estimatedCost: Number(form.estimatedCost), intervalYears: Number(form.intervalYears) }) });
-      const body = await response.json(); if (!response.ok) throw new Error(body.error || "Kunde inte lägga till åtgärden");
+      const body = await readResponseJson(response); if (!response.ok) throw new Error(body.error || "Kunde inte lägga till åtgärden");
       setForm({ ...form, component: "", measure: "", estimatedCost: "" }); setMessage("Åtgärden har lagts till i underhållsplanen."); await load();
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte lägga till åtgärden"); }
     finally { setSaving(false); }
@@ -72,7 +73,7 @@ export default function MaintenancePage() {
     setBusyId(item.id); setError(""); setMessage("");
     try {
       const response = await fetch("/api/maintenance", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: item.id, status, workOrderId }) });
-      const body = await response.json(); if (!response.ok) throw new Error(body.error || "Kunde inte uppdatera åtgärden");
+      const body = await readResponseJson(response); if (!response.ok) throw new Error(body.error || "Kunde inte uppdatera åtgärden");
       setMessage("Underhållsåtgärden har uppdaterats."); await load();
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte uppdatera åtgärden"); }
     finally { setBusyId(""); }
@@ -98,7 +99,7 @@ export default function MaintenancePage() {
           intervalYears: Number(editForm.intervalYears),
         }),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte uppdatera åtgärden");
       setMessage("Underhållsåtgärden har uppdaterats.");
       setEditingId("");
@@ -116,7 +117,7 @@ export default function MaintenancePage() {
     try {
       const scheduledStart = new Date(item.planned_year, 0, 15, 8, 0).toISOString();
       const response = await fetch("/api/work-orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ propertyId: item.property_id, title: `${item.component} – förebyggande underhåll`, description: item.measure, status: "planned", priority: item.priority, workType: "preventive", source: "internal", scheduledStart, estimatedCost: item.estimated_cost }) });
-      const body = await response.json(); if (!response.ok) throw new Error(body.error || "Kunde inte skapa arbetsordern");
+      const body = await readResponseJson(response); if (!response.ok) throw new Error(body.error || "Kunde inte skapa arbetsordern");
       await updateStatus(item, "approved", body.workOrder.id);
       setMessage("Arbetsorder skapad och kopplad till underhållsåtgärden.");
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte skapa arbetsordern"); setBusyId(""); }

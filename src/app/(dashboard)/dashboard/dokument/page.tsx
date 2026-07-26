@@ -11,6 +11,7 @@ import {
   premiumFieldClass,
   premiumPrimaryButtonClass,
 } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Unit = { id: string; designation: string };
 type Property = { id: string; name: string; address: string; city: string; units: Unit[] };
@@ -90,6 +91,8 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [changingId, setChangingId] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [editForm, setEditForm] = useState({ name: "", category: "other", validUntil: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -98,7 +101,7 @@ export default function DocumentsPage() {
     setError("");
     try {
       const response = await fetch("/api/documents", { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta dokument");
       setData({
         documents: payload.documents || [], properties: payload.properties || [], leases: payload.leases || [],
@@ -140,11 +143,56 @@ export default function DocumentsPage() {
       formData.append("visibility", visibility); formData.append("propertyId", propertyId); formData.append("unitId", unitId);
       formData.append("leaseId", leaseId); formData.append("validUntil", validUntil);
       const response = await fetch("/api/documents", { method: "POST", body: formData });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte ladda upp dokumentet");
       resetForm(); setMessage("Dokumentet har sparats med vald åtkomstnivå."); await loadDocuments();
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte ladda upp dokumentet"); }
     finally { setSubmitting(false); }
+  }
+
+  function startEdit(document: DocumentItem) {
+    if (document.source === "legacy") {
+      setError("Dokumentet finns i äldre lagring. Kör backfill till ManagedDocument innan det kan ändras.");
+      return;
+    }
+    if (document.lifecycleState === "archived") {
+      setError("Arkiverade dokument kan inte redigeras. Återställ först.");
+      return;
+    }
+    setEditingId(document.id);
+    setEditForm({
+      name: document.name,
+      category: document.category || "other",
+      validUntil: document.validUntil || "",
+    });
+    setError("");
+  }
+
+  async function saveEdit(document: DocumentItem) {
+    setChangingId(document.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/documents", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: document.id,
+          name: editForm.name,
+          category: editForm.category,
+          validUntil: editForm.validUntil,
+        }),
+      });
+      const payload = await readResponseJson(response);
+      if (!response.ok) throw new Error(payload.error || "Kunde inte uppdatera dokumentet");
+      setEditingId("");
+      setMessage("Dokumentet har uppdaterats.");
+      await loadDocuments();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Kunde inte uppdatera dokumentet");
+    } finally {
+      setChangingId("");
+    }
   }
 
   async function changeLifecycle(document: DocumentItem, transition: "archive" | "unpublish" | "restore") {
@@ -159,7 +207,7 @@ export default function DocumentsPage() {
       const response = await fetch(`/api/documents/${document.id}/lifecycle`, {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transition }),
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte ändra dokumentstatus");
       setMessage(`Dokumentet är nu ${lifecycleLabels[payload.state as LifecycleState]?.toLowerCase() || "uppdaterat"}.`);
       await loadDocuments();
@@ -209,20 +257,35 @@ export default function DocumentsPage() {
             <div className="divide-y divide-sand-100">{filtered.map((document) => {
               const scope = document.lease ? `${document.lease.leaseNumber} · ${document.lease.unit} · ${document.lease.holder}` : document.unit ? `${document.property?.name || "Fastighet"} · ${document.unit.designation}` : document.property?.name || visibilityLabels[document.visibility as Visibility] || document.visibility;
               const inactive = document.lifecycleState !== "active";
-              return <article key={document.id} className={`grid gap-4 p-5 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center ${inactive ? "bg-sand-50/60" : "hover:bg-sand-50/70"}`}>
+              return <article key={document.id} className={`space-y-3 p-5 sm:p-6 ${inactive ? "bg-sand-50/60" : "hover:bg-sand-50/70"}`}>
+                <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div className="flex min-w-0 items-start gap-4"><div className="rounded-xl bg-sand-50 p-3 text-petroleum-700"><FileText className="h-5 w-5" /></div><div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-950">{document.name}</h3><span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{categoryLabels[document.category] || document.category}</span><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{visibilityLabels[document.visibility as Visibility] || document.visibility}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${document.lifecycleState === "active" ? "bg-success-50 text-success-700" : document.lifecycleState === "unpublished" ? "bg-warning-50 text-warning-700" : "bg-sand-200 text-ink-700"}`}>{lifecycleLabels[document.lifecycleState]}</span></div>
                   <p className="mt-2 text-sm text-ink-600">{scope}</p><p className="mt-1 text-xs text-ink-400">{document.fileName || "Fil"} · {formatBytes(document.sizeBytes)} · publicerat {dateFormatter.format(new Date(document.createdAt))} av {document.uploadedBy}</p>
                   {document.lifecycleChangedAt ? <p className="mt-1 text-xs text-ink-400">Status ändrad {dateFormatter.format(new Date(document.lifecycleChangedAt))}</p> : null}
                   {document.validUntil ? <p className="mt-2 text-xs font-semibold text-warning-700">Giltigt till {dateFormatter.format(new Date(document.validUntil))}</p> : null}
-                  {document.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan livscykel kan ändras.</p> : null}
+                  {document.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan dokumentet kan ändras.</p> : null}
                 </div></div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
+                  {document.source !== "legacy" && document.lifecycleState !== "archived" ? <button type="button" onClick={() => (editingId === document.id ? setEditingId("") : startEdit(document))} className="inline-flex h-9 items-center rounded-lg border border-sand-200 px-3 text-xs font-semibold text-ink-700 hover:bg-white">{editingId === document.id ? "Stäng" : "Ändra"}</button> : null}
                   {document.downloadUrl && document.lifecycleState !== "archived" ? <a href={document.downloadUrl} className="inline-flex h-9 items-center gap-2 rounded-lg border border-sand-200 px-3 text-xs font-semibold text-ink-700 hover:bg-white"><Download className="h-3.5 w-3.5" /> Hämta</a> : null}
                   {document.source !== "legacy" && data.canManageLifecycle && document.lifecycleState === "active" && document.visibility !== "internal" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "unpublish")} className="inline-flex h-9 items-center gap-2 rounded-lg border border-warning-200 px-3 text-xs font-semibold text-warning-800 hover:bg-warning-50"><EyeOff className="h-3.5 w-3.5" /> Avpublicera</button> : null}
                   {document.source !== "legacy" && data.canManageLifecycle && document.lifecycleState !== "archived" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "archive")} className="inline-flex h-9 items-center gap-2 rounded-lg border border-sand-300 px-3 text-xs font-semibold text-ink-700 hover:bg-sand-100"><Archive className="h-3.5 w-3.5" /> Arkivera</button> : null}
                   {document.source !== "legacy" && data.canManageLifecycle && document.lifecycleState !== "active" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "restore")} className="inline-flex h-9 items-center gap-2 rounded-lg bg-petroleum-800 px-3 text-xs font-semibold text-white hover:bg-petroleum-900"><RotateCcw className="h-3.5 w-3.5" /> Återställ</button> : null}
                 </div>
+                </div>
+                {editingId === document.id ? (
+                  <div className="grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 md:grid-cols-3">
+                    <input className={premiumFieldClass} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Dokumentnamn" />
+                    <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                      {Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <input className={premiumFieldClass} type="date" value={editForm.validUntil} onChange={(e) => setEditForm({ ...editForm, validUntil: e.target.value })} />
+                    <button type="button" disabled={changingId === document.id} onClick={() => void saveEdit(document)} className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900 md:col-span-3">
+                      {changingId === document.id ? "Sparar…" : "Spara ändringar"}
+                    </button>
+                  </div>
+                ) : null}
               </article>;
             })}</div>
           )}

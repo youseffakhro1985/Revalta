@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CircleDollarSign, FileCheck2, Printer, Send, XCircle } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
 type HistoryItem = { id: string; status?: string; previous_status?: string; comment?: string | null; actor_name?: string; created_at: string };
@@ -27,7 +28,7 @@ export default function QuotesPage() {
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({ propertyId: "", title: "", supplier: "", status: "draft", validUntil: "", labor: "", material: "", supplierCost: "", other: "", vatRate: "25", note: "" });
 
-  async function load() { setLoading(true); const response = await fetch("/api/quotes", { cache: "no-store" }); const data = await response.json(); if (response.ok) { setQuotes(data.quotes || []); setProperties(data.properties || []); } else setError(data.error || "Kunde inte hämta offerter"); setLoading(false); }
+  async function load() { setLoading(true); const response = await fetch("/api/quotes", { cache: "no-store" }); const data = await readResponseJson(response); if (response.ok) { setQuotes(data.quotes || []); setProperties(data.properties || []); } else setError(data.error || "Kunde inte hämta offerter"); setLoading(false); }
   useEffect(() => { void load(); }, []);
 
   const summary = useMemo(() => ({ total: quotes.reduce((sum, quote) => sum + Number(quote.total || 0), 0), approved: quotes.filter((quote) => quote.status === "approved" || quote.status === "invoiced").reduce((sum, quote) => sum + Number(quote.total || 0), 0), open: quotes.filter((quote) => quote.status === "draft" || quote.status === "sent").length }), [quotes]);
@@ -51,7 +52,7 @@ export default function QuotesPage() {
     });
   }
 
-  async function submit(event: React.FormEvent) { event.preventDefault(); setSaving(true); setError(""); setSuccess(""); const response = await fetch("/api/quotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) setError(data.error || "Kunde inte spara offerten"); else { setForm({ propertyId: "", title: "", supplier: "", status: "draft", validUntil: "", labor: "", material: "", supplierCost: "", other: "", vatRate: "25", note: "" }); setSuccess("Offerten har sparats."); await load(); } setSaving(false); }
+  async function submit(event: React.FormEvent) { event.preventDefault(); setSaving(true); setError(""); setSuccess(""); const response = await fetch("/api/quotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); const data = await readResponseJson(response); if (!response.ok) setError(data.error || "Kunde inte spara offerten"); else { setForm({ propertyId: "", title: "", supplier: "", status: "draft", validUntil: "", labor: "", material: "", supplierCost: "", other: "", vatRate: "25", note: "" }); setSuccess("Offerten har sparats."); await load(); } setSaving(false); }
 
   async function updateStatus(quote: Quote, status: string) {
     if (quote.source === "legacy") {
@@ -64,7 +65,7 @@ export default function QuotesPage() {
     setError("");
     setSuccess("");
     const response = await fetch("/api/quotes", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quoteId: quote.id, status, comment }) });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera offerten");
     else await load();
     setUpdatingId("");
@@ -94,7 +95,7 @@ export default function QuotesPage() {
         note: editForm.note,
       }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera offerten");
     else {
       setSuccess("Offerten har uppdaterats.");

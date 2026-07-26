@@ -13,6 +13,7 @@ import {
   premiumPrimaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
 type Inspection = {
@@ -55,11 +56,15 @@ export default function InspectionsPage() {
   const [saving, setSaving] = useState(false);
   const [creatingId, setCreatingId] = useState("");
   const [updatingId, setUpdatingId] = useState("");
+  const [editingId, setEditingId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({
     propertyId: "", type: "ovk", title: "", dueDate: "", responsible: "", supplier: "",
     intervalMonths: "36", status: "planned", note: "",
+  });
+  const [editForm, setEditForm] = useState({
+    title: "", type: "ovk", dueDate: "", responsible: "", supplier: "", intervalMonths: "0", note: "",
   });
 
   async function load() {
@@ -67,7 +72,7 @@ export default function InspectionsPage() {
     setError("");
     try {
       const r = await fetch("/api/inspections", { cache: "no-store" });
-      const d = await r.json();
+      const d = await readResponseJson(r);
       if (!r.ok) throw new Error(d.error || "Kunde inte hämta besiktningar");
       setInspections(d.inspections || []);
       setProperties(d.properties || []);
@@ -98,7 +103,7 @@ export default function InspectionsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const d = await r.json();
+      const d = await readResponseJson(r);
       if (!r.ok) throw new Error(d.error || "Kunde inte spara kontrollen");
       setForm({ propertyId: "", type: "ovk", title: "", dueDate: "", responsible: "", supplier: "", intervalMonths: "36", status: "planned", note: "" });
       setSuccess("Kontrollen har lagts till i kontrollplanen.");
@@ -120,7 +125,7 @@ export default function InspectionsPage() {
     setSuccess("");
     try {
       const response = await fetch(`/api/inspections/${inspection.id}/work-order`, { method: "POST" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsorder");
       setSuccess("Arbetsorder skapades från besiktningskontrollen.");
       await load();
@@ -128,6 +133,54 @@ export default function InspectionsPage() {
       setError(e instanceof Error ? e.message : "Kunde inte skapa arbetsorder");
     } finally {
       setCreatingId("");
+    }
+  }
+
+  function startEdit(inspection: Inspection) {
+    if (inspection.source === "legacy") {
+      setError("Äldre kontroller måste migreras innan de kan ändras.");
+      return;
+    }
+    setEditingId(inspection.id);
+    setEditForm({
+      title: inspection.title || "",
+      type: inspection.type || "other",
+      dueDate: inspection.due_date || "",
+      responsible: inspection.responsible || "",
+      supplier: inspection.supplier || "",
+      intervalMonths: String(inspection.interval_months ?? 0),
+      note: inspection.note || "",
+    });
+    setError("");
+  }
+
+  async function saveEdit(inspection: Inspection) {
+    setUpdatingId(inspection.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/inspections/${inspection.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editForm.title,
+          type: editForm.type,
+          dueDate: editForm.dueDate,
+          responsible: editForm.responsible,
+          supplier: editForm.supplier,
+          intervalMonths: Number(editForm.intervalMonths),
+          note: editForm.note,
+        }),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera kontrollen");
+      setEditingId("");
+      setSuccess("Kontrollen har uppdaterats.");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kunde inte uppdatera kontrollen");
+    } finally {
+      setUpdatingId("");
     }
   }
 
@@ -146,7 +199,7 @@ export default function InspectionsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera status");
       setSuccess("Kontrollens status har uppdaterats.");
       await load();
@@ -255,19 +308,28 @@ export default function InspectionsPage() {
                       {i.source === "legacy" ? (
                         <p className="text-xs font-medium text-amber-700">Äldre rad – kör backfill innan status eller arbetsorder kan ändras.</p>
                       ) : (
-                        <label className="flex items-center gap-2 text-xs text-ink-600">
-                          <span className="font-semibold">Status</span>
-                          <select
-                            disabled={updatingId === i.id}
-                            value={i.status || "planned"}
-                            onChange={(event) => void updateStatus(i, event.target.value)}
-                            className="rounded-lg border border-sand-200 bg-white px-2 py-1.5 text-xs font-semibold text-ink-800"
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => (editingId === i.id ? setEditingId("") : startEdit(i))}
+                            className="rounded-xl border border-sand-300 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-sand-50"
                           >
-                            {Object.entries(statusLabels).map(([value, label]) => (
-                              <option key={value} value={value}>{label}</option>
-                            ))}
-                          </select>
-                        </label>
+                            {editingId === i.id ? "Stäng" : "Ändra"}
+                          </button>
+                          <label className="flex items-center gap-2 text-xs text-ink-600">
+                            <span className="font-semibold">Status</span>
+                            <select
+                              disabled={updatingId === i.id}
+                              value={i.status || "planned"}
+                              onChange={(event) => void updateStatus(i, event.target.value)}
+                              className="rounded-lg border border-sand-200 bg-white px-2 py-1.5 text-xs font-semibold text-ink-800"
+                            >
+                              {Object.entries(statusLabels).map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </>
                       )}
                       {i.work_order_id ? (
                         <Link href={`/dashboard/arbetsorder/${i.work_order_id}`} className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">
@@ -284,6 +346,27 @@ export default function InspectionsPage() {
                         </button>
                       ) : null}
                     </div>
+                    {editingId === i.id ? (
+                      <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 sm:grid-cols-2">
+                        <input className={premiumFieldClass} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} placeholder="Titel" />
+                        <select className={premiumFieldClass} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>
+                          {Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                        <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
+                        <input className={premiumFieldClass} value={editForm.intervalMonths} onChange={(e) => setEditForm({ ...editForm, intervalMonths: e.target.value })} placeholder="Intervall (månader)" />
+                        <input className={premiumFieldClass} value={editForm.responsible} onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })} placeholder="Ansvarig" />
+                        <input className={premiumFieldClass} value={editForm.supplier} onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} placeholder="Leverantör" />
+                        <textarea className={`${premiumTextareaClass} sm:col-span-2`} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} placeholder="Anteckning" />
+                        <button
+                          type="button"
+                          disabled={updatingId === i.id}
+                          onClick={() => void saveEdit(i)}
+                          className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900 sm:col-span-2"
+                        >
+                          {updatingId === i.id ? "Sparar…" : "Spara ändringar"}
+                        </button>
+                      </div>
+                    ) : null}
                   </article>
                 );
               })}

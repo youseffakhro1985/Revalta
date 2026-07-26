@@ -1,4 +1,5 @@
 "use client";
+import { readResponseJson } from "@/lib/fetch-json";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Banknote, CheckCircle2, Clock3, Info, Package, Route, Square, Wrench } from "lucide-react";
@@ -61,7 +62,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
     setLoading(true);
     try {
       const response = await fetch(endpoint, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta arbetsorderregistreringar");
       setChecklist(data.checklist || []);
       setEntries(data.entries || []);
@@ -86,7 +87,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara registreringen");
       reset?.();
       setSuccess(message);

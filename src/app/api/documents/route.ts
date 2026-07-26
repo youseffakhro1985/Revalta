@@ -294,3 +294,129 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json().catch(() => ({}));
+    const documentId = String(body.documentId || body.id || "").trim();
+    if (!documentId) return NextResponse.json({ error: "Dokument-id krävs" }, { status: 400 });
+
+    const existing = await db.managedDocument.findFirst({
+      where: {
+        id: documentId,
+        company_id: user.company_id,
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
+      },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        visibility: true,
+        valid_until: true,
+        lifecycle_state: true,
+      },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: {
+          ...auditScopedWhere(user),
+          entity_type: "document",
+          action: "document.created",
+          id: documentId,
+        },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "ManagedDocument") {
+        return NextResponse.json({
+          error: "Dokumentet finns kvar i äldre lagring. Kör backfill till ManagedDocument innan det kan ändras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    }
+
+    if (existing.lifecycle_state === "archived") {
+      return NextResponse.json({ error: "Arkiverade dokument kan inte redigeras. Återställ först." }, { status: 409 });
+    }
+
+    const data: {
+      name?: string;
+      category?: string;
+      visibility?: string;
+      valid_until?: Date | null;
+    } = {};
+
+    if (body.name !== undefined) {
+      const name = String(body.name || "").trim();
+      if (!name || name.length > 200) {
+        return NextResponse.json({ error: "Dokumentnamn krävs och får vara max 200 tecken" }, { status: 400 });
+      }
+      data.name = name;
+    }
+    if (body.category !== undefined) {
+      const category = String(body.category || "").trim() || "other";
+      if (category.length > 80) {
+        return NextResponse.json({ error: "Kategorin är för lång" }, { status: 400 });
+      }
+      data.category = category;
+    }
+    if (body.visibility !== undefined) {
+      const visibility = String(body.visibility || "").trim();
+      if (!allowedVisibilities.has(visibility)) {
+        return NextResponse.json({ error: "Ogiltig synlighet" }, { status: 400 });
+      }
+      // Keep existing property/unit/lease targeting; only allow visibility flips that do not
+      // require new parent resolution in this field PATCH.
+      if (
+        (visibility === "resident_property" || visibility === "resident_unit" || visibility === "resident_lease") &&
+        existing.visibility === "internal"
+      ) {
+        return NextResponse.json({
+          error: "Byt synlighet till boende via ny uppladdning eller behåll befintlig målgrupp.",
+        }, { status: 400 });
+      }
+      data.visibility = visibility;
+    }
+    if (body.validUntil !== undefined) {
+      const raw = String(body.validUntil || "").trim();
+      data.valid_until = raw ? parseOptionalDate(raw) : null;
+      if (raw && !data.valid_until) {
+        return NextResponse.json({ error: "Ogiltigt giltighetsdatum" }, { status: 400 });
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "Inga fält att uppdatera" }, { status: 400 });
+    }
+
+    const updated = await db.managedDocument.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
+      data,
+    });
+    if (updated.count === 0) {
+      return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "document",
+      entityId: existing.id,
+      action: "document.updated",
+      metadata: {
+        previousName: existing.name,
+        name: data.name ?? existing.name,
+        category: data.category ?? existing.category,
+        visibility: data.visibility ?? existing.visibility,
+        storage: "ManagedDocument",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id });
+  } catch (error) {
+    console.error("Update document error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}

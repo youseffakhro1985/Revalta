@@ -1,4 +1,5 @@
 "use client";
+import { readResponseJson } from "@/lib/fetch-json";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -31,7 +32,7 @@ export default function CalendarPage() {
 
   async function load() {
     const response = await fetch("/api/calendar", { cache: "no-store" });
-    if (response.ok) setEvents((await response.json()).events || []);
+    if (response.ok) setEvents((await readResponseJson(response)).events || []);
   }
 
   useEffect(() => { load(); }, []);
@@ -61,7 +62,7 @@ export default function CalendarPage() {
       setForm({ title: "", date: "", time: "", type: "Aktivitet", propertyName: "", responsible: "", note: "" });
       await load();
     } else {
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       setError(data.error || "Kunde inte spara aktiviteten");
     }
     setSaving(false);
@@ -80,7 +81,7 @@ export default function CalendarPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventId: event.id, status }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera status");
     else await load();
     setUpdatingId("");
@@ -106,7 +107,7 @@ export default function CalendarPage() {
         propertyName: editForm.propertyName,
       }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera aktiviteten");
     else {
       setEditingId("");

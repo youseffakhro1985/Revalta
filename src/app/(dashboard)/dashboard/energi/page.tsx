@@ -12,6 +12,7 @@ import {
   premiumPrimaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string; total_area?: number | null };
 type Reading = { id: string; property_id?: string; property_name?: string; type?: string; period?: string; unit?: string; value?: number; cost?: number; value_per_sqm?: number | null; cost_per_sqm?: number | null; note?: string; created_at: string; source?: "table" | "legacy" };
@@ -39,7 +40,7 @@ export default function EnergyPage() {
     setError("");
     try {
       const response = await fetch("/api/energy", { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta förbrukning");
       setReadings(data.readings || []);
       setProperties(data.properties || []);
@@ -76,7 +77,7 @@ export default function EnergyPage() {
     setSuccess("");
     try {
       const response = await fetch("/api/energy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara avläsningen");
       setForm({ ...form, propertyId: "", value: "", cost: "", note: "" });
       setSuccess("Avläsningen har sparats.");
@@ -108,7 +109,7 @@ export default function EnergyPage() {
           note: editForm.note,
         }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera avläsningen");
       setSuccess("Avläsningen har uppdaterats.");
       setEditingId("");
@@ -135,7 +136,7 @@ export default function EnergyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ readingId: reading.id }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort avläsningen");
       setSuccess("Avläsningen har tagits bort.");
       await load();

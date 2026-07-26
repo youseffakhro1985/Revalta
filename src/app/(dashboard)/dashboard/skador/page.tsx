@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address?: string; city?: string };
 type Claim = {
@@ -41,7 +42,7 @@ export default function InsuranceClaimsPage() {
   async function load() {
     setLoading(true);
     const response = await fetch("/api/insurance-claims", { cache: "no-store" });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte läsa skadeärenden");
     else { setClaims(data.claims || []); setProperties(data.properties || []); }
     setLoading(false);
@@ -74,7 +75,7 @@ export default function InsuranceClaimsPage() {
     const form = new FormData(event.currentTarget);
     const payload = Object.fromEntries(form.entries());
     const response = await fetch("/api/insurance-claims", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte registrera skadeärendet");
     else { event.currentTarget.reset(); await load(); }
     setSaving(false);
@@ -93,7 +94,7 @@ export default function InsuranceClaimsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ claimId: claim.id, status }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera status");
     else await load();
     setUpdatingId("");
@@ -121,7 +122,7 @@ export default function InsuranceClaimsPage() {
         note: editForm.note,
       }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera skadeärendet");
     else {
       setEditingId("");

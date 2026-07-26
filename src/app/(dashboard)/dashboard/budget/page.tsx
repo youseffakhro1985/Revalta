@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CircleDollarSign, TrendingUp } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string };
 type Entry = {
@@ -39,7 +40,7 @@ export default function BudgetPage() {
   async function load() {
     setLoading(true);
     const response = await fetch("/api/budget", { cache: "no-store" });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (response.ok) { setEntries(data.entries || []); setProperties(data.properties || []); }
     else setError(data.error || "Kunde inte hämta budget");
     setLoading(false);
@@ -70,7 +71,7 @@ export default function BudgetPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setSaving(true); setError(""); setSuccess("");
     const response = await fetch("/api/budget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte spara budgetraden");
     else { setForm({ propertyId: "", year: String(new Date().getFullYear()), category: "operations", account: "", budget: "", forecast: "", actual: "", note: "" }); setSuccess("Budgetraden har sparats."); await load(); }
     setSaving(false);
@@ -98,7 +99,7 @@ export default function BudgetPage() {
         note: editForm.note,
       }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte uppdatera budgetraden");
     else {
       setSuccess("Budgetraden har uppdaterats.");
@@ -122,7 +123,7 @@ export default function BudgetPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entryId: entry.id }),
     });
-    const data = await response.json();
+    const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte ta bort budgetraden");
     else { setSuccess("Budgetraden har tagits bort."); await load(); }
     setRemovingId("");
