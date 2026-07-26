@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Återställ lösenord",
+  title: { absolute: "Återställ lösenord | Revalta" },
   description: "Begär en säker återställningslänk för ditt Revalta-konto.",
 };
 

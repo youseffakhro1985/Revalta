@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Välj nytt lösenord",
+  title: { absolute: "Välj nytt lösenord | Revalta" },
   description: "Välj ett nytt lösenord för ditt Revalta-konto.",
 };
 
