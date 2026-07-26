@@ -23,7 +23,7 @@ export async function POST(
     }
 
     const ticket = await db.ticket.findFirst({
-      where: { id, deleted_at: null, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: { id: true, title: true },
     });
 

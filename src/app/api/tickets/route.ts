@@ -28,14 +28,17 @@ export async function GET(request: Request) {
       ...(priority ? { priority } : {}),
       ...(propertyId ? { property_id: propertyId } : {}),
       ...(assignedToId ? { assigned_to_id: assignedToId } : {}),
-      ...(q
-        ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" as const } },
-              { description: { contains: q, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
+      AND: [
+        { OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+        ...(q
+          ? [{
+              OR: [
+                { title: { contains: q, mode: "insensitive" as const } },
+                { description: { contains: q, mode: "insensitive" as const } },
+              ],
+            }]
+          : []),
+      ],
     };
 
     const tickets = await db.ticket.findMany({

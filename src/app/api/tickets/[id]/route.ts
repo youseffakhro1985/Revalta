@@ -30,6 +30,7 @@ export async function GET(
         id,
         deleted_at: null,
         ...tenantWhere(user),
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
       select: {
         id: true,
@@ -143,7 +144,7 @@ export async function PATCH(
     if (!body) return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
     const existing = await db.ticket.findFirst({
-      where: { id, deleted_at: null, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: {
         id: true,
         title: true,
@@ -332,7 +333,7 @@ export async function DELETE(
 
     const { id } = await params;
     const existing = await db.ticket.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: null },
+      where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: { id: true, title: true, status: true },
     });
     if (!existing) {

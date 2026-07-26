@@ -48,7 +48,7 @@ export async function GET(
 
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
-      where: { id, deleted_at: null, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: { id: true, company_id: true },
     });
 
@@ -126,7 +126,7 @@ export async function POST(
 
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
-      where: { id, deleted_at: null, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: { id: true, title: true },
     });
     if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
@@ -229,7 +229,7 @@ export async function PATCH(
     }
 
     const ticket = await db.ticket.findFirst({
-      where: { id, deleted_at: null, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: { id: true, title: true },
     });
     if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
@@ -383,7 +383,7 @@ export async function DELETE(
     if (!operationId) return NextResponse.json({ error: "Registrerings-id krävs" }, { status: 400 });
 
     const ticket = await db.ticket.findFirst({
-      where: { id, deleted_at: null, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       select: { id: true },
     });
     if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });

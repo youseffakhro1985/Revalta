@@ -25,7 +25,7 @@ export async function GET(
 
   const { id } = await params;
   const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null },
+    where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
     select: {
       id: true,
       property_id: true,
@@ -95,7 +95,7 @@ export async function POST(
   }
 
   const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null },
+    where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
     select: {
       id: true,
       property_id: true,
