@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 
 const action = "quote.created";
 const decisionAction = "quote.status_changed";
-const allowedStatuses = new Set(["draft", "sent", "approved", "rejected", "invoiced"]);
+const allowedStatuses = new Set(["draft", "sent", "approved", "rejected", "invoiced", "cancelled"]);
 
 function money(value: { toString(): string } | number) {
   return Number(value);

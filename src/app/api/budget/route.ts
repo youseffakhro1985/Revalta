@@ -5,6 +5,7 @@ import { asNumber, isModernStorageMirror, mergeByCreatedAt } from "@/lib/dual-li
 import { NextResponse } from "next/server";
 
 const action = "budget.entry.created";
+const allowedCategories = new Set(["income", "operations", "maintenance", "energy", "administration", "finance", "investment", "other"]);
 
 export async function GET() {
   try {
@@ -79,9 +80,7 @@ export async function POST(request: Request) {
     const forecast = Number(body.forecast || 0);
     const actual = Number(body.actual || 0);
     const note = String(body.note || "").trim();
-    const allowed = new Set(["income", "operations", "maintenance", "energy", "administration", "finance", "investment", "other"]);
-
-    if (!propertyId || !account || !Number.isInteger(year) || year < 2000 || year > 2100 || !allowed.has(category)) {
+    if (!propertyId || !account || !Number.isInteger(year) || year < 2000 || year > 2100 || !allowedCategories.has(category)) {
       return NextResponse.json({ error: "Fastighet, år, kostnadsslag och konto krävs" }, { status: 400 });
     }
     if ([budget, forecast, actual].some((value) => !Number.isFinite(value))) {
@@ -129,6 +128,124 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, entry }, { status: 201 });
   } catch (error) {
     console.error("Create budget error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const entryId = String(body.entryId || body.id || "").trim();
+    if (!entryId) return NextResponse.json({ error: "Budgetrad-id krävs" }, { status: 400 });
+
+    const fieldKeys = ["year", "category", "account", "budget", "forecast", "actual", "note"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!hasFieldUpdate) {
+      return NextResponse.json({ error: "Fält att uppdatera krävs" }, { status: 400 });
+    }
+
+    const existing = await db.budgetEntry.findFirst({
+      where: { id: entryId, company_id: user.company_id },
+      select: {
+        id: true,
+        property_id: true,
+        year: true,
+        category: true,
+        account: true,
+        budget: true,
+        forecast: true,
+        actual: true,
+        note: true,
+      },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: entryId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Budgetraden finns kvar i äldre lagring. Kör backfill till BudgetEntry innan den kan uppdateras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Budgetraden hittades inte" }, { status: 404 });
+    }
+
+    let year = existing.year;
+    let category = existing.category;
+    let account = existing.account;
+    let budget = asNumber(existing.budget);
+    let forecast = asNumber(existing.forecast);
+    let actual = asNumber(existing.actual);
+    let note = existing.note || "";
+
+    if (body.year !== undefined) year = Number(body.year);
+    if (body.category !== undefined) category = String(body.category || "").trim();
+    if (body.account !== undefined) account = String(body.account || "").trim();
+    if (body.budget !== undefined) budget = Number(body.budget);
+    if (body.forecast !== undefined) forecast = Number(body.forecast);
+    if (body.actual !== undefined) actual = Number(body.actual);
+    if (body.note !== undefined) note = String(body.note || "").trim();
+
+    if (!account || !Number.isInteger(year) || year < 2000 || year > 2100 || !allowedCategories.has(category)) {
+      return NextResponse.json({ error: "År, kostnadsslag och konto krävs" }, { status: 400 });
+    }
+    if ([budget, forecast, actual].some((value) => !Number.isFinite(value))) {
+      return NextResponse.json({ error: "Kontrollera beloppen" }, { status: 400 });
+    }
+
+    const updateResult = await db.budgetEntry.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
+      data: {
+        year,
+        category,
+        account,
+        budget,
+        forecast,
+        actual,
+        note: note || null,
+      },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Budgetraden hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "budget_entry",
+      entityId: existing.id,
+      action: "budget.entry.updated",
+      metadata: {
+        property_id: existing.property_id,
+        year,
+        category,
+        account,
+        budget,
+        forecast,
+        actual,
+        variance_budget: actual - budget,
+        variance_forecast: actual - forecast,
+        note,
+        storage: "BudgetEntry",
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      id: existing.id,
+      year,
+      category,
+      account,
+      budget,
+      forecast,
+      actual,
+    });
+  } catch (error) {
+    console.error("Update budget entry error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

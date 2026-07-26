@@ -119,6 +119,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
         where: {
           property_id: existing.id,
           company_id: user.company_id,
+          deleted_at: null,
           status: { in: [...OCCUPYING_LEASE_STATUSES] },
         },
       }),

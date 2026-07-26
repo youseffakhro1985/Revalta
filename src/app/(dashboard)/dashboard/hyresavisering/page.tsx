@@ -14,7 +14,11 @@ type Notice = {
   period?: string;
   due_date?: string;
   status?: string;
+  base_rent?: number;
+  additions?: number;
+  deductions?: number;
   index_percent?: number;
+  note?: string;
   total?: number;
   created_at: string;
   source?: "table" | "legacy";
@@ -29,6 +33,8 @@ export default function RentNoticesPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState("");
+  const [editingId, setEditingId] = useState("");
+  const [editForm, setEditForm] = useState({ period: "", dueDate: "", baseRent: "", additions: "", deductions: "", indexPercent: "0", note: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({ propertyId: "", leaseId: "", tenantName: "", unit: "", period: "", dueDate: "", status: "draft", baseRent: "", additions: "", deductions: "", indexPercent: "0", note: "" });
@@ -64,6 +70,19 @@ export default function RentNoticesPage() {
     }));
   }
 
+  function startEdit(notice: Notice) {
+    setEditingId(notice.id);
+    setEditForm({
+      period: notice.period || "",
+      dueDate: notice.due_date || "",
+      baseRent: String(notice.base_rent ?? ""),
+      additions: String(notice.additions ?? ""),
+      deductions: String(notice.deductions ?? ""),
+      indexPercent: String(notice.index_percent ?? "0"),
+      note: notice.note || "",
+    });
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -86,7 +105,7 @@ export default function RentNoticesPage() {
 
   async function updateStatus(notice: Notice, status: string) {
     if (notice.source === "legacy") {
-      setError("Hyresavin finns i äldre lagring. Kör backfill till RentNotice innan status ändras.");
+      setError("Hyresavin finns i äldre lagring. Kör backfill till RentNotice innan den kan uppdateras.");
       return;
     }
     if (status === notice.status) return;
@@ -102,6 +121,38 @@ export default function RentNoticesPage() {
     if (!response.ok) setError(data.error || "Kunde inte uppdatera status");
     else {
       setSuccess("Avis status har uppdaterats.");
+      await load();
+    }
+    setUpdatingId("");
+  }
+
+  async function saveEdit(notice: Notice) {
+    if (notice.source === "legacy") {
+      setError("Hyresavin finns i äldre lagring. Kör backfill till RentNotice innan den kan uppdateras.");
+      return;
+    }
+    setUpdatingId(notice.id);
+    setError("");
+    setSuccess("");
+    const response = await fetch("/api/rent-notices", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        noticeId: notice.id,
+        period: editForm.period,
+        dueDate: editForm.dueDate,
+        baseRent: editForm.baseRent,
+        additions: editForm.additions,
+        deductions: editForm.deductions,
+        indexPercent: editForm.indexPercent,
+        note: editForm.note,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) setError(data.error || "Kunde inte uppdatera avin");
+    else {
+      setSuccess("Hyresavin har uppdaterats.");
+      setEditingId("");
       await load();
     }
     setUpdatingId("");
@@ -169,27 +220,63 @@ export default function RentNoticesPage() {
                     <p className="mt-1 text-sm text-ink-500">{notice.property_name}{notice.unit ? ` · ${notice.unit}` : ""}</p>
                     <p className="mt-2 text-xs text-ink-400">Period {notice.period || "–"} · Förfaller {notice.due_date || "–"}</p>
                     {notice.source === "legacy" ? (
-                      <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan status kan ändras.</p>
+                      <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering.</p>
                     ) : null}
                   </div>
                   <div className="space-y-2 sm:text-right">
                     <p className="text-xl font-semibold text-ink-900">{money.format(Number(notice.total || 0))}</p>
                     <p className="text-xs text-ink-400">Index {Number(notice.index_percent || 0).toLocaleString("sv-SE")} %</p>
                     {notice.source !== "legacy" ? (
-                      <select
-                        disabled={updatingId === notice.id}
-                        value={notice.status || "draft"}
-                        onChange={(event) => void updateStatus(notice, event.target.value)}
-                        className="h-9 rounded-lg border border-sand-200 bg-white px-2 text-xs text-ink-700 outline-none focus:border-petroleum-500 sm:ml-auto"
-                        aria-label={`Ändra status för avi ${notice.period || notice.id}`}
-                      >
-                        {Object.entries(labels).map(([value, label]) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
+                      <>
+                        <select
+                          disabled={updatingId === notice.id}
+                          value={notice.status || "draft"}
+                          onChange={(event) => void updateStatus(notice, event.target.value)}
+                          className="h-9 rounded-lg border border-sand-200 bg-white px-2 text-xs text-ink-700 outline-none focus:border-petroleum-500 sm:ml-auto"
+                          aria-label={`Ändra status för avi ${notice.period || notice.id}`}
+                        >
+                          {Object.entries(labels).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
+                        {notice.status === "draft" ? (
+                          <button
+                            type="button"
+                            onClick={() => (editingId === notice.id ? setEditingId("") : startEdit(notice))}
+                            className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto"
+                          >
+                            {editingId === notice.id ? "Stäng" : "Ändra"}
+                          </button>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                 </div>
+                {editingId === notice.id && notice.status === "draft" ? (
+                  <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />
+                      <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input className={premiumFieldClass} type="number" min="0" placeholder="Grundhyra" value={editForm.baseRent} onChange={(e) => setEditForm({ ...editForm, baseRent: e.target.value })} />
+                      <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Index %" value={editForm.indexPercent} onChange={(e) => setEditForm({ ...editForm, indexPercent: e.target.value })} />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <input className={premiumFieldClass} type="number" min="0" placeholder="Tillägg" value={editForm.additions} onChange={(e) => setEditForm({ ...editForm, additions: e.target.value })} />
+                      <input className={premiumFieldClass} type="number" min="0" placeholder="Avdrag" value={editForm.deductions} onChange={(e) => setEditForm({ ...editForm, deductions: e.target.value })} />
+                    </div>
+                    <textarea className={premiumTextareaClass} placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                    <button
+                      type="button"
+                      disabled={updatingId === notice.id}
+                      onClick={() => void saveEdit(notice)}
+                      className={`${premiumPrimaryButtonClass} sm:w-auto`}
+                    >
+                      {updatingId === notice.id ? "Sparar…" : "Spara ändringar"}
+                    </button>
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

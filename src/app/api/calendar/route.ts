@@ -137,14 +137,33 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
     const eventId = String(body.eventId || body.id || "").trim();
-    const status = String(body.status || "").trim();
-    if (!eventId || !allowedStatuses.has(status)) {
-      return NextResponse.json({ error: "Aktivitets-id och giltig status krävs" }, { status: 400 });
+    if (!eventId) return NextResponse.json({ error: "Aktivitets-id krävs" }, { status: 400 });
+
+    const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
+    const status = hasStatus ? String(body.status).trim() : "";
+    if (hasStatus && !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Giltig status krävs" }, { status: 400 });
+    }
+
+    const fieldKeys = ["title", "date", "time", "responsible", "note", "propertyName", "type"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!hasStatus && !hasFieldUpdate) {
+      return NextResponse.json({ error: "Status eller fält att uppdatera krävs" }, { status: 400 });
     }
 
     const existing = await db.calendarEvent.findFirst({
       where: { id: eventId, company_id: user.company_id },
-      select: { id: true, title: true, status: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        date: true,
+        time: true,
+        type: true,
+        property_name: true,
+        responsible: true,
+        note: true,
+      },
     });
     if (!existing) {
       const legacy = await db.auditLog.findFirst({
@@ -153,17 +172,57 @@ export async function PATCH(request: Request) {
       });
       if (legacy) {
         return NextResponse.json({
-          error: "Aktiviteten finns kvar i äldre lagring. Kör backfill till CalendarEvent innan status ändras.",
+          error: "Aktiviteten finns kvar i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.",
         }, { status: 409 });
       }
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
     }
 
-    if (existing.status === status) return NextResponse.json({ success: true, id: existing.id, status });
+    const nextStatus = hasStatus ? status : existing.status;
+    let title = existing.title;
+    let date = existing.date;
+    let time = existing.time || "";
+    let type = existing.type;
+    let propertyName = existing.property_name || "";
+    let responsible = existing.responsible || "";
+    let note = existing.note || "";
+
+    if (hasFieldUpdate) {
+      if (body.title !== undefined) title = String(body.title || "").trim();
+      if (body.date !== undefined) {
+        const parsedDate = parseDateOnly(String(body.date || "").trim());
+        if (!parsedDate) return NextResponse.json({ error: "Ogiltigt datum" }, { status: 400 });
+        date = parsedDate;
+      }
+      if (body.time !== undefined) time = String(body.time || "").trim();
+      if (body.type !== undefined) type = String(body.type || "Aktivitet").trim() || "Aktivitet";
+      if (body.propertyName !== undefined) propertyName = String(body.propertyName || "").trim();
+      if (body.responsible !== undefined) responsible = String(body.responsible || "").trim();
+      if (body.note !== undefined) note = String(body.note || "").trim();
+      if (!title) return NextResponse.json({ error: "Titel krävs" }, { status: 400 });
+    }
+
+    const statusOnly = hasStatus && !hasFieldUpdate;
+    if (statusOnly && existing.status === nextStatus) {
+      return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
+    }
+
+    const data = hasFieldUpdate
+      ? {
+          status: nextStatus,
+          title,
+          date,
+          time: time || null,
+          type,
+          property_name: propertyName || null,
+          responsible: responsible || null,
+          note: note || null,
+        }
+      : { status: nextStatus };
 
     const updateResult = await db.calendarEvent.updateMany({
       where: { id: existing.id, company_id: user.company_id },
-      data: { status },
+      data,
     });
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
@@ -172,18 +231,22 @@ export async function PATCH(request: Request) {
     await writeAuditLog(user, {
       entityType: "calendar_event",
       entityId: existing.id,
-      action: "calendar.event.status_updated",
+      action: statusOnly ? "calendar.event.status_updated" : "calendar.event.updated",
       metadata: {
-        title: existing.title,
+        title,
         previousStatus: existing.status,
-        status,
+        status: nextStatus,
+        date: date.toISOString().slice(0, 10),
+        time,
+        responsible,
+        note,
         storage: "CalendarEvent",
       },
     });
 
-    return NextResponse.json({ success: true, id: existing.id, status });
+    return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
   } catch (error) {
-    console.error("Update calendar event status error:", error);
+    console.error("Update calendar event error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

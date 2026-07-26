@@ -41,6 +41,7 @@ type DocumentItem = {
   lease: { id: string; leaseNumber: string; status: string; holder: string; unit: string } | null;
   uploadedBy: string;
   createdAt: string;
+  source?: "table" | "legacy";
 };
 type Payload = { documents: DocumentItem[]; properties: Property[]; leases: Lease[]; canManageLifecycle: boolean };
 type Visibility = "internal" | "resident_all" | "resident_property" | "resident_unit" | "resident_lease";
@@ -147,6 +148,10 @@ export default function DocumentsPage() {
   }
 
   async function changeLifecycle(document: DocumentItem, transition: "archive" | "unpublish" | "restore") {
+    if (document.source === "legacy") {
+      setError("Dokumentet finns i äldre lagring. Kör backfill till ManagedDocument innan livscykel ändras.");
+      return;
+    }
     const labels = { archive: "arkivera", unpublish: "avpublicera", restore: "återställa" };
     if (!window.confirm(`Vill du ${labels[transition]} dokumentet ”${document.name}”?`)) return;
     setChangingId(document.id); setError(""); setMessage("");
@@ -210,12 +215,13 @@ export default function DocumentsPage() {
                   <p className="mt-2 text-sm text-ink-600">{scope}</p><p className="mt-1 text-xs text-ink-400">{document.fileName || "Fil"} · {formatBytes(document.sizeBytes)} · publicerat {dateFormatter.format(new Date(document.createdAt))} av {document.uploadedBy}</p>
                   {document.lifecycleChangedAt ? <p className="mt-1 text-xs text-ink-400">Status ändrad {dateFormatter.format(new Date(document.lifecycleChangedAt))}</p> : null}
                   {document.validUntil ? <p className="mt-2 text-xs font-semibold text-warning-700">Giltigt till {dateFormatter.format(new Date(document.validUntil))}</p> : null}
+                  {document.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan livscykel kan ändras.</p> : null}
                 </div></div>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {document.downloadUrl && document.lifecycleState !== "archived" ? <a href={document.downloadUrl} className="inline-flex h-9 items-center gap-2 rounded-lg border border-sand-200 px-3 text-xs font-semibold text-ink-700 hover:bg-white"><Download className="h-3.5 w-3.5" /> Hämta</a> : null}
-                  {data.canManageLifecycle && document.lifecycleState === "active" && document.visibility !== "internal" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "unpublish")} className="inline-flex h-9 items-center gap-2 rounded-lg border border-warning-200 px-3 text-xs font-semibold text-warning-800 hover:bg-warning-50"><EyeOff className="h-3.5 w-3.5" /> Avpublicera</button> : null}
-                  {data.canManageLifecycle && document.lifecycleState !== "archived" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "archive")} className="inline-flex h-9 items-center gap-2 rounded-lg border border-sand-300 px-3 text-xs font-semibold text-ink-700 hover:bg-sand-100"><Archive className="h-3.5 w-3.5" /> Arkivera</button> : null}
-                  {data.canManageLifecycle && document.lifecycleState !== "active" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "restore")} className="inline-flex h-9 items-center gap-2 rounded-lg bg-petroleum-800 px-3 text-xs font-semibold text-white hover:bg-petroleum-900"><RotateCcw className="h-3.5 w-3.5" /> Återställ</button> : null}
+                  {document.source !== "legacy" && data.canManageLifecycle && document.lifecycleState === "active" && document.visibility !== "internal" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "unpublish")} className="inline-flex h-9 items-center gap-2 rounded-lg border border-warning-200 px-3 text-xs font-semibold text-warning-800 hover:bg-warning-50"><EyeOff className="h-3.5 w-3.5" /> Avpublicera</button> : null}
+                  {document.source !== "legacy" && data.canManageLifecycle && document.lifecycleState !== "archived" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "archive")} className="inline-flex h-9 items-center gap-2 rounded-lg border border-sand-300 px-3 text-xs font-semibold text-ink-700 hover:bg-sand-100"><Archive className="h-3.5 w-3.5" /> Arkivera</button> : null}
+                  {document.source !== "legacy" && data.canManageLifecycle && document.lifecycleState !== "active" ? <button disabled={changingId === document.id} onClick={() => void changeLifecycle(document, "restore")} className="inline-flex h-9 items-center gap-2 rounded-lg bg-petroleum-800 px-3 text-xs font-semibold text-white hover:bg-petroleum-900"><RotateCcw className="h-3.5 w-3.5" /> Återställ</button> : null}
                 </div>
               </article>;
             })}</div>

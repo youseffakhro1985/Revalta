@@ -38,18 +38,24 @@ export async function createInspectionWorkOrders(args: {
     where: { company_id_lease_id: { company_id: args.companyId, lease_id: args.leaseId } },
     select: { payload: true, version: true },
   });
-  const event = modernRecord
-    ? null
-    : await db.integrationEvent.findFirst({
+  if (!modernRecord) {
+    const legacy = await db.integrationEvent.findFirst({
       where: { company_id: args.companyId, type: inspectionRecordEventType, recipient: args.leaseId },
       orderBy: { created_at: "desc" },
+      select: { id: true },
     });
+    if (legacy) {
+      throw new InspectionWorkOrderError(
+        "Besiktningen finns kvar i äldre lagring. Kör backfill till LeaseInspectionRecord innan arbetsorder kan skapas.",
+        409,
+      );
+    }
+    throw new InspectionWorkOrderError("Spara besiktningspunkterna först", 409);
+  }
 
-  const record = modernRecord?.payload && typeof modernRecord.payload === "object"
+  const record = modernRecord.payload && typeof modernRecord.payload === "object"
     ? modernRecord.payload as unknown as LeaseInspectionRecord
-    : event?.payload && typeof event.payload === "object"
-      ? event.payload as unknown as LeaseInspectionRecord
-      : null;
+    : null;
   if (!record) throw new InspectionWorkOrderError("Spara besiktningspunkterna först", 409);
   if (record.version !== args.version) {
     throw new InspectionWorkOrderError("Besiktningen har ändrats. Ladda om och försök igen.", 409);

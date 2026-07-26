@@ -20,7 +20,7 @@ export async function GET() {
     const [modern, modernReads, notifications, readLogs, recentEvents] = await Promise.all([
       user.company_id
         ? db.appNotification.findMany({
-            where: { company_id: user.company_id },
+            where: { company_id: user.company_id, deleted_at: null },
             orderBy: { created_at: "desc" },
             take: 100,
           })
@@ -162,7 +162,7 @@ export async function PATCH(request: Request) {
 
     if (user.company_id) {
       const modern = await db.appNotification.findFirst({
-        where: { id: notificationId, company_id: user.company_id },
+        where: { id: notificationId, company_id: user.company_id, deleted_at: null },
         select: { id: true },
       });
       if (modern) {
@@ -192,6 +192,55 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Notisen hittades inte" }, { status: 404 });
   } catch (error) {
     console.error("Mark notification read error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json().catch(() => ({}));
+    const notificationId = String(body.notificationId || body.id || "").trim();
+    if (!notificationId) return NextResponse.json({ error: "Notis-id krävs" }, { status: 400 });
+
+    const modern = await db.appNotification.findFirst({
+      where: { id: notificationId, company_id: user.company_id, deleted_at: null },
+      select: { id: true, title: true },
+    });
+    if (!modern) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...scopeFor(user), action: createdAction, entity_id: notificationId },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "AppNotification") {
+        return NextResponse.json({
+          error: "Notisen finns kvar i äldre lagring. Kör backfill till AppNotification innan den kan tas bort.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Notisen hittades inte" }, { status: 404 });
+    }
+
+    const deleted = await db.appNotification.updateMany({
+      where: { id: modern.id, company_id: user.company_id, deleted_at: null },
+      data: { deleted_at: new Date() },
+    });
+    if (deleted.count === 0) return NextResponse.json({ error: "Notisen hittades inte" }, { status: 404 });
+
+    await writeAuditLog(user, {
+      entityType: "notification",
+      entityId: modern.id,
+      action: "notification.deleted",
+      metadata: { title: modern.title, softDelete: true, storage: "AppNotification" },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete notification error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

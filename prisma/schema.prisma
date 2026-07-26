@@ -1300,11 +1300,13 @@ model AppNotification {
   author_name    String?
   created_by_id  String
   created_at     DateTime           @default(now())
+  deleted_at     DateTime?
   company        Company            @relation(fields: [company_id], references: [id], onDelete: Cascade)
   created_by     User               @relation("AppNotificationCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
   reads          NotificationRead[]
 
   @@index([company_id, created_at])
+  @@index([company_id, deleted_at])
   @@index([created_by_id])
 }
 

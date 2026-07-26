@@ -31,7 +31,7 @@ export async function reconcileInspectionRecord(args: {
     });
     if (legacy) {
       throw new InspectionRecordSyncError(
-        "Besiktningen finns kvar i äldre lagring. Kör backfill/migrera till LeaseInspectionRecord innan avstämning.",
+        "Besiktningen finns kvar i äldre lagring. Kör backfill till LeaseInspectionRecord innan avstämning.",
         409,
       );
     }

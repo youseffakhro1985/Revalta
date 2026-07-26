@@ -143,6 +143,122 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const body = await request.json();
+    const readingId = String(body.readingId || body.id || "").trim();
+    if (!readingId) return NextResponse.json({ error: "Avläsnings-id krävs" }, { status: 400 });
+
+    const fieldKeys = ["value", "cost", "period", "note", "unit"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!hasFieldUpdate) {
+      return NextResponse.json({ error: "Fält att uppdatera krävs" }, { status: 400 });
+    }
+
+    const existing = await db.energyReading.findFirst({
+      where: { id: readingId, company_id: user.company_id },
+      select: {
+        id: true,
+        property_id: true,
+        type: true,
+        period: true,
+        unit: true,
+        value: true,
+        cost: true,
+        note: true,
+        property: { select: { total_area: true } },
+      },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: readingId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Avläsningen finns kvar i äldre lagring. Kör backfill till EnergyReading innan den kan uppdateras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+    }
+
+    let period = existing.period;
+    let unit = existing.unit;
+    let value = asNumber(existing.value);
+    let cost = asNumber(existing.cost);
+    let note = existing.note || "";
+
+    if (body.period !== undefined) period = String(body.period || "").trim();
+    if (body.unit !== undefined) unit = String(body.unit || "").trim();
+    if (body.value !== undefined) value = Number(body.value);
+    if (body.cost !== undefined) cost = Number(body.cost);
+    if (body.note !== undefined) note = String(body.note || "").trim();
+
+    if (!period || !unit) {
+      return NextResponse.json({ error: "Period och enhet krävs" }, { status: 400 });
+    }
+    if (![value, cost].every((number) => Number.isFinite(number) && number >= 0)) {
+      return NextResponse.json({ error: "Kontrollera förbrukning och kostnad" }, { status: 400 });
+    }
+
+    const area = Number(existing.property.total_area || 0);
+    const valuePerSqm = area > 0 ? value / area : null;
+    const costPerSqm = area > 0 ? cost / area : null;
+
+    const updateResult = await db.energyReading.updateMany({
+      where: { id: existing.id, company_id: user.company_id },
+      data: {
+        period,
+        unit,
+        value,
+        cost,
+        value_per_sqm: valuePerSqm,
+        cost_per_sqm: costPerSqm,
+        note: note || null,
+      },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "energy_reading",
+      entityId: existing.id,
+      action: "energy.reading.updated",
+      metadata: {
+        property_id: existing.property_id,
+        type: existing.type,
+        period,
+        unit,
+        value,
+        cost,
+        value_per_sqm: valuePerSqm,
+        cost_per_sqm: costPerSqm,
+        note,
+        storage: "EnergyReading",
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      id: existing.id,
+      period,
+      value,
+      cost,
+      value_per_sqm: valuePerSqm,
+      cost_per_sqm: costPerSqm,
+    });
+  } catch (error) {
+    console.error("Update energy reading error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();

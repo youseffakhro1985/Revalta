@@ -26,20 +26,28 @@ async function getLease(id: string, companyId: string) {
   });
 }
 
-async function getRecord(id: string, companyId: string) {
+/** Mutation path: require modern LeaseInspectionRecord; IE-only → 409. */
+async function getRecordForMutation(id: string, companyId: string) {
   const modern = await db.leaseInspectionRecord.findUnique({
     where: { company_id_lease_id: { company_id: companyId, lease_id: id } },
     select: { payload: true },
   });
   if (modern?.payload && typeof modern.payload === "object") {
-    return modern.payload as unknown as LeaseInspectionRecord;
+    return { record: modern.payload as unknown as LeaseInspectionRecord } as const;
   }
 
-  const event = await db.integrationEvent.findFirst({
+  const legacy = await db.integrationEvent.findFirst({
     where: { company_id: companyId, type: RECORD_EVENT, recipient: id },
     orderBy: { created_at: "desc" },
+    select: { id: true },
   });
-  return event?.payload && typeof event.payload === "object" ? event.payload as unknown as LeaseInspectionRecord : null;
+  if (legacy) {
+    return {
+      error: "Besiktningen finns kvar i äldre lagring. Kör backfill till LeaseInspectionRecord innan arbetsorder kan skapas.",
+      status: 409 as const,
+    };
+  }
+  return { error: "Spara besiktningspunkterna innan arbetsorder skapas", status: 409 as const };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -104,9 +112,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att skapa arbetsorder" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     const { id } = await params;
-    const [lease, record] = await Promise.all([getLease(id, user.company_id), getRecord(id, user.company_id)]);
+    const [lease, loaded] = await Promise.all([getLease(id, user.company_id), getRecordForMutation(id, user.company_id)]);
     if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
-    if (!record) return NextResponse.json({ error: "Spara besiktningspunkterna innan arbetsorder skapas" }, { status: 409 });
+    if ("error" in loaded) return NextResponse.json({ error: loaded.error }, { status: loaded.status });
+    const record = loaded.record;
 
     const body = await request.json().catch(() => null) as { version?: unknown; itemIds?: unknown } | null;
     if (!body || Number(body.version) !== record.version) {

@@ -152,15 +152,16 @@ Detta blir referensarkitekturen för övriga moduler.
 - **C** Besiktning/rond → åtgärd (avvikelser till arbetsorder, compliance corrective WO).
 - **D** IMD → debiteringsunderlag (`ImdDebitLine` + koppling till hyresavi).
 
-### Leverans E – Ekonomi och rapportering (pågående)
+### Leverans E – Ekonomi och rapportering (levererad, dual-read-retirement kvar)
 
 - Attesterbar tid/material/lönsamhet/fakturaunderlag på arbetsorder.
-- Fakturaexport-UI till Fortnox/Visma/webhook är levererad (`WorkOrderInvoiceExportJob` + integrationsöversikt).
+- Fakturaexport-UI till Fortnox/Visma/webhook (`WorkOrderInvoiceExportJob` + integrationsöversikt).
 - Kanonisk fakturaväg: godkänd tid/material → `WorkOrderInvoiceDraft` → export. Rapportflödet skapar samma draft och arkiverar `WorkOrderInvoiceBasis` som snapshot.
-- Fältregistrering (`WorkOrderExecutionEntry`) är driftunderlag; ticket time/cost blockeras när arbetsorder finns.
-- Soft-delete för tickets, work orders, projects, properties, leases, lease holders och operational documents.
+- Fältavslut (`completion.finalize`) sätter driftkostnad och promoverar tid/material till attesterbara rader.
+- Ticket time/cost blockeras när arbetsorder finns; ticket operations kan soft-deletas.
+- Soft-delete för tickets, work orders, projects, properties, leases, lease holders, operational documents, notifications; IMD void.
 - Cron-produktjournaler på `CronJobRun` (preventive/recurring escalations).
-- Kvarstår efter prod-backfill: ta bort kvarvarande dual-read-grenar och eventuellt pensionera `WorkOrderInvoiceBasis` som separat skapandeyta.
+- Kvarstår efter prod-backfill: ta bort kvarvarande dual-read-listgrenar.
 
 ## Kvalitetskrav före merge
 

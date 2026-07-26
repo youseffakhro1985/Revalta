@@ -51,7 +51,19 @@ Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview in
 8. Driftsätt exakt samma commit till Vercel.
 9. Kör smoke tests och rulla tillbaka applikationen vid fel.
 
-## 5. Verifiering efter driftsättning
+## 5. Efter migration: backfill och cron
+
+När releasen innehåller schema cutover (moderna tabeller / soft-delete / `CronJobRun`):
+
+1. Kör `node scripts/backfill-auditlog-modules.mjs` mot produktionsdatabasen (idempotent).
+2. Verifiera att kritiska moduler inte längre returnerar `409` för backfill på vanliga arbetsflöden.
+3. Smoke-testa cron med `CRON_SECRET`:
+   - `/api/cron/preventive-maintenance` → journal i `CronJobRun`
+   - `/api/cron/recurring-incident-escalations` → journal i `CronJobRun`
+   - `/api/cron/invoice-export-jobs` → jobb i `WorkOrderInvoiceExportJob`
+4. Kontrollera att soft-deletade tickets/fastigheter/avtal och makulerade IMD-avläsningar inte syns i listor.
+
+## 6. Verifiering efter driftsättning
 
 - `GET /api/health` svarar utan serverfel.
 - Registrering, inloggning, utloggning och lösenordsåterställning fungerar.
@@ -61,6 +73,6 @@ Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview in
 - Kontrollera att `/dashboard` och `/api/*` skickar `Cache-Control: private, no-store`.
 - Kontrollera CSP, HSTS och övriga säkerhetsheaders på `https://www.revalta.se`.
 
-## 6. Återställning
+## 7. Återställning
 
 Vid applikationsfel: rulla tillbaka till föregående verifierad Vercel-deployment. Vid datafel: stoppa skrivtrafik, dokumentera tidpunkten och återställ från den verifierade backupen. Ändra aldrig en redan applicerad migration; skapa en ny korrigerande migration.

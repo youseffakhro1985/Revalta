@@ -209,14 +209,36 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
     const noticeId = String(body.noticeId || body.id || "").trim();
-    const status = String(body.status || "").trim();
-    if (!noticeId || !patchAllowedStatuses.has(status)) {
-      return NextResponse.json({ error: "Avi-id och giltig status krävs" }, { status: 400 });
+    if (!noticeId) return NextResponse.json({ error: "Avi-id krävs" }, { status: 400 });
+
+    const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
+    const status = hasStatus ? String(body.status).trim() : "";
+    if (hasStatus && !patchAllowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Giltig status krävs" }, { status: 400 });
+    }
+
+    const fieldKeys = ["baseRent", "additions", "deductions", "indexPercent", "period", "dueDate", "note"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+
+    if (!hasStatus && !hasFieldUpdate) {
+      return NextResponse.json({ error: "Status eller fält att uppdatera krävs" }, { status: 400 });
     }
 
     const existing = await db.rentNotice.findFirst({
       where: { id: noticeId, company_id: user.company_id },
-      select: { id: true, tenant_name: true, period: true, status: true },
+      select: {
+        id: true,
+        tenant_name: true,
+        period: true,
+        status: true,
+        due_date: true,
+        base_rent: true,
+        index_percent: true,
+        additions: true,
+        deductions: true,
+        note: true,
+        total: true,
+      },
     });
     if (!existing) {
       const legacy = await db.auditLog.findFirst({
@@ -225,17 +247,68 @@ export async function PATCH(request: Request) {
       });
       if (legacy) {
         return NextResponse.json({
-          error: "Hyresavin finns kvar i äldre lagring. Kör backfill till RentNotice innan status ändras.",
+          error: "Hyresavin finns kvar i äldre lagring. Kör backfill till RentNotice innan den kan uppdateras.",
         }, { status: 409 });
       }
       return NextResponse.json({ error: "Hyresavin hittades inte" }, { status: 404 });
     }
 
-    if (existing.status === status) return NextResponse.json({ success: true, id: existing.id, status });
+    if (hasFieldUpdate && existing.status !== "draft") {
+      return NextResponse.json({ error: "Belopp och period kan bara ändras när avin är utkast" }, { status: 400 });
+    }
+
+    const nextStatus = hasStatus ? status : existing.status;
+    let baseRent = asNumber(existing.base_rent);
+    let additions = asNumber(existing.additions);
+    let deductions = asNumber(existing.deductions);
+    let indexPercent = asNumber(existing.index_percent);
+    let period = existing.period;
+    let dueDate = existing.due_date;
+    let note = existing.note || "";
+
+    if (hasFieldUpdate) {
+      if (body.baseRent !== undefined) baseRent = Number(body.baseRent);
+      if (body.additions !== undefined) additions = Number(body.additions);
+      if (body.deductions !== undefined) deductions = Number(body.deductions);
+      if (body.indexPercent !== undefined) indexPercent = Number(body.indexPercent);
+      if (body.period !== undefined) period = String(body.period || "").trim();
+      if (body.dueDate !== undefined) {
+        const parsedDue = parseDateOnly(String(body.dueDate || "").trim());
+        if (!parsedDue) return NextResponse.json({ error: "Ogiltigt förfallodatum" }, { status: 400 });
+        dueDate = parsedDue;
+      }
+      if (body.note !== undefined) note = String(body.note || "").trim();
+      if (!period) return NextResponse.json({ error: "Period krävs" }, { status: 400 });
+      if ([baseRent, additions, deductions, indexPercent].some((value) => !Number.isFinite(value) || value < 0)) {
+        return NextResponse.json({ error: "Kontrollera hyra, tillägg, avdrag och index" }, { status: 400 });
+      }
+    }
+
+    const indexedRent = baseRent * (1 + indexPercent / 100);
+    const total = Math.max(0, indexedRent + additions - deductions);
+    const statusOnly = hasStatus && !hasFieldUpdate;
+    if (statusOnly && existing.status === nextStatus) {
+      return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
+    }
+
+    const data = hasFieldUpdate
+      ? {
+          status: nextStatus,
+          base_rent: baseRent,
+          index_percent: indexPercent,
+          indexed_rent: indexedRent,
+          additions,
+          deductions,
+          total,
+          period,
+          due_date: dueDate,
+          note: note || null,
+        }
+      : { status: nextStatus };
 
     const updateResult = await db.rentNotice.updateMany({
       where: { id: existing.id, company_id: user.company_id },
-      data: { status },
+      data,
     });
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Hyresavin hittades inte" }, { status: 404 });
@@ -244,19 +317,33 @@ export async function PATCH(request: Request) {
     await writeAuditLog(user, {
       entityType: "rent_notice",
       entityId: existing.id,
-      action: "rent_notice.status_updated",
+      action: statusOnly ? "rent_notice.status_updated" : "rent_notice.updated",
       metadata: {
         tenant_name: existing.tenant_name,
-        period: existing.period,
+        period,
         previousStatus: existing.status,
-        status,
+        status: nextStatus,
+        base_rent: baseRent,
+        index_percent: indexPercent,
+        indexed_rent: indexedRent,
+        additions,
+        deductions,
+        total,
+        due_date: dueDate.toISOString().slice(0, 10),
+        note,
         storage: "RentNotice",
       },
     });
 
-    return NextResponse.json({ success: true, id: existing.id, status });
+    return NextResponse.json({
+      success: true,
+      id: existing.id,
+      status: nextStatus,
+      total,
+      indexed_rent: indexedRent,
+    });
   } catch (error) {
-    console.error("Update rent notice status error:", error);
+    console.error("Update rent notice error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

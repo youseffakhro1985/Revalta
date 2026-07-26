@@ -165,6 +165,7 @@ export async function POST(request: Request) {
 }
 
 const allowedStatuses = new Set(["reported", "investigating", "awaiting_insurer", "repairing", "settled", "closed"]);
+const closedStatuses = new Set(["settled", "closed"]);
 
 export async function PATCH(request: Request) {
   try {
@@ -175,14 +176,34 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
     const claimId = String(body.claimId || body.id || "").trim();
-    const status = String(body.status || "").trim();
-    if (!claimId || !allowedStatuses.has(status)) {
-      return NextResponse.json({ error: "Ärende-id och giltig status krävs" }, { status: 400 });
+    if (!claimId) return NextResponse.json({ error: "Ärende-id krävs" }, { status: 400 });
+
+    const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
+    const status = hasStatus ? String(body.status).trim() : "";
+    if (hasStatus && !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Giltig status krävs" }, { status: 400 });
+    }
+
+    const fieldKeys = ["title", "estimatedCost", "deductible", "compensation", "claimNumber", "insurer", "location", "note"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!hasStatus && !hasFieldUpdate) {
+      return NextResponse.json({ error: "Status eller fält att uppdatera krävs" }, { status: 400 });
     }
 
     const existing = await db.insuranceClaim.findFirst({
       where: { id: claimId, company_id: user.company_id },
-      select: { id: true, title: true, status: true },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        estimated_cost: true,
+        deductible: true,
+        compensation: true,
+        claim_number: true,
+        insurer: true,
+        location: true,
+        note: true,
+      },
     });
     if (!existing) {
       const legacy = await db.auditLog.findFirst({
@@ -191,17 +212,63 @@ export async function PATCH(request: Request) {
       });
       if (legacy) {
         return NextResponse.json({
-          error: "Skadeärendet finns kvar i äldre lagring. Kör backfill till InsuranceClaim innan status ändras.",
+          error: "Skadeärendet finns kvar i äldre lagring. Kör backfill till InsuranceClaim innan det kan uppdateras.",
         }, { status: 409 });
       }
       return NextResponse.json({ error: "Skadeärendet hittades inte" }, { status: 404 });
     }
 
-    if (existing.status === status) return NextResponse.json({ success: true, id: existing.id, status });
+    if (hasFieldUpdate && closedStatuses.has(existing.status)) {
+      return NextResponse.json({ error: "Avslutade eller reglerade ärenden kan bara få ny status" }, { status: 400 });
+    }
+
+    const nextStatus = hasStatus ? status : existing.status;
+    let title = existing.title;
+    let estimatedCost = asNumber(existing.estimated_cost);
+    let deductible = asNumber(existing.deductible);
+    let compensation = asNumber(existing.compensation);
+    let claimNumber = existing.claim_number || "";
+    let insurer = existing.insurer || "";
+    let location = existing.location || "";
+    let note = existing.note || "";
+
+    if (hasFieldUpdate) {
+      if (body.title !== undefined) title = String(body.title || "").trim();
+      if (body.estimatedCost !== undefined) estimatedCost = Number(body.estimatedCost);
+      if (body.deductible !== undefined) deductible = Number(body.deductible);
+      if (body.compensation !== undefined) compensation = Number(body.compensation);
+      if (body.claimNumber !== undefined) claimNumber = String(body.claimNumber || "").trim();
+      if (body.insurer !== undefined) insurer = String(body.insurer || "").trim();
+      if (body.location !== undefined) location = String(body.location || "").trim();
+      if (body.note !== undefined) note = String(body.note || "").trim();
+      if (!title) return NextResponse.json({ error: "Rubrik krävs" }, { status: 400 });
+      if (![estimatedCost, deductible, compensation].every((value) => Number.isFinite(value) && value >= 0)) {
+        return NextResponse.json({ error: "Kontrollera ekonomiska belopp" }, { status: 400 });
+      }
+    }
+
+    const statusOnly = hasStatus && !hasFieldUpdate;
+    if (statusOnly && existing.status === nextStatus) {
+      return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
+    }
+
+    const data = hasFieldUpdate
+      ? {
+          status: nextStatus,
+          title,
+          estimated_cost: estimatedCost,
+          deductible,
+          compensation,
+          claim_number: claimNumber || null,
+          insurer: insurer || null,
+          location: location || null,
+          note: note || null,
+        }
+      : { status: nextStatus };
 
     const updateResult = await db.insuranceClaim.updateMany({
       where: { id: existing.id, company_id: user.company_id },
-      data: { status },
+      data,
     });
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Skadeärendet hittades inte" }, { status: 404 });
@@ -210,18 +277,30 @@ export async function PATCH(request: Request) {
     await writeAuditLog(user, {
       entityType: "insurance_claim",
       entityId: existing.id,
-      action: "insurance_claim.status_updated",
+      action: statusOnly ? "insurance_claim.status_updated" : "insurance_claim.updated",
       metadata: {
-        title: existing.title,
+        title,
         previousStatus: existing.status,
-        status,
+        status: nextStatus,
+        estimated_cost: estimatedCost,
+        deductible,
+        compensation,
+        claim_number: claimNumber,
+        insurer,
+        location,
+        note,
         storage: "InsuranceClaim",
       },
     });
 
-    return NextResponse.json({ success: true, id: existing.id, status });
+    return NextResponse.json({
+      success: true,
+      id: existing.id,
+      status: nextStatus,
+      net_cost: Math.max(0, estimatedCost - compensation),
+    });
   } catch (error) {
-    console.error("Update insurance claim status error:", error);
+    console.error("Update insurance claim error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

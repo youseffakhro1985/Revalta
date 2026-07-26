@@ -146,6 +146,8 @@ export async function POST(request: Request) {
 }
 
 const allowedStatuses = new Set(["active", "ended", "cancelled"]);
+const contactFieldKeys = ["contactName", "email", "phone"] as const;
+const contractFieldKeys = ["name", "orgNumber", "category", "contractTitle", "contractValue", "startDate", "endDate", "noticeMonths"] as const;
 
 export async function PATCH(request: Request) {
   try {
@@ -156,14 +158,38 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
     const vendorId = String(body.vendorId || body.id || "").trim();
-    const status = String(body.status || "").trim();
-    if (!vendorId || !allowedStatuses.has(status)) {
-      return NextResponse.json({ error: "Leverantörs-id och giltig status krävs" }, { status: 400 });
+    if (!vendorId) return NextResponse.json({ error: "Leverantörs-id krävs" }, { status: 400 });
+
+    const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
+    const status = hasStatus ? String(body.status).trim() : "";
+    if (hasStatus && !allowedStatuses.has(status)) {
+      return NextResponse.json({ error: "Giltig status krävs" }, { status: 400 });
+    }
+
+    const hasContactUpdate = contactFieldKeys.some((key) => body[key] !== undefined);
+    const hasContractUpdate = contractFieldKeys.some((key) => body[key] !== undefined);
+    const hasFieldUpdate = hasContactUpdate || hasContractUpdate;
+    if (!hasStatus && !hasFieldUpdate) {
+      return NextResponse.json({ error: "Status eller fält att uppdatera krävs" }, { status: 400 });
     }
 
     const existing = await db.vendorContract.findFirst({
       where: { id: vendorId, company_id: user.company_id },
-      select: { id: true, name: true, status: true },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        org_number: true,
+        category: true,
+        contact_name: true,
+        email: true,
+        phone: true,
+        contract_title: true,
+        contract_value: true,
+        start_date: true,
+        end_date: true,
+        notice_months: true,
+      },
     });
     if (!existing) {
       const legacy = await db.auditLog.findFirst({
@@ -177,17 +203,83 @@ export async function PATCH(request: Request) {
       const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
       if (legacy && metadata.storage !== "VendorContract") {
         return NextResponse.json({
-          error: "Leverantören finns kvar i äldre lagring. Kör backfill till VendorContract innan status ändras.",
+          error: "Leverantören finns kvar i äldre lagring. Kör backfill till VendorContract innan den kan uppdateras.",
         }, { status: 409 });
       }
       return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 404 });
     }
 
-    if (existing.status === status) return NextResponse.json({ success: true, id: existing.id, status });
+    if (hasContractUpdate && existing.status !== "active") {
+      return NextResponse.json({ error: "Avtalsuppgifter kan bara ändras när leverantören är aktiv" }, { status: 400 });
+    }
+
+    const nextStatus = hasStatus ? status : existing.status;
+    let name = existing.name;
+    let orgNumber = existing.org_number || "";
+    let category = existing.category;
+    let contactName = existing.contact_name || "";
+    let email = existing.email || "";
+    let phone = existing.phone || "";
+    let contractTitle = existing.contract_title || "";
+    let contractValue = asNumber(existing.contract_value);
+    let startDate = existing.start_date;
+    let endDate = existing.end_date;
+    let noticeMonths = existing.notice_months;
+
+    if (hasContactUpdate) {
+      if (body.contactName !== undefined) contactName = String(body.contactName || "").trim();
+      if (body.email !== undefined) email = String(body.email || "").trim();
+      if (body.phone !== undefined) phone = String(body.phone || "").trim();
+    }
+
+    if (hasContractUpdate) {
+      if (body.name !== undefined) name = String(body.name || "").trim();
+      if (body.orgNumber !== undefined) orgNumber = String(body.orgNumber || "").trim();
+      if (body.category !== undefined) category = String(body.category || "Övrigt").trim() || "Övrigt";
+      if (body.contractTitle !== undefined) contractTitle = String(body.contractTitle || "").trim();
+      if (body.contractValue !== undefined) contractValue = Number(body.contractValue);
+      if (body.noticeMonths !== undefined) noticeMonths = Number(body.noticeMonths);
+      if (body.startDate !== undefined) {
+        const parsed = body.startDate ? parseOptionalDate(String(body.startDate)) : null;
+        if (body.startDate && !parsed) return NextResponse.json({ error: "Ogiltigt startdatum" }, { status: 400 });
+        startDate = parsed;
+      }
+      if (body.endDate !== undefined) {
+        const parsed = body.endDate ? parseOptionalDate(String(body.endDate)) : null;
+        if (body.endDate && !parsed) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 });
+        endDate = parsed;
+      }
+      if (!name) return NextResponse.json({ error: "Leverantörsnamn krävs" }, { status: 400 });
+      if (!Number.isFinite(contractValue) || contractValue < 0 || !Number.isFinite(noticeMonths) || noticeMonths < 0) {
+        return NextResponse.json({ error: "Kontrollera avtalsvärde och uppsägningstid" }, { status: 400 });
+      }
+    }
+
+    const statusOnly = hasStatus && !hasFieldUpdate;
+    if (statusOnly && existing.status === nextStatus) {
+      return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
+    }
+
+    const data: Record<string, unknown> = { status: nextStatus };
+    if (hasContactUpdate) {
+      data.contact_name = contactName || null;
+      data.email = email || null;
+      data.phone = phone || null;
+    }
+    if (hasContractUpdate) {
+      data.name = name;
+      data.org_number = orgNumber || null;
+      data.category = category;
+      data.contract_title = contractTitle || null;
+      data.contract_value = contractValue;
+      data.start_date = startDate;
+      data.end_date = endDate;
+      data.notice_months = noticeMonths;
+    }
 
     const updateResult = await db.vendorContract.updateMany({
       where: { id: existing.id, company_id: user.company_id },
-      data: { status },
+      data,
     });
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 404 });
@@ -196,18 +288,25 @@ export async function PATCH(request: Request) {
     await writeAuditLog(user, {
       entityType,
       entityId: existing.id,
-      action: "vendor_contract.status_updated",
+      action: statusOnly ? "vendor_contract.status_updated" : "vendor_contract.updated",
       metadata: {
-        name: existing.name,
+        name,
         previousStatus: existing.status,
-        status,
+        status: nextStatus,
+        contactName,
+        email,
+        phone,
+        contractTitle,
+        contractValue,
+        endDate: endDate?.toISOString().slice(0, 10) || "",
+        noticeMonths,
         storage: "VendorContract",
       },
     });
 
-    return NextResponse.json({ success: true, id: existing.id, status });
+    return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
   } catch (error) {
-    console.error("Update vendor status error:", error);
+    console.error("Update vendor error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 
 export const ESCALATION_RULE_EVENT = "service_escalation_rules";
@@ -24,10 +23,6 @@ export const DEFAULT_ESCALATION_RULES: ServiceEscalationRules = {
   recipientRoles: ["owner", "admin"],
   includeAssignee: true,
 };
-
-function isObject(value: Prisma.JsonValue | null | undefined): value is Prisma.JsonObject {
-  return value !== null && value !== undefined && typeof value === "object" && !Array.isArray(value);
-}
 
 export function normalizeEscalationRules(value: unknown): ServiceEscalationRules {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -69,25 +64,14 @@ export async function getServiceEscalationRules(companyId: string) {
     };
   }
 
-  const event = await db.integrationEvent.findFirst({
-    where: { company_id: companyId, type: ESCALATION_RULE_EVENT, status: "active" },
-    orderBy: { created_at: "desc" },
-    select: { payload: true, created_at: true },
-  });
-
-  const rawPayload = event?.payload;
-  let rulesValue: Prisma.JsonValue | null = null;
-
-  if (isObject(rawPayload)) {
-    rulesValue = Object.prototype.hasOwnProperty.call(rawPayload, "rules")
-      ? rawPayload.rules ?? null
-      : rawPayload;
-  } else if (rawPayload !== undefined) {
-    rulesValue = rawPayload;
-  }
-
-  const rules = normalizeEscalationRules(rulesValue);
-  return { rules, updatedAt: event?.created_at.toISOString() ?? null, source: "legacy" as const };
+  return {
+    rules: {
+      ...DEFAULT_ESCALATION_RULES,
+      recipientRoles: [...DEFAULT_ESCALATION_RULES.recipientRoles],
+    },
+    updatedAt: null,
+    source: "defaults" as const,
+  };
 }
 
 export async function upsertServiceEscalationRules(

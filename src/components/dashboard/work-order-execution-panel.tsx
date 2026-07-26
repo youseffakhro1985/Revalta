@@ -119,14 +119,19 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
       <article className="rounded-2xl border border-sand-200 bg-sand-50 p-5"><div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Bilddokumentation</p><p className="mt-2 text-2xl font-semibold text-ink-950">{completion.before_photo_count} / {completion.after_photo_count}</p><p className="mt-1 text-xs text-ink-400">Före / efter</p></div><Info className="h-5 w-5 text-petroleum-700" aria-hidden="true" /></div></article>
     </section>
 
-    <Panel title="Slutkontroll" description="Arbetsordern kan avslutas först när kvalitetskraven är uppfyllda.">
+    <Panel title="Slutkontroll" description="Avslut sätter driftkostnad och skickar tid/material vidare till attestering under Ekonomi och fakturering.">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className={`rounded-2xl border p-4 ${requiredIncomplete === 0 ? "border-petroleum-200 bg-petroleum-50 text-petroleum-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><p className="text-xs font-semibold uppercase tracking-wide">Kontrollpunkter</p><p className="mt-2 text-sm font-semibold">{requiredIncomplete === 0 ? "Alla obligatoriska klara" : `${requiredIncomplete} återstår`}</p></div>
         <div className={`rounded-2xl border p-4 ${completion.after_photo_count > 0 ? "border-petroleum-200 bg-petroleum-50 text-petroleum-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}><p className="text-xs font-semibold uppercase tracking-wide">Bilddokumentation</p><p className="mt-2 text-sm font-semibold">{completion.before_photo_count} före · {completion.after_photo_count} efter</p></div>
-        <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-ink-700"><p className="text-xs font-semibold uppercase tracking-wide">Faktiskt utfall</p><p className="mt-2 text-sm font-semibold">{money.format(summary.total_cost)}</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-ink-700"><p className="text-xs font-semibold uppercase tracking-wide">Driftkostnad (fält)</p><p className="mt-2 text-sm font-semibold">{money.format(summary.total_cost)}</p></div>
       </div>
-      <button type="button" disabled={!canFinalize || saving} onClick={() => void post({ action: "completion.finalize" }, "Arbetsordern har slutförts och kostnadsutfallet har uppdaterats.")} className={`${premiumPrimaryButtonClass} mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50`} aria-describedby="completion-help">{isCompleted ? "Arbetsordern är slutförd" : saving ? "Slutför…" : "Godkänn och slutför arbetsorder"}</button>
-      <p id="completion-help" className="mt-2 text-xs text-ink-500">{isCompleted ? "Registreringarna är låsta eftersom arbetsordern är avslutad." : canFinalize ? "Alla krav är uppfyllda." : "Slutför checklistan och ladda upp minst en efterbild i dokumentpanelen."}</p>
+      <button type="button" disabled={!canFinalize || saving} onClick={() => void post({ action: "completion.finalize" }, "Arbetsordern är slutförd. Tid och material väntar på attestering under Ekonomi och fakturering.")} className={`${premiumPrimaryButtonClass} mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50`} aria-describedby="completion-help">{isCompleted ? "Arbetsordern är slutförd" : saving ? "Slutför…" : "Godkänn och slutför arbetsorder"}</button>
+      <p id="completion-help" className="mt-2 text-xs text-ink-500">{isCompleted ? "Fältregistreringarna är låsta. Attestera och exportera under Ekonomi och fakturering." : canFinalize ? "Vid avslut uppdateras driftkostnad och tid/material skapas som attesterbara rader." : "Slutför checklistan och ladda upp minst en efterbild i dokumentpanelen."}</p>
+      {isCompleted ? (
+        <a href="#ekonomi" className="mt-3 inline-flex text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">
+          Öppna Ekonomi och fakturering
+        </a>
+      ) : null}
     </Panel>
 
     <Panel title="Checklista" description="Kontrollpunkter som ska vara klara innan arbetsordern avslutas.">
@@ -144,7 +149,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
       </div>
     </Panel>
 
-    <Panel title="Registrera arbete och kostnader" description="Tid, material, resor och externa kostnader summeras automatiskt till arbetsorderns faktiska utfall.">
+    <Panel title="Registrera arbete och kostnader" description="Fältregistrering för driftutfall. Vid avslut förs tid och material över till attesterbara rader under Ekonomi.">
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {([
           { type: "time", title: "Arbetstid", icon: Clock3, fields: "time" },
