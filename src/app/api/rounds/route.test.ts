@@ -33,7 +33,7 @@ describe("rounds route", () => {
 
     expect(response.status).toBe(200);
     expect(inspectionRoundFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: "company-1" },
+      where: { company_id: "company-1", property: { deleted_at: null } },
     }));
     expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { company_id: "company-1", entity_type: "round" },

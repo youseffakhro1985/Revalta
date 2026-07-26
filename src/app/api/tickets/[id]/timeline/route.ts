@@ -45,20 +45,22 @@ export async function GET(
           orderBy: { created_at: "asc" },
           select: { id: true, file_name: true, visibility: true, created_at: true },
         },
-        work_order: {
-          select: {
-            id: true,
-            title: true,
-            created_at: true,
-            assigned_to: { select: { name: true, email: true } },
-          },
-        },
       },
     });
 
     if (!ticket) {
       return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
     }
+
+    const workOrder = await db.workOrder.findFirst({
+      where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
+      select: {
+        id: true,
+        title: true,
+        created_at: true,
+        assigned_to: { select: { name: true, email: true } },
+      },
+    });
 
     const [auditLogs, enterprise, workOrderEvents] = await Promise.all([
       db.auditLog.findMany({
@@ -72,22 +74,22 @@ export async function GET(
           actor: { select: { name: true, email: true } },
         },
       }),
-      ticket.work_order
-        ? getWorkOrderEnterpriseState(db, user.company_id, ticket.work_order.id)
+      workOrder
+        ? getWorkOrderEnterpriseState(db, user.company_id, workOrder.id)
         : Promise.resolve(null),
-      ticket.work_order
-        ? getWorkOrderStatusEvents(db, user.company_id, ticket.work_order.id)
+      workOrder
+        ? getWorkOrderStatusEvents(db, user.company_id, workOrder.id)
         : Promise.resolve([]),
     ]);
 
-    const workOrderItems: TimelineItem[] = ticket.work_order
+    const workOrderItems: TimelineItem[] = workOrder
       ? buildTicketWorkOrderTimeline(
           {
-            id: ticket.work_order.id,
-            title: ticket.work_order.title,
+            id: workOrder.id,
+            title: workOrder.title,
             workOrderNumber: enterprise?.work_order_number ?? null,
-            createdAt: ticket.work_order.created_at,
-            assignedTo: ticket.work_order.assigned_to,
+            createdAt: workOrder.created_at,
+            assignedTo: workOrder.assigned_to,
           },
           workOrderEvents,
         )

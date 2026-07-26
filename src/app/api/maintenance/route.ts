@@ -31,7 +31,7 @@ export async function GET() {
     const [rows, logs, properties] = await Promise.all([
       user.company_id
         ? db.portfolioMaintenanceItem.findMany({
-            where: { company_id: user.company_id },
+            where: { company_id: user.company_id, property: { deleted_at: null } },
             orderBy: { created_at: "asc" },
             include: { property: { select: { name: true } } },
           })

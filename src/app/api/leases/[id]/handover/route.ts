@@ -30,7 +30,7 @@ async function loadHandoverForRead(companyId: string, leaseId: string, actor: { 
     select: { payload: true, status: true, version: true },
   });
   if (modern?.payload && typeof modern.payload === "object") {
-    return modern.payload as unknown as LeaseHandoverPayload;
+    return { handover: modern.payload as unknown as LeaseHandoverPayload, source: "table" as const };
   }
 
   const event = await db.integrationEvent.findFirst({
@@ -38,9 +38,9 @@ async function loadHandoverForRead(companyId: string, leaseId: string, actor: { 
     orderBy: { created_at: "desc" },
   });
   if (event?.payload && typeof event.payload === "object") {
-    return event.payload as unknown as LeaseHandoverPayload;
+    return { handover: event.payload as unknown as LeaseHandoverPayload, source: "legacy" as const };
   }
-  return emptyHandover(actor);
+  return { handover: emptyHandover(actor), source: "table" as const };
 }
 
 /** Mutation path: modern first; IE-only → 409 (no rematerialize); neither → empty for first create. */
@@ -77,7 +77,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const lease = await getLease(id, user.company_id);
     if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
 
-    const handover = await loadHandoverForRead(user.company_id, id, { id: user.id, name: user.name, email: user.email });
+    const { handover, source } = await loadHandoverForRead(user.company_id, id, { id: user.id, name: user.name, email: user.email });
     const history = await db.auditLog.findMany({
       where: { company_id: user.company_id, entity_type: "lease_handover", entity_id: id },
       orderBy: { created_at: "desc" },
@@ -85,7 +85,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       include: { actor: { select: { name: true, email: true } } },
     });
 
-    return NextResponse.json({ lease, handover, history, permissions: { canManage: canManageLeases(user.role) } });
+    return NextResponse.json({ lease, handover, source, history, permissions: { canManage: canManageLeases(user.role) } });
   } catch (error) {
     console.error("Get lease handover error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

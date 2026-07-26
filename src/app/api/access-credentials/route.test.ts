@@ -50,7 +50,7 @@ describe("access credentials route", () => {
 
     expect(response.status).toBe(200);
     expect(accessCredentialFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: "company-1" },
+      where: { company_id: "company-1", property: { deleted_at: null } },
     }));
     expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { company_id: "company-1", action: "access.credential.created" },

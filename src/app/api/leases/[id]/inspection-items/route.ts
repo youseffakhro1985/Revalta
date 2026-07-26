@@ -26,7 +26,7 @@ async function loadRecordForRead(companyId: string, leaseId: string, actor: { id
     select: { payload: true },
   });
   if (modern?.payload && typeof modern.payload === "object") {
-    return modern.payload as unknown as LeaseInspectionRecord;
+    return { record: modern.payload as unknown as LeaseInspectionRecord, source: "table" as const };
   }
 
   const event = await db.integrationEvent.findFirst({
@@ -34,9 +34,9 @@ async function loadRecordForRead(companyId: string, leaseId: string, actor: { id
     orderBy: { created_at: "desc" },
   });
   if (event?.payload && typeof event.payload === "object") {
-    return event.payload as unknown as LeaseInspectionRecord;
+    return { record: event.payload as unknown as LeaseInspectionRecord, source: "legacy" as const };
   }
-  return emptyInspectionRecord(actor);
+  return { record: emptyInspectionRecord(actor), source: "table" as const };
 }
 
 /** Mutation path: modern first; IE-only → 409 (no rematerialize); neither → empty for first create. */
@@ -73,8 +73,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const lease = await getLease(id, user.company_id);
     if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });
 
-    const record = await loadRecordForRead(user.company_id, id, { id: user.id, name: user.name, email: user.email });
-    return NextResponse.json({ lease, record, permissions: { canManage: canManageLeases(user.role) } });
+    const { record, source } = await loadRecordForRead(user.company_id, id, { id: user.id, name: user.name, email: user.email });
+    return NextResponse.json({ lease, record, source, permissions: { canManage: canManageLeases(user.role) } });
   } catch (error) {
     console.error("Get lease inspection items error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

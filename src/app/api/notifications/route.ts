@@ -162,10 +162,13 @@ export async function PATCH(request: Request) {
 
     if (user.company_id) {
       const modern = await db.appNotification.findFirst({
-        where: { id: notificationId, company_id: user.company_id, deleted_at: null },
-        select: { id: true },
+        where: { id: notificationId, company_id: user.company_id },
+        select: { id: true, deleted_at: true },
       });
       if (modern) {
+        if (modern.deleted_at) {
+          return NextResponse.json({ error: "Notisen hittades inte" }, { status: 404 });
+        }
         await db.notificationRead.upsert({
           where: { notification_id_reader_user_id: { notification_id: modern.id, reader_user_id: user.id } },
           create: {
@@ -181,9 +184,10 @@ export async function PATCH(request: Request) {
 
     const legacyNotification = await db.auditLog.findFirst({
       where: { ...scopeFor(user), action: createdAction, entity_id: notificationId },
-      select: { id: true },
+      select: { id: true, metadata: true },
     });
-    if (legacyNotification) {
+    const legacyMetadata = (legacyNotification?.metadata || {}) as Record<string, unknown>;
+    if (legacyNotification && legacyMetadata.storage !== "AppNotification") {
       return NextResponse.json({
         error: "Notisen finns kvar i äldre lagring. Kör backfill till AppNotification innan den kan markeras som läst.",
       }, { status: 409 });

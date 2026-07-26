@@ -22,7 +22,7 @@ export async function GET() {
 
     const [rows, legacyLogs, properties] = await Promise.all([
       db.accessCredential.findMany({
-        where: { company_id: user.company_id },
+        where: { company_id: user.company_id, property: { deleted_at: null } },
         orderBy: { created_at: "desc" },
         take: 400,
         select: {
@@ -231,10 +231,17 @@ export async function PATCH(request: Request) {
     }
 
     const existing = await db.accessCredential.findFirst({
-      where: { id: credentialId, company_id: user.company_id },
+      where: { id: credentialId, company_id: user.company_id, property: { deleted_at: null } },
       select: { id: true, status: true, holder: true, identifier: true },
     });
     if (!existing) {
+      const orphaned = await db.accessCredential.findFirst({
+        where: { id: credentialId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Behörigheten hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action: legacyAction, id: credentialId },
         select: { id: true },

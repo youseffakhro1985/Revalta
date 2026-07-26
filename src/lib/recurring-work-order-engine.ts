@@ -30,7 +30,11 @@ export type RecurringSchedule = {
   last_work_order_number: string | null;
   created_at: Date;
   updated_at: string | Date;
+  source: "table" | "legacy";
 };
+
+export const RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR =
+  "Schemat finns kvar i äldre lagring. Kör backfill till RecurringWorkOrderSchedule innan det kan uppdateras eller genereras.";
 
 export type RecurringRunRecord = {
   id: string;
@@ -88,6 +92,7 @@ function toSchedule(row: {
     last_work_order_number: row.last_work_order_number,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    source: "table",
   };
 }
 
@@ -125,6 +130,7 @@ async function readLegacySchedules(companyId: string, client: DbClient) {
         : (previous?.last_work_order_number ?? null),
       created_at: previous?.created_at || log.created_at,
       updated_at: metadata.updated_at || log.created_at,
+      source: "legacy",
     });
   }
   return latest;
@@ -146,7 +152,7 @@ export async function readRecurringSchedules(companyId: string, client: DbClient
   ]);
 
   const byId = new Map<string, RecurringSchedule>();
-  for (const row of legacy.values()) byId.set(row.id, row);
+  for (const row of legacy.values()) byId.set(row.id, { ...row, source: "legacy" });
   for (const row of modern) byId.set(row.id, toSchedule(row));
   return [...byId.values()].sort((a, b) => String(a.next_run_at).localeCompare(String(b.next_run_at)));
 }
@@ -324,6 +330,10 @@ export async function generateRecurringWorkOrder(input: {
     const schedules = await readRecurringSchedules(input.companyId, tx);
     const schedule = schedules.find((item) => item.id === input.scheduleId);
     if (!schedule || !schedule.active) return { status: "skipped" as const, reason: "inactive_or_missing" };
+    // Fail-closed: never rematerialize AuditLog-only schedules into RecurringWorkOrderSchedule.
+    if (schedule.source === "legacy") {
+      return { status: "failed" as const, reason: "legacy_requires_backfill" as const };
+    }
     if (!schedule.property_id || !schedule.title || !schedule.description || !schedule.frequency || !schedule.priority || !schedule.next_run_at) {
       return { status: "failed" as const, reason: "invalid_schedule" };
     }
@@ -438,8 +448,10 @@ export async function runRecurringWorkOrderEngine(input: { companyId?: string; n
     });
     if (!actor) { result.failed += 1; continue; }
     const schedules = await readRecurringSchedules(companyId);
-    const due = schedules.filter((item) => item.active && new Date(item.next_run_at).getTime() <= now.getTime());
+    const due = schedules.filter((item) => item.active && item.source === "table" && new Date(item.next_run_at).getTime() <= now.getTime());
+    const legacyDue = schedules.filter((item) => item.active && item.source === "legacy" && new Date(item.next_run_at).getTime() <= now.getTime());
     result.due += due.length;
+    result.skipped += legacyDue.length;
     for (const schedule of due) {
       try {
         const generated = await generateRecurringWorkOrder({ companyId, scheduleId: schedule.id, actorUserId: actor.id, now });

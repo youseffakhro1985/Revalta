@@ -14,7 +14,7 @@ export async function GET() {
     const [rows, notices, leases, properties] = await Promise.all([
       user.company_id
         ? db.rentNotice.findMany({
-            where: { company_id: user.company_id },
+            where: { company_id: user.company_id, property: { deleted_at: null } },
             orderBy: { created_at: "desc" },
             take: 500,
             include: { property: { select: { name: true } } },
@@ -28,7 +28,7 @@ export async function GET() {
       }),
       user.company_id
         ? db.lease.findMany({
-            where: { company_id: user.company_id, deleted_at: null },
+            where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
             orderBy: { updated_at: "desc" },
             take: 500,
             include: {

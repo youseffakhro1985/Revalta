@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       const existing = await db.appNotification.findFirst({
         where: {
           company_id: document.company_id,
+          deleted_at: null,
           title: { startsWith: "Dokument går ut" },
           message: { contains: document.id },
           created_at: { gte: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) },
@@ -55,17 +56,6 @@ export async function GET(request: Request) {
         select: { id: true },
       });
       if (existing) { skipped += 1; continue; }
-
-      const auditDedupe = await db.auditLog.findFirst({
-        where: {
-          company_id: document.company_id,
-          action: "document.expiry_reminder",
-          entity_id: document.id,
-          created_at: { gte: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) },
-        },
-        select: { id: true },
-      });
-      if (auditDedupe) { skipped += 1; continue; }
 
       const urgency = days <= 0 ? "hög" : days <= 7 ? "hög" : "normal";
       const title = days <= 0

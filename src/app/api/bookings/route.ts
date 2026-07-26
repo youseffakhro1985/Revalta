@@ -14,7 +14,7 @@ export async function GET() {
 
     const [rows, legacyLogs, properties] = await Promise.all([
       db.booking.findMany({
-        where: { company_id: user.company_id },
+        where: { company_id: user.company_id, property: { deleted_at: null } },
         orderBy: { created_at: "desc" },
         take: 250,
         include: { property: { select: { name: true } } },

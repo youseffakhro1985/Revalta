@@ -12,6 +12,7 @@ type Schedule = {
   priority: "low" | "normal" | "high" | "urgent";
   estimated_cost: number | null; next_run_at: string; active: boolean;
   last_generated_at: string | null; last_work_order_id: string | null; last_work_order_number: string | null;
+  source?: "table" | "legacy";
 };
 type RunPayload = { generated?: number; skipped?: number; locked?: number; failed?: number; error?: string; completedAt?: string; startedAt?: string };
 type Run = { id: string; status: string; payload: RunPayload | null; created_at: string };
@@ -81,6 +82,10 @@ export default function RecurringWorkOrdersPage() {
   }
 
   async function toggle(item: Schedule) {
+    if (item.source === "legacy") {
+      setError("Schemat finns kvar i äldre lagring. Kör backfill till RecurringWorkOrderSchedule innan det kan uppdateras eller genereras.");
+      return;
+    }
     setBusyId(item.id); setError(""); setMessage("");
     try {
       const response = await fetch("/api/work-orders/recurring", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scheduleId: item.id, active: !item.active }) });
@@ -92,6 +97,10 @@ export default function RecurringWorkOrdersPage() {
   }
 
   async function generate(item: Schedule) {
+    if (item.source === "legacy") {
+      setError("Schemat finns kvar i äldre lagring. Kör backfill till RecurringWorkOrderSchedule innan det kan uppdateras eller genereras.");
+      return;
+    }
     setBusyId(item.id); setError(""); setMessage("");
     try {
       const response = await fetch("/api/work-orders/recurring", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "generate", scheduleId: item.id }) });
@@ -132,10 +141,13 @@ export default function RecurringWorkOrdersPage() {
       <Panel title="Scheman" description={`${schedules.length} återkommande arbetsflöden`} bodyClassName="p-0">
         {loading && !schedules.length ? <div className="p-8 text-sm text-ink-500">Hämtar scheman…</div> : null}
         {!loading && schedules.length === 0 ? <EmptyState title="Inga återkommande scheman" description="Skapa ett schema för att automatisera återkommande drift och underhåll." /> : null}
-        <div className="divide-y divide-sand-100">{schedules.map((item) => <article key={item.id} className="p-5 sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.active ? "bg-petroleum-50 text-petroleum-700" : "bg-sand-100 text-ink-500"}`}>{item.active ? "Aktivt" : "Pausat"}</span><span className="text-xs font-semibold text-ink-400">{frequencyLabel[item.frequency]}</span></div><h3 className="mt-3 text-lg font-semibold text-ink-950">{item.title}</h3><p className="mt-1 text-sm text-ink-500">{item.property_name} · {priorityLabel[item.priority]} prioritet</p><p className="mt-3 line-clamp-2 text-sm leading-6 text-ink-600">{item.description}</p></div><div className="shrink-0 lg:text-right"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Nästa körning</p><p className="mt-1 font-semibold text-ink-900">{dateTime.format(new Date(item.next_run_at))}</p><p className="mt-1 text-xs text-ink-400">{item.estimated_cost == null ? "Kostnad saknas" : currency.format(item.estimated_cost)}</p></div></div>
-          <div className="mt-5 flex flex-wrap items-center gap-2"><button type="button" disabled={busyId === item.id || !item.active} onClick={() => void generate(item)} className="inline-flex h-10 items-center gap-2 rounded-lg bg-petroleum-700 px-3.5 text-sm font-semibold text-white disabled:opacity-40"><PlayCircle className="h-4 w-4" /> Generera nu</button><button type="button" disabled={busyId === item.id} onClick={() => void toggle(item)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-sand-200 bg-white px-3.5 text-sm font-semibold text-ink-700 disabled:opacity-40">{item.active ? <PauseCircle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}{item.active ? "Pausa" : "Aktivera"}</button>{item.last_work_order_id ? <Link href={`/dashboard/arbetsorder/${item.last_work_order_id}`} className="ml-auto text-sm font-semibold text-petroleum-700 hover:underline">Senaste: {item.last_work_order_number || "arbetsorder"}</Link> : null}</div>
-        </article>)}</div>
+        <div className="divide-y divide-sand-100">{schedules.map((item) => {
+          const isLegacy = item.source === "legacy";
+          return <article key={item.id} className="p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.active ? "bg-petroleum-50 text-petroleum-700" : "bg-sand-100 text-ink-500"}`}>{item.active ? "Aktivt" : "Pausat"}</span><span className="text-xs font-semibold text-ink-400">{frequencyLabel[item.frequency]}</span></div><h3 className="mt-3 text-lg font-semibold text-ink-950">{item.title}</h3><p className="mt-1 text-sm text-ink-500">{item.property_name} · {priorityLabel[item.priority]} prioritet</p><p className="mt-3 line-clamp-2 text-sm leading-6 text-ink-600">{item.description}</p>{isLegacy ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre schema – kör backfill till RecurringWorkOrderSchedule innan paus/generering.</p> : null}</div><div className="shrink-0 lg:text-right"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Nästa körning</p><p className="mt-1 font-semibold text-ink-900">{dateTime.format(new Date(item.next_run_at))}</p><p className="mt-1 text-xs text-ink-400">{item.estimated_cost == null ? "Kostnad saknas" : currency.format(item.estimated_cost)}</p></div></div>
+          <div className="mt-5 flex flex-wrap items-center gap-2">{!isLegacy ? <><button type="button" disabled={busyId === item.id || !item.active} onClick={() => void generate(item)} className="inline-flex h-10 items-center gap-2 rounded-lg bg-petroleum-700 px-3.5 text-sm font-semibold text-white disabled:opacity-40"><PlayCircle className="h-4 w-4" /> Generera nu</button><button type="button" disabled={busyId === item.id} onClick={() => void toggle(item)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-sand-200 bg-white px-3.5 text-sm font-semibold text-ink-700 disabled:opacity-40">{item.active ? <PauseCircle className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}{item.active ? "Pausa" : "Aktivera"}</button></> : null}{item.last_work_order_id ? <Link href={`/dashboard/arbetsorder/${item.last_work_order_id}`} className="ml-auto text-sm font-semibold text-petroleum-700 hover:underline">Senaste: {item.last_work_order_number || "arbetsorder"}</Link> : null}</div>
+        </article>;
+        })}</div>
       </Panel>
     </section>
     <Panel title="Körhistorik" description="De senaste automatiska och manuella företagskörningarna" bodyClassName="p-0">

@@ -26,7 +26,7 @@ export async function GET() {
 
     const [rows, decisions, legacyLogs, legacyDecisions, properties] = await Promise.all([
       db.quote.findMany({
-        where: { company_id: user.company_id },
+        where: { company_id: user.company_id, property: { deleted_at: null } },
         orderBy: { created_at: "desc" },
         take: 300,
         include: {
@@ -243,7 +243,7 @@ export async function PATCH(request: Request) {
     }
 
     const quote = await db.quote.findFirst({
-      where: { id: quoteId, company_id: user.company_id },
+      where: { id: quoteId, company_id: user.company_id, property: { deleted_at: null } },
       select: { id: true, property_id: true, title: true, status: true },
     });
 
@@ -287,6 +287,14 @@ export async function PATCH(request: Request) {
       });
 
       return NextResponse.json({ success: true });
+    }
+
+    const orphaned = await db.quote.findFirst({
+      where: { id: quoteId, company_id: user.company_id },
+      select: { id: true },
+    });
+    if (orphaned) {
+      return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
     }
 
     const legacyQuote = await db.auditLog.findFirst({

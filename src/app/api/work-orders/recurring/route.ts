@@ -9,6 +9,7 @@ import {
   readRecurringSchedules,
   RECURRING_FREQUENCIES,
   RECURRING_PRIORITIES,
+  RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR,
   upsertRecurringSchedule,
   type RecurringFrequency,
   type RecurringPriority,
@@ -59,9 +60,18 @@ export async function POST(request: Request) {
   if (body.action === "generate") {
     const scheduleId = String(body.scheduleId || "").trim();
     if (!scheduleId) return NextResponse.json({ error: "Schema krävs" }, { status: 400 });
+    const schedules = await readRecurringSchedules(user.company_id);
+    const existing = schedules.find((item) => item.id === scheduleId);
+    if (!existing) return NextResponse.json({ error: "Aktivt schema hittades inte" }, { status: 404 });
+    if (existing.source === "legacy") {
+      return NextResponse.json({ error: RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR }, { status: 409 });
+    }
     const result = await generateRecurringWorkOrder({ companyId: user.company_id, scheduleId, actorUserId: user.id, force: true });
     if (result.status === "generated") return NextResponse.json(result, { status: 201 });
     if (result.status === "locked") return NextResponse.json({ error: "Schemat körs redan" }, { status: 409 });
+    if (result.status === "failed" && result.reason === "legacy_requires_backfill") {
+      return NextResponse.json({ error: RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR }, { status: 409 });
+    }
     if (result.status === "failed") return NextResponse.json({ error: "Schemat kunde inte generera en arbetsorder", reason: result.reason }, { status: 400 });
     return NextResponse.json({ error: "Aktivt schema hittades inte" }, { status: 404 });
   }
@@ -129,6 +139,9 @@ export async function PATCH(request: Request) {
   const schedules = await readRecurringSchedules(user.company_id);
   const schedule = schedules.find((item) => item.id === scheduleId);
   if (!schedule) return NextResponse.json({ error: "Schemat hittades inte" }, { status: 404 });
+  if (schedule.source === "legacy") {
+    return NextResponse.json({ error: RECURRING_SCHEDULE_LEGACY_BACKFILL_ERROR }, { status: 409 });
+  }
 
   await upsertRecurringSchedule({
     id: scheduleId,
