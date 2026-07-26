@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import type { Prisma } from "@prisma/client";
+import { buildChecklistFromLabels, normalizeChecklist } from "@/lib/inspection-round-checklist";
 
 export async function GET() {
   try {
@@ -25,28 +26,39 @@ export async function GET() {
     ]);
 
     const modernIds = new Set(rows.map((row) => row.id));
-    const modern = rows.map((row) => ({
-      id: row.id,
-      createdAt: row.created_at,
-      title: row.title,
-      propertyId: row.property_id,
-      propertyName: row.property.name,
-      interval: row.interval,
-      status: row.status,
-      nextDue: row.next_due.toISOString(),
-      checklist: row.checklist,
-      deviations: row.deviations,
-      source: "table" as const,
-    }));
+    const modern = rows.map((row) => {
+      const checklist = normalizeChecklist(row.checklist);
+      return {
+        id: row.id,
+        createdAt: row.created_at,
+        title: row.title,
+        propertyId: row.property_id,
+        propertyName: row.property.name,
+        interval: row.interval,
+        status: row.status,
+        nextDue: row.next_due.toISOString(),
+        checklist,
+        deviations: row.deviations || checklist.filter((item) => item.hasDeviation).length,
+        source: "table" as const,
+      };
+    });
 
     const legacy = logs
-      .filter((log) => !modernIds.has(log.id))
-      .map((log) => ({
-        id: log.id,
-        createdAt: log.created_at,
-        ...(log.metadata as Record<string, unknown>),
-        source: "legacy" as const,
-      }));
+      .filter((log) => {
+        const metadata = (log.metadata || {}) as Record<string, unknown>;
+        if (metadata.storage === "InspectionRound") return false;
+        return !modernIds.has(log.id) && !(typeof log.entity_id === "string" && modernIds.has(log.entity_id));
+      })
+      .map((log) => {
+        const metadata = (log.metadata || {}) as Record<string, unknown>;
+        return {
+          id: log.id,
+          createdAt: log.created_at,
+          ...metadata,
+          checklist: normalizeChecklist(metadata.checklist),
+          source: "legacy" as const,
+        };
+      });
 
     return NextResponse.json({
       rounds: [...modern, ...legacy]
@@ -91,7 +103,7 @@ export async function POST(request: Request) {
     const days = interval === "weekly" ? 7 : interval === "quarterly" ? 90 : interval === "yearly" ? 365 : 30;
     nextDue.setDate(nextDue.getDate() + days);
 
-    const checklistPayload = checklist.map((label: string) => ({ label, completed: false })) as Prisma.InputJsonValue;
+    const checklistPayload = buildChecklistFromLabels(checklist) as unknown as Prisma.InputJsonValue;
 
     const round = await db.inspectionRound.create({
       data: {

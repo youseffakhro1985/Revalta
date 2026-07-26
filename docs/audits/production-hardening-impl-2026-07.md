@@ -49,6 +49,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - IMD → debit flow: `ImdDebitLine` auto-created on reading; attach to/create rent notice.
    - Document expiry cron (`/api/cron/document-expiry-reminders`) creates AppNotifications.
    - Work-order detail exposes “Skapa projekt från arbetsorder”.
+   - Round deviations can be marked and converted to work orders (`PATCH /api/rounds/[id]`, `POST /api/rounds/[id]/work-orders`).
    - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables).
 
 ## Verification
