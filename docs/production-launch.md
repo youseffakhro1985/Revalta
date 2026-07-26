@@ -12,6 +12,26 @@ Den här checklistan ska vara uppfylld före och efter varje produktionsrelease.
 - Kör `Database Release` manuellt med exakt verifierad commit-SHA och bekräftelsen `MIGRATE_PRODUCTION`.
 - Driftsätt endast samma commit som migrationen godkändes för.
 
+### Database Release kräver två GitHub-secrets
+
+Workflowen `.github/workflows/database-release.yml` läser **inte** Vercel-variabler.
+Den behöver dessa secrets på GitHub-miljön **Production**:
+
+| Secret | Varifrån |
+| --- | --- |
+| `DATABASE_URL` | Samma värde som Vercel Production |
+| `DIRECT_URL` | Samma värde som Vercel Production (direkt/non-pooled URL när hosten kräver det) |
+
+Steg:
+
+1. Vercel → Project → Settings → Environment Variables → kopiera Production-värdena för `DATABASE_URL` och `DIRECT_URL`.
+2. GitHub → Settings → Environments → **Production** → **Environment secrets**.
+3. Lägg till/uppdatera `DATABASE_URL` och `DIRECT_URL` (exakta namn).
+4. Actions → **Database Release** → Run workflow med merge-commit-SHA + `MIGRATE_PRODUCTION`.
+
+Om workflowen faller på “Validate required secrets” saknas dessa två värden.  
+Vercel-miljöer som `Production – revalta` syns i GitHub men används **inte** av Database Release.
+
 Migrationen `20260713190000_add_work_orders_and_projects` är idempotent. Buildskriptet kan markera just en tidigare misslyckad körning av den migrationen som återställd och därefter göra ett säkert nytt försök. Inga andra misslyckade migrationer löses automatiskt.
 
 ## 2. Obligatoriska hemligheter
@@ -23,7 +43,8 @@ Migrationen `20260713190000_add_work_orders_and_projects` är idempotent. Builds
 - `BLOB_READ_WRITE_TOKEN`: privat Vercel Blob-token. `STORAGE_PROVIDER_KEY` stöds endast som övergångsreserv.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` och pris-id:n om betalning är aktiverad.
 
-AI och SMS kan aktiveras separat. Sätt aldrig produktionshemligheter i GitHub, källkod eller publika `NEXT_PUBLIC_*`-variabler.
+AI och SMS kan aktiveras separat. Sätt aldrig produktionshemligheter i källkod eller publika `NEXT_PUBLIC_*`-variabler.  
+Undantag för Database Release: endast `DATABASE_URL` och `DIRECT_URL` får ligga som GitHub Environment secrets på **Production** (se ovan). Övriga secrets hör hemma i Vercel.
 
 ## 3. Releasegrind
 

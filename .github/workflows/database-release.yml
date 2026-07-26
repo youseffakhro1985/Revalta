@@ -25,7 +25,10 @@ jobs:
     name: Apply production migrations
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: production
+    # Must match GitHub Environment name "Production" (case-insensitive).
+    # Secrets DATABASE_URL + DIRECT_URL must exist on that Environment
+    # (Settings → Environments → Production → Environment secrets).
+    environment: Production
 
     steps:
       - name: Check out approved revision
@@ -56,8 +59,26 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
-          test -n "$DATABASE_URL" || (echo "DATABASE_URL is missing" && exit 1)
-          test -n "$DIRECT_URL" || (echo "DIRECT_URL is missing" && exit 1)
+          missing=0
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL saknas i GitHub Environment 'Production'."
+            missing=1
+          fi
+          if [ -z "$DIRECT_URL" ]; then
+            echo "::error::DIRECT_URL saknas i GitHub Environment 'Production'."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo ""
+            echo "Så här fixar du det:"
+            echo "1. Kopiera DATABASE_URL och DIRECT_URL från Vercel → Project → Settings → Environment Variables (Production)."
+            echo "2. GitHub → Settings → Environments → Production → Environment secrets."
+            echo "3. Lägg till exakt namnen DATABASE_URL och DIRECT_URL med samma värden."
+            echo "4. Kör Database Release igen med samma commit-SHA och MIGRATE_PRODUCTION."
+            echo ""
+            echo "Obs: Vercel-miljön 'Production – revalta' räcker inte. Secrets måste sitta på GitHub-miljön Production."
+            exit 1
+          fi
 
       - name: Generate Prisma client
         env:
