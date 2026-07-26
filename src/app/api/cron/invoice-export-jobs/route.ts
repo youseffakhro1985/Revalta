@@ -245,7 +245,7 @@ export async function GET(request: Request) {
 
     try {
       const workOrder = await db.workOrder.findFirst({
-        where: { deleted_at: null, id: workOrderId, company_id: companyId },
+        where: { deleted_at: null, id: workOrderId, company_id: companyId, property: { deleted_at: null } },
         select: {
           id: true,
           title: true,

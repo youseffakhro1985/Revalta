@@ -52,7 +52,7 @@ export async function GET() {
       }),
       user.company_id
         ? db.lease.findMany({
-            where: { company_id: user.company_id, deleted_at: null },
+            where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
             orderBy: { lease_number: "asc" },
             take: 2000,
             select: {
@@ -204,7 +204,7 @@ export async function POST(request: Request) {
     if (visibility === "resident_lease" && !leaseId) return NextResponse.json({ error: "Hyresavtal krävs för denna synlighet" }, { status: 400 });
 
     if (leaseId) {
-      const lease = await db.lease.findFirst({ where: { id: leaseId, company_id: user.company_id, deleted_at: null }, select: { id: true, property_id: true, unit_id: true } });
+      const lease = await db.lease.findFirst({ where: { id: leaseId, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } }, select: { id: true, property_id: true, unit_id: true } });
       if (!lease) return NextResponse.json({ error: "Hyresavtalet hittades inte" }, { status: 404 });
       resolvedLeaseId = lease.id;
       resolvedPropertyId = lease.property_id;

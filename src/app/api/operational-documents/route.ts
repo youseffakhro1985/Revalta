@@ -11,12 +11,19 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const ENTITY_TYPES = new Set(["work_order", "project", "property", "technical_asset"]);
 
 async function resolveEntity(companyId: string, entityType: string, entityId: string) {
-  if (entityType === "work_order") return db.workOrder.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId }, select: { id: true } });
-  if (entityType === "project") return db.project.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId }, select: { id: true } });
+  if (entityType === "work_order") return db.workOrder.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId, property: { deleted_at: null } }, select: { id: true } });
+  if (entityType === "project") return db.project.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId, property: { deleted_at: null } }, select: { id: true } });
   if (entityType === "property") return db.property.findFirst({ where: { id: entityId, company_id: companyId, deleted_at: null }, select: { id: true } });
   if (entityType === "technical_asset") {
+    const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
     const rows = await db.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-      SELECT "id" FROM "PropertyTechnicalAsset" WHERE "id" = ${entityId} AND "company_id" = ${companyId} LIMIT 1
+      SELECT a."id"
+      FROM "PropertyTechnicalAsset" a
+      INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
+      WHERE a."id" = ${entityId}
+        AND a."company_id" = ${companyId}
+        ${propertyGuard}
+      LIMIT 1
     `);
     return rows[0] || null;
   }

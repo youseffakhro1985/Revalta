@@ -16,7 +16,7 @@ export async function GET(
     const { id } = await params;
     const [workOrder, users] = await Promise.all([
       db.workOrder.findFirst({
-        where: { deleted_at: null, id, company_id: user.company_id },
+        where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
         select: { id: true, status: true, assigned_to_id: true },
       }),
       db.user.findMany({

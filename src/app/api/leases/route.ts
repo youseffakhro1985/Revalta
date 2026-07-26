@@ -29,7 +29,7 @@ export async function GET() {
 
     const [leases, properties, holders] = await Promise.all([
       db.lease.findMany({
-        where: { company_id: user.company_id, deleted_at: null },
+        where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
         orderBy: [{ status: "asc" }, { updated_at: "desc" }],
         take: 1_000,
         include: {

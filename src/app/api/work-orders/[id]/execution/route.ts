@@ -75,7 +75,7 @@ function nonNegativeNumber(value: unknown, fallback = 0) {
 
 async function resolveWorkOrder(id: string, companyId: string) {
   return db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: companyId },
+    where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
     select: { id: true, title: true, status: true },
   });
 }

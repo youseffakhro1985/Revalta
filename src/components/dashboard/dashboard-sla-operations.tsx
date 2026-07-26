@@ -63,9 +63,10 @@ export async function DashboardSlaOperations() {
       notDeletedFilter("WorkOrder"),
       sqlSoftDeleteGuard(db, "WorkOrder", "w"),
     ]);
+    const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
     [workOrders, enterpriseRows] = await Promise.all([
       db.workOrder.findMany({
-        where: { company_id: user.company_id, ...workOrderActive },
+        where: { company_id: user.company_id, ...workOrderActive, property: { deleted_at: null } },
         take: 300,
         orderBy: { created_at: "desc" },
         select: {
@@ -83,8 +84,10 @@ export async function DashboardSlaOperations() {
         SELECT w."id", w."work_order_number", w."sla_response_due_at", w."sla_resolution_due_at",
                w."responded_at", w."paused_at", w."pause_reason", w."closed_at"
         FROM "WorkOrder" w
+        INNER JOIN "Property" p ON p."id" = w."property_id" AND p."company_id" = w."company_id"
         WHERE w."company_id" = ${user.company_id}
           ${workOrderGuard}
+          ${propertyGuard}
         LIMIT 300
       `),
     ]);

@@ -24,6 +24,7 @@ import {
   Hammer,
   HandCoins,
   KeyRound,
+  LayoutList,
   LockKeyhole,
   Menu,
   MessageSquareText,
@@ -53,6 +54,7 @@ const navigation = [
       { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
       { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
       { href: "/dashboard/arbetsorder/planering", label: "Teknikerplanering", icon: UsersRound },
+      { href: "/dashboard/arbetsorder/operationsoversikt", label: "Arbetsorderöversikt", icon: LayoutList },
       { href: "/dashboard/arbetsorder/aterkommande", label: "Återkommande", icon: Repeat2 },
       { href: "/dashboard/projekt", label: "Projekt", icon: FolderKanban },
       { href: "/dashboard/skador", label: "Skador & försäkring", icon: ShieldAlert },
@@ -98,7 +100,12 @@ const navigation = [
 function isActive(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === href;
   if (href === "/dashboard/arbetsorder") {
-    return pathname === href || (pathname.startsWith(`${href}/`) && !pathname.startsWith("/dashboard/arbetsorder/planering") && !pathname.startsWith("/dashboard/arbetsorder/aterkommande"));
+    return pathname === href || (
+      pathname.startsWith(`${href}/`)
+      && !pathname.startsWith("/dashboard/arbetsorder/planering")
+      && !pathname.startsWith("/dashboard/arbetsorder/operationsoversikt")
+      && !pathname.startsWith("/dashboard/arbetsorder/aterkommande")
+    );
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

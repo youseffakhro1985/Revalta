@@ -43,7 +43,7 @@ export async function GET() {
       }),
       user.company_id
         ? db.lease.findMany({
-            where: { company_id: user.company_id, deleted_at: null, status: { in: ["active", "notice"] } },
+            where: { company_id: user.company_id, deleted_at: null, status: { in: ["active", "notice"] }, property: { deleted_at: null } },
             orderBy: { updated_at: "desc" },
             take: 500,
             select: {

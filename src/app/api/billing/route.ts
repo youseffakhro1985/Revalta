@@ -19,7 +19,14 @@ export async function GET() {
     const [properties, teamMembers, openTickets] = await Promise.all([
       db.property.count({ where: { deleted_at: null, ...tenantWhere(user) } }),
       db.user.count({ where: { company_id: user.company_id } }),
-      db.ticket.count({ where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" } } }),
+      db.ticket.count({
+        where: {
+          deleted_at: null,
+          ...tenantWhere(user),
+          status: { not: "closed" },
+          OR: [{ property_id: null }, { property: { deleted_at: null } }],
+        },
+      }),
     ]);
     const company = await db.company.findUnique({
       where: { id: user.company_id },

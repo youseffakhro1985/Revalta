@@ -35,7 +35,7 @@ export async function readInspectionWorkOrders(companyId: string, leaseId: strin
   const ids = rows.map((link) => link.workOrderId);
   const orders = ids.length
     ? await db.workOrder.findMany({
-      where: { deleted_at: null, company_id: companyId, id: { in: ids } },
+      where: { deleted_at: null, company_id: companyId, id: { in: ids }, property: { deleted_at: null } },
       select: { id: true, status: true, priority: true, title: true, created_at: true, completed_at: true },
     })
     : [];

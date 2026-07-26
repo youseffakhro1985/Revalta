@@ -8,7 +8,7 @@ const HANDOVER_EVENT_TYPE = "lease_handover_record";
 
 export async function getLeaseHandoverReport(companyId: string, leaseId: string) {
   const lease = await db.lease.findFirst({
-    where: { id: leaseId, company_id: companyId, deleted_at: null },
+    where: { id: leaseId, company_id: companyId, deleted_at: null, property: { deleted_at: null } },
     select: {
       id: true,
       lease_number: true,

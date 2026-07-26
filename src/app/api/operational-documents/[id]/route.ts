@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { isOperationalDocumentParentActive } from "@/lib/operational-document-access";
 
 export async function DELETE(
   _request: Request,
@@ -27,6 +28,9 @@ export async function DELETE(
       },
     });
     if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    if (!(await isOperationalDocumentParentActive(user.company_id, document))) {
+      return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    }
 
     const deleteResult = await db.operationalDocument.updateMany({
       where: { id: document.id, company_id: user.company_id, deleted_at: null },

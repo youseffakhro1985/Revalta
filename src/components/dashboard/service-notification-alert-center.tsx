@@ -15,6 +15,7 @@ type AlertItem = {
   acknowledged: boolean;
   title: string;
   description: string;
+  source?: "table" | "legacy";
 };
 
 type AlertData = {
@@ -125,9 +126,14 @@ export function ServiceNotificationAlertCenter() {
                 <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-950">{item.title}</h3><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.severity === "critical" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>{item.severity === "critical" ? "Kritisk" : "Varning"}</span>{item.acknowledged ? <span className="rounded-full bg-sand-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">Kvitterad</span> : null}</div>
                 <p className="mt-1 text-sm leading-6 text-ink-600">{item.description}</p>
                 <p className="mt-2 text-xs text-ink-400">Upptäckt {dateTime.format(new Date(item.createdAt))}</p>
+                {item.source === "legacy" ? (
+                  <p className="mt-2 text-xs font-medium text-amber-800">Äldre larm – kör backfill innan det kan kvitteras.</p>
+                ) : null}
               </div>
             </div>
-            <button type="button" onClick={() => void acknowledge(item.id)} disabled={item.acknowledged || pending.has(item.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-4 w-4" aria-hidden="true" />{pending.has(item.id) ? "Kvitterar…" : item.acknowledged ? "Kvitterad" : "Kvittera larm"}</button>
+            {item.source === "legacy" ? null : (
+              <button type="button" onClick={() => void acknowledge(item.id)} disabled={item.acknowledged || pending.has(item.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-4 w-4" aria-hidden="true" />{pending.has(item.id) ? "Kvitterar…" : item.acknowledged ? "Kvitterad" : "Kvittera larm"}</button>
+            )}
           </article>
         ))}
 

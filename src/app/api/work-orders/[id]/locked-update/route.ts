@@ -41,7 +41,10 @@ export async function PATCH(
     return noStore({ error: "Ogiltig arbetsorderversion", code: "invalid_version" }, { status: 400 });
   }
 
-  const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
+  const [workOrderGuard, propertyGuard] = await Promise.all([
+    sqlSoftDeleteGuard(db, "WorkOrder", "w"),
+    sqlSoftDeleteGuard(db, "Property", "p"),
+  ]);
   const rows = await db.$queryRaw<Array<{ updated_at: Date; lock_valid: boolean }>>(Prisma.sql`
     SELECT w."updated_at",
            EXISTS (
@@ -54,8 +57,10 @@ export async function PATCH(
                AND l."expires_at" > CURRENT_TIMESTAMP
            ) AS "lock_valid"
     FROM "WorkOrder" w
+    INNER JOIN "Property" p ON p."id" = w."property_id" AND p."company_id" = w."company_id"
     WHERE w."id" = ${id} AND w."company_id" = ${user.company_id}
       ${workOrderGuard}
+      ${propertyGuard}
     LIMIT 1
   `);
 

@@ -14,6 +14,7 @@ import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 import {
+  activePropertyRelationFilter,
   getCachedSchemaReadiness,
   notDeletedFilter,
   schemaCompatibilityBannerMessage,
@@ -28,11 +29,18 @@ async function getDashboardData() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const schema = await getCachedSchemaReadiness();
-  const [ticketActive, propertyActive] = await Promise.all([
+  const [ticketActive, propertyActive, propertyRelation] = await Promise.all([
     notDeletedFilter("Ticket"),
     notDeletedFilter("Property"),
+    activePropertyRelationFilter(),
   ]);
-  const ticketScope = { ...ticketActive, ...scope };
+  const ticketScope = {
+    ...ticketActive,
+    ...scope,
+    ...("property" in propertyRelation
+      ? { OR: [{ property_id: null }, propertyRelation] }
+      : {}),
+  };
 
   const [
     totalTickets,

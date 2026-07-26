@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
-import { notDeletedFilter } from "@/lib/schema-readiness";
+import { activePropertyRelationFilter, notDeletedFilter } from "@/lib/schema-readiness";
 import { redirect } from "next/navigation";
 
 const closedStatuses = new Set(["done", "closed", "completed", "resolved"]);
@@ -23,10 +23,14 @@ export default async function ReportsPage() {
   const where = tenantWhere(user);
   const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
-  const [propertyActive, ticketActive] = await Promise.all([
+  const [propertyActive, ticketActive, propertyRelation] = await Promise.all([
     notDeletedFilter("Property"),
     notDeletedFilter("Ticket"),
+    activePropertyRelationFilter(),
   ]);
+  const ticketPropertyScope = "property" in propertyRelation
+    ? { OR: [{ property_id: null }, propertyRelation] }
+    : {};
 
   const [properties, tickets, recentAudit] = await Promise.all([
     db.property.findMany({
@@ -39,11 +43,16 @@ export default async function ReportsPage() {
         total_area: true,
         boa: true,
         loa: true,
-        _count: { select: { tickets: { where: ticketActive }, buildings: true, units: true } },
+        _count: { select: { tickets: { where: { ...ticketActive, ...ticketPropertyScope } }, buildings: true, units: true } },
       },
     }),
     db.ticket.findMany({
-      where: { ...ticketActive, ...where, created_at: { gte: ninetyDaysAgo } },
+      where: {
+        ...ticketActive,
+        ...where,
+        created_at: { gte: ninetyDaysAgo },
+        ...ticketPropertyScope,
+      },
       orderBy: { created_at: "asc" },
       select: {
         id: true,
