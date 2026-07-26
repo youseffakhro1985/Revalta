@@ -179,17 +179,48 @@ export async function PATCH(request: Request) {
 
     const body = await request.json();
     const bookingId = String(body.bookingId || body.id || "").trim();
-    const status = String(body.status || "").trim();
     if (!bookingId) return NextResponse.json({ error: "Boknings-id krävs" }, { status: 400 });
-    if (status !== "cancelled") {
-      return NextResponse.json({ error: "Endast avbokning (cancelled) stöds" }, { status: 400 });
+
+    const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
+    const status = hasStatus ? String(body.status).trim() : "";
+    const fieldKeys = ["resource", "residentName", "unit", "start", "end", "note"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!hasStatus && !hasFieldUpdate) {
+      return NextResponse.json({ error: "Status eller fält att uppdatera krävs" }, { status: 400 });
+    }
+    if (hasStatus && status !== "cancelled") {
+      return NextResponse.json({ error: "Endast avbokning (cancelled) stöds som statusändring" }, { status: 400 });
     }
 
     const modern = await db.booking.findFirst({
       where: { id: bookingId, company_id: user.company_id },
-      select: { id: true, status: true, resource: true, resident_name: true },
+      select: {
+        id: true,
+        property_id: true,
+        status: true,
+        resource: true,
+        resident_name: true,
+        unit: true,
+        start_at: true,
+        end_at: true,
+        note: true,
+      },
     });
-    if (modern) {
+
+    if (!modern) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: bookingId },
+        select: { id: true },
+      });
+      if (legacy) {
+        return NextResponse.json({
+          error: "Bokningen finns kvar i äldre lagring. Kör backfill till Booking innan den kan uppdateras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+    }
+
+    if (hasStatus && status === "cancelled") {
       if (modern.status === "cancelled") return NextResponse.json({ success: true, alreadyCancelled: true });
       const updateResult = await db.booking.updateMany({
         where: { id: modern.id, company_id: user.company_id },
@@ -212,19 +243,75 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const legacy = await db.auditLog.findFirst({
-      where: { ...auditScopedWhere(user), action, id: bookingId },
-      select: { id: true },
-    });
-    if (legacy) {
-      return NextResponse.json({
-        error: "Bokningen finns kvar i äldre lagring. Kör backfill till Booking innan den kan avbokas.",
-      }, { status: 409 });
+    if (modern.status === "cancelled") {
+      return NextResponse.json({ error: "Avbokade bokningar kan inte ändras" }, { status: 400 });
     }
 
-    return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+    let resource = modern.resource;
+    let residentName = modern.resident_name;
+    let unit = modern.unit || "";
+    let start = modern.start_at;
+    let end = modern.end_at;
+    let note = modern.note || "";
+
+    if (body.resource !== undefined) resource = String(body.resource || "").trim();
+    if (body.residentName !== undefined) residentName = String(body.residentName || "").trim();
+    if (body.unit !== undefined) unit = String(body.unit || "").trim();
+    if (body.start !== undefined) start = new Date(String(body.start || ""));
+    if (body.end !== undefined) end = new Date(String(body.end || ""));
+    if (body.note !== undefined) note = String(body.note || "").trim();
+
+    if (!resource || !residentName || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      return NextResponse.json({ error: "Kontrollera resurs, boende och tid" }, { status: 400 });
+    }
+    if (resource.length > 120 || residentName.length > 160 || unit.length > 80 || note.length > 1000) {
+      return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
+    }
+
+    const conflict = await db.booking.findFirst({
+      where: {
+        company_id: user.company_id,
+        property_id: modern.property_id,
+        resource,
+        status: { not: "cancelled" },
+        id: { not: modern.id },
+        start_at: { lt: end },
+        end_at: { gt: start },
+      },
+      select: { id: true },
+    });
+    if (conflict) return NextResponse.json({ error: "Tiden är redan bokad för denna resurs" }, { status: 409 });
+
+    const updateResult = await db.booking.updateMany({
+      where: { id: modern.id, company_id: user.company_id },
+      data: {
+        resource,
+        resident_name: residentName,
+        unit: unit || null,
+        start_at: start,
+        end_at: end,
+        note: note || null,
+      },
+    });
+    if (updateResult.count === 0) return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+
+    await writeAuditLog(user, {
+      entityType: "booking",
+      entityId: modern.id,
+      action: "booking.updated",
+      metadata: {
+        resource,
+        resident_name: residentName,
+        unit,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        note,
+        storage: "Booking",
+      },
+    });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Cancel booking error:", error);
+    console.error("Update booking error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

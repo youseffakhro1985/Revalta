@@ -6,6 +6,7 @@ import {
   listServiceNotificationAssignments,
   upsertServiceNotificationAssignment,
 } from "@/lib/service-notification-assignments";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +20,13 @@ function keyFor(row: AssetRow) {
 
 async function validNotificationKeys(companyId: string) {
   const dueBefore = new Date(Date.now() + 30 * 86400000);
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
   const rows = await db.$queryRaw<AssetRow[]>(Prisma.sql`
     SELECT a."id", a."next_service_at"
     FROM "PropertyTechnicalAsset" a
     INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
-    WHERE p."deleted_at" IS NULL
-      AND a."company_id" = ${companyId}
+    WHERE a."company_id" = ${companyId}
+      ${propertyGuard}
       AND a."next_service_at" IS NOT NULL
       AND a."next_service_at" <= ${dueBefore}
       AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
