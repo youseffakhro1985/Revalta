@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, parseDateOnly } from "@/lib/dual-list";
 
@@ -26,7 +26,19 @@ export async function POST(
       where: { id, company_id: user.company_id },
       include: { debit_line: true, property: { select: { id: true, name: true } } },
     });
-    if (!reading) return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+    if (!reading) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action: "imd.reading.created", id },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "ImdReading") {
+        return NextResponse.json({
+          error: "Avläsningen finns kvar i äldre lagring. Kör backfill till ImdReading innan den kan kopplas till hyresavi.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+    }
     if (!reading.debit_line) return NextResponse.json({ error: "Debiteringsrad saknas för avläsningen" }, { status: 409 });
     if (reading.debit_line.status === "linked" && reading.debit_line.rent_notice_id) {
       return NextResponse.json({ error: "Debiteringsraden är redan kopplad till en hyresavi", rentNoticeId: reading.debit_line.rent_notice_id }, { status: 409 });

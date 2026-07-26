@@ -155,7 +155,8 @@ Detta blir referensarkitekturen för övriga moduler.
 ### Leverans E – Ekonomi och rapportering (pågående)
 
 - Attesterbar tid/material/lönsamhet/fakturaunderlag på arbetsorder.
-- Fakturaexport till Fortnox/Visma/webhook.
+- Fakturaexport-UI till Fortnox/Visma/webhook är levererad (`WorkOrderInvoiceExportJob` + integrationsöversikt).
+- Kvarstår: konsolidera till en enda kostnads-/faktureringspipeline (field ops `WorkOrderExecutionEntry` vs billable `WorkOrderTimeEntry` / `MaterialEntry` / `InvoiceDraft`).
 - Rapporter och CSV/PDF-export byggs vidare mot normaliserade tabeller.
 
 ## Kvalitetskrav före merge

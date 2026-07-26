@@ -74,6 +74,12 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Work-order economics UI wires Fortnox/Visma/webhook invoice export (`/invoice-integration`) with queue/retry/cancel.
    - Ticket operations panel on felanmälan detail.
    - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes AccessCredential, InspectionRound, QuoteDecision, ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables, recurring schedule/run/incident tables, lock notifications, service escalations, lock/recurring notification UX, NotificationRead, ComponentServiceDeliveryAlertAck).
+   - Economics UI `entryId` fix: approve/reject for time/material uses `entryId` (not bare `id`) when mapping API rows (parallel/uncommitted work on branch).
+   - Invoice export receipt lives on `WorkOrderInvoiceExportJob` (`sent_at` / `external_id` / `provider_response`); cron no longer writes `work_order.invoice_export_receipt` IntegrationEvent.
+   - Integrations summary (`GET /api/integrations`) counts invoice jobs from `WorkOrderInvoiceExportJob` by status (queued/processing/failed/sent); IntegrationEvent list remains general activity.
+   - `TicketComment` author columns (`author_type`, `author_name`, `author_email`) for public portal/staff comments; public track prefers columns and falls back to AuditLog only for legacy rows missing `author_name`.
+   - Ticket soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update paths filter active rows; `DELETE /api/tickets/[id]` for managers; public track 404s soft-deleted tickets.
+   - Fail-closed legacy mutations for rounds (`PATCH /api/rounds/[id]`, `POST .../work-orders`), compliance inspection work-order spawn, and IMD attach-notice: legacy AuditLog-only rows return Swedish `409` asking for backfill to modern tables.
 
 ## Verification
 

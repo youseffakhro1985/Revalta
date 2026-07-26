@@ -28,6 +28,7 @@ export async function GET(
     const ticket = await db.ticket.findFirst({
       where: {
         id,
+        deleted_at: null,
         ...tenantWhere(user),
       },
       select: {
@@ -74,6 +75,9 @@ export async function GET(
             body: true,
             is_internal: true,
             created_at: true,
+            author_type: true,
+            author_name: true,
+            author_email: true,
             user: {
               select: {
                 name: true,
@@ -139,7 +143,7 @@ export async function PATCH(
     if (!body) return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
     const existing = await db.ticket.findFirst({
-      where: { id, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user) },
       select: {
         id: true,
         title: true,
@@ -216,7 +220,7 @@ export async function PATCH(
 
     const ticket = await db.$transaction(async (tx) => {
       const updateResult = await tx.ticket.updateMany({
-        where: { id, company_id: user.company_id! },
+        where: { id, company_id: user.company_id!, deleted_at: null },
         data: {
           status: nextStatus,
           priority: normalizedPriority,
@@ -230,7 +234,7 @@ export async function PATCH(
       }
 
       const updated = await tx.ticket.findFirst({
-        where: { id, company_id: user.company_id! },
+        where: { id, company_id: user.company_id!, deleted_at: null },
         select: {
           id: true,
           title: true,
@@ -308,6 +312,51 @@ export async function PATCH(
     });
   } catch (error) {
     console.error("Update ticket error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att ta bort ärenden" }, { status: 403 });
+    }
+    if (!user.company_id) {
+      return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    }
+
+    const { id } = await params;
+    const existing = await db.ticket.findFirst({
+      where: { id, company_id: user.company_id, deleted_at: null },
+      select: { id: true, title: true, status: true },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    }
+
+    const deleteResult = await db.ticket.updateMany({
+      where: { id: existing.id, company_id: user.company_id, deleted_at: null },
+      data: { deleted_at: new Date() },
+    });
+    if (deleteResult.count === 0) {
+      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "ticket",
+      entityId: existing.id,
+      action: "ticket.deleted",
+      metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

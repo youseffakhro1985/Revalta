@@ -40,6 +40,7 @@ export async function POST(
       where: {
         public_reference: reference.toUpperCase(),
         reporter_email: authorizedEmail,
+        deleted_at: null,
         ...(tracking ? { company_id: tracking.companyId } : {}),
       },
       select: {
@@ -57,17 +58,23 @@ export async function POST(
     }
 
     const authorName = name || ticket.reporter_name || "Boende";
+    const authorEmail = ticket.reporter_email || authorizedEmail;
     const comment = await db.ticketComment.create({
       data: {
         ticket_id: ticket.id,
         user_id: ticket.user_id,
         body,
         is_internal: false,
+        author_type: "resident",
+        author_name: authorName,
+        author_email: authorEmail,
       },
       select: {
         id: true,
         body: true,
         created_at: true,
+        author_type: true,
+        author_name: true,
       },
     });
 
@@ -77,7 +84,7 @@ export async function POST(
       action: "public.comment_created",
       metadata: {
         reporterName: authorName,
-        reporterEmail: ticket.reporter_email || authorizedEmail,
+        reporterEmail: authorEmail,
         commentId: comment.id,
         schemaVersion: 2,
       },
@@ -92,8 +99,10 @@ export async function POST(
     return NextResponse.json({
       success: true,
       comment: {
-        ...comment,
-        author: { type: "resident", name: authorName },
+        id: comment.id,
+        body: comment.body,
+        created_at: comment.created_at,
+        author: { type: "resident", name: comment.author_name || authorName },
       },
     }, { status: 201 });
   } catch (error) {

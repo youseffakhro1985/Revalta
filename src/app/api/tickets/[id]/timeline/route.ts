@@ -26,7 +26,7 @@ export async function GET(
     const { id } = await params;
 
     const ticket = await db.ticket.findFirst({
-      where: { id, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user) },
       select: {
         id: true,
         title: true,

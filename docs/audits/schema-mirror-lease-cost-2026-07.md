@@ -24,8 +24,9 @@ Bygger vidare på WorkOrder- och property-component-speglingarna.
 
 ## Legacy cost tables
 
-- `MaterialCost` och `TimeReport` finns i production men saknas i moderna Prisma-call sites.
-- Canonical ersättare: `WorkOrderExecutionEntry` (`material` / `time`).
+- `MaterialCost` och `TimeReport` är dead/legacy i production (saknas i moderna Prisma-call sites).
+- Canonical billable path: `WorkOrderTimeEntry` / `WorkOrderMaterialEntry` / `WorkOrderInvoiceDraft` (attesterbar ekonomi → fakturaunderlag).
+- Field ops förblir `WorkOrderExecutionEntry` (`material` / `time`) för utförande i fält.
 - Speglas för typning och inventering, inte för ny featureutveckling.
 
 ## Vad som inte ändras

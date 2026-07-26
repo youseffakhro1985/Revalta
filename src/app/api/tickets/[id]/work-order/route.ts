@@ -25,7 +25,7 @@ export async function GET(
 
   const { id } = await params;
   const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id },
+    where: { id, company_id: user.company_id, deleted_at: null },
     select: {
       id: true,
       property_id: true,
@@ -93,7 +93,7 @@ export async function POST(
   }
 
   const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id },
+    where: { id, company_id: user.company_id, deleted_at: null },
     include: { work_order: { select: { id: true } } },
   });
   if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });

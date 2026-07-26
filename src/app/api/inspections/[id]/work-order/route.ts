@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { addWorkOrderStatusEvent, allocateWorkOrderNumber, calculateWorkOrderSla, setWorkOrderEnterpriseFields } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
@@ -21,7 +21,19 @@ export async function POST(
       where: { id, company_id: user.company_id },
       include: { property: { select: { id: true, name: true } } },
     });
-    if (!inspection) return NextResponse.json({ error: "Kontrollen hittades inte" }, { status: 404 });
+    if (!inspection) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action: "inspection.created", id },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "ComplianceInspection") {
+        return NextResponse.json({
+          error: "Kontrollen finns kvar i äldre lagring. Kör backfill till ComplianceInspection innan arbetsorder kan skapas.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Kontrollen hittades inte" }, { status: 404 });
+    }
     if (inspection.status !== "action_required") {
       return NextResponse.json({ error: "Arbetsorder kan endast skapas när status är ”Åtgärd krävs”" }, { status: 409 });
     }

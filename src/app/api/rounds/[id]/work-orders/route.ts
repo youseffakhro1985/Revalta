@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { countDeviations, normalizeChecklist } from "@/lib/inspection-round-checklist";
 import { addWorkOrderStatusEvent, allocateWorkOrderNumber, calculateWorkOrderSla, setWorkOrderEnterpriseFields } from "@/lib/work-order-enterprise-core";
@@ -28,7 +28,19 @@ export async function POST(
       where: { id, company_id: user.company_id },
       include: { property: { select: { id: true, name: true } } },
     });
-    if (!round) return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
+    if (!round) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), entity_type: "round", id },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "InspectionRound") {
+        return NextResponse.json({
+          error: "Ronden finns kvar i äldre lagring. Kör backfill till InspectionRound innan arbetsorder kan skapas.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
+    }
 
     const checklist = normalizeChecklist(round.checklist);
     const candidates = checklist.filter((item) => {

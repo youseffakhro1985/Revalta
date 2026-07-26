@@ -62,16 +62,76 @@ describe("public ticket tracking", () => {
     expect(response.status).toBe(200);
     expect(typeof body.trackingToken).toBe("string");
     expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { public_reference: "RV-2026-TEST", reporter_email: "boende@example.se" },
+      where: { public_reference: "RV-2026-TEST", reporter_email: "boende@example.se", deleted_at: null },
       select: expect.objectContaining({
         comments: expect.objectContaining({
           where: { is_internal: false },
         }),
       }),
     }));
-    expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ company_id: "company-1", entity_id: "ticket-1" }),
-    }));
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to AuditLog authors only for legacy comments missing author_name", async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      company_id: "company-1",
+      reporter_name: "Boende",
+      reporter_email: "boende@example.se",
+      public_reference: "RV-2026-TEST",
+      title: "Trasig port",
+      status: "new",
+      priority: "normal",
+      category: "other",
+      created_at: new Date("2026-07-01T10:00:00Z"),
+      updated_at: new Date("2026-07-01T10:00:00Z"),
+      ai_summary: null,
+      property: null,
+      comments: [
+        {
+          id: "comment-modern",
+          body: "Modern",
+          created_at: new Date("2026-07-01T11:00:00Z"),
+          author_type: "resident",
+          author_name: "Anna",
+          user: { name: "Ignored" },
+        },
+        {
+          id: "comment-legacy",
+          body: "Legacy",
+          created_at: new Date("2026-07-01T12:00:00Z"),
+          author_type: "staff",
+          author_name: null,
+          user: { name: "Förvaltningen" },
+        },
+      ],
+    });
+    auditFindManyMock.mockResolvedValue([
+      { metadata: { commentId: "comment-legacy", reporterName: "Legacy Boende" } },
+    ]);
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/public/tickets/RV-2026-TEST?email=boende@example.se"),
+      { params },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.comments).toEqual([
+      {
+        id: "comment-modern",
+        body: "Modern",
+        created_at: "2026-07-01T11:00:00.000Z",
+        author: { type: "resident", name: "Anna" },
+      },
+      {
+        id: "comment-legacy",
+        body: "Legacy",
+        created_at: "2026-07-01T12:00:00.000Z",
+        author: { type: "resident", name: "Legacy Boende" },
+      },
+    ]);
+    expect(auditFindManyMock).toHaveBeenCalled();
   });
 
   it("rejects tickets without company scope", async () => {

@@ -16,6 +16,7 @@ export async function GET(request: Request) {
     const propertyId = searchParams.get("propertyId")?.trim();
     const assignedToId = searchParams.get("assignedToId")?.trim();
     const where = {
+      deleted_at: null,
       ...tenantWhere(user),
       ...(status ? { status } : {}),
       ...(priority ? { priority } : {}),

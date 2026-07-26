@@ -254,27 +254,13 @@ export async function GET(request: Request) {
 
       const payload = exportPayload({ job, invoice, workOrder });
       const providerResult = await send(job, payload);
+      // Receipt fields live on WorkOrderInvoiceExportJob (sent_at/external_id/provider_response).
       await saveJob(companyId, job, "sent", {
         sentAt: new Date().toISOString(),
         providerStatus: providerResult.status,
         externalId: providerResult.externalId,
         providerResponse: providerResult.response,
         error: null,
-      });
-      await db.integrationEvent.create({
-        data: {
-          company_id: companyId,
-          recipient: workOrderId,
-          type: "work_order.invoice_export_receipt",
-          status: "sent",
-          payload: {
-            jobId: job.jobId,
-            provider: job.provider,
-            invoiceVersionId: invoice.versionId,
-            externalId: providerResult.externalId,
-            sentAt: new Date().toISOString(),
-          },
-        },
       });
       result.sent += 1;
     } catch (error) {

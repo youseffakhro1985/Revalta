@@ -174,7 +174,7 @@ export async function POST(request: Request) {
     if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
   }
   if (ticketId) {
-    const ticket = await db.ticket.findFirst({ where: { id: ticketId, company_id: user.company_id }, select: { id: true } });
+    const ticket = await db.ticket.findFirst({ where: { id: ticketId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
     if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
   }
   try {

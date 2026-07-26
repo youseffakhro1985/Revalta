@@ -48,7 +48,7 @@ export async function GET(
 
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
-      where: { id, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user) },
       select: { id: true, company_id: true },
     });
 
@@ -126,7 +126,7 @@ export async function POST(
 
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
-      where: { id, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user) },
       select: { id: true, title: true },
     });
     if (!ticket) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });

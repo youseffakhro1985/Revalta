@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { countDeviations, normalizeChecklist, parseChecklistUpdate } from "@/lib/inspection-round-checklist";
 
@@ -20,7 +20,19 @@ export async function PATCH(
       where: { id, company_id: user.company_id },
       select: { id: true, title: true, checklist: true, status: true },
     });
-    if (!round) return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
+    if (!round) {
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), entity_type: "round", id },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "InspectionRound") {
+        return NextResponse.json({
+          error: "Ronden finns kvar i äldre lagring. Kör backfill till InspectionRound innan den kan uppdateras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
+    }
 
     const previous = normalizeChecklist(round.checklist);
     const parsed = parseChecklistUpdate(await request.json().catch(() => null), previous);

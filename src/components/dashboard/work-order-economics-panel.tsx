@@ -7,7 +7,7 @@ import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButton
 type Props = { workOrderId: string };
 
 type TimeEntry = {
-  id: string;
+  entryId: string;
   kind: string;
   minutes: number | null;
   billable: boolean;
@@ -20,7 +20,7 @@ type TimeEntry = {
 };
 
 type MaterialEntry = {
-  id: string;
+  entryId: string;
   name: string;
   quantity: number;
   unit: string;
@@ -157,8 +157,30 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
       if (!invoiceRes.ok) throw new Error(invoiceData.error || "Kunde inte hämta fakturaunderlag");
       if (!integrationRes.ok) throw new Error(integrationData.error || "Kunde inte hämta fakturaexport");
 
-      setTimes(timeData.entries || []);
-      setMaterials(materialData.materials || []);
+      setTimes((timeData.entries || []).map((entry: Record<string, unknown>) => ({
+        entryId: String(entry.entryId || entry.id || ""),
+        kind: String(entry.kind || "work"),
+        minutes: typeof entry.minutes === "number" ? entry.minutes : null,
+        billable: entry.billable !== false,
+        status: String(entry.status || "submitted"),
+        note: typeof entry.note === "string" ? entry.note : null,
+        startedAt: typeof entry.startedAt === "string" ? entry.startedAt : null,
+        endedAt: typeof entry.endedAt === "string" ? entry.endedAt : null,
+        userName: typeof entry.userName === "string" ? entry.userName : null,
+        userEmail: String(entry.userEmail || ""),
+      })).filter((entry: TimeEntry) => entry.entryId));
+      setMaterials((materialData.materials || []).map((entry: Record<string, unknown>) => ({
+        entryId: String(entry.entryId || entry.id || ""),
+        name: String(entry.name || ""),
+        quantity: Number(entry.quantity || 0),
+        unit: String(entry.unit || "st"),
+        unitPrice: Number(entry.unitPrice || 0),
+        total: Number(entry.total || 0),
+        billable: entry.billable !== false,
+        status: String(entry.status || "submitted"),
+        stockStatus: String(entry.stockStatus || "used"),
+        supplier: typeof entry.supplier === "string" ? entry.supplier : null,
+      })).filter((entry: MaterialEntry) => entry.entryId));
       setProfit(profitData.summary || null);
       setSettings(profitData.settings || {
         internalHourlyCost: 350,
@@ -336,7 +358,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             {times.length === 0 ? (
               <EmptyState title="Ingen attesterbar tid" description="Registrera tid här för att bygga fakturaunderlag." />
             ) : times.map((entry) => (
-              <article key={entry.id} className="rounded-xl border border-sand-200 p-4">
+              <article key={entry.entryId} className="rounded-xl border border-sand-200 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-semibold text-ink-900">
                     {kindLabels[entry.kind] || entry.kind} · {entry.minutes ?? 0} min
@@ -355,7 +377,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                     <button
                       type="button"
                       disabled={saving}
-                      onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "approve", entryId: entry.id }, "Tiden har godkänts.")}
+                      onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "approve", entryId: entry.entryId }, "Tiden har godkänts.")}
                       className="rounded-lg border border-petroleum-200 bg-petroleum-50 px-3 py-1.5 text-xs font-semibold text-petroleum-900"
                     >
                       Godkänn
@@ -363,7 +385,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                     <button
                       type="button"
                       disabled={saving}
-                      onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "reject", entryId: entry.id }, "Tiden har avvisats.")}
+                      onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "reject", entryId: entry.entryId }, "Tiden har avvisats.")}
                       className="rounded-lg border border-sand-200 px-3 py-1.5 text-xs font-semibold text-ink-700"
                     >
                       Avvisa
@@ -412,7 +434,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             {materials.length === 0 ? (
               <EmptyState title="Inget material" description="Lägg till material för att spegla verklig kostnad." />
             ) : materials.map((entry) => (
-              <article key={entry.id} className="rounded-xl border border-sand-200 p-4">
+              <article key={entry.entryId} className="rounded-xl border border-sand-200 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-petroleum-700" />
@@ -430,7 +452,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                     <button
                       type="button"
                       disabled={saving}
-                      onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "approve", entryId: entry.id }, "Materialet har godkänts.")}
+                      onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "approve", entryId: entry.entryId }, "Materialet har godkänts.")}
                       className="rounded-lg border border-petroleum-200 bg-petroleum-50 px-3 py-1.5 text-xs font-semibold text-petroleum-900"
                     >
                       Godkänn
@@ -438,7 +460,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                     <button
                       type="button"
                       disabled={saving}
-                      onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "reject", entryId: entry.id }, "Materialet har avvisats.")}
+                      onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "reject", entryId: entry.entryId }, "Materialet har avvisats.")}
                       className="rounded-lg border border-sand-200 px-3 py-1.5 text-xs font-semibold text-ink-700"
                     >
                       Avvisa

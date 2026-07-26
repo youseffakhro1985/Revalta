@@ -41,6 +41,7 @@ export async function GET(
       where: {
         public_reference: reference.toUpperCase(),
         reporter_email: authorizedEmail,
+        deleted_at: null,
         ...(tracking ? { company_id: tracking.companyId } : {}),
       },
       select: {
@@ -64,6 +65,8 @@ export async function GET(
             id: true,
             body: true,
             created_at: true,
+            author_type: true,
+            author_name: true,
             user: { select: { name: true } },
           },
         },
@@ -74,25 +77,32 @@ export async function GET(
       return NextResponse.json({ error: "Ärendet hittades inte. Kontrollera referensnummer och e-post." }, { status: 404 });
     }
 
-    const externalAuthorLogs = await db.auditLog.findMany({
-      where: {
-        company_id: ticket.company_id,
-        entity_type: "ticket",
-        entity_id: ticket.id,
-        action: "public.comment_created",
-      },
-      orderBy: { created_at: "asc" },
-      select: { metadata: true },
-    });
+    const legacyCommentIds = ticket.comments
+      .filter((comment) => !comment.author_name)
+      .map((comment) => comment.id);
 
     const externalAuthors = new Map<string, { type: "resident"; name: string }>();
-    for (const log of externalAuthorLogs) {
-      const metadata = (log.metadata || {}) as PublicCommentAuditMetadata;
-      if (typeof metadata.commentId !== "string") continue;
-      const name = typeof metadata.reporterName === "string" && metadata.reporterName.trim()
-        ? metadata.reporterName.trim()
-        : ticket.reporter_name || "Boende";
-      externalAuthors.set(metadata.commentId, { type: "resident", name });
+    if (legacyCommentIds.length > 0) {
+      const externalAuthorLogs = await db.auditLog.findMany({
+        where: {
+          company_id: ticket.company_id,
+          entity_type: "ticket",
+          entity_id: ticket.id,
+          action: "public.comment_created",
+        },
+        orderBy: { created_at: "asc" },
+        select: { metadata: true },
+      });
+
+      for (const log of externalAuthorLogs) {
+        const metadata = (log.metadata || {}) as PublicCommentAuditMetadata;
+        if (typeof metadata.commentId !== "string") continue;
+        if (!legacyCommentIds.includes(metadata.commentId)) continue;
+        const name = typeof metadata.reporterName === "string" && metadata.reporterName.trim()
+          ? metadata.reporterName.trim()
+          : ticket.reporter_name || "Boende";
+        externalAuthors.set(metadata.commentId, { type: "resident", name });
+      }
     }
 
     const trackingToken = createPortalTrackingToken({
@@ -113,15 +123,28 @@ export async function GET(
         updated_at: ticket.updated_at,
         ai_summary: ticket.ai_summary,
         property: ticket.property,
-        comments: ticket.comments.map((comment) => ({
-          id: comment.id,
-          body: comment.body,
-          created_at: comment.created_at,
-          author: externalAuthors.get(comment.id) || {
-            type: "management" as const,
-            name: comment.user.name || "Förvaltningen",
-          },
-        })),
+        comments: ticket.comments.map((comment) => {
+          if (comment.author_name) {
+            return {
+              id: comment.id,
+              body: comment.body,
+              created_at: comment.created_at,
+              author: {
+                type: comment.author_type === "resident" ? ("resident" as const) : ("management" as const),
+                name: comment.author_name,
+              },
+            };
+          }
+          return {
+            id: comment.id,
+            body: comment.body,
+            created_at: comment.created_at,
+            author: externalAuthors.get(comment.id) || {
+              type: "management" as const,
+              name: comment.user.name || "Förvaltningen",
+            },
+          };
+        }),
       },
     });
   } catch (error) {

@@ -68,7 +68,7 @@ export async function GET() {
         },
       }),
       db.ticket.findMany({
-        where: { company_id: user.company_id, source: "resident_portal" },
+        where: { company_id: user.company_id, source: "resident_portal", deleted_at: null },
         orderBy: { created_at: "desc" },
         take: 500,
         select: {

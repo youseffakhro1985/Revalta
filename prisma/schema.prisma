@@ -302,6 +302,7 @@ model Ticket {
   created_at            DateTime           @default(now())
   updated_at            DateTime           @default(now()) @updatedAt
   closed_at             DateTime?
+  deleted_at            DateTime?
   ai_summary            String?
   ai_recommended_action String?
   ai_confidence         Float?
@@ -315,6 +316,8 @@ model Ticket {
   attachments           TicketAttachment[]
   work_order            WorkOrder?
   operations            TicketOperation[]
+
+  @@index([company_id, deleted_at])
 }
 
 model WorkOrder {
@@ -1064,14 +1067,17 @@ model Lease {
 }
 
 model TicketComment {
-  id          String   @id @default(uuid())
-  ticket_id   String
-  user_id     String
-  body        String
-  is_internal Boolean  @default(false)
-  created_at  DateTime @default(now())
-  ticket      Ticket   @relation(fields: [ticket_id], references: [id])
-  user        User     @relation(fields: [user_id], references: [id])
+  id           String   @id @default(uuid())
+  ticket_id    String
+  user_id      String
+  body         String
+  is_internal  Boolean  @default(false)
+  author_type  String   @default("staff")
+  author_name  String?
+  author_email String?
+  created_at   DateTime @default(now())
+  ticket       Ticket   @relation(fields: [ticket_id], references: [id])
+  user         User     @relation(fields: [user_id], references: [id])
 }
 
 model TicketAttachment {

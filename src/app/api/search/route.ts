@@ -29,6 +29,7 @@ export async function GET(request: Request) {
       }),
       db.ticket.findMany({
         where: {
+          deleted_at: null,
           ...tenantWhere(user),
           OR: [
             { title: contains },

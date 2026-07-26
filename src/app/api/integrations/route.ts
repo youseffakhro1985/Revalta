@@ -28,18 +28,27 @@ export async function GET() {
       requiredEnv: envKeys,
     }));
 
-    const events = await db.integrationEvent.findMany({
-      where: user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" },
-      orderBy: { created_at: "desc" },
-      take: 50,
-    });
+    const companyFilter = user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" };
 
-    const invoiceExportEvents = events.filter((event) => event.type === "work_order.invoice_integration_job");
+    const [events, invoiceJobs] = await Promise.all([
+      db.integrationEvent.findMany({
+        where: companyFilter,
+        orderBy: { created_at: "desc" },
+        take: 50,
+      }),
+      user.company_id
+        ? db.workOrderInvoiceExportJob.findMany({
+            where: { company_id: user.company_id },
+            select: { status: true },
+          })
+        : Promise.resolve([] as Array<{ status: string }>),
+    ]);
+
     const invoiceExportSummary = {
-      total: invoiceExportEvents.length,
-      active: invoiceExportEvents.filter((event) => event.status === "queued" || event.status === "processing").length,
-      failed: invoiceExportEvents.filter((event) => event.status === "failed").length,
-      sent: invoiceExportEvents.filter((event) => event.status === "sent").length,
+      total: invoiceJobs.length,
+      active: invoiceJobs.filter((job) => job.status === "queued" || job.status === "processing").length,
+      failed: invoiceJobs.filter((job) => job.status === "failed").length,
+      sent: invoiceJobs.filter((job) => job.status === "sent").length,
     };
 
     return NextResponse.json(

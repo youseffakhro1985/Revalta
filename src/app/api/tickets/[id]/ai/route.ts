@@ -18,7 +18,7 @@ export async function POST(
 
     const { id } = await params;
     const existing = await db.ticket.findFirst({
-      where: { id, ...tenantWhere(user) },
+      where: { id, deleted_at: null, ...tenantWhere(user) },
       select: { id: true, title: true, description: true },
     });
 
@@ -32,7 +32,7 @@ export async function POST(
     }
 
     const updateResult = await db.ticket.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
+      where: { id: existing.id, company_id: user.company_id, deleted_at: null },
       data: {
         category: analysis.category,
         priority: analysis.priority,
@@ -47,7 +47,7 @@ export async function POST(
     }
 
     const ticket = await db.ticket.findFirst({
-      where: { id: existing.id, company_id: user.company_id },
+      where: { id: existing.id, company_id: user.company_id, deleted_at: null },
       select: {
         id: true,
         category: true,
