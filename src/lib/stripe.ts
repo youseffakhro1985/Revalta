@@ -69,18 +69,20 @@ export async function createCustomerPortalSession(input: {
   });
 }
 
-export function verifyStripeSignature(payload: string, signatureHeader: string | null) {
+export function verifyStripeSignature(payload: string, signatureHeader: string | null, toleranceSeconds = 300) {
   if (!process.env.STRIPE_WEBHOOK_SECRET || !signatureHeader) return false;
 
-  const parts = Object.fromEntries(
-    signatureHeader.split(",").map((part) => {
-      const [key, value] = part.split("=");
-      return [key, value];
-    })
-  );
-  const timestamp = parts.t;
-  const signature = parts.v1;
-  if (!timestamp || !signature) return false;
+  const signatures: string[] = [];
+  let timestamp = "";
+  for (const part of signatureHeader.split(",")) {
+    const [key, value] = part.split("=");
+    if (key === "t") timestamp = value;
+    if (key === "v1" && value) signatures.push(value);
+  }
+  if (!timestamp || signatures.length === 0) return false;
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) return false;
+  if (Math.abs(Date.now() / 1000 - timestampSeconds) > toleranceSeconds) return false;
 
   const signedPayload = `${timestamp}.${payload}`;
   const expected = createHmac("sha256", process.env.STRIPE_WEBHOOK_SECRET)
@@ -88,8 +90,8 @@ export function verifyStripeSignature(payload: string, signatureHeader: string |
     .digest("hex");
 
   const expectedBuffer = Buffer.from(expected);
-  const signatureBuffer = Buffer.from(signature);
-  if (expectedBuffer.length !== signatureBuffer.length) return false;
-
-  return timingSafeEqual(expectedBuffer, signatureBuffer);
+  return signatures.some((signature) => {
+    const signatureBuffer = Buffer.from(signature);
+    return expectedBuffer.length === signatureBuffer.length && timingSafeEqual(expectedBuffer, signatureBuffer);
+  });
 }
