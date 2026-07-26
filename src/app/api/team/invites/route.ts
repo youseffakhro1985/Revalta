@@ -89,10 +89,11 @@ export async function POST(request: Request) {
       event: "updated",
     });
 
+    const canExposeInviteUrl = !process.env.EMAIL_PROVIDER_API_KEY && process.env.NODE_ENV !== "production";
     return NextResponse.json({
       success: true,
       invite,
-      inviteUrl: process.env.EMAIL_PROVIDER_API_KEY ? undefined : inviteUrl,
+      inviteUrl: canExposeInviteUrl ? inviteUrl : undefined,
     }, { status: 201 });
   } catch (error) {
     console.error("Create team invite error:", error);

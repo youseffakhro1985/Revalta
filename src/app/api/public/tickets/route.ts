@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, queueSmsNotification } from "@/lib/integrations";
 import { analyzeTicket } from "@/lib/ai";
+import { createPortalTrackingToken } from "@/lib/portal-tracking";
 import { getPublicPortalCompany, generatePublicReference } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { calculateDueDate } from "@/lib/sla";
@@ -121,7 +122,13 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, ticket }, { status: 201 });
+    const trackingToken = createPortalTrackingToken({
+      reference: publicReference,
+      email: normalizedReporterEmail,
+      companyId: portal.company.id,
+    });
+
+    return NextResponse.json({ success: true, ticket, trackingToken }, { status: 201 });
   } catch (error) {
     console.error("Create public ticket error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

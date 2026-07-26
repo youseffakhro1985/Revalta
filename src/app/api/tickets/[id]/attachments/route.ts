@@ -1,12 +1,10 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { validateUploadFile } from "@/lib/document-file-security";
 import { recordStorageEvent } from "@/lib/integrations";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { NextResponse } from "next/server";
-
-const maxFileSize = 1024 * 1024;
-const allowedTypes = new Set(["image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain"]);
 
 export async function POST(
   request: Request,
@@ -35,27 +33,30 @@ export async function POST(
       return NextResponse.json({ error: "Fil krävs" }, { status: 400 });
     }
 
-    if (!allowedTypes.has(file.type)) {
-      return NextResponse.json({ error: "Filtypen stöds inte" }, { status: 400 });
-    }
-
-    if (file.size > maxFileSize) {
-      return NextResponse.json({ error: "Filen får vara max 1 MB" }, { status: 400 });
-    }
-
     const buffer = Buffer.from(await file.arrayBuffer());
-    const storedFile = await storeAttachment({
-      fileName: file.name,
+    const validation = validateUploadFile({
+      bytes: buffer,
       contentType: file.type,
+      fileName: file.name,
+      profile: "attachment",
+      maxBytes: 1024 * 1024,
+    });
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const storedFile = await storeAttachment({
+      fileName: validation.fileName,
+      contentType: validation.contentType,
       buffer,
       prefix: `tickets/${ticket.id}`,
     });
     const attachment = await db.ticketAttachment.create({
       data: {
         ticket_id: ticket.id,
-        file_name: file.name,
-        content_type: file.type,
-        size_bytes: file.size,
+        file_name: validation.fileName,
+        content_type: validation.contentType,
+        size_bytes: validation.sizeBytes,
         data_url: storedFile.url,
       },
       select: {

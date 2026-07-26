@@ -1,4 +1,9 @@
 import db from "@/lib/db";
+import {
+  createPortalTrackingToken,
+  extractPortalTrackingToken,
+  verifyPortalTrackingToken,
+} from "@/lib/portal-tracking";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
@@ -22,15 +27,21 @@ export async function GET(
     const { reference } = await params;
     const { searchParams } = new URL(request.url);
     const email = searchParams.get("email")?.trim().toLowerCase();
+    const tracking = verifyPortalTrackingToken(extractPortalTrackingToken(request));
+    const authorizedEmail = tracking?.email || email;
 
-    if (!reference || !email?.includes("@")) {
-      return NextResponse.json({ error: "Referensnummer och e-post krävs" }, { status: 400 });
+    if (!reference || !authorizedEmail?.includes("@")) {
+      return NextResponse.json({ error: "Referensnummer och e-post eller spårningstoken krävs" }, { status: 400 });
+    }
+    if (tracking && tracking.reference !== reference.toUpperCase()) {
+      return NextResponse.json({ error: "Ogiltig spårningstoken" }, { status: 403 });
     }
 
     const ticket = await db.ticket.findFirst({
       where: {
         public_reference: reference.toUpperCase(),
-        reporter_email: email,
+        reporter_email: authorizedEmail,
+        ...(tracking ? { company_id: tracking.companyId } : {}),
       },
       select: {
         id: true,
@@ -59,13 +70,13 @@ export async function GET(
       },
     });
 
-    if (!ticket) {
+    if (!ticket?.company_id) {
       return NextResponse.json({ error: "Ärendet hittades inte. Kontrollera referensnummer och e-post." }, { status: 404 });
     }
 
     const externalAuthorLogs = await db.auditLog.findMany({
       where: {
-        company_id: ticket.company_id ?? undefined,
+        company_id: ticket.company_id,
         entity_type: "ticket",
         entity_id: ticket.id,
         action: "public.comment_created",
@@ -84,7 +95,14 @@ export async function GET(
       externalAuthors.set(metadata.commentId, { type: "resident", name });
     }
 
+    const trackingToken = createPortalTrackingToken({
+      reference: ticket.public_reference || reference.toUpperCase(),
+      email: authorizedEmail,
+      companyId: ticket.company_id,
+    });
+
     return NextResponse.json({
+      trackingToken,
       ticket: {
         public_reference: ticket.public_reference,
         title: ticket.title,

@@ -82,6 +82,7 @@ export async function GET() {
         fileName: typeof metadata.fileName === "string" ? metadata.fileName : null,
         contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
         sizeBytes: typeof metadata.sizeBytes === "number" ? metadata.sizeBytes : 0,
+        downloadUrl: `/api/documents/${log.id}/download`,
         property,
         unit,
         lease: lease ? {

@@ -31,7 +31,8 @@ type PublicTicket = {
     id: string;
     body: string;
     created_at: string;
-    user: { name: string | null };
+    author?: { type: string; name: string };
+    user?: { name: string | null };
   }>;
 };
 
@@ -68,6 +69,7 @@ export default function PortalPage() {
   const [description, setDescription] = useState("");
   const [reference, setReference] = useState("");
   const [trackEmail, setTrackEmail] = useState("");
+  const [trackingToken, setTrackingToken] = useState("");
   const [trackedTicket, setTrackedTicket] = useState<PublicTicket | null>(null);
   const [createdReference, setCreatedReference] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -112,6 +114,7 @@ export default function PortalPage() {
       setCreatedReference(data.ticket.public_reference);
       setReference(data.ticket.public_reference);
       setTrackEmail(reporterEmail);
+      if (typeof data.trackingToken === "string") setTrackingToken(data.trackingToken);
       setReporterName("");
       setReporterEmail("");
       setReporterPhone("");
@@ -136,7 +139,10 @@ export default function PortalPage() {
 
     try {
       const normalizedReference = reference.trim().toUpperCase();
-      const response = await fetch(`/api/public/tickets/${encodeURIComponent(normalizedReference)}?email=${encodeURIComponent(trackEmail)}`, { cache: "no-store" });
+      const params = new URLSearchParams();
+      if (trackEmail) params.set("email", trackEmail);
+      if (trackingToken) params.set("token", trackingToken);
+      const response = await fetch(`/api/public/tickets/${encodeURIComponent(normalizedReference)}?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
 
       if (!response.ok) {
@@ -144,6 +150,7 @@ export default function PortalPage() {
         return;
       }
 
+      if (typeof data.trackingToken === "string") setTrackingToken(data.trackingToken);
       setTrackedTicket(data.ticket);
       setSuccess("Ärendet hittades.");
     } catch {
@@ -164,6 +171,7 @@ export default function PortalPage() {
       const formData = new FormData();
       formData.append("file", attachmentFile);
       formData.append("email", trackEmail);
+      if (trackingToken) formData.append("token", trackingToken);
       const response = await fetch(`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/attachments`, {
         method: "POST",
         body: formData,
@@ -193,7 +201,7 @@ export default function PortalPage() {
       const response = await fetch(`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trackEmail, body: residentComment }),
+        body: JSON.stringify({ email: trackEmail, body: residentComment, token: trackingToken || undefined }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -332,7 +340,7 @@ export default function PortalPage() {
                       <p className="text-xs font-semibold text-ink-900 uppercase tracking-wide">Uppdateringar</p>
                       {trackedTicket.comments.map((comment) => (
                         <div key={comment.id} className="rounded-lg border border-sand-100 bg-sand-50/50 p-3.5">
-                           <p className="text-xs font-medium text-ink-950 mb-1">{comment.user.name || "Förvaltningen"} <span className="text-[10px] text-ink-400 font-normal ml-2">{dateFormatter.format(new Date(comment.created_at))}</span></p>
+                           <p className="text-xs font-medium text-ink-950 mb-1">{comment.author?.name || comment.user?.name || "Förvaltningen"} <span className="text-[10px] text-ink-400 font-normal ml-2">{dateFormatter.format(new Date(comment.created_at))}</span></p>
                            <p className="text-sm text-ink-700">{comment.body}</p>
                         </div>
                       ))}
