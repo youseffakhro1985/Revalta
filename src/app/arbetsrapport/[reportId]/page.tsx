@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -63,7 +64,7 @@ export default function WorkOrderReportPage() {
       try {
         const response = await fetch(`/api/work-order-reports/${reportId}`, { cache: "no-store" });
         if (response.status === 401) { router.push("/login"); return; }
-        const data = await response.json();
+        const data = await readResponseJson(response);
         if (!response.ok) throw new Error(data.error || "Kunde inte hämta arbetsrapporten");
         if (active) setReport(data.report);
       } catch (err) {

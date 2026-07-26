@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -26,7 +27,7 @@ export default function RegisterPage() {
       if (res.ok) {
         router.push("/login");
       } else {
-        const data = await res.json();
+        const data = await readResponseJson(res);
         setError(data.error || "Kunde inte skapa konto");
       }
     } catch {

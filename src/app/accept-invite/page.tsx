@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -25,7 +26,7 @@ function AcceptInviteForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, name, password }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
 
       if (!response.ok) {
         setError(data.error || "Kunde inte acceptera inbjudan");

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -14,7 +15,7 @@ export default function ForgotPasswordPage() {
     setMessage("");
     try {
       const response = await fetch("/api/auth/password-reset/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       setMessage(data.message || "Om kontot finns skickar vi en återställningslänk.");
     } catch {
       setMessage("Om kontot finns skickar vi en återställningslänk.");
