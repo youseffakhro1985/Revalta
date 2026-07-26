@@ -21,7 +21,7 @@ function configured(provider: string) {
 }
 
 async function getOrder(id: string, companyId: string) {
-  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId }, select: { id: true, title: true } });
+  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } }, select: { id: true, title: true } });
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {

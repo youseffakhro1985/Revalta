@@ -188,7 +188,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         stockStatus: String(entry.stockStatus || "used"),
         supplier: typeof entry.supplier === "string" ? entry.supplier : null,
         source: entry.source === "legacy" || entry.source === "table" ? entry.source : undefined,
-      })).filter((entry: MaterialEntry) => entry.entryId));
+      })).filter((entry: MaterialEntry) => entry.entryId && entry.status !== "deleted"));
       setProfit(profitData.summary || null);
       setSettings({
         ...(profitData.settings || {
@@ -476,24 +476,41 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 {entry.source === "legacy" ? (
                   <p className="mt-2 text-[11px] font-medium text-amber-800">Äldre rad – kan inte attesteras innan backfill.</p>
                 ) : null}
-                {canManage && entry.status === "submitted" && entry.source !== "legacy" ? (
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "approve", entryId: entry.entryId }, "Materialet har godkänts.")}
-                      className="rounded-lg border border-petroleum-200 bg-petroleum-50 px-3 py-1.5 text-xs font-semibold text-petroleum-900"
-                    >
-                      Godkänn
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "reject", entryId: entry.entryId }, "Materialet har avvisats.")}
-                      className="rounded-lg border border-sand-200 px-3 py-1.5 text-xs font-semibold text-ink-700"
-                    >
-                      Avvisa
-                    </button>
+                {entry.source !== "legacy" && (entry.status === "submitted" || entry.status === "rejected") ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {canManage && entry.status === "submitted" ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "approve", entryId: entry.entryId }, "Materialet har godkänts.")}
+                          className="rounded-lg border border-petroleum-200 bg-petroleum-50 px-3 py-1.5 text-xs font-semibold text-petroleum-900"
+                        >
+                          Godkänn
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => void post(`/api/work-orders/${workOrderId}/materials`, { action: "reject", entryId: entry.entryId }, "Materialet har avvisats.")}
+                          className="rounded-lg border border-sand-200 px-3 py-1.5 text-xs font-semibold text-ink-700"
+                        >
+                          Avvisa
+                        </button>
+                      </>
+                    ) : null}
+                    {entry.status === "submitted" ? (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => {
+                          if (!window.confirm("Ta bort materialraden?")) return;
+                          void post(`/api/work-orders/${workOrderId}/materials`, { action: "delete", entryId: entry.entryId }, "Materialraden har tagits bort.");
+                        }}
+                        className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"
+                      >
+                        Ta bort
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </article>

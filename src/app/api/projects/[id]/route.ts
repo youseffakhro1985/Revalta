@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const project = await db.project.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null },
+    where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
     include: {
       property: { select: { id: true, name: true, address: true, city: true } },
       manager: { select: { id: true, name: true, email: true } },
@@ -45,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const existing = await db.project.findFirst({ where: { id, company_id: user.company_id, deleted_at: null }, select: { id: true, status: true } });
+  const existing = await db.project.findFirst({ where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } }, select: { id: true, status: true } });
   if (!existing) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
 
   const body = await request.json();
@@ -105,7 +105,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   const { id } = await params;
   const existing = await db.project.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null },
+    where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
     select: { id: true, name: true, status: true },
   });
   if (!existing) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
