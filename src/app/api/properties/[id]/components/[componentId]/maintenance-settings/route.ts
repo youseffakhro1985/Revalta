@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 async function resolveContext(params: Promise<{ id: string; componentId: string }>) {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ async function resolveContext(params: Promise<{ id: string; componentId: string 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string; componentId: string }> }) {
   const context = await resolveContext(params);
   if ("error" in context) return context.error;
+  const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "wo");
   const rows = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
     SELECT a."id", a."name", a."next_service_at", a."service_interval_months", a."service_lead_days",
            a."auto_create_service_work_orders", a."criticality", a."status",
@@ -31,7 +33,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         AND wo."technical_asset_id" = a."id"
         AND wo."source" = 'maintenance_plan'
         AND wo."maintenance_cycle_advanced_at" IS NOT NULL
-        AND wo."deleted_at" IS NULL
+        ${workOrderGuard}
       ORDER BY wo."maintenance_cycle_advanced_at" DESC
       LIMIT 1
     ) w ON TRUE

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
-import db from "@/lib/db";
+import db, { getPrismaBaseClient } from "@/lib/db";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type Client = Prisma.TransactionClient | typeof db;
 
@@ -63,6 +64,7 @@ export async function setWorkOrderAssetLinks(tx: Prisma.TransactionClient, args:
 }
 
 export async function getWorkOrderAssetLink(client: Client, companyId: string, workOrderId: string) {
+  const workOrderGuard = await sqlSoftDeleteGuard(getPrismaBaseClient(), "WorkOrder", "w");
   const rows = await client.$queryRaw<WorkOrderAssetLink[]>(Prisma.sql`
     SELECT w."building_id", b."name" AS "building_name",
       w."technical_asset_id", a."name" AS "technical_asset_name",
@@ -71,7 +73,7 @@ export async function getWorkOrderAssetLink(client: Client, companyId: string, w
     LEFT JOIN "Building" b ON b."id" = w."building_id"
     LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
     WHERE w."id" = ${workOrderId} AND w."company_id" = ${companyId}
-      AND w."deleted_at" IS NULL
+      ${workOrderGuard}
     LIMIT 1
   `);
   return rows[0] ?? null;

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClipboardPlus } from "lucide-react";
@@ -28,7 +29,7 @@ export function ComponentWorkOrderPanel({ propertyId, componentId }: { propertyI
     async function load() {
       try {
         const response = await fetch(`/api/properties/${propertyId}/components/${componentId}`, { cache: "no-store" });
-        const data = await response.json();
+        const data = await readResponseJson(response);
         if (!response.ok) throw new Error(data.error || "Kunde inte hämta komponenten");
         const component = data.component || {};
         if (mounted) setContext({
@@ -68,7 +69,7 @@ export function ComponentWorkOrderPanel({ propertyId, componentId }: { propertyI
     };
     try {
       const response = await fetch("/api/work-orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsordern");
       router.push(`/dashboard/arbetsorder/${data.workOrder.id}`);
       router.refresh();

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, FileText, Inbox, MessageSquareText, RefreshCw, UsersRound } from "lucide-react";
@@ -75,7 +76,7 @@ export default function ResidentPortalPage() {
     setError("");
     try {
       const response = await fetch("/api/resident-portal", { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta boendeportalen");
       setData(payload);
       setForm((current) => ({ ...current, leaseId: current.leaseId || payload.leases?.[0]?.id || "" }));
@@ -99,7 +100,7 @@ export default function ResidentPortalPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte skapa boendeärendet");
       setForm((current) => ({ ...current, category: "other", priority: "normal", subject: "", message: "" }));
       setSuccess(`Ärendet har skapats${payload.ticket?.public_reference ? ` med referens ${payload.ticket.public_reference}` : ""}.`);

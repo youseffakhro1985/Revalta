@@ -4,10 +4,10 @@ import { AlertTriangle, ArrowRight, Clock3, ShieldCheck, UserRoundX } from "luci
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import {
-  hasSoftDeleteColumn,
   isMissingSchemaColumnError,
   notDeletedFilter,
 } from "@/lib/schema-readiness";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 
@@ -59,9 +59,9 @@ export async function DashboardSlaOperations() {
   let enterpriseRows: EnterpriseRow[] = [];
 
   try {
-    const [workOrderActive, workOrderSoftDelete] = await Promise.all([
+    const [workOrderActive, workOrderGuard] = await Promise.all([
       notDeletedFilter("WorkOrder"),
-      hasSoftDeleteColumn("WorkOrder"),
+      sqlSoftDeleteGuard(db, "WorkOrder", "w"),
     ]);
     [workOrders, enterpriseRows] = await Promise.all([
       db.workOrder.findMany({
@@ -80,11 +80,11 @@ export async function DashboardSlaOperations() {
         },
       }),
       db.$queryRaw<EnterpriseRow[]>(Prisma.sql`
-        SELECT "id", "work_order_number", "sla_response_due_at", "sla_resolution_due_at",
-               "responded_at", "paused_at", "pause_reason", "closed_at"
-        FROM "WorkOrder"
-        WHERE "company_id" = ${user.company_id}
-          ${workOrderSoftDelete ? Prisma.sql`AND "deleted_at" IS NULL` : Prisma.empty}
+        SELECT w."id", w."work_order_number", w."sla_response_due_at", w."sla_resolution_due_at",
+               w."responded_at", w."paused_at", w."pause_reason", w."closed_at"
+        FROM "WorkOrder" w
+        WHERE w."company_id" = ${user.company_id}
+          ${workOrderGuard}
         LIMIT 300
       `),
     ]);

@@ -17,11 +17,11 @@ import { setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { WORK_ORDER_PRIORITIES, WORK_ORDER_STATUSES, normalizeWorkOrderPriority, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import {
-  hasSoftDeleteColumn,
   isMissingSchemaColumnError,
   notDeletedFilter,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 function parseOptionalDate(value: unknown) {
   if (!value) return null;
@@ -60,10 +60,10 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
-    const [workOrderActive, projectActive, workOrderSoftDelete] = await Promise.all([
+    const [workOrderActive, projectActive, workOrderGuard] = await Promise.all([
       notDeletedFilter("WorkOrder"),
       notDeletedFilter("Project"),
-      hasSoftDeleteColumn("WorkOrder"),
+      sqlSoftDeleteGuard(db, "WorkOrder", "w"),
     ]);
 
     const [workOrders, enterpriseRows] = await Promise.all([
@@ -100,7 +100,7 @@ export async function GET() {
         LEFT JOIN "Building" b ON b."id" = w."building_id"
         LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
         WHERE w."company_id" = ${user.company_id}
-          ${workOrderSoftDelete ? Prisma.sql`AND w."deleted_at" IS NULL` : Prisma.empty}
+          ${workOrderGuard}
       `),
     ]);
 

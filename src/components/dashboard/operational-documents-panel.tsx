@@ -3,6 +3,7 @@
 import { FileText, UploadCloud } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type DocumentItem = {
   id: string;
@@ -62,7 +63,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
     try {
       const params = new URLSearchParams({ entityType, entityId });
       const response = await fetch(`/api/operational-documents?${params.toString()}`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta dokument");
       setDocuments(data.documents || []);
     } catch (err) {
@@ -85,7 +86,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
       formData.set("entityType", entityType);
       formData.set("entityId", entityId);
       const response = await fetch("/api/operational-documents", { method: "POST", body: formData });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ladda upp dokumentet");
       setSuccess("Dokumentet har laddats upp.");
       form.reset();
@@ -104,7 +105,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
     setSuccess("");
     try {
       const response = await fetch(`/api/operational-documents/${documentId}`, { method: "DELETE" });
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort dokumentet");
       setSuccess("Dokumentet har tagits bort.");
       await load();

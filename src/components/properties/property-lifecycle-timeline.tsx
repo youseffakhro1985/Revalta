@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, FileBadge2, ShieldCheck, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, Panel } from "@/components/dashboard/premium-ui";
@@ -48,7 +49,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
     setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/card`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta tidslinjen");
       setData(payload);
     } catch (err) {

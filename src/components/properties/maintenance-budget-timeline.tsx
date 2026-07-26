@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart3, CalendarRange, CheckCircle2, Filter, Layers3, RotateCcw } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
@@ -82,7 +83,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
     setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/maintenance-plan`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta budget och tidslinje");
       setData(payload);
     } catch (value) {

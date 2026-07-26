@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { BadgeCheck, CheckCircle2, ExternalLink, FileCheck2, FileText, ReceiptText, Signature } from "lucide-react";
@@ -67,7 +68,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
     setError("");
     try {
       const response = await fetch(endpoint, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta rapportflödet");
       setSignatures(data.signatures || []);
       setReports(data.reports || []);
@@ -91,7 +92,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara");
       reset?.();
       setSuccess(message);

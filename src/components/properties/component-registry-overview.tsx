@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarRange, CircleDollarSign, Gauge, Layers3 } from "lucide-react";
@@ -30,7 +31,7 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/components`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta komponentregistret");
       setData(payload);
     } catch (value) {

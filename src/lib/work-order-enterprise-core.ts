@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { getPrismaBaseClient } from "@/lib/db";
 import { calculateResolutionDueAt, calculateResponseDueAt } from "@/lib/sla-policy";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import type { WorkOrderPriority, WorkOrderStatus } from "@/lib/work-order-workflow";
 
 export const WORK_ORDER_TYPES = ["corrective", "preventive", "inspection", "emergency", "project", "warranty"] as const;
@@ -120,12 +122,13 @@ export async function addWorkOrderStatusEvent(tx: Prisma.TransactionClient, args
 }
 
 export async function getWorkOrderEnterpriseState(client: Prisma.TransactionClient | typeof import("@/lib/db").default, companyId: string, workOrderId: string) {
+  const workOrderGuard = await sqlSoftDeleteGuard(getPrismaBaseClient(), "WorkOrder", "w");
   const rows = await client.$queryRaw<EnterpriseRow[]>(Prisma.sql`
-    SELECT "id", "work_order_number", "work_type", "source", "sla_response_due_at", "sla_resolution_due_at",
-           "responded_at", "paused_at", "pause_reason", "closed_at"
-    FROM "WorkOrder"
-    WHERE "id" = ${workOrderId} AND "company_id" = ${companyId}
-      AND "deleted_at" IS NULL
+    SELECT w."id", w."work_order_number", w."work_type", w."source", w."sla_response_due_at", w."sla_resolution_due_at",
+           w."responded_at", w."paused_at", w."pause_reason", w."closed_at"
+    FROM "WorkOrder" w
+    WHERE w."id" = ${workOrderId} AND w."company_id" = ${companyId}
+      ${workOrderGuard}
     LIMIT 1
   `);
   return rows[0] ?? null;

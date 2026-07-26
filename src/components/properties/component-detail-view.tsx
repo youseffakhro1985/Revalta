@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, Check, CircleDollarSign, ClipboardList, FolderKanban, Gauge, Pencil, Save, X } from "lucide-react";
@@ -77,7 +78,7 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta komponenten");
       setData(payload);
       setForm(formFromComponent(payload.component));
@@ -110,7 +111,7 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte spara komponenten");
       setData((current) => current ? { ...current, component: { ...current.component, ...payload.component } } : current);
       setForm(formFromComponent(payload.component));

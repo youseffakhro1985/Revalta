@@ -73,7 +73,7 @@ export default function ProjectsPage() {
     try {
       const payload = Object.fromEntries(formData.entries());
       const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa projektet");
       setSuccess("Projektet har skapats och kopplats till projektportföljen.");
       await load();
@@ -92,7 +92,7 @@ export default function ProjectsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera projektet");
       setProjects((current) => current.map((project) => project.id === projectId ? {
         ...project,

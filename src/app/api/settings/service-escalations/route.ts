@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { listServiceAssignmentEscalations } from "@/lib/service-escalation-engine";
 import { getServiceEscalationRules } from "@/lib/service-escalation-rules";
 import { listServiceNotificationAssignments } from "@/lib/service-notification-assignments";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 
@@ -33,13 +34,14 @@ export async function GET() {
   const dueBefore = new Date(now.getTime() + 30 * 86400000);
   const { rules, updatedAt: rulesUpdatedAt } = await getServiceEscalationRules(user.company_id);
 
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
   const [assets, assignmentRows, escalationEvents, recipients] = await Promise.all([
     db.$queryRaw<AssetRow[]>(Prisma.sql`
       SELECT a."id", a."property_id", a."name" AS "component_name", a."next_service_at", p."name" AS "property_name"
       FROM "PropertyTechnicalAsset" a
       INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
-      WHERE p."deleted_at" IS NULL
-        AND a."company_id" = ${user.company_id}
+      WHERE a."company_id" = ${user.company_id}
+        ${propertyGuard}
         AND a."next_service_at" IS NOT NULL
         AND a."next_service_at" <= ${dueBefore}
         AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')

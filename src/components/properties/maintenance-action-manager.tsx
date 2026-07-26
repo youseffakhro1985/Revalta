@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, PencilLine, RefreshCw } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -47,7 +48,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
     setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/maintenance-plan`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta åtgärderna");
       setData(payload);
       setSelectedId((current) => current || payload.actions?.[0]?.id || "");
@@ -81,7 +82,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...body, actionId: selected.id }),
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte uppdatera åtgärden");
       setSuccess("Åtgärden har uppdaterats och revisionsloggats.");
       await load();

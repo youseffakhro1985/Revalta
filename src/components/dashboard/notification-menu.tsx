@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, BellRing, CalendarClock, Check, ChevronRight, ShieldAlert, TimerReset } from "lucide-react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Notification = {
   key: string;
@@ -38,10 +39,10 @@ export function NotificationMenu() {
         fetch("/api/notifications/work-order-sla?filter=unread", { cache: "no-store" }),
         fetch("/api/notifications/recurring-work-orders?filter=unread", { cache: "no-store" }),
       ]);
-      const service = serviceResponse.ok ? await serviceResponse.json() as ResponseData : null;
-      const security = securityResponse.ok ? await securityResponse.json() as ResponseData : null;
-      const sla = slaResponse.ok ? await slaResponse.json() as ResponseData : null;
-      const recurring = recurringResponse.ok ? await recurringResponse.json() as ResponseData : null;
+      const service = serviceResponse.ok ? await readResponseJson(serviceResponse) as ResponseData : null;
+      const security = securityResponse.ok ? await readResponseJson(securityResponse) as ResponseData : null;
+      const sla = slaResponse.ok ? await readResponseJson(slaResponse) as ResponseData : null;
+      const recurring = recurringResponse.ok ? await readResponseJson(recurringResponse) as ResponseData : null;
       const securityUnread = (security?.notifications || []).filter((item) => !item.read).map((item) => ({ ...item, kind: "security" as const }));
       const serviceUnread = (service?.notifications || []).map((item) => ({ ...item, kind: "service" as const }));
       const slaUnread = (sla?.notifications || []).map((item) => ({ ...item, kind: "sla" as const }));

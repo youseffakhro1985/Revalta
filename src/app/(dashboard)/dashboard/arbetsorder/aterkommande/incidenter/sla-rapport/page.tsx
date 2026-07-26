@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, BarChart3, CheckCircle2, ChevronLeft, Clock3, Download, RefreshCw, UserRoundX } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Summary = {
   periodDays: number;
@@ -60,7 +61,7 @@ export default function RecurringIncidentSlaReportPage() {
     setLoading(true); setError("");
     try {
       const response = await fetch(`/api/work-orders/recurring/incidents/sla-report?days=${selectedDays}`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta SLA-rapporten");
       setSummary(body.summary); setRows(body.rows || []);
     } catch (value) {

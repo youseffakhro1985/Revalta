@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Clock3, RefreshCw, UserRoundX, Wrench } from "lucide-react";
@@ -12,7 +13,7 @@ const riskLabel:Record<string,string> = { critical:"Kritisk", overdue:"Försenad
 
 export default function WorkOrderOperationsPage() {
   const [data,setData] = useState<Data|null>(null); const [loading,setLoading]=useState(true); const [error,setError]=useState(""); const [filter,setFilter]=useState("open");
-  async function load(){ setLoading(true); setError(""); try { const r=await fetch("/api/work-orders/operations-overview",{cache:"no-store"}); const b=await r.json(); if(!r.ok) throw new Error(b.error||"Kunde inte hämta arbetsorderöversikten"); setData(b);} catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta arbetsorderöversikten");} finally{setLoading(false);} }
+  async function load(){ setLoading(true); setError(""); try { const r=await fetch("/api/work-orders/operations-overview",{cache:"no-store"}); const b=await readResponseJson(r); if(!r.ok) throw new Error(b.error||"Kunde inte hämta arbetsorderöversikten"); setData(b);} catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta arbetsorderöversikten");} finally{setLoading(false);} }
   useEffect(()=>{void load();},[]);
   const items=useMemo(()=>{const rows=data?.workOrders??[]; if(filter==="risk") return rows.filter(x=>["critical","overdue","high"].includes(x.risk)); if(filter==="unassigned") return rows.filter(x=>!x.assignee && x.risk!=="closed"); if(filter==="all") return rows; return rows.filter(x=>x.risk!=="closed");},[data,filter]);
   return <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">

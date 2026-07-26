@@ -7,6 +7,7 @@ import { ArrowLeft, Building2, CalendarRange, CircleDollarSign, ShieldAlert } fr
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Project = {
   id: string; name: string; description: string | null; contractor: string | null;
@@ -43,9 +44,9 @@ export default function ProjectDetailPage() {
           fetch("/api/team", { cache: "no-store" }),
         ]);
         if (projectResponse.status === 401 || teamResponse.status === 401) { router.push("/login"); return; }
-        const data = await projectResponse.json();
+        const data = await readResponseJson(projectResponse);
         if (!projectResponse.ok) throw new Error(data.error || "Kunde inte hämta projektet");
-        const teamData = await teamResponse.json().catch(() => ({}));
+        const teamData = await readResponseJson(teamResponse);
         if (active) {
           setProject(data.project);
           const nextMembers = Array.isArray(teamData.members)
@@ -65,7 +66,7 @@ export default function ProjectDetailPage() {
     try {
       const payload = Object.fromEntries(formData.entries());
       const response = await fetch(`/api/projects/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera projektet");
       setProject(data.project); setSuccess("Projektet har uppdaterats.");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte uppdatera projektet"); }
@@ -77,7 +78,7 @@ export default function ProjectDetailPage() {
     setSaving(true); setError(""); setSuccess("");
     try {
       const response = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-      const data = await response.json().catch(() => ({}));
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort projektet");
       router.push("/dashboard/projekt");
     } catch (err) {

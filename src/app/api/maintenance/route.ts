@@ -1,8 +1,10 @@
+import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber } from "@/lib/dual-list";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { NextResponse } from "next/server";
 
 const action = "maintenance.plan.item";
@@ -265,7 +267,13 @@ export async function PATCH(request: Request) {
         select: { id: true },
       });
       if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });
-      const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} AND "deleted_at" IS NULL LIMIT 1`;
+      const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
+      const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>(Prisma.sql`
+        SELECT w."work_order_number" FROM "WorkOrder" w
+        WHERE w."id" = ${workOrderId}
+          ${workOrderGuard}
+        LIMIT 1
+      `);
       workOrderNumber = rows[0]?.work_order_number ?? null;
       nextWorkOrderId = workOrderId;
     }

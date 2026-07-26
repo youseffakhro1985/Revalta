@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, AlertTriangle, CheckCircle2, Clock3, RefreshCw, ServerCog } from "lucide-react";
 
@@ -70,7 +71,7 @@ export function ServiceNotificationHealthCard() {
     setError("");
     try {
       const response = await fetch("/api/settings/service-notifications/health", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta leveranshälsan");
       setData(body);
     } catch (value) {

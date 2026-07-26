@@ -57,7 +57,7 @@ export default function FelanmalanPage() {
           fetch("/api/team", { cache: "no-store" }),
         ]);
         if ([ticketsResponse, propertiesResponse, teamResponse].some((response) => response.status === 401)) { router.push("/login"); return; }
-        const [ticketsData, propertiesData, teamData] = await Promise.all([ticketsResponse.json(), propertiesResponse.json(), teamResponse.json()]);
+        const [ticketsData, propertiesData, teamData] = await Promise.all([readResponseJson(ticketsResponse), readResponseJson(propertiesResponse), readResponseJson(teamResponse)]);
         if (!mounted) return;
         if (!ticketsResponse.ok) throw new Error(ticketsData.error || "Kunde inte hämta ärenden");
         if (!propertiesResponse.ok) throw new Error(propertiesData.error || "Kunde inte hämta fastigheter");

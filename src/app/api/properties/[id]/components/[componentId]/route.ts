@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 const COMPONENT_STATUSES = new Set(["active", "planned", "inactive", "replaced", "decommissioned"]);
 const CRITICALITIES = new Set(["low", "normal", "high", "critical"]);
@@ -63,13 +64,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const component = components[0];
   if (!component) return NextResponse.json({ error: "Komponenten hittades inte" }, { status: 404 });
 
+  const [workOrderGuard, projectGuard] = await Promise.all([
+    sqlSoftDeleteGuard(db, "WorkOrder", "w"),
+    sqlSoftDeleteGuard(db, "Project", "p"),
+  ]);
+
   const events = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
     SELECT e.*, u."name" AS "created_by_name", u."email" AS "created_by_email",
       w."title" AS "work_order_title", p."name" AS "project_name"
     FROM "ComponentLifecycleEvent" e
     JOIN "User" u ON u."id" = e."created_by_id"
-    LEFT JOIN "WorkOrder" w ON w."id" = e."work_order_id" AND w."company_id" = ${user.company_id} AND w."deleted_at" IS NULL
-    LEFT JOIN "Project" p ON p."id" = e."project_id" AND p."company_id" = ${user.company_id} AND p."deleted_at" IS NULL
+    LEFT JOIN "WorkOrder" w ON w."id" = e."work_order_id" AND w."company_id" = ${user.company_id} ${workOrderGuard}
+    LEFT JOIN "Project" p ON p."id" = e."project_id" AND p."company_id" = ${user.company_id} ${projectGuard}
     WHERE e."technical_asset_id" = ${componentId} AND e."property_id" = ${propertyId} AND e."company_id" = ${user.company_id}
     ORDER BY e."event_date" DESC, e."created_at" DESC
     LIMIT 200
@@ -80,8 +86,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       w."title" AS "work_order_title", p."name" AS "project_name"
     FROM "ComponentCostEntry" c
     JOIN "User" u ON u."id" = c."created_by_id"
-    LEFT JOIN "WorkOrder" w ON w."id" = c."work_order_id" AND w."company_id" = ${user.company_id} AND w."deleted_at" IS NULL
-    LEFT JOIN "Project" p ON p."id" = c."project_id" AND p."company_id" = ${user.company_id} AND p."deleted_at" IS NULL
+    LEFT JOIN "WorkOrder" w ON w."id" = c."work_order_id" AND w."company_id" = ${user.company_id} ${workOrderGuard}
+    LEFT JOIN "Project" p ON p."id" = c."project_id" AND p."company_id" = ${user.company_id} ${projectGuard}
     WHERE c."technical_asset_id" = ${componentId} AND c."property_id" = ${propertyId} AND c."company_id" = ${user.company_id}
     ORDER BY c."cost_date" DESC, c."created_at" DESC
     LIMIT 200
@@ -92,7 +98,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     FROM "WorkOrder" w
     JOIN "ComponentLifecycleEvent" e ON e."work_order_id" = w."id"
     WHERE e."technical_asset_id" = ${componentId} AND w."company_id" = ${user.company_id}
-      AND w."deleted_at" IS NULL
+      ${workOrderGuard}
     ORDER BY w."updated_at" DESC
     LIMIT 50
   `);
@@ -102,7 +108,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     FROM "Project" p
     JOIN "ComponentLifecycleEvent" e ON e."project_id" = p."id"
     WHERE e."technical_asset_id" = ${componentId} AND p."company_id" = ${user.company_id}
-      AND p."deleted_at" IS NULL
+      ${projectGuard}
     ORDER BY p."updated_at" DESC
     LIMIT 50
   `);

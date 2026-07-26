@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { LockKeyhole } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -19,7 +20,7 @@ export function WorkOrderLockIndicator() {
           if (active) setCount(0);
           return;
         }
-        const data = await response.json() as LockSummary;
+        const data = await readResponseJson(response) as LockSummary;
         if (active) setCount(Array.isArray(data.locks) ? data.locks.length : 0);
       } catch {
         if (active) setCount(0);

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, ClipboardCheck, FileBadge2, Plus, ShieldCheck, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -61,7 +62,7 @@ export function PropertyCardManager({ propertyId }: Props) {
     setLoading(true);
     try {
       const response = await fetch(endpoint, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta registerdata");
       setData(payload);
     } catch (err) {
@@ -95,7 +96,7 @@ export function PropertyCardManager({ propertyId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, action: `${section}.save`, recordId: selectedId || undefined }),
       });
-      const result = await response.json();
+      const result = await readResponseJson(response);
       if (!response.ok) throw new Error(result.error || "Kunde inte spara posten");
       setSuccess(selectedId ? "Posten har uppdaterats." : "Posten har lagts till.");
       setSelectedId("");

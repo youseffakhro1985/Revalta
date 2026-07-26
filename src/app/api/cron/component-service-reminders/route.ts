@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { deliverServiceEmail, type ServiceEmailDelivery } from "@/lib/component-service-email";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -168,13 +169,15 @@ export async function GET(request: Request) {
   if (!authorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
   const now = new Date();
   const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
   const [components, modernSettings, modernUserPreferences] = await Promise.all([
     db.$queryRaw<DueComponent[]>(Prisma.sql`
       SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."criticality", a."next_service_at",
         p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
       FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
-      WHERE p."deleted_at" IS NULL
-        AND a."next_service_at" IS NOT NULL AND a."next_service_at" <= ${maxDueBefore}
+      WHERE a."next_service_at" IS NOT NULL
+        ${propertyGuard}
+        AND a."next_service_at" <= ${maxDueBefore}
         AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
       ORDER BY a."company_id", a."next_service_at" ASC, a."criticality" DESC
     `),

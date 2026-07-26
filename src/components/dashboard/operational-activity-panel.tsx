@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { Clock3, MessageSquareText, Send } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { EmptyState, InlineAlert, Panel, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -63,7 +64,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
     setError("");
     try {
       const response = await fetch(endpoint, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta aktivitet");
       setComments(data.comments || []);
       setHistory(data.history || []);
@@ -89,7 +90,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: text, isInternal }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte spara kommentaren");
       setBody("");
       setSuccess("Kommentaren har sparats.");

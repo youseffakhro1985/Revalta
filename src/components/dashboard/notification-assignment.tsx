@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, CheckCircle2, UserRound, XCircle } from "lucide-react";
 
@@ -20,7 +21,7 @@ function loadAssignments() {
   if (!sharedRequest) {
     sharedRequest = fetch("/api/notifications/service-center/assignments", { cache: "no-store" })
       .then(async (response) => {
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error || "Kunde inte hämta ansvarstilldelningar");
         return body as AssignmentData;
       })
@@ -78,7 +79,7 @@ export function NotificationAssignment({ notificationKey }: { notificationKey: s
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationKey, assigneeId: assigneeId || null, status, deadline: deadline || null, note }),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte spara ansvarstilldelningen");
       setAssignment(body.assignment);
       sharedRequest = null;

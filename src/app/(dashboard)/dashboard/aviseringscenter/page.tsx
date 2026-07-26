@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, BellRing, CalendarClock, CheckCheck, Clock3, RefreshCw, RotateCcw, TimerReset } from "lucide-react";
 import { NotificationAssignment } from "@/components/dashboard/notification-assignment";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type NotificationKind = "service" | "sla" | "recurring";
 type Notification = {
@@ -66,7 +67,7 @@ export default function NotificationCenterPage() {
         fetch(`/api/notifications/work-order-sla?filter=${filter}`, { cache: "no-store" }),
         fetch(`/api/notifications/recurring-work-orders?filter=${filter}`, { cache: "no-store" }),
       ]);
-      const [serviceBody, slaBody, recurringBody] = await Promise.all([serviceResponse.json(), slaResponse.json(), recurringResponse.json()]);
+      const [serviceBody, slaBody, recurringBody] = await Promise.all([readResponseJson(serviceResponse), readResponseJson(slaResponse), readResponseJson(recurringResponse)]);
       if (!serviceResponse.ok) throw new Error(serviceBody.error || "Kunde inte hämta serviceaviseringar");
       if (!slaResponse.ok) throw new Error(slaBody.error || "Kunde inte hämta SLA-aviseringar");
       if (!recurringResponse.ok) throw new Error(recurringBody.error || "Kunde inte hämta schemaaviseringar");
@@ -106,7 +107,7 @@ export default function NotificationCenterPage() {
 
   async function patch(kind: NotificationKind, body: Record<string, unknown>) {
     const response = await fetch(endpointFor(kind), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const result = await response.json();
+    const result = await readResponseJson(response);
     if (!response.ok) throw new Error(result.error || "Åtgärden kunde inte genomföras");
     return result;
   }

@@ -4,6 +4,7 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { validateUploadFile } from "@/lib/document-file-security";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
   if (!entity) return NextResponse.json({ error: "Objektet hittades inte" }, { status: 404 });
 
   if (entityType === "property" || entityType === "technical_asset") {
+    const documentGuard = await sqlSoftDeleteGuard(db, "OperationalDocument", "d");
     const documents = await db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
       SELECT d."id", d."file_name", d."storage_key" AS "storage_url", d."content_type",
              d."size_bytes", d."category", d."visibility", d."version", d."created_at",
@@ -53,7 +55,7 @@ export async function GET(request: Request) {
       FROM "OperationalDocument" d
       JOIN "User" u ON u."id" = d."uploaded_by_id"
       WHERE d."company_id" = ${user.company_id}
-        AND d."deleted_at" IS NULL
+        ${documentGuard}
         AND ${entityType === "property" ? Prisma.sql`d."property_id" = ${entityId}` : Prisma.sql`d."technical_asset_id" = ${entityId}`}
       ORDER BY d."created_at" DESC
       LIMIT 100

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, FileCheck2, FileText, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import {
@@ -71,7 +72,7 @@ export default function ResidentDocumentsPage() {
     setError("");
     try {
       const response = await fetch("/api/resident-portal", { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta boendedokument");
       setData({ leases: payload.leases || [], documents: payload.documents || [] });
       setSelectedLeaseId((current) => {

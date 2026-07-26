@@ -41,12 +41,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { DELETE, GET } from "./route";
+import { DELETE, GET, PATCH } from "./route";
 
 describe("ticket operations route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", company_id: "company-1" });
+    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", company_id: "company-1", title: "Läckage" });
     auditFindManyMock.mockResolvedValue([]);
   });
 
@@ -75,6 +75,66 @@ describe("ticket operations route", () => {
     }));
     expect(body.operations[0].action).toBe("workorder.time.added");
     expect(body.operations[0].metadata.minutes).toBe(45);
+  });
+
+  it("updates modern ticket operation fields and rejects legacy rows", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    operationFindFirstMock
+      .mockResolvedValueOnce({
+        id: "op-1",
+        operation_type: "time",
+        description: "Arbete",
+        minutes: 45,
+        amount: null,
+        completed: null,
+        ticket_title: "Läckage",
+        created_at: new Date("2026-07-20T10:00:00Z"),
+        created_by: { name: "Anna", email: "anna@example.se" },
+      })
+      .mockResolvedValueOnce({
+        id: "op-1",
+        operation_type: "time",
+        description: "Uppdaterat arbete",
+        minutes: 60,
+        amount: null,
+        completed: null,
+        ticket_title: "Läckage",
+        created_at: new Date("2026-07-20T10:00:00Z"),
+        created_by: { name: "Anna", email: "anna@example.se" },
+      });
+    operationUpdateManyMock.mockResolvedValue({ count: 1 });
+
+    const ok = await PATCH(new Request("http://localhost", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operationId: "op-1", description: "Uppdaterat arbete", minutes: 60 }),
+    }), { params: Promise.resolve({ id: "ticket-1" }) });
+    const body = await ok.json();
+
+    expect(ok.status).toBe(200);
+    expect(operationUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: "op-1",
+        company_id: "company-1",
+        ticket_id: "ticket-1",
+        deleted_at: null,
+      },
+      data: { description: "Uppdaterat arbete", minutes: 60 },
+    }));
+    expect(body.operation.metadata.minutes).toBe(60);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: "workorder.operation.updated",
+    }));
+
+    operationFindFirstMock.mockResolvedValueOnce(null);
+    auditFindFirstMock.mockResolvedValue({ id: "legacy-op", metadata: { storage: "AuditLog" } });
+    const legacy = await PATCH(new Request("http://localhost", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operationId: "legacy-op", description: "x" }),
+    }), { params: Promise.resolve({ id: "ticket-1" }) });
+    expect(legacy.status).toBe(409);
+    expect((await legacy.json()).error).toMatch(/backfill/i);
   });
 
   it("soft-deletes modern ticket operations and rejects legacy rows", async () => {

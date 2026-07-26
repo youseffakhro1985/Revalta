@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { getPrismaBaseClient } from "@/lib/db";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 const EVENT_TYPE_BY_WORK_TYPE: Record<string, string> = {
   corrective: "repair",
@@ -61,11 +63,12 @@ async function advancePreventiveMaintenanceCycle(
   tx: Prisma.TransactionClient,
   args: { companyId: string; technicalAssetId: string; workOrderId: string; completedAt: Date },
 ) {
+  const workOrderGuard = await sqlSoftDeleteGuard(getPrismaBaseClient(), "WorkOrder", "w");
   const workOrders = await tx.$queryRaw<MaintenanceCycleRow[]>(Prisma.sql`
-    SELECT "source", "maintenance_cycle_key", "maintenance_cycle_advanced_at"
-    FROM "WorkOrder"
-    WHERE "id" = ${args.workOrderId} AND "company_id" = ${args.companyId}
-      AND "deleted_at" IS NULL
+    SELECT w."source", w."maintenance_cycle_key", w."maintenance_cycle_advanced_at"
+    FROM "WorkOrder" w
+    WHERE w."id" = ${args.workOrderId} AND w."company_id" = ${args.companyId}
+      ${workOrderGuard}
     LIMIT 1
     FOR UPDATE
   `);

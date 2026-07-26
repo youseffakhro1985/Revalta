@@ -122,6 +122,9 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Access credentials field correction (`PATCH` identifier/type/holder/unit/area/dates/note) + Nycklar “Ändra” UI; critical dashboard clients use `readResponseJson`.
    - Rounds field PATCH (title/interval/nextDue) + Ronder “Ändra”; IMD field PATCH (readings/price/note) with debit recalc + IMD “Ändra”; more SQL soft-delete guards (edit-lock force-release, preventive engine, service escalations).
    - Compliance inspections field PATCH + Besiktningar “Ändra”; ManagedDocument field PATCH (name/category/validUntil) + Dokument “Ändra”; broader dashboard `readResponseJson` coverage (skador, budget, energi, kalender, offerter, underhåll, economics/execution panels, etc.).
+   - Remaining raw SQL soft-delete ternaries migrated to `sqlSoftDeleteGuard` (work-orders list enterprise join, dashboard SLA ops, maintenance/execution/component SQL paths).
+   - Client fetch hardening: properties/maintenance/dashboard notification panels + integrations/boendeportal use `readResponseJson` (empty/non-JSON bodies no longer crash Safari).
+   - Ticket operations field correction (`PATCH /api/tickets/[id]/operations` for description/minutes/amount/completed) + felanmälan detail “Ändra”; modern-only fail-closed for legacy AuditLog rows.
 
 ## Verification
 

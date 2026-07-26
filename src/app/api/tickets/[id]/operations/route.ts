@@ -203,6 +203,168 @@ export async function POST(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    }
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const { id } = await params;
+    const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+    if (!body) return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
+
+    const operationId = String(body.operationId || body.id || "").trim();
+    if (!operationId) return NextResponse.json({ error: "Registrerings-id krävs" }, { status: 400 });
+
+    const fieldKeys = ["description", "minutes", "amount", "completed"] as const;
+    const hasFieldUpdate = fieldKeys.some((key) => body[key] !== undefined);
+    if (!hasFieldUpdate) {
+      return NextResponse.json({ error: "Ange minst ett fält att uppdatera" }, { status: 400 });
+    }
+
+    const ticket = await db.ticket.findFirst({
+      where: { id, deleted_at: null, ...tenantWhere(user) },
+      select: { id: true, title: true },
+    });
+    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+
+    const existing = await db.ticketOperation.findFirst({
+      where: {
+        id: operationId,
+        company_id: user.company_id,
+        ticket_id: ticket.id,
+        deleted_at: null,
+      },
+      select: {
+        id: true,
+        operation_type: true,
+        description: true,
+        minutes: true,
+        amount: true,
+        completed: true,
+        ticket_title: true,
+        created_at: true,
+        created_by: { select: { name: true, email: true } },
+      },
+    });
+    if (!existing) {
+      const legacy = await db.auditLog.findFirst({
+        where: {
+          ...(user.company_id ? { company_id: user.company_id } : { actor_user_id: user.id }),
+          entity_type: "ticket",
+          entity_id: ticket.id,
+          id: operationId,
+          action: { startsWith: "workorder." },
+        },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "TicketOperation") {
+        return NextResponse.json({
+          error: "Registreringen finns kvar i äldre lagring. Kör backfill till TicketOperation innan den kan ändras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Registreringen hittades inte" }, { status: 404 });
+    }
+
+    const type = existing.operation_type;
+    const data: {
+      description?: string | null;
+      minutes?: number | null;
+      amount?: number | null;
+      completed?: boolean | null;
+    } = {};
+
+    if (body.description !== undefined) {
+      const description = typeof body.description === "string" ? body.description.trim() : "";
+      if ((type === "checklist" || type === "note") && description.length < 2) {
+        return NextResponse.json({ error: "Beskrivningen är för kort" }, { status: 400 });
+      }
+      if (description.length > 2000) {
+        return NextResponse.json({ error: "Beskrivningen är för lång" }, { status: 400 });
+      }
+      data.description = description || null;
+    }
+
+    if (body.minutes !== undefined) {
+      if (type !== "time") {
+        return NextResponse.json({ error: "Minuter kan bara ändras på tidsregistreringar" }, { status: 400 });
+      }
+      const minutes = Number(body.minutes);
+      if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 1440) {
+        return NextResponse.json({ error: "Ange giltig arbetstid i minuter" }, { status: 400 });
+      }
+      data.minutes = Math.round(minutes);
+    }
+
+    if (body.amount !== undefined) {
+      if (type !== "cost") {
+        return NextResponse.json({ error: "Belopp kan bara ändras på kostnadsregistreringar" }, { status: 400 });
+      }
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount) || amount < 0 || amount > 10000000) {
+        return NextResponse.json({ error: "Ange ett giltigt kostnadsbelopp" }, { status: 400 });
+      }
+      data.amount = Math.round(amount * 100) / 100;
+    }
+
+    if (body.completed !== undefined) {
+      if (type !== "checklist") {
+        return NextResponse.json({ error: "Klar-status kan bara ändras på checklistor" }, { status: 400 });
+      }
+      data.completed = Boolean(body.completed);
+    }
+
+    const updated = await db.ticketOperation.updateMany({
+      where: {
+        id: existing.id,
+        company_id: user.company_id,
+        ticket_id: ticket.id,
+        deleted_at: null,
+      },
+      data,
+    });
+    if (updated.count !== 1) {
+      return NextResponse.json({ error: "Registreringen kunde inte uppdateras. Ladda om och försök igen." }, { status: 409 });
+    }
+
+    const operation = await db.ticketOperation.findFirst({
+      where: { id: existing.id, company_id: user.company_id, ticket_id: ticket.id, deleted_at: null },
+      include: { created_by: { select: { name: true, email: true } } },
+    });
+    if (!operation) {
+      return NextResponse.json({ error: "Registreringen hittades inte efter uppdatering" }, { status: 404 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "ticket",
+      entityId: ticket.id,
+      action: "workorder.operation.updated",
+      metadata: {
+        operationId: existing.id,
+        type,
+        description: operation.description,
+        minutes: operation.minutes,
+        amount: operation.amount === null ? null : asNumber(operation.amount),
+        completed: operation.completed,
+        ticketTitle: ticket.title,
+        storage: "TicketOperation",
+      },
+    });
+
+    return NextResponse.json({ success: true, operation: mapModernOperation(operation) });
+  } catch (error) {
+    console.error("Update ticket operation error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

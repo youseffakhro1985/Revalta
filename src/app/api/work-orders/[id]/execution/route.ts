@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import {
   getModernMaterialEntry,
   getModernTimeEntry,
@@ -80,6 +81,7 @@ async function resolveWorkOrder(id: string, companyId: string) {
 }
 
 async function getCompletionState(id: string, companyId: string) {
+  const documentGuard = await sqlSoftDeleteGuard(db, "OperationalDocument", "d");
   const rows = await db.$queryRaw<CompletionRow[]>(Prisma.sql`
     SELECT
       (SELECT COUNT(*)::integer
@@ -89,17 +91,17 @@ async function getCompletionState(id: string, companyId: string) {
          AND "is_required" = true
          AND "completed_at" IS NULL) AS "required_incomplete",
       (SELECT COUNT(*)::integer
-       FROM "OperationalDocument"
-       WHERE "company_id" = ${companyId}
-         AND "work_order_id" = ${id}
-         AND "deleted_at" IS NULL
-         AND "category" = 'before_photo') AS "before_photos",
+       FROM "OperationalDocument" d
+       WHERE d."company_id" = ${companyId}
+         AND d."work_order_id" = ${id}
+         ${documentGuard}
+         AND d."category" = 'before_photo') AS "before_photos",
       (SELECT COUNT(*)::integer
-       FROM "OperationalDocument"
-       WHERE "company_id" = ${companyId}
-         AND "work_order_id" = ${id}
-         AND "deleted_at" IS NULL
-         AND "category" = 'after_photo') AS "after_photos"
+       FROM "OperationalDocument" d
+       WHERE d."company_id" = ${companyId}
+         AND d."work_order_id" = ${id}
+         ${documentGuard}
+         AND d."category" = 'after_photo') AS "after_photos"
   `);
   return rows[0] ?? { required_incomplete: 0, before_photos: 0, after_photos: 0 };
 }
@@ -145,13 +147,16 @@ export async function GET(
       FROM "WorkOrderExecutionEntry"
       WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
     `),
-    db.$queryRaw<SlaRow[]>(Prisma.sql`
-      SELECT "response_due_at", "completion_due_at", "responded_at", "sla_status"
-      FROM "WorkOrder"
-      WHERE "id" = ${id} AND "company_id" = ${user.company_id}
-        AND "deleted_at" IS NULL
-      LIMIT 1
-    `),
+    (async () => {
+      const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
+      return db.$queryRaw<SlaRow[]>(Prisma.sql`
+        SELECT w."response_due_at", w."completion_due_at", w."responded_at", w."sla_status"
+        FROM "WorkOrder" w
+        WHERE w."id" = ${id} AND w."company_id" = ${user.company_id}
+          ${workOrderGuard}
+        LIMIT 1
+      `);
+    })(),
     getCompletionState(id, user.company_id),
   ]);
 
@@ -317,11 +322,12 @@ export async function POST(
     `);
     const actualCost = totals[0]?.total_cost ?? 0;
     const completedAt = new Date();
+    const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
     const slaRows = await db.$queryRaw<{ completion_due_at: Date | null }[]>(Prisma.sql`
-      SELECT "completion_due_at"
-      FROM "WorkOrder"
-      WHERE "id" = ${id} AND "company_id" = ${companyId}
-        AND "deleted_at" IS NULL
+      SELECT w."completion_due_at"
+      FROM "WorkOrder" w
+      WHERE w."id" = ${id} AND w."company_id" = ${companyId}
+        ${workOrderGuard}
       LIMIT 1
     `);
     const completionDueAt = slaRows[0]?.completion_due_at ?? null;

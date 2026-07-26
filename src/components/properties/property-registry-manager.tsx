@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -28,7 +29,7 @@ const labelClass = "text-xs font-semibold uppercase tracking-[0.08em] text-ink-5
 
 async function requestJson(url: string, options: RequestInit) {
   const response = await fetch(url, options);
-  const data = await response.json();
+  const data = await readResponseJson(response);
   if (!response.ok) throw new Error(data.error || "Kunde inte spara ändringen");
   return data;
 }
@@ -99,7 +100,7 @@ export function PropertyRegistryManager({
     setMessage("");
     try {
       const response = await fetch(`/api/properties/${propertyId}`, { method: "DELETE" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort fastigheten");
       router.push("/dashboard/fastigheter");
     } catch (err) {

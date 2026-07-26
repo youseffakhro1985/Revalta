@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -47,7 +48,7 @@ export default function IntegrationsPage() {
       try {
         const response = await fetch("/api/integrations", { cache: "no-store" });
         if (response.status === 401) { router.push("/login"); return; }
-        const data = await response.json();
+        const data = await readResponseJson(response);
         if (!isMounted) return;
         if (!response.ok) { setError(data.error || "Kunde inte hämta integrationer"); return; }
         setIntegrations(data.integrations || []);

@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarRange, CheckCircle2, CircleDollarSign, Plus, TrendingUp } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -37,7 +38,7 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
 
   const load=useCallback(async()=>{
     setLoading(true);setError("");
-    try{const r=await fetch(`/api/properties/${propertyId}/maintenance-plan`,{cache:"no-store"});const p=await r.json();if(!r.ok)throw new Error(p.error||"Kunde inte hämta underhållsplanen");setData(p);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta underhållsplanen");}finally{setLoading(false);}
+    try{const r=await fetch(`/api/properties/${propertyId}/maintenance-plan`,{cache:"no-store"});const p=await readResponseJson(r);if(!r.ok)throw new Error(p.error||"Kunde inte hämta underhållsplanen");setData(p);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta underhållsplanen");}finally{setLoading(false);}
   },[propertyId]);
   useEffect(()=>{void load();},[load]);
 
@@ -47,14 +48,14 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
     event.preventDefault();setSaving(true);setError("");setSuccess("");
     try{
       const form=new FormData(event.currentTarget);const body=Object.fromEntries(form.entries());
-      const r=await fetch(`/api/properties/${propertyId}/maintenance-plan`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const p=await r.json();if(!r.ok)throw new Error(p.error||"Kunde inte spara");
+      const r=await fetch(`/api/properties/${propertyId}/maintenance-plan`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const p=await readResponseJson(r);if(!r.ok)throw new Error(p.error||"Kunde inte spara");
       event.currentTarget.reset();setSuccess(mode==="plan"?"Underhållsplanen har skapats.":"Åtgärden har lagts till.");await load();
     }catch(e){setError(e instanceof Error?e.message:"Kunde inte spara");}finally{setSaving(false);}
   }
 
   async function activate(planId:string){
     setSaving(true);setError("");setSuccess("");
-    try{const r=await fetch(`/api/properties/${propertyId}/maintenance-plan`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"plan.activate",planId})});const p=await r.json();if(!r.ok)throw new Error(p.error||"Kunde inte aktivera planen");setSuccess("Planen är nu aktiv.");await load();}catch(e){setError(e instanceof Error?e.message:"Kunde inte aktivera planen");}finally{setSaving(false);}
+    try{const r=await fetch(`/api/properties/${propertyId}/maintenance-plan`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"plan.activate",planId})});const p=await readResponseJson(r);if(!r.ok)throw new Error(p.error||"Kunde inte aktivera planen");setSuccess("Planen är nu aktiv.");await load();}catch(e){setError(e instanceof Error?e.message:"Kunde inte aktivera planen");}finally{setSaving(false);}
   }
 
   if(loading)return <div className="space-y-4"><div className="h-28 animate-pulse rounded-2xl bg-sand-100"/><div className="h-96 animate-pulse rounded-2xl bg-sand-100"/></div>;

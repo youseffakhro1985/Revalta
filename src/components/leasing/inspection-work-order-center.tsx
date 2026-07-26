@@ -39,7 +39,7 @@ export function InspectionWorkOrderCenter() {
         fetch(`/api/leases/${id}/inspection-items`, { cache: "no-store" }),
         fetch(`/api/leases/${id}/inspection-work-orders/status`, { cache: "no-store" }),
       ]);
-      const itemsData = await itemsResponse.json(); const statusData = await statusResponse.json();
+      const itemsData = await readResponseJson(itemsResponse); const statusData = await readResponseJson(statusResponse);
       if (!itemsResponse.ok) throw new Error(itemsData.error || "Kunde inte hämta besiktningspunkter");
       if (!statusResponse.ok) throw new Error(statusData.error || "Kunde inte hämta arbetsorderstatus");
       setRecord(itemsData.record);

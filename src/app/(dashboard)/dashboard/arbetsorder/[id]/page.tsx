@@ -87,7 +87,7 @@ export default function WorkOrderDetailPage() {
         fetch(`/api/work-orders/${id}/transitions`, { cache: "no-store" }),
       ]);
       if ([workOrderResponse, optionsResponse, transitionResponse].some((response) => response.status === 401)) { router.push("/login"); return; }
-      const [workOrderData, optionsData, transitionData] = await Promise.all([workOrderResponse.json(), optionsResponse.json(), transitionResponse.json()]);
+      const [workOrderData, optionsData, transitionData] = await Promise.all([readResponseJson(workOrderResponse), readResponseJson(optionsResponse), readResponseJson(transitionResponse)]);
       if (!workOrderResponse.ok) throw new Error(workOrderData.error || "Kunde inte hämta arbetsordern");
       if (!optionsResponse.ok) throw new Error(optionsData.error || "Kunde inte hämta komponentregistret");
       if (!transitionResponse.ok) throw new Error(transitionData.error || "Kunde inte hämta styrningsalternativ");

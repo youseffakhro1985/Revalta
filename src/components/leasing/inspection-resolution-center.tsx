@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, RefreshCw } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import type { LeaseInspectionRecord } from "@/lib/lease-inspection-items";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Lease = { id: string; lease_number: string; status: string; property: { name: string }; unit: { designation: string }; lease_holder: { name: string } };
 const LEGACY_BACKFILL = "Besiktningen finns kvar i äldre lagring. Kör backfill till LeaseInspectionRecord innan den kan synkroniseras.";
@@ -19,7 +20,7 @@ export function InspectionResolutionCenter() {
 
   async function loadLeases() {
     const r = await fetch("/api/leases", { cache: "no-store" });
-    const d = await r.json();
+    const d = await readResponseJson(r);
     if (!r.ok) throw new Error(d.error || "Kunde inte hämta avtal");
     const o = (d.leases || []).filter((x: Lease) => ["reserved", "active", "notice", "ended"].includes(x.status));
     setLeases(o);
@@ -31,7 +32,7 @@ export function InspectionResolutionCenter() {
     setLoading(true); setError(""); setMessage("");
     try {
       const r = await fetch(`/api/leases/${id}/inspection-items`, { cache: "no-store" });
-      const d = await r.json();
+      const d = await readResponseJson(r);
       if (!r.ok) throw new Error(d.error || "Kunde inte hämta besiktningen");
       setRecord(d.record);
       setSource(d.source === "legacy" || d.source === "table" ? d.source : undefined);
@@ -62,7 +63,7 @@ export function InspectionResolutionCenter() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version: record.version }),
       });
-      const d = await r.json();
+      const d = await readResponseJson(r);
       if (!r.ok) throw new Error(d.error || "Kunde inte synkronisera");
       setRecord(d.record);
       setMessage(d.changed ? `${d.changed} besiktningspunkter markerades som åtgärdade.` : "Inga nya slutförda arbetsorder behövde återkopplas.");

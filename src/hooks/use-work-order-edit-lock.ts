@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type Holder = { userId: string; name: string | null; email: string; acquiredAt: string; expiresAt: string };
 type LockState =
@@ -24,7 +25,7 @@ export function useWorkOrderEditLock(workOrderId: string, enabled: boolean) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "acquire", leaseSeconds: 120 }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (response.status === 423) {
         tokenRef.current = null;
         setState({
@@ -77,7 +78,7 @@ export function useWorkOrderEditLock(workOrderId: string, enabled: boolean) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "renew", token, leaseSeconds: 120 }),
         });
-        const data = await response.json();
+        const data = await readResponseJson(response);
         if (!response.ok) {
           tokenRef.current = null;
           setState({ status: "lost", token: null, version: currentVersion, holder: null, expiresAt: "", message: data.error || "Redigeringslåset har gått förlorat" });

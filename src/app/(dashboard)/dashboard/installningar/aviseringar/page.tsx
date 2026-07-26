@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, Mail, RefreshCw, Save, Send, Settings2, Users } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { readResponseJson } from "@/lib/fetch-json";
 
 type EventRow = { id: string; type: string; status: string; recipient: string | null; payload: Record<string, unknown> | null; created_at: string };
 type Recipient = { id: string; name: string | null; email: string; role: string };
@@ -67,7 +68,7 @@ export default function ServiceNotificationsPage() {
     setError("");
     try {
       const response = await fetch("/api/settings/service-notifications", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta aviseringsstatus");
       const loadedPreferences = body.preferences as Preferences;
       const loadedEmails = loadedPreferences.additionalEmails.join("\n");
@@ -96,7 +97,7 @@ export default function ServiceNotificationsPage() {
     setSuccess("");
     try {
       const response = await fetch("/api/settings/service-notifications", { method: "POST" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Testutskicket misslyckades");
       setSuccess(`Testutskicket skickades till ${body.recipient}.`);
       await load();
@@ -120,7 +121,7 @@ export default function ServiceNotificationsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...preferences, additionalEmails }),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte spara inställningarna");
       setSuccess("Aviseringsinställningarna är sparade och används vid nästa dagliga körning.");
       await load();

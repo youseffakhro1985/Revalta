@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useState } from "react";
 import { Archive, CheckCircle2, History } from "lucide-react";
 import { InlineAlert, Panel, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -38,7 +39,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
     setError("");
     try {
       const response = await fetch(`/api/properties/${propertyId}/maintenance-plan/governance`, { cache: "no-store" });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta versionshistoriken");
       setData(payload);
     } catch (reason) {
@@ -60,7 +61,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId, action }),
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte uppdatera planversionen");
       setSuccess(action === "plan.approve" ? "Planversionen är godkänd och aktiv." : "Planversionen är arkiverad.");
       await load();

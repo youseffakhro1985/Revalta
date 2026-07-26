@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
+import { readResponseJson } from "@/lib/fetch-json";
 
 function withCompanySlug(path: string, companySlug?: string) {
   if (!companySlug) return path;
@@ -76,7 +77,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
   useEffect(() => {
     async function loadProperties() {
       const response = await fetch(withCompanySlug("/api/public/properties", companySlug), { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (response.ok) {
         setProperties(data.properties || []);
         setCompanyName(data.company?.name || "Revalta");
@@ -101,7 +102,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reporterName, reporterEmail, reporterPhone, reporterUnit, propertyId, title, description, companySlug }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
 
       if (!response.ok) {
         setError(data.error || "Kunde inte skapa ärendet");
@@ -140,7 +141,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
       if (trackEmail) params.set("email", trackEmail);
       if (trackingToken) params.set("token", trackingToken);
       const response = await fetch(`/api/public/tickets/${encodeURIComponent(normalizedReference)}?${params.toString()}`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readResponseJson(response);
 
       if (!response.ok) {
         setError(data.error || "Kunde inte hitta ärendet");
@@ -173,7 +174,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) {
         setError(data.error || "Kunde inte ladda upp bilagan");
         return;
@@ -200,7 +201,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: trackEmail, body: residentComment, token: trackingToken || undefined }),
       });
-      const data = await response.json();
+      const data = await readResponseJson(response);
       if (!response.ok) {
         setError(data.error || "Kunde inte lägga till kommentaren");
         return;

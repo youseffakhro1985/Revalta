@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, RotateCcw, Search, Send, XCircle } from "lucide-react";
@@ -53,7 +54,7 @@ export default function InvoiceExportOperationsPage() {
       if (provider) params.set("provider", provider);
       if (query.trim()) params.set("q", query.trim());
       const response = await fetch(`/api/integrations/invoice-exports?${params.toString()}`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta exportdriften");
       setData(body);
     } catch (e) {
@@ -75,7 +76,7 @@ export default function InvoiceExportOperationsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, jobId: job.jobId }),
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Åtgärden misslyckades");
       setMessage(action === "retry" ? "Exportjobbet har lagts tillbaka i kön." : "Exportjobbet har avbrutits.");
       await load();
