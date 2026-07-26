@@ -61,7 +61,9 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Recurring schedules/runs/incidents off AuditLog/IntegrationEvent primary storage: `RecurringWorkOrderSchedule`, `RecurringWorkOrderRun`, `RecurringIncidentEvent` (dual-read + cron cutover).
    - Work-order detail wires attestable economics UI (time/materials/profitability/invoice-basis) alongside field execution.
    - Lease inspection helpers dual-read modern `LeaseInspectionRecord` / `LeaseInspectionWorkOrderLink`.
-   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables, recurring schedule/run/incident tables, lock/recurring notification UX).
+   - Lock force-release notifications on `WorkOrderLockNotification`; service escalation runs/admin actions on `ServiceAssignmentEscalation` / `ServiceEscalationAdminAction`.
+   - Fail-closed legacy mutations for document lifecycle, quote status and portfolio maintenance (require modern tables after backfill).
+   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes AccessCredential, InspectionRound, QuoteDecision, ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables, recurring schedule/run/incident tables, lock notifications, service escalations, lock/recurring notification UX).
 
 ## Verification
 

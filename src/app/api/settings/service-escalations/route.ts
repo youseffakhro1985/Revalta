@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { listServiceAssignmentEscalations } from "@/lib/service-escalation-engine";
 import { getServiceEscalationRules } from "@/lib/service-escalation-rules";
 import { listServiceNotificationAssignments } from "@/lib/service-notification-assignments";
 
@@ -45,11 +46,7 @@ export async function GET() {
       LIMIT 1000
     `),
     listServiceNotificationAssignments(user.company_id),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "service_assignment_escalation" },
-      orderBy: { created_at: "desc" },
-      take: 100,
-    }),
+    listServiceAssignmentEscalations(user.company_id, 100),
     db.user.findMany({
       where: {
         company_id: user.company_id,

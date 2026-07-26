@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
-import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
 import { writeAuditLog } from "@/lib/audit";
 
 const allowedTransitions = new Set(["archive", "unpublish", "restore"]);
@@ -70,45 +69,23 @@ export async function PATCH(
       return NextResponse.json({ success: true, state: nextState });
     }
 
-    const document = await db.auditLog.findFirst({
+    // Legacy AuditLog documents are no longer mutable — migrate via backfill first.
+    const legacy = await db.auditLog.findFirst({
       where: {
         id,
         company_id: user.company_id,
         entity_type: "document",
         action: "document.created",
       },
-      select: { id: true, metadata: true },
+      select: { id: true },
     });
-    if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
-
-    const current = await getDocumentLifecycleState(user.company_id, document.id);
-    if (current.state === nextState) {
-      return NextResponse.json({ success: true, state: current.state, unchanged: true });
-    }
-    if (transition === "unpublish" && current.state === "archived") {
-      return NextResponse.json({ error: "Återställ det arkiverade dokumentet innan det avpubliceras" }, { status: 409 });
+    if (legacy) {
+      return NextResponse.json({
+        error: "Dokumentet finns kvar i äldre lagring. Kör backfill till ManagedDocument innan livscykel ändras.",
+      }, { status: 409 });
     }
 
-    const metadata = (document.metadata || {}) as Record<string, unknown>;
-    await db.auditLog.create({
-      data: {
-        company_id: user.company_id,
-        actor_user_id: user.id,
-        entity_type: "document",
-        entity_id: document.id,
-        action,
-        metadata: {
-          documentId: document.id,
-          previousState: current.state,
-          nextState,
-          reason: reason || null,
-          documentName: typeof metadata.name === "string" ? metadata.name : "Dokument",
-          previousVisibility: typeof metadata.visibility === "string" ? metadata.visibility : "internal",
-        },
-      },
-    });
-
-    return NextResponse.json({ success: true, state: nextState });
+    return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
   } catch (error) {
     console.error("Update document lifecycle error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

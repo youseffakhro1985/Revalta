@@ -220,47 +220,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const logs = await db.auditLog.findMany({
-      where: { company_id: user.company_id, action },
-      orderBy: { created_at: "asc" },
-      select: { id: true, entity_id: true, metadata: true, created_at: true },
-    });
-    const related = logs.filter((log) => {
-      const metadata = (log.metadata ?? {}) as MaintenanceMetadata;
-      return log.id === itemId || metadata.item_id === itemId;
-    });
-    if (!related.length) return NextResponse.json({ error: "Underhållsåtgärden hittades inte" }, { status: 404 });
-
-    const snapshot = related.reduce<MaintenanceMetadata>((current, log) => ({ ...current, ...((log.metadata ?? {}) as MaintenanceMetadata) }), {});
-    const propertyId = related.at(-1)?.entity_id;
-    if (!propertyId) return NextResponse.json({ error: "Underhållsåtgärden saknar fastighet" }, { status: 400 });
-
-    let workOrderNumber: string | null = snapshot.work_order_number || null;
-    if (workOrderId) {
-      const workOrder = await db.workOrder.findFirst({
-        where: { deleted_at: null, id: workOrderId, company_id: user.company_id, property_id: propertyId },
-        select: { id: true },
-      });
-      if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });
-      const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} AND "deleted_at" IS NULL LIMIT 1`;
-      workOrderNumber = rows[0]?.work_order_number ?? null;
-    }
-
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: propertyId,
-      action,
-      metadata: {
-        ...snapshot,
-        item_id: itemId,
-        status,
-        work_order_id: workOrderId ?? snapshot.work_order_id ?? null,
-        work_order_number: workOrderNumber,
-        updated_at: new Date().toISOString(),
-      },
-    });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      error: "Underhållsåtgärden finns kvar i äldre lagring. Kör backfill till PortfolioMaintenanceItem innan status ändras.",
+    }, { status: 409 });
   } catch (error) {
     console.error("Update maintenance item error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

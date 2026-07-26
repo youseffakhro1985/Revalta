@@ -156,13 +156,22 @@ export async function DELETE(request: Request) {
       reason,
     };
 
-    await tx.integrationEvent.create({
+    await tx.workOrderLockNotification.create({
       data: {
         company_id: companyId,
-        type: "work_order_edit_lock_forced_release",
-        status: "unread",
-        recipient: lock.user_id,
-        payload: notificationPayload,
+        work_order_id: workOrderId,
+        recipient_user_id: lock.user_id,
+        notification_key: notificationKey,
+        title: notificationPayload.title,
+        description: notificationPayload.description,
+        href: notificationPayload.href,
+        high: true,
+        work_order_number: lock.work_order_number,
+        work_order_title: lock.title,
+        released_by_id: user.id,
+        released_by_name: actorName,
+        reason,
+        occurred_at: occurredAt,
       },
     });
 
@@ -182,6 +191,7 @@ export async function DELETE(request: Request) {
           previousExpiresAt: lock.expires_at.toISOString(),
           notificationKey,
           reason,
+          storage: "WorkOrderLockNotification",
         },
       },
     });

@@ -288,44 +288,17 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // Legacy AuditLog quotes still support status updates during transition.
     const legacyQuote = await db.auditLog.findFirst({
       where: { id: quoteId, ...auditScopedWhere(user), action },
-      select: { id: true, entity_id: true, metadata: true },
+      select: { id: true },
     });
-    if (!legacyQuote) return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
+    if (legacyQuote) {
+      return NextResponse.json({
+        error: "Offerten finns kvar i äldre lagring. Kör backfill till Quote innan status ändras.",
+      }, { status: 409 });
+    }
 
-    const current = (legacyQuote.metadata || {}) as Record<string, unknown>;
-    const previousStatus = String(current.status || "draft");
-    const changedAt = new Date().toISOString();
-
-    await db.auditLog.update({
-      where: { id: legacyQuote.id },
-      data: {
-        metadata: {
-          ...current,
-          status,
-          decision_comment: comment || null,
-          decision_at: changedAt,
-          decision_by: user.name || user.email,
-        },
-      },
-    });
-
-    await writeAuditLog(user, {
-      entityType: "quote",
-      entityId: legacyQuote.entity_id || undefined,
-      action: decisionAction,
-      metadata: {
-        quote_id: legacyQuote.id,
-        title: current.title,
-        previous_status: previousStatus,
-        status,
-        comment: comment || null,
-      },
-    });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
   } catch (error) {
     console.error("Update quote status error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

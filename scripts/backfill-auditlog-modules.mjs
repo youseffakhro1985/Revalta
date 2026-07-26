@@ -1492,6 +1492,302 @@ async function main() {
     return { created: localCreated, skipped: localSkipped };
   });
 
+  await backfill("AccessCredential", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: { action: "access.credential.created", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      if (metadata.storage === "AccessCredential") { localSkipped += 1; continue; }
+      if (!log.company_id || !log.actor_user_id || !log.entity_id || !metadata.identifier) {
+        localSkipped += 1;
+        continue;
+      }
+      if (await prisma.accessCredential.findUnique({ where: { id: log.id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const property = await prisma.property.findFirst({
+        where: { id: log.entity_id, company_id: log.company_id },
+        select: { id: true },
+      });
+      if (!property) { localSkipped += 1; continue; }
+      await prisma.accessCredential.create({
+        data: {
+          id: log.id,
+          company_id: log.company_id,
+          property_id: property.id,
+          identifier: String(metadata.identifier),
+          credential_type: String(metadata.credential_type || "key"),
+          holder: metadata.holder ? String(metadata.holder) : null,
+          unit: metadata.unit ? String(metadata.unit) : null,
+          access_area: metadata.access_area ? String(metadata.access_area) : null,
+          status: String(metadata.status || "in_stock"),
+          issued_at: dateOrNull(metadata.issued_at),
+          return_due: dateOrNull(metadata.return_due),
+          note: metadata.note ? String(metadata.note) : null,
+          created_by_id: log.actor_user_id,
+          created_at: log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("InspectionRound", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: {
+        company_id: { not: null },
+        OR: [
+          { action: "round.created" },
+          { entity_type: "round" },
+        ],
+      },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      if (metadata.storage === "InspectionRound") { localSkipped += 1; continue; }
+      const propertyId = metadata.propertyId || metadata.property_id;
+      const title = metadata.title;
+      const isRoundCreated = log.action === "round.created";
+      if (!isRoundCreated && !(title && propertyId)) { localSkipped += 1; continue; }
+      if (!log.company_id || !log.actor_user_id || !title || !propertyId) {
+        localSkipped += 1;
+        continue;
+      }
+      const nextDue = dateOrNull(metadata.nextDue || metadata.next_due);
+      if (!nextDue) { localSkipped += 1; continue; }
+      if (log.entity_id && await prisma.inspectionRound.findUnique({ where: { id: log.entity_id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      if (await prisma.inspectionRound.findUnique({ where: { id: log.id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const property = await prisma.property.findFirst({
+        where: { id: String(propertyId), company_id: log.company_id },
+        select: { id: true },
+      });
+      if (!property) { localSkipped += 1; continue; }
+      const checklist = metadata.checklist === undefined || metadata.checklist === null
+        ? []
+        : metadata.checklist;
+      await prisma.inspectionRound.create({
+        data: {
+          id: log.id,
+          company_id: log.company_id,
+          property_id: property.id,
+          title: String(title),
+          interval: String(metadata.interval || "monthly"),
+          status: String(metadata.status || "planned"),
+          next_due: nextDue,
+          checklist,
+          deviations: num(metadata.deviations, 0),
+          created_by_id: log.actor_user_id,
+          created_at: log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("QuoteDecision", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: { action: "quote.status_changed", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      if (metadata.storage === "QuoteDecision") { localSkipped += 1; continue; }
+      if (!log.company_id || !log.actor_user_id) { localSkipped += 1; continue; }
+      const quoteId = metadata.quoteId || metadata.quote_id || log.entity_id;
+      if (!quoteId) { localSkipped += 1; continue; }
+      if (await prisma.quoteDecision.findUnique({ where: { id: log.id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const quote = await prisma.quote.findFirst({
+        where: { id: String(quoteId), company_id: log.company_id },
+        select: { id: true },
+      });
+      if (!quote) { localSkipped += 1; continue; }
+      const comment = metadata.comment ?? metadata.decision_comment;
+      await prisma.quoteDecision.create({
+        data: {
+          id: log.id,
+          company_id: log.company_id,
+          quote_id: quote.id,
+          previous_status: String(metadata.previous_status || metadata.previousStatus || "draft"),
+          status: String(metadata.status || metadata.new_status || "draft"),
+          comment: comment ? String(comment) : null,
+          actor_user_id: log.actor_user_id,
+          created_at: log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("WorkOrderLockNotification", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "work_order_edit_lock_forced_release", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const key = payload.notificationKey ? String(payload.notificationKey) : "";
+      const workOrderId = payload.workOrderId ? String(payload.workOrderId) : "";
+      const releasedById = payload.releasedById ? String(payload.releasedById) : "";
+      if (!event.company_id || !event.recipient || !key || !workOrderId || !releasedById) {
+        localSkipped += 1;
+        continue;
+      }
+      if (await prisma.workOrderLockNotification.findUnique({
+        where: { company_id_notification_key: { company_id: event.company_id, notification_key: key } },
+      })) {
+        localSkipped += 1;
+        continue;
+      }
+      const workOrder = await prisma.workOrder.findFirst({
+        where: { id: workOrderId, company_id: event.company_id },
+        select: { id: true },
+      });
+      const recipient = await prisma.user.findFirst({
+        where: { id: event.recipient, company_id: event.company_id },
+        select: { id: true },
+      });
+      const releasedBy = await prisma.user.findFirst({
+        where: { id: releasedById },
+        select: { id: true },
+      });
+      if (!workOrder || !recipient || !releasedBy) { localSkipped += 1; continue; }
+      await prisma.workOrderLockNotification.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          work_order_id: workOrderId,
+          recipient_user_id: event.recipient,
+          notification_key: key,
+          title: String(payload.title || "Ditt redigeringslås frigjordes"),
+          description: String(payload.description || ""),
+          href: String(payload.href || `/dashboard/arbetsorder/${workOrderId}`),
+          high: payload.high !== false,
+          work_order_number: payload.workOrderNumber ? String(payload.workOrderNumber) : null,
+          work_order_title: payload.workOrderTitle ? String(payload.workOrderTitle) : null,
+          released_by_id: releasedById,
+          released_by_name: payload.releasedByName ? String(payload.releasedByName) : null,
+          reason: String(payload.reason || "Frigjort"),
+          occurred_at: dateOrNull(payload.dueAt) || event.created_at,
+          created_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("ServiceAssignmentEscalation", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "service_assignment_escalation", company_id: { not: null }, recipient: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      if (!event.company_id || !event.recipient) { localSkipped += 1; continue; }
+      if (await prisma.serviceAssignmentEscalation.findUnique({
+        where: { company_id_dedupe_key: { company_id: event.company_id, dedupe_key: event.recipient } },
+      })) {
+        localSkipped += 1;
+        continue;
+      }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      await prisma.serviceAssignmentEscalation.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          dedupe_key: event.recipient,
+          notification_key: payload.notificationKey ? String(payload.notificationKey) : event.recipient,
+          status: String(event.status || "processing"),
+          reason: payload.reason ? String(payload.reason) : "unknown",
+          payload: event.payload ?? {},
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("ServiceEscalationAdminAction", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "service_escalation_admin_action", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 5000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      if (!event.company_id) { localSkipped += 1; continue; }
+      if (await prisma.serviceEscalationAdminAction.findUnique({ where: { id: event.id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const requestedById = payload.requestedBy
+        ? String(payload.requestedBy)
+        : (await prisma.user.findFirst({ where: { company_id: event.company_id, status: "active" }, select: { id: true } }))?.id;
+      if (!requestedById) { localSkipped += 1; continue; }
+      await prisma.serviceEscalationAdminAction.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          action: payload.action ? String(payload.action) : "retry",
+          status: String(event.status || "processing"),
+          requested_by_id: requestedById,
+          requested_by_email: String(payload.requestedByEmail || event.recipient || ""),
+          payload: event.payload ?? undefined,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
   console.log(`Backfill complete: created=${created} skipped=${skipped}`);
 }
 
