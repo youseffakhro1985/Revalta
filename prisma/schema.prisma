@@ -50,6 +50,7 @@ model User {
   maintenance_plans_created            MaintenancePlan[]          @relation("MaintenancePlanCreatedBy")
   maintenance_plans_approved           MaintenancePlan[]          @relation("MaintenancePlanApprovedBy")
   maintenance_actions                  MaintenanceAction[]
+  time_reports                         TimeReport[]
 }
 
 model Company {
@@ -92,6 +93,7 @@ model Company {
   component_lifecycle_events  ComponentLifecycleEvent[]
   maintenance_plans           MaintenancePlan[]
   maintenance_actions         MaintenanceAction[]
+  lease_contracts             LeaseContract[]
 }
 
 model Property {
@@ -133,6 +135,7 @@ model Property {
   component_lifecycle_events ComponentLifecycleEvent[]
   maintenance_plans        MaintenancePlan[]
   maintenance_actions      MaintenanceAction[]
+  lease_contracts          LeaseContract[]
 
   @@index([company_id])
   @@index([user_id])
@@ -197,6 +200,8 @@ model Ticket {
   reporter_email        String?
   reporter_phone        String?
   reporter_unit         String?
+  /// Legacy FK till Tenant (boende-auth). Primär B2B-tenant är Company.
+  tenant_id             String?
   due_date              DateTime?
   created_at            DateTime           @default(now())
   updated_at            DateTime           @default(now()) @updatedAt
@@ -209,6 +214,7 @@ model Ticket {
   user                  User               @relation(fields: [user_id], references: [id])
   property              Property?          @relation(fields: [property_id], references: [id])
   assigned_to           User?              @relation("AssignedTickets", fields: [assigned_to_id], references: [id])
+  tenant                Tenant?            @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
   comments              TicketComment[]
   attachments           TicketAttachment[]
   work_order            WorkOrder?
@@ -271,6 +277,8 @@ model WorkOrder {
   component_cost_entries        ComponentCostEntry[]
   component_lifecycle_events    ComponentLifecycleEvent[]
   maintenance_actions           MaintenanceAction[]
+  material_costs                MaterialCost[]
+  time_reports                  TimeReport[]
 
   @@index([company_id, status])
   @@index([property_id])
@@ -826,6 +834,61 @@ model MaintenanceAction {
   @@index([maintenance_plan_id, status], map: "MaintenanceAction_plan_status_idx")
   @@index([project_id])
   @@index([technical_asset_id])
+}
+
+/// Legacy boende/portal-användare. Inte samma sak som Company (B2B-tenant).
+model Tenant {
+  id         String          @id @default(uuid())
+  email      String          @unique
+  password   String
+  first_name String
+  last_name  String
+  phone      String?
+  created_at DateTime        @default(now())
+  updated_at DateTime        @default(now()) @updatedAt
+  tickets    Ticket[]
+  leases     LeaseContract[]
+}
+
+/// Legacy hyreskontrakt kopplat till Tenant. Canonical leasing idag är Lease/LeaseHolder.
+model LeaseContract {
+  id          String    @id @default(uuid())
+  tenant_id   String
+  property_id String
+  company_id  String?
+  unit_number String
+  start_date  DateTime
+  end_date    DateTime?
+  status      String    @default("active")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now()) @updatedAt
+  tenant      Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Restrict)
+  property    Property  @relation(fields: [property_id], references: [id], onDelete: Restrict)
+  company     Company?  @relation(fields: [company_id], references: [id], onDelete: SetNull)
+}
+
+/// Legacy materialkostnad. Nyare flöden använder WorkOrderExecutionEntry.
+model MaterialCost {
+  id            String    @id @default(uuid())
+  work_order_id String
+  item_name     String
+  quantity      Float
+  unit_cost     Float
+  created_at    DateTime  @default(now())
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+}
+
+/// Legacy tidsrapport. Nyare flöden använder WorkOrderExecutionEntry (entry_type=time).
+model TimeReport {
+  id            String    @id @default(uuid())
+  work_order_id String
+  user_id       String
+  date          DateTime
+  hours         Float
+  description   String?
+  created_at    DateTime  @default(now())
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Restrict)
 }
 
 model LeaseHolder {
