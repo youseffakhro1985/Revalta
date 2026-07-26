@@ -8,12 +8,18 @@ export type DualListOptions<U> = {
 };
 
 /**
- * After production backfill is verified, set REVALTA_MODERN_STORAGE_ONLY=1
- * to stop merging AuditLog/IntegrationEvent product rows into list APIs.
- * Default remains dual-read so unrebacked tenants keep visibility.
+ * Dual-read kill-switch after production schema + backfill cutover.
+ *
+ * - Explicit `REVALTA_MODERN_STORAGE_ONLY=1` → modern only
+ * - Explicit `REVALTA_MODERN_STORAGE_ONLY=0` → keep dual-read (rollback)
+ * - Otherwise: modern only on Vercel Production (post-cutover default)
+ * - Preview/local keep dual-read unless explicitly enabled
  */
 export function isModernStorageOnly() {
-  return process.env.REVALTA_MODERN_STORAGE_ONLY === "1";
+  const flag = process.env.REVALTA_MODERN_STORAGE_ONLY;
+  if (flag === "1") return true;
+  if (flag === "0") return false;
+  return process.env.VERCEL_ENV === "production";
 }
 
 export function isModernStorageMirror(
