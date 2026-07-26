@@ -146,14 +146,25 @@ export function advanceRecurringDate(date: Date, frequency: RecurringFrequency) 
 }
 
 export async function readRecurringSchedules(companyId: string, client: DbClient = db) {
-  const [modern, legacy] = await Promise.all([
+  const [modern, legacy, activeProperties] = await Promise.all([
     client.recurringWorkOrderSchedule.findMany({ where: { company_id: companyId } }),
     readLegacySchedules(companyId, client),
+    client.property.findMany({
+      where: { company_id: companyId, deleted_at: null },
+      select: { id: true },
+    }),
   ]);
 
+  const activePropertyIds = new Set(activeProperties.map((property) => property.id));
   const byId = new Map<string, RecurringSchedule>();
-  for (const row of legacy.values()) byId.set(row.id, { ...row, source: "legacy" });
-  for (const row of modern) byId.set(row.id, toSchedule(row));
+  for (const row of legacy.values()) {
+    if (row.property_id && !activePropertyIds.has(row.property_id)) continue;
+    byId.set(row.id, { ...row, source: "legacy" });
+  }
+  for (const row of modern) {
+    if (row.property_id && !activePropertyIds.has(row.property_id)) continue;
+    byId.set(row.id, toSchedule(row));
+  }
   return [...byId.values()].sort((a, b) => String(a.next_run_at).localeCompare(String(b.next_run_at)));
 }
 

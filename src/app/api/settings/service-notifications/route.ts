@@ -10,6 +10,7 @@ import {
   upsertCompanyServicePreferences,
   type ServiceNotificationRole,
 } from "@/lib/service-notification-settings";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ export async function GET() {
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const stored = await getPreferences(user.company_id);
+  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
   const [events, recipients, counts] = await Promise.all([
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: { in: ["component_service_digest", "component_service_test"] } },
@@ -59,12 +61,14 @@ export async function GET() {
     }),
     db.$queryRaw<ServiceCount[]>(Prisma.sql`
       SELECT COUNT(*)::bigint AS "total",
-        COUNT(*) FILTER (WHERE "next_service_at" < NOW())::bigint AS "overdue"
-      FROM "PropertyTechnicalAsset"
-      WHERE "company_id" = ${user.company_id}
-        AND "next_service_at" IS NOT NULL
-        AND "next_service_at" <= NOW() + (${stored.preferences.daysAhead} * INTERVAL '1 day')
-        AND COALESCE("status", 'active') NOT IN ('retired', 'removed')
+        COUNT(*) FILTER (WHERE a."next_service_at" < NOW())::bigint AS "overdue"
+      FROM "PropertyTechnicalAsset" a
+      INNER JOIN "Property" p ON p."id" = a."property_id"
+      WHERE a."company_id" = ${user.company_id}
+        AND a."next_service_at" IS NOT NULL
+        AND a."next_service_at" <= NOW() + (${stored.preferences.daysAhead} * INTERVAL '1 day')
+        AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
+        ${propertyGuard}
     `),
   ]);
 

@@ -226,7 +226,7 @@ export async function PATCH(request: Request) {
     }
 
     const existing = await db.insuranceClaim.findFirst({
-      where: { id: claimId, company_id: user.company_id },
+      where: { id: claimId, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         title: true,
@@ -241,6 +241,13 @@ export async function PATCH(request: Request) {
       },
     });
     if (!existing) {
+      const orphaned = await db.insuranceClaim.findFirst({
+        where: { id: claimId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Skadeärendet hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: claimId },
         select: { id: true },

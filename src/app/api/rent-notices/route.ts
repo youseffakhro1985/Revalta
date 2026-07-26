@@ -225,7 +225,7 @@ export async function PATCH(request: Request) {
     }
 
     const existing = await db.rentNotice.findFirst({
-      where: { id: noticeId, company_id: user.company_id },
+      where: { id: noticeId, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         tenant_name: true,
@@ -241,6 +241,13 @@ export async function PATCH(request: Request) {
       },
     });
     if (!existing) {
+      const orphaned = await db.rentNotice.findFirst({
+        where: { id: noticeId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Hyresavin hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action: noticeAction, id: noticeId },
         select: { id: true },

@@ -25,10 +25,17 @@ export async function POST(
       : [];
 
     const round = await db.inspectionRound.findFirst({
-      where: { id, company_id: user.company_id },
+      where: { id, company_id: user.company_id, property: { deleted_at: null } },
       include: { property: { select: { id: true, name: true } } },
     });
     if (!round) {
+      const orphaned = await db.inspectionRound.findFirst({
+        where: { id, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), entity_type: "round", id },
         select: { id: true, metadata: true },

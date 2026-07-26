@@ -124,6 +124,9 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Compliance inspections field PATCH + Besiktningar “Ändra”; ManagedDocument field PATCH (name/category/validUntil) + Dokument “Ändra”; broader dashboard `readResponseJson` coverage (skador, budget, energi, kalender, offerter, underhåll, economics/execution panels, etc.).
    - Remaining raw SQL soft-delete ternaries migrated to `sqlSoftDeleteGuard` (work-orders list enterprise join, dashboard SLA ops, maintenance/execution/component SQL paths).
    - Client fetch hardening: properties/maintenance/dashboard notification panels + integrations/boendeportal + auth/invite/password + public report pages use `readResponseJson` (empty/non-JSON bodies no longer crash Safari).
+   - Property soft-delete orphan guards on child mutations (bookings, insurance claims, energy, budget, rent notices, IMD, rounds, inspections, vendors, attach-notice) so deleted properties cannot be mutated or spawn work orders.
+   - Recurring schedules and service-notification due counts exclude soft-deleted properties; `validateWorkOrderAssetLinks` requires an active property.
+   - Work-order time/material dual-read marks `source: table|legacy`; economics UI hides Godkänn/Avvisa for legacy rows with amber backfill banner.
    - Ticket operations field correction (`PATCH /api/tickets/[id]/operations` for description/minutes/amount/completed) + felanmälan detail “Ändra”; modern-only fail-closed for legacy AuditLog rows.
 
 ## Verification

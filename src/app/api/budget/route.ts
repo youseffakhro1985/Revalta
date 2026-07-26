@@ -150,7 +150,7 @@ export async function PATCH(request: Request) {
     }
 
     const existing = await db.budgetEntry.findFirst({
-      where: { id: entryId, company_id: user.company_id },
+      where: { id: entryId, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         property_id: true,
@@ -164,6 +164,13 @@ export async function PATCH(request: Request) {
       },
     });
     if (!existing) {
+      const orphaned = await db.budgetEntry.findFirst({
+        where: { id: entryId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Budgetraden hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: entryId },
         select: { id: true },
@@ -262,10 +269,17 @@ export async function DELETE(request: Request) {
     if (!entryId) return NextResponse.json({ error: "Budgetrad-id krävs" }, { status: 400 });
 
     const existing = await db.budgetEntry.findFirst({
-      where: { id: entryId, company_id: user.company_id },
+      where: { id: entryId, company_id: user.company_id, property: { deleted_at: null } },
       select: { id: true, account: true, year: true, category: true, property_id: true },
     });
     if (!existing) {
+      const orphaned = await db.budgetEntry.findFirst({
+        where: { id: entryId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Budgetraden hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: entryId },
         select: { id: true },

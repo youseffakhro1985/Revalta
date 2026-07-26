@@ -12,6 +12,8 @@ type DbClient = Pick<
   | "integrationEvent"
 >;
 
+export type OpsStorageSource = "table" | "legacy";
+
 export type TimeEntryPayload = {
   entryId: string;
   workOrderId: string;
@@ -28,6 +30,7 @@ export type TimeEntryPayload = {
   status?: "running" | "submitted" | "approved" | "rejected";
   actorId: string;
   createdAt?: string;
+  source?: OpsStorageSource;
 };
 
 export type MaterialEntryPayload = {
@@ -49,9 +52,8 @@ export type MaterialEntryPayload = {
   createdByEmail: string;
   actorId: string;
   createdAt?: string;
+  source?: OpsStorageSource;
 };
-
-export type OpsStorageSource = "table" | "legacy";
 
 export type ProfitabilitySettingsPayload = {
   internalHourlyCost: number;
@@ -160,6 +162,7 @@ function mapTimeRow(row: {
     status: row.status as TimeEntryPayload["status"],
     actorId: row.actor_id,
     createdAt: row.created_at.toISOString(),
+    source: "table",
   };
 }
 
@@ -202,6 +205,7 @@ function mapMaterialRow(row: {
     createdByEmail: row.created_by_email,
     actorId: row.actor_id,
     createdAt: row.created_at.toISOString(),
+    source: "table",
   };
 }
 
@@ -330,6 +334,7 @@ export async function listTimeEntries(companyId: string, workOrderId: string, cl
         ...(previous ?? {}),
         ...(payload as unknown as TimeEntryPayload),
         createdAt: previous?.createdAt ?? event.created_at.toISOString(),
+        source: "legacy",
       });
     }
   }
@@ -396,6 +401,7 @@ export async function listMaterialEntries(companyId: string, workOrderId: string
         ...(previous ?? {}),
         ...(payload as unknown as MaterialEntryPayload),
         createdAt: previous?.createdAt ?? event.created_at.toISOString(),
+        source: "legacy",
       });
     }
   }

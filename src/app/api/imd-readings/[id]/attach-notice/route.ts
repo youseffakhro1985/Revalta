@@ -23,10 +23,17 @@ export async function POST(
     } | null;
 
     const reading = await db.imdReading.findFirst({
-      where: { id, company_id: user.company_id },
+      where: { id, company_id: user.company_id, property: { deleted_at: null } },
       include: { debit_line: true, property: { select: { id: true, name: true } } },
     });
     if (!reading) {
+      const orphaned = await db.imdReading.findFirst({
+        where: { id, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action: "imd.reading.created", id },
         select: { id: true, metadata: true },
@@ -57,7 +64,12 @@ export async function POST(
 
     let notice = rentNoticeId
       ? await db.rentNotice.findFirst({
-          where: { id: rentNoticeId, company_id: user.company_id, property_id: reading.property_id },
+          where: {
+            id: rentNoticeId,
+            company_id: user.company_id,
+            property_id: reading.property_id,
+            property: { deleted_at: null },
+          },
         })
       : null;
 

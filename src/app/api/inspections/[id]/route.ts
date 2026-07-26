@@ -33,7 +33,7 @@ export async function PATCH(
 
     const { id } = await params;
     const inspection = await db.complianceInspection.findFirst({
-      where: { id, company_id: user.company_id },
+      where: { id, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         title: true,
@@ -47,6 +47,13 @@ export async function PATCH(
       },
     });
     if (!inspection) {
+      const orphaned = await db.complianceInspection.findFirst({
+        where: { id, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Kontrollen hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action: "inspection.created", id },
         select: { id: true, metadata: true },

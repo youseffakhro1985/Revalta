@@ -33,7 +33,7 @@ export async function PATCH(
     }
 
     const round = await db.inspectionRound.findFirst({
-      where: { id, company_id: user.company_id },
+      where: { id, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         title: true,
@@ -44,6 +44,13 @@ export async function PATCH(
       },
     });
     if (!round) {
+      const orphaned = await db.inspectionRound.findFirst({
+        where: { id, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), entity_type: "round", id },
         select: { id: true, metadata: true },

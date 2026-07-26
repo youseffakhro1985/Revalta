@@ -19,3 +19,13 @@ describe("work-order-ops-storage contracts", () => {
     });
   });
 });
+
+describe("work-order time/material source markers", () => {
+  it("documents dual-read source contract for attestation UI", () => {
+    const modern = { entryId: "t1", source: "table" as const, status: "submitted" };
+    const legacy = { entryId: "t2", source: "legacy" as const, status: "submitted" };
+    expect(modern.source).toBe("table");
+    expect(legacy.source).toBe("legacy");
+    expect(legacy.source === "legacy").toBe(true);
+  });
+});

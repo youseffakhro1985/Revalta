@@ -265,7 +265,7 @@ export async function PATCH(request: Request) {
     }
 
     const existing = await db.imdReading.findFirst({
-      where: { id: readingId, company_id: companyId, voided_at: null },
+      where: { id: readingId, company_id: companyId, voided_at: null, property: { deleted_at: null } },
       select: {
         id: true,
         property_id: true,
@@ -288,6 +288,9 @@ export async function PATCH(request: Request) {
         return NextResponse.json({
           error: voidAction ? "Avläsningen är redan makulerad" : "Makulerade avläsningar kan inte ändras",
         }, { status: 409 });
+      }
+      if (alreadyVoided) {
+        return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
       }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: readingId },

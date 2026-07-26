@@ -18,6 +18,7 @@ type TimeEntry = {
   endedAt: string | null;
   userName: string | null;
   userEmail: string;
+  source?: "table" | "legacy";
 };
 
 type MaterialEntry = {
@@ -31,6 +32,7 @@ type MaterialEntry = {
   status: string;
   stockStatus: string;
   supplier: string | null;
+  source?: "table" | "legacy";
 };
 
 type ProfitSummary = {
@@ -172,6 +174,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         endedAt: typeof entry.endedAt === "string" ? entry.endedAt : null,
         userName: typeof entry.userName === "string" ? entry.userName : null,
         userEmail: String(entry.userEmail || ""),
+        source: entry.source === "legacy" || entry.source === "table" ? entry.source : undefined,
       })).filter((entry: TimeEntry) => entry.entryId));
       setMaterials((materialData.materials || []).map((entry: Record<string, unknown>) => ({
         entryId: String(entry.entryId || entry.id || ""),
@@ -184,6 +187,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         status: String(entry.status || "submitted"),
         stockStatus: String(entry.stockStatus || "used"),
         supplier: typeof entry.supplier === "string" ? entry.supplier : null,
+        source: entry.source === "legacy" || entry.source === "table" ? entry.source : undefined,
       })).filter((entry: MaterialEntry) => entry.entryId));
       setProfit(profitData.summary || null);
       setSettings({
@@ -367,6 +371,9 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             </label>
             <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till tid"}</button>
           </form>
+          {times.some((entry) => entry.source === "legacy") ? (
+            <p className="mt-4 text-xs font-medium text-amber-800">Äldre tidrader – kör backfill till WorkOrderTimeEntry innan attestering.</p>
+          ) : null}
           <div className="mt-4 space-y-3">
             {times.length === 0 ? (
               <EmptyState title="Ingen attesterbar tid" description="Registrera tid här för att bygga fakturaunderlag." />
@@ -385,7 +392,10 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                   {entry.startedAt ? ` · ${dateTime.format(new Date(entry.startedAt))}` : ""}
                   {entry.billable ? " · Debiterbar" : " · Ej debiterbar"}
                 </p>
-                {canManage && entry.status === "submitted" ? (
+                {entry.source === "legacy" ? (
+                  <p className="mt-2 text-[11px] font-medium text-amber-800">Äldre rad – kan inte attesteras innan backfill.</p>
+                ) : null}
+                {canManage && entry.status === "submitted" && entry.source !== "legacy" ? (
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
@@ -443,6 +453,9 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             </label>
             <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till material"}</button>
           </form>
+          {materials.some((entry) => entry.source === "legacy") ? (
+            <p className="mt-4 text-xs font-medium text-amber-800">Äldre materialrader – kör backfill till WorkOrderMaterialEntry innan attestering.</p>
+          ) : null}
           <div className="mt-4 space-y-3">
             {materials.length === 0 ? (
               <EmptyState title="Inget material" description="Lägg till material för att spegla verklig kostnad." />
@@ -460,7 +473,10 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                   {entry.supplier ? ` · ${entry.supplier}` : ""}
                   {entry.billable ? " · Debiterbar" : " · Ej debiterbar"}
                 </p>
-                {canManage && entry.status === "submitted" ? (
+                {entry.source === "legacy" ? (
+                  <p className="mt-2 text-[11px] font-medium text-amber-800">Äldre rad – kan inte attesteras innan backfill.</p>
+                ) : null}
+                {canManage && entry.status === "submitted" && entry.source !== "legacy" ? (
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"

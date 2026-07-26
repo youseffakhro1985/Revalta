@@ -102,6 +102,7 @@ export async function POST(request: Request) {
         where: {
           company_id: user.company_id,
           property_id: property.id,
+          property: { deleted_at: null },
           resource,
           status: { not: "cancelled" },
           start_at: { lt: end },
@@ -193,7 +194,7 @@ export async function PATCH(request: Request) {
     }
 
     const modern = await db.booking.findFirst({
-      where: { id: bookingId, company_id: user.company_id },
+      where: { id: bookingId, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         property_id: true,
@@ -208,6 +209,13 @@ export async function PATCH(request: Request) {
     });
 
     if (!modern) {
+      const orphaned = await db.booking.findFirst({
+        where: { id: bookingId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: bookingId },
         select: { id: true },
@@ -272,6 +280,7 @@ export async function PATCH(request: Request) {
       where: {
         company_id: user.company_id,
         property_id: modern.property_id,
+        property: { deleted_at: null },
         resource,
         status: { not: "cancelled" },
         id: { not: modern.id },

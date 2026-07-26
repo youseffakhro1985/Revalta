@@ -161,7 +161,7 @@ export async function PATCH(request: Request) {
     }
 
     const existing = await db.energyReading.findFirst({
-      where: { id: readingId, company_id: user.company_id },
+      where: { id: readingId, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
         property_id: true,
@@ -175,6 +175,13 @@ export async function PATCH(request: Request) {
       },
     });
     if (!existing) {
+      const orphaned = await db.energyReading.findFirst({
+        where: { id: readingId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: readingId },
         select: { id: true },
@@ -271,10 +278,17 @@ export async function DELETE(request: Request) {
     if (!readingId) return NextResponse.json({ error: "Avläsnings-id krävs" }, { status: 400 });
 
     const existing = await db.energyReading.findFirst({
-      where: { id: readingId, company_id: user.company_id },
+      where: { id: readingId, company_id: user.company_id, property: { deleted_at: null } },
       select: { id: true, type: true, period: true, property_id: true },
     });
     if (!existing) {
+      const orphaned = await db.energyReading.findFirst({
+        where: { id: readingId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: { ...auditScopedWhere(user), action, id: readingId },
         select: { id: true },

@@ -14,7 +14,10 @@ export async function GET() {
     const [rows, legacy] = await Promise.all([
       user.company_id
         ? db.vendorContract.findMany({
-            where: { company_id: user.company_id },
+            where: {
+              company_id: user.company_id,
+              OR: [{ property_id: null }, { property: { deleted_at: null } }],
+            },
             orderBy: { created_at: "desc" },
             take: 200,
           })
@@ -174,7 +177,11 @@ export async function PATCH(request: Request) {
     }
 
     const existing = await db.vendorContract.findFirst({
-      where: { id: vendorId, company_id: user.company_id },
+      where: {
+        id: vendorId,
+        company_id: user.company_id,
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
+      },
       select: {
         id: true,
         name: true,
@@ -192,6 +199,13 @@ export async function PATCH(request: Request) {
       },
     });
     if (!existing) {
+      const orphaned = await db.vendorContract.findFirst({
+        where: { id: vendorId, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 404 });
+      }
       const legacy = await db.auditLog.findFirst({
         where: {
           ...auditScopedWhere(user),
