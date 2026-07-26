@@ -112,6 +112,7 @@ export default function TicketDetailPage() {
   const [operationAmount, setOperationAmount] = useState("");
   const [operationCompleted, setOperationCompleted] = useState(false);
   const [savingOperation, setSavingOperation] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -149,6 +150,9 @@ export default function TicketDetailPage() {
         setTimeline(timelineData.timeline || []);
         setWorkOrder(workOrderData.workOrder || null);
         setCanCreateWorkOrder(Boolean(workOrderData.canCreate));
+        if (workOrderData.workOrder) {
+          setOperationType((current) => (current === "time" || current === "cost" ? "note" : current));
+        }
         if (operationsResponse.ok) setOperations(operationsData.operations || []);
       } catch (caught) {
         if (mounted) setError(caught instanceof Error ? caught.message : "Kunde inte kontakta servern");
@@ -282,6 +286,26 @@ export default function TicketDetailPage() {
     } finally { setSavingOperation(false); }
   }
 
+  async function softDeleteTicket() {
+    const warning = workOrder
+      ? "Ta bort ärendet? Det döljs från listor men behålls i historiken. Kopplad arbetsorder påverkas inte."
+      : "Ta bort ärendet? Det döljs från listor men behålls i historiken.";
+    if (!window.confirm(warning)) return;
+    setDeleting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/tickets/${params.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) { router.push("/login"); return; }
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort ärendet");
+      router.push("/dashboard/felanmalan");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Kunde inte ta bort ärendet");
+      setDeleting(false);
+    }
+  }
+
   if (loading) return <div className="h-72 animate-pulse rounded-3xl bg-sand-100" />;
   if (!ticket) return <InlineAlert>{error || "Ärendet hittades inte"}</InlineAlert>;
 
@@ -324,14 +348,42 @@ export default function TicketDetailPage() {
           {workOrder ? <div className="space-y-4"><div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-4"><div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-petroleum-700" /><div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">Kopplad arbetsorder</p><p className="mt-1 font-semibold text-ink-950">{workOrder.title}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-petroleum-700">{statusLabels[workOrder.status] || workOrder.status}</span><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-ink-600">{priorityLabels[workOrder.priority] || workOrder.priority}</span></div></div><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />Öppna arbetsorder</Link></div> : <div className="space-y-4"><p className="text-sm leading-6 text-ink-600">Skapa en arbetsorder med ärendets titel, beskrivning, prioritet, fastighet och ansvarig.</p><button type="button" onClick={createWorkOrder} disabled={!canCreateWorkOrder || creatingWorkOrder} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />{creatingWorkOrder ? "Skapar arbetsorder…" : "Skapa arbetsorder"}</button>{!canCreateWorkOrder ? <p className="text-xs font-medium text-amber-700">Fastighet måste väljas innan arbetsorder kan skapas.</p> : null}</div>}
         </Panel>
 
-        <Panel title="Styr ärendet" description="Status, prioritet och ansvarig." bodyClassName="p-6"><form onSubmit={updateTicket} className="space-y-4"><SelectField label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} /><SelectField label="Prioritet" value={priority} onChange={setPriority} options={Object.entries(priorityLabels)} /><label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select></label><button disabled={saving} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button></form></Panel>
+        <Panel title="Styr ärendet" description="Status, prioritet och ansvarig." bodyClassName="p-6">
+          <form onSubmit={updateTicket} className="space-y-4">
+            <SelectField label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} />
+            <SelectField label="Prioritet" value={priority} onChange={setPriority} options={Object.entries(priorityLabels)} />
+            <label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select></label>
+            <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button>
+          </form>
+          <div className="mt-5 border-t border-sand-100 pt-4">
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => void softDeleteTicket()}
+              className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+            >
+              {deleting ? "Tar bort…" : "Ta bort ärende"}
+            </button>
+          </div>
+        </Panel>
 
         <Panel title="Ny kommentar" description="Dokumentera nästa åtgärd." bodyClassName="p-6"><form onSubmit={addComment}><textarea required minLength={2} rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className={premiumTextareaClass} placeholder="Skriv en uppdatering…" /><button disabled={saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Send className="h-4 w-4" />Lägg till kommentar</button></form></Panel>
 
-        <Panel title="Operativa registreringar" description="Tid, kostnad, checklista eller anteckning." bodyClassName="space-y-4 p-6">
+        <Panel title="Operativa registreringar" description={workOrder ? "Checklista och anteckningar. Tid och kostnad registreras på den kopplade arbetsordern." : "Tid, kostnad, checklista eller anteckning."} bodyClassName="space-y-4 p-6">
+          {workOrder ? (
+            <div className="rounded-xl border border-petroleum-100 bg-petroleum-50 px-3 py-2 text-xs leading-5 text-petroleum-900">
+              Ärendet har arbetsorder. Registrera attesterbar tid och material under{" "}
+              <Link href={`/dashboard/arbetsorder/${workOrder.id}#ekonomi`} className="font-semibold underline underline-offset-2">
+                Ekonomi och fakturering
+              </Link>
+              .
+            </div>
+          ) : null}
           <form onSubmit={addOperation} className="space-y-3">
             <select value={operationType} onChange={(event) => setOperationType(event.target.value)} className={premiumFieldClass}>
-              {Object.entries(operationTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {Object.entries(operationTypeLabels)
+                .filter(([value]) => !workOrder || value === "checklist" || value === "note")
+                .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             {operationType === "time" ? <input type="number" min="1" max="1440" required value={operationMinutes} onChange={(event) => setOperationMinutes(event.target.value)} placeholder="Minuter" className={premiumFieldClass} /> : null}
             {operationType === "cost" ? <input type="number" min="0" step="0.01" required value={operationAmount} onChange={(event) => setOperationAmount(event.target.value)} placeholder="Belopp (SEK)" className={premiumFieldClass} /> : null}

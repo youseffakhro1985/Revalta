@@ -283,10 +283,10 @@ export default function WorkOrderDetailPage() {
     </Panel>
 
     <WorkOrderExecutionPanel workOrderId={workOrder.id} />
-    <section aria-label="Ekonomi och fakturering" className="space-y-3">
+    <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>
-        <p className="mt-1 text-sm text-ink-500">Attesterbar tid, material, lönsamhet och fakturaunderlag – separat från fältregistreringen ovan.</p>
+        <p className="mt-1 text-sm text-ink-500">Kanonisk väg för attesterad tid, material, lönsamhet och exportbart fakturaunderlag (Fortnox/Visma). Fältregistreringen ovan är driftunderlag, inte fakturarader.</p>
       </div>
       <WorkOrderEconomicsPanel workOrderId={workOrder.id} />
     </section>

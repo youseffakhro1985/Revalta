@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import {
+  createInvoiceDraft,
+  getProfitabilitySettings,
+  listMaterialEntries,
+  listTimeEntries,
+  type InvoiceDraftPayload,
+} from "@/lib/work-order-ops-storage";
 
 const signerRoles = new Set(["executor", "contractor", "customer"]);
 
@@ -170,25 +177,143 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (action === "invoice.create") {
     const snapshot = await buildSnapshot(id, user.company_id);
     if (!snapshot) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-    const totals = await db.$queryRaw<{ subtotal: number }[]>(Prisma.sql`
-      SELECT COALESCE(SUM("total_amount"), 0)::double precision AS "subtotal"
-      FROM "WorkOrderExecutionEntry"
-      WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
-    `);
-    const subtotal = Number(totals[0]?.subtotal || 0);
+
+    // Canonical invoice path: approved/billable time + material → WorkOrderInvoiceDraft (exportable).
+    // WorkOrderInvoiceBasis remains an archival report snapshot with the same totals.
+    const [times, materials, profit] = await Promise.all([
+      listTimeEntries(user.company_id, id),
+      listMaterialEntries(user.company_id, id),
+      getProfitabilitySettings(user.company_id, id),
+    ]);
+    let billableMinutes = 0;
+    for (const row of times) {
+      if (row.status === "approved" && row.billable === true && row.kind !== "break") {
+        billableMinutes += Number(row.minutes || 0);
+      }
+    }
+    let billableMaterial = 0;
+    for (const row of materials) {
+      if (row.status !== "deleted" && row.status !== "rejected" && row.billable === true) {
+        billableMaterial += Number(row.total || 0);
+      }
+    }
+    const hourlyRate = Number(profit.customerHourlyRate || 650);
+    const materialMarkup = Number(profit.materialMarkupPercent || 15);
+    const fixedRevenue = Number(profit.fixedRevenue || 0);
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const lines: Array<{
+      id: string;
+      type: "labor" | "material" | "other";
+      description: string;
+      quantity: number;
+      unit: string;
+      unitPrice: number;
+      total: number;
+    }> = [];
+    if (billableMinutes > 0) {
+      const quantity = round(billableMinutes / 60);
+      lines.push({
+        id: crypto.randomUUID(),
+        type: "labor",
+        description: "Arbete enligt arbetsorder",
+        quantity,
+        unit: "tim",
+        unitPrice: hourlyRate,
+        total: round(quantity * hourlyRate),
+      });
+    }
+    if (billableMaterial > 0) {
+      const amount = round(billableMaterial * (1 + materialMarkup / 100));
+      lines.push({
+        id: crypto.randomUUID(),
+        type: "material",
+        description: "Material enligt arbetsorder",
+        quantity: 1,
+        unit: "st",
+        unitPrice: amount,
+        total: amount,
+      });
+    }
+    if (fixedRevenue > 0) {
+      lines.push({
+        id: crypto.randomUUID(),
+        type: "other",
+        description: "Fast ersättning",
+        quantity: 1,
+        unit: "st",
+        unitPrice: fixedRevenue,
+        total: fixedRevenue,
+      });
+    }
+    if (lines.length === 0) {
+      return NextResponse.json({
+        error: "Inga attesterade tid- eller materialrader finns. Godkänn rader under Ekonomi och fakturering först.",
+      }, { status: 409 });
+    }
+
+    const subtotal = round(lines.reduce((sum, line) => sum + line.total, 0));
     const vatRate = 25;
-    const vatAmount = Math.round(subtotal * vatRate) / 100;
-    const total = subtotal + vatAmount;
+    const vatAmount = round(subtotal * vatRate / 100);
+    const total = round(subtotal + vatAmount);
+    const versionId = crypto.randomUUID();
+    const draftPayload: InvoiceDraftPayload = {
+      versionId,
+      workOrderId: id,
+      status: "draft",
+      customerName: "",
+      customerOrgNumber: "",
+      customerReference: "",
+      invoiceDate: new Date().toISOString().slice(0, 10),
+      dueDays: 30,
+      discountPercent: 0,
+      vatPercent: vatRate,
+      note: "Skapat från rapportflödet utifrån attesterad tid och material.",
+      lines,
+      subtotal,
+      discount: 0,
+      net: subtotal,
+      vat: vatAmount,
+      total,
+      updatedById: user.id,
+      updatedAt: new Date().toISOString(),
+    };
+    const draft = await createInvoiceDraft(user.company_id, draftPayload);
+
     const reference = `REV-${new Date().getFullYear()}-${id.slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-5)}`;
     const invoiceId = crypto.randomUUID();
     await db.$executeRaw(Prisma.sql`
       INSERT INTO "WorkOrderInvoiceBasis"
         ("id", "company_id", "work_order_id", "created_by_id", "reference", "subtotal", "vat_rate", "vat_amount", "total", "snapshot")
       VALUES
-        (${invoiceId}, ${user.company_id}, ${id}, ${user.id}, ${reference}, ${subtotal}, ${vatRate}, ${vatAmount}, ${total}, ${JSON.stringify(snapshot)}::jsonb)
+        (${invoiceId}, ${user.company_id}, ${id}, ${user.id}, ${reference}, ${subtotal}, ${vatRate}, ${vatAmount}, ${total}, ${JSON.stringify({
+          ...snapshot,
+          canonicalDraftVersionId: versionId,
+          source: "approved_time_material",
+        })}::jsonb)
     `);
-    await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.invoice_basis_created", metadata: { invoiceId, reference, subtotal, vatAmount, total } });
-    return NextResponse.json({ id: invoiceId, reference, subtotal, vatAmount, total }, { status: 201 });
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: "work_order.invoice_basis_created",
+      metadata: {
+        invoiceId,
+        reference,
+        subtotal,
+        vatAmount,
+        total,
+        draftVersionId: versionId,
+        storage: "WorkOrderInvoiceDraft",
+        archive: "WorkOrderInvoiceBasis",
+      },
+    });
+    return NextResponse.json({
+      id: invoiceId,
+      reference,
+      subtotal,
+      vatAmount,
+      total,
+      draft,
+    }, { status: 201 });
   }
 
   if (action === "invoice.approve") {

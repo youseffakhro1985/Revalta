@@ -37,7 +37,7 @@ const typeLabels: Record<string, string> = {
   pressure: "Trycksatta anordningar", playground: "Lekplats", electrical: "Elrevision", other: "Övrig kontroll",
 };
 const statusLabels: Record<string, string> = {
-  planned: "Planerad", booked: "Bokad", completed: "Genomförd", action_required: "Åtgärd krävs",
+  planned: "Planerad", booked: "Bokad", completed: "Genomförd", action_required: "Åtgärd krävs", cancelled: "Avbruten",
 };
 
 function daysUntil(value?: string) {
@@ -54,6 +54,7 @@ export default function InspectionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingId, setCreatingId] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({
@@ -127,6 +128,32 @@ export default function InspectionsPage() {
       setError(e instanceof Error ? e.message : "Kunde inte skapa arbetsorder");
     } finally {
       setCreatingId("");
+    }
+  }
+
+  async function updateStatus(inspection: Inspection, status: string) {
+    if (inspection.source === "legacy") {
+      setError("Äldre kontroller måste migreras innan status kan ändras.");
+      return;
+    }
+    if (status === inspection.status) return;
+    setUpdatingId(inspection.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/inspections/${inspection.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera status");
+      setSuccess("Kontrollens status har uppdaterats.");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kunde inte uppdatera status");
+    } finally {
+      setUpdatingId("");
     }
   }
 
@@ -224,7 +251,24 @@ export default function InspectionsPage() {
                       <Mini label="Intervall" value={Number(i.interval_months || 0) ? `${i.interval_months} månader` : "Engångskontroll"} />
                       <Mini label="Anteckning" value={i.note || "Ingen anteckning"} />
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      {i.source === "legacy" ? (
+                        <p className="text-xs font-medium text-amber-700">Äldre rad – kör backfill innan status eller arbetsorder kan ändras.</p>
+                      ) : (
+                        <label className="flex items-center gap-2 text-xs text-ink-600">
+                          <span className="font-semibold">Status</span>
+                          <select
+                            disabled={updatingId === i.id}
+                            value={i.status || "planned"}
+                            onChange={(event) => void updateStatus(i, event.target.value)}
+                            className="rounded-lg border border-sand-200 bg-white px-2 py-1.5 text-xs font-semibold text-ink-800"
+                          >
+                            {Object.entries(statusLabels).map(([value, label]) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                       {i.work_order_id ? (
                         <Link href={`/dashboard/arbetsorder/${i.work_order_id}`} className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">
                           Öppna kopplad arbetsorder

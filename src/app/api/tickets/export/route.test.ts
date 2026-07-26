@@ -36,7 +36,7 @@ describe("ticket export tenant isolation", () => {
     const response = await GET();
     expect(response.status).toBe(200);
     expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: "company-a" },
+      where: { company_id: "company-a", deleted_at: null },
     }));
   });
 

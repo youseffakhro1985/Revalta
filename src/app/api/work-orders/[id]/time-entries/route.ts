@@ -3,6 +3,7 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
+  getModernTimeEntry,
   getTimeEntry,
   listTimeEntries,
   upsertTimeEntry,
@@ -74,8 +75,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (end.getTime() - start.getTime() > 24 * 60 * 60 * 1000) return NextResponse.json({ error: "En tidsrad får vara högst 24 timmar" }, { status: 400 });
     startedAt = start.toISOString(); endedAt = end.toISOString(); minutes = Math.round((end.getTime() - start.getTime()) / 60000);
   } else {
-    const latest = await getTimeEntry(user.company_id, id, entryId);
+    const modern = await getModernTimeEntry(user.company_id, id, entryId);
+    const latest = modern ?? await getTimeEntry(user.company_id, id, entryId);
     if (!latest) return NextResponse.json({ error: "Tidsraden hittades inte" }, { status: 404 });
+    if (!modern) {
+      return NextResponse.json({
+        error: "Tidsraden finns kvar i äldre lagring. Kör backfill till WorkOrderTimeEntry innan den kan uppdateras.",
+      }, { status: 409 });
+    }
     userId = latest.userId;
     userName = latest.userName ?? null;
     userEmail = latest.userEmail;

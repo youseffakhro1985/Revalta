@@ -80,6 +80,12 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - `TicketComment` author columns (`author_type`, `author_name`, `author_email`) for public portal/staff comments; public track prefers columns and falls back to AuditLog only for legacy rows missing `author_name`.
    - Ticket soft-delete (`deleted_at` + index `[company_id, deleted_at]`); list/get/update paths filter active rows; `DELETE /api/tickets/[id]` for managers; public track 404s soft-deleted tickets.
    - Fail-closed legacy mutations for rounds (`PATCH /api/rounds/[id]`, `POST .../work-orders`), compliance inspection work-order spawn, and IMD attach-notice: legacy AuditLog-only rows return Swedish `409` asking for backfill to modern tables.
+   - Ticket soft-delete UI on felanmälan detail; WO ops approve/reject/stop/delete fail-closed for IE-only rows.
+   - Report `invoice.create` builds canonical `WorkOrderInvoiceDraft` from approved time/material (plus archival `WorkOrderInvoiceBasis` snapshot); UI clarifies export via Ekonomi.
+   - Compliance inspection status lifecycle (`PATCH /api/inspections/[id]`) with UI; fail-closed for legacy.
+   - Operational document soft-delete (`DELETE /api/operational-documents/[id]`) + panel action.
+   - Ticket operations hide time/cost when a work order exists and deep-link to WO economics.
+   - Cron product journals: `CronJobRun` for preventive maintenance and recurring incident escalations (no IE job envelopes).
 
 ## Verification
 

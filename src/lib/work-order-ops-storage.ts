@@ -331,11 +331,16 @@ export async function listTimeEntries(companyId: string, workOrderId: string, cl
   return [...entries.values()];
 }
 
-export async function getTimeEntry(companyId: string, workOrderId: string, entryId: string, client: DbClient = db) {
+export async function getModernTimeEntry(companyId: string, workOrderId: string, entryId: string, client: DbClient = db) {
   const modern = await client.workOrderTimeEntry.findFirst({
     where: { id: entryId, company_id: companyId, work_order_id: workOrderId },
   });
-  if (modern) return mapTimeRow(modern);
+  return modern ? mapTimeRow(modern) : null;
+}
+
+export async function getTimeEntry(companyId: string, workOrderId: string, entryId: string, client: DbClient = db) {
+  const modern = await getModernTimeEntry(companyId, workOrderId, entryId, client);
+  if (modern) return modern;
   const entries = await listTimeEntries(companyId, workOrderId, client);
   return entries.find((entry) => entry.entryId === entryId) ?? null;
 }
@@ -392,11 +397,16 @@ export async function listMaterialEntries(companyId: string, workOrderId: string
   return [...latest.values()];
 }
 
-export async function getMaterialEntry(companyId: string, workOrderId: string, entryId: string, client: DbClient = db) {
+export async function getModernMaterialEntry(companyId: string, workOrderId: string, entryId: string, client: DbClient = db) {
   const modern = await client.workOrderMaterialEntry.findFirst({
     where: { id: entryId, company_id: companyId, work_order_id: workOrderId },
   });
-  if (modern) return mapMaterialRow(modern);
+  return modern ? mapMaterialRow(modern) : null;
+}
+
+export async function getMaterialEntry(companyId: string, workOrderId: string, entryId: string, client: DbClient = db) {
+  const modern = await getModernMaterialEntry(companyId, workOrderId, entryId, client);
+  if (modern) return modern;
   const entries = await listMaterialEntries(companyId, workOrderId, client);
   return entries.find((entry) => entry.entryId === entryId) ?? null;
 }

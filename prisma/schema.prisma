@@ -176,6 +176,7 @@ model Company {
   work_order_lock_notifications WorkOrderLockNotification[]
   service_assignment_escalations ServiceAssignmentEscalation[]
   service_escalation_admin_actions ServiceEscalationAdminAction[]
+  cron_job_runs CronJobRun[]
 }
 
 model Property {
@@ -2099,4 +2100,21 @@ model ServiceEscalationAdminAction {
 
   @@index([company_id, created_at])
   @@index([requested_by_id])
+}
+
+/// Durable journal for product cron runs (replaces IntegrationEvent job envelopes).
+model CronJobRun {
+  id         String   @id @default(uuid())
+  company_id String?
+  job_type   String
+  status     String   @default("processing")
+  recipient  String?
+  payload    Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  company    Company? @relation(fields: [company_id], references: [id], onDelete: SetNull)
+
+  @@index([job_type, created_at])
+  @@index([company_id, job_type, created_at])
+  @@index([status, created_at])
 }

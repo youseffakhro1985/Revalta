@@ -4,6 +4,7 @@ import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getMaterialEntry,
+  getModernMaterialEntry,
   listMaterialEntries,
   upsertMaterialEntry,
   type MaterialEntryPayload,
@@ -87,8 +88,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     };
   } else {
     if (!canManageTickets(user.role) && action !== "delete") return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    const existing = await getMaterialEntry(user.company_id, id, entryId);
+    const modern = await getModernMaterialEntry(user.company_id, id, entryId);
+    const existing = modern ?? await getMaterialEntry(user.company_id, id, entryId);
     if (!existing) return NextResponse.json({ error: "Materialraden hittades inte" }, { status: 404 });
+    if (!modern) {
+      return NextResponse.json({
+        error: "Materialraden finns kvar i äldre lagring. Kör backfill till WorkOrderMaterialEntry innan den kan uppdateras.",
+      }, { status: 409 });
+    }
     if (action === "delete" && existing.createdById !== user.id && !canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du kan bara ta bort dina egna rader" }, { status: 403 });
     }
