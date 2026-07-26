@@ -70,6 +70,9 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Settings nav links to `/dashboard/installningar/eskaleringar` (+ regler).
    - Access credential status lifecycle (`PATCH /api/access-credentials`) and booking cancel (`PATCH /api/bookings`, modern `Booking` only, fail-closed for legacy) with minimal UI actions.
    - Work-order soft-delete (`DELETE /api/work-orders/[id]` sets `deleted_at`) with discreet manager control on detail page.
+   - Settings preference writes no longer supersede IntegrationEvent rows; modern tables + AuditLog only (test-email IE remains outbound transport).
+   - Work-order economics UI wires Fortnox/Visma/webhook invoice export (`/invoice-integration`) with queue/retry/cancel.
+   - Ticket operations panel on felanmälan detail.
    - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes AccessCredential, InspectionRound, QuoteDecision, ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables, recurring schedule/run/incident tables, lock notifications, service escalations, lock/recurring notification UX, NotificationRead, ComponentServiceDeliveryAlertAck).
 
 ## Verification

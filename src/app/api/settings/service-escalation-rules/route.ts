@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import {
-  ESCALATION_RULE_EVENT,
   getServiceEscalationRules,
   normalizeEscalationRules,
   upsertServiceEscalationRules,
@@ -49,26 +48,20 @@ export async function PUT(request: Request) {
   }
 
   const updatedAt = await upsertServiceEscalationRules(user.company_id, user.id, rules);
-  await db.$transaction([
-    db.integrationEvent.updateMany({
-      where: { company_id: user.company_id, type: ESCALATION_RULE_EVENT, status: "active" },
-      data: { status: "superseded" },
-    }),
-    db.auditLog.create({
-      data: {
-        company_id: user.company_id,
-        actor_user_id: user.id,
-        entity_type: "service_escalation_rules",
-        entity_id: user.company_id,
-        action: "service_escalation_rules.updated",
-        metadata: {
-          before: previous.rules,
-          after: rules,
-          storage: "ServiceEscalationRulesSettings",
-        },
+  await db.auditLog.create({
+    data: {
+      company_id: user.company_id,
+      actor_user_id: user.id,
+      entity_type: "service_escalation_rules",
+      entity_id: user.company_id,
+      action: "service_escalation_rules.updated",
+      metadata: {
+        before: previous.rules,
+        after: rules,
+        storage: "ServiceEscalationRulesSettings",
       },
-    }),
-  ]);
+    },
+  });
 
   return NextResponse.json({
     rules,

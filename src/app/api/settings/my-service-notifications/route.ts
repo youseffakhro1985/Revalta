@@ -38,15 +38,6 @@ export async function PATCH(request: Request) {
   const previous = await getUserServicePreferences(user.company_id, user.id);
   await db.$transaction(async (tx) => {
     await upsertUserServicePreferences(user.company_id!, user.id, next, tx);
-    await tx.integrationEvent.updateMany({
-      where: {
-        company_id: user.company_id!,
-        type: "user_service_notification_preferences",
-        status: "active",
-        recipient: user.id,
-      },
-      data: { status: "superseded" },
-    });
     await tx.auditLog.create({
       data: {
         company_id: user.company_id!,

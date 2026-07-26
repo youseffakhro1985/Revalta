@@ -143,39 +143,20 @@ Detta blir referensarkitekturen för övriga moduler.
 6. Stäng av AuditLog som primär lagring.
 7. Behåll historiken som revisionsspår.
 
-## Kommande leveranser
+## Leveransstatus
 
-### Leverans A – Ärende till arbetsorder
+### Leverans A–D – levererade
 
-- Skapa arbetsorder från ärende.
-- Koppla ansvarig, fastighet och enhet.
-- Statushistorik.
-- Kostnadsuppföljning.
-- Stäng ärende när arbetsorder slutförs, valbart.
+- **A** Ärende → arbetsorder (skapande, koppling, statushistorik, ticket-sync).
+- **B** Arbetsorder → projekt (skapande från WO-detalj, projektledare, dokument).
+- **C** Besiktning/rond → åtgärd (avvikelser till arbetsorder, compliance corrective WO).
+- **D** IMD → debiteringsunderlag (`ImdDebitLine` + koppling till hyresavi).
 
-### Leverans B – Arbetsorder till projekt
+### Leverans E – Ekonomi och rapportering (pågående)
 
-- Skapa projekt från större arbetsorder.
-- Budget, prognos och utfall.
-- Entreprenör och projektledare.
-- Dokument och projektkostnader.
-
-### Leverans C – Besiktning och rond till åtgärd
-
-- Avvikelse skapar ärende eller arbetsorder.
-- Spårbar relation till ursprungskontrollen.
-
-### Leverans D – IMD till debiteringsunderlag
-
-- Avläsning skapar förbrukning.
-- Förbrukning skapar debiteringsrad.
-- Debiteringsrad kan kopplas till hyresavi.
-
-### Leverans E – Ekonomi och rapportering
-
-- Projekt och arbetsordrar påverkar budgetutfall.
-- Rapporter hämtar från normaliserade tabeller.
-- Export till CSV, Excel och PDF.
+- Attesterbar tid/material/lönsamhet/fakturaunderlag på arbetsorder.
+- Fakturaexport till Fortnox/Visma/webhook.
+- Rapporter och CSV/PDF-export byggs vidare mot normaliserade tabeller.
 
 ## Kvalitetskrav före merge
 

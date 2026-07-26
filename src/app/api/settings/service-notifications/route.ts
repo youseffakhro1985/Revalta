@@ -119,10 +119,6 @@ export async function PATCH(request: Request) {
   const previous = await getPreferences(user.company_id);
   const updated = await db.$transaction(async (tx) => {
     const row = await upsertCompanyServicePreferences(user.company_id!, user.id, preferences, tx);
-    await tx.integrationEvent.updateMany({
-      where: { company_id: user.company_id, type: "component_service_settings", status: "active" },
-      data: { status: "superseded" },
-    });
     await tx.auditLog.create({
       data: {
         company_id: user.company_id,

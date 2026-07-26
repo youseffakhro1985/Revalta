@@ -82,6 +82,17 @@ type InvoiceDraft = {
   versionId?: string;
 };
 
+type IntegrationProvider = { id: string; name: string; configured: boolean };
+type IntegrationJob = {
+  jobId: string;
+  provider: string;
+  status: string;
+  attempt?: number;
+  error?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+};
+
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 const kindLabels: Record<string, string> = { work: "Arbete", travel: "Resa", break: "Rast" };
@@ -94,7 +105,12 @@ const statusLabels: Record<string, string> = {
   ready: "Klar",
   exported: "Exporterad",
   cancelled: "Makulerad",
+  queued: "I kö",
+  processing: "Bearbetas",
+  sent: "Skickad",
+  failed: "Misslyckad",
 };
+const providerLabels: Record<string, string> = { fortnox: "Fortnox", visma: "Visma", webhook: "Webhook" };
 
 export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
   const [times, setTimes] = useState<TimeEntry[]>([]);
@@ -108,6 +124,9 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
     fixedRevenue: 0,
   });
   const [draft, setDraft] = useState<InvoiceDraft | null>(null);
+  const [providers, setProviders] = useState<IntegrationProvider[]>([]);
+  const [exportJobs, setExportJobs] = useState<IntegrationJob[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState("fortnox");
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,22 +137,25 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
     setLoading(true);
     setError("");
     try {
-      const [timeRes, materialRes, profitRes, invoiceRes] = await Promise.all([
+      const [timeRes, materialRes, profitRes, invoiceRes, integrationRes] = await Promise.all([
         fetch(`/api/work-orders/${workOrderId}/time-entries`, { cache: "no-store" }),
         fetch(`/api/work-orders/${workOrderId}/materials`, { cache: "no-store" }),
         fetch(`/api/work-orders/${workOrderId}/profitability`, { cache: "no-store" }),
         fetch(`/api/work-orders/${workOrderId}/invoice-basis`, { cache: "no-store" }),
+        fetch(`/api/work-orders/${workOrderId}/invoice-integration`, { cache: "no-store" }),
       ]);
-      const [timeData, materialData, profitData, invoiceData] = await Promise.all([
+      const [timeData, materialData, profitData, invoiceData, integrationData] = await Promise.all([
         timeRes.json(),
         materialRes.json(),
         profitRes.json(),
         invoiceRes.json(),
+        integrationRes.json(),
       ]);
       if (!timeRes.ok) throw new Error(timeData.error || "Kunde inte hämta tid");
       if (!materialRes.ok) throw new Error(materialData.error || "Kunde inte hämta material");
       if (!profitRes.ok) throw new Error(profitData.error || "Kunde inte hämta lönsamhet");
       if (!invoiceRes.ok) throw new Error(invoiceData.error || "Kunde inte hämta fakturaunderlag");
+      if (!integrationRes.ok) throw new Error(integrationData.error || "Kunde inte hämta fakturaexport");
 
       setTimes(timeData.entries || []);
       setMaterials(materialData.materials || []);
@@ -163,7 +185,19 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         total: invoiceData.draft?.total,
         versionId: invoiceData.draft?.versionId,
       });
-      setCanManage(Boolean(timeData.canManage || materialData.canManage || profitData.canManage || invoiceData.canManage));
+      setProviders(integrationData.providers || []);
+      setExportJobs((integrationData.jobs || []).map((job: Record<string, unknown>) => ({
+        jobId: String(job.jobId || job.id || ""),
+        provider: String(job.provider || ""),
+        status: String(job.status || ""),
+        attempt: typeof job.attempt === "number" ? job.attempt : undefined,
+        error: typeof job.error === "string" ? job.error : null,
+        updatedAt: typeof job.updatedAt === "string" ? job.updatedAt : null,
+        createdAt: typeof job.createdAt === "string" ? job.createdAt : null,
+      })));
+      const configured = (integrationData.providers || []).find((provider: IntegrationProvider) => provider.configured);
+      if (configured?.id) setSelectedProvider(configured.id);
+      setCanManage(Boolean(timeData.canManage || materialData.canManage || profitData.canManage || invoiceData.canManage || integrationData.canManage));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta ekonomi");
     } finally {
@@ -511,6 +545,79 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             ) : null}
           </div>
         )}
+      </Panel>
+
+      <Panel title="Fakturaexport" description="Köa export till Fortnox, Visma eller webhook när underlaget är klart.">
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <label className="space-y-2 text-sm">
+            <span className="font-semibold text-ink-700">Leverantör</span>
+            <select
+              value={selectedProvider}
+              onChange={(event) => setSelectedProvider(event.target.value)}
+              disabled={!canManage}
+              className={premiumFieldClass}
+            >
+              {providers.map((provider) => (
+                <option key={provider.id} value={provider.id} disabled={!provider.configured}>
+                  {provider.name}{provider.configured ? "" : " · ej konfigurerad"}
+                </option>
+              ))}
+            </select>
+          </label>
+          {canManage ? (
+            <button
+              type="button"
+              disabled={saving || !providers.some((provider) => provider.id === selectedProvider && provider.configured)}
+              onClick={() => void post(`/api/work-orders/${workOrderId}/invoice-integration`, { action: "queue", provider: selectedProvider }, "Exportjobbet har lagts i kö.")}
+              className={premiumPrimaryButtonClass}
+            >
+              {saving ? "Köar…" : "Köa export"}
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-4 space-y-3">
+          {exportJobs.length === 0 ? (
+            <EmptyState title="Inga exportjobb" description="När underlaget är klart kan du köa en export till ekonomisystemet." />
+          ) : exportJobs.map((job) => (
+            <article key={job.jobId} className="rounded-xl border border-sand-200 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-ink-900">{providerLabels[job.provider] || job.provider}</p>
+                <span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">
+                  {statusLabels[job.status] || job.status}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-ink-500">
+                {job.updatedAt || job.createdAt ? dateTime.format(new Date(String(job.updatedAt || job.createdAt))) : "—"}
+                {job.attempt ? ` · Försök ${job.attempt}` : ""}
+              </p>
+              {job.error ? <p className="mt-2 text-xs text-red-700">{job.error}</p> : null}
+              {canManage && (job.status === "failed" || job.status === "queued") ? (
+                <div className="mt-3 flex gap-2">
+                  {job.status === "failed" ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void post(`/api/work-orders/${workOrderId}/invoice-integration`, { action: "retry", jobId: job.jobId }, "Exportjobbet köas om.")}
+                      className="rounded-lg border border-petroleum-200 bg-petroleum-50 px-3 py-1.5 text-xs font-semibold text-petroleum-900"
+                    >
+                      Försök igen
+                    </button>
+                  ) : null}
+                  {job.status === "queued" ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void post(`/api/work-orders/${workOrderId}/invoice-integration`, { action: "cancel", jobId: job.jobId }, "Exportjobbet har avbrutits.")}
+                      className="rounded-lg border border-sand-200 px-3 py-1.5 text-xs font-semibold text-ink-700"
+                    >
+                      Avbryt
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
       </Panel>
     </div>
   );
