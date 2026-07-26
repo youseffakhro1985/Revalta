@@ -53,18 +53,27 @@ export async function getCurrentUser() {
   return user;
 }
 
-export function tenantWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+export type CompanyUser = CurrentUser & { company_id: string };
+
+export function tenantWhere(user: CurrentUser) {
   return user.company_id ? { company_id: user.company_id } : { user_id: user.id };
 }
 
-export function companyScopedWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+export function companyScopedWhere(user: CurrentUser) {
   return user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" };
 }
 
-export function auditScopedWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+export function auditScopedWhere(user: CurrentUser) {
   return user.company_id ? { company_id: user.company_id } : { actor_user_id: user.id };
 }
 
-export function companyUserWhere(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+export function companyUserWhere(user: CurrentUser) {
   return user.company_id ? { company_id: user.company_id } : { id: user.id };
+}
+
+/** Fail-closed helper for organisation-scoped API routes. */
+export function requireCompanyUser(user: CurrentUser | null): CompanyUser | null {
+  if (!user?.company_id) return null;
+  return user as CompanyUser;
 }

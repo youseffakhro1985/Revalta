@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeDocumentFileName, validateDocumentFile } from "@/lib/document-file-security";
+import { safeDocumentFileName, validateDocumentFile, validateUploadFile } from "@/lib/document-file-security";
 
 describe("document file security", () => {
   it("accepts a PDF with matching extension and signature", () => {
@@ -39,4 +39,27 @@ describe("document file security", () => {
   it("sanitizes unsafe download names", () => {
     expect(safeDocumentFileName("..\\\r\nrapport<2026>.pdf")).toBe(".._rapport_2026_.pdf");
   });
+
+  it("accepts attachment profiles for webp and plain text", () => {
+    const webp = Buffer.from([
+      0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+    ]);
+    expect(
+      validateUploadFile({
+        bytes: webp,
+        contentType: "image/webp",
+        fileName: "foto.webp",
+        profile: "attachment",
+      }).ok,
+    ).toBe(true);
+    expect(
+      validateUploadFile({
+        bytes: Buffer.from("Hej från boendeportalen"),
+        contentType: "text/plain",
+        fileName: "anteckning.txt",
+        profile: "attachment",
+      }).ok,
+    ).toBe(true);
+  });
 });
+

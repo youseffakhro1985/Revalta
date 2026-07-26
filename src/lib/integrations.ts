@@ -1,5 +1,6 @@
 import db from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { allowIntegrationMocks } from "@/lib/runtime-env";
 import { hasStorageConfig } from "@/lib/storage";
 
 type IntegrationUser = {
@@ -14,13 +15,21 @@ const configured = {
   ai: Boolean(process.env.AI_PROVIDER_API_KEY),
 };
 
+/** Dev may mock; production records a hard failure instead of pretending delivery succeeded. */
+function mockOrFail() {
+  if (allowIntegrationMocks()) {
+    return { status: "mocked" as const, providerId: null };
+  }
+  return { status: "failed" as const, providerId: null, reason: "not_configured" };
+}
+
 async function sendEmail(payload: {
   recipient?: string;
   subject: string;
   text: string;
 }) {
   if (!configured.email || !payload.recipient) {
-    return { status: "mocked", providerId: null };
+    return mockOrFail();
   }
 
   const response = await fetch("https://api.resend.com/emails", {
@@ -47,7 +56,7 @@ async function sendEmail(payload: {
 
 async function sendSms(payload: { recipient?: string; message: string }) {
   if (!configured.sms || !payload.recipient) {
-    return { status: "mocked", providerId: null };
+    return mockOrFail();
   }
 
   if (process.env.SMS_PROVIDER_API_KEY?.startsWith("46elks:")) {
@@ -101,13 +110,14 @@ async function recordIntegrationEvent(
   statusOverride?: string
 ) {
   const isConfigured = configured[type as keyof typeof configured] ?? false;
+  const status = statusOverride ?? (isConfigured ? "queued" : allowIntegrationMocks() ? "mocked" : "failed");
 
   return db.integrationEvent.create({
     data: {
       company_id: user.company_id,
       type,
       recipient,
-      status: statusOverride ?? (isConfigured ? "queued" : "mocked"),
+      status,
       payload: payload as Prisma.InputJsonValue,
     },
   });
