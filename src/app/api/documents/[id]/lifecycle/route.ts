@@ -26,9 +26,22 @@ export async function PATCH(
     }
 
     const modern = await db.managedDocument.findFirst({
-      where: { id, company_id: user.company_id },
+      where: {
+        id,
+        company_id: user.company_id,
+        OR: [{ property_id: null }, { property: { deleted_at: null } }],
+      },
       select: { id: true, name: true, visibility: true, lifecycle_state: true },
     });
+    if (!modern) {
+      const orphaned = await db.managedDocument.findFirst({
+        where: { id, company_id: user.company_id },
+        select: { id: true },
+      });
+      if (orphaned) {
+        return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+      }
+    }
 
     const nextState = transition === "archive" ? "archived" : transition === "unpublish" ? "unpublished" : "active";
     const action = transition === "archive"

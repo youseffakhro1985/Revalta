@@ -26,7 +26,7 @@ export async function GET() {
 
     const [projects, properties, members] = await Promise.all([
       db.project.findMany({
-        where: { company_id: user.company_id, deleted_at: null },
+        where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
         orderBy: [{ status: "asc" }, { start_date: "asc" }, { created_at: "desc" }],
         take: 500,
         include: {

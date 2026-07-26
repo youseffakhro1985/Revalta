@@ -14,7 +14,7 @@ const allowedKinds = new Set(["work", "travel", "break"]);
 const allowedActions = new Set(["manual", "start", "stop", "approve", "reject"]);
 
 async function ensureOrder(id: string, companyId: string) {
-  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId }, select: { id: true, title: true } });
+  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } }, select: { id: true, title: true } });
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
