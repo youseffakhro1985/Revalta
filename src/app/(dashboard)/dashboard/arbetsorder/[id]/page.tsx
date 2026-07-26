@@ -8,6 +8,7 @@ import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumP
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
+import { WorkOrderEconomicsPanel } from "@/components/dashboard/work-order-economics-panel";
 import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
 import { useWorkOrderEditLock } from "@/hooks/use-work-order-edit-lock";
 
@@ -255,6 +256,13 @@ export default function WorkOrderDetailPage() {
     </Panel>
 
     <WorkOrderExecutionPanel workOrderId={workOrder.id} />
+    <section aria-label="Ekonomi och fakturering" className="space-y-3">
+      <div>
+        <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>
+        <p className="mt-1 text-sm text-ink-500">Attesterbar tid, material, lönsamhet och fakturaunderlag – separat från fältregistreringen ovan.</p>
+      </div>
+      <WorkOrderEconomicsPanel workOrderId={workOrder.id} />
+    </section>
     <WorkOrderReportingPanel workOrderId={workOrder.id} />
     <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
   </div>;

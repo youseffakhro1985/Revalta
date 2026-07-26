@@ -2,7 +2,9 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
-import { readRecurringSchedules } from "@/lib/recurring-work-order-engine";
+import { getNotificationUxState, markNotificationsRead } from "@/lib/notification-ux-state";
+import { listRecurringIncidentEvents } from "@/lib/recurring-incident-storage";
+import { listRecurringRuns, readRecurringSchedules } from "@/lib/recurring-work-order-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +18,6 @@ type EventPayload = {
   resolutionDueAt?: string | null;
   assignedToName?: string | null;
 };
-
-type ReadPayload = { notificationKey?: string };
 
 type Notification = {
   key: string;
@@ -38,19 +38,9 @@ function eventPayload(value: Prisma.JsonValue | null): EventPayload {
   return (objectPayload(value) || {}) as EventPayload;
 }
 
-function notificationKey(value: Prisma.JsonValue | null) {
-  const key = (objectPayload(value) as ReadPayload | null)?.notificationKey;
-  return typeof key === "string" ? key : null;
-}
-
 async function slaNotifications(companyId: string, now: Date): Promise<Notification[]> {
-  const events = await db.integrationEvent.findMany({
-    where: {
-      company_id: companyId,
-      type: { in: ["recurring_incident_sla", "recurring_work_order_incident", "recurring_incident_assignment"] },
-    },
-    orderBy: { created_at: "desc" },
-    select: { id: true, type: true, status: true, payload: true, created_at: true },
+  const events = await listRecurringIncidentEvents(companyId, {
+    eventTypes: ["status", "assignment", "sla"],
     take: 4000,
   });
 
@@ -59,17 +49,18 @@ async function slaNotifications(companyId: string, now: Date): Promise<Notificat
   const assignee = new Map<string, string | null>();
 
   for (const event of events) {
-    const data = eventPayload(event.payload);
-    if (!data.notificationKey) continue;
-    if (event.type === "recurring_incident_sla" && !sla.has(data.notificationKey)) {
-      sla.set(data.notificationKey, {
+    const data = eventPayload(event.payload as Prisma.JsonValue);
+    const key = event.notification_key || data.notificationKey;
+    if (!key) continue;
+    if (event.event_type === "sla" && !sla.has(key)) {
+      sla.set(key, {
         responseDueAt: data.responseDueAt || null,
         resolutionDueAt: data.resolutionDueAt || null,
       });
-    } else if (event.type === "recurring_work_order_incident" && !status.has(data.notificationKey)) {
-      status.set(data.notificationKey, data.status || event.status);
-    } else if (event.type === "recurring_incident_assignment" && !assignee.has(data.notificationKey)) {
-      assignee.set(data.notificationKey, data.assignedToName || null);
+    } else if (event.event_type === "status" && !status.has(key)) {
+      status.set(key, data.status || event.status);
+    } else if (event.event_type === "assignment" && !assignee.has(key)) {
+      assignee.set(key, data.assignedToName || null);
     }
   }
 
@@ -115,17 +106,7 @@ async function notificationsFor(companyId: string) {
 
   const [schedules, runs, slaAlerts] = await Promise.all([
     readRecurringSchedules(companyId),
-    db.integrationEvent.findMany({
-      where: {
-        company_id: companyId,
-        type: "recurring_work_orders_run",
-        status: { in: ["partial", "failed"] },
-        created_at: { gte: historySince },
-      },
-      orderBy: { created_at: "desc" },
-      select: { id: true, status: true, payload: true, created_at: true },
-      take: 20,
-    }),
+    listRecurringRuns(companyId, { statuses: ["partial", "failed"], since: historySince, take: 20 }),
     slaNotifications(companyId, now),
   ]);
 
@@ -147,7 +128,7 @@ async function notificationsFor(companyId: string) {
     });
 
   const failedRuns: Notification[] = runs.map((run) => {
-    const payload = eventPayload(run.payload);
+    const payload = eventPayload(run.payload as Prisma.JsonValue);
     const failed = typeof payload.failed === "number" ? payload.failed : 0;
     const generated = typeof payload.generated === "number" ? payload.generated : 0;
     const partial = run.status === "partial";
@@ -176,17 +157,12 @@ export async function GET(request: Request) {
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const filter = new URL(request.url).searchParams.get("filter") || "all";
-  const [all, reads] = await Promise.all([
+  const [all, ux] = await Promise.all([
     notificationsFor(user.company_id),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "recurring_notification_read", recipient: user.id, status: "read" },
-      select: { payload: true },
-      take: 2000,
-    }),
+    getNotificationUxState(user.company_id, user.id, "recurring"),
   ]);
 
-  const read = new Set(reads.map((item) => notificationKey(item.payload)).filter((value): value is string => Boolean(value)));
-  const hydrated = all.map((item) => ({ ...item, read: read.has(item.key) }));
+  const hydrated = all.map((item) => ({ ...item, read: ux.read.has(item.key) }));
   const notifications = filter === "unread" ? hydrated.filter((item) => !item.read) : hydrated;
 
   return NextResponse.json({
@@ -217,23 +193,9 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
   }
 
-  const existing = await db.integrationEvent.findMany({
-    where: { company_id: user.company_id, type: "recurring_notification_read", recipient: user.id, status: "read" },
-    select: { payload: true },
-  });
-  const existingKeys = new Set(existing.map((item) => notificationKey(item.payload)).filter((value): value is string => Boolean(value)));
-  const missing = Array.from(new Set(keys)).filter((key) => !existingKeys.has(key));
-  if (missing.length) {
-    await db.integrationEvent.createMany({
-      data: missing.map((key) => ({
-        company_id: user.company_id!,
-        type: "recurring_notification_read",
-        status: "read",
-        recipient: user.id,
-        payload: { notificationKey: key },
-      })),
-    });
-  }
+  const ux = await getNotificationUxState(user.company_id, user.id, "recurring");
+  const missing = Array.from(new Set(keys)).filter((key) => !ux.read.has(key));
+  if (missing.length) await markNotificationsRead(user.company_id, user.id, "recurring", missing);
 
   return NextResponse.json({ success: true, marked: missing.length });
 }

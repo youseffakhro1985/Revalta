@@ -69,7 +69,7 @@ export async function GET() {
            l."expires_at",
            l."updated_at"
     FROM "WorkOrderEditLock" l
-    INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id"
+    INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id" AND w."deleted_at" IS NULL
     INNER JOIN "Property" p ON p."id" = w."property_id" AND p."company_id" = l."company_id"
     INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
     WHERE l."company_id" = ${user.company_id}
@@ -122,7 +122,7 @@ export async function DELETE(request: Request) {
       SELECT l."work_order_id", w."work_order_number", w."title", u."id" AS "user_id",
              u."name" AS "user_name", u."email" AS "user_email", l."expires_at"
       FROM "WorkOrderEditLock" l
-      INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id"
+      INNER JOIN "WorkOrder" w ON w."id" = l."work_order_id" AND w."company_id" = l."company_id" AND w."deleted_at" IS NULL
       INNER JOIN "User" u ON u."id" = l."user_id" AND u."company_id" = l."company_id"
       WHERE l."work_order_id" = ${workOrderId}
         AND l."company_id" = ${companyId}

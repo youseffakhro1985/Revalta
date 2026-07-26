@@ -1,13 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { listRecurringIncidentEvents } from "@/lib/recurring-incident-storage";
 
 export const dynamic = "force-dynamic";
 
-const INCIDENT_TYPE = "recurring_work_order_incident";
-const ASSIGNMENT_TYPE = "recurring_incident_assignment";
-const SLA_TYPE = "recurring_incident_sla";
 const MAX_EVENTS = 10_000;
 
 type Payload = {
@@ -76,20 +73,15 @@ export async function GET(request: Request) {
   if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet att visa operativa rapporter" }, { status: 403 });
 
   const { days, from, to, format } = parsePeriod(request);
-  const events = await db.integrationEvent.findMany({
-    where: {
-      company_id: user.company_id,
-      type: { in: [INCIDENT_TYPE, ASSIGNMENT_TYPE, SLA_TYPE] },
-      created_at: { gte: new Date(from.getTime() - 365 * 24 * 60 * 60 * 1000), lte: to },
-    },
-    orderBy: { created_at: "asc" },
-    select: { id: true, type: true, status: true, payload: true, created_at: true },
+  const lookbackFrom = new Date(from.getTime() - 365 * 24 * 60 * 60 * 1000);
+  const events = (await listRecurringIncidentEvents(user.company_id, {
+    eventTypes: ["status", "assignment", "sla"],
     take: MAX_EVENTS,
-  });
+  })).filter((event) => event.created_at >= lookbackFrom && event.created_at <= to);
 
   const groups = new Map<string, typeof events>();
   for (const event of events) {
-    const key = payload(event.payload).notificationKey;
+    const key = event.notification_key || payload(event.payload).notificationKey;
     if (!key) continue;
     const group = groups.get(key) || [];
     group.push(event);
@@ -107,15 +99,17 @@ export async function GET(request: Request) {
     let status = "open";
     let assignee = "Ej tilldelad";
 
-    for (const event of group) {
+    // Process oldest-first for chronological status transitions.
+    const chronological = [...group].sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
+    for (const event of chronological) {
       const data = payload(event.payload);
-      if (event.type === SLA_TYPE) {
+      if (event.event_type === "sla") {
         responseDueAt = data.responseDueAt || null;
         resolutionDueAt = data.resolutionDueAt || null;
         slaChangedAt = data.slaChangedAt || event.created_at.toISOString();
-      } else if (event.type === ASSIGNMENT_TYPE) {
+      } else if (event.event_type === "assignment") {
         assignee = data.assignedTo ? data.assignedToName || "Tilldelad användare" : "Ej tilldelad";
-      } else if (event.type === INCIDENT_TYPE) {
+      } else if (event.event_type === "status") {
         const changedAt = data.changedAt || event.created_at.toISOString();
         status = data.status || event.status;
         if (status === "acknowledged" && !acknowledgedAt) acknowledgedAt = changedAt;

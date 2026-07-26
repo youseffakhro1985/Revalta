@@ -31,6 +31,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         AND wo."technical_asset_id" = a."id"
         AND wo."source" = 'maintenance_plan'
         AND wo."maintenance_cycle_advanced_at" IS NOT NULL
+        AND wo."deleted_at" IS NULL
       ORDER BY wo."maintenance_cycle_advanced_at" DESC
       LIMIT 1
     ) w ON TRUE

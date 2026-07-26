@@ -190,7 +190,7 @@ export async function PATCH(request: Request) {
           select: { id: true },
         });
         if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });
-        const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} LIMIT 1`;
+        const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} AND "deleted_at" IS NULL LIMIT 1`;
         workOrderNumber = rows[0]?.work_order_number ?? null;
       }
 
@@ -242,7 +242,7 @@ export async function PATCH(request: Request) {
         select: { id: true },
       });
       if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte för aktuell fastighet" }, { status: 404 });
-      const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} LIMIT 1`;
+      const rows = await db.$queryRaw<Array<{ work_order_number: string | null }>>`SELECT "work_order_number" FROM "WorkOrder" WHERE "id" = ${workOrderId} AND "deleted_at" IS NULL LIMIT 1`;
       workOrderNumber = rows[0]?.work_order_number ?? null;
     }
 

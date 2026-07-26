@@ -34,6 +34,7 @@ export async function GET(
       FROM "WorkOrder"
       WHERE "company_id" = ${user.company_id}
         AND "property_id" = ${propertyId}
+        AND "deleted_at" IS NULL
       ORDER BY
         CASE WHEN "status" IN ('completed', 'cancelled') THEN 1 ELSE 0 END,
         "updated_at" DESC
@@ -44,6 +45,7 @@ export async function GET(
       FROM "Project"
       WHERE "company_id" = ${user.company_id}
         AND "property_id" = ${propertyId}
+        AND "deleted_at" IS NULL
       ORDER BY
         CASE WHEN "status" IN ('completed', 'cancelled') THEN 1 ELSE 0 END,
         "updated_at" DESC

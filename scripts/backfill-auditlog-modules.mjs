@@ -1017,8 +1017,19 @@ async function main() {
   });
 
   await backfill("NotificationUxState", async () => {
+    const channelByType = {
+      service_notification_read: "service_center",
+      work_order_sla_notification_read: "work_order_sla",
+      work_order_lock_notification_read: "work_order_lock",
+      recurring_notification_read: "recurring",
+    };
     const readEvents = await prisma.integrationEvent.findMany({
-      where: { type: { in: ["service_notification_read", "work_order_sla_notification_read"] }, company_id: { not: null }, recipient: { not: null }, status: "read" },
+      where: {
+        type: { in: Object.keys(channelByType) },
+        company_id: { not: null },
+        recipient: { not: null },
+        status: "read",
+      },
       orderBy: { created_at: "asc" },
       take: 20000,
     });
@@ -1028,7 +1039,8 @@ async function main() {
       const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
       const key = payload.notificationKey ? String(payload.notificationKey) : "";
       if (!event.company_id || !event.recipient || !key) { localSkipped += 1; continue; }
-      const channel = event.type === "work_order_sla_notification_read" ? "work_order_sla" : "service_center";
+      const channel = channelByType[event.type];
+      if (!channel) { localSkipped += 1; continue; }
       const existing = await prisma.notificationUxState.findUnique({
         where: { company_id_user_id_channel_notification_key: { company_id: event.company_id, user_id: event.recipient, channel, notification_key: key } },
       });
@@ -1303,6 +1315,132 @@ async function main() {
           overdue_only: payload.overdueOnly === true,
           created_at: event.created_at,
           updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("RecurringWorkOrderSchedule", async () => {
+    const logs = await prisma.auditLog.findMany({
+      where: { action: "work_order.recurring.schedule", company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 20000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    const latest = new Map();
+    for (const log of logs) {
+      const metadata = (log.metadata && typeof log.metadata === "object") ? log.metadata : {};
+      const id = metadata.schedule_id || log.entity_id || log.id;
+      if (!log.company_id || !id) { localSkipped += 1; continue; }
+      latest.set(`${log.company_id}:${id}`, { log, metadata, id });
+    }
+    for (const { log, metadata, id } of latest.values()) {
+      if (await prisma.recurringWorkOrderSchedule.findUnique({ where: { id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      if (!metadata.property_id || !metadata.title || !metadata.description || !metadata.frequency || !metadata.next_run_at) {
+        localSkipped += 1;
+        continue;
+      }
+      await prisma.recurringWorkOrderSchedule.create({
+        data: {
+          id,
+          company_id: log.company_id,
+          property_id: String(metadata.property_id),
+          property_name: String(metadata.property_name || ""),
+          title: String(metadata.title),
+          description: String(metadata.description),
+          frequency: String(metadata.frequency),
+          priority: String(metadata.priority || "normal"),
+          estimated_cost: metadata.estimated_cost == null || metadata.estimated_cost === "" ? null : num(metadata.estimated_cost),
+          next_run_at: new Date(String(metadata.next_run_at)),
+          active: metadata.active !== false,
+          last_generated_at: dateOrNull(metadata.last_generated_at),
+          last_work_order_id: metadata.last_work_order_id ? String(metadata.last_work_order_id) : null,
+          last_work_order_number: metadata.last_work_order_number ? String(metadata.last_work_order_number) : null,
+          created_by_id: log.actor_user_id || null,
+          updated_by_id: log.actor_user_id || null,
+          created_at: log.created_at,
+          updated_at: dateOrNull(metadata.updated_at) || log.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("RecurringWorkOrderRun", async () => {
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: "recurring_work_orders_run" },
+      orderBy: { created_at: "asc" },
+      take: 10000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      if (await prisma.recurringWorkOrderRun.findUnique({ where: { id: event.id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      await prisma.recurringWorkOrderRun.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          status: String(event.status || "processing"),
+          recipient: event.recipient,
+          payload: event.payload ?? undefined,
+          created_at: event.created_at,
+          updated_at: event.created_at,
+        },
+      });
+      localCreated += 1;
+    }
+    created += localCreated;
+    skipped += localSkipped;
+    return { created: localCreated, skipped: localSkipped };
+  });
+
+  await backfill("RecurringIncidentEvent", async () => {
+    const typeMap = {
+      recurring_work_order_incident: "status",
+      recurring_incident_escalation: "escalation",
+      recurring_incident_assignment: "assignment",
+      recurring_incident_sla: "sla",
+    };
+    const events = await prisma.integrationEvent.findMany({
+      where: { type: { in: Object.keys(typeMap) }, company_id: { not: null } },
+      orderBy: { created_at: "asc" },
+      take: 20000,
+    });
+    let localCreated = 0;
+    let localSkipped = 0;
+    for (const event of events) {
+      if (!event.company_id) { localSkipped += 1; continue; }
+      if (await prisma.recurringIncidentEvent.findUnique({ where: { id: event.id } })) {
+        localSkipped += 1;
+        continue;
+      }
+      const payload = (event.payload && typeof event.payload === "object") ? event.payload : {};
+      const key = payload.notificationKey ? String(payload.notificationKey) : "";
+      if (!key) { localSkipped += 1; continue; }
+      await prisma.recurringIncidentEvent.create({
+        data: {
+          id: event.id,
+          company_id: event.company_id,
+          notification_key: key,
+          event_type: typeMap[event.type],
+          status: String(event.status || "open"),
+          recipient: event.recipient,
+          payload: event.payload ?? {},
+          created_at: event.created_at,
         },
       });
       localCreated += 1;

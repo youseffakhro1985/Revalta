@@ -118,6 +118,7 @@ export async function runPreventiveMaintenanceEngine(options: { companyId?: stri
         const existing = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
           SELECT "id" FROM "WorkOrder"
           WHERE "company_id" = ${component.company_id} AND "maintenance_cycle_key" = ${cycleKey}
+            AND "deleted_at" IS NULL
           LIMIT 1
         `);
         if (existing[0]) return { id: existing[0].id, wasCreated: false };

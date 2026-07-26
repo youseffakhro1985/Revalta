@@ -5,10 +5,11 @@ import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   generateRecurringWorkOrder,
+  listRecurringRuns,
   readRecurringSchedules,
   RECURRING_FREQUENCIES,
   RECURRING_PRIORITIES,
-  RECURRING_SCHEDULE_ACTION,
+  upsertRecurringSchedule,
   type RecurringFrequency,
   type RecurringPriority,
 } from "@/lib/recurring-work-order-engine";
@@ -25,12 +26,7 @@ export async function GET() {
       orderBy: { name: "asc" },
       select: { id: true, name: true, address: true, city: true },
     }),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "recurring_work_orders_run" },
-      orderBy: { created_at: "desc" },
-      take: 20,
-      select: { id: true, status: true, payload: true, created_at: true },
-    }),
+    listRecurringRuns(user.company_id, { take: 20 }),
   ]);
 
   const now = Date.now();
@@ -89,25 +85,32 @@ export async function POST(request: Request) {
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   const scheduleId = randomUUID();
+  await upsertRecurringSchedule({
+    id: scheduleId,
+    companyId: user.company_id,
+    propertyId: property.id,
+    propertyName: property.name,
+    title,
+    description,
+    frequency,
+    priority,
+    estimatedCost,
+    nextRunAt,
+    active: true,
+    actorUserId: user.id,
+  });
   await writeAuditLog(user, {
     entityType: "recurring_work_order",
     entityId: scheduleId,
-    action: RECURRING_SCHEDULE_ACTION,
+    action: "work_order.recurring.schedule_created",
     metadata: {
-      schedule_id: scheduleId,
-      property_id: property.id,
-      property_name: property.name,
+      scheduleId,
+      propertyId: property.id,
       title,
-      description,
       frequency,
       priority,
-      estimated_cost: estimatedCost,
-      next_run_at: nextRunAt.toISOString(),
-      active: true,
-      last_generated_at: null,
-      last_work_order_id: null,
-      last_work_order_number: null,
-      updated_at: new Date().toISOString(),
+      nextRunAt: nextRunAt.toISOString(),
+      storage: "RecurringWorkOrderSchedule",
     },
   });
   return NextResponse.json({ scheduleId }, { status: 201 });
@@ -127,11 +130,28 @@ export async function PATCH(request: Request) {
   const schedule = schedules.find((item) => item.id === scheduleId);
   if (!schedule) return NextResponse.json({ error: "Schemat hittades inte" }, { status: 404 });
 
+  await upsertRecurringSchedule({
+    id: scheduleId,
+    companyId: user.company_id,
+    propertyId: schedule.property_id,
+    propertyName: schedule.property_name,
+    title: schedule.title,
+    description: schedule.description,
+    frequency: schedule.frequency,
+    priority: schedule.priority,
+    estimatedCost: schedule.estimated_cost,
+    nextRunAt: new Date(schedule.next_run_at),
+    active: body.active,
+    actorUserId: user.id,
+    lastGeneratedAt: schedule.last_generated_at ? new Date(schedule.last_generated_at) : null,
+    lastWorkOrderId: schedule.last_work_order_id,
+    lastWorkOrderNumber: schedule.last_work_order_number,
+  });
   await writeAuditLog(user, {
     entityType: "recurring_work_order",
     entityId: scheduleId,
-    action: RECURRING_SCHEDULE_ACTION,
-    metadata: { ...schedule, schedule_id: scheduleId, active: body.active, updated_at: new Date().toISOString() },
+    action: "work_order.recurring.schedule_updated",
+    metadata: { scheduleId, active: body.active, storage: "RecurringWorkOrderSchedule" },
   });
   return NextResponse.json({ success: true });
 }

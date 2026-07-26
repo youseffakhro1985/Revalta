@@ -125,6 +125,7 @@ export async function getWorkOrderEnterpriseState(client: Prisma.TransactionClie
            "responded_at", "paused_at", "pause_reason", "closed_at"
     FROM "WorkOrder"
     WHERE "id" = ${workOrderId} AND "company_id" = ${companyId}
+      AND "deleted_at" IS NULL
     LIMIT 1
   `);
   return rows[0] ?? null;

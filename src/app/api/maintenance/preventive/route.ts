@@ -49,6 +49,7 @@ export async function GET() {
       WHERE wo."company_id" = a."company_id"
         AND wo."technical_asset_id" = a."id"
         AND wo."source" = 'maintenance_plan'
+        AND wo."deleted_at" IS NULL
       ORDER BY COALESCE(wo."maintenance_cycle_advanced_at", wo."created_at") DESC
       LIMIT 1
     ) w ON TRUE

@@ -71,6 +71,7 @@ export async function getWorkOrderAssetLink(client: Client, companyId: string, w
     LEFT JOIN "Building" b ON b."id" = w."building_id"
     LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
     WHERE w."id" = ${workOrderId} AND w."company_id" = ${companyId}
+      AND w."deleted_at" IS NULL
     LIMIT 1
   `);
   return rows[0] ?? null;

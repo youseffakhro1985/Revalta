@@ -65,6 +65,7 @@ async function advancePreventiveMaintenanceCycle(
     SELECT "source", "maintenance_cycle_key", "maintenance_cycle_advanced_at"
     FROM "WorkOrder"
     WHERE "id" = ${args.workOrderId} AND "company_id" = ${args.companyId}
+      AND "deleted_at" IS NULL
     LIMIT 1
     FOR UPDATE
   `);

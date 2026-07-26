@@ -1,9 +1,7 @@
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
-import { readRecurringSchedules } from "@/lib/recurring-work-order-engine";
-
-const INCIDENT_TYPE = "recurring_work_order_incident";
-const ESCALATION_TYPE = "recurring_incident_escalation";
+import { createRecurringIncidentEvent, listRecurringIncidentEvents } from "@/lib/recurring-incident-storage";
+import { listRecurringRuns, readRecurringSchedules } from "@/lib/recurring-work-order-engine";
 
 type IncidentPayload = {
   notificationKey?: string;
@@ -40,14 +38,9 @@ async function sourceIncidents(companyId: string) {
   const historySince = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const [schedules, runs] = await Promise.all([
     readRecurringSchedules(companyId),
-    db.integrationEvent.findMany({
-      where: {
-        company_id: companyId,
-        type: "recurring_work_orders_run",
-        status: { in: ["partial", "failed"] },
-        created_at: { gte: historySince },
-      },
-      select: { id: true, created_at: true },
+    listRecurringRuns(companyId, {
+      statuses: ["partial", "failed"],
+      since: historySince,
       take: 100,
     }),
   ]);
@@ -92,37 +85,30 @@ export async function runRecurringIncidentEscalation(options: { companyId?: stri
     try {
       const sources = await sourceIncidents(companyId);
       scanned += sources.length;
-      const [incidentEvents, escalationEvents] = await Promise.all([
-        db.integrationEvent.findMany({
-          where: { company_id: companyId, type: INCIDENT_TYPE },
-          orderBy: { created_at: "desc" },
-          select: { payload: true, status: true, created_at: true },
-          take: 2000,
-        }),
-        db.integrationEvent.findMany({
-          where: { company_id: companyId, type: ESCALATION_TYPE },
-          orderBy: { created_at: "desc" },
-          select: { payload: true },
-          take: 2000,
-        }),
-      ]);
+      const events = await listRecurringIncidentEvents(companyId, {
+        eventTypes: ["status", "escalation"],
+        take: 4000,
+      });
 
       const latestIncident = new Map<string, { status: string; changedAt: Date }>();
-      for (const event of incidentEvents) {
-        const payload = incidentPayload(event.payload);
-        if (!payload.notificationKey || latestIncident.has(payload.notificationKey)) continue;
-        const changedAt = payload.changedAt ? new Date(payload.changedAt) : event.created_at;
-        latestIncident.set(payload.notificationKey, {
-          status: payload.status || event.status,
-          changedAt: Number.isNaN(changedAt.getTime()) ? event.created_at : changedAt,
-        });
-      }
-
       const highestLevel = new Map<string, number>();
-      for (const event of escalationEvents) {
-        const payload = escalationPayload(event.payload);
-        if (!payload.notificationKey || typeof payload.level !== "number") continue;
-        highestLevel.set(payload.notificationKey, Math.max(highestLevel.get(payload.notificationKey) || 0, payload.level));
+
+      for (const event of events) {
+        if (event.event_type === "status") {
+          const data = incidentPayload(event.payload);
+          const key = event.notification_key || data.notificationKey;
+          if (!key || latestIncident.has(key)) continue;
+          const changedAt = data.changedAt ? new Date(data.changedAt) : event.created_at;
+          latestIncident.set(key, {
+            status: data.status || event.status,
+            changedAt: Number.isNaN(changedAt.getTime()) ? event.created_at : changedAt,
+          });
+        } else if (event.event_type === "escalation") {
+          const data = escalationPayload(event.payload);
+          const key = event.notification_key || data.notificationKey;
+          if (!key || typeof data.level !== "number") continue;
+          highestLevel.set(key, Math.max(highestLevel.get(key) || 0, data.level));
+        }
       }
 
       const now = Date.now();
@@ -158,20 +144,19 @@ export async function runRecurringIncidentEscalation(options: { companyId?: stri
           continue;
         }
 
-        await db.integrationEvent.create({
-          data: {
-            company_id: companyId,
-            type: ESCALATION_TYPE,
-            status: `level_${desiredLevel}`,
-            recipient: desiredLevel === 2 ? "company:management" : "company:operations",
-            payload: {
-              notificationKey: source.notificationKey,
-              level: desiredLevel,
-              reason,
-              sourceType: source.sourceType,
-              sourceAt: source.sourceAt.toISOString(),
-              escalatedAt: new Date().toISOString(),
-            },
+        await createRecurringIncidentEvent({
+          companyId,
+          notificationKey: source.notificationKey,
+          eventType: "escalation",
+          status: `level_${desiredLevel}`,
+          recipient: desiredLevel === 2 ? "company:management" : "company:operations",
+          payload: {
+            notificationKey: source.notificationKey,
+            level: desiredLevel,
+            reason,
+            sourceType: source.sourceType,
+            sourceAt: source.sourceAt.toISOString(),
+            escalatedAt: new Date().toISOString(),
           },
         });
         highestLevel.set(source.notificationKey, desiredLevel);

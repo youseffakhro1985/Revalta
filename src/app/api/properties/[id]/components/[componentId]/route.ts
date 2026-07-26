@@ -68,8 +68,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       w."title" AS "work_order_title", p."name" AS "project_name"
     FROM "ComponentLifecycleEvent" e
     JOIN "User" u ON u."id" = e."created_by_id"
-    LEFT JOIN "WorkOrder" w ON w."id" = e."work_order_id" AND w."company_id" = ${user.company_id}
-    LEFT JOIN "Project" p ON p."id" = e."project_id" AND p."company_id" = ${user.company_id}
+    LEFT JOIN "WorkOrder" w ON w."id" = e."work_order_id" AND w."company_id" = ${user.company_id} AND w."deleted_at" IS NULL
+    LEFT JOIN "Project" p ON p."id" = e."project_id" AND p."company_id" = ${user.company_id} AND p."deleted_at" IS NULL
     WHERE e."technical_asset_id" = ${componentId} AND e."property_id" = ${propertyId} AND e."company_id" = ${user.company_id}
     ORDER BY e."event_date" DESC, e."created_at" DESC
     LIMIT 200
@@ -80,8 +80,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       w."title" AS "work_order_title", p."name" AS "project_name"
     FROM "ComponentCostEntry" c
     JOIN "User" u ON u."id" = c."created_by_id"
-    LEFT JOIN "WorkOrder" w ON w."id" = c."work_order_id" AND w."company_id" = ${user.company_id}
-    LEFT JOIN "Project" p ON p."id" = c."project_id" AND p."company_id" = ${user.company_id}
+    LEFT JOIN "WorkOrder" w ON w."id" = c."work_order_id" AND w."company_id" = ${user.company_id} AND w."deleted_at" IS NULL
+    LEFT JOIN "Project" p ON p."id" = c."project_id" AND p."company_id" = ${user.company_id} AND p."deleted_at" IS NULL
     WHERE c."technical_asset_id" = ${componentId} AND c."property_id" = ${propertyId} AND c."company_id" = ${user.company_id}
     ORDER BY c."cost_date" DESC, c."created_at" DESC
     LIMIT 200
@@ -92,6 +92,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     FROM "WorkOrder" w
     JOIN "ComponentLifecycleEvent" e ON e."work_order_id" = w."id"
     WHERE e."technical_asset_id" = ${componentId} AND w."company_id" = ${user.company_id}
+      AND w."deleted_at" IS NULL
     ORDER BY w."updated_at" DESC
     LIMIT 50
   `);
@@ -101,6 +102,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     FROM "Project" p
     JOIN "ComponentLifecycleEvent" e ON e."project_id" = p."id"
     WHERE e."technical_asset_id" = ${componentId} AND p."company_id" = ${user.company_id}
+      AND p."deleted_at" IS NULL
     ORDER BY p."updated_at" DESC
     LIMIT 50
   `);

@@ -141,6 +141,7 @@ export async function GET(
       SELECT "response_due_at", "completion_due_at", "responded_at", "sla_status"
       FROM "WorkOrder"
       WHERE "id" = ${id} AND "company_id" = ${user.company_id}
+        AND "deleted_at" IS NULL
       LIMIT 1
     `),
     getCompletionState(id, user.company_id),
@@ -311,6 +312,7 @@ export async function POST(
       SELECT "completion_due_at"
       FROM "WorkOrder"
       WHERE "id" = ${id} AND "company_id" = ${user.company_id}
+        AND "deleted_at" IS NULL
       LIMIT 1
     `);
     const completionDueAt = slaRows[0]?.completion_due_at ?? null;

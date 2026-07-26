@@ -75,6 +75,7 @@ export async function GET() {
       LEFT JOIN "Building" b ON b."id" = w."building_id"
       LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
       WHERE w."company_id" = ${user.company_id}
+        AND w."deleted_at" IS NULL
     `),
   ]);
 

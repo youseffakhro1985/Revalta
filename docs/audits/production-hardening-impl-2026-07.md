@@ -56,8 +56,12 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Project detail can assign project manager via `/api/team` and soft-delete projects.
    - Work-order ops off IntegrationEvent primary storage: `WorkOrderTimeEntry`, `WorkOrderMaterialEntry`, `WorkOrderProfitabilitySettings`, `WorkOrderInvoiceDraft`, `WorkOrderInvoiceExportJob` (dual-read + cron/export jobs).
    - Service ops state: `ServiceNotificationAssignment`, `ComponentServiceDigestRun`, `ComponentServiceDeliveryAlert` (+ acks) with dual-read and cron cutover.
-   - Notification UX state (`NotificationUxState`) for service-center and WO SLA reads/snoozes; escalation rules on `ServiceEscalationRulesSettings`.
-   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables).
+   - Notification UX state (`NotificationUxState`) for service-center, WO SLA, lock and recurring reads/snoozes; escalation rules on `ServiceEscalationRulesSettings`.
+   - Soft-delete filters applied to raw SQL list/join paths for WorkOrder and Project.
+   - Recurring schedules/runs/incidents off AuditLog/IntegrationEvent primary storage: `RecurringWorkOrderSchedule`, `RecurringWorkOrderRun`, `RecurringIncidentEvent` (dual-read + cron cutover).
+   - Work-order detail wires attestable economics UI (time/materials/profitability/invoice-basis) alongside field execution.
+   - Lease inspection helpers dual-read modern `LeaseInspectionRecord` / `LeaseInspectionWorkOrderLink`.
+   - Idempotent backfill script: `node scripts/backfill-auditlog-modules.mjs` (includes ManagedDocument, ImdReading, TicketOperation, lease domain tables, service notification settings, work-order ops tables, assignment/digest/alert tables, recurring schedule/run/incident tables, lock/recurring notification UX).
 
 ## Verification
 

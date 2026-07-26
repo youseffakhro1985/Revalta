@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { getNotificationUxState, markNotificationsRead } from "@/lib/notification-ux-state";
 
 export const dynamic = "force-dynamic";
 
 const MAX_NOTIFICATIONS = 200;
-const MAX_READ_MARKERS = 1000;
 
 type Payload = {
   notificationKey?: unknown;
@@ -72,26 +72,18 @@ export async function GET() {
   if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
-  const [events, reads] = await Promise.all([
+  const [events, ux] = await Promise.all([
     db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "work_order_edit_lock_forced_release", recipient: user.id },
       orderBy: { created_at: "desc" },
       select: { payload: true },
       take: MAX_NOTIFICATIONS,
     }),
-    db.integrationEvent.findMany({
-      where: { company_id: user.company_id, type: "work_order_lock_notification_read", recipient: user.id, status: "read" },
-      orderBy: { created_at: "desc" },
-      select: { payload: true },
-      take: MAX_READ_MARKERS,
-    }),
+    getNotificationUxState(user.company_id, user.id, "work_order_lock"),
   ]);
 
-  const readKeys = new Set(
-    reads.map((event) => notificationKeyFrom(event.payload)).filter((value): value is string => value !== null),
-  );
   const notifications = events
-    .map((event) => safeNotification(event.payload, readKeys))
+    .map((event) => safeNotification(event.payload, ux.read))
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return noStore({
@@ -126,28 +118,9 @@ export async function PATCH(request: Request) {
     return noStore({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
   }
 
-  const existing = await db.integrationEvent.findMany({
-    where: { company_id: user.company_id, type: "work_order_lock_notification_read", recipient: user.id, status: "read" },
-    orderBy: { created_at: "desc" },
-    select: { payload: true },
-    take: MAX_READ_MARKERS,
-  });
-  const existingKeys = new Set(
-    existing.map((event) => notificationKeyFrom(event.payload)).filter((value): value is string => value !== null),
-  );
-  const missing = Array.from(new Set(keys)).filter((key) => !existingKeys.has(key));
-
-  if (missing.length) {
-    await db.integrationEvent.createMany({
-      data: missing.map((key) => ({
-        company_id: user.company_id,
-        type: "work_order_lock_notification_read",
-        status: "read",
-        recipient: user.id,
-        payload: { notificationKey: key },
-      })),
-    });
-  }
+  const ux = await getNotificationUxState(user.company_id, user.id, "work_order_lock");
+  const missing = Array.from(new Set(keys)).filter((key) => !ux.read.has(key));
+  if (missing.length) await markNotificationsRead(user.company_id, user.id, "work_order_lock", missing);
 
   return noStore({ success: true, marked: missing.length });
 }

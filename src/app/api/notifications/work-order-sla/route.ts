@@ -41,6 +41,7 @@ async function rowsFor(companyId: string) {
     FROM "WorkOrder" w
     INNER JOIN "Property" p ON p."id" = w."property_id" AND p."company_id" = w."company_id"
     WHERE w."company_id" = ${companyId}
+      AND w."deleted_at" IS NULL
       AND w."status" NOT IN ('completed', 'invoiced', 'cancelled')
     LIMIT 500
   `);

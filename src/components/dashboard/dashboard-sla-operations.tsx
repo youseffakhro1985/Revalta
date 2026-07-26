@@ -62,6 +62,7 @@ export async function DashboardSlaOperations() {
              "responded_at", "paused_at", "pause_reason", "closed_at"
       FROM "WorkOrder"
       WHERE "company_id" = ${user.company_id}
+        AND "deleted_at" IS NULL
       LIMIT 300
     `),
   ]);

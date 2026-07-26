@@ -53,6 +53,7 @@ export async function PATCH(
            ) AS "lock_valid"
     FROM "WorkOrder" w
     WHERE w."id" = ${id} AND w."company_id" = ${user.company_id}
+      AND w."deleted_at" IS NULL
     LIMIT 1
   `);
 
