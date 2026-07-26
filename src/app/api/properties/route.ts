@@ -13,7 +13,7 @@ export async function GET() {
       orderBy: { created_at: "desc" },
       include: {
         _count: {
-          select: { tickets: true, buildings: true, units: true },
+          select: { tickets: { where: { deleted_at: null } }, buildings: true, units: true },
         },
       },
     });
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       },
       include: {
         _count: {
-          select: { tickets: true, buildings: true, units: true },
+          select: { tickets: { where: { deleted_at: null } }, buildings: true, units: true },
         },
       },
     });

@@ -4,12 +4,20 @@ const {
   getCurrentUserMock,
   ticketFindFirstMock,
   operationFindManyMock,
+  operationFindFirstMock,
+  operationUpdateManyMock,
   auditFindManyMock,
+  auditFindFirstMock,
+  writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   ticketFindFirstMock: vi.fn(),
   operationFindManyMock: vi.fn(),
+  operationFindFirstMock: vi.fn(),
+  operationUpdateManyMock: vi.fn(),
   auditFindManyMock: vi.fn(),
+  auditFindFirstMock: vi.fn(),
+  writeAuditLogMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -17,15 +25,23 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
   getCurrentUser: getCurrentUserMock,
 }));
 
+vi.mock("@/lib/audit", () => ({
+  writeAuditLog: writeAuditLogMock,
+}));
+
 vi.mock("@/lib/db", () => ({
   default: {
     ticket: { findFirst: ticketFindFirstMock },
-    ticketOperation: { findMany: operationFindManyMock },
-    auditLog: { findMany: auditFindManyMock },
+    ticketOperation: {
+      findMany: operationFindManyMock,
+      findFirst: operationFindFirstMock,
+      updateMany: operationUpdateManyMock,
+    },
+    auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
   },
 }));
 
-import { GET } from "./route";
+import { DELETE, GET } from "./route";
 
 describe("ticket operations route", () => {
   beforeEach(() => {
@@ -55,9 +71,41 @@ describe("ticket operations route", () => {
 
     expect(response.status).toBe(200);
     expect(operationFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: "company-1", ticket_id: "ticket-1" },
+      where: { company_id: "company-1", ticket_id: "ticket-1", deleted_at: null },
     }));
     expect(body.operations[0].action).toBe("workorder.time.added");
     expect(body.operations[0].metadata.minutes).toBe(45);
+  });
+
+  it("soft-deletes modern ticket operations and rejects legacy rows", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    operationFindFirstMock.mockResolvedValueOnce({ id: "op-1", operation_type: "note" });
+    operationUpdateManyMock.mockResolvedValue({ count: 1 });
+
+    const ok = await DELETE(new Request("http://localhost", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operationId: "op-1" }),
+    }), { params: Promise.resolve({ id: "ticket-1" }) });
+    expect(ok.status).toBe(200);
+    expect(operationUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: "op-1",
+        company_id: "company-1",
+        ticket_id: "ticket-1",
+        deleted_at: null,
+      },
+      data: { deleted_at: expect.any(Date) },
+    }));
+
+    operationFindFirstMock.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    auditFindFirstMock.mockResolvedValue({ id: "legacy-op", metadata: { storage: "AuditLog" } });
+    const legacy = await DELETE(new Request("http://localhost", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operationId: "legacy-op" }),
+    }), { params: Promise.resolve({ id: "ticket-1" }) });
+    expect(legacy.status).toBe(409);
+    expect((await legacy.json()).error).toMatch(/backfill/i);
   });
 });

@@ -29,7 +29,7 @@ export function ComponentEntryCorrections({ propertyId, componentId }: { propert
     try {
       const [detailResponse, optionsResponse] = await Promise.all([
         fetch(`/api/properties/${propertyId}/components/${componentId}`, { cache: "no-store" }),
-        fetch(`/api/properties/${propertyId}/components/${componentId}/options`, { cache: "no-store" }),
+        fetch(`/api/properties/${propertyId}/components/${componentId}/link-options`, { cache: "no-store" }),
       ]);
       const detail = await detailResponse.json();
       const options = await optionsResponse.json();

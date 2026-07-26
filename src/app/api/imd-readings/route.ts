@@ -14,7 +14,7 @@ export async function GET() {
     const [rows, logs, properties, leases] = await Promise.all([
       user.company_id
         ? db.imdReading.findMany({
-            where: { company_id: user.company_id },
+            where: { company_id: user.company_id, voided_at: null },
             orderBy: { created_at: "desc" },
             take: 500,
             include: {
@@ -232,6 +232,103 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, reading: created.reading, debit: created.debit }, { status: 201 });
   } catch (error) {
     console.error("Create IMD reading error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    const companyId = user.company_id;
+
+    const body = await request.json();
+    const readingId = String(body.readingId || body.id || "").trim();
+    const voidAction = body.action === "void" || body.void === true;
+    if (!readingId || !voidAction) {
+      return NextResponse.json({ error: "Avläsnings-id och åtgärden makulera krävs" }, { status: 400 });
+    }
+
+    const existing = await db.imdReading.findFirst({
+      where: { id: readingId, company_id: companyId, voided_at: null },
+      select: {
+        id: true,
+        property_id: true,
+        meter_id: true,
+        period: true,
+        debit_line: { select: { id: true, rent_notice_id: true, status: true } },
+      },
+    });
+    if (!existing) {
+      const alreadyVoided = await db.imdReading.findFirst({
+        where: { id: readingId, company_id: companyId },
+        select: { id: true, voided_at: true },
+      });
+      if (alreadyVoided?.voided_at) {
+        return NextResponse.json({ error: "Avläsningen är redan makulerad" }, { status: 409 });
+      }
+      const legacy = await db.auditLog.findFirst({
+        where: { ...auditScopedWhere(user), action, id: readingId },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "ImdReading") {
+        return NextResponse.json({
+          error: "Avläsningen finns kvar i äldre lagring. Kör backfill till ImdReading innan den kan makuleras.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+    }
+
+    if (existing.debit_line?.rent_notice_id) {
+      return NextResponse.json({
+        error: "Avläsningen är kopplad till en hyresavi och kan inte makuleras.",
+        rentNoticeId: existing.debit_line.rent_notice_id,
+      }, { status: 409 });
+    }
+
+    const now = new Date();
+    await db.$transaction(async (tx) => {
+      const updated = await tx.imdReading.updateMany({
+        where: { id: existing.id, company_id: companyId, voided_at: null },
+        data: { voided_at: now },
+      });
+      if (updated.count !== 1) {
+        throw new Error("IMD_VOID_CONFLICT");
+      }
+      if (existing.debit_line) {
+        await tx.imdDebitLine.updateMany({
+          where: {
+            id: existing.debit_line.id,
+            company_id: companyId,
+            rent_notice_id: null,
+          },
+          data: { status: "voided" },
+        });
+      }
+    });
+
+    await writeAuditLog(user, {
+      entityType: "property",
+      entityId: existing.property_id,
+      action: "imd.reading.voided",
+      metadata: {
+        readingId: existing.id,
+        debitLineId: existing.debit_line?.id ?? null,
+        meter_id: existing.meter_id,
+        period: existing.period,
+        storage: "ImdReading",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id, voided_at: now.toISOString() });
+  } catch (error) {
+    if (error instanceof Error && error.message === "IMD_VOID_CONFLICT") {
+      return NextResponse.json({ error: "Avläsningen kunde inte makuleras. Ladda om och försök igen." }, { status: 409 });
+    }
+    console.error("Void IMD reading error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

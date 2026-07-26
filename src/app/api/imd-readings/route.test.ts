@@ -3,13 +3,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   getCurrentUserMock,
   imdFindManyMock,
+  imdFindFirstMock,
+  imdUpdateManyMock,
+  debitUpdateManyMock,
+  transactionMock,
   auditFindManyMock,
+  auditFindFirstMock,
+  writeAuditLogMock,
   propertyFindManyMock,
   leaseFindManyMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   imdFindManyMock: vi.fn(),
+  imdFindFirstMock: vi.fn(),
+  imdUpdateManyMock: vi.fn(),
+  debitUpdateManyMock: vi.fn(),
+  transactionMock: vi.fn(),
   auditFindManyMock: vi.fn(),
+  auditFindFirstMock: vi.fn(),
+  writeAuditLogMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   leaseFindManyMock: vi.fn(),
 }));
@@ -19,16 +31,26 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
   getCurrentUser: getCurrentUserMock,
 }));
 
+vi.mock("@/lib/audit", () => ({
+  writeAuditLog: writeAuditLogMock,
+}));
+
 vi.mock("@/lib/db", () => ({
   default: {
-    imdReading: { findMany: imdFindManyMock },
-    auditLog: { findMany: auditFindManyMock },
+    imdReading: {
+      findMany: imdFindManyMock,
+      findFirst: imdFindFirstMock,
+      updateMany: imdUpdateManyMock,
+    },
+    imdDebitLine: { updateMany: debitUpdateManyMock },
+    auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
     property: { findMany: propertyFindManyMock },
     lease: { findMany: leaseFindManyMock },
+    $transaction: transactionMock,
   },
 }));
 
-import { GET } from "./route";
+import { GET, PATCH } from "./route";
 
 describe("imd-readings route", () => {
   beforeEach(() => {
@@ -71,10 +93,66 @@ describe("imd-readings route", () => {
 
     expect(response.status).toBe(200);
     expect(imdFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: "company-1" },
+      where: { company_id: "company-1", voided_at: null },
     }));
     expect(body.readings).toHaveLength(1);
     expect(body.readings[0].debit.status).toBe("open");
     expect(body.readings[0].charge).toBe(20);
+  });
+
+  it("voids modern unattached IMD readings and rejects linked or legacy rows", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    imdFindFirstMock.mockResolvedValueOnce({
+      id: "reading-1",
+      property_id: "property-1",
+      meter_id: "EL-1",
+      period: "2026-07",
+      debit_line: { id: "debit-1", rent_notice_id: null, status: "open" },
+    });
+    transactionMock.mockImplementation(async (callback: (tx: {
+      imdReading: { updateMany: typeof imdUpdateManyMock };
+      imdDebitLine: { updateMany: typeof debitUpdateManyMock };
+    }) => Promise<unknown>) => callback({
+      imdReading: { updateMany: imdUpdateManyMock },
+      imdDebitLine: { updateMany: debitUpdateManyMock },
+    }));
+    imdUpdateManyMock.mockResolvedValue({ count: 1 });
+    debitUpdateManyMock.mockResolvedValue({ count: 1 });
+
+    const ok = await PATCH(new Request("http://localhost", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-1", action: "void" }),
+    }));
+    expect(ok.status).toBe(200);
+    expect(imdUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "reading-1", company_id: "company-1", voided_at: null },
+      data: { voided_at: expect.any(Date) },
+    }));
+
+    imdFindFirstMock.mockResolvedValueOnce({
+      id: "reading-2",
+      property_id: "property-1",
+      meter_id: "EL-2",
+      period: "2026-07",
+      debit_line: { id: "debit-2", rent_notice_id: "notice-1", status: "linked" },
+    });
+    const linked = await PATCH(new Request("http://localhost", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-2", action: "void" }),
+    }));
+    expect(linked.status).toBe(409);
+    expect((await linked.json()).error).toMatch(/hyresavi/i);
+
+    imdFindFirstMock.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    auditFindFirstMock.mockResolvedValue({ id: "legacy-1", metadata: { storage: "AuditLog" } });
+    const legacy = await PATCH(new Request("http://localhost", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "legacy-1", action: "void" }),
+    }));
+    expect(legacy.status).toBe(409);
+    expect((await legacy.json()).error).toMatch(/backfill/i);
   });
 });

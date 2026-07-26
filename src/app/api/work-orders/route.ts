@@ -63,7 +63,7 @@ export async function GET() {
         unit: { select: { id: true, designation: true, unit_type: true } },
         ticket: { select: { id: true, public_reference: true, title: true } },
         assigned_to: { select: { id: true, name: true, email: true } },
-        projects: { select: { id: true, name: true, status: true } },
+        projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
       },
     }),
     db.$queryRaw<EnterpriseListRow[]>(Prisma.sql`

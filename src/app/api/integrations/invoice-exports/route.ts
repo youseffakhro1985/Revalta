@@ -125,8 +125,8 @@ export async function POST(request: Request) {
     }, { status: 409 });
   }
   const currentStatus = String(modern.status ?? "");
-  if (action === "retry" && currentStatus !== "failed") return NextResponse.json({ error: "Endast misslyckade jobb kan köras om" }, { status: 409 });
-  if (action === "cancel" && !["queued", "processing"].includes(currentStatus)) return NextResponse.json({ error: "Jobbet kan inte avbrytas i nuvarande status" }, { status: 409 });
+  if (action === "retry" && currentStatus !== "failed") return NextResponse.json({ error: "Endast misslyckade jobb kan återförsökas" }, { status: 409 });
+  if (action === "cancel" && !["queued", "processing"].includes(currentStatus)) return NextResponse.json({ error: "Endast köade eller pågående jobb kan avbrytas" }, { status: 409 });
   const provider = String(modern.provider ?? "");
   if (action === "retry" && !configured(provider)) return NextResponse.json({ error: "Integrationen är inte fullständigt konfigurerad" }, { status: 400 });
 

@@ -43,6 +43,7 @@ export default function ImdPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [linkingId, setLinkingId] = useState("");
+  const [voidingId, setVoidingId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -119,6 +120,36 @@ export default function ImdPage() {
     }
   }
 
+  async function voidReading(reading: Reading) {
+    if (reading.source === "legacy") {
+      setError("Avläsningen finns i äldre lagring. Kör backfill till ImdReading innan den kan makuleras.");
+      return;
+    }
+    if (reading.debit?.rent_notice_id) {
+      setError("Avläsningen är kopplad till en hyresavi och kan inte makuleras.");
+      return;
+    }
+    if (!window.confirm("Makulera den här avläsningen? Den döljs från listan men behålls i historiken.")) return;
+    setVoidingId(reading.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch("/api/imd-readings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ readingId: reading.id, action: "void" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Kunde inte makulera avläsningen");
+      setSuccess("Avläsningen har makulerats.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunde inte makulera avläsningen");
+    } finally {
+      setVoidingId("");
+    }
+  }
+
   const totals = useMemo(() => ({
     charge: readings.reduce((sum, item) => sum + Number(item.charge || 0), 0),
     consumption: readings.reduce((sum, item) => sum + Number(item.consumption || 0), 0),
@@ -188,13 +219,15 @@ export default function ImdPage() {
             <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="bg-sand-50 text-xs uppercase tracking-[0.08em] text-ink-400">
                 <tr>
-                  {["Fastighet", "Objekt", "Mätare", "Typ", "Period", "Förbrukning", "Belopp", "Debitering"].map((head) => (
-                    <th key={head} className="px-5 py-3 font-semibold">{head}</th>
+                  {["Fastighet", "Objekt", "Mätare", "Typ", "Period", "Förbrukning", "Belopp", "Debitering", ""].map((head) => (
+                    <th key={head || "actions"} className="px-5 py-3 font-semibold">{head}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-sand-100">
-                {readings.map((item) => (
+                {readings.map((item) => {
+                  const canVoid = item.source === "table" && !item.debit?.rent_notice_id;
+                  return (
                   <tr key={item.id} className="text-ink-700 transition-colors hover:bg-sand-50/60">
                     <td className="px-5 py-4 font-medium text-ink-900">{item.property_name}</td>
                     <td className="px-5 py-4">{item.unit}</td>
@@ -215,12 +248,29 @@ export default function ImdPage() {
                         >
                           {linkingId === item.id ? "Kopplar…" : "Skapa avi"}
                         </button>
+                      ) : item.source === "legacy" ? (
+                        <span className="text-xs font-medium text-amber-800">Äldre rad – kör backfill innan makulering</span>
                       ) : (
                         <span className="text-xs text-ink-400">Saknas</span>
                       )}
                     </td>
+                    <td className="px-5 py-4 text-right">
+                      {canVoid ? (
+                        <button
+                          type="button"
+                          disabled={voidingId === item.id}
+                          onClick={() => void voidReading(item)}
+                          className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+                        >
+                          {voidingId === item.id ? "Makulerar…" : "Makulera"}
+                        </button>
+                      ) : item.source === "legacy" ? (
+                        <span className="text-xs text-ink-400">—</span>
+                      ) : null}
+                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -23,6 +23,7 @@ async function getDashboardData() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  const ticketScope = { deleted_at: null, ...scope };
   const [
     totalTickets,
     openTickets,
@@ -35,16 +36,16 @@ async function getDashboardData() {
     latestTickets,
     propertyWorkload,
   ] = await Promise.all([
-    db.ticket.count({ where: scope }),
-    db.ticket.count({ where: { ...scope, status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, priority: "urgent", status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, assigned_to_id: null, status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, due_date: { lt: now }, status: { not: "closed" } } }),
-    db.ticket.count({ where: { ...scope, closed_at: { gte: monthStart } } }),
+    db.ticket.count({ where: ticketScope }),
+    db.ticket.count({ where: { ...ticketScope, status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, priority: "urgent", status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, assigned_to_id: null, status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, due_date: { lt: now }, status: { not: "closed" } } }),
+    db.ticket.count({ where: { ...ticketScope, closed_at: { gte: monthStart } } }),
     db.property.count({ where: { deleted_at: null, ...scope } }),
     db.user.count({ where: user.company_id ? { company_id: user.company_id } : { id: user.id } }),
     db.ticket.findMany({
-      where: scope,
+      where: ticketScope,
       orderBy: { created_at: "desc" },
       take: 5,
       select: {
@@ -64,7 +65,7 @@ async function getDashboardData() {
         id: true,
         name: true,
         city: true,
-        _count: { select: { tickets: true } },
+        _count: { select: { tickets: { where: { deleted_at: null } } } },
       },
     }),
   ]);

@@ -1562,7 +1562,7 @@ model ManagedDocument {
 }
 
 model ImdReading {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   company_id        String
   property_id       String
   property_name     String
@@ -1570,41 +1570,45 @@ model ImdReading {
   meter_id          String
   meter_type        String
   period            String
-  previous_reading  Decimal  @default(0) @db.Decimal(14, 4)
-  current_reading   Decimal  @default(0) @db.Decimal(14, 4)
-  consumption       Decimal  @default(0) @db.Decimal(14, 4)
-  unit_price        Decimal  @default(0) @db.Decimal(14, 4)
-  charge            Decimal  @default(0) @db.Decimal(14, 2)
+  previous_reading  Decimal   @default(0) @db.Decimal(14, 4)
+  current_reading   Decimal   @default(0) @db.Decimal(14, 4)
+  consumption       Decimal   @default(0) @db.Decimal(14, 4)
+  unit_price        Decimal   @default(0) @db.Decimal(14, 4)
+  charge            Decimal   @default(0) @db.Decimal(14, 2)
   note              String?
+  voided_at         DateTime?
   created_by_id     String
-  created_at        DateTime @default(now())
-  company           Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  property          Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  created_by        User     @relation("ImdReadingCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  created_at        DateTime  @default(now())
+  company           Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property          Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by        User      @relation("ImdReadingCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
   debit_line        ImdDebitLine?
 
   @@index([company_id, created_at])
+  @@index([company_id, voided_at])
   @@index([company_id, property_id, meter_type])
   @@index([created_by_id])
 }
 
 model TicketOperation {
-  id            String   @id @default(uuid())
-  company_id    String
-  ticket_id     String
+  id             String    @id @default(uuid())
+  company_id     String
+  ticket_id      String
   operation_type String
-  description   String?
-  minutes       Int?
-  amount        Decimal? @db.Decimal(14, 2)
-  completed     Boolean?
-  ticket_title  String?
-  created_by_id String
-  created_at    DateTime @default(now())
-  company       Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  ticket        Ticket   @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
-  created_by    User     @relation("TicketOperationCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  description    String?
+  minutes        Int?
+  amount         Decimal?  @db.Decimal(14, 2)
+  completed      Boolean?
+  ticket_title   String?
+  created_by_id  String
+  created_at     DateTime  @default(now())
+  deleted_at     DateTime?
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  ticket         Ticket    @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  created_by     User      @relation("TicketOperationCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
 
   @@index([company_id, ticket_id, created_at])
+  @@index([company_id, deleted_at])
   @@index([ticket_id, operation_type])
   @@index([created_by_id])
 }

@@ -94,6 +94,11 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Energy hard-safe delete (`DELETE /api/energy`) on modern `EnergyReading` only; legacy → Swedish `409` backfill; energi UI “Ta bort” + legacy banner; audit `energy.reading.deleted` with `storage: "EnergyReading"`.
    - Budget hard-safe delete (`DELETE /api/budget`) on modern `BudgetEntry` only; legacy → Swedish `409` backfill; budget UI “Ta bort” + legacy banner; audit `budget.entry.deleted` with `storage: "BudgetEntry"`.
    - Work-order economics fail-closed for IE-only dual-read: profitability update, invoice export queue (legacy draft), and export job retry/cancel require modern tables (`WorkOrderProfitabilitySettings` / `WorkOrderInvoiceDraft` / `WorkOrderInvoiceExportJob`); Swedish `409` asks for backfill (same style as time/materials). New draft/settings creates still write modern. GET dual-read marks `source: "legacy"`; economics panel banners + hides legacy mutations. Cron skips IE-only queued jobs (no rematerialize).
+   - Soft-delete filter holes closed for manager lists/counts: dashboard ticket KPIs/`_count.tickets`, property detail tickets/`openTickets`, property card work_orders/projects/`_count`, properties API `_count.tickets`, rapporter ticket findMany/`_count`, work-orders list projects include, team `assigned_tickets` count, search nested leases, and WO execution before/after photo counts (`deleted_at: null`); ticket operations GET 404 copy → "Ärendet hittades inte".
+   - Component entry corrections fetch `/link-options` (aligned with create-form options route).
+   - IMD reading soft-void (`voided_at` on `ImdReading`); `PATCH /api/imd-readings` with `action: "void"` for modern unattached rows only; linked `rent_notice_id` or legacy AuditLog → Swedish `409`; default GET filters voided; debit line status set to `voided`; IMD UI “Makulera” + legacy banner.
+   - Ticket operation soft-delete (`deleted_at` on `TicketOperation`); `DELETE /api/tickets/[id]/operations` for modern rows only (company-scoped); legacy → Swedish `409` backfill; GET filters deleted; felanmälan detail discreet “Ta bort” on modern operations.
+   - Invoice export retry/cancel `409` copy aligned between `/api/integrations/invoice-exports` and work-order invoice-integration (prefer “återförsökas”).
 
 ## Verification
 

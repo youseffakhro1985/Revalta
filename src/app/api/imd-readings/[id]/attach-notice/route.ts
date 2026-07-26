@@ -39,9 +39,15 @@ export async function POST(
       }
       return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
     }
+    if (reading.voided_at) {
+      return NextResponse.json({ error: "Makulerade avläsningar kan inte kopplas till hyresavi" }, { status: 409 });
+    }
     if (!reading.debit_line) return NextResponse.json({ error: "Debiteringsrad saknas för avläsningen" }, { status: 409 });
     if (reading.debit_line.status === "linked" && reading.debit_line.rent_notice_id) {
       return NextResponse.json({ error: "Debiteringsraden är redan kopplad till en hyresavi", rentNoticeId: reading.debit_line.rent_notice_id }, { status: 409 });
+    }
+    if (reading.debit_line.status === "voided") {
+      return NextResponse.json({ error: "Makulerade debiteringsrader kan inte kopplas till hyresavi" }, { status: 409 });
     }
 
     const rentNoticeId = typeof body?.rentNoticeId === "string" ? body.rentNoticeId.trim() : "";

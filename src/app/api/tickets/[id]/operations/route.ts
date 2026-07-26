@@ -52,12 +52,12 @@ export async function GET(
       select: { id: true, company_id: true },
     });
 
-    if (!ticket) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
 
     const [rows, logs] = await Promise.all([
       user.company_id
         ? db.ticketOperation.findMany({
-            where: { company_id: user.company_id, ticket_id: ticket.id },
+            where: { company_id: user.company_id, ticket_id: ticket.id, deleted_at: null },
             orderBy: { created_at: "desc" },
             take: 100,
             include: { created_by: { select: { name: true, email: true } } },
@@ -199,6 +199,97 @@ export async function POST(
     return NextResponse.json({ success: true, operation: mapModernOperation(operation) }, { status: 201 });
   } catch (error) {
     console.error("Create work order operation error:", error);
+    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    }
+    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const { id } = await params;
+    const body = await request.json().catch(() => ({} as Record<string, unknown>));
+    const operationId = String(body.operationId || body.id || "").trim();
+    if (!operationId) return NextResponse.json({ error: "Registrerings-id krävs" }, { status: 400 });
+
+    const ticket = await db.ticket.findFirst({
+      where: { id, deleted_at: null, ...tenantWhere(user) },
+      select: { id: true },
+    });
+    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+
+    const existing = await db.ticketOperation.findFirst({
+      where: {
+        id: operationId,
+        company_id: user.company_id,
+        ticket_id: ticket.id,
+        deleted_at: null,
+      },
+      select: { id: true, operation_type: true },
+    });
+    if (!existing) {
+      const alreadyDeleted = await db.ticketOperation.findFirst({
+        where: { id: operationId, company_id: user.company_id, ticket_id: ticket.id },
+        select: { id: true, deleted_at: true },
+      });
+      if (alreadyDeleted?.deleted_at) {
+        return NextResponse.json({ error: "Registreringen är redan borttagen" }, { status: 409 });
+      }
+      const legacy = await db.auditLog.findFirst({
+        where: {
+          ...(user.company_id ? { company_id: user.company_id } : { actor_user_id: user.id }),
+          entity_type: "ticket",
+          entity_id: ticket.id,
+          id: operationId,
+          action: { startsWith: "workorder." },
+        },
+        select: { id: true, metadata: true },
+      });
+      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+      if (legacy && metadata.storage !== "TicketOperation") {
+        return NextResponse.json({
+          error: "Registreringen finns kvar i äldre lagring. Kör backfill till TicketOperation innan den kan tas bort.",
+        }, { status: 409 });
+      }
+      return NextResponse.json({ error: "Registreringen hittades inte" }, { status: 404 });
+    }
+
+    const now = new Date();
+    const updated = await db.ticketOperation.updateMany({
+      where: {
+        id: existing.id,
+        company_id: user.company_id,
+        ticket_id: ticket.id,
+        deleted_at: null,
+      },
+      data: { deleted_at: now },
+    });
+    if (updated.count !== 1) {
+      return NextResponse.json({ error: "Registreringen kunde inte tas bort. Ladda om och försök igen." }, { status: 409 });
+    }
+
+    await writeAuditLog(user, {
+      entityType: "ticket",
+      entityId: ticket.id,
+      action: "workorder.operation.deleted",
+      metadata: {
+        operationId: existing.id,
+        type: existing.operation_type,
+        storage: "TicketOperation",
+      },
+    });
+
+    return NextResponse.json({ success: true, id: existing.id, deleted_at: now.toISOString() });
+  } catch (error) {
+    console.error("Delete ticket operation error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

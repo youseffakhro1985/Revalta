@@ -71,6 +71,7 @@ type TicketOperation = {
   id: string;
   action: string;
   created_at: string;
+  source?: "table" | "legacy";
   metadata?: {
     type?: string;
     description?: string | null;
@@ -112,6 +113,7 @@ export default function TicketDetailPage() {
   const [operationAmount, setOperationAmount] = useState("");
   const [operationCompleted, setOperationCompleted] = useState(false);
   const [savingOperation, setSavingOperation] = useState(false);
+  const [deletingOperationId, setDeletingOperationId] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -286,6 +288,33 @@ export default function TicketDetailPage() {
     } finally { setSavingOperation(false); }
   }
 
+  async function removeOperation(operation: TicketOperation) {
+    if (operation.source !== "table") {
+      setError("Registreringen finns i äldre lagring. Kör backfill till TicketOperation innan den kan tas bort.");
+      return;
+    }
+    if (!window.confirm("Ta bort registreringen? Den döljs från listan men behålls i historiken.")) return;
+    setDeletingOperationId(operation.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/tickets/${params.id}/operations`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId: operation.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) { router.push("/login"); return; }
+      if (!response.ok) throw new Error(data.error || "Kunde inte ta bort registreringen");
+      setOperations((current) => current.filter((item) => item.id !== operation.id));
+      setSuccess("Registreringen har tagits bort.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Kunde inte ta bort registreringen");
+    } finally {
+      setDeletingOperationId("");
+    }
+  }
+
   async function softDeleteTicket() {
     const warning = workOrder
       ? "Ta bort ärendet? Det döljs från listor men behålls i historiken. Kopplad arbetsorder påverkas inte."
@@ -399,7 +428,28 @@ export default function TicketDetailPage() {
                 : type === "cost" && item.metadata?.amount != null
                   ? `${item.metadata.amount} SEK`
                   : item.metadata?.description || item.action;
-              return <div key={item.id} className="rounded-xl border border-sand-200 px-3 py-2"><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{operationTypeLabels[type] || type || "Registrering"}</p><p className="mt-1 text-sm text-ink-700">{detail}</p><p className="mt-1 text-[11px] text-ink-400">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p></div>;
+              return (
+                <div key={item.id} className="rounded-xl border border-sand-200 px-3 py-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{operationTypeLabels[type] || type || "Registrering"}</p>
+                      <p className="mt-1 text-sm text-ink-700">{detail}</p>
+                      <p className="mt-1 text-[11px] text-ink-400">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p>
+                      {item.source === "legacy" ? <p className="mt-1 text-[11px] font-medium text-amber-800">Äldre rad – kör backfill innan borttagning.</p> : null}
+                    </div>
+                    {item.source === "table" ? (
+                      <button
+                        type="button"
+                        disabled={deletingOperationId === item.id}
+                        onClick={() => void removeOperation(item)}
+                        className="shrink-0 text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+                      >
+                        {deletingOperationId === item.id ? "Tar bort…" : "Ta bort"}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              );
             })}
           </div>
         </Panel>

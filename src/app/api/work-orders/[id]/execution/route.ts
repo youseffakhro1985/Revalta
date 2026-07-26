@@ -86,11 +86,13 @@ async function getCompletionState(id: string, companyId: string) {
        FROM "OperationalDocument"
        WHERE "company_id" = ${companyId}
          AND "work_order_id" = ${id}
+         AND "deleted_at" IS NULL
          AND "category" = 'before_photo') AS "before_photos",
       (SELECT COUNT(*)::integer
        FROM "OperationalDocument"
        WHERE "company_id" = ${companyId}
          AND "work_order_id" = ${id}
+         AND "deleted_at" IS NULL
          AND "category" = 'after_photo') AS "after_photos"
   `);
   return rows[0] ?? { required_incomplete: 0, before_photos: 0, after_photos: 0 };

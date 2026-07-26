@@ -34,11 +34,11 @@ export default async function ReportsPage() {
         total_area: true,
         boa: true,
         loa: true,
-        _count: { select: { tickets: true, buildings: true, units: true } },
+        _count: { select: { tickets: { where: { deleted_at: null } }, buildings: true, units: true } },
       },
     }),
     db.ticket.findMany({
-      where: { ...where, created_at: { gte: ninetyDaysAgo } },
+      where: { deleted_at: null, ...where, created_at: { gte: ninetyDaysAgo } },
       orderBy: { created_at: "asc" },
       select: {
         id: true,
