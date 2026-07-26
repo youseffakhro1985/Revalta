@@ -13,6 +13,7 @@ import {
   premiumPrimaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { OPERATIONS_STATUS_LABELS, PRIORITY_LABELS } from "@/lib/domain-labels";
 
 type Lease = {
   id: string;
@@ -46,16 +47,8 @@ type Ticket = {
 
 type Payload = { leases: Lease[]; tickets: Ticket[]; canManage: boolean };
 
-const statusLabels: Record<string, string> = {
-  new: "Ny",
-  open: "Öppen",
-  assigned: "Tilldelad",
-  in_progress: "Pågår",
-  waiting: "Väntar",
-  resolved: "Löst",
-  closed: "Stängd",
-};
-const priorityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
+const statusLabels = OPERATIONS_STATUS_LABELS;
+const priorityLabels = PRIORITY_LABELS;
 const categoryLabels: Record<string, string> = {
   maintenance: "Underhåll",
   plumbing: "Vatten och avlopp",

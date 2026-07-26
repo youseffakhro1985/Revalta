@@ -197,7 +197,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const now = new Date();
   const transactionResult = await db.$transaction(async (tx) => {
-    const updated = await tx.workOrder.update({ where: { id: existing.id }, data, include });
+    const updateResult = await tx.workOrder.updateMany({
+      where: { id: existing.id, company_id: user.company_id! },
+      data,
+    });
+    if (updateResult.count === 0) {
+      throw new Error("WORK_ORDER_NOT_FOUND");
+    }
+    const updated = await tx.workOrder.findFirst({
+      where: { id: existing.id, company_id: user.company_id! },
+      include,
+    });
+    if (!updated) {
+      throw new Error("WORK_ORDER_NOT_FOUND");
+    }
 
     if (assetLinksChanged) {
       await setWorkOrderAssetLinks(tx, { workOrderId: existing.id, companyId: user.company_id!, buildingId, technicalAssetId });
@@ -270,7 +283,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
 
     return { workOrder: updated, componentSync, ticketSync };
+  }).catch((error) => {
+    if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") {
+      return null;
+    }
+    throw error;
   });
+
+  if (!transactionResult) {
+    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
 
   const workOrder = transactionResult.workOrder;
   const [enterprise, statusEvents, assetLink] = await Promise.all([

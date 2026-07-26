@@ -45,8 +45,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Ange ett giltigt byggår" }, { status: 400 });
     }
 
-    const property = await db.property.update({
-      where: { id },
+    const updateResult = await db.property.updateMany({
+      where: { id, company_id: user.company_id! },
       data: {
         name,
         address,
@@ -65,6 +65,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         contact_phone: optionalText(body.contactPhone),
       },
     });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
+    }
+
+    const property = await db.property.findFirst({
+      where: { id, company_id: user.company_id! },
+    });
+    if (!property) {
+      return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
+    }
 
     await writeAuditLog(user, {
       entityType: "property",

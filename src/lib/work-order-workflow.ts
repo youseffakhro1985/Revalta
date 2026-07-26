@@ -1,3 +1,5 @@
+import { calculateResolutionDueAt } from "@/lib/sla-policy";
+
 export const WORK_ORDER_STATUSES = ["new", "planned", "in_progress", "waiting_material", "blocked", "completed", "invoiced", "cancelled"] as const;
 export const WORK_ORDER_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 export type WorkOrderStatus = (typeof WORK_ORDER_STATUSES)[number];
@@ -21,8 +23,6 @@ export const WORK_ORDER_PRIORITY_LABELS: Record<WorkOrderPriority, string> = {
   urgent: "Akut",
 };
 
-const SLA_HOURS: Record<WorkOrderPriority, number> = { low: 168, normal: 72, high: 24, urgent: 4 };
-
 export function normalizeWorkOrderStatus(value: unknown): WorkOrderStatus {
   return WORK_ORDER_STATUSES.includes(value as WorkOrderStatus) ? value as WorkOrderStatus : "planned";
 }
@@ -32,8 +32,7 @@ export function normalizeWorkOrderPriority(value: unknown): WorkOrderPriority {
 }
 
 export function workOrderSlaDeadline(createdAt: Date, priorityValue: unknown) {
-  const priority = normalizeWorkOrderPriority(priorityValue);
-  return new Date(createdAt.getTime() + SLA_HOURS[priority] * 60 * 60 * 1000);
+  return calculateResolutionDueAt(priorityValue, createdAt);
 }
 
 export function workOrderRisk(args: { status: unknown; priority: unknown; createdAt: Date; scheduledEnd?: Date | null; now?: Date }) {

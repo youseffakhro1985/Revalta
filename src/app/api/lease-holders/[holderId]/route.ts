@@ -56,8 +56,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
     });
     if (duplicate) return NextResponse.json({ error: `Kontakten finns redan som ${duplicate.name}` }, { status: 409 });
 
-    const holder = await db.leaseHolder.update({
-      where: { id: holderId },
+    const updateResult = await db.leaseHolder.updateMany({
+      where: { id: holderId, company_id: user.company_id },
       data: {
         party_type: partyType,
         name,
@@ -67,6 +67,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
         organization_number: organizationNumber,
         status,
       },
+    });
+    if (updateResult.count === 0) {
+      return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
+    }
+
+    const holder = await db.leaseHolder.findFirst({
+      where: { id: holderId, company_id: user.company_id },
       include: {
         leases: {
           orderBy: { updated_at: "desc" },
@@ -84,6 +91,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
         _count: { select: { leases: true } },
       },
     });
+    if (!holder) {
+      return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
+    }
 
     await writeAuditLog(user, {
       entityType: "lease_holder",
@@ -114,7 +124,12 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (!holder) return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
     if (holder._count.leases > 0) return NextResponse.json({ error: "Kontakten kan inte tas bort eftersom den är kopplad till avtal. Sätt status till inaktiv i stället." }, { status: 409 });
 
-    await db.leaseHolder.delete({ where: { id: holderId } });
+    const deleteResult = await db.leaseHolder.deleteMany({
+      where: { id: holderId, company_id: user.company_id },
+    });
+    if (deleteResult.count === 0) {
+      return NextResponse.json({ error: "Kontakten hittades inte" }, { status: 404 });
+    }
     await writeAuditLog(user, {
       entityType: "lease_holder",
       entityId: holderId,

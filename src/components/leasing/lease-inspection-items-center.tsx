@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipboardCheck, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 import type { InspectionCondition, InspectionPriority, LeaseInspectionItem, LeaseInspectionRecord } from "@/lib/lease-inspection-items";
+import { PRIORITY_LABELS } from "@/lib/domain-labels";
 
 type LeaseOption = { id: string; lease_number: string; property: { name: string }; unit: { designation: string }; lease_holder: { name: string } };
 type Detail = { lease: LeaseOption; record: LeaseInspectionRecord; permissions: { canManage: boolean } };
 
 const conditionLabels: Record<InspectionCondition, string> = { approved: "Godkänd", remark: "Anmärkning", action_required: "Åtgärd krävs", not_inspected: "Ej kontrollerad" };
-const priorityLabels: Record<InspectionPriority, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
+const priorityLabels = PRIORITY_LABELS;
 
 function newItem(): LeaseInspectionItem {
   return { id: crypto.randomUUID(), area: "", component: "", condition: "not_inspected", priority: "normal", description: "", recommendation: "", selectedForWorkOrder: false, resolved: false };

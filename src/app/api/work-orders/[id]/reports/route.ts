@@ -39,7 +39,7 @@ async function buildSnapshot(id: string, companyId: string) {
     `),
     db.operationalDocument.findMany({
       where: { company_id: companyId, work_order_id: id },
-      select: { id: true, file_name: true, storage_url: true, category: true, created_at: true },
+      select: { id: true, file_name: true, category: true, created_at: true },
       orderBy: { created_at: "asc" },
     }),
     db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
@@ -50,7 +50,15 @@ async function buildSnapshot(id: string, companyId: string) {
     `),
   ]);
 
-  return { workOrder, checklist, entries, documents, signatures, generatedAt: new Date().toISOString() };
+  const safeDocuments = documents.map((document) => ({
+    id: document.id,
+    file_name: document.file_name,
+    category: document.category,
+    created_at: document.created_at,
+    download_url: `/api/work-orders/${id}/documents/${document.id}`,
+  }));
+
+  return { workOrder, checklist, entries, documents: safeDocuments, signatures, generatedAt: new Date().toISOString() };
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {

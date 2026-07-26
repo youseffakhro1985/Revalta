@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, ClipboardList, Play, RefreshCw, Settings2, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { WORK_ORDER_STATUS_LABELS } from "@/lib/domain-labels";
 
 type Row = {
   id: string;
@@ -33,7 +34,7 @@ type Payload = {
 
 const date = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" });
 const criticalityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", critical: "Kritisk" };
-const statusLabels: Record<string, string> = { new: "Ny", planned: "Planerad", in_progress: "Pågår", waiting_material: "Väntar material", blocked: "Blockerad", completed: "Slutförd", invoiced: "Fakturerad", cancelled: "Avbruten" };
+const statusLabels = WORK_ORDER_STATUS_LABELS;
 
 function serviceState(value: string | null) {
   if (!value) return { label: "Ej planerad", className: "bg-sand-100 text-ink-600" };

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ClipboardList, Filter, Inbox, Search } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
 
 type Property = { id: string; name: string; address: string; city: string };
 type TeamMember = { id: string; name: string | null; email: string };
@@ -15,8 +16,8 @@ type Ticket = {
 };
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
-const statusLabels: Record<string, string> = { new: "Ny", received: "Mottagen", in_progress: "Pågår", waiting: "Väntar", completed: "Klar", closed: "Stängd" };
-const priorityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
+const statusLabels = TICKET_STATUS_LABELS;
+const priorityLabels = PRIORITY_LABELS;
 
 export default function FelanmalanPage() {
   const router = useRouter();

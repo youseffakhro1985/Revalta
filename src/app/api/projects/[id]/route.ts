@@ -72,8 +72,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body[bodyKey] !== undefined) { const value = parseOptionalMoney(body[bodyKey]); if (value === undefined) return NextResponse.json({ error: `Ogiltigt ${label}` }, { status: 400 }); data[dataKey] = value ?? 0; }
   }
 
-  const project = await db.project.update({
-    where: { id: existing.id }, data,
+  const updateResult = await db.project.updateMany({
+    where: { id: existing.id, company_id: user.company_id },
+    data,
+  });
+  if (updateResult.count === 0) {
+    return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
+  }
+
+  const project = await db.project.findFirst({
+    where: { id: existing.id, company_id: user.company_id },
     include: {
       property: { select: { id: true, name: true, address: true, city: true } },
       manager: { select: { id: true, name: true, email: true } },
@@ -81,6 +89,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       source_work_order: { select: { id: true, title: true, status: true } },
     },
   });
+  if (!project) {
+    return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
+  }
 
   await writeAuditLog(user, { entityType: "project", entityId: project.id, action: "project.updated", metadata: { previousStatus: existing.status, status: project.status, managerId: project.manager_id, budget: project.budget.toString(), forecast: project.forecast.toString(), actual: project.actual.toString(), deviation: (Number(project.forecast) - Number(project.budget)).toString() } });
   return NextResponse.json({ project });

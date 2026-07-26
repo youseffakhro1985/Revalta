@@ -13,6 +13,7 @@ import {
   premiumPrimaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { OPERATIONS_STATUS_LABELS, PRIORITY_LABELS } from "@/lib/domain-labels";
 
 type TeamMember = { id: string; name: string | null; email: string };
 type WorkOrder = {
@@ -67,19 +68,8 @@ type Ticket = {
 };
 type TimelineItem = { id: string; type: string; title: string; description: string; created_at: string };
 
-const statusLabels: Record<string, string> = {
-  new: "Ny",
-  received: "Mottagen",
-  planned: "Planerad",
-  assigned: "Tilldelad",
-  in_progress: "Pågår",
-  waiting: "Väntar",
-  inspection: "Kontroll",
-  completed: "Klar",
-  closed: "Stängd",
-  cancelled: "Avbruten",
-};
-const priorityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
+const statusLabels = OPERATIONS_STATUS_LABELS;
+const priorityLabels = PRIORITY_LABELS;
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 
 export default function TicketDetailPage() {

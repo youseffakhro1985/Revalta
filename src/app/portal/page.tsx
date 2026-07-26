@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
+import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
 
 type Property = {
   id: string;
@@ -36,21 +37,8 @@ type PublicTicket = {
   }>;
 };
 
-const statusLabels: Record<string, string> = {
-  new: "Ny",
-  received: "Mottagen",
-  in_progress: "Pågår",
-  waiting: "Väntar",
-  completed: "Klar",
-  closed: "Stängd",
-};
-
-const priorityLabels: Record<string, string> = {
-  low: "Låg",
-  normal: "Normal",
-  high: "Hög",
-  urgent: "Akut",
-};
+const statusLabels = TICKET_STATUS_LABELS;
+const priorityLabels = PRIORITY_LABELS;
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
   dateStyle: "medium",

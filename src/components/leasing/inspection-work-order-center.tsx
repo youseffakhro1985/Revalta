@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, Wrench } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import type { LeaseInspectionRecord } from "@/lib/lease-inspection-items";
+import { WORK_ORDER_STATUS_LABELS } from "@/lib/domain-labels";
 
 type Lease = { id: string; lease_number: string; status: string; property: { name: string }; unit: { designation: string }; lease_holder: { name: string } };
 type Link = { itemId: string; workOrderId: string; workOrder: { id: string; status: string; priority: string; title: string } | null };
-const statusLabels: Record<string, string> = { new: "Ny", planned: "Planerad", in_progress: "Pågår", waiting_material: "Väntar material", blocked: "Blockerad", completed: "Slutförd", invoiced: "Fakturerad", cancelled: "Makulerad" };
+const statusLabels = WORK_ORDER_STATUS_LABELS;
 
 export function InspectionWorkOrderCenter() {
   const [leases, setLeases] = useState<Lease[]>([]);

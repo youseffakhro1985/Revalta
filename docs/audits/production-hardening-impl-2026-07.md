@@ -27,6 +27,13 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Index redirects to `/dashboard/arbetsorder`.
    - Operations overview retained as unique legacy surface.
 
+5. **Domain consolidation (P2)**
+   - Canonical SLA policy (`sla-policy`) shared by tickets and enterprise work orders.
+   - Shared Swedish domain labels (`domain-labels`) for tickets/priorities/work orders.
+   - Company-scoped `updateMany`/`deleteMany` on tickets, work orders, properties, projects and lease holders.
+   - Work-order report snapshots store proxy download URLs (no raw `storage_url`).
+   - Legal/marketing copy is honest (draft legal pages, no overstated GDPR claims).
+
 ## Verification
 
 ```bash

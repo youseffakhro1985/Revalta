@@ -215,8 +215,8 @@ export async function PATCH(
       : "";
 
     const ticket = await db.$transaction(async (tx) => {
-      const updated = await tx.ticket.update({
-        where: { id },
+      const updateResult = await tx.ticket.updateMany({
+        where: { id, company_id: user.company_id! },
         data: {
           status: nextStatus,
           priority: normalizedPriority,
@@ -224,6 +224,13 @@ export async function PATCH(
           due_date: priorityChanged && !terminal ? calculateDueDate(nextPriority) : undefined,
           closed_at: nextStatus === "closed" ? new Date() : currentStatus === "closed" ? null : undefined,
         },
+      });
+      if (updateResult.count === 0) {
+        throw new Error("TICKET_NOT_FOUND");
+      }
+
+      const updated = await tx.ticket.findFirst({
+        where: { id, company_id: user.company_id! },
         select: {
           id: true,
           title: true,
@@ -240,6 +247,9 @@ export async function PATCH(
           },
         },
       });
+      if (!updated) {
+        throw new Error("TICKET_NOT_FOUND");
+      }
 
       await tx.auditLog.create({
         data: {
@@ -263,7 +273,16 @@ export async function PATCH(
       });
 
       return updated;
+    }).catch((error) => {
+      if (error instanceof Error && error.message === "TICKET_NOT_FOUND") {
+        return null;
+      }
+      throw error;
     });
+
+    if (!ticket) {
+      return NextResponse.json({ error: "Ärende hittades inte" }, { status: 404 });
+    }
 
     await writeAuditLog(user, {
       entityType: "ticket",
