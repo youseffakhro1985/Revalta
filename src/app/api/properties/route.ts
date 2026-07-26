@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 export async function GET() {
   try {
@@ -21,6 +22,9 @@ export async function GET() {
     return NextResponse.json({ properties });
   } catch (error) {
     console.error("Get properties error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

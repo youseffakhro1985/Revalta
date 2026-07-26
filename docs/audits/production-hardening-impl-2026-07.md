@@ -115,6 +115,7 @@ Stacks on tenant hardening (#159), dashboard shell (#160) and schema mirror (#16
    - Soft-delete property filters on remaining API SQL paths: preventive overview, portfolio maintenance, service-center assignment key validation, work-order SLA notifications, and edit-locks list (`p."deleted_at" IS NULL`).
    - Field correction PATCH for quotes (draft/sent), portfolio maintenance items, and recurring schedules (+ UI “Ändra”).
    - Dual-read retirement kill-switch: `REVALTA_MODERN_STORAGE_ONLY=1` makes `mergeByCreatedAt` and WO ops storage skip AuditLog/IE product rows (default off until post-backfill).
+   - Preview login diagnosis: Vercel green + login `200` but `/dashboard`/`/api/properties`/`/api/tickets` crash when soft-delete migrations are not deployed yet. Added `getSchemaReadiness` (ops `/api/health` → `schema.ready`/`missing`), graceful dashboard copy, and `503` on properties/tickets list when Prisma reports missing columns. Documented in `docs/production-launch.md`.
 
 ## Verification
 

@@ -44,12 +44,22 @@ Granska dessutom beroendevarningar, Prisma-migrationsdiff och Vercels preview in
 1. Öppna en pull request från en avgränsad branch.
 2. Låt CI validera Prisma-schemat och applicera samtliga migrationer mot ren PostgreSQL.
 3. Kräv grönt lint, tester, typkontroll och produktionsbuild.
-4. Verifiera Vercel Preview utan produktionsmigrationer.
+4. Verifiera Vercel Preview **build** (CI/Vercel grönt). Förvänta dig **inte** fungerande inloggning/dashboard på preview om preview delar produktionsdatabas och PR:n innehåller nya kolumner/tabeller — applikationen frågar då kolumner som inte finns ännu.
 5. Mergea pull requesten till `main`.
 6. Ta en verifierad databasbackup när releasen innehåller migrationer.
-7. Kör `Database Release` för exakt merge-commit.
+7. Kör `Database Release` för exakt merge-commit (additive soft-delete-kolumner är bakåtkompatibla med föregående app-version).
 8. Driftsätt exakt samma commit till Vercel.
 9. Kör smoke tests och rulla tillbaka applikationen vid fel.
+
+### Preview vs databas (vanligt inloggningsfel)
+
+Symptom: Vercel Preview är grön, `/api/auth/login` svarar `200`, men Safari visar "This page couldn’t load" / server error efter redirect till `/dashboard`.
+
+Orsak: Preview-koden filtrerar på soft-delete-kolumner (`Ticket.deleted_at`, `Property.deleted_at`, `WorkOrder.deleted_at`, …) medan databasen ännu inte har fått `prisma migrate deploy`.
+
+Kontroll (inloggad ops-användare): `GET /api/health` ska innehålla `schema.ready` och eventuellt `schema.missing`. Dashboard visar också ett tydligt meddelande i stället för en blank 500:a.
+
+Åtgärd: följ releaseordningen (merge → backup → Database Release → deploy). Testa full inloggning mot `www.revalta.se` först efter migration + deploy av samma commit.
 
 ## 5. Efter migration: backfill och cron
 

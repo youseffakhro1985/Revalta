@@ -3,6 +3,7 @@ import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-use
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
+import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -72,6 +73,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ tickets });
   } catch (error) {
     console.error("Get tickets error:", error);
+    if (isMissingSchemaColumnError(error)) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
