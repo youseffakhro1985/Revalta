@@ -35,6 +35,22 @@ model User {
   project_comments          ProjectComment[]
   uploaded_documents        OperationalDocument[]    @relation("UploadedOperationalDocuments")
   created_leases            Lease[]                  @relation("CreatedLeases")
+  work_order_checklist_items_created   WorkOrderChecklistItem[]  @relation("WorkOrderChecklistItemCreatedBy")
+  work_order_checklist_items_completed WorkOrderChecklistItem[]  @relation("WorkOrderChecklistItemCompletedBy")
+  work_order_edit_locks                WorkOrderEditLock[]
+  work_order_execution_entries         WorkOrderExecutionEntry[]
+  work_order_invoice_bases_created     WorkOrderInvoiceBasis[]    @relation("WorkOrderInvoiceBasisCreatedBy")
+  work_order_invoice_bases_approved    WorkOrderInvoiceBasis[]    @relation("WorkOrderInvoiceBasisApprovedBy")
+  work_order_reports_created           WorkOrderReport[]          @relation("WorkOrderReportCreatedBy")
+  work_order_reports_approved          WorkOrderReport[]          @relation("WorkOrderReportApprovedBy")
+  work_order_signatures                WorkOrderSignature[]
+  work_order_status_events             WorkOrderStatusEvent[]
+  component_cost_entries               ComponentCostEntry[]
+  component_lifecycle_events           ComponentLifecycleEvent[]
+  maintenance_plans_created            MaintenancePlan[]          @relation("MaintenancePlanCreatedBy")
+  maintenance_plans_approved           MaintenancePlan[]          @relation("MaintenancePlanApprovedBy")
+  maintenance_actions                  MaintenanceAction[]
+  time_reports                         TimeReport[]
 }
 
 model Company {
@@ -60,37 +76,66 @@ model Company {
   operational_documents  OperationalDocument[]
   lease_holders          LeaseHolder[]
   leases                 Lease[]
+  work_order_checklist_items  WorkOrderChecklistItem[]
+  work_order_edit_locks       WorkOrderEditLock[]
+  work_order_execution_entries WorkOrderExecutionEntry[]
+  work_order_invoice_bases    WorkOrderInvoiceBasis[]
+  work_order_number_counters  WorkOrderNumberCounter[]
+  work_order_reports          WorkOrderReport[]
+  work_order_signatures       WorkOrderSignature[]
+  work_order_status_events    WorkOrderStatusEvent[]
+  property_entrances          PropertyEntrance[]
+  property_technical_assets   PropertyTechnicalAsset[]
+  property_warranties         PropertyWarranty[]
+  property_inspections        PropertyInspection[]
+  property_service_agreements PropertyServiceAgreement[]
+  component_cost_entries      ComponentCostEntry[]
+  component_lifecycle_events  ComponentLifecycleEvent[]
+  maintenance_plans           MaintenancePlan[]
+  maintenance_actions         MaintenanceAction[]
+  lease_contracts             LeaseContract[]
 }
 
 model Property {
-  id                  String      @id @default(uuid())
-  name                String
-  address             String
-  postal_code         String?
-  city                String
-  property_identifier String?
-  property_type       String      @default("residential")
-  status              String      @default("active")
-  construction_year   Int?
-  total_area          Float?
-  boa                 Float?
-  loa                 Float?
-  manager_name        String?
-  contact_name        String?
-  contact_email       String?
-  contact_phone       String?
-  company_id          String?
-  user_id             String
-  created_at          DateTime    @default(now())
-  updated_at          DateTime    @default(now()) @updatedAt
-  company             Company?    @relation(fields: [company_id], references: [id])
-  user                User        @relation(fields: [user_id], references: [id])
-  tickets             Ticket[]
-  buildings           Building[]
-  units               Unit[]
-  work_orders         WorkOrder[]
-  projects            Project[]
-  leases              Lease[]
+  id                       String                     @id @default(uuid())
+  name                     String
+  address                  String
+  postal_code              String?
+  city                     String
+  property_identifier      String?
+  property_type            String                     @default("residential")
+  status                   String                     @default("active")
+  construction_year        Int?
+  total_area               Float?
+  boa                      Float?
+  loa                      Float?
+  manager_name             String?
+  contact_name             String?
+  contact_email            String?
+  contact_phone            String?
+  company_id               String?
+  user_id                  String
+  created_at               DateTime                   @default(now())
+  updated_at               DateTime                   @default(now()) @updatedAt
+  company                  Company?                   @relation(fields: [company_id], references: [id])
+  user                     User                       @relation(fields: [user_id], references: [id])
+  tickets                  Ticket[]
+  buildings                Building[]
+  units                    Unit[]
+  work_orders              WorkOrder[]
+  projects                 Project[]
+  leases                   Lease[]
+  operational_documents    OperationalDocument[]
+  entrances                PropertyEntrance[]
+  technical_assets         PropertyTechnicalAsset[]
+  warranties               PropertyWarranty[]
+  inspections              PropertyInspection[]
+  service_agreements       PropertyServiceAgreement[]
+  component_cost_entries   ComponentCostEntry[]
+  component_lifecycle_events ComponentLifecycleEvent[]
+  maintenance_plans        MaintenancePlan[]
+  maintenance_actions      MaintenanceAction[]
+  lease_contracts          LeaseContract[]
 
   @@index([company_id])
   @@index([user_id])
@@ -98,16 +143,20 @@ model Property {
 }
 
 model Building {
-  id                String   @id @default(uuid())
-  property_id       String
-  name              String
-  address           String?
-  construction_year Int?
-  floors            Int?
-  created_at        DateTime @default(now())
-  updated_at        DateTime @default(now()) @updatedAt
-  property          Property @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  units             Unit[]
+  id                 String                   @id @default(uuid())
+  property_id        String
+  name               String
+  address            String?
+  construction_year  Int?
+  floors             Int?
+  created_at         DateTime                 @default(now())
+  updated_at         DateTime                 @default(now()) @updatedAt
+  property           Property                 @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  units              Unit[]
+  work_orders        WorkOrder[]
+  entrances          PropertyEntrance[]
+  technical_assets   PropertyTechnicalAsset[]
+  maintenance_actions MaintenanceAction[]
 
   @@index([property_id])
 }
@@ -151,6 +200,8 @@ model Ticket {
   reporter_email        String?
   reporter_phone        String?
   reporter_unit         String?
+  /// Legacy FK till Tenant (boende-auth). Primär B2B-tenant är Company.
+  tenant_id             String?
   due_date              DateTime?
   created_at            DateTime           @default(now())
   updated_at            DateTime           @default(now()) @updatedAt
@@ -163,45 +214,86 @@ model Ticket {
   user                  User               @relation(fields: [user_id], references: [id])
   property              Property?          @relation(fields: [property_id], references: [id])
   assigned_to           User?              @relation("AssignedTickets", fields: [assigned_to_id], references: [id])
+  tenant                Tenant?            @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
   comments              TicketComment[]
   attachments           TicketAttachment[]
   work_order            WorkOrder?
 }
 
 model WorkOrder {
-  id              String                @id @default(uuid())
-  company_id      String
-  ticket_id       String?               @unique
-  property_id     String
-  unit_id         String?
-  assigned_to_id  String?
-  created_by_id   String
-  title           String
-  description     String
-  status          String                @default("planned")
-  priority        String                @default("normal")
-  scheduled_start DateTime?
-  scheduled_end   DateTime?
-  estimated_cost  Decimal?              @db.Decimal(14, 2)
-  actual_cost     Decimal?              @db.Decimal(14, 2)
-  completed_at    DateTime?
-  created_at      DateTime              @default(now())
-  updated_at      DateTime              @default(now()) @updatedAt
-  company         Company               @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  ticket          Ticket?               @relation(fields: [ticket_id], references: [id], onDelete: SetNull)
-  property        Property              @relation(fields: [property_id], references: [id], onDelete: Restrict)
-  unit            Unit?                 @relation(fields: [unit_id], references: [id], onDelete: SetNull)
-  assigned_to     User?                 @relation("AssignedWorkOrders", fields: [assigned_to_id], references: [id], onDelete: SetNull)
-  created_by      User                  @relation("CreatedWorkOrders", fields: [created_by_id], references: [id], onDelete: Restrict)
-  projects        Project[]
-  comments        WorkOrderComment[]
-  documents       OperationalDocument[]
+  id                            String                    @id @default(uuid())
+  company_id                    String
+  ticket_id                     String?                   @unique
+  property_id                   String
+  building_id                   String?
+  unit_id                       String?
+  technical_asset_id            String?
+  assigned_to_id                String?
+  created_by_id                 String
+  title                         String
+  description                   String
+  notes                         String?
+  status                        String                    @default("planned")
+  priority                      String                    @default("normal")
+  work_order_number             String?
+  work_type                     String                    @default("corrective")
+  source                        String                    @default("internal")
+  scheduled_start               DateTime?
+  scheduled_end                 DateTime?
+  estimated_cost                Decimal?                  @db.Decimal(14, 2)
+  actual_cost                   Decimal?                  @db.Decimal(14, 2)
+  response_due_at               DateTime?
+  completion_due_at             DateTime?
+  sla_response_due_at           DateTime?
+  sla_resolution_due_at         DateTime?
+  responded_at                  DateTime?
+  paused_at                     DateTime?
+  pause_reason                  String?
+  completed_at                  DateTime?
+  closed_at                     DateTime?
+  sla_status                    String                    @default("not_set")
+  maintenance_cycle_key         String?
+  maintenance_cycle_advanced_at DateTime?
+  created_at                    DateTime                  @default(now())
+  updated_at                    DateTime                  @default(now()) @updatedAt
+  company                       Company                   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  ticket                        Ticket?                   @relation(fields: [ticket_id], references: [id], onDelete: SetNull)
+  property                      Property                  @relation(fields: [property_id], references: [id], onDelete: Restrict)
+  building                      Building?                 @relation(fields: [building_id], references: [id], onDelete: SetNull)
+  unit                          Unit?                     @relation(fields: [unit_id], references: [id], onDelete: SetNull)
+  technical_asset               PropertyTechnicalAsset?   @relation(fields: [technical_asset_id], references: [id], onDelete: SetNull)
+  assigned_to                   User?                     @relation("AssignedWorkOrders", fields: [assigned_to_id], references: [id], onDelete: SetNull)
+  created_by                    User                      @relation("CreatedWorkOrders", fields: [created_by_id], references: [id], onDelete: Restrict)
+  projects                      Project[]
+  comments                      WorkOrderComment[]
+  documents                     OperationalDocument[]
+  checklist_items               WorkOrderChecklistItem[]
+  edit_lock                     WorkOrderEditLock?
+  execution_entries             WorkOrderExecutionEntry[]
+  invoice_bases                 WorkOrderInvoiceBasis[]
+  reports                       WorkOrderReport[]
+  signatures                    WorkOrderSignature[]
+  status_events                 WorkOrderStatusEvent[]
+  component_cost_entries        ComponentCostEntry[]
+  component_lifecycle_events    ComponentLifecycleEvent[]
+  maintenance_actions           MaintenanceAction[]
+  material_costs                MaterialCost[]
+  time_reports                  TimeReport[]
 
   @@index([company_id, status])
   @@index([property_id])
   @@index([unit_id])
   @@index([assigned_to_id])
   @@index([scheduled_start])
+  @@index([building_id])
+  @@index([technical_asset_id])
+  @@index([company_id, technical_asset_id, status], map: "WorkOrder_company_asset_status_idx")
+  @@index([company_id, maintenance_cycle_advanced_at])
+  @@index([company_id, sla_status])
+  @@index([company_id, sla_resolution_due_at], map: "WorkOrder_company_sla_resolution_idx")
+  @@index([company_id, sla_response_due_at], map: "WorkOrder_company_sla_response_idx")
+  @@index([completion_due_at])
+  @@index([response_due_at])
 }
 
 model Project {
@@ -231,6 +323,9 @@ model Project {
   created_by           User                  @relation("CreatedProjects", fields: [created_by_id], references: [id], onDelete: Restrict)
   comments             ProjectComment[]
   documents            OperationalDocument[]
+  component_cost_entries     ComponentCostEntry[]
+  component_lifecycle_events ComponentLifecycleEvent[]
+  maintenance_actions        MaintenanceAction[]
 
   @@index([company_id, status])
   @@index([property_id])
@@ -255,6 +350,162 @@ model WorkOrderComment {
   @@index([user_id])
 }
 
+model WorkOrderChecklistItem {
+  id              String    @id @default(uuid())
+  company_id      String
+  work_order_id   String
+  created_by_id   String
+  completed_by_id String?
+  title           String
+  description     String?
+  is_required     Boolean   @default(true)
+  sort_order      Int       @default(0)
+  completed_at    DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @default(now()) @updatedAt
+  company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order      WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by      User      @relation("WorkOrderChecklistItemCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  completed_by    User?     @relation("WorkOrderChecklistItemCompletedBy", fields: [completed_by_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id, work_order_id])
+  @@index([work_order_id, sort_order])
+}
+
+model WorkOrderEditLock {
+  work_order_id String    @id
+  company_id    String
+  user_id       String
+  token_hash    String
+  acquired_at   DateTime  @default(now())
+  expires_at    DateTime
+  updated_at    DateTime  @default(now()) @updatedAt
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id, expires_at])
+  @@index([user_id])
+}
+
+model WorkOrderExecutionEntry {
+  id            String    @id @default(uuid())
+  company_id    String
+  work_order_id String
+  created_by_id String
+  entry_type    String
+  description   String
+  quantity      Decimal   @default(1) @db.Decimal(14, 3)
+  unit          String?
+  unit_cost     Decimal?  @db.Decimal(14, 2)
+  total_amount  Decimal   @default(0) @db.Decimal(14, 2)
+  minutes       Int?
+  distance_km   Decimal?  @db.Decimal(10, 2)
+  supplier      String?
+  occurred_at   DateTime  @default(now())
+  created_at    DateTime  @default(now())
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by    User      @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, work_order_id])
+  @@index([occurred_at])
+  @@index([work_order_id, entry_type])
+}
+
+model WorkOrderInvoiceBasis {
+  id             String    @id @default(uuid())
+  company_id     String
+  work_order_id  String
+  created_by_id  String
+  status         String    @default("draft")
+  reference      String    @unique
+  currency       String    @default("SEK")
+  subtotal       Decimal   @default(0) @db.Decimal(14, 2)
+  vat_rate       Decimal   @default(25) @db.Decimal(5, 2)
+  vat_amount     Decimal   @default(0) @db.Decimal(14, 2)
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  snapshot       Json
+  approved_by_id String?
+  approved_at    DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now()) @updatedAt
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order     WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by     User      @relation("WorkOrderInvoiceBasisCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  approved_by    User?     @relation("WorkOrderInvoiceBasisApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id, status])
+}
+
+model WorkOrderNumberCounter {
+  company_id  String
+  year        Int
+  last_number Int      @default(0)
+  updated_at  DateTime @default(now()) @updatedAt
+  company     Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@id([company_id, year])
+}
+
+model WorkOrderReport {
+  id             String    @id @default(uuid())
+  company_id     String
+  work_order_id  String
+  created_by_id  String
+  version        Int
+  status         String    @default("draft")
+  title          String
+  snapshot       Json
+  approved_by_id String?
+  approved_at    DateTime?
+  created_at     DateTime  @default(now())
+  company        Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order     WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by     User      @relation("WorkOrderReportCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  approved_by    User?     @relation("WorkOrderReportApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
+
+  @@unique([work_order_id, version])
+  @@index([company_id, work_order_id])
+}
+
+model WorkOrderSignature {
+  id                String    @id @default(uuid())
+  company_id        String
+  work_order_id     String
+  created_by_id     String
+  signer_role       String
+  signer_name       String
+  signer_email      String?
+  confirmation_text String
+  signed_at         DateTime  @default(now())
+  created_at        DateTime  @default(now())
+  company           Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order        WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  created_by        User      @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([work_order_id, signer_role])
+  @@index([company_id, work_order_id])
+}
+
+model WorkOrderStatusEvent {
+  id            String    @id @default(uuid())
+  company_id    String
+  work_order_id String
+  actor_user_id String
+  from_status   String?
+  to_status     String
+  reason        String?
+  metadata      Json?
+  created_at    DateTime  @default(now())
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  actor         User      @relation(fields: [actor_user_id], references: [id], onDelete: Restrict)
+
+  @@index([company_id, created_at], map: "WorkOrderStatusEvent_company_created_idx")
+  @@index([work_order_id, created_at], map: "WorkOrderStatusEvent_work_order_created_idx")
+}
+
 model ProjectComment {
   id          String   @id @default(uuid())
   company_id  String
@@ -272,28 +523,372 @@ model ProjectComment {
 }
 
 model OperationalDocument {
-  id             String     @id @default(uuid())
-  company_id     String
-  work_order_id  String?
-  project_id     String?
-  uploaded_by_id String
-  file_name      String
-  storage_url    String     @map("storage_key")
-  content_type   String
-  size_bytes     Int
-  category       String     @default("other")
-  visibility     String     @default("internal")
-  version        Int        @default(1)
-  created_at     DateTime   @default(now())
-  company        Company    @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  work_order     WorkOrder? @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
-  project        Project?   @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  uploaded_by    User       @relation("UploadedOperationalDocuments", fields: [uploaded_by_id], references: [id], onDelete: Restrict)
+  id                 String                  @id @default(uuid())
+  company_id         String
+  work_order_id      String?
+  project_id         String?
+  property_id        String?
+  technical_asset_id String?
+  uploaded_by_id     String
+  file_name          String
+  storage_url        String                  @map("storage_key")
+  content_type       String
+  size_bytes         Int
+  category           String                  @default("other")
+  visibility         String                  @default("internal")
+  version            Int                     @default(1)
+  created_at         DateTime                @default(now())
+  company            Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  work_order         WorkOrder?              @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  project            Project?                @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  property           Property?               @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  technical_asset    PropertyTechnicalAsset? @relation(fields: [technical_asset_id], references: [id], onDelete: Cascade)
+  uploaded_by        User                    @relation("UploadedOperationalDocuments", fields: [uploaded_by_id], references: [id], onDelete: Restrict)
 
   @@index([company_id, work_order_id, created_at])
   @@index([company_id, project_id, created_at])
+  @@index([company_id, property_id, created_at])
+  @@index([technical_asset_id, created_at], map: "OperationalDocument_technical_asset_created_idx")
   @@index([uploaded_by_id])
   @@index([storage_url])
+}
+
+model PropertyEntrance {
+  id            String    @id @default(uuid())
+  company_id    String
+  property_id   String
+  building_id   String?
+  name          String
+  address       String?
+  floors        Int?
+  accessibility String?
+  status        String    @default("active")
+  notes         String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+  company       Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property      Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  building      Building? @relation(fields: [building_id], references: [id], onDelete: SetNull)
+
+  @@index([building_id])
+  @@index([company_id, property_id])
+}
+
+model PropertyTechnicalAsset {
+  id                              String                     @id @default(uuid())
+  company_id                      String
+  property_id                     String
+  building_id                     String?
+  category                        String
+  name                            String
+  manufacturer                    String?
+  model                           String?
+  serial_number                   String?
+  location                        String?
+  installed_at                    DateTime?
+  last_service_at                 DateTime?
+  next_service_at                 DateTime?
+  service_provider                String?
+  criticality                     String                     @default("normal")
+  status                          String                     @default("active")
+  notes                           String?
+  component_class                 String?
+  commissioned_at                 DateTime?
+  installation_year               Int?
+  technical_lifetime_years        Int?
+  economic_lifetime_years         Int?
+  expected_replacement_year       Int?
+  condition_grade                 Int?
+  replacement_value               Decimal?                   @db.Decimal(14, 2)
+  responsible_supplier            String?
+  service_interval_months         Int                        @default(12)
+  auto_create_service_work_orders Boolean                    @default(true)
+  service_lead_days               Int                        @default(30)
+  created_at                      DateTime                   @default(now())
+  updated_at                      DateTime                   @default(now()) @updatedAt
+  company                         Company                    @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property                        Property                   @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  building                        Building?                  @relation(fields: [building_id], references: [id], onDelete: SetNull)
+  work_orders                     WorkOrder[]
+  operational_documents           OperationalDocument[]
+  warranties                      PropertyWarranty[]
+  inspections                     PropertyInspection[]
+  service_agreements              PropertyServiceAgreement[]
+  component_cost_entries          ComponentCostEntry[]
+  component_lifecycle_events      ComponentLifecycleEvent[]
+  maintenance_actions             MaintenanceAction[]
+
+  @@index([company_id, property_id])
+  @@index([component_class])
+  @@index([expected_replacement_year])
+  @@index([next_service_at])
+  @@index([property_id, category])
+  @@index([company_id, next_service_at, auto_create_service_work_orders], map: "PropertyTechnicalAsset_service_planning_idx")
+}
+
+model PropertyWarranty {
+  id                 String                  @id @default(uuid())
+  company_id         String
+  property_id        String
+  technical_asset_id String?
+  title              String
+  supplier           String?
+  scope              String?
+  starts_at          DateTime?
+  expires_at         DateTime?
+  contact_name       String?
+  contact_email      String?
+  contact_phone      String?
+  document_url       String?
+  status             String                  @default("active")
+  created_at         DateTime                @default(now())
+  updated_at         DateTime                @default(now()) @updatedAt
+  company            Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property           Property                @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  technical_asset    PropertyTechnicalAsset? @relation(fields: [technical_asset_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id, property_id])
+  @@index([expires_at])
+}
+
+model PropertyInspection {
+  id                 String                  @id @default(uuid())
+  company_id         String
+  property_id        String
+  technical_asset_id String?
+  inspection_type    String
+  title              String
+  scheduled_at       DateTime?
+  performed_at       DateTime?
+  next_due_at        DateTime?
+  provider           String?
+  contact_name       String?
+  result             String?
+  summary            String?
+  document_url       String?
+  status             String                  @default("planned")
+  created_at         DateTime                @default(now())
+  updated_at         DateTime                @default(now()) @updatedAt
+  company            Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property           Property                @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  technical_asset    PropertyTechnicalAsset? @relation(fields: [technical_asset_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id, property_id])
+  @@index([next_due_at])
+}
+
+model PropertyServiceAgreement {
+  id                   String                  @id @default(uuid())
+  company_id           String
+  property_id          String
+  technical_asset_id   String?
+  supplier             String
+  agreement_number     String?
+  service_area         String
+  starts_at            DateTime?
+  ends_at              DateTime?
+  notice_period_months Int?
+  cost_amount          Decimal?                @db.Decimal(14, 2)
+  cost_interval        String?
+  contact_name         String?
+  contact_email        String?
+  contact_phone        String?
+  document_url         String?
+  status               String                  @default("active")
+  created_at           DateTime                @default(now())
+  updated_at           DateTime                @default(now()) @updatedAt
+  company              Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property             Property                @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  technical_asset      PropertyTechnicalAsset? @relation(fields: [technical_asset_id], references: [id], onDelete: SetNull)
+
+  @@index([company_id, property_id])
+  @@index([ends_at])
+}
+
+model ComponentLifecycleEvent {
+  id                 String                 @id @default(uuid())
+  company_id         String
+  property_id        String
+  technical_asset_id String
+  created_by_id      String
+  work_order_id      String?
+  project_id         String?
+  event_type         String
+  event_date         DateTime
+  title              String
+  description        String?
+  provider           String?
+  result             String?
+  next_due_at        DateTime?
+  meter_reading      Decimal?               @db.Decimal(14, 2)
+  sync_key           String?
+  created_at         DateTime               @default(now())
+  updated_at         DateTime               @default(now()) @updatedAt
+  company            Company                @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property           Property               @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  technical_asset    PropertyTechnicalAsset @relation(fields: [technical_asset_id], references: [id], onDelete: Cascade)
+  created_by         User                   @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+  work_order         WorkOrder?             @relation(fields: [work_order_id], references: [id], onDelete: SetNull)
+  project            Project?               @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  cost_entries       ComponentCostEntry[]
+
+  @@index([technical_asset_id, event_date], map: "ComponentLifecycleEvent_asset_event_date_idx")
+  @@index([company_id, property_id, next_due_at], map: "ComponentLifecycleEvent_company_property_next_due_idx")
+  @@index([work_order_id], map: "ComponentLifecycleEvent_work_order_idx")
+}
+
+model ComponentCostEntry {
+  id                 String                  @id @default(uuid())
+  company_id         String
+  property_id        String
+  technical_asset_id String
+  lifecycle_event_id String?
+  work_order_id      String?
+  project_id         String?
+  created_by_id      String
+  cost_type          String
+  description        String?
+  supplier           String?
+  amount_ex_vat      Decimal                 @default(0) @db.Decimal(14, 2)
+  vat_rate           Decimal                 @default(25) @db.Decimal(5, 2)
+  cost_date          DateTime
+  sync_key           String?
+  created_at         DateTime                @default(now())
+  company            Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property           Property                @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  technical_asset    PropertyTechnicalAsset  @relation(fields: [technical_asset_id], references: [id], onDelete: Cascade)
+  lifecycle_event    ComponentLifecycleEvent? @relation(fields: [lifecycle_event_id], references: [id], onDelete: SetNull)
+  work_order         WorkOrder?              @relation(fields: [work_order_id], references: [id], onDelete: SetNull)
+  project            Project?                @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  created_by         User                    @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([technical_asset_id, cost_date], map: "ComponentCostEntry_asset_cost_date_idx")
+  @@index([company_id, property_id, cost_date], map: "ComponentCostEntry_company_property_cost_date_idx")
+  @@index([work_order_id], map: "ComponentCostEntry_work_order_idx")
+}
+
+model MaintenancePlan {
+  id                String              @id @default(uuid())
+  company_id        String
+  property_id       String
+  created_by_id     String
+  approved_by_id    String?
+  name              String
+  version           Int                 @default(1)
+  status            String              @default("draft")
+  base_year         Int
+  horizon_years     Int                 @default(30)
+  annual_index_rate Decimal             @default(2.00) @db.Decimal(5, 2)
+  summary           String?
+  assumptions       String?
+  approved_at       DateTime?
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now()) @updatedAt
+  company           Company             @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  property          Property            @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  created_by        User                @relation("MaintenancePlanCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  approved_by       User?               @relation("MaintenancePlanApprovedBy", fields: [approved_by_id], references: [id], onDelete: SetNull)
+  actions           MaintenanceAction[]
+
+  @@unique([property_id, version])
+  @@index([company_id, property_id, status])
+}
+
+model MaintenanceAction {
+  id                       String                  @id @default(uuid())
+  company_id               String
+  maintenance_plan_id      String
+  property_id              String
+  building_id              String?
+  technical_asset_id       String?
+  source_work_order_id     String?
+  project_id               String?
+  created_by_id            String
+  category                 String
+  title                    String
+  description              String?
+  scope                    String?
+  planned_year             Int
+  recurrence_years         Int?
+  technical_lifetime_years Int?
+  estimated_cost           Decimal                 @default(0) @db.Decimal(14, 2)
+  annual_index_rate        Decimal?                @db.Decimal(5, 2)
+  priority                 String                  @default("normal")
+  risk                     String                  @default("low")
+  status                   String                  @default("planned")
+  contractor               String?
+  completed_at             DateTime?
+  created_at               DateTime                @default(now())
+  updated_at               DateTime                @default(now()) @updatedAt
+  company                  Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  maintenance_plan         MaintenancePlan         @relation(fields: [maintenance_plan_id], references: [id], onDelete: Cascade)
+  property                 Property                @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  building                 Building?               @relation(fields: [building_id], references: [id], onDelete: SetNull)
+  technical_asset          PropertyTechnicalAsset? @relation(fields: [technical_asset_id], references: [id], onDelete: SetNull)
+  source_work_order        WorkOrder?              @relation(fields: [source_work_order_id], references: [id], onDelete: SetNull)
+  project                  Project?                @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  created_by               User                    @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([building_id])
+  @@index([company_id, property_id, planned_year])
+  @@index([maintenance_plan_id, status], map: "MaintenanceAction_plan_status_idx")
+  @@index([project_id])
+  @@index([technical_asset_id])
+}
+
+/// Legacy boende/portal-användare. Inte samma sak som Company (B2B-tenant).
+model Tenant {
+  id         String          @id @default(uuid())
+  email      String          @unique
+  password   String
+  first_name String
+  last_name  String
+  phone      String?
+  created_at DateTime        @default(now())
+  updated_at DateTime        @default(now()) @updatedAt
+  tickets    Ticket[]
+  leases     LeaseContract[]
+}
+
+/// Legacy hyreskontrakt kopplat till Tenant. Canonical leasing idag är Lease/LeaseHolder.
+model LeaseContract {
+  id          String    @id @default(uuid())
+  tenant_id   String
+  property_id String
+  company_id  String?
+  unit_number String
+  start_date  DateTime
+  end_date    DateTime?
+  status      String    @default("active")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @default(now()) @updatedAt
+  tenant      Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Restrict)
+  property    Property  @relation(fields: [property_id], references: [id], onDelete: Restrict)
+  company     Company?  @relation(fields: [company_id], references: [id], onDelete: SetNull)
+}
+
+/// Legacy materialkostnad. Nyare flöden använder WorkOrderExecutionEntry.
+model MaterialCost {
+  id            String    @id @default(uuid())
+  work_order_id String
+  item_name     String
+  quantity      Float
+  unit_cost     Float
+  created_at    DateTime  @default(now())
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+}
+
+/// Legacy tidsrapport. Nyare flöden använder WorkOrderExecutionEntry (entry_type=time).
+model TimeReport {
+  id            String    @id @default(uuid())
+  work_order_id String
+  user_id       String
+  date          DateTime
+  hours         Float
+  description   String?
+  created_at    DateTime  @default(now())
+  work_order    WorkOrder @relation(fields: [work_order_id], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Restrict)
 }
 
 model LeaseHolder {
