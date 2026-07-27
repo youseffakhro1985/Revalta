@@ -22,6 +22,7 @@ async function loadGlobalHeaders(vercelEnv: string | undefined, nodeEnv: string)
 }
 
 function expectBrowserIsolationHeaders(headers: Map<string, string>) {
+  expect(headers.get("X-DNS-Prefetch-Control")).toBe("off");
   expect(headers.get("Cross-Origin-Opener-Policy")).toBe("same-origin");
   expect(headers.get("Origin-Agent-Cluster")).toBe("?1");
   expect(headers.get("X-Permitted-Cross-Domain-Policies")).toBe("none");
