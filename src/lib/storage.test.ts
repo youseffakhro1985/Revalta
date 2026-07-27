@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { putMock } = vi.hoisted(() => ({
+const { putMock, delMock } = vi.hoisted(() => ({
   putMock: vi.fn(),
+  delMock: vi.fn(),
 }));
 
-vi.mock("@vercel/blob", () => ({ put: putMock }));
+vi.mock("@vercel/blob", () => ({ put: putMock, del: delMock }));
 
 import {
+  deleteStoredFile,
   getStorageToken,
   hasStorageConfig,
   StorageConfigurationError,
@@ -16,7 +18,9 @@ import {
 describe("storage configuration", () => {
   beforeEach(() => {
     putMock.mockReset();
+    delMock.mockReset();
     putMock.mockResolvedValue({ url: "https://store.private.blob.vercel-storage.com/file.pdf" });
+    delMock.mockResolvedValue(undefined);
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
     vi.stubEnv("STORAGE_PROVIDER_KEY", "");
   });
@@ -60,5 +64,23 @@ describe("storage configuration", () => {
       expect.any(Buffer),
       expect.objectContaining({ access: "private", token: "canonical-token" }),
     );
+  });
+
+  it("deletes a stored blob with the configured token", async () => {
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "canonical-token");
+
+    await deleteStoredFile("  https://store.private.blob.vercel-storage.com/file.pdf  ");
+
+    expect(delMock).toHaveBeenCalledWith(
+      "https://store.private.blob.vercel-storage.com/file.pdf",
+      { token: "canonical-token" },
+    );
+  });
+
+  it("fails closed when compensation deletion has no storage token", async () => {
+    await expect(
+      deleteStoredFile("https://store.private.blob.vercel-storage.com/file.pdf"),
+    ).rejects.toBeInstanceOf(StorageConfigurationError);
+    expect(delMock).not.toHaveBeenCalled();
   });
 });
