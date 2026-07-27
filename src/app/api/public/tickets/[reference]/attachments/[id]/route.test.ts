@@ -52,9 +52,10 @@ vi.mock("@/lib/structured-logger", () => ({
 import { GET } from "./route";
 
 const params = Promise.resolve({ reference: "RV-2026-ABC123", id: "attachment_123" });
+const REQUEST_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 function request(url = "https://www.revalta.se/api/public/tickets/RV-2026-ABC123/attachments/attachment_123") {
-  return new Request(url, { headers: { "x-request-id": "download-request-1" } });
+  return new Request(url, { headers: { "x-request-id": REQUEST_ID } });
 }
 
 function publicAttachment(overrides: Record<string, unknown> = {}) {
@@ -132,7 +133,7 @@ describe("GET public ticket attachment", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toContain("private, no-store");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-    expect(response.headers.get("x-request-id")).toBe("download-request-1");
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
     expect(response.headers.get("content-disposition")).toContain("attachment;");
     expect(response.headers.get("location")).toBeNull();
     expect(blobGetMock).toHaveBeenCalledWith("https://blob.example/private-file", {
