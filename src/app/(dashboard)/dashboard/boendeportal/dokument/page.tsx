@@ -39,6 +39,7 @@ type ResidentDocument = {
 type Payload = {
   leases: Lease[];
   documents: ResidentDocument[];
+  isResident?: boolean;
 };
 
 const categoryLabels: Record<string, string> = {
@@ -74,7 +75,11 @@ export default function ResidentDocumentsPage() {
       const response = await fetch("/api/resident-portal", { cache: "no-store" });
       const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta boendedokument");
-      setData({ leases: payload.leases || [], documents: payload.documents || [] });
+      setData({
+        leases: payload.leases || [],
+        documents: payload.documents || [],
+        isResident: Boolean(payload.isResident),
+      });
       setSelectedLeaseId((current) => {
         if (current && payload.leases?.some((lease: Lease) => lease.id === current)) return current;
         return payload.leases?.[0]?.id || "";
@@ -110,9 +115,11 @@ export default function ResidentDocumentsPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Boende och kundservice"
-        title="Boendedokument"
-        description="Visa avtal, information, intyg och andra filer med strikt åtkomst per aktivt hyresavtal och objekt."
+        eyebrow={data?.isResident ? "Min boendeservice" : "Boende och kundservice"}
+        title={data?.isResident ? "Mina dokument" : "Boendedokument"}
+        description={data?.isResident
+          ? "Dokument som förvaltningen har publicerat för ditt hyresavtal och objekt."
+          : "Visa avtal, information, intyg och andra filer med strikt åtkomst per aktivt hyresavtal och objekt."}
       />
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}

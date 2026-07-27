@@ -4,17 +4,22 @@ import { verifyToken } from "@/lib/session";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
 
 export {
+  canAccessResidentPortal,
   canCreateProperties,
+  canCreateResidentPortalTicket,
+  canDownloadResidentDocuments,
   canExportTickets,
   canManageBilling,
   canManageCompany,
   canManageAccessCredentials,
   canManageIntegrations,
   canManageLeases,
+  canManageResidentPortal,
   canManageTeam,
   canManageTickets,
   canViewAudit,
   canViewOperations,
+  isResident,
 } from "@/lib/permissions";
 
 export async function getCurrentUser() {

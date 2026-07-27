@@ -49,3 +49,27 @@ export function canExportTickets(role: string) {
 export function canViewOperations(role: string) {
   return hasRole(role, ["owner", "admin", "manager"]);
 }
+
+export function isResident(role: string) {
+  return role === "resident";
+}
+
+/** Authenticated portal access for staff workspace and resident self-service. */
+export function canAccessResidentPortal(role: string) {
+  return isResident(role) || hasRole(role, ["owner", "admin", "manager", "technician", "viewer"]);
+}
+
+/** Staff may create tickets on behalf of any active lease. */
+export function canManageResidentPortal(role: string) {
+  return canManageTickets(role);
+}
+
+/** Residents create tickets for their own matched leases; staff keep current rights. */
+export function canCreateResidentPortalTicket(role: string) {
+  return canManageResidentPortal(role) || isResident(role);
+}
+
+/** Document download for ops staff or resident self-service. */
+export function canDownloadResidentDocuments(role: string) {
+  return canViewOperations(role) || isResident(role);
+}

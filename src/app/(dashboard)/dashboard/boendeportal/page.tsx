@@ -46,7 +46,13 @@ type Ticket = {
   assigned_to: { id: string; name: string | null; email: string } | null;
 };
 
-type Payload = { leases: Lease[]; tickets: Ticket[]; canManage: boolean };
+type Payload = {
+  leases: Lease[];
+  tickets: Ticket[];
+  canManage: boolean;
+  canCreate?: boolean;
+  isResident?: boolean;
+};
 
 const statusLabels = OPERATIONS_STATUS_LABELS;
 const priorityLabels = PRIORITY_LABELS;
@@ -130,27 +136,44 @@ export default function ResidentPortalPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Boende och kundservice"
-        title="Boendeportal"
-        description="Hantera boendes ärenden med direkt koppling till rätt hyresavtal, fastighet och lägenhet eller lokal."
+        eyebrow={data?.isResident ? "Min boendeservice" : "Boende och kundservice"}
+        title={data?.isResident ? "Mina ärenden" : "Boendeportal"}
+        description={data?.isResident
+          ? "Skapa felanmälningar för ditt hyresavtal och följ statusen hos förvaltningen."
+          : "Hantera boendes ärenden med direkt koppling till rätt hyresavtal, fastighet och lägenhet eller lokal."}
       />
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
+      {data?.isResident && data.leases.length === 0 ? (
+        <InlineAlert tone="info">
+          Inget aktivt hyresavtal är kopplat till din e-postadress ännu. Kontakta förvaltningen om du behöver hjälp.
+        </InlineAlert>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={UsersRound} label="Aktiva avtal" value={data?.leases.length || 0} hint="Boende och hyresparter" />
+        <MetricCard icon={UsersRound} label={data?.isResident ? "Mina avtal" : "Aktiva avtal"} value={data?.leases.length || 0} hint={data?.isResident ? "Kopplade till din e-post" : "Boende och hyresparter"} />
         <MetricCard icon={MessageSquareText} label="Öppna ärenden" value={openCount} hint="Kräver fortsatt hantering" />
         <MetricCard icon={Inbox} label="Nya ärenden" value={newCount} hint="Ännu inte handlagda" />
         <MetricCard icon={FileText} label="Portalärenden totalt" value={data?.tickets.length || 0} hint="Riktiga ärendeposter" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <Panel title="Registrera boendeärende" description="Välj ett aktivt avtal. Boende, fastighet och objekt kopplas automatiskt till ärendet.">
-          {loading ? <div className="h-72 animate-pulse rounded-xl bg-sand-100" /> : !data?.canManage ? (
+        <Panel
+          title={data?.isResident ? "Skapa felanmälan" : "Registrera boendeärende"}
+          description={data?.isResident
+            ? "Beskriv problemet. Avtal, lägenhet och kontaktuppgifter kopplas automatiskt."
+            : "Välj ett aktivt avtal. Boende, fastighet och objekt kopplas automatiskt till ärendet."}
+        >
+          {loading ? <div className="h-72 animate-pulse rounded-xl bg-sand-100" /> : !(data?.canCreate ?? data?.canManage) ? (
             <InlineAlert>Du har läsbehörighet men saknar rättighet att skapa nya boendeärenden.</InlineAlert>
           ) : data.leases.length === 0 ? (
-            <EmptyState title="Inga aktiva hyresavtal" description="Skapa eller aktivera ett hyresavtal i uthyrningsmodulen innan ett avtalskopplat boendeärende registreras." />
+            <EmptyState
+              title="Inga aktiva hyresavtal"
+              description={data.isResident
+                ? "När ditt avtal är kopplat till din e-post kan du skapa felanmälningar här."
+                : "Skapa eller aktivera ett hyresavtal i uthyrningsmodulen innan ett avtalskopplat boendeärende registreras."}
+            />
           ) : (
             <form onSubmit={submit} className="space-y-4">
               <label className="block space-y-1.5">
@@ -204,13 +227,17 @@ export default function ResidentPortalPage() {
                 <textarea required minLength={10} maxLength={5000} placeholder="Beskriv problemet, när det började och om någon akut risk finns." value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className={premiumTextareaClass} />
               </label>
               <button disabled={saving || !form.leaseId} className={`${premiumPrimaryButtonClass} w-full`}>
-                {saving ? "Skapar ärende…" : "Skapa boendeärende"}
+                {saving ? "Skapar ärende…" : data.isResident ? "Skicka felanmälan" : "Skapa boendeärende"}
               </button>
             </form>
           )}
         </Panel>
 
-        <Panel title="Ärendehistorik" description="Sök och öppna alla ärenden som har skapats genom boendeportalen." bodyClassName="p-0">
+        <Panel
+          title="Ärendehistorik"
+          description={data?.isResident ? "Dina felanmälningar och deras aktuella status." : "Sök och öppna alla ärenden som har skapats genom boendeportalen."}
+          bodyClassName="p-0"
+        >
           <div className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row">
             <input placeholder="Sök referens, boende, fastighet, objekt eller ämne" value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} />
             <button type="button" onClick={() => void load()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50">
@@ -242,7 +269,13 @@ export default function ResidentPortalPage() {
                   </div>
                   <div className="flex flex-col items-start gap-2 lg:items-end">
                     <span className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-800">{statusLabels[ticket.status] || ticket.status}</span>
-                    <Link href={`/dashboard/felanmalan/${ticket.id}`} className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna ärendet</Link>
+                    {data?.isResident ? (
+                      ticket.public_reference ? (
+                        <p className="text-xs font-semibold text-ink-500">Referens {ticket.public_reference}</p>
+                      ) : null
+                    ) : (
+                      <Link href={`/dashboard/felanmalan/${ticket.id}`} className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna ärendet</Link>
+                    )}
                   </div>
                 </article>
               ))}

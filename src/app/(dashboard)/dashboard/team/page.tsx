@@ -8,7 +8,14 @@ import { readResponseJson } from "@/lib/fetch-json";
 
 type TeamMember = { id: string; name: string | null; email: string; role: string; status: string; created_at: string; _count: { assigned_tickets: number } };
 type TeamInvite = { id: string; email: string; name: string | null; role: string; expires_at: string; accepted_at: string | null; created_at: string };
-const roleLabels: Record<string, string> = { owner: "Ägare", admin: "Admin", manager: "Förvaltare", technician: "Tekniker", viewer: "Läsbehörig" };
+const roleLabels: Record<string, string> = {
+  owner: "Ägare",
+  admin: "Admin",
+  manager: "Förvaltare",
+  technician: "Tekniker",
+  viewer: "Läsbehörig",
+  resident: "Boende",
+};
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -72,7 +79,7 @@ export default function TeamPage() {
           <fieldset disabled={!canManage} className="space-y-4 disabled:opacity-60">
             <input placeholder="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} />
             <input type="email" required placeholder="E-post" value={email} onChange={(event) => setEmail(event.target.value)} className={premiumFieldClass} />
-            <select value={role} onChange={(event) => setRole(event.target.value)} className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option></select>
+            <select value={role} onChange={(event) => setRole(event.target.value)} className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option><option value="resident">Boende</option></select>
             <button disabled={submitting || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skapar…" : "Skapa inbjudan"}</button>
           </fieldset>
         </form>

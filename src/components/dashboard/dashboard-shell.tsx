@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -19,6 +19,7 @@ import {
   DoorOpen,
   FileArchive,
   FileClock,
+  FileText,
   FolderKanban,
   Gauge,
   Hammer,
@@ -44,6 +45,17 @@ import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { NotificationMenu } from "@/components/dashboard/notification-menu";
 import { WorkOrderLockIndicator } from "@/components/dashboard/work-order-lock-indicator";
+import { isResident } from "@/lib/permissions";
+
+const residentNavigation = [
+  {
+    label: "Min portal",
+    items: [
+      { href: "/dashboard/boendeportal", label: "Mina ärenden", icon: MessageSquareText },
+      { href: "/dashboard/boendeportal/dokument", label: "Mina dokument", icon: FileText },
+    ],
+  },
+];
 
 const navigation = [
   {
@@ -110,9 +122,22 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavigationContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavigationContent({
+  pathname,
+  role,
+  onNavigate,
+}: {
+  pathname: string;
+  role: string;
+  onNavigate?: () => void;
+}) {
+  const groups = useMemo(
+    () => (isResident(role) ? residentNavigation : navigation),
+    [role],
+  );
+
   return <>
-    {navigation.map((group, groupIndex) => (
+    {groups.map((group, groupIndex) => (
       <div key={group.label} className={groupIndex > 0 ? "mt-7" : ""}>
         <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-400">{group.label}</p>
         <div className="space-y-1">
@@ -127,11 +152,38 @@ function NavigationContent({ pathname, onNavigate }: { pathname: string; onNavig
   </>;
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+function initials(name: string | null | undefined, email: string) {
+  const source = (name || email || "RV").trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]![0] || ""}${parts[1]![0] || ""}`.toUpperCase();
+  return source.slice(0, 2).toUpperCase();
+}
+
+export function DashboardShell({
+  children,
+  role,
+  userName,
+  userEmail,
+}: {
+  children: React.ReactNode;
+  role: string;
+  userName?: string | null;
+  userEmail: string;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const resident = isResident(role);
+  const homeHref = resident ? "/dashboard/boendeportal" : "/dashboard";
+  const displayName = userName?.trim() || userEmail;
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!resident) return;
+    if (pathname === "/dashboard" || pathname === "/dashboard/") {
+      router.replace("/dashboard/boendeportal");
+    }
+  }, [pathname, resident, router]);
   useEffect(() => {
     if (!mobileOpen) return;
     const previous = document.body.style.overflow;
@@ -147,22 +199,36 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] border-r border-sand-200 bg-[#F1F1EC] lg:flex lg:flex-col">
         <div className="flex h-[72px] items-center border-b border-sand-200 px-6">
-          <Link href="/dashboard" className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Revalta dashboard">
+          <Link href={homeHref} className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Revalta dashboard">
             <span className="font-display text-[21px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</span><span className="h-5 w-px bg-sand-300" aria-hidden="true" /><span className="text-[8px] font-semibold uppercase leading-[1.2] tracking-[0.13em] text-ink-400">Förvaltning<br />Sverige</span>
           </Link>
         </div>
-        <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} /></nav>
-        <div className="border-t border-sand-200 p-3"><div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">RV</div><div className="min-w-0"><p className="truncate text-[12px] font-semibold text-ink-800">Organisation</p><p className="truncate text-[10px] text-ink-400">Aktiv användare</p></div></div><LogoutButton className="w-full justify-start" /></div>
+        <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} /></nav>
+        <div className="border-t border-sand-200 p-3">
+          <div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">{initials(userName, userEmail)}</div>
+            <div className="min-w-0">
+              <p className="truncate text-[12px] font-semibold text-ink-800">{displayName}</p>
+              <p className="truncate text-[10px] text-ink-400">{resident ? "Boende" : "Aktiv användare"}</p>
+            </div>
+          </div>
+          <LogoutButton className="w-full justify-start" />
+        </div>
       </aside>
 
-      {mobileOpen ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny"><button className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} /><aside className="relative flex h-full w-[min(88vw,340px)] flex-col border-r border-sand-200 bg-[#F7F7F3] shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-sand-200 px-5"><Link href="/dashboard" className="font-display text-xl font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link><button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Stäng meny"><X className="h-5 w-5" /></button></div><nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} onNavigate={() => setMobileOpen(false)} /></nav><div className="border-t border-sand-200 p-4"><LogoutButton className="w-full justify-start" /></div></aside></div> : null}
+      {mobileOpen ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny"><button className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} /><aside className="relative flex h-full w-[min(88vw,340px)] flex-col border-r border-sand-200 bg-[#F7F7F3] shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-sand-200 px-5"><Link href={homeHref} className="font-display text-xl font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link><button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Stäng meny"><X className="h-5 w-5" /></button></div><nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} onNavigate={() => setMobileOpen(false)} /></nav><div className="border-t border-sand-200 p-4"><LogoutButton className="w-full justify-start" /></div></aside></div> : null}
 
       <div className="lg:pl-[248px]">
         <header className="sticky top-0 z-30 border-b border-sand-200 bg-[#FAFAF8]/95 backdrop-blur-sm">
           <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
-            <div className="flex items-center gap-3 lg:hidden"><button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button><Link href="/dashboard" className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link></div>
-            <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">Fastighetsförvaltning</p><p className="mt-1 text-[12px] font-medium text-ink-600">Samlad arbetsyta</p></div>
-            <div className="ml-auto flex items-center gap-2 sm:gap-3"><WorkOrderLockIndicator /><GlobalSearch /><NotificationMenu /><div className="hidden sm:block lg:hidden"><LogoutButton /></div></div>
+            <div className="flex items-center gap-3 lg:hidden"><button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button><Link href={homeHref} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link></div>
+            <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">{resident ? "Boendeportal" : "Fastighetsförvaltning"}</p><p className="mt-1 text-[12px] font-medium text-ink-600">{resident ? "Självservice" : "Samlad arbetsyta"}</p></div>
+            <div className="ml-auto flex items-center gap-2 sm:gap-3">
+              {resident ? null : <WorkOrderLockIndicator />}
+              {resident ? null : <GlobalSearch />}
+              {resident ? null : <NotificationMenu />}
+              <div className="hidden sm:block lg:hidden"><LogoutButton /></div>
+            </div>
           </div>
         </header>
         <main id="dashboard-content" tabIndex={-1} className="mx-auto w-full max-w-[1440px] px-4 py-6 outline-none sm:px-8 sm:py-10 lg:px-10 xl:px-12">{children}</main>
