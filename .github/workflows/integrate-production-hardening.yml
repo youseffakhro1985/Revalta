@@ -50,6 +50,28 @@ jobs:
           git merge --no-edit --no-ff -X theirs origin/cursor/wo-board-role-scope-6157
           git merge --no-edit --no-ff -X theirs origin/cursor/staff-read-hardening-6157
 
+      - name: Reconcile dashboard shell merge residue
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/components/dashboard/dashboard-shell.tsx")
+          source = path.read_text()
+          stale = '''  const roleLabel = role === "owner" ? "Ägare"
+            : role === "admin" ? "Administratör"
+              : role === "manager" ? "Förvaltare"
+                : role === "technician" ? "Tekniker"
+                  : role === "viewer" ? "Läsbehörighet"
+                    : role === "resident" ? "Boende"
+                      : role;
+
+          '''
+          if source.count(stale) != 1:
+              raise SystemExit("Expected exactly one stale roleLabel block after stack merge")
+          path.write_text(source.replace(stale, ""))
+          PY
+
       - name: Remove temporary workflow from final tree
         run: git rm .github/workflows/integrate-production-hardening.yml
 
