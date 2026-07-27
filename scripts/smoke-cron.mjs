@@ -39,13 +39,11 @@ for (const job of jobs) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${baseUrl}${job.path}`, {
-      method: "POST",
+      method: "GET",
       headers: {
         authorization: `Bearer ${secret}`,
-        "content-type": "application/json",
         accept: "application/json",
       },
-      body: "{}",
       signal: controller.signal,
     });
     const text = await response.text();
