@@ -48,6 +48,10 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { GET } from "./route";
 
+const DEFAULT_REQUEST_ID = "11111111-1111-4111-8111-111111111111";
+const DOWNLOAD_REQUEST_ID = "22222222-2222-4222-8222-222222222222";
+const STORAGE_REQUEST_ID = "33333333-3333-4333-8333-333333333333";
+
 const user = {
   id: "user-1",
   company_id: "company-1",
@@ -65,7 +69,7 @@ const attachment = {
   ticket: { id: "ticket-1", assigned_to_id: "user-1" },
 };
 
-function request(requestId = "request-1") {
+function request(requestId = DEFAULT_REQUEST_ID) {
   return new Request("https://www.revalta.se/api/attachments/attachment-1", {
     headers: { "x-request-id": requestId },
   });
@@ -102,7 +106,7 @@ describe("GET /api/attachments/[id]", () => {
     expect(attachmentFindFirstMock).not.toHaveBeenCalled();
     expect(await response.json()).toMatchObject({
       errorCode: "UNAUTHORIZED",
-      requestId: "request-1",
+      requestId: DEFAULT_REQUEST_ID,
     });
   });
 
@@ -135,7 +139,7 @@ describe("GET /api/attachments/[id]", () => {
   });
 
   it("downloads a private blob with the configured token and secure headers", async () => {
-    const response = await GET(request("download-request"), context());
+    const response = await GET(request(DOWNLOAD_REQUEST_ID), context());
 
     expect(response.status).toBe(200);
     expect(blobGetMock).toHaveBeenCalledWith(attachment.data_url, {
@@ -146,7 +150,7 @@ describe("GET /api/attachments/[id]", () => {
     expect(response.headers.get("cdn-cache-control")).toBe("no-store");
     expect(response.headers.get("vercel-cdn-cache-control")).toBe("no-store");
     expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
-    expect(response.headers.get("x-request-id")).toBe("download-request");
+    expect(response.headers.get("x-request-id")).toBe(DOWNLOAD_REQUEST_ID);
     expect(response.headers.get("content-type")).toBe("application/pdf");
   });
 
@@ -186,13 +190,13 @@ describe("GET /api/attachments/[id]", () => {
   it("returns a correlated 503 when private storage is not configured", async () => {
     getStorageTokenMock.mockReturnValue(null);
 
-    const response = await GET(request("storage-request"), context());
+    const response = await GET(request(STORAGE_REQUEST_ID), context());
 
     expect(response.status).toBe(503);
     expect(blobGetMock).not.toHaveBeenCalled();
     expect(await response.json()).toMatchObject({
       errorCode: "SERVICE_UNAVAILABLE",
-      requestId: "storage-request",
+      requestId: STORAGE_REQUEST_ID,
     });
   });
 
