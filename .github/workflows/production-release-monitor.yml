@@ -14,12 +14,15 @@ concurrency:
 
 jobs:
   verify-production-release:
-    name: Verify production release identity
+    name: Verify production release and boundaries
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
 
     steps:
-      - name: Probe production health
+      - name: Check out monitor code
+        uses: actions/checkout@v4
+
+      - name: Probe production release identity
         shell: bash
         env:
           HEALTH_URL: https://www.revalta.se/api/health
@@ -71,3 +74,8 @@ jobs:
           [[ "$vercel_cdn_cache_control" == *"no-store"* ]]
 
           echo "Production release verified: $short_sha"
+
+      - name: Verify production security and cache boundaries
+        env:
+          BASE_URL: https://www.revalta.se
+        run: node scripts/verify-production-boundaries.mjs
