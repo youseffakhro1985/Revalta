@@ -80,12 +80,12 @@ jobs:
           source = path.read_text()
           needle = "  getCurrentUser: getCurrentUserMock,\n"
           replacement = """  getCurrentUser: getCurrentUserMock,
-  canAssignWorkOrders: (role: string | null | undefined) =>
-    role === "owner" || role === "admin" || role === "manager",
-  canManageTickets: (role: string | null | undefined) =>
-    role === "owner" || role === "admin" || role === "manager" || role === "technician",
-  shouldScopeToAssignedWork: (role: string | null | undefined) => role === "technician",
-"""
+          canAssignWorkOrders: (role: string | null | undefined) =>
+            role === "owner" || role === "admin" || role === "manager",
+          canManageTickets: (role: string | null | undefined) =>
+            role === "owner" || role === "admin" || role === "manager" || role === "technician",
+          shouldScopeToAssignedWork: (role: string | null | undefined) => role === "technician",
+          """
           occurrences = source.count(needle)
           if occurrences != 1:
               raise SystemExit(
@@ -161,3 +161,5 @@ jobs:
         run: |
           git commit -m "feat: integrate production hardening and resident security stack"
           git push origin HEAD:integration/revalta-production-hardening-20260727
+
+# trigger after workflow registration on main
