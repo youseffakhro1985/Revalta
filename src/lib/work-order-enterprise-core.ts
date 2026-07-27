@@ -7,7 +7,6 @@ import {
   canTransitionWorkOrder as canTransitionWorkOrderStatus,
   getAllowedWorkOrderTransitions as getAllowedWorkOrderStatusTransitions,
   type WorkOrderPriority,
-  type WorkOrderStatus,
 } from "@/lib/work-order-workflow";
 
 export {
