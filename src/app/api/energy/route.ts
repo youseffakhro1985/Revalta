@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageTickets, canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, isModernStorageMirror, mergeByCreatedAt } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
@@ -10,6 +10,9 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canViewFinanceData(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa energidata" }, { status: 403 });
+    }
 
     const [rows, logs, properties] = await Promise.all([
       user.company_id

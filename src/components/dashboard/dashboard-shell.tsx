@@ -106,7 +106,7 @@ const navigation: NavGroup[] = [
       { href: "/dashboard/uthyrning", label: "Uthyrning", icon: DoorOpen, visible: canViewLeasingData },
       { href: "/dashboard/hyresavisering", label: "Hyresavisering", icon: HandCoins, visible: canViewLeasingData },
       { href: "/dashboard/underhall", label: "Underhåll", icon: Hammer },
-      { href: "/dashboard/energi", label: "Energi", icon: Gauge },
+      { href: "/dashboard/energi", label: "Energi", icon: Gauge, visible: canViewFinanceData },
       { href: "/dashboard/imd", label: "Mätare & IMD", icon: Gauge, visible: canViewFinanceData },
       { href: "/dashboard/dokument", label: "Dokument", icon: FileArchive },
       { href: "/dashboard/offerter", label: "Offerter", icon: ReceiptText, visible: canViewFinanceData },
@@ -116,7 +116,7 @@ const navigation: NavGroup[] = [
     label: "Organisation",
     items: [
       { href: "/dashboard/boendeportal", label: "Boendeportal", icon: MessageSquareText },
-      { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness },
+      { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness, visible: canViewOperations },
       { href: "/dashboard/team", label: "Team", icon: Users, visible: (role) => canManageTeam(role) || canViewLeasingData(role) },
       { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck, visible: canManageCompany },
       { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug, visible: canManageIntegrations },
