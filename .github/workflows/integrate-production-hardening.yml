@@ -1,11 +1,10 @@
 name: Integrate production hardening
 
 on:
-  push:
+  pull_request:
     branches:
-      - integration/revalta-production-hardening-20260727
-    paths:
-      - .github/workflows/integrate-production-hardening.yml
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
@@ -16,6 +15,7 @@ concurrency:
 
 jobs:
   integrate-and-validate:
+    if: github.head_ref == 'integration/revalta-production-hardening-20260727'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
