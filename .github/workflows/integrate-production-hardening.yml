@@ -1,0 +1,83 @@
+name: Integrate production hardening
+
+on:
+  push:
+    branches:
+      - integration/revalta-production-hardening-20260727
+    paths:
+      - .github/workflows/integrate-production-hardening.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-production-hardening
+  cancel-in-progress: false
+
+jobs:
+  integrate-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: integration/revalta-production-hardening-20260727
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch source branches
+        run: |
+          git fetch origin \
+            cursor/product-hardening-followthrough-6157 \
+            cursor/wo-board-role-scope-6157 \
+            cursor/staff-read-hardening-6157
+
+      - name: Merge reviewed feature stacks
+        run: |
+          set -euo pipefail
+          git merge --no-edit --no-ff -X theirs origin/cursor/product-hardening-followthrough-6157
+          git merge --no-edit --no-ff -X theirs origin/cursor/wo-board-role-scope-6157
+          git merge --no-edit --no-ff -X theirs origin/cursor/staff-read-hardening-6157
+
+      - name: Remove temporary workflow from final tree
+        run: git rm .github/workflows/integrate-production-hardening.yml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npm run db:validate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and route tests
+        run: npm run test:ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build:ci
+        env:
+          DATABASE_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
+          DIRECT_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
+          JWT_SECRET: ci-only-jwt-secret-at-least-32-characters-long
+          CRON_SECRET: ci-only-cron-secret-at-least-32-characters-long
+          NEXT_PUBLIC_APP_URL: https://www.revalta.se
+
+      - name: Commit validated integration
+        run: |
+          git commit -m "feat: integrate production hardening and resident security stack"
+          git push origin HEAD:integration/revalta-production-hardening-20260727
