@@ -63,18 +63,20 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/sla", () => ({ calculateDueDate: vi.fn(() => new Date("2026-07-28T10:00:00.000Z")) }));
 vi.mock("@/lib/schema-readiness", () => ({
   isMissingSchemaColumnError: isMissingSchemaColumnErrorMock,
-  schemaMismatchUserMessage: "Databasen är inte redo",
+  schemaMismatchUserMessage: vi.fn(() => "Databasen är inte redo"),
 }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { POST } from "./route";
+
+const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
 
 function request(body: Record<string, unknown> = {}) {
   return new Request("https://www.revalta.se/api/public/tickets?companySlug=demo", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-request-id": "public-request-1",
+      "x-request-id": REQUEST_ID,
     },
     body: JSON.stringify({
       reporterName: "Anna Boende",
@@ -236,7 +238,7 @@ describe("POST /api/public/tickets", () => {
     const response = await POST(request());
 
     expect(response.status).toBe(201);
-    expect(response.headers.get("x-request-id")).toBe("public-request-1");
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
     expect(response.headers.get("cache-control")).toContain("private, no-store");
     expect(loggerWarnMock).toHaveBeenCalledWith(
       "public ticket created with side-effect failures",
