@@ -54,10 +54,11 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 import { GET } from "./route";
 
 const params = Promise.resolve({ reference: "rv-2026-test" });
+const REQUEST_ID = "44444444-4444-4444-8444-444444444444";
 
 function request(query = "?email=boende@example.se") {
   return new Request(`https://www.revalta.se/api/public/tickets/RV-2026-TEST${query}`, {
-    headers: { "x-request-id": "track-request-1" },
+    headers: { "x-request-id": REQUEST_ID },
   });
 }
 
@@ -128,7 +129,7 @@ describe("GET /api/public/tickets/[reference]", () => {
 
     expect(response.status).toBe(200);
     expect(body.trackingToken).toBe("rotated-token");
-    expect(response.headers.get("x-request-id")).toBe("track-request-1");
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
     expect(response.headers.get("cache-control")).toContain("private, no-store");
     expect(response.headers.get("vercel-cdn-cache-control")).toBe("no-store");
     expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
