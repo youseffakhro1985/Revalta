@@ -192,7 +192,7 @@ export async function GET(request: Request) {
       return apiErrorResponse({
         status: 503,
         code: API_ERROR_CODES.serviceUnavailable,
-        message: schemaMismatchUserMessage,
+        message: schemaMismatchUserMessage(),
         requestId,
       });
     }
