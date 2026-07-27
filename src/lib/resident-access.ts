@@ -3,7 +3,10 @@
  * Residents may only use the self-service portal surfaces listed here.
  */
 
+import { isResident } from "@/lib/permissions";
+
 export const RESIDENT_HOME_PATH = "/dashboard/boendeportal";
+export const STAFF_HOME_PATH = "/dashboard";
 
 const RESIDENT_DASHBOARD_PREFIXES = [
   "/dashboard/boendeportal",
@@ -58,4 +61,9 @@ export function isStaffOnlyApiPath(pathname: string) {
 
 export function residentHomePath() {
   return RESIDENT_HOME_PATH;
+}
+
+/** Landing path after login or invite acceptance. */
+export function homePathForRole(role: string) {
+  return isResident(role) ? RESIDENT_HOME_PATH : STAFF_HOME_PATH;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  homePathForRole,
   isPublicApiPath,
   isResidentAllowedApiPath,
   isResidentAllowedDashboardPath,
@@ -59,5 +60,11 @@ describe("resident-access allowlists", () => {
 
   it("exposes a stable resident home path", () => {
     expect(residentHomePath()).toBe("/dashboard/boendeportal");
+  });
+
+  it("routes residents and staff to the right home after auth", () => {
+    expect(homePathForRole("resident")).toBe("/dashboard/boendeportal");
+    expect(homePathForRole("manager")).toBe("/dashboard");
+    expect(homePathForRole("viewer")).toBe("/dashboard");
   });
 });
