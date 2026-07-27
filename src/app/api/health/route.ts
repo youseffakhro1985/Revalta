@@ -25,21 +25,44 @@ function buildEnvSnapshot() {
   };
 }
 
+function buildReleaseSnapshot() {
+  const commitSha = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local";
+
+  return {
+    commitSha,
+    shortCommitSha: commitSha === "local" ? "local" : commitSha.slice(0, 7),
+    branch: process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME || "local",
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
+    deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
+  };
+}
+
+function healthResponse(body: unknown, status = 200, release = buildReleaseSnapshot()) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, max-age=0",
+      "CDN-Cache-Control": "no-store",
+      "Vercel-CDN-Cache-Control": "no-store",
+      "X-Revalta-Release": release.shortCommitSha,
+      "X-Revalta-Environment": release.environment,
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 export async function GET() {
   const user = await getCurrentUser();
   const isPublic = !user;
   const startedAt = Date.now();
-  const release = {
-    commitSha: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local",
-    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
-  };
+  const release = buildReleaseSnapshot();
   const modernStorageOnly = isModernStorageOnly();
   const env = buildEnvSnapshot();
 
   try {
     await db.$queryRaw`SELECT 1`;
     if (isPublic) {
-      return NextResponse.json({
+      return healthResponse({
         status: "ok",
         ok: true,
         database: "ok",
@@ -47,10 +70,10 @@ export async function GET() {
         release,
         modernStorageOnly,
         checkedAt: new Date().toISOString(),
-      });
+      }, 200, release);
     }
     if (!canViewOperations(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att visa driftstatus" }, { status: 403 });
+      return healthResponse({ error: "Du saknar behörighet att visa driftstatus" }, 403, release);
     }
 
     const schema = await getSchemaReadiness();
@@ -65,7 +88,7 @@ export async function GET() {
       && schema.ready,
     );
 
-    return NextResponse.json({
+    return healthResponse({
       status: schema.ready ? "ok" : "degraded",
       ok: schema.ready,
       database: "ok",
@@ -80,10 +103,10 @@ export async function GET() {
         prefersBlobToken: env.blobReadWriteToken,
       },
       checkedAt: new Date().toISOString(),
-    }, { status: schema.ready ? 200 : 503 });
+    }, schema.ready ? 200 : 503, release);
   } catch (error) {
     console.error("Health check error:", error);
-    return NextResponse.json({
+    return healthResponse({
       status: "error",
       ok: false,
       database: "error",
@@ -92,6 +115,6 @@ export async function GET() {
       modernStorageOnly,
       ...(isPublic ? {} : { env }),
       checkedAt: new Date().toISOString(),
-    }, { status: 500 });
+    }, 500, release);
   }
 }
