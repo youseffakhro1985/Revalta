@@ -64,6 +64,9 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { POST } from "./route";
 
+const DEFAULT_REQUEST_ID = "55555555-5555-4555-8555-555555555555";
+const CORRELATED_REQUEST_ID = "66666666-6666-4666-8666-666666666666";
+
 const user = {
   id: "user-1",
   company_id: "company-1",
@@ -83,7 +86,7 @@ const comment = {
   user: { name: "Anna Admin", email: "anna@example.se" },
 };
 
-function request(body: unknown, requestId = "request-1") {
+function request(body: unknown, requestId = DEFAULT_REQUEST_ID) {
   return new Request("https://www.revalta.se/api/tickets/ticket-1/comments", {
     method: "POST",
     headers: { "content-type": "application/json", "x-request-id": requestId },
@@ -201,11 +204,11 @@ describe("POST /api/tickets/[id]/comments", () => {
 
   it("returns a correlated no-store response", async () => {
     const response = await POST(
-      request({ body: "Kontroll utförd" }, "request-comment-1"),
+      request({ body: "Kontroll utförd" }, CORRELATED_REQUEST_ID),
       context(),
     );
 
-    expect(response.headers.get("x-request-id")).toBe("request-comment-1");
+    expect(response.headers.get("x-request-id")).toBe(CORRELATED_REQUEST_ID);
     expect(response.headers.get("cache-control")).toContain("private");
     expect(response.headers.get("cache-control")).toContain("no-store");
   });
