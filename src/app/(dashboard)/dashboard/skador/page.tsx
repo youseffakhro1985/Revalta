@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { InlineAlert } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address?: string; city?: string };
@@ -32,6 +33,7 @@ const closedStatuses = new Set(["settled", "closed"]);
 export default function InsuranceClaimsPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState("");
@@ -44,7 +46,7 @@ export default function InsuranceClaimsPage() {
     const response = await fetch("/api/insurance-claims", { cache: "no-store" });
     const data = await readResponseJson(response);
     if (!response.ok) setError(data.error || "Kunde inte läsa skadeärenden");
-    else { setClaims(data.claims || []); setProperties(data.properties || []); }
+    else { setClaims(data.claims || []); setProperties(data.properties || []); setCanManage(Boolean(data.permissions?.canManage)); }
     setLoading(false);
   }
 
@@ -138,6 +140,10 @@ export default function InsuranceClaimsPage() {
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["Öppna ärenden", openClaims], ["Beräknad kostnad", money.format(totalEstimated)], ["Försäkringsersättning", money.format(totalCompensation)], ["Nettokostnad", money.format(totalNet)]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-sand-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,34,31,0.04)]"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">{label}</p><p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink-900">{value}</p></div>)}</div>
 
+    {error ? <InlineAlert tone="error">{error}</InlineAlert> : null}
+    {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra skadeärenden.</InlineAlert> : null}
+
+    {canManage ? (
     <form onSubmit={submit} className="rounded-xl border border-sand-200 bg-white p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)]">
       <div className="mb-5"><h2 className="font-display text-xl font-semibold text-ink-900">Registrera skadeärende</h2><p className="mt-1 text-sm text-ink-500">Dokumentera händelsen och den ekonomiska bedömningen.</p></div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -155,8 +161,9 @@ export default function InsuranceClaimsPage() {
         <input name="compensation" type="number" min="0" placeholder="Ersättning" className={field} />
       </div>
       <textarea name="note" placeholder="Anteckning och nästa steg" className="mt-4 min-h-24 w-full rounded-lg border border-sand-200 bg-white px-3 py-3 text-sm outline-none focus:border-petroleum-500" />
-      <div className="mt-4 flex items-center justify-between gap-4">{error ? <p className="text-sm text-red-700">{error}</p> : <span />}<button disabled={saving} className="rounded-lg bg-petroleum-800 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{saving ? "Sparar…" : "Registrera skadeärende"}</button></div>
+      <div className="mt-4 flex justify-end"><button disabled={saving} className="rounded-lg bg-petroleum-800 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{saving ? "Sparar…" : "Registrera skadeärende"}</button></div>
     </form>
+    ) : null}
 
     <div className="overflow-hidden rounded-xl border border-sand-200 bg-white shadow-[0_1px_2px_rgba(17,34,31,0.04)]">
       <div className="border-b border-sand-200 px-6 py-5"><h2 className="font-display text-xl font-semibold text-ink-900">Ärendeöversikt</h2></div>
@@ -186,7 +193,7 @@ export default function InsuranceClaimsPage() {
                     <span className="inline-flex h-fit rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-medium text-ink-600">
                       {statusLabel[claim.status || "reported"]}
                     </span>
-                    {claim.source !== "legacy" ? (
+                    {canManage && claim.source !== "legacy" ? (
                       <>
                         <select
                           disabled={updatingId === claim.id}
@@ -212,7 +219,7 @@ export default function InsuranceClaimsPage() {
                     ) : null}
                   </div>
                 </div>
-                {editingId === claim.id && canEditFields ? (
+                {canManage && editingId === claim.id && canEditFields ? (
                   <div className="mt-4 grid gap-3 border-t border-sand-100 pt-4 md:grid-cols-2 xl:grid-cols-4">
                     <input className={field} placeholder="Rubrik" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
                     <input className={field} placeholder="Skadeplats" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />

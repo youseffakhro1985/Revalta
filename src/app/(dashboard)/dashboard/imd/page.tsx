@@ -44,6 +44,7 @@ export default function ImdPage() {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [propertyId, setPropertyId] = useState("");
   const [leaseId, setLeaseId] = useState("");
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [linkingId, setLinkingId] = useState("");
@@ -72,6 +73,7 @@ export default function ImdPage() {
       setProperties(data.properties || []);
       setLeases(data.leases || []);
       setReadings(data.readings || []);
+      setCanManage(Boolean(data.permissions?.canManage));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta mätvärden");
     } finally {
@@ -240,6 +242,10 @@ export default function ImdPage() {
         <MetricCard icon={CreditCard} label="Öppna debiteringar" value={totals.openDebits.toLocaleString("sv-SE")} />
       </section>
 
+      {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
+      {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra mätvärden.</InlineAlert> : null}
+
+      {canManage ? (
       <Panel title="Registrera avläsning" description="Förbrukning, debiteringsbelopp och öppen debiteringsrad skapas automatiskt.">
         <form action={submit} className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -272,10 +278,9 @@ export default function ImdPage() {
             <input name="note" placeholder="Anteckning" className={`${premiumFieldClass} md:col-span-2 xl:col-span-2`} />
             <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Spara avläsning"}</button>
           </div>
-          {error ? <InlineAlert>{error}</InlineAlert> : null}
-          {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
         </form>
       </Panel>
+      ) : null}
 
       <Panel title="Avläsningar och debitering" description="Samlad historik med förbrukning, pris, debiteringsbelopp och koppling till hyresavi." bodyClassName="p-0">
         {loading ? (
@@ -294,7 +299,7 @@ export default function ImdPage() {
               </thead>
               <tbody className="divide-y divide-sand-100">
                 {readings.map((item) => {
-                  const canEdit = item.source === "table" && !item.debit?.rent_notice_id;
+                  const canEdit = canManage && item.source === "table" && !item.debit?.rent_notice_id;
                   const canVoid = canEdit;
                   return (
                   <Fragment key={item.id}>
@@ -309,7 +314,7 @@ export default function ImdPage() {
                     <td className="px-5 py-4">
                       {item.debit?.status === "linked" ? (
                         <span className="text-xs font-semibold text-emerald-800">Kopplad till avi</span>
-                      ) : item.debit?.status === "open" && item.source === "table" ? (
+                      ) : canManage && item.debit?.status === "open" && item.source === "table" ? (
                         <button
                           type="button"
                           disabled={linkingId === item.id}
@@ -318,6 +323,8 @@ export default function ImdPage() {
                         >
                           {linkingId === item.id ? "Kopplar…" : "Skapa avi"}
                         </button>
+                      ) : item.debit?.status === "open" ? (
+                        <span className="text-xs font-semibold text-petroleum-800">Öppen debitering</span>
                       ) : item.source === "legacy" ? (
                         <span className="text-xs font-medium text-amber-800">Äldre rad – kör backfill innan ändring</span>
                       ) : (
@@ -350,7 +357,7 @@ export default function ImdPage() {
                       </div>
                     </td>
                   </tr>
-                  {editingId === item.id ? (
+                  {canManage && editingId === item.id ? (
                     <tr className="bg-sand-50/70">
                       <td colSpan={9} className="px-5 py-4">
                         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
