@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, BadgeCheck, ClipboardList, Clock3, FolderKanban, Gauge, Search, UserRound } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
+import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type SlaRisk = "overdue" | "critical" | "soon" | "normal" | "fulfilled" | "paused" | "not_configured";
@@ -169,6 +170,11 @@ export default function WorkOrdersPage() {
   return <div className="space-y-8">
     <PageHeader eyebrow="Operativ förvaltning" title="Arbetsordrar" description="Prioritera efter serverberäknad svarstid, lösningstid, ansvar och verklig SLA-risk." action={<div className="flex flex-wrap gap-2"><Link href="/dashboard/arbetsorder/ny" className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200">Ny arbetsorder</Link><Link href="/dashboard/felanmalan" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-5 text-sm font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800">Skapa från ärende</Link></div>} />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
+    <SoftDeleteUndoBanner
+      entityLabel="Arbetsordern"
+      restoreApiPath={(id) => `/api/work-orders/${id}/restore`}
+      detailPath={(id) => `/dashboard/arbetsorder/${id}`}
+    />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={AlertTriangle} label="SLA passerad" value={slaSummary?.overdue ?? 0} hint="Aktiva arbetsordrar utanför avtalad tid" />

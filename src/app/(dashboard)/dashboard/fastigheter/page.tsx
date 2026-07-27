@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Building2, DoorOpen, MapPin } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
 
 type Property = { id:string; name:string; address:string; postal_code:string|null; city:string; property_identifier:string|null; property_type:string; status:string; created_at:string; _count:{tickets:number;buildings:number;units:number} };
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" });
@@ -31,6 +32,7 @@ export default function PropertiesPage() {
       <MetricCard label="Aktiva ärenden" value={totals.tickets} />
     </section>
     {error?<InlineAlert>{error}</InlineAlert>:null}{success?<InlineAlert tone="success">{success}</InlineAlert>:null}
+    <SoftDeleteUndoBanner entityLabel="Fastigheten" restoreApiPath={(id)=>`/api/properties/${id}/restore`} detailPath={(id)=>`/dashboard/fastigheter/${id}`} />
     <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
       <Panel title="Lägg till fastighet" description="Registrera grunduppgifterna. Detaljer fylls i på fastighetskortet.">
         <form onSubmit={submit} className="space-y-4">

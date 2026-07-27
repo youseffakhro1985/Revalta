@@ -186,7 +186,7 @@ export default function WorkOrderDetailPage() {
       const response = await fetch(`/api/work-orders/${id}`, { method: "DELETE" });
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort arbetsordern");
-      router.push("/dashboard/arbetsorder");
+      router.push(`/dashboard/arbetsorder?deleted=${encodeURIComponent(String(id))}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte ta bort arbetsordern");
       setDeleting(false);

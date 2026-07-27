@@ -102,7 +102,7 @@ export function PropertyRegistryManager({
       const response = await fetch(`/api/properties/${propertyId}`, { method: "DELETE" });
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort fastigheten");
-      router.push("/dashboard/fastigheter");
+      router.push(`/dashboard/fastigheter?deleted=${encodeURIComponent(propertyId)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte ta bort fastigheten");
       setDeleting(false);

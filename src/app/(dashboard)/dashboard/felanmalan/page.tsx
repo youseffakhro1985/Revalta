@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ClipboardList, Filter, Inbox, Search } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
+import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
 import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -112,6 +113,11 @@ export default function FelanmalanPage() {
 
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
+    <SoftDeleteUndoBanner
+      entityLabel="Ärendet"
+      restoreApiPath={(id) => `/api/tickets/${id}/restore`}
+      detailPath={(id) => `/dashboard/felanmalan/${id}`}
+    />
 
     <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
       <Panel title="Nytt ärende" description="Registrera en tydlig felanmälan och fördela den direkt." bodyClassName="p-6">

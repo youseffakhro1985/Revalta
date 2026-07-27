@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, CircleDollarSign, FolderKanban, TrendingUp, WalletCards } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Project = {
@@ -121,6 +122,11 @@ export default function ProjectsPage() {
       <MetricCard icon={CircleDollarSign} label="Utfall" value={money.format(totals.actual)} />
     </section>
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
+    <SoftDeleteUndoBanner
+      entityLabel="Projektet"
+      restoreApiPath={(id) => `/api/projects/${id}/restore`}
+      detailPath={(id) => `/dashboard/projekt/${id}`}
+    />
 
     <Panel title="Nytt projekt" description="Registrera ansvar, entreprenör, tidsplan, risk och ekonomiska ramar.">
       <form action={createProject} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
