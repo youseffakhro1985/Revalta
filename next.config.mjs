@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const isDevelopment = process.env.NODE_ENV === "development";
-const isPreview = process.env.VERCEL_ENV === "preview";
+const vercelEnvironment = process.env.VERCEL_ENV;
+const isPreview = vercelEnvironment === "preview";
+const isProduction = vercelEnvironment === "production";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -34,6 +36,7 @@ const securityHeaders = [
         { key: "X-Revalta-Environment", value: "preview" },
       ]
     : []),
+  ...(isProduction ? [{ key: "X-Revalta-Environment", value: "production" }] : []),
 ];
 
 const noStoreHeaders = [{ key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" }];

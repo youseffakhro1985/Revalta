@@ -35,15 +35,15 @@ describe("Next.js environment security headers", () => {
     expect(headers.get("Strict-Transport-Security")).toBe("max-age=63072000; includeSubDomains");
   });
 
-  it("never adds Preview markers to Production", async () => {
+  it("identifies Production without adding Preview indexing directives", async () => {
     const headers = await loadGlobalHeaders("production", "production");
 
     expect(headers.has("X-Robots-Tag")).toBe(false);
-    expect(headers.has("X-Revalta-Environment")).toBe(false);
+    expect(headers.get("X-Revalta-Environment")).toBe("production");
     expect(headers.get("Strict-Transport-Security")).toBe("max-age=63072000; includeSubDomains");
   });
 
-  it("keeps local development usable without weakening deployed environments", async () => {
+  it("keeps local development usable without deployment markers", async () => {
     const headers = await loadGlobalHeaders(undefined, "development");
     const csp = headers.get("Content-Security-Policy");
 
