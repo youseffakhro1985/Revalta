@@ -69,6 +69,8 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { POST } from "./route";
 
+const DEFAULT_REQUEST_ID = "77777777-7777-4777-8777-777777777777";
+const CORRELATED_REQUEST_ID = "88888888-8888-4888-8888-888888888888";
 const user = {
   id: "user-1",
   company_id: "company-1",
@@ -86,7 +88,7 @@ const attachment = {
   created_at: new Date("2026-07-27T20:00:00Z"),
 };
 
-function request(requestId = "request-attachment-1") {
+function request(requestId = DEFAULT_REQUEST_ID) {
   return {
     headers: new Headers({ "x-request-id": requestId }),
     formData: vi.fn().mockResolvedValue({ get: () => file }),
@@ -189,9 +191,9 @@ describe("POST /api/tickets/[id]/attachments", () => {
   });
 
   it("returns a private correlated response", async () => {
-    const response = await POST(request("request-attachment-2"), context());
+    const response = await POST(request(CORRELATED_REQUEST_ID), context());
 
-    expect(response.headers.get("x-request-id")).toBe("request-attachment-2");
+    expect(response.headers.get("x-request-id")).toBe(CORRELATED_REQUEST_ID);
     expect(response.headers.get("cache-control")).toContain("private");
     expect(response.headers.get("cache-control")).toContain("no-store");
   });
