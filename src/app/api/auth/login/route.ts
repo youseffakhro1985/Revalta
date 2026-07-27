@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { comparePassword, signToken } from "@/lib/auth";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { resolveRequestId, withRequestCorrelation } from "@/lib/request-correlation";
 import { isValidEmail, normalizeEmail } from "@/lib/security";
 import {
   LEGACY_SESSION_COOKIE_NAME,
@@ -10,17 +12,21 @@ import {
   expiredSessionCookieOptions,
   sessionCookieOptions,
 } from "@/lib/session-policy";
+import { createLogger } from "@/lib/structured-logger";
 
-function rateLimitHeaders(resetAt: Date, remaining: number) {
-  return {
-    "Cache-Control": "no-store",
-    "Retry-After": String(Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))),
-    "X-RateLimit-Remaining": String(Math.max(0, remaining)),
-    "X-Content-Type-Options": "nosniff",
-  };
-}
+const ROUTE = "/api/auth/login";
 
 export async function POST(request: Request) {
+  const requestId = resolveRequestId(request.headers);
+  const startedAt = Date.now();
+  const logger = createLogger({
+    route: ROUTE,
+    method: "POST",
+    requestId,
+    release: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local",
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
+  });
+
   try {
     const ip = getClientIp(request);
     const body = await request.json().catch(() => ({})) as { email?: unknown; password?: unknown };
@@ -33,20 +39,47 @@ export async function POST(request: Request) {
     ]);
     const strictest = ipLimit.resetAt > accountLimit.resetAt ? ipLimit : accountLimit;
     if (!ipLimit.allowed || !accountLimit.allowed) {
-      return NextResponse.json(
-        { error: "För många inloggningsförsök. Vänta en stund och prova igen." },
-        { status: 429, headers: rateLimitHeaders(strictest.resetAt, strictest.remaining) },
-      );
+      const retryAfter = String(Math.max(1, Math.ceil((strictest.resetAt.getTime() - Date.now()) / 1000)));
+      logger.warn("auth.login.rate_limited", {
+        eventCode: "auth.login.rate_limited",
+        latencyMs: Date.now() - startedAt,
+        retryAfterSeconds: Number(retryAfter),
+      });
+      return apiErrorResponse({
+        status: 429,
+        code: API_ERROR_CODES.rateLimited,
+        message: "För många inloggningsförsök. Vänta en stund och prova igen.",
+        requestId,
+        headers: { "Retry-After": retryAfter },
+      });
     }
 
     if (!isValidEmail(normalizedEmail) || password.length < 1 || password.length > 512) {
-      return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      logger.info("auth.login.rejected", {
+        eventCode: "auth.login.invalid_credentials",
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Ogiltiga uppgifter",
+        requestId,
+      });
     }
 
     const user = await db.user.findUnique({ where: { email: normalizedEmail }, include: { company: { select: { status: true } } } });
     const valid = user ? await comparePassword(password, user.password) : false;
     if (!user || !valid || user.status !== "active" || (user.company && user.company.status !== "active")) {
-      return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      logger.info("auth.login.rejected", {
+        eventCode: "auth.login.invalid_credentials",
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Ogiltiga uppgifter",
+        requestId,
+      });
     }
 
     const latestPasswordChange = await db.auditLog.findFirst({
@@ -70,12 +103,36 @@ export async function POST(request: Request) {
     cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
     cookieStore.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
 
-    return NextResponse.json(
-      { success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } },
-      { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
+    logger.info("auth.login.succeeded", {
+      eventCode: "auth.login.succeeded",
+      userId: user.id,
+      latencyMs: Date.now() - startedAt,
+    });
+
+    return withRequestCorrelation(
+      NextResponse.json(
+        { success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } },
+        {
+          headers: {
+            "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+            "CDN-Cache-Control": "no-store",
+            "Vercel-CDN-Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+          },
+        },
+      ),
+      requestId,
     );
   } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    logger.error("auth.login.failed", error, {
+      eventCode: "auth.login.failed",
+      latencyMs: Date.now() - startedAt,
+    });
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId,
+    });
   }
 }
