@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, BadgeCheck, ClipboardList, Clock3, FolderKanban, Gauge, Search, UserRound } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
-import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
+import { WorkOrderQuickActions, type QuickActionUser } from "@/components/dashboard/work-order-quick-actions";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type SlaRisk = "overdue" | "critical" | "soon" | "normal" | "fulfilled" | "paused" | "not_configured";
@@ -46,14 +46,8 @@ type WorkOrder = {
   property: { id: string; name: string; address: string; city: string };
   unit: { id: string; designation: string; unit_type: string } | null;
   ticket: { id: string; public_reference: string | null; title: string } | null;
-  assigned_to: { id: string; name: string | null; email: string } | null;
+  assigned_to: QuickActionUser | null;
   projects: { id: string; name: string; status: string }[];
-};
-
-type SlaSummary = Record<SlaRisk, number> & {
-  total: number;
-  awaitingResponse: number;
-  awaitingResolution: number;
 };
 
 type BoardColumn = { key: string; label: string; statuses: readonly string[]; description: string };
@@ -104,7 +98,15 @@ function riskPresentation(risk: SlaRisk) {
 export default function WorkOrdersPage() {
   const router = useRouter();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [slaSummary, setSlaSummary] = useState<SlaSummary | null>(null);
+  const [assignees, setAssignees] = useState<QuickActionUser[]>([]);
+  const [canManage, setCanManage] = useState(false);
+  const [canAssign, setCanAssign] = useState(false);
+  const [scopedToAssigned, setScopedToAssigned] = useState(false);
+  const [slaSummary, setSlaSummary] = useState<Record<SlaRisk, number> & {
+    total: number;
+    awaitingResponse: number;
+    awaitingResolution: number;
+  } | null>(null);
   const [evaluatedAt, setEvaluatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -122,12 +124,18 @@ export default function WorkOrdersPage() {
         const data = await readResponseJson<{
           error?: string;
           workOrders?: WorkOrder[];
-          slaSummary?: SlaSummary | null;
+          assignees?: QuickActionUser[];
+          permissions?: { canManage?: boolean; canAssign?: boolean; scopedToAssigned?: boolean };
+          slaSummary?: typeof slaSummary;
           evaluatedAt?: string | null;
         }>(response);
         if (!response.ok) throw new Error(data.error || "Kunde inte hämta arbetsordrar");
         if (!mounted) return;
         setWorkOrders(data.workOrders || []);
+        setAssignees(data.assignees || []);
+        setCanManage(Boolean(data.permissions?.canManage));
+        setCanAssign(Boolean(data.permissions?.canAssign));
+        setScopedToAssigned(Boolean(data.permissions?.scopedToAssigned));
         setSlaSummary(data.slaSummary || null);
         setEvaluatedAt(data.evaluatedAt || null);
       } catch (err) {
@@ -167,14 +175,29 @@ export default function WorkOrdersPage() {
     setAssignmentFilter("all");
   }
 
+  function updateWorkOrder(id: string, patch: { status?: string; assigned_to?: QuickActionUser | null }) {
+    setWorkOrders((current) => current.map((workOrder) => (
+      workOrder.id === id
+        ? {
+            ...workOrder,
+            ...(patch.status ? { status: patch.status } : {}),
+            ...(patch.assigned_to !== undefined ? { assigned_to: patch.assigned_to } : {}),
+          }
+        : workOrder
+    )));
+  }
+
   return <div className="space-y-8">
-    <PageHeader eyebrow="Operativ förvaltning" title="Arbetsordrar" description="Prioritera efter serverberäknad svarstid, lösningstid, ansvar och verklig SLA-risk." action={<div className="flex flex-wrap gap-2"><Link href="/dashboard/arbetsorder/ny" className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200">Ny arbetsorder</Link><Link href="/dashboard/felanmalan" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-5 text-sm font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800">Skapa från ärende</Link></div>} />
-    {error ? <InlineAlert>{error}</InlineAlert> : null}
-    <SoftDeleteUndoBanner
-      entityLabel="Arbetsordern"
-      restoreApiPath={(id) => `/api/work-orders/${id}/restore`}
-      detailPath={(id) => `/dashboard/arbetsorder/${id}`}
+    <PageHeader
+      eyebrow="Operativ förvaltning"
+      title="Arbetsordrar"
+      description={scopedToAssigned
+        ? "Dina tilldelade arbetsordrar med serverberäknad SLA-risk. Ändra status direkt i tavlan."
+        : "Prioritera efter serverberäknad svarstid, lösningstid, ansvar och verklig SLA-risk. Tilldela och flytta status direkt i tavlan."}
+      action={canManage ? <div className="flex flex-wrap gap-2"><Link href="/dashboard/arbetsorder/ny" className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200">Ny arbetsorder</Link><Link href="/dashboard/felanmalan" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-5 text-sm font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800">Skapa från ärende</Link></div> : undefined}
     />
+    {error ? <InlineAlert>{error}</InlineAlert> : null}
+    {scopedToAssigned ? <InlineAlert tone="info">Du ser endast arbetsordrar som är tilldelade dig.</InlineAlert> : null}
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={AlertTriangle} label="SLA passerad" value={slaSummary?.overdue ?? 0} hint="Aktiva arbetsordrar utanför avtalad tid" />
@@ -194,7 +217,7 @@ export default function WorkOrdersPage() {
       {evaluatedAt ? <p className="mt-4 text-xs text-ink-400">SLA beräknad {dateTime.format(new Date(evaluatedAt))}</p> : null}
     </Panel>
 
-    <Panel title="Planeringstavla" description="Sök och filtrera arbetsorderportföljen efter serverns aktuella SLA-bedömning." bodyClassName="p-4 sm:p-5">
+    <Panel title="Planeringstavla" description="Sök, filtrera och hantera arbetsorderportföljen efter serverns aktuella SLA-bedömning." bodyClassName="p-4 sm:p-5">
       <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_190px_190px_190px_auto]">
         <label className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-300" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök nummer, arbetsorder, fastighet eller ansvarig" className={`${premiumFieldClass} pl-10`} aria-label="Sök arbetsordrar" /></label>
         <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera arbetstyp"><option value="all">Alla arbetstyper</option>{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
@@ -202,14 +225,29 @@ export default function WorkOrdersPage() {
         <select value={assignmentFilter} onChange={(event) => setAssignmentFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera tilldelning"><option value="all">Alla ansvarslägen</option><option value="assigned">Tilldelade</option><option value="unassigned">Ej tilldelade</option></select>
         <button type="button" onClick={clearFilters} disabled={!hasFilters} className="h-11 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40">Rensa</button>
       </div>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-sand-100 pt-4"><p className="text-xs font-medium text-ink-400">{visibleWorkOrders.length} arbetsordrar visas</p><p className="text-xs text-ink-400">Status ändras i arbetsorderdetaljen för att bevara orsak och revisionsspår.</p></div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-sand-100 pt-4">
+        <p className="text-xs font-medium text-ink-400">{visibleWorkOrders.length} arbetsordrar visas</p>
+        <p className="text-xs text-ink-400">{canManage || canAssign ? "Status och tilldelning sparas med revisionsspår." : "Öppna en arbetsorder för mer detaljer."}</p>
+      </div>
 
       {loading ? <div className="mt-5 grid gap-4 xl:grid-cols-5">{columns.map((column) => <div key={column.key} className="h-96 animate-pulse rounded-2xl bg-sand-100" />)}</div> : visibleWorkOrders.length === 0 ? <div className="mt-5"><EmptyState title="Inga arbetsordrar matchar filtreringen" description="Rensa filtren eller skapa en arbetsorder från ett ärende." /></div> : <div className="mt-5 grid gap-4 xl:grid-cols-5">
         {columns.map((column) => {
           const items = visibleWorkOrders.filter((workOrder) => column.statuses.includes(workOrder.status));
           return <section key={column.key} className="min-h-[440px] rounded-2xl border border-sand-200 bg-[#F1F1EC] p-3">
             <div className="flex items-start justify-between gap-3 px-2 py-2"><div><h2 className="text-sm font-semibold text-ink-900">{column.label}</h2><p className="mt-0.5 text-xs leading-4 text-ink-400">{column.description}</p></div><span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500">{items.length}</span></div>
-            <div className="mt-2 space-y-3">{items.map((workOrder) => <WorkOrderCard key={workOrder.id} workOrder={workOrder} />)}{items.length === 0 ? <div className="rounded-xl border border-dashed border-sand-300 bg-white/60 p-6 text-center"><ClipboardList className="mx-auto h-5 w-5 text-ink-300" /><p className="mt-2 text-xs text-ink-400">Inga arbetsordrar</p></div> : null}</div>
+            <div className="mt-2 space-y-3">
+              {items.map((workOrder) => (
+                <WorkOrderCard
+                  key={workOrder.id}
+                  workOrder={workOrder}
+                  users={assignees}
+                  canManage={canManage}
+                  canAssign={canAssign}
+                  onUpdated={(patch) => updateWorkOrder(workOrder.id, patch)}
+                />
+              ))}
+              {items.length === 0 ? <div className="rounded-xl border border-dashed border-sand-300 bg-white/60 p-6 text-center"><ClipboardList className="mx-auto h-5 w-5 text-ink-300" /><p className="mt-2 text-xs text-ink-400">Inga arbetsordrar</p></div> : null}
+            </div>
           </section>;
         })}
       </div>}
@@ -221,7 +259,19 @@ function SlaMini({ label, value }: { label: string; value: number }) {
   return <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4"><p className="text-xs font-medium text-ink-400">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-ink-950">{value}</p></div>;
 }
 
-function WorkOrderCard({ workOrder }: { workOrder: WorkOrder }) {
+function WorkOrderCard({
+  workOrder,
+  users,
+  canManage,
+  canAssign,
+  onUpdated,
+}: {
+  workOrder: WorkOrder;
+  users: QuickActionUser[];
+  canManage: boolean;
+  canAssign: boolean;
+  onUpdated: (patch: { status?: string; assigned_to?: QuickActionUser | null }) => void;
+}) {
   const enterprise = workOrder.enterprise;
   const sla = workOrder.sla;
   const riskUi = riskPresentation(sla.risk);
@@ -234,6 +284,15 @@ function WorkOrderCard({ workOrder }: { workOrder: WorkOrder }) {
     {workOrder.projects[0] ? <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-petroleum-50 px-2.5 py-2 text-[11px] font-medium text-petroleum-700"><FolderKanban className="h-3.5 w-3.5" />{workOrder.projects[0].name}</div> : null}
     <div className="mt-4 rounded-xl border border-sand-100 bg-sand-50 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">{phaseLabels[sla.phase]}</span><Clock3 className="h-3.5 w-3.5 text-ink-300" /></div><p className={`mt-1 text-sm font-semibold ${riskUi.timeClass}`}>{timeText}</p>{sla.dueAt ? <p className="mt-1 text-[11px] text-ink-400">Deadline {dateTime.format(new Date(sla.dueAt))}</p> : null}</div>
     <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-ink-400"><span>{statusLabels[workOrder.status] || workOrder.status}</span>{formatMoney(workOrder.estimated_cost) ? <span className="font-semibold text-ink-600">{formatMoney(workOrder.estimated_cost)}</span> : null}</div>
+    <WorkOrderQuickActions
+      workOrderId={workOrder.id}
+      status={workOrder.status}
+      assignedToId={workOrder.assigned_to?.id || null}
+      users={users}
+      canManage={canManage}
+      canAssign={canAssign}
+      onUpdated={onUpdated}
+    />
     <Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg border border-sand-200 bg-sand-50 text-xs font-semibold text-petroleum-800 transition hover:border-petroleum-200 hover:bg-petroleum-50">Öppna arbetsorder</Link>
   </article>;
 }

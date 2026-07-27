@@ -31,6 +31,26 @@ export function normalizeWorkOrderPriority(value: unknown): WorkOrderPriority {
   return WORK_ORDER_PRIORITIES.includes(value as WorkOrderPriority) ? value as WorkOrderPriority : "normal";
 }
 
+/** Canonical enterprise status graph used by API and board quick-actions. */
+const ENTERPRISE_TRANSITIONS: Record<WorkOrderStatus, readonly WorkOrderStatus[]> = {
+  new: ["planned", "in_progress", "cancelled"],
+  planned: ["new", "in_progress", "waiting_material", "blocked", "cancelled"],
+  in_progress: ["planned", "waiting_material", "blocked", "completed", "cancelled"],
+  waiting_material: ["planned", "in_progress", "blocked", "cancelled"],
+  blocked: ["planned", "in_progress", "waiting_material", "cancelled"],
+  completed: ["in_progress", "invoiced"],
+  invoiced: ["completed"],
+  cancelled: ["new", "planned"],
+};
+
+export function canTransitionWorkOrder(from: WorkOrderStatus, to: WorkOrderStatus) {
+  return from === to || ENTERPRISE_TRANSITIONS[from].includes(to);
+}
+
+export function getAllowedWorkOrderTransitions(from: WorkOrderStatus) {
+  return [from, ...ENTERPRISE_TRANSITIONS[from]] as readonly WorkOrderStatus[];
+}
+
 export function workOrderSlaDeadline(createdAt: Date, priorityValue: unknown) {
   return calculateResolutionDueAt(priorityValue, createdAt);
 }

@@ -1,7 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import {
+  canAssignWorkOrders,
+  canManageTickets,
+  getCurrentUser,
+  shouldScopeToAssignedWork,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   addWorkOrderStatusEvent,
@@ -67,9 +72,19 @@ export async function GET() {
       sqlSoftDeleteGuard(db, "Property", "p"),
     ]);
 
-    const [workOrders, enterpriseRows] = await Promise.all([
+    const scopedToAssigned = shouldScopeToAssignedWork(user.role);
+    const canAssign = canAssignWorkOrders(user.role);
+    const canManage = canManageTickets(user.role);
+    const assignedScope = scopedToAssigned ? { assigned_to_id: user.id } : {};
+
+    const [workOrders, enterpriseRows, assignees] = await Promise.all([
       db.workOrder.findMany({
-        where: { company_id: user.company_id, ...workOrderActive, property: { deleted_at: null } },
+        where: {
+          company_id: user.company_id,
+          ...workOrderActive,
+          property: { deleted_at: null },
+          ...assignedScope,
+        },
         orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
         take: 500,
         // Explicit select omits deleted_at so preview works before soft-delete migrate.
@@ -104,7 +119,19 @@ export async function GET() {
         WHERE w."company_id" = ${user.company_id}
           ${workOrderGuard}
           ${propertyGuard}
+          ${scopedToAssigned ? Prisma.sql`AND w."assigned_to_id" = ${user.id}` : Prisma.empty}
       `),
+      canAssign
+        ? db.user.findMany({
+            where: {
+              company_id: user.company_id,
+              status: "active",
+              role: { in: ["owner", "admin", "manager", "technician"] },
+            },
+            orderBy: [{ name: "asc" }, { email: "asc" }],
+            select: { id: true, name: true, email: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     const now = new Date();
@@ -144,7 +171,18 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      { workOrders: enriched, slaSummary, evaluatedAt: now.toISOString() },
+      {
+        workOrders: enriched,
+        slaSummary,
+        evaluatedAt: now.toISOString(),
+        assignees,
+        permissions: {
+          canManage,
+          canAssign,
+          scopedToAssigned,
+        },
+        currentUserId: user.id,
+      },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
