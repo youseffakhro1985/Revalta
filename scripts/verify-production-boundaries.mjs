@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_BASE_URL = "https://www.revalta.se";
 const DEFAULT_ATTEMPTS = 3;
 const DEFAULT_TIMEOUT_MS = 20_000;
-const RETRY_DELAY_MS = 1_500;
+const DEFAULT_RETRY_DELAY_MS = 1_500;
 
 const globalHeaders = new Map([
   ["x-revalta-environment", "production"],
@@ -61,25 +61,26 @@ export async function requestWithRetry(url, options = {}, dependencies = {}) {
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const attempts = dependencies.attempts ?? DEFAULT_ATTEMPTS;
   const timeoutMs = dependencies.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const retryDelayMs = dependencies.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
   let lastError;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
+      const requestHeaders = new Headers(options.headers);
+      requestHeaders.set("user-agent", "Revalta-Production-Boundary-Monitor/1.0");
+      if (!requestHeaders.has("accept")) requestHeaders.set("accept", "*/*");
+
       const response = await fetchImpl(url, {
         redirect: "manual",
         ...options,
-        headers: {
-          "user-agent": "Revalta-Production-Boundary-Monitor/1.0",
-          accept: "*/*",
-          ...options.headers,
-        },
+        headers: requestHeaders,
         signal: AbortSignal.timeout(timeoutMs),
       });
       return response;
     } catch (error) {
       lastError = error;
-      if (attempt < attempts) {
-        await sleep(RETRY_DELAY_MS * attempt);
+      if (attempt < attempts && retryDelayMs > 0) {
+        await sleep(retryDelayMs * attempt);
       }
     }
   }
@@ -118,6 +119,7 @@ export async function runProductionBoundaryMonitor(baseUrl = DEFAULT_BASE_URL) {
   }
 
   const health = results.find((result) => result.label === "health-api");
+  invariant(health, "health-api result is missing");
   const payload = await health.response.json();
   validateHealthPayload(payload, health.response.headers);
 
