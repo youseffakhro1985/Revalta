@@ -80,7 +80,7 @@ export default function ProjectDetailPage() {
       const response = await fetch(`/api/projects/${id}`, { method: "DELETE" });
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort projektet");
-      router.push("/dashboard/projekt");
+      router.push(`/dashboard/projekt?deleted=${encodeURIComponent(String(id))}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte ta bort projektet");
       setSaving(false);

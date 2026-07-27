@@ -83,6 +83,9 @@ export default function LeasingPage() {
   const [saving, setSaving] = useState(false);
   const [deletingLease, setDeletingLease] = useState(false);
   const [deletingHolder, setDeletingHolder] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [undoLeaseId, setUndoLeaseId] = useState<string | null>(null);
+  const [undoHolderId, setUndoHolderId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [query, setQuery] = useState("");
@@ -234,6 +237,8 @@ export default function LeasingPage() {
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort avtalet");
       if (form.id === lease.id) setForm(emptyForm);
+      setUndoHolderId(null);
+      setUndoLeaseId(lease.id);
       setSuccess("Avtalet har tagits bort.");
       await load();
     } catch (deleteError) {
@@ -258,12 +263,50 @@ export default function LeasingPage() {
           ? { ...current, holderId: "", holderName: "", holderContactName: "", holderEmail: "", holderPhone: "", holderOrganizationNumber: "", holderType: "individual" }
           : current
       ));
+      setUndoLeaseId(null);
+      setUndoHolderId(holderId);
       setSuccess("Hyresparten har tagits bort.");
       await load();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Kunde inte ta bort hyresparten");
     } finally {
       setDeletingHolder(false);
+    }
+  }
+
+  async function restoreLease(leaseId: string) {
+    if (!canManage) return;
+    setRestoringId(leaseId);
+    setError("");
+    try {
+      const response = await fetch(`/api/leases/${leaseId}/restore`, { method: "POST" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte återställa avtalet");
+      setUndoLeaseId(null);
+      setSuccess("Avtalet har återställts.");
+      await load();
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : "Kunde inte återställa avtalet");
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
+  async function restoreHolder(holderId: string) {
+    if (!canManage) return;
+    setRestoringId(holderId);
+    setError("");
+    try {
+      const response = await fetch(`/api/lease-holders/${holderId}/restore`, { method: "POST" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte återställa hyresparten");
+      setUndoHolderId(null);
+      setSuccess("Hyresparten har återställts.");
+      await load();
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : "Kunde inte återställa hyresparten");
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -287,7 +330,31 @@ export default function LeasingPage() {
     </section>
 
     {error ? <InlineAlert>{error}</InlineAlert> : null}
-    {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
+    {success ? (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+        <p>{success}</p>
+        {undoLeaseId ? (
+          <button
+            type="button"
+            disabled={restoringId === undoLeaseId}
+            onClick={() => void restoreLease(undoLeaseId)}
+            className="text-sm font-semibold text-petroleum-800 underline underline-offset-2 transition hover:text-petroleum-950 disabled:opacity-60"
+          >
+            {restoringId === undoLeaseId ? "Återställer…" : "Återställ"}
+          </button>
+        ) : null}
+        {undoHolderId ? (
+          <button
+            type="button"
+            disabled={restoringId === undoHolderId}
+            onClick={() => void restoreHolder(undoHolderId)}
+            className="text-sm font-semibold text-petroleum-800 underline underline-offset-2 transition hover:text-petroleum-950 disabled:opacity-60"
+          >
+            {restoringId === undoHolderId ? "Återställer…" : "Återställ"}
+          </button>
+        ) : null}
+      </div>
+    ) : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra avtal.</InlineAlert> : null}
 
     <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[430px_1fr]" : "grid-cols-1"}`}>

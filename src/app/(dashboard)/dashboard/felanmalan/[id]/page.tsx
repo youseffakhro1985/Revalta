@@ -386,7 +386,7 @@ export default function TicketDetailPage() {
       const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort ärendet");
-      router.push("/dashboard/felanmalan");
+      router.push(`/dashboard/felanmalan?deleted=${encodeURIComponent(String(params.id))}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Kunde inte ta bort ärendet");
       setDeleting(false);
