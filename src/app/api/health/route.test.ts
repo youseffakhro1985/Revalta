@@ -65,6 +65,31 @@ describe("health route", () => {
     expect(body.env).toBeUndefined();
   });
 
+  it("publishes immutable release provenance with cache-safe headers", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+    vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "1234567890abcdef1234567890abcdef12345678");
+    vi.stubEnv("VERCEL_GIT_COMMIT_REF", "main");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("VERCEL_DEPLOYMENT_ID", "dpl_revalta_test");
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.release).toEqual({
+      commitSha: "1234567890abcdef1234567890abcdef12345678",
+      shortCommitSha: "1234567",
+      branch: "main",
+      environment: "production",
+      deploymentId: "dpl_revalta_test",
+    });
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
+    expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+    expect(response.headers.get("vercel-cdn-cache-control")).toBe("no-store");
+    expect(response.headers.get("x-revalta-release")).toBe("1234567");
+    expect(response.headers.get("x-revalta-environment")).toBe("production");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
   it("ops GET includes schema and critical env flags", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
     vi.stubEnv("DATABASE_URL", "postgres://example");
