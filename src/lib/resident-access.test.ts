@@ -12,6 +12,7 @@ describe("resident-access allowlists", () => {
   it("allows only the boendeportal dashboard surfaces", () => {
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/dokument")).toBe(true);
+    expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/konto")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard")).toBe(false);
     expect(isResidentAllowedDashboardPath("/dashboard/fastigheter")).toBe(false);
     expect(isResidentAllowedDashboardPath("/dashboard/felanmalan")).toBe(false);
@@ -22,6 +23,7 @@ describe("resident-access allowlists", () => {
     expect(isStaffOnlyDashboardPath("/dashboard/fastigheter")).toBe(true);
     expect(isStaffOnlyDashboardPath("/dashboard/boendeportal")).toBe(false);
     expect(isStaffOnlyDashboardPath("/dashboard/boendeportal/dokument")).toBe(false);
+    expect(isStaffOnlyDashboardPath("/dashboard/boendeportal/konto")).toBe(false);
   });
 
   it("allows resident self-service APIs and blocks company APIs", () => {

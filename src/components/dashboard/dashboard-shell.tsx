@@ -35,6 +35,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  UserRound,
   Users,
   UsersRound,
   WalletCards,
@@ -54,6 +55,7 @@ const residentNavigation = [
     items: [
       { href: "/dashboard/boendeportal", label: "Mina ärenden", icon: MessageSquareText },
       { href: "/dashboard/boendeportal/dokument", label: "Mina dokument", icon: FileText },
+      { href: "/dashboard/boendeportal/konto", label: "Mitt konto", icon: UserRound },
     ],
   },
 ];
