@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly } from "@/lib/dual-list";
+import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const action = "calendar.event";
@@ -19,12 +19,12 @@ export async function GET() {
             take: 500,
           })
         : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "asc" },
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-      }),
+      })),
     ]);
 
     const modern = rows.map((row) => ({

@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
+import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
 import {
   activePropertyRelationFilter,
   isMissingSchemaColumnError,
@@ -40,12 +40,12 @@ export async function GET() {
     ]);
     const [rows, logs, properties] = await Promise.all([
       user.company_id ? listInsuranceClaimRows(user.company_id, propertyRelation) : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "desc" },
         take: 400,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-      }),
+      })),
       db.property.findMany({
         where: { ...propertyActive, ...tenantWhere(user) },
         orderBy: { name: "asc" },

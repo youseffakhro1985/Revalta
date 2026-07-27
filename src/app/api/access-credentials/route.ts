@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageAccessCredentials, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const legacyAction = "access.credential.created";
@@ -42,12 +43,12 @@ export async function GET() {
           created_by: { select: { name: true, email: true } },
         },
       }),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action: legacyAction },
         orderBy: { created_at: "desc" },
         take: 400,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-      }),
+      })),
       db.property.findMany({
         where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },

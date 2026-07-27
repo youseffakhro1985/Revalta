@@ -22,6 +22,15 @@ export function isModernStorageOnly() {
   return process.env.VERCEL_ENV === "production";
 }
 
+/**
+ * Skip legacy AuditLog/IntegrationEvent product reads when modern-storage-only is on.
+ * Keeps dual-read available for preview and explicit `REVALTA_MODERN_STORAGE_ONLY=0` rollback.
+ */
+export function loadLegacyRows<T>(load: () => Promise<T[]>): Promise<T[]> {
+  if (isModernStorageOnly()) return Promise.resolve([]);
+  return load();
+}
+
 export function isModernStorageMirror(
   metadata: unknown,
   modernStorage: string,

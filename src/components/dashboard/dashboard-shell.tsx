@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -44,8 +44,27 @@ import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { NotificationMenu } from "@/components/dashboard/notification-menu";
 import { WorkOrderLockIndicator } from "@/components/dashboard/work-order-lock-indicator";
+import {
+  canManageBilling,
+  canManageCompany,
+  canManageIntegrations,
+  canViewAudit,
+  canViewOperations,
+} from "@/lib/permissions";
 
-const navigation = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof CircleGauge;
+  visible?: (role: string) => boolean;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const navigation: NavGroup[] = [
   {
     label: "Arbetsyta",
     items: [
@@ -76,10 +95,11 @@ const navigation = [
     label: "Organisation",
     items: [
       { href: "/dashboard/boendeportal", label: "Boendeportal", icon: MessageSquareText },
+      { href: "/dashboard/aviseringscenter", label: "Aviseringscenter", icon: BellRing },
       { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness },
       { href: "/dashboard/team", label: "Team", icon: Users },
-      { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck },
-      { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug },
+      { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck, visible: canManageCompany },
+      { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug, visible: canManageIntegrations },
     ],
   },
   {
@@ -88,10 +108,10 @@ const navigation = [
       { href: "/dashboard/budget", label: "Budget & prognos", icon: WalletCards },
       { href: "/dashboard/rapporter", label: "Rapporter", icon: BarChart3 },
       { href: "/dashboard/notiser", label: "Notiser", icon: BellRing },
-      { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock },
-      { href: "/dashboard/drift", label: "Driftstatus", icon: Activity },
-      { href: "/dashboard/arbetsorder/redigeringslas", label: "Redigeringslås", icon: LockKeyhole },
-      { href: "/dashboard/billing", label: "Abonnemang", icon: CreditCard },
+      { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock, visible: canViewAudit },
+      { href: "/dashboard/drift", label: "Driftstatus", icon: Activity, visible: canViewOperations },
+      { href: "/dashboard/arbetsorder/redigeringslas", label: "Redigeringslås", icon: LockKeyhole, visible: canViewOperations },
+      { href: "/dashboard/billing", label: "Abonnemang", icon: CreditCard, visible: canManageBilling },
       { href: "/dashboard/installningar", label: "Inställningar", icon: Settings },
     ],
   },
@@ -105,14 +125,33 @@ function isActive(pathname: string, href: string) {
       && !pathname.startsWith("/dashboard/arbetsorder/planering")
       && !pathname.startsWith("/dashboard/arbetsorder/operationsoversikt")
       && !pathname.startsWith("/dashboard/arbetsorder/aterkommande")
+      && !pathname.startsWith("/dashboard/arbetsorder/redigeringslas")
     );
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavigationContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavigationContent({
+  pathname,
+  role,
+  onNavigate,
+}: {
+  pathname: string;
+  role: string;
+  onNavigate?: () => void;
+}) {
+  const groups = useMemo(
+    () => navigation
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !item.visible || item.visible(role)),
+      }))
+      .filter((group) => group.items.length > 0),
+    [role],
+  );
+
   return <>
-    {navigation.map((group, groupIndex) => (
+    {groups.map((group, groupIndex) => (
       <div key={group.label} className={groupIndex > 0 ? "mt-7" : ""}>
         <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-400">{group.label}</p>
         <div className="space-y-1">
@@ -127,7 +166,24 @@ function NavigationContent({ pathname, onNavigate }: { pathname: string; onNavig
   </>;
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+function initials(name: string | null | undefined, email: string) {
+  const source = (name || email || "RV").trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]![0] || ""}${parts[1]![0] || ""}`.toUpperCase();
+  return source.slice(0, 2).toUpperCase();
+}
+
+export function DashboardShell({
+  children,
+  role,
+  userName,
+  userEmail,
+}: {
+  children: React.ReactNode;
+  role: string;
+  userName?: string | null;
+  userEmail: string;
+}) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -141,6 +197,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", close); };
   }, [mobileOpen]);
 
+  const displayName = userName?.trim() || userEmail;
+  const roleLabel = role === "owner" ? "Ägare"
+    : role === "admin" ? "Administratör"
+      : role === "manager" ? "Förvaltare"
+        : role === "technician" ? "Tekniker"
+          : role === "viewer" ? "Läsbehörighet"
+            : role === "resident" ? "Boende"
+              : role;
+
   return (
     <div className="dashboard-surface min-h-screen bg-[#F7F7F3] text-ink-900">
       <a href="#dashboard-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-petroleum-800 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Hoppa till innehåll</a>
@@ -151,11 +216,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <span className="font-display text-[21px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</span><span className="h-5 w-px bg-sand-300" aria-hidden="true" /><span className="text-[8px] font-semibold uppercase leading-[1.2] tracking-[0.13em] text-ink-400">Förvaltning<br />Sverige</span>
           </Link>
         </div>
-        <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} /></nav>
-        <div className="border-t border-sand-200 p-3"><div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">RV</div><div className="min-w-0"><p className="truncate text-[12px] font-semibold text-ink-800">Organisation</p><p className="truncate text-[10px] text-ink-400">Aktiv användare</p></div></div><LogoutButton className="w-full justify-start" /></div>
+        <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} /></nav>
+        <div className="border-t border-sand-200 p-3">
+          <div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">{initials(userName, userEmail)}</div>
+            <div className="min-w-0">
+              <p className="truncate text-[12px] font-semibold text-ink-800">{displayName}</p>
+              <p className="truncate text-[10px] text-ink-400">{roleLabel}</p>
+            </div>
+          </div>
+          <LogoutButton className="w-full justify-start" />
+        </div>
       </aside>
 
-      {mobileOpen ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny"><button className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} /><aside className="relative flex h-full w-[min(88vw,340px)] flex-col border-r border-sand-200 bg-[#F7F7F3] shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-sand-200 px-5"><Link href="/dashboard" className="font-display text-xl font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link><button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Stäng meny"><X className="h-5 w-5" /></button></div><nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} onNavigate={() => setMobileOpen(false)} /></nav><div className="border-t border-sand-200 p-4"><LogoutButton className="w-full justify-start" /></div></aside></div> : null}
+      {mobileOpen ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny"><button className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} /><aside className="relative flex h-full w-[min(88vw,340px)] flex-col border-r border-sand-200 bg-[#F7F7F3] shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-sand-200 px-5"><Link href="/dashboard" className="font-display text-xl font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link><button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Stäng meny"><X className="h-5 w-5" /></button></div><nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} onNavigate={() => setMobileOpen(false)} /></nav><div className="border-t border-sand-200 p-4"><LogoutButton className="w-full justify-start" /></div></aside></div> : null}
 
       <div className="lg:pl-[248px]">
         <header className="sticky top-0 z-30 border-b border-sand-200 bg-[#FAFAF8]/95 backdrop-blur-sm">

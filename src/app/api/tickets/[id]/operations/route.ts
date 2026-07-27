@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { asNumber } from "@/lib/dual-list";
+import { asNumber, loadLegacyRows } from "@/lib/dual-list";
 
 const allowedTypes = new Set(["time", "cost", "checklist", "note"]);
 
@@ -63,7 +63,7 @@ export async function GET(
             include: { created_by: { select: { name: true, email: true } } },
           })
         : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: {
           ...(user.company_id ? { company_id: user.company_id } : { actor_user_id: user.id }),
           entity_type: "ticket",
@@ -79,7 +79,7 @@ export async function GET(
           created_at: true,
           actor: { select: { name: true, email: true } },
         },
-      }),
+      })),
     ]);
 
     const modern = rows.map(mapModernOperation);
