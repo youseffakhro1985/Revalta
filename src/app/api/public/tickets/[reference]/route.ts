@@ -17,6 +17,7 @@ import { NextResponse } from "next/server";
 const PUBLIC_TRACK_LIMIT = 20;
 const PUBLIC_TRACK_WINDOW_MS = 60 * 60 * 1000;
 const MAX_PUBLIC_COMMENTS = 200;
+const MAX_PUBLIC_ATTACHMENTS = 100;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const REFERENCE_PATTERN = /^[A-Z0-9][A-Z0-9-]{3,78}[A-Z0-9]$/;
 
@@ -143,6 +144,18 @@ export async function GET(
             user: { select: { name: true } },
           },
         },
+        attachments: {
+          where: { visibility: "public" },
+          orderBy: [{ created_at: "asc" }, { id: "asc" }],
+          take: MAX_PUBLIC_ATTACHMENTS,
+          select: {
+            id: true,
+            file_name: true,
+            content_type: true,
+            size_bytes: true,
+            created_at: true,
+          },
+        },
       },
     });
 
@@ -197,6 +210,7 @@ export async function GET(
       companyId: ticket.company_id,
       ticketId: ticket.id,
       commentCount: ticket.comments.length,
+      attachmentCount: ticket.attachments.length,
       usedTrackingToken: Boolean(tracking),
       latencyMs: Date.now() - startedAt,
     });
@@ -214,6 +228,14 @@ export async function GET(
           updated_at: ticket.updated_at,
           ai_summary: ticket.ai_summary,
           property: ticket.property,
+          attachments: ticket.attachments.map((attachment) => ({
+            id: attachment.id,
+            file_name: attachment.file_name,
+            content_type: attachment.content_type,
+            size_bytes: attachment.size_bytes,
+            created_at: attachment.created_at,
+            download_url: `/api/public/tickets/${encodeURIComponent(publicReference)}/attachments/${encodeURIComponent(attachment.id)}`,
+          })),
           comments: ticket.comments.map((comment) => {
             if (comment.author_name) {
               return {
