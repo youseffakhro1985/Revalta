@@ -81,6 +81,8 @@ describe("work-orders GET role scoping", () => {
     expect(body.permissions).toEqual({
       canManage: true,
       canAssign: false,
+      canManageFinance: false,
+      canViewFinance: false,
       scopedToAssigned: true,
     });
     expect(body.assignees).toEqual([]);
@@ -103,6 +105,8 @@ describe("work-orders GET role scoping", () => {
     expect(body.permissions).toEqual({
       canManage: true,
       canAssign: true,
+      canManageFinance: true,
+      canViewFinance: true,
       scopedToAssigned: false,
     });
     expect(body.assignees).toHaveLength(1);
