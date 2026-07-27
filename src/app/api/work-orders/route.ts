@@ -4,6 +4,8 @@ import db from "@/lib/db";
 import {
   canAssignWorkOrders,
   canManageTickets,
+  canManageWorkOrderFinance,
+  canViewFinanceData,
   getCurrentUser,
   shouldScopeToAssignedWork,
 } from "@/lib/current-user";
@@ -75,6 +77,8 @@ export async function GET() {
     const scopedToAssigned = shouldScopeToAssignedWork(user.role);
     const canAssign = canAssignWorkOrders(user.role);
     const canManage = canManageTickets(user.role);
+    const includeFinance = canViewFinanceData(user.role);
+    const canManageFinance = canManageWorkOrderFinance(user.role);
     const assignedScope = scopedToAssigned ? { assigned_to_id: user.id } : {};
 
     const [workOrders, enterpriseRows, assignees] = await Promise.all([
@@ -148,7 +152,12 @@ export async function GET() {
         pausedAt: enterprise?.paused_at,
         pauseReason: enterprise?.pause_reason,
       }, now);
-      return { ...workOrder, enterprise, sla };
+      return {
+        ...workOrder,
+        estimated_cost: includeFinance ? workOrder.estimated_cost : null,
+        enterprise,
+        sla,
+      };
     });
 
     const slaSummary = enriched.reduce((summary, workOrder) => {
@@ -179,6 +188,8 @@ export async function GET() {
         permissions: {
           canManage,
           canAssign,
+          canManageFinance,
+          canViewFinance: includeFinance,
           scopedToAssigned,
         },
         currentUserId: user.id,
@@ -234,6 +245,9 @@ export async function POST(request: Request) {
   if (body.scheduledEnd && !scheduledEnd) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 });
   if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) return NextResponse.json({ error: "Sluttiden måste ligga efter starttiden" }, { status: 400 });
   if (body.estimatedCost !== undefined && body.estimatedCost !== "" && estimatedCost === null) return NextResponse.json({ error: "Beräknad kostnad måste vara ett positivt belopp" }, { status: 400 });
+  if (body.estimatedCost !== undefined && body.estimatedCost !== null && body.estimatedCost !== "" && !canManageWorkOrderFinance(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att sätta arbetsorderkostnader" }, { status: 403 });
+  }
 
   const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });

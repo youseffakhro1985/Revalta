@@ -4,6 +4,8 @@ import db from "@/lib/db";
 import {
   canAssignWorkOrders,
   canManageTickets,
+  canManageWorkOrderFinance,
+  canViewFinanceData,
   getCurrentUser,
   shouldScopeToAssignedWork,
 } from "@/lib/current-user";
@@ -74,12 +76,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (shouldScopeToAssignedWork(user.role) && workOrder.assigned_to_id !== user.id) {
     return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
   }
+  const includeFinance = canViewFinanceData(user.role);
+  const workOrderPayload = includeFinance
+    ? workOrder
+    : { ...workOrder, estimated_cost: null, actual_cost: null };
   return NextResponse.json(
     {
-      workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
+      workOrder: { ...workOrderPayload, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
       users,
       canManage: canManageTickets(user.role),
       canAssign: canAssignWorkOrders(user.role),
+      canManageFinance: canManageWorkOrderFinance(user.role),
+      canViewFinance: includeFinance,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );
@@ -205,6 +213,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const finalStart = data.scheduled_start !== undefined ? data.scheduled_start : existing.scheduled_start;
   const finalEnd = data.scheduled_end !== undefined ? data.scheduled_end : existing.scheduled_end;
   if (finalStart && finalEnd && finalEnd <= finalStart) return NextResponse.json({ error: "Sluttiden måste ligga efter starttiden" }, { status: 400 });
+  if (body.estimatedCost !== undefined || body.actualCost !== undefined) {
+    if (!canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att ändra arbetsorderkostnader" }, { status: 403 });
+    }
+  }
   if (body.estimatedCost !== undefined) {
     const value = parseOptionalMoney(body.estimatedCost);
     if (value === undefined) return NextResponse.json({ error: "Ogiltig beräknad kostnad" }, { status: 400 });
