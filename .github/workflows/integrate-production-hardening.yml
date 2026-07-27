@@ -38,7 +38,7 @@ jobs:
 
       - name: Fetch source branches
         run: |
-          git fetch origin \
+          git fetch --quiet origin \
             cursor/product-hardening-followthrough-6157 \
             cursor/wo-board-role-scope-6157 \
             cursor/staff-read-hardening-6157
@@ -66,7 +66,25 @@ jobs:
         run: npm run db:validate
 
       - name: Lint
-        run: npm run lint
+        id: lint
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-output.txt
+
+      - name: Upload lint diagnostics
+        if: steps.lint.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-diagnostics
+          path: lint-output.txt
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Stop on lint failure
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
 
       - name: Unit and route tests
         run: npm run test:ci
