@@ -256,7 +256,13 @@ export async function POST(request: Request) {
           return created;
         });
 
-        persisted = { ticket, trackingToken };
+        persisted = {
+          ticket: {
+            ...ticket,
+            public_reference: ticket.public_reference ?? publicReference,
+          },
+          trackingToken,
+        };
         break;
       } catch (error) {
         if (isPublicReferenceConflict(error) && attempt < MAX_REFERENCE_ATTEMPTS - 1) {
@@ -325,7 +331,7 @@ export async function POST(request: Request) {
       return apiErrorResponse({
         status: 503,
         code: API_ERROR_CODES.serviceUnavailable,
-        message: schemaMismatchUserMessage,
+        message: schemaMismatchUserMessage(),
         requestId,
       });
     }
