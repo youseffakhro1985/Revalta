@@ -231,6 +231,7 @@ describe("ticket detail lifecycle", () => {
       assigned_to_id: null,
       due_date: null,
     });
+    userFindFirstMock.mockResolvedValue({ id: "user-2" });
     txTicketUpdateManyMock.mockResolvedValue({ count: 0 });
 
     const response = await PATCH(request("PATCH", { assignedToId: "user-2" }), context);
