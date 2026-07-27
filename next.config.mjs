@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const isDevelopment = process.env.NODE_ENV === "development";
+const isPreview = process.env.VERCEL_ENV === "preview";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -26,6 +27,12 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
   ...(!isDevelopment
     ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]
+    : []),
+  ...(isPreview
+    ? [
+        { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive, nosnippet" },
+        { key: "X-Revalta-Environment", value: "preview" },
+      ]
     : []),
 ];
 
