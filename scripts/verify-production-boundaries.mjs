@@ -1,3 +1,4 @@
+import { appendFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_BASE_URL = "https://www.revalta.se";
@@ -42,6 +43,26 @@ export function validateSensitiveCache(headers, label) {
   }
 }
 
+export function validateDashboardBoundary(response, baseUrl) {
+  const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+  const denialStatuses = new Set([401, 403]);
+
+  invariant(
+    redirectStatuses.has(response.status) || denialStatuses.has(response.status),
+    `dashboard-boundary: unauthenticated request must redirect or deny access, received HTTP ${response.status}`,
+  );
+
+  if (redirectStatuses.has(response.status)) {
+    const location = response.headers.get("location");
+    invariant(location, "dashboard-boundary: redirect response is missing Location");
+
+    const destination = new URL(location, baseUrl);
+    const expectedOrigin = new URL(baseUrl).origin;
+    invariant(destination.origin === expectedOrigin, `dashboard-boundary: redirect escaped Revalta origin to ${destination.origin}`);
+    invariant(destination.pathname === "/login", `dashboard-boundary: expected redirect to /login, received ${destination.pathname}`);
+  }
+}
+
 export function validateHealthPayload(payload, headers) {
   invariant(payload?.ok === true, "health: expected ok=true");
   invariant(payload?.status === "ok", "health: expected status=ok");
@@ -70,13 +91,12 @@ export async function requestWithRetry(url, options = {}, dependencies = {}) {
       requestHeaders.set("user-agent", "Revalta-Production-Boundary-Monitor/1.0");
       if (!requestHeaders.has("accept")) requestHeaders.set("accept", "*/*");
 
-      const response = await fetchImpl(url, {
+      return await fetchImpl(url, {
         redirect: "manual",
         ...options,
         headers: requestHeaders,
         signal: AbortSignal.timeout(timeoutMs),
       });
-      return response;
     } catch (error) {
       lastError = error;
       if (attempt < attempts && retryDelayMs > 0) {
@@ -98,10 +118,15 @@ async function verifyRoute(baseUrl, route) {
     validateSensitiveCache(response.headers, route.label);
   }
 
+  if (route.kind === "dashboard-boundary") {
+    validateDashboardBoundary(response, baseUrl);
+  }
+
   return {
     label: route.label,
     status: response.status,
     durationMs: Date.now() - startedAt,
+    location: response.headers.get("location"),
     response,
   };
 }
@@ -109,7 +134,13 @@ async function verifyRoute(baseUrl, route) {
 export async function runProductionBoundaryMonitor(baseUrl = DEFAULT_BASE_URL) {
   const routes = [
     { label: "public-home", path: "/", allowedStatuses: [200], sensitive: false },
-    { label: "dashboard-boundary", path: "/dashboard", allowedStatuses: [200, 301, 302, 303, 307, 308, 401, 403], sensitive: true },
+    {
+      label: "dashboard-boundary",
+      kind: "dashboard-boundary",
+      path: "/dashboard",
+      allowedStatuses: [301, 302, 303, 307, 308, 401, 403],
+      sensitive: true,
+    },
     { label: "health-api", path: "/api/health", allowedStatuses: [200], sensitive: true },
   ];
 
@@ -125,8 +156,25 @@ export async function runProductionBoundaryMonitor(baseUrl = DEFAULT_BASE_URL) {
 
   return {
     release: payload.release.shortCommitSha,
-    results: results.map(({ label, status, durationMs }) => ({ label, status, durationMs })),
+    results: results.map(({ label, status, durationMs, location }) => ({ label, status, durationMs, location })),
   };
+}
+
+function renderMarkdownSummary(report) {
+  const rows = report.results
+    .map((result) => `| ${result.label} | ${result.status} | ${result.durationMs} ms | ${result.location ?? "—"} |`)
+    .join("\n");
+
+  return [
+    "## Production boundary monitor",
+    "",
+    `Release: \`${report.release}\``,
+    "",
+    "| Boundary | HTTP | Duration | Location |",
+    "| --- | ---: | ---: | --- |",
+    rows,
+    "",
+  ].join("\n");
 }
 
 async function main() {
@@ -135,7 +183,12 @@ async function main() {
 
   console.log(`Production boundary monitor passed for release ${report.release}`);
   for (const result of report.results) {
-    console.log(`- ${result.label}: HTTP ${result.status} (${result.durationMs} ms)`);
+    const destination = result.location ? ` -> ${result.location}` : "";
+    console.log(`- ${result.label}: HTTP ${result.status}${destination} (${result.durationMs} ms)`);
+  }
+
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    await appendFile(process.env.GITHUB_STEP_SUMMARY, renderMarkdownSummary(report));
   }
 }
 
