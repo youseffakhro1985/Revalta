@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 type Header = { key: string; value: string };
 type HeaderRule = { source: string; headers: Header[] };
 
-async function loadGlobalHeaders(vercelEnv: string | undefined, nodeEnv: string) {
+const PRIVATE_NO_STORE = "private, no-store, max-age=0, must-revalidate";
+
+async function loadHeaderRules(vercelEnv: string | undefined, nodeEnv: string) {
   vi.resetModules();
   vi.stubEnv("NODE_ENV", nodeEnv);
 
@@ -14,11 +16,17 @@ async function loadGlobalHeaders(vercelEnv: string | undefined, nodeEnv: string)
   }
 
   const { default: nextConfig } = await import("./next.config.mjs");
-  const rules = (await nextConfig.headers?.()) as HeaderRule[];
-  const globalRule = rules.find((rule) => rule.source === "/(.*)");
+  return (await nextConfig.headers?.()) as HeaderRule[];
+}
 
-  expect(globalRule).toBeDefined();
-  return new Map(globalRule!.headers.map((header) => [header.key, header.value]));
+function toHeaderMap(rule: HeaderRule | undefined) {
+  expect(rule).toBeDefined();
+  return new Map(rule!.headers.map((header) => [header.key, header.value]));
+}
+
+async function loadGlobalHeaders(vercelEnv: string | undefined, nodeEnv: string) {
+  const rules = await loadHeaderRules(vercelEnv, nodeEnv);
+  return toHeaderMap(rules.find((rule) => rule.source === "/(.*)"));
 }
 
 function expectBrowserIsolationHeaders(headers: Map<string, string>) {
@@ -62,5 +70,16 @@ describe("Next.js environment security headers", () => {
     expect(csp).toContain("'unsafe-eval'");
     expect(csp).not.toContain("upgrade-insecure-requests");
     expectBrowserIsolationHeaders(headers);
+  });
+
+  it("keeps dashboard and API responses strictly non-cacheable", async () => {
+    const rules = await loadHeaderRules("production", "production");
+    const dashboardHeaders = toHeaderMap(rules.find((rule) => rule.source === "/dashboard/:path*"));
+    const apiHeaders = toHeaderMap(rules.find((rule) => rule.source === "/api/:path*"));
+    const globalHeaders = toHeaderMap(rules.find((rule) => rule.source === "/(.*)"));
+
+    expect(dashboardHeaders.get("Cache-Control")).toBe(PRIVATE_NO_STORE);
+    expect(apiHeaders.get("Cache-Control")).toBe(PRIVATE_NO_STORE);
+    expect(globalHeaders.has("Cache-Control")).toBe(false);
   });
 });
