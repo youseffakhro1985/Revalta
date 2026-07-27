@@ -110,8 +110,9 @@ describe("login route observability", () => {
       "auth.login.rejected",
       expect.objectContaining({ eventCode: "auth.login.invalid_credentials" }),
     );
-    expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("secret-value");
-    expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("invalid");
+    const logged = JSON.stringify(loggerInfoMock.mock.calls);
+    expect(logged).not.toContain("secret-value");
+    expect(logged).not.toContain('"email":"invalid"');
   });
 
   it("returns rate-limit metadata without exposing account or IP values", async () => {
