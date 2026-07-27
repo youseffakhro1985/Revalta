@@ -68,7 +68,12 @@ describe("production boundary validation", () => {
     };
 
     await expect(
-      requestWithRetry("https://example.test", {}, { fetchImpl, attempts: 3, timeoutMs: 1_000 }),
+      requestWithRetry("https://example.test", {}, {
+        fetchImpl,
+        attempts: 3,
+        timeoutMs: 1_000,
+        retryDelayMs: 0,
+      }),
     ).resolves.toBe(response);
     expect(calls).toBe(3);
   });
