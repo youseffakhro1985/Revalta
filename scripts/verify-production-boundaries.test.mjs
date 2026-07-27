@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   requestWithRetry,
+  validateDashboardBoundary,
   validateGlobalHeaders,
   validateHealthPayload,
   validateSensitiveCache,
@@ -37,6 +38,28 @@ describe("production boundary validation", () => {
 
     const invalid = new Headers({ "cache-control": "private, max-age=0" });
     expect(() => validateSensitiveCache(invalid, "dashboard")).toThrow(/no-store/);
+  });
+
+  it("requires unauthenticated dashboard traffic to redirect to the local login route", () => {
+    const redirect = new Response(null, {
+      status: 307,
+      headers: { location: "https://www.revalta.se/login?next=%2Fdashboard" },
+    });
+    expect(() => validateDashboardBoundary(redirect, "https://www.revalta.se")).not.toThrow();
+
+    const publicDashboard = new Response("dashboard", { status: 200 });
+    expect(() => validateDashboardBoundary(publicDashboard, "https://www.revalta.se")).toThrow(/must redirect or deny access/);
+
+    const externalRedirect = new Response(null, {
+      status: 302,
+      headers: { location: "https://attacker.example/login" },
+    });
+    expect(() => validateDashboardBoundary(externalRedirect, "https://www.revalta.se")).toThrow(/escaped Revalta origin/);
+  });
+
+  it("accepts an explicit unauthenticated denial at the dashboard boundary", () => {
+    expect(() => validateDashboardBoundary(new Response(null, { status: 401 }), "https://www.revalta.se")).not.toThrow();
+    expect(() => validateDashboardBoundary(new Response(null, { status: 403 }), "https://www.revalta.se")).not.toThrow();
   });
 
   it("binds health release metadata to the response header", () => {
