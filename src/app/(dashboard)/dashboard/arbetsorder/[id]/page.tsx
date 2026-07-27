@@ -36,7 +36,14 @@ type WorkOrder = {
   enterprise: EnterpriseState; statusEvents: StatusEvent[];
 };
 type Person = { id: string; name: string | null; email: string; role: string };
-type TransitionData = { currentStatus: string; allowedStatuses: string[]; assignedToId: string | null; users: Person[]; canManage: boolean };
+type TransitionData = {
+  currentStatus: string;
+  allowedStatuses: string[];
+  assignedToId: string | null;
+  users: Person[];
+  canManage: boolean;
+  canAssign?: boolean;
+};
 type BuildingOption = { id: string; name: string; address: string | null };
 type AssetOption = { id: string; name: string; category: string; component_class: string | null; location: string | null; status: string; criticality: string; building_id: string | null; building_name: string | null };
 
@@ -241,7 +248,7 @@ export default function WorkOrderDetailPage() {
         <form action={save} className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select disabled={!editable} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!["blocked", "cancelled"].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass}>{transitions.allowedStatuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
           <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={!editable} defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={!editable} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{transitions.users.map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select></label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={!editable || !transitions.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{transitions.users.map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select>{!transitions.canAssign ? <span className="block text-xs text-ink-400">Endast förvaltare och administratörer kan tilldela ansvarig.</span> : null}</label>
           <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={!editable} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
           <input name="scheduledStart" type="date" disabled={!editable} defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} />
           <input name="scheduledEnd" type="date" disabled={!editable} defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} />

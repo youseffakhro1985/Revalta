@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
@@ -21,13 +21,14 @@ export async function GET(request: Request) {
     const propertyId = searchParams.get("propertyId")?.trim();
     const assignedToId = searchParams.get("assignedToId")?.trim();
     const ticketActive = await notDeletedFilter("Ticket");
+    const scopedAssignedToId = shouldScopeToAssignedWork(user.role) ? user.id : assignedToId;
     const where = {
       ...ticketActive,
       ...tenantWhere(user),
       ...(status ? { status } : {}),
       ...(priority ? { priority } : {}),
       ...(propertyId ? { property_id: propertyId } : {}),
-      ...(assignedToId ? { assigned_to_id: assignedToId } : {}),
+      ...(scopedAssignedToId ? { assigned_to_id: scopedAssignedToId } : {}),
       AND: [
         { OR: [{ property_id: null }, { property: { deleted_at: null } }] },
         ...(q

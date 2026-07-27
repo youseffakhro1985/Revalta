@@ -3,7 +3,17 @@ import { Prisma } from "@prisma/client";
 import { getPrismaBaseClient } from "@/lib/db";
 import { calculateResolutionDueAt, calculateResponseDueAt } from "@/lib/sla-policy";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
-import type { WorkOrderPriority, WorkOrderStatus } from "@/lib/work-order-workflow";
+import {
+  canTransitionWorkOrder as canTransitionWorkOrderStatus,
+  getAllowedWorkOrderTransitions as getAllowedWorkOrderStatusTransitions,
+  type WorkOrderPriority,
+  type WorkOrderStatus,
+} from "@/lib/work-order-workflow";
+
+export {
+  canTransitionWorkOrderStatus as canTransitionWorkOrder,
+  getAllowedWorkOrderStatusTransitions as getAllowedWorkOrderTransitions,
+};
 
 export const WORK_ORDER_TYPES = ["corrective", "preventive", "inspection", "emergency", "project", "warranty"] as const;
 export const WORK_ORDER_SOURCES = ["internal", "ticket", "maintenance_plan", "inspection", "component", "resident", "supplier"] as const;
@@ -35,17 +45,6 @@ export type WorkOrderStatusEventRow = {
   actor_email: string;
 };
 
-const TRANSITIONS: Record<WorkOrderStatus, readonly WorkOrderStatus[]> = {
-  new: ["planned", "in_progress", "cancelled"],
-  planned: ["new", "in_progress", "waiting_material", "blocked", "cancelled"],
-  in_progress: ["planned", "waiting_material", "blocked", "completed", "cancelled"],
-  waiting_material: ["planned", "in_progress", "blocked", "cancelled"],
-  blocked: ["planned", "in_progress", "waiting_material", "cancelled"],
-  completed: ["in_progress", "invoiced"],
-  invoiced: ["completed"],
-  cancelled: ["new", "planned"],
-};
-
 export function normalizeWorkOrderType(value: unknown): WorkOrderType {
   return WORK_ORDER_TYPES.includes(value as WorkOrderType) ? value as WorkOrderType : "corrective";
 }
@@ -59,14 +58,6 @@ export function calculateWorkOrderSla(createdAt: Date, priority: WorkOrderPriori
     responseDueAt: calculateResponseDueAt(priority, createdAt),
     resolutionDueAt: calculateResolutionDueAt(priority, createdAt),
   };
-}
-
-export function canTransitionWorkOrder(from: WorkOrderStatus, to: WorkOrderStatus) {
-  return from === to || TRANSITIONS[from].includes(to);
-}
-
-export function getAllowedWorkOrderTransitions(from: WorkOrderStatus) {
-  return [from, ...TRANSITIONS[from]] as readonly WorkOrderStatus[];
 }
 
 export async function allocateWorkOrderNumber(tx: Prisma.TransactionClient, companyId: string, now = new Date()) {

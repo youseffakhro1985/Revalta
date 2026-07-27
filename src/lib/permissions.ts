@@ -49,3 +49,18 @@ export function canExportTickets(role: string) {
 export function canViewOperations(role: string) {
   return hasRole(role, ["owner", "admin", "manager"]);
 }
+
+/** Technicians (and residents) only see work assigned to themselves. */
+export function shouldScopeToAssignedWork(role: string) {
+  return hasRole(role, ["technician", "resident"]);
+}
+
+/** Managers and admins distribute work; technicians execute assigned work. */
+export function canAssignWorkOrders(role: string) {
+  return hasRole(role, ["owner", "admin", "manager"]);
+}
+
+/** Viewer/resident are read-only in the manager workspace. */
+export function canWriteOperations(role: string) {
+  return canManageTickets(role);
+}
