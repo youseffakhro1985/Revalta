@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import { resolveRequestId, REQUEST_ID_HEADER } from "@/lib/request-correlation";
 import {
   isMissingSchemaColumnError,
   notDeletedFilter,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
+import { createLogger } from "@/lib/structured-logger";
 
 /** Explicit select avoids querying soft-delete columns that may not exist yet. */
 const propertyListSelect = (ticketActive: { deleted_at: null } | Record<string, never>) => ({
@@ -25,50 +28,156 @@ const propertyListSelect = (ticketActive: { deleted_at: null } | Record<string, 
   },
 } as const);
 
-export async function GET() {
+function successHeaders(requestId: string) {
+  return {
+    "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+    "CDN-Cache-Control": "no-store",
+    "Vercel-CDN-Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    [REQUEST_ID_HEADER]: requestId,
+  };
+}
+
+function routeLogger(method: "GET" | "POST", requestId: string) {
+  return createLogger({
+    route: "/api/properties",
+    method,
+    requestId,
+    release: process.env.VERCEL_GIT_COMMIT_SHA,
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+  });
+}
+
+export async function GET(request: Request) {
+  const startedAt = Date.now();
+  const requestId = resolveRequestId(request.headers);
+  const logger = routeLogger("GET", requestId);
+
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(await getCurrentUser());
+    if (!user) {
+      logger.warn("properties access denied", {
+        eventCode: "properties.list.unauthorized",
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        requestId,
+      });
+    }
 
     const [propertyActive, ticketActive] = await Promise.all([
       notDeletedFilter("Property"),
       notDeletedFilter("Ticket"),
     ]);
     const properties = await db.property.findMany({
-      where: { ...propertyActive, ...tenantWhere(user) },
+      where: { ...propertyActive, company_id: user.company_id },
       orderBy: { created_at: "desc" },
       select: propertyListSelect(ticketActive),
     });
 
-    return NextResponse.json({
-      properties,
-      permissions: { canCreate: canCreateProperties(user.role) },
+    logger.info("properties listed", {
+      eventCode: "properties.list.succeeded",
+      companyId: user.company_id,
+      resultCount: properties.length,
+      latencyMs: Date.now() - startedAt,
     });
+
+    return NextResponse.json(
+      {
+        properties,
+        permissions: { canCreate: canCreateProperties(user.role) },
+        requestId,
+      },
+      { headers: successHeaders(requestId) },
+    );
   } catch (error) {
-    console.error("Get properties error:", error);
     if (isMissingSchemaColumnError(error)) {
-      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+      logger.error("properties schema unavailable", error, {
+        eventCode: "properties.list.schema_unavailable",
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        requestId,
+      });
     }
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+
+    logger.error("properties listing failed", error, {
+      eventCode: "properties.list.failed",
+      latencyMs: Date.now() - startedAt,
+    });
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId,
+    });
   }
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const requestId = resolveRequestId(request.headers);
+  const logger = routeLogger("POST", requestId);
+
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(await getCurrentUser());
+    if (!user) {
+      logger.warn("property creation access denied", {
+        eventCode: "properties.create.unauthorized",
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        requestId,
+      });
+    }
     if (!canCreateProperties(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att skapa fastigheter" }, { status: 403 });
+      logger.warn("property creation forbidden", {
+        eventCode: "properties.create.forbidden",
+        companyId: user.company_id,
+        role: user.role,
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att skapa fastigheter",
+        requestId,
+      });
     }
 
-    const { name, address, postalCode, city } = await request.json();
-    const normalizedName = typeof name === "string" ? name.trim() : "";
-    const normalizedAddress = typeof address === "string" ? address.trim() : "";
-    const normalizedPostalCode = typeof postalCode === "string" && postalCode.trim() ? postalCode.trim() : null;
-    const normalizedCity = typeof city === "string" ? city.trim() : "";
+    const body = await request.json().catch(() => ({})) as {
+      name?: unknown;
+      address?: unknown;
+      postalCode?: unknown;
+      city?: unknown;
+    };
+    const normalizedName = typeof body.name === "string" ? body.name.trim() : "";
+    const normalizedAddress = typeof body.address === "string" ? body.address.trim() : "";
+    const normalizedPostalCode =
+      typeof body.postalCode === "string" && body.postalCode.trim() ? body.postalCode.trim() : null;
+    const normalizedCity = typeof body.city === "string" ? body.city.trim() : "";
 
     if (!normalizedName || !normalizedAddress || !normalizedCity) {
-      return NextResponse.json({ error: "Namn, adress och ort krävs" }, { status: 400 });
+      logger.info("property creation validation failed", {
+        eventCode: "properties.create.validation_failed",
+        companyId: user.company_id,
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Namn, adress och ort krävs",
+        requestId,
+      });
     }
 
     const ticketActive = await notDeletedFilter("Ticket");
@@ -91,9 +200,40 @@ export async function POST(request: Request) {
       metadata: { name: property.name, address: property.address, city: property.city },
     });
 
-    return NextResponse.json({ success: true, property }, { status: 201 });
+    logger.info("property created", {
+      eventCode: "properties.create.succeeded",
+      companyId: user.company_id,
+      propertyId: property.id,
+      latencyMs: Date.now() - startedAt,
+    });
+
+    return NextResponse.json(
+      { success: true, property, requestId },
+      { status: 201, headers: successHeaders(requestId) },
+    );
   } catch (error) {
-    console.error("Create property error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    if (isMissingSchemaColumnError(error)) {
+      logger.error("property creation schema unavailable", error, {
+        eventCode: "properties.create.schema_unavailable",
+        latencyMs: Date.now() - startedAt,
+      });
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        requestId,
+      });
+    }
+
+    logger.error("property creation failed", error, {
+      eventCode: "properties.create.failed",
+      latencyMs: Date.now() - startedAt,
+    });
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId,
+    });
   }
 }
