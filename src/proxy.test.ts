@@ -33,6 +33,16 @@ function dashboardRequest(path = "/dashboard", cookie?: string, requestId?: stri
   return new NextRequest(`https://www.revalta.se${path}`, { headers });
 }
 
+function expectPrivateErrorHeaders(response: Response, requestId: string) {
+  expect(response.headers.get(REQUEST_ID_HEADER)).toBe(requestId);
+  expect(response.headers.get("cache-control")).toBe(
+    "private, no-store, max-age=0, must-revalidate",
+  );
+  expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+  expect(response.headers.get("vercel-cdn-cache-control")).toBe("no-store");
+  expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+}
+
 describe("request proxy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -84,7 +94,7 @@ describe("request proxy", () => {
     expect(verifyToken).not.toHaveBeenCalled();
   });
 
-  it("rejects cross-site API mutations before application code runs", async () => {
+  it("rejects cross-site API mutations with a stable error contract", async () => {
     const request = new NextRequest("https://www.revalta.se/api/properties", {
       method: "POST",
       headers: {
@@ -97,8 +107,12 @@ describe("request proxy", () => {
     const response = await proxy(request);
 
     expect(response.status).toBe(403);
-    expect(response.headers.get(REQUEST_ID_HEADER)).toBe(validRequestId);
-    await expect(response.json()).resolves.toEqual({ error: "Otillåtet anrop" });
+    expectPrivateErrorHeaders(response, validRequestId);
+    await expect(response.json()).resolves.toEqual({
+      error: "Otillåtet anrop",
+      errorCode: "UNTRUSTED_MUTATION",
+      requestId: validRequestId,
+    });
     expect(verifyToken).not.toHaveBeenCalled();
   });
 
@@ -132,7 +146,7 @@ describe("request proxy", () => {
     expect(findUnique).not.toHaveBeenCalled();
   });
 
-  it("blocks resident access to company APIs", async () => {
+  it("blocks resident access to company APIs with a stable error contract", async () => {
     findUnique.mockResolvedValue({
       role: "resident",
       status: "active",
@@ -140,14 +154,19 @@ describe("request proxy", () => {
     });
 
     const request = new NextRequest("https://www.revalta.se/api/properties", {
-      headers: { cookie: `${SESSION_COOKIE_NAME}=current-token` },
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=current-token`,
+        [REQUEST_ID_HEADER]: validRequestId,
+      },
     });
 
     const response = await proxy(request);
     expect(response.status).toBe(403);
-    expect(response.headers.get(REQUEST_ID_HEADER)).toMatch(requestIdPattern);
+    expectPrivateErrorHeaders(response, validRequestId);
     await expect(response.json()).resolves.toEqual({
       error: "Boende har endast åtkomst till boendeportalen",
+      errorCode: "RESIDENT_PORTAL_ONLY",
+      requestId: validRequestId,
     });
   });
 

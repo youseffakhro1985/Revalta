@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { isResident } from "@/lib/permissions";
 import {
@@ -34,7 +35,12 @@ export async function proxy(request: NextRequest) {
 
   if (pathname.startsWith("/api/") && pathname !== "/api/stripe/webhook" && unsafeMethod) {
     if (!isTrustedMutationRequest(request)) {
-      return correlate(NextResponse.json({ error: "Otillåtet anrop" }, { status: 403 }));
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.untrustedMutation,
+        message: "Otillåtet anrop",
+        requestId,
+      });
     }
   }
 
@@ -67,12 +73,12 @@ export async function proxy(request: NextRequest) {
   if (session && isStaffOnlyApiPath(pathname)) {
     const role = await resolveSessionRole(session.sub, session.email);
     if (role && isResident(role)) {
-      return correlate(
-        NextResponse.json(
-          { error: "Boende har endast åtkomst till boendeportalen" },
-          { status: 403 },
-        ),
-      );
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.residentPortalOnly,
+        message: "Boende har endast åtkomst till boendeportalen",
+        requestId,
+      });
     }
   }
 
