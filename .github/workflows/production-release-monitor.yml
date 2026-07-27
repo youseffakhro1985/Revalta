@@ -1,0 +1,73 @@
+name: Production Release Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17,47 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release-monitor
+  cancel-in-progress: true
+
+jobs:
+  verify-production-release:
+    name: Verify production release identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Probe production health
+        shell: bash
+        env:
+          HEALTH_URL: https://www.revalta.se/api/health
+        run: |
+          set -euo pipefail
+
+          headers_file="$(mktemp)"
+          body_file="$(mktemp)"
+          trap 'rm -f "$headers_file" "$body_file"' EXIT
+
+          http_status="$(curl \
+            --silent \
+            --show-error \
+            --location \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --dump-header "$headers_file" \
+            --output "$body_file" \
+            --write-out '%{http_code}' \
+            "$HEALTH_URL")"
+
+          if [[ "$http_status" != "200" ]]; then
+            echo "Production health returned HTTP $http_status"
+            cat "$body_file"
+            exit 1
+          fi
+
+          jq -e '.ok == true and .status == "ok" and .database == "ok"' "$body_file" >/dev/null
+          jq -e '.release.environment == "production"' "$body_file" >/dev/null
+          jq -e '.release.commitSha | test("^[0-9a-f]{40}$")' "$body_file" >/dev/null
+          jq -e '.release.shortCommitSha | test("^[0-9a-f]{7}$")' "$body_file" >/dev/null
+          jq -e '.release.branch == "main"' "$body_file" >/dev/null
+
+          release_header="$(awk 'BEGIN{IGNORECASE=1} /^x-revalta-release:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
+          environment_header="$(awk 'BEGIN{IGNORECASE=1} /^x-revalta-environment:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
+          cache_control="$(awk 'BEGIN{IGNORECASE=1} /^cache-control:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
+          cdn_cache_control="$(awk 'BEGIN{IGNORECASE=1} /^cdn-cache-control:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
+          vercel_cdn_cache_control="$(awk 'BEGIN{IGNORECASE=1} /^vercel-cdn-cache-control:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
+
+          short_sha="$(jq -r '.release.shortCommitSha' "$body_file")"
+
+          [[ "$release_header" == "$short_sha" ]]
+          [[ "$environment_header" == "production" ]]
+          [[ "$cache_control" == *"no-store"* ]]
+          [[ "$cdn_cache_control" == *"no-store"* ]]
+          [[ "$vercel_cdn_cache_control" == *"no-store"* ]]
+
+          echo "Production release verified: $short_sha"
