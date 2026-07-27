@@ -4,6 +4,8 @@ import { readResponseJson } from "@/lib/fetch-json";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { isResident } from "@/lib/permissions";
+import { isStaffOnlyDashboardPath, residentHomePath } from "@/lib/resident-access";
 import { safeInternalPath } from "@/lib/security";
 
 export default function LoginPage() {
@@ -24,9 +26,12 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
+        const data = await readResponseJson<{ user?: { role?: string } }>(res);
         const params = new URLSearchParams(window.location.search);
-        const nextPath = params.get("next");
-        router.push(safeInternalPath(nextPath));
+        const resident = isResident(String(data.user?.role || ""));
+        const fallback = resident ? residentHomePath() : "/dashboard";
+        const nextPath = safeInternalPath(params.get("next"), fallback);
+        router.push(resident && isStaffOnlyDashboardPath(nextPath) ? residentHomePath() : nextPath);
       } else {
         const data = await readResponseJson(res);
         setError(data.error || "Inloggningen misslyckades");

@@ -54,9 +54,14 @@ export function isResident(role: string) {
   return role === "resident";
 }
 
+/** Internal company workspace roles (not resident self-service). */
+export function isStaffRole(role: string) {
+  return hasRole(role, ["owner", "admin", "manager", "technician", "viewer"]);
+}
+
 /** Authenticated portal access for staff workspace and resident self-service. */
 export function canAccessResidentPortal(role: string) {
-  return isResident(role) || hasRole(role, ["owner", "admin", "manager", "technician", "viewer"]);
+  return isResident(role) || isStaffRole(role);
 }
 
 /** Staff may create tickets on behalf of any active lease. */

@@ -139,4 +139,9 @@ describe("tenant scoping helpers", () => {
     expect(requireCompanyUser(soloUser)).toBeNull();
     expect(requireCompanyUser(null)).toBeNull();
   });
+
+  it("fail-closes company scope for resident users", () => {
+    const residentUser = { ...activeUser, role: "resident" };
+    expect(requireCompanyUser(residentUser)).toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import db from "@/lib/db";
+import { isResident } from "@/lib/permissions";
 import { verifyToken } from "@/lib/session";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
 
@@ -20,6 +21,7 @@ export {
   canViewAudit,
   canViewOperations,
   isResident,
+  isStaffRole,
 } from "@/lib/permissions";
 
 export async function getCurrentUser() {
@@ -77,8 +79,13 @@ export function companyUserWhere(user: CurrentUser) {
   return user.company_id ? { company_id: user.company_id } : { id: user.id };
 }
 
-/** Fail-closed helper for organisation-scoped API routes. */
+/** Fail-closed helper for organisation-scoped staff API routes. */
 export function requireCompanyUser(user: CurrentUser | null): CompanyUser | null {
-  if (!user?.company_id) return null;
+  if (!user?.company_id || isResident(user.role)) return null;
   return user as CompanyUser;
+}
+
+/** Explicit staff-only company scope (alias of requireCompanyUser). */
+export function requireStaffCompanyUser(user: CurrentUser | null): CompanyUser | null {
+  return requireCompanyUser(user);
 }

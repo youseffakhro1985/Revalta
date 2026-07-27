@@ -11,6 +11,7 @@ import {
   canViewAudit,
   canViewOperations,
   isResident,
+  isStaffRole,
   USER_ROLES,
 } from "@/lib/permissions";
 
@@ -58,6 +59,15 @@ describe("permissions", () => {
   it("identifierar resident-rollen", () => {
     expect(isResident("resident")).toBe(true);
     expect(isResident("viewer")).toBe(false);
+  });
+
+  it.each(["owner", "admin", "manager", "technician", "viewer"])("identifierar %s som personalroll", (role) => {
+    expect(isStaffRole(role)).toBe(true);
+    expect(isResident(role)).toBe(false);
+  });
+
+  it("nekar resident som personalroll", () => {
+    expect(isStaffRole("resident")).toBe(false);
   });
 
   it.each(["owner", "admin", "manager", "technician", "viewer", "resident"])("låter %s öppna boendeportalen", (role) => {

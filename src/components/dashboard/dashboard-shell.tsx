@@ -46,6 +46,7 @@ import { GlobalSearch } from "@/components/dashboard/global-search";
 import { NotificationMenu } from "@/components/dashboard/notification-menu";
 import { WorkOrderLockIndicator } from "@/components/dashboard/work-order-lock-indicator";
 import { isResident } from "@/lib/permissions";
+import { isStaffOnlyDashboardPath, residentHomePath } from "@/lib/resident-access";
 
 const residentNavigation = [
   {
@@ -174,14 +175,14 @@ export function DashboardShell({
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const resident = isResident(role);
-  const homeHref = resident ? "/dashboard/boendeportal" : "/dashboard";
+  const homeHref = resident ? residentHomePath() : "/dashboard";
   const displayName = userName?.trim() || userEmail;
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
   useEffect(() => {
     if (!resident) return;
-    if (pathname === "/dashboard" || pathname === "/dashboard/") {
-      router.replace("/dashboard/boendeportal");
+    if (isStaffOnlyDashboardPath(pathname)) {
+      router.replace(residentHomePath());
     }
   }, [pathname, resident, router]);
   useEffect(() => {
