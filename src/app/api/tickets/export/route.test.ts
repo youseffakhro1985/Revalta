@@ -140,13 +140,14 @@ describe("GET /api/tickets/export", () => {
     ]);
 
     const response = await GET(request());
-    const csv = await response.text();
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const csv = new TextDecoder().decode(bytes.subarray(3));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
     expect(response.headers.get("cache-control")).toContain("private, no-store");
     expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
-    expect(csv.startsWith("\uFEFF")).toBe(true);
+    expect(Array.from(bytes.subarray(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
     expect(csv).toContain("'=HYPERLINK");
     expect(csv).toContain("'+SUM(1,1)");
   });
