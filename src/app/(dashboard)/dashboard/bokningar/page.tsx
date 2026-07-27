@@ -8,7 +8,7 @@ type Booking = {
   id: string;
   property_name?: string;
   resource: string;
-  resident_name: string;
+  resident_name?: string | null;
   unit?: string;
   start: string;
   end: string;
@@ -29,6 +29,7 @@ function toLocalInput(value: string) {
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [cancellingId, setCancellingId] = useState("");
   const [editingId, setEditingId] = useState("");
@@ -38,13 +39,19 @@ export default function BookingsPage() {
 
   const load = useCallback(async () => {
     const response = await fetch("/api/bookings", { cache: "no-store" });
-    const data = await readResponseJson<{ bookings?: Booking[]; properties?: Property[]; error?: string }>(response);
+    const data = await readResponseJson<{
+      bookings?: Booking[];
+      properties?: Property[];
+      permissions?: { canManage?: boolean };
+      error?: string;
+    }>(response);
     if (!response.ok) {
       setMessage(data.error || "Kunde inte hämta bokningar");
       return;
     }
     setBookings(data.bookings || []);
     setProperties(data.properties || []);
+    setCanManage(Boolean(data.permissions?.canManage));
     if (data.properties?.[0]?.id) {
       setForm((value) => (value.propertyId ? value : { ...value, propertyId: data.properties![0].id }));
     }
@@ -77,8 +84,8 @@ export default function BookingsPage() {
     if (booking.source === "legacy" || booking.status === "cancelled") return;
     setEditingId(booking.id);
     setEditForm({
-      resource: booking.resource,
-      residentName: booking.resident_name,
+      resource: booking.resource || "Tvättstuga",
+      residentName: booking.resident_name || "",
       unit: booking.unit || "",
       start: toLocalInput(booking.start),
       end: toLocalInput(booking.end),
@@ -149,7 +156,10 @@ export default function BookingsPage() {
           </div>
         ))}
       </section>
-      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
+      {!canManage && message ? <p className="text-sm text-petroleum-700">{message}</p> : null}
+      {!canManage ? <p className="text-sm text-ink-500">Du har läsbehörighet till resurskalendern. Förvaltare kan skapa och ändra bokningar med boendeuppgifter.</p> : null}
+      <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[380px_1fr]" : "grid-cols-1"}`}>
+        {canManage ? (
         <form onSubmit={submit} className="space-y-4 rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
           <h2 className="text-lg font-semibold text-ink-950">Ny bokning</h2>
           <select required value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm">
@@ -171,6 +181,7 @@ export default function BookingsPage() {
             {saving ? "Sparar…" : "Registrera bokning"}
           </button>
         </form>
+        ) : null}
         <div className="rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
           <div className="border-b border-sand-200 p-5"><h2 className="font-semibold text-ink-950">Bokningsöversikt</h2></div>
           <div className="divide-y divide-sand-200">
@@ -182,7 +193,7 @@ export default function BookingsPage() {
                   <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto] md:items-center">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{booking.resource}</p>
-                      <h3 className="mt-1 font-semibold text-ink-950">{booking.resident_name}</h3>
+                      <h3 className="mt-1 font-semibold text-ink-950">{booking.resident_name || "Bokad resurs"}</h3>
                       <p className="text-sm text-ink-500">{booking.property_name || "Fastighet"}{booking.unit ? ` · ${booking.unit}` : ""}</p>
                       {booking.source === "legacy" ? (
                         <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan bokningen kan ändras eller avbokas.</p>
@@ -196,7 +207,7 @@ export default function BookingsPage() {
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${booking.status === "cancelled" ? "bg-sand-100 text-ink-600" : "bg-petroleum-50 text-petroleum-700"}`}>
                         {booking.status === "cancelled" ? "Avbokad" : "Bekräftad"}
                       </span>
-                      {booking.status !== "cancelled" && booking.source !== "legacy" ? (
+                      {canManage && booking.status !== "cancelled" && booking.source !== "legacy" ? (
                         <>
                           <button type="button" onClick={() => startEdit(booking)} className="text-xs font-semibold text-petroleum-700 hover:text-petroleum-900">
                             Ändra
@@ -208,7 +219,7 @@ export default function BookingsPage() {
                       ) : null}
                     </div>
                   </div>
-                  {editingId === booking.id ? (
+                  {canManage && editingId === booking.id ? (
                     <div className="grid gap-3 rounded-xl border border-sand-200 bg-sand-50 p-4 md:grid-cols-2">
                       <select value={editForm.resource} onChange={(e) => setEditForm({ ...editForm, resource: e.target.value })} className="rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm">
                         {resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}

@@ -31,6 +31,7 @@ export default function RentNoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState("");
@@ -48,6 +49,7 @@ export default function RentNoticesPage() {
       setNotices(data.notices || []);
       setLeases(data.leases || []);
       setProperties(data.properties || []);
+      setCanManage(Boolean(data.permissions?.canManage));
     } else setError(data.error || "Kunde inte hämta hyresavier");
     setLoading(false);
   }
@@ -167,7 +169,9 @@ export default function RentNoticesPage() {
       <MetricCard icon={CalendarClock} label="Förfallna" value={String(summary.overdue)} />
     </section>
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
-    <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
+    {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra hyresavier.</InlineAlert> : null}
+    <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+      {canManage ? (
       <Panel title="Ny hyresavi" description="Utgå från ett aktivt kontrakt eller registrera uppgifterna manuellt.">
         <form onSubmit={submit} className="space-y-4">
           <select className={premiumFieldClass} value={form.leaseId} onChange={(e) => selectLease(e.target.value)}>
@@ -203,6 +207,7 @@ export default function RentNoticesPage() {
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Skapa hyresavi"}</button>
         </form>
       </Panel>
+      ) : null}
       <Panel title="Avier och betalningsläge" description="Samlad översikt över perioder, förfallodatum och betalningsstatus." bodyClassName="p-0">
         {loading ? <p className="p-6 text-sm text-ink-500">Hämtar hyresavier…</p> : notices.length === 0 ? (
           <EmptyState title="Inga hyresavier registrerade" description="Skapa den första hyresavin för att börja följa avisering och betalningsläge." />
@@ -227,7 +232,7 @@ export default function RentNoticesPage() {
                   <div className="space-y-2 sm:text-right">
                     <p className="text-xl font-semibold text-ink-900">{money.format(Number(notice.total || 0))}</p>
                     <p className="text-xs text-ink-400">Index {Number(notice.index_percent || 0).toLocaleString("sv-SE")} %</p>
-                    {notice.source !== "legacy" ? (
+                    {canManage && notice.source !== "legacy" ? (
                       <>
                         <select
                           disabled={updatingId === notice.id}
@@ -253,7 +258,7 @@ export default function RentNoticesPage() {
                     ) : null}
                   </div>
                 </div>
-                {editingId === notice.id && notice.status === "draft" ? (
+                {canManage && editingId === notice.id && notice.status === "draft" ? (
                   <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />

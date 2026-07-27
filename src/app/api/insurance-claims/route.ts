@@ -91,7 +91,11 @@ export async function GET() {
         source: "legacy" as const,
       }));
 
-    return NextResponse.json({ claims: mergeByCreatedAt(modern, legacy, 400), properties });
+    return NextResponse.json({
+      claims: mergeByCreatedAt(modern, legacy, 400),
+      properties,
+      permissions: { canManage: canManageWorkOrderFinance(user.role) },
+    });
   } catch (error) {
     console.error("Get insurance claims error:", error);
     if (isMissingSchemaColumnError(error)) {

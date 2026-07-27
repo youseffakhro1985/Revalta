@@ -112,6 +112,7 @@ export async function GET() {
         unit: lease.unit.designation,
         tenant_name: lease.lease_holder.name,
       })),
+      permissions: { canManage: canManageWorkOrderFinance(user.role) },
     });
   } catch (error) {
     console.error("Get IMD readings error:", error);

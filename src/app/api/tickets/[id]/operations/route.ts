@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import {
+  canManageTickets,
+  canManageWorkOrderFinance,
+  canViewFinanceData,
+  getCurrentUser,
+  tenantWhere,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, loadLegacyRows } from "@/lib/dual-list";
 
@@ -82,7 +88,14 @@ export async function GET(
       })),
     ]);
 
-    const modern = rows.map(mapModernOperation);
+    const includeFinance = canViewFinanceData(user.role);
+    const modern = rows.map((row) => {
+      const mapped = mapModernOperation(row);
+      if (!includeFinance && mapped.metadata.type === "cost") {
+        return { ...mapped, metadata: { ...mapped.metadata, amount: null } };
+      }
+      return mapped;
+    });
     const modernIds = new Set(modern.map((row) => row.id));
     const legacy = logs
       .filter((log) => {
@@ -92,20 +105,33 @@ export async function GET(
         if (typeof metadata.operationId === "string" && modernIds.has(metadata.operationId)) return false;
         return true;
       })
-      .map((log) => ({
-        id: log.id,
-        action: log.action,
-        metadata: log.metadata,
-        created_at: log.created_at,
-        actor: log.actor,
-        source: "legacy" as const,
-      }));
+      .map((log) => {
+        const metadata = (log.metadata || {}) as Record<string, unknown>;
+        const redacted = !includeFinance && (metadata.type === "cost" || String(log.action).includes(".cost."))
+          ? { ...metadata, amount: null }
+          : metadata;
+        return {
+          id: log.id,
+          action: log.action,
+          metadata: redacted,
+          created_at: log.created_at,
+          actor: log.actor,
+          source: "legacy" as const,
+        };
+      });
 
     const operations = [...modern, ...legacy]
       .sort((left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime())
       .slice(0, 100);
 
-    return NextResponse.json({ operations });
+    return NextResponse.json({
+      operations,
+      permissions: {
+        canManage: canManageTickets(user.role),
+        canManageFinance: canManageWorkOrderFinance(user.role),
+        canViewFinance: includeFinance,
+      },
+    });
   } catch (error) {
     console.error("Get work order operations error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -135,6 +161,9 @@ export async function POST(
     const type = typeof body.type === "string" ? body.type.trim() : "";
     if (!allowedTypes.has(type)) {
       return NextResponse.json({ error: "Ogiltig registreringstyp" }, { status: 400 });
+    }
+    if (type === "cost" && !canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att registrera kostnader" }, { status: 403 });
     }
 
     if (type === "time" || type === "cost") {
@@ -307,6 +336,9 @@ export async function PATCH(
       if (type !== "cost") {
         return NextResponse.json({ error: "Belopp kan bara ändras på kostnadsregistreringar" }, { status: 400 });
       }
+      if (!canManageWorkOrderFinance(user.role)) {
+        return NextResponse.json({ error: "Du saknar behörighet att ändra kostnader" }, { status: 403 });
+      }
       const amount = Number(body.amount);
       if (!Number.isFinite(amount) || amount < 0 || amount > 10000000) {
         return NextResponse.json({ error: "Ange ett giltigt kostnadsbelopp" }, { status: 400 });
@@ -422,6 +454,9 @@ export async function DELETE(
         }, { status: 409 });
       }
       return NextResponse.json({ error: "Registreringen hittades inte" }, { status: 404 });
+    }
+    if (existing.operation_type === "cost" && !canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att ta bort kostnader" }, { status: 403 });
     }
 
     const now = new Date();

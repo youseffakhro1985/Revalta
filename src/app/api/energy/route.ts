@@ -62,7 +62,7 @@ export async function GET() {
         source: "legacy" as const,
       }));
 
-    return NextResponse.json({ readings: mergeByCreatedAt(modern, legacy, 500), properties });
+    return NextResponse.json({ readings: mergeByCreatedAt(modern, legacy, 500), properties, permissions: { canManage: canManageWorkOrderFinance(user.role) } });
   } catch (error) {
     console.error("Get energy readings error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

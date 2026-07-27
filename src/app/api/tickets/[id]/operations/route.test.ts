@@ -77,6 +77,54 @@ describe("ticket operations route", () => {
     expect(body.operations[0].metadata.minutes).toBe(45);
   });
 
+  it("redacts cost amounts for technicians on GET", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    operationFindManyMock.mockResolvedValue([
+      {
+        id: "op-cost",
+        operation_type: "cost",
+        description: "Material",
+        minutes: null,
+        amount: 1500,
+        completed: null,
+        ticket_title: "Läckage",
+        created_at: new Date("2026-07-20T10:00:00Z"),
+        created_by: { name: "Anna", email: "anna@example.se" },
+      },
+    ]);
+
+    const response = await GET(new Request("http://localhost"), { params: Promise.resolve({ id: "ticket-1" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.operations[0].metadata.amount).toBeNull();
+    expect(body.permissions.canManageFinance).toBe(false);
+  });
+
+  it("denies technician cost amount updates on PATCH", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    operationFindFirstMock.mockResolvedValue({
+      id: "op-cost",
+      operation_type: "cost",
+      description: "Material",
+      minutes: null,
+      amount: 1500,
+      completed: null,
+      ticket_title: "Läckage",
+      created_at: new Date(),
+      created_by: { name: "Anna", email: "anna@example.se" },
+    });
+
+    const response = await PATCH(new Request("http://localhost", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operationId: "op-cost", amount: 2000 }),
+    }), { params: Promise.resolve({ id: "ticket-1" }) });
+
+    expect(response.status).toBe(403);
+    expect(operationUpdateManyMock).not.toHaveBeenCalled();
+  });
+
   it("updates modern ticket operation fields and rejects legacy rows", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     operationFindFirstMock

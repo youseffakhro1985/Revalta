@@ -42,7 +42,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH } from "./route";
+import { GET, PATCH } from "./route";
 
 describe("maintenance route", () => {
   beforeEach(() => {
@@ -52,6 +52,60 @@ describe("maintenance route", () => {
     propertyFindManyMock.mockResolvedValue([]);
     itemUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("redacts estimated cost for technicians on GET", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    itemFindManyMock.mockResolvedValue([{
+      id: "item-1",
+      property_id: "property-1",
+      property: { name: "Storgatan 1" },
+      component: "Tak",
+      measure: "Omläggning",
+      planned_year: 2027,
+      estimated_cost: 100000,
+      priority: "normal",
+      interval_years: 30,
+      status: "planned",
+      work_order_id: null,
+      work_order_number: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.items[0].estimated_cost).toBeNull();
+    expect(body.permissions.canViewFinance).toBe(false);
+    expect(body.permissions.canManageFinance).toBe(false);
+  });
+
+  it("denies technician cost mutations on PATCH", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    itemFindFirstMock.mockResolvedValue({
+      id: "item-1",
+      property_id: "property-1",
+      component: "Tak",
+      measure: "Omläggning",
+      planned_year: 2027,
+      estimated_cost: 100000,
+      priority: "normal",
+      interval_years: 30,
+      status: "planned",
+      work_order_id: null,
+      work_order_number: null,
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/maintenance", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId: "item-1", estimatedCost: 120000 }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect(itemUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("updates modern maintenance item with active property filter", async () => {

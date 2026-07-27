@@ -91,6 +91,7 @@ export async function GET() {
         status: lease.status,
       })),
       properties,
+      permissions: { canManage: canManageLeases(user.role) },
     });
   } catch (error) {
     console.error("Get rent notices error:", error);

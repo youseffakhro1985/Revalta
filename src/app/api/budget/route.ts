@@ -50,8 +50,10 @@ export async function GET() {
       source: "table" as const,
     }));
     const modernIds = new Set(modern.map((row) => row.id));
+    const activePropertyIds = new Set(properties.map((property) => property.id));
     const legacy = logs
       .filter((log) => !isModernStorageMirror(log.metadata, "BudgetEntry", modernIds, log.entity_id) && !modernIds.has(log.id))
+      .filter((log) => !log.entity_id || activePropertyIds.has(log.entity_id))
       .map((log) => ({
         id: log.id,
         property_id: log.entity_id,
@@ -60,7 +62,11 @@ export async function GET() {
         source: "legacy" as const,
       }));
 
-    return NextResponse.json({ entries: mergeByCreatedAt(modern, legacy, 600), properties });
+    return NextResponse.json({
+      entries: mergeByCreatedAt(modern, legacy, 600),
+      properties,
+      permissions: { canManage: canManageWorkOrderFinance(user.role) },
+    });
   } catch (error) {
     console.error("Get budget error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

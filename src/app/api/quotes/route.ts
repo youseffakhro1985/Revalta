@@ -132,6 +132,7 @@ export async function GET() {
     return NextResponse.json({
       quotes: mergeByCreatedAt(modern, legacy, 300),
       properties,
+      permissions: { canManage: canManageWorkOrderFinance(user.role) },
     });
   } catch (error) {
     console.error("Get quotes error:", error);
