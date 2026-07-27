@@ -50,6 +50,56 @@ jobs:
           git merge --no-edit --no-ff -X theirs origin/cursor/wo-board-role-scope-6157
           git merge --no-edit --no-ff -X theirs origin/cursor/staff-read-hardening-6157
 
+      - name: Reconcile permission exports after stacked merge
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          permissions = Path("src/lib/permissions.ts")
+          source = permissions.read_text()
+          additions = []
+          if "export function shouldScopeToAssignedWork" not in source:
+              additions.append('''
+          /** Technicians (and residents) only see work assigned to themselves. */
+          export function shouldScopeToAssignedWork(role: string) {
+            return hasRole(role, ["technician", "resident"]);
+          }
+          ''')
+          if "export function canAssignWorkOrders" not in source:
+              additions.append('''
+          /** Managers and admins distribute work; technicians execute assigned work. */
+          export function canAssignWorkOrders(role: string) {
+            return hasRole(role, ["owner", "admin", "manager"]);
+          }
+          ''')
+          if "export function canWriteOperations" not in source:
+              additions.append('''
+          /** Viewer/resident are read-only in the manager workspace. */
+          export function canWriteOperations(role: string) {
+            return canManageTickets(role);
+          }
+          ''')
+          if additions:
+              permissions.write_text(source.rstrip() + "\n" + "".join(additions))
+
+          current_user = Path("src/lib/current-user.ts")
+          source = current_user.read_text()
+          export_start = source.index("export {")
+          export_end = source.index('} from "@/lib/permissions";', export_start)
+          block = source[export_start:export_end]
+          required = [
+              "canAssignWorkOrders",
+              "canWriteOperations",
+              "shouldScopeToAssignedWork",
+          ]
+          missing = [name for name in required if name not in block]
+          if missing:
+              insertion = "".join(f"  {name},\n" for name in missing)
+              source = source[:export_end] + insertion + source[export_end:]
+              current_user.write_text(source)
+          PY
+
       - name: Reconcile dashboard shell merge residue
         shell: bash
         run: |
@@ -59,15 +109,46 @@ jobs:
 
           path = Path("src/components/dashboard/dashboard-shell.tsx")
           source = path.read_text()
+
           pattern = re.compile(
               r'(?ms)^  const roleLabel = role === "owner" \? "Ägare".*?^\s*: role;\n\n?'
           )
-          updated, replacements = pattern.subn("", source)
-          if replacements != 1:
+          source, replacements = pattern.subn("", source)
+          if replacements not in (0, 1):
               raise SystemExit(
-                  f"Expected exactly one stale roleLabel declaration after stack merge; found {replacements}"
+                  f"Expected at most one stale roleLabel declaration after stack merge; found {replacements}"
               )
-          path.write_text(updated)
+
+          permission_names = [
+              "canManageBilling",
+              "canManageCompany",
+              "canManageIntegrations",
+              "canViewAudit",
+              "canViewOperations",
+              "isResident",
+          ]
+          source = re.sub(
+              r'import \{[^}]*\} from "@/lib/permissions";',
+              'import {\n' + ''.join(f'  {name},\n' for name in permission_names) + '} from "@/lib/permissions";',
+              source,
+              count=1,
+              flags=re.S,
+          )
+          if 'from "@/lib/permissions";' not in source:
+              marker = 'import { WorkOrderLockIndicator } from "@/components/dashboard/work-order-lock-indicator";\n'
+              replacement = marker + 'import {\n' + ''.join(f'  {name},\n' for name in permission_names) + '} from "@/lib/permissions";\n'
+              if marker not in source:
+                  raise SystemExit("Could not find dashboard shell import insertion point")
+              source = source.replace(marker, replacement, 1)
+
+          display = "  const displayName = userName?.trim() || userEmail;\n"
+          first = source.find(display)
+          if first == -1:
+              raise SystemExit("Missing displayName declaration after stack merge")
+          tail = source[first + len(display):].replace(display, "")
+          source = source[:first + len(display)] + tail
+
+          path.write_text(source)
           PY
 
       - name: Reconcile work-order role test mocks
@@ -86,12 +167,14 @@ jobs:
             role === "owner" || role === "admin" || role === "manager" || role === "technician",
           shouldScopeToAssignedWork: (role: string | null | undefined) => role === "technician",
           """
-          occurrences = source.count(needle)
-          if occurrences != 1:
-              raise SystemExit(
-                  f"Expected exactly one current-user mock insertion point; found {occurrences}"
-              )
-          path.write_text(source.replace(needle, replacement, 1))
+          if "canAssignWorkOrders:" not in source:
+              occurrences = source.count(needle)
+              if occurrences != 1:
+                  raise SystemExit(
+                      f"Expected exactly one current-user mock insertion point; found {occurrences}"
+                  )
+              source = source.replace(needle, replacement, 1)
+              path.write_text(source)
           PY
 
       - name: Remove temporary workflow from final tree
