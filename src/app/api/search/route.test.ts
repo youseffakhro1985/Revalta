@@ -75,4 +75,22 @@ describe("global search tenant isolation", () => {
     }));
     expect(leaseHolderFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("keeps technicians on property/ticket search without directory hits", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-a",
+      role: "technician",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/search?q=port"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(propertyFindManyMock).toHaveBeenCalled();
+    expect(ticketFindManyMock).toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+    expect(leaseHolderFindManyMock).not.toHaveBeenCalled();
+    expect(body.results.every((item: { type: string }) => item.type === "property" || item.type === "ticket")).toBe(true);
+  });
 });

@@ -1,17 +1,100 @@
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { hashPassword, hashResetToken } from "@/lib/auth";
-import { NextResponse } from "next/server";
+import { hashPassword, hashResetToken, signToken } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { homePathForRole } from "@/lib/resident-access";
 import { isStrongPassword, passwordPolicyMessage } from "@/lib/security";
+import {
+  LEGACY_SESSION_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  expiredSessionCookieOptions,
+  sessionCookieOptions,
+} from "@/lib/session-policy";
+
+function noStore(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: {
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      ...(init?.headers || {}),
+    },
+  });
+}
+
+async function loadInvitePreview(token: string) {
+  return db.teamInvite.findUnique({
+    where: { token_hash: hashResetToken(token) },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      expires_at: true,
+      accepted_at: true,
+      company: { select: { name: true, status: true } },
+    },
+  });
+}
+
+export async function GET(request: Request) {
+  try {
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit(`invite-preview:${ip}`, 30, 60 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return noStore({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
+    }
+
+    const token = new URL(request.url).searchParams.get("token")?.trim() || "";
+    if (!token) {
+      return noStore({ error: "Inbjudningslänken saknas" }, { status: 400 });
+    }
+
+    const invite = await loadInvitePreview(token);
+    if (!invite || invite.accepted_at || invite.expires_at < new Date()) {
+      return noStore({ error: "Inbjudan är ogiltig eller har gått ut" }, { status: 400 });
+    }
+    if (invite.company.status !== "active") {
+      return noStore({ error: "Organisationen är inte aktiv" }, { status: 400 });
+    }
+
+    return noStore({
+      invite: {
+        email: invite.email,
+        name: invite.name,
+        role: invite.role,
+        companyName: invite.company.name,
+        redirectTo: homePathForRole(invite.role),
+      },
+    });
+  } catch (error) {
+    console.error("Preview team invite error:", error);
+    return noStore({ error: "Internt serverfel" }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
-    const { token, password, name } = await request.json();
-    if (typeof token !== "string" || !token) {
-      return NextResponse.json({ error: "Inbjudningslänken saknas" }, { status: 400 });
+    const ip = getClientIp(request);
+    const rateLimit = await checkRateLimit(`invite-accept:${ip}`, 12, 60 * 60 * 1000);
+    if (!rateLimit.allowed) {
+      return noStore({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
+    }
+
+    const body = await request.json().catch(() => ({})) as {
+      token?: unknown;
+      password?: unknown;
+      name?: unknown;
+    };
+    const token = typeof body.token === "string" ? body.token : "";
+    const password = typeof body.password === "string" ? body.password : "";
+    if (!token) {
+      return noStore({ error: "Inbjudningslänken saknas" }, { status: 400 });
     }
     if (!isStrongPassword(password)) {
-      return NextResponse.json({ error: passwordPolicyMessage }, { status: 400 });
+      return noStore({ error: passwordPolicyMessage }, { status: 400 });
     }
 
     const invite = await db.teamInvite.findUnique({
@@ -24,14 +107,18 @@ export async function POST(request: Request) {
         role: true,
         expires_at: true,
         accepted_at: true,
+        company: { select: { status: true } },
       },
     });
 
     if (!invite || invite.accepted_at || invite.expires_at < new Date()) {
-      return NextResponse.json({ error: "Inbjudan är ogiltig eller har gått ut" }, { status: 400 });
+      return noStore({ error: "Inbjudan är ogiltig eller har gått ut" }, { status: 400 });
+    }
+    if (invite.company.status !== "active") {
+      return noStore({ error: "Organisationen är inte aktiv" }, { status: 400 });
     }
 
-    const normalizedName = typeof name === "string" && name.trim() ? name.trim() : invite.name;
+    const normalizedName = typeof body.name === "string" && body.name.trim() ? body.name.trim() : invite.name;
     const user = await db.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
         data: {
@@ -61,9 +148,29 @@ export async function POST(request: Request) {
       metadata: { email: user.email, role: user.role },
     });
 
-    return NextResponse.json({ success: true, user });
+    const sessionToken = await signToken({
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      passwordChangedAt: null,
+    });
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE_NAME, sessionToken, sessionCookieOptions());
+    cookieStore.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
+
+    const redirectTo = homePathForRole(user.role);
+    return noStore({
+      success: true,
+      redirectTo,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+    });
   } catch (error) {
     console.error("Accept team invite error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    return noStore({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { verifyToken } = vi.hoisted(() => ({
+const { verifyToken, findUnique } = vi.hoisted(() => ({
   verifyToken: vi.fn(),
+  findUnique: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({ verifyToken }));
+vi.mock("@/lib/db", () => ({
+  default: { user: { findUnique } },
+}));
 
 import { proxy } from "@/proxy";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
@@ -17,8 +21,8 @@ const validSession = {
   passwordChangedAt: null,
 };
 
-function dashboardRequest(cookie?: string) {
-  return new NextRequest("https://www.revalta.se/dashboard", {
+function dashboardRequest(path = "/dashboard", cookie?: string) {
+  return new NextRequest(`https://www.revalta.se${path}`, {
     headers: cookie ? { cookie } : undefined,
   });
 }
@@ -27,10 +31,15 @@ describe("request proxy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     verifyToken.mockResolvedValue(validSession);
+    findUnique.mockResolvedValue({
+      role: "owner",
+      status: "active",
+      email: validSession.email,
+    });
   });
 
   it("accepts the current host-only session cookie", async () => {
-    const response = await proxy(dashboardRequest(`${SESSION_COOKIE_NAME}=current-token`));
+    const response = await proxy(dashboardRequest("/dashboard", `${SESSION_COOKIE_NAME}=current-token`));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-middleware-next")).toBe("1");
@@ -38,7 +47,7 @@ describe("request proxy", () => {
   });
 
   it("keeps the controlled legacy-cookie fallback during migration", async () => {
-    const response = await proxy(dashboardRequest(`${LEGACY_SESSION_COOKIE_NAME}=legacy-token`));
+    const response = await proxy(dashboardRequest("/dashboard", `${LEGACY_SESSION_COOKIE_NAME}=legacy-token`));
 
     expect(response.status).toBe(200);
     expect(verifyToken).toHaveBeenCalledWith("legacy-token");
@@ -66,5 +75,88 @@ describe("request proxy", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "Otillåtet anrop" });
     expect(verifyToken).not.toHaveBeenCalled();
+  });
+
+  it("redirects residents away from staff dashboard paths", async () => {
+    findUnique.mockResolvedValue({
+      role: "resident",
+      status: "active",
+      email: validSession.email,
+    });
+
+    const response = await proxy(
+      dashboardRequest("/dashboard/fastigheter", `${SESSION_COOKIE_NAME}=current-token`),
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal");
+  });
+
+  it("allows residents on the boendeportal without blocking", async () => {
+    findUnique.mockResolvedValue({
+      role: "resident",
+      status: "active",
+      email: validSession.email,
+    });
+
+    const response = await proxy(
+      dashboardRequest("/dashboard/boendeportal", `${SESSION_COOKIE_NAME}=current-token`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it("blocks resident access to company APIs", async () => {
+    findUnique.mockResolvedValue({
+      role: "resident",
+      status: "active",
+      email: validSession.email,
+    });
+
+    const request = new NextRequest("https://www.revalta.se/api/properties", {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=current-token` },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Boende har endast åtkomst till boendeportalen",
+    });
+  });
+
+  it("allows resident portal APIs", async () => {
+    findUnique.mockResolvedValue({
+      role: "resident",
+      status: "active",
+      email: validSession.email,
+    });
+
+    const request = new NextRequest("https://www.revalta.se/api/resident-portal", {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=current-token` },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it("sends residents from login to the boendeportal", async () => {
+    findUnique.mockResolvedValue({
+      role: "resident",
+      status: "active",
+      email: validSession.email,
+    });
+
+    const request = new NextRequest("https://www.revalta.se/login", {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=current-token` },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal");
   });
 });

@@ -50,17 +50,41 @@ export function canViewOperations(role: string) {
   return hasRole(role, ["owner", "admin", "manager"]);
 }
 
-/** Technicians (and residents) only see work assigned to themselves. */
-export function shouldScopeToAssignedWork(role: string) {
-  return hasRole(role, ["technician", "resident"]);
+/** Leasing/hyresgästdata — not for field technicians. */
+export function canViewLeasingData(role: string) {
+  return hasRole(role, ["owner", "admin", "manager", "viewer"]);
 }
 
-/** Managers and admins distribute work; technicians execute assigned work. */
-export function canAssignWorkOrders(role: string) {
-  return hasRole(role, ["owner", "admin", "manager"]);
+/** Budget, offerter, IMD, skador, hyresavier — commercial/finance read. */
+export function canViewFinanceData(role: string) {
+  return hasRole(role, ["owner", "admin", "manager", "viewer"]);
 }
 
-/** Viewer/resident are read-only in the manager workspace. */
-export function canWriteOperations(role: string) {
+export function isResident(role: string) {
+  return role === "resident";
+}
+
+/** Internal company workspace roles (not resident self-service). */
+export function isStaffRole(role: string) {
+  return hasRole(role, ["owner", "admin", "manager", "technician", "viewer"]);
+}
+
+/** Authenticated portal access for staff workspace and resident self-service. */
+export function canAccessResidentPortal(role: string) {
+  return isResident(role) || isStaffRole(role);
+}
+
+/** Staff may create tickets on behalf of any active lease. */
+export function canManageResidentPortal(role: string) {
   return canManageTickets(role);
+}
+
+/** Residents create tickets for their own matched leases; staff keep current rights. */
+export function canCreateResidentPortalTicket(role: string) {
+  return canManageResidentPortal(role) || isResident(role);
+}
+
+/** Document download for ops staff or resident self-service. */
+export function canDownloadResidentDocuments(role: string) {
+  return canViewOperations(role) || isResident(role);
 }

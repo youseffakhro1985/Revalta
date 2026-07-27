@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
-  canAssignWorkOrders,
+  canAccessResidentPortal,
+  canCreateResidentPortalTicket,
+  canDownloadResidentDocuments,
   canExportTickets,
   canManageAccessCredentials,
+  canManageResidentPortal,
+  canManageBilling,
   canManageTeam,
   canManageTickets,
   canViewAudit,
+  canViewFinanceData,
+  canViewLeasingData,
   canViewOperations,
-  shouldScopeToAssignedWork,
+  isResident,
+  isStaffRole,
   USER_ROLES,
 } from "@/lib/permissions";
 
@@ -36,6 +43,24 @@ describe("permissions", () => {
     expect(canExportTickets(role)).toBe(false);
   });
 
+  it.each(["owner", "admin", "manager", "viewer"])("låter %s läsa leasing- och finansdata", (role) => {
+    expect(canViewLeasingData(role)).toBe(true);
+    expect(canViewFinanceData(role)).toBe(true);
+  });
+
+  it.each(["technician", "resident", "unknown", ""])("nekar %s leasing- och finansläsning", (role) => {
+    expect(canViewLeasingData(role)).toBe(false);
+    expect(canViewFinanceData(role)).toBe(false);
+  });
+
+  it.each(["owner", "admin"])("låter %s hantera billing", (role) => {
+    expect(canManageBilling(role)).toBe(true);
+  });
+
+  it.each(["manager", "technician", "viewer", "resident"])("nekar %s billing-administration", (role) => {
+    expect(canManageBilling(role)).toBe(false);
+  });
+
   it.each(["owner", "admin", "manager", "technician"])("låter %s arbeta med ärenden", (role) => {
     expect(canManageTickets(role)).toBe(true);
   });
@@ -52,19 +77,42 @@ describe("permissions", () => {
     expect(canManageAccessCredentials(role)).toBe(false);
   });
 
-  it.each(["technician", "resident"])("scopesar %s till tilldelat arbete", (role) => {
-    expect(shouldScopeToAssignedWork(role)).toBe(true);
+  it("identifierar resident-rollen", () => {
+    expect(isResident("resident")).toBe(true);
+    expect(isResident("viewer")).toBe(false);
   });
 
-  it.each(["owner", "admin", "manager", "viewer"])("scopesar inte %s till endast tilldelat arbete", (role) => {
-    expect(shouldScopeToAssignedWork(role)).toBe(false);
+  it.each(["owner", "admin", "manager", "technician", "viewer"])("identifierar %s som personalroll", (role) => {
+    expect(isStaffRole(role)).toBe(true);
+    expect(isResident(role)).toBe(false);
   });
 
-  it.each(["owner", "admin", "manager"])("låter %s tilldela arbetsordrar", (role) => {
-    expect(canAssignWorkOrders(role)).toBe(true);
+  it("nekar resident som personalroll", () => {
+    expect(isStaffRole("resident")).toBe(false);
   });
 
-  it.each(["technician", "viewer", "resident", "unknown", ""])("nekar %s att tilldela arbetsordrar", (role) => {
-    expect(canAssignWorkOrders(role)).toBe(false);
+  it.each(["owner", "admin", "manager", "technician", "viewer", "resident"])("låter %s öppna boendeportalen", (role) => {
+    expect(canAccessResidentPortal(role)).toBe(true);
+  });
+
+  it("nekar okänd roll till boendeportalen", () => {
+    expect(canAccessResidentPortal("unknown")).toBe(false);
+  });
+
+  it.each(["owner", "admin", "manager", "technician", "resident"])("låter %s skapa boendeärenden", (role) => {
+    expect(canCreateResidentPortalTicket(role)).toBe(true);
+  });
+
+  it.each(["viewer", "unknown", ""])("nekar %s att skapa boendeärenden", (role) => {
+    expect(canCreateResidentPortalTicket(role)).toBe(false);
+    expect(canManageResidentPortal(role)).toBe(false);
+  });
+
+  it.each(["owner", "admin", "manager", "resident"])("låter %s ladda ner boendedokument", (role) => {
+    expect(canDownloadResidentDocuments(role)).toBe(true);
+  });
+
+  it.each(["technician", "viewer", "unknown", ""])("nekar %s nedladdning av boendedokument", (role) => {
+    expect(canDownloadResidentDocuments(role)).toBe(false);
   });
 });
