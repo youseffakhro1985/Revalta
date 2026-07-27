@@ -133,4 +133,14 @@ describe("documents route", () => {
     expect(body.documents[0].dataUrl).toBeUndefined();
     expect(body.documents[0].downloadUrl).toBe("/api/documents/doc-1/download");
   });
+
+  it("omits company lease dump for technicians", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(body.leases).toEqual([]);
+  });
 });

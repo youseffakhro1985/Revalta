@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageWorkOrderFinance, canViewFinanceData, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getModernInvoiceExportJob,
@@ -61,6 +61,9 @@ export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewFinanceData(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa fakturaexporter" }, { status: 403 });
+  }
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status")?.trim();
@@ -101,7 +104,7 @@ export async function GET(request: Request) {
       { id: "visma", name: "Visma", configured: configured("visma") },
       { id: "webhook", name: "Generell webhook", configured: configured("webhook") },
     ],
-    canManage: canManageTickets(user.role),
+    canManage: canManageWorkOrderFinance(user.role),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -109,7 +112,7 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
 
   const body = await request.json();
   const action = String(body.action ?? "");

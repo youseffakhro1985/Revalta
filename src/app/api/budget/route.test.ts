@@ -45,7 +45,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { DELETE, PATCH } from "./route";
+import { DELETE, GET, PATCH } from "./route";
 
 describe("budget route", () => {
   beforeEach(() => {
@@ -56,6 +56,13 @@ describe("budget route", () => {
     budgetUpdateManyMock.mockResolvedValue({ count: 1 });
     budgetDeleteManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("denies technicians from reading budget data", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(budgetFindManyMock).not.toHaveBeenCalled();
   });
 
   it("updates modern budget fields and scopes active properties", async () => {

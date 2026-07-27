@@ -6,7 +6,7 @@ import { queueTicketNotification } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 import { isValidEmail, normalizeEmail } from "@/lib/security";
 
-const allowedRoles = new Set(["admin", "manager", "technician", "viewer"]);
+const allowedRoles = new Set(["admin", "manager", "technician", "viewer", "resident"]);
 
 export async function GET() {
   try {

@@ -1,7 +1,12 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import {
+  canDownloadResidentDocuments,
+  getCurrentUser,
+  isResident,
+} from "@/lib/current-user";
+import { leaseHolderEmailMatch } from "@/lib/resident-portal-scope";
 import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
 import { allowedDocumentContentTypes, safeDocumentFileName, validateDocumentFile } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
@@ -85,11 +90,14 @@ export async function GET(
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet till boendedokument" }, { status: 403 });
+    if (!canDownloadResidentDocuments(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet till boendedokument" }, { status: 403 });
+    }
 
     const { id } = await params;
     const leaseId = new URL(request.url).searchParams.get("leaseId")?.trim() || "";
     if (!leaseId) return NextResponse.json({ error: "Hyresavtal krävs" }, { status: 400 });
+    const residentView = isResident(user.role);
 
     const lease = await db.lease.findFirst({
       where: {
@@ -98,6 +106,7 @@ export async function GET(
         deleted_at: null,
         status: { in: activeLeaseStatuses },
         property: { deleted_at: null },
+        ...(residentView ? { lease_holder: leaseHolderEmailMatch(user.email) } : {}),
       },
       select: { id: true, property_id: true, unit_id: true, lease_number: true },
     });
@@ -253,7 +262,7 @@ export async function GET(
           fileName: validation.fileName,
           contentType,
           sizeBytes: bytes.length,
-          accessMode: "operations_preview",
+          accessMode: residentView ? "resident_self_service" : "operations_preview",
         },
       },
     });

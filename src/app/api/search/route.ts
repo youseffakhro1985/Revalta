@@ -1,5 +1,10 @@
 import db from "@/lib/db";
-import { companyUserWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import {
+  canViewLeasingData,
+  companyUserWhere,
+  getCurrentUser,
+  tenantWhere,
+} from "@/lib/current-user";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -12,6 +17,8 @@ export async function GET(request: Request) {
     if (query.length < 2) return NextResponse.json({ results: [] });
 
     const contains = { contains: query, mode: "insensitive" as const };
+    const includeDirectory = canViewLeasingData(user.role);
+
     const [properties, tickets, users, leaseHolders] = await Promise.all([
       db.property.findMany({
         where: {
@@ -48,37 +55,41 @@ export async function GET(request: Request) {
         orderBy: { updated_at: "desc" },
         select: { id: true, title: true, status: true, public_reference: true, property: { select: { name: true } } },
       }),
-      db.user.findMany({
-        where: {
-          ...companyUserWhere(user),
-          OR: [{ name: contains }, { email: contains }],
-        },
-        take: 5,
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, email: true, role: true },
-      }),
-      user.company_id ? db.leaseHolder.findMany({
-        where: {
-          deleted_at: null,
-          company_id: user.company_id,
-          status: "active",
-          OR: [{ name: contains }, { contact_name: contains }, { email: contains }, { organization_number: contains }],
-        },
-        take: 6,
-        orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          organization_number: true,
-          leases: {
-            where: { deleted_at: null, status: { in: ["reserved", "active", "notice"] }, property: { deleted_at: null } },
-            orderBy: { updated_at: "desc" },
-            take: 1,
-            select: { lease_number: true, unit: { select: { designation: true } }, property: { select: { name: true } } },
-          },
-        },
-      }) : Promise.resolve([]),
+      includeDirectory
+        ? db.user.findMany({
+            where: {
+              ...companyUserWhere(user),
+              OR: [{ name: contains }, { email: contains }],
+            },
+            take: 5,
+            orderBy: { name: "asc" },
+            select: { id: true, name: true, email: true, role: true },
+          })
+        : Promise.resolve([]),
+      includeDirectory && user.company_id
+        ? db.leaseHolder.findMany({
+            where: {
+              deleted_at: null,
+              company_id: user.company_id,
+              status: "active",
+              OR: [{ name: contains }, { contact_name: contains }, { email: contains }, { organization_number: contains }],
+            },
+            take: 6,
+            orderBy: { name: "asc" },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              organization_number: true,
+              leases: {
+                where: { deleted_at: null, status: { in: ["reserved", "active", "notice"] }, property: { deleted_at: null } },
+                orderBy: { updated_at: "desc" },
+                take: 1,
+                select: { lease_number: true, unit: { select: { designation: true } }, property: { select: { name: true } } },
+              },
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     const results = [

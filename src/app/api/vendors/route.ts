@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
-import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
+import { auditScopedWhere, canManageTickets, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { asNumber, isModernStorageMirror, loadLegacyRows, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const entityType = "vendor_contract";
@@ -10,6 +10,9 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canViewOperations(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa leverantörsavtal" }, { status: 403 });
+    }
 
     const [rows, legacy] = await Promise.all([
       user.company_id

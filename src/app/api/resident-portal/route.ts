@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import {
+  canAccessResidentPortal,
+  canCreateResidentPortalTicket,
+  canManageResidentPortal,
+  getCurrentUser,
+  isResident,
+} from "@/lib/current-user";
 import { generatePublicReference } from "@/lib/public-portal";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { loadLegacyRows } from "@/lib/dual-list";
+import { leaseHolderEmailMatch, reporterEmailMatch } from "@/lib/resident-portal-scope";
+import { normalizeEmail } from "@/lib/security";
 
 const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "heating", "access", "noise", "other"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
@@ -48,10 +56,27 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!canAccessResidentPortal(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet till boendeportalen" }, { status: 403 });
+    }
+
+    const residentView = isResident(user.role);
+    const leaseScope = residentView
+      ? { lease_holder: leaseHolderEmailMatch(user.email) }
+      : {};
+    const ticketScope = residentView
+      ? { reporter_email: reporterEmailMatch(user.email) }
+      : {};
 
     const [leases, tickets, managedDocuments, documentLogs] = await Promise.all([
       db.lease.findMany({
-        where: { company_id: user.company_id, deleted_at: null, status: { in: activeLeaseStatuses }, property: { deleted_at: null } },
+        where: {
+          company_id: user.company_id,
+          deleted_at: null,
+          status: { in: activeLeaseStatuses },
+          property: { deleted_at: null },
+          ...leaseScope,
+        },
         orderBy: [{ property: { name: "asc" } }, { unit: { designation: "asc" } }],
         take: 1000,
         select: {
@@ -74,6 +99,7 @@ export async function GET() {
           source: "resident_portal",
           deleted_at: null,
           OR: [{ property_id: null }, { property: { deleted_at: null } }],
+          ...ticketScope,
         },
         orderBy: { created_at: "desc" },
         take: 500,
@@ -115,10 +141,12 @@ export async function GET() {
     ]);
 
     const modernIds = new Set(managedDocuments.map((row) => row.id));
-    const lifecycleMap = await getDocumentLifecycleMap(
-      user.company_id,
-      documentLogs.map((log) => log.id).filter((id) => !modernIds.has(id)),
-    );
+    const lifecycleMap = user.company_id && documentLogs.length > 0
+      ? await getDocumentLifecycleMap(
+          user.company_id,
+          documentLogs.map((log) => log.id).filter((id) => !modernIds.has(id)),
+        )
+      : new Map();
 
     const modernDocuments = managedDocuments.flatMap((row) => {
       const accessibleLeaseIds = accessibleLeaseIdsForDocument(
@@ -200,7 +228,9 @@ export async function GET() {
         leases: leases.map((lease) => ({ ...lease, monthly_rent: Number(lease.monthly_rent) })),
         tickets,
         documents,
-        canManage: canManageTickets(user.role),
+        canManage: canManageResidentPortal(user.role),
+        canCreate: canCreateResidentPortalTicket(user.role),
+        isResident: residentView,
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
@@ -215,7 +245,9 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canCreateResidentPortalTicket(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    }
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     if (!body) return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
@@ -225,6 +257,7 @@ export async function POST(request: Request) {
     const message = String(body.message || "").trim();
     const category = String(body.category || "other").trim();
     const priority = String(body.priority || "normal").trim();
+    const residentView = isResident(user.role);
 
     if (!leaseId || !subject || message.length < 10) return NextResponse.json({ error: "Hyresavtal, ämne och en tydlig beskrivning krävs" }, { status: 400 });
     if (subject.length > 200 || message.length > 5000) return NextResponse.json({ error: "Ämnet eller beskrivningen är för lång" }, { status: 400 });
@@ -237,6 +270,7 @@ export async function POST(request: Request) {
         deleted_at: null,
         status: { in: activeLeaseStatuses },
         property: { deleted_at: null },
+        ...(residentView ? { lease_holder: leaseHolderEmailMatch(user.email) } : {}),
       },
       select: {
         id: true,
@@ -249,6 +283,10 @@ export async function POST(request: Request) {
     if (!lease) return NextResponse.json({ error: "Det aktiva hyresavtalet hittades inte" }, { status: 404 });
 
     const reporterName = lease.lease_holder.contact_name || lease.lease_holder.name;
+    const reporterEmail = residentView
+      ? normalizeEmail(user.email)
+      : (lease.lease_holder.email || normalizeEmail(user.email) || null);
+
     const ticket = await db.$transaction(async (tx) => {
       const created = await tx.ticket.create({
         data: {
@@ -263,7 +301,7 @@ export async function POST(request: Request) {
           public_reference: generatePublicReference(),
           source: "resident_portal",
           reporter_name: reporterName,
-          reporter_email: lease.lease_holder.email,
+          reporter_email: reporterEmail,
           reporter_phone: lease.lease_holder.phone,
           reporter_unit: lease.unit.designation,
         },
@@ -286,6 +324,7 @@ export async function POST(request: Request) {
             category,
             priority,
             publicReference: created.public_reference,
+            accessMode: residentView ? "resident_self_service" : "staff",
           },
         },
       });
@@ -296,7 +335,11 @@ export async function POST(request: Request) {
       entityType: "lease",
       entityId: lease.id,
       action: "resident_portal.lease_ticket_linked",
-      metadata: { ticketId: ticket.id, publicReference: ticket.public_reference },
+      metadata: {
+        ticketId: ticket.id,
+        publicReference: ticket.public_reference,
+        accessMode: residentView ? "resident_self_service" : "staff",
+      },
     });
 
     return NextResponse.json({ ticket }, { status: 201 });

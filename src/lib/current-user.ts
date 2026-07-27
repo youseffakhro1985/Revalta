@@ -1,22 +1,32 @@
 import { cookies } from "next/headers";
 import db from "@/lib/db";
+import { isResident } from "@/lib/permissions";
 import { verifyToken } from "@/lib/session";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
 
 export {
+  canAccessResidentPortal,
   canAssignWorkOrders,
   canCreateProperties,
+  canCreateResidentPortalTicket,
+  canDownloadResidentDocuments,
   canExportTickets,
   canManageBilling,
   canManageCompany,
   canManageAccessCredentials,
   canManageIntegrations,
   canManageLeases,
+  canManageResidentPortal,
   canManageTeam,
   canManageTickets,
+  canManageWorkOrderFinance,
   canViewAudit,
+  canViewFinanceData,
+  canViewLeasingData,
   canViewOperations,
   canWriteOperations,
+  isResident,
+  isStaffRole,
   shouldScopeToAssignedWork,
 } from "@/lib/permissions";
 
@@ -75,8 +85,20 @@ export function companyUserWhere(user: CurrentUser) {
   return user.company_id ? { company_id: user.company_id } : { id: user.id };
 }
 
-/** Fail-closed helper for organisation-scoped API routes. */
-export function requireCompanyUser(user: CurrentUser | null): CompanyUser | null {
+/** Organisation member with company scope (includes resident self-service). */
+export function requireCompanyMember(user: CurrentUser | null): CompanyUser | null {
   if (!user?.company_id) return null;
   return user as CompanyUser;
+}
+
+/** Fail-closed helper for organisation-scoped staff API routes. */
+export function requireCompanyUser(user: CurrentUser | null): CompanyUser | null {
+  const member = requireCompanyMember(user);
+  if (!member || isResident(member.role)) return null;
+  return member;
+}
+
+/** Explicit staff-only company scope (alias of requireCompanyUser). */
+export function requireStaffCompanyUser(user: CurrentUser | null): CompanyUser | null {
+  return requireCompanyUser(user);
 }

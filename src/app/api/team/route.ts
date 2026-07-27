@@ -5,7 +5,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 
-const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer"]);
+const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer", "resident"]);
 
 export async function GET() {
   try {

@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     cookieStore.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
 
     return NextResponse.json(
-      { success: true, user: { id: user.id, email: user.email, name: user.name } },
+      { success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } },
       { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
     );
   } catch (error) {

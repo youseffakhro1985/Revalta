@@ -1,7 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken } from "@/lib/session";
+import db from "@/lib/db";
+import { isResident } from "@/lib/permissions";
+import {
+  isStaffOnlyApiPath,
+  isStaffOnlyDashboardPath,
+  residentHomePath,
+} from "@/lib/resident-access";
 import { isTrustedMutationRequest } from "@/lib/request-security";
+import { verifyToken } from "@/lib/session";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
+
+async function resolveSessionRole(sessionSub: string, sessionEmail: string) {
+  const user = await db.user.findUnique({
+    where: { id: sessionSub },
+    select: { role: true, status: true, email: true },
+  });
+  if (!user || user.status !== "active") return null;
+  if (user.email.toLowerCase() !== sessionEmail.toLowerCase()) return null;
+  return user.role;
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -25,7 +42,28 @@ export async function proxy(request: NextRequest) {
   }
 
   if ((pathname === "/login" || pathname === "/register") && session) {
+    const role = await resolveSessionRole(session.sub, session.email);
+    if (role && isResident(role)) {
+      return NextResponse.redirect(new URL(residentHomePath(), request.url));
+    }
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  if (session && isStaffOnlyDashboardPath(pathname)) {
+    const role = await resolveSessionRole(session.sub, session.email);
+    if (role && isResident(role)) {
+      return NextResponse.redirect(new URL(residentHomePath(), request.url));
+    }
+  }
+
+  if (session && isStaffOnlyApiPath(pathname)) {
+    const role = await resolveSessionRole(session.sub, session.email);
+    if (role && isResident(role)) {
+      return NextResponse.json(
+        { error: "Boende har endast åtkomst till boendeportalen" },
+        { status: 403 },
+      );
+    }
   }
 
   return NextResponse.next();
