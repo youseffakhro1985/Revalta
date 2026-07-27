@@ -65,6 +65,24 @@ describe("projects/[id] route", () => {
     expect(body.project.id).toBe("project-1");
   });
 
+  it("denies technicians from reading projects", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET(new Request("http://localhost/api/projects/project-1"), { params });
+    expect(response.status).toBe(403);
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians from mutating projects", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/projects/project-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Nytt namn" }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("GET returns 404 when project is missing or on a soft-deleted property", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     projectFindFirstMock.mockResolvedValue(null);

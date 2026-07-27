@@ -60,7 +60,11 @@ export async function GET() {
         source: "legacy" as const,
       }));
 
-    return NextResponse.json({ inspections: mergeByCreatedAt(modern, legacy, 300), properties });
+    return NextResponse.json({
+      inspections: mergeByCreatedAt(modern, legacy, 300),
+      properties,
+      permissions: { canManage: canManageTickets(user.role) },
+    });
   } catch (error) {
     console.error("Get inspections error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

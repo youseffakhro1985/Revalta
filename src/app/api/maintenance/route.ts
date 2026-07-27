@@ -1,7 +1,15 @@
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import db from "@/lib/db";
-import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import {
+  auditScopedWhere,
+  canManageTickets,
+  canManageWorkOrderFinance,
+  canViewFinanceData,
+  canViewOperations,
+  getCurrentUser,
+  tenantWhere,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, loadLegacyRows } from "@/lib/dual-list";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
@@ -29,7 +37,11 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!canManageTickets(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa underhållsplanen" }, { status: 403 });
+    }
 
+    const includeFinance = canViewFinanceData(user.role);
     const [rows, logs, properties] = await Promise.all([
       user.company_id
         ? db.portfolioMaintenanceItem.findMany({
@@ -51,6 +63,7 @@ export async function GET() {
     ]);
 
     const modernIds = new Set(rows.map((row) => row.id));
+    const activePropertyIds = new Set(properties.map((property) => property.id));
     const modern = rows.map((row) => ({
       id: row.id,
       property_id: row.property_id,
@@ -58,7 +71,7 @@ export async function GET() {
       component: row.component,
       measure: row.measure,
       planned_year: row.planned_year,
-      estimated_cost: asNumber(row.estimated_cost),
+      estimated_cost: includeFinance ? asNumber(row.estimated_cost) : null,
       priority: row.priority,
       interval_years: row.interval_years,
       status: row.status,
@@ -71,11 +84,12 @@ export async function GET() {
 
     const latest = new Map<string, Record<string, unknown>>();
     for (const log of logs) {
+      if (log.entity_id && !activePropertyIds.has(log.entity_id)) continue;
       const metadata = (log.metadata ?? {}) as MaintenanceMetadata;
       const itemId = metadata.item_id || log.id;
       if (modernIds.has(itemId)) continue;
       const previous = latest.get(itemId) || {};
-      latest.set(itemId, {
+      const next = {
         ...previous,
         ...metadata,
         id: itemId,
@@ -83,12 +97,18 @@ export async function GET() {
         created_at: previous.created_at || log.created_at,
         updated_at: metadata.updated_at || log.created_at,
         source: "legacy",
-      });
+      };
+      if (!includeFinance) next.estimated_cost = undefined;
+      latest.set(itemId, next);
     }
 
     return NextResponse.json({
       items: [...modern, ...latest.values()],
       properties,
+      permissions: {
+        canManage: canViewOperations(user.role),
+        canViewFinance: includeFinance,
+      },
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Get maintenance plan error:", error);
@@ -100,7 +120,7 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null);
@@ -114,6 +134,9 @@ export async function POST(request: Request) {
     const priority = String(body.priority || "normal");
     const intervalYears = Number(body.intervalYears || 0);
 
+    if (!canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att skapa underhållsposter med kostnad" }, { status: 403 });
+    }
     if (!propertyId || !component || !measure || !Number.isInteger(plannedYear) || plannedYear < 2020 || !Number.isFinite(estimatedCost) || estimatedCost < 0 || !Number.isInteger(intervalYears) || intervalYears < 0) {
       return NextResponse.json({ error: "Kontrollera fastighet, byggnadsdel, åtgärd, år, intervall och kostnad" }, { status: 400 });
     }
@@ -168,7 +191,7 @@ export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null);
@@ -244,6 +267,9 @@ export async function PATCH(request: Request) {
     const nextStatus = hasStatus ? status : (modern.status as MaintenanceStatus);
 
     if (hasFieldUpdate) {
+      if (body.estimatedCost !== undefined && !canManageWorkOrderFinance(user.role)) {
+        return NextResponse.json({ error: "Du saknar behörighet att ändra underhållskostnader" }, { status: 403 });
+      }
       if (body.component !== undefined) component = String(body.component || "").trim();
       if (body.measure !== undefined) measure = String(body.measure || "").trim();
       if (body.plannedYear !== undefined) plannedYear = Number(body.plannedYear);

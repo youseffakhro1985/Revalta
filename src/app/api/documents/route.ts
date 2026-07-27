@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canViewLeasingData, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
 import { parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
@@ -21,6 +21,7 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
+    const includeLeases = canViewLeasingData(user.role);
     const [rows, logs, properties, leases] = await Promise.all([
       user.company_id
         ? db.managedDocument.findMany({
@@ -50,7 +51,7 @@ export async function GET() {
           units: { orderBy: { designation: "asc" }, select: { id: true, designation: true } },
         },
       }),
-      user.company_id
+      includeLeases && user.company_id
         ? db.lease.findMany({
             where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
             orderBy: { lease_number: "asc" },

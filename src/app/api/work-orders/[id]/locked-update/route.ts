@@ -2,8 +2,9 @@ import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
+import { isAssignedWorkAccessible } from "@/lib/assigned-work-access";
 import { PATCH as updateWorkOrder } from "../route";
 
 function noStore(body: unknown, init?: ResponseInit) {
@@ -45,8 +46,8 @@ export async function PATCH(
     sqlSoftDeleteGuard(db, "WorkOrder", "w"),
     sqlSoftDeleteGuard(db, "Property", "p"),
   ]);
-  const rows = await db.$queryRaw<Array<{ updated_at: Date; lock_valid: boolean }>>(Prisma.sql`
-    SELECT w."updated_at",
+  const rows = await db.$queryRaw<Array<{ updated_at: Date; lock_valid: boolean; assigned_to_id: string | null }>>(Prisma.sql`
+    SELECT w."updated_at", w."assigned_to_id",
            EXISTS (
              SELECT 1
              FROM "WorkOrderEditLock" l
@@ -66,6 +67,9 @@ export async function PATCH(
 
   const current = rows[0];
   if (!current) return noStore({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!isAssignedWorkAccessible(user as CompanyUser, current.assigned_to_id)) {
+    return noStore({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
   if (!current.lock_valid) {
     return noStore({ error: "Redigeringslåset har gått förlorat. Ladda om arbetsordern.", code: "lock_lost" }, { status: 409 });
   }

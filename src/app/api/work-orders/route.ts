@@ -1,7 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import {
+  canAssignWorkOrders,
+  canManageTickets,
+  canManageWorkOrderFinance,
+  canViewFinanceData,
+  getCurrentUser,
+  shouldScopeToAssignedWork,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   addWorkOrderStatusEvent,
@@ -67,9 +74,21 @@ export async function GET() {
       sqlSoftDeleteGuard(db, "Property", "p"),
     ]);
 
-    const [workOrders, enterpriseRows] = await Promise.all([
+    const scopedToAssigned = shouldScopeToAssignedWork(user.role);
+    const canAssign = canAssignWorkOrders(user.role);
+    const canManage = canManageTickets(user.role);
+    const includeFinance = canViewFinanceData(user.role);
+    const canManageFinance = canManageWorkOrderFinance(user.role);
+    const assignedScope = scopedToAssigned ? { assigned_to_id: user.id } : {};
+
+    const [workOrders, enterpriseRows, assignees] = await Promise.all([
       db.workOrder.findMany({
-        where: { company_id: user.company_id, ...workOrderActive, property: { deleted_at: null } },
+        where: {
+          company_id: user.company_id,
+          ...workOrderActive,
+          property: { deleted_at: null },
+          ...assignedScope,
+        },
         orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
         take: 500,
         // Explicit select omits deleted_at so preview works before soft-delete migrate.
@@ -104,7 +123,19 @@ export async function GET() {
         WHERE w."company_id" = ${user.company_id}
           ${workOrderGuard}
           ${propertyGuard}
+          ${scopedToAssigned ? Prisma.sql`AND w."assigned_to_id" = ${user.id}` : Prisma.empty}
       `),
+      canAssign
+        ? db.user.findMany({
+            where: {
+              company_id: user.company_id,
+              status: "active",
+              role: { in: ["owner", "admin", "manager", "technician"] },
+            },
+            orderBy: [{ name: "asc" }, { email: "asc" }],
+            select: { id: true, name: true, email: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     const now = new Date();
@@ -121,7 +152,12 @@ export async function GET() {
         pausedAt: enterprise?.paused_at,
         pauseReason: enterprise?.pause_reason,
       }, now);
-      return { ...workOrder, enterprise, sla };
+      return {
+        ...workOrder,
+        estimated_cost: includeFinance ? workOrder.estimated_cost : null,
+        enterprise,
+        sla,
+      };
     });
 
     const slaSummary = enriched.reduce((summary, workOrder) => {
@@ -144,7 +180,20 @@ export async function GET() {
     });
 
     return NextResponse.json(
-      { workOrders: enriched, slaSummary, evaluatedAt: now.toISOString() },
+      {
+        workOrders: enriched,
+        slaSummary,
+        evaluatedAt: now.toISOString(),
+        assignees,
+        permissions: {
+          canManage,
+          canAssign,
+          canManageFinance,
+          canViewFinance: includeFinance,
+          scopedToAssigned,
+        },
+        currentUserId: user.id,
+      },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
@@ -196,6 +245,9 @@ export async function POST(request: Request) {
   if (body.scheduledEnd && !scheduledEnd) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 });
   if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) return NextResponse.json({ error: "Sluttiden måste ligga efter starttiden" }, { status: 400 });
   if (body.estimatedCost !== undefined && body.estimatedCost !== "" && estimatedCost === null) return NextResponse.json({ error: "Beräknad kostnad måste vara ett positivt belopp" }, { status: 400 });
+  if (body.estimatedCost !== undefined && body.estimatedCost !== null && body.estimatedCost !== "" && !canManageWorkOrderFinance(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att sätta arbetsorderkostnader" }, { status: 403 });
+  }
 
   const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });

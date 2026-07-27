@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 import {
   activePropertyRelationFilter,
@@ -29,6 +29,7 @@ async function getDashboardData() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const schema = await getCachedSchemaReadiness();
+  const scopedToAssigned = shouldScopeToAssignedWork(user.role);
   const [ticketActive, propertyActive, propertyRelation] = await Promise.all([
     notDeletedFilter("Ticket"),
     notDeletedFilter("Property"),
@@ -37,6 +38,7 @@ async function getDashboardData() {
   const ticketScope = {
     ...ticketActive,
     ...scope,
+    ...(scopedToAssigned ? { assigned_to_id: user.id } : {}),
     ...("property" in propertyRelation
       ? { OR: [{ property_id: null }, propertyRelation] }
       : {}),
@@ -90,16 +92,17 @@ async function getDashboardData() {
 
   return {
     user,
+    scopedToAssigned,
     totalTickets,
     openTickets,
     urgentTickets,
-    unassignedTickets,
+    unassignedTickets: scopedToAssigned ? 0 : unassignedTickets,
     overdueTickets,
     closedThisMonth,
     totalProperties,
     totalMembers,
     latestTickets,
-    propertyWorkload,
+    propertyWorkload: scopedToAssigned ? [] : propertyWorkload,
     schemaCompatibility: schema.ready
       ? null
       : { message: schemaCompatibilityBannerMessage(), missing: schema.missing },
@@ -125,16 +128,20 @@ export default async function Dashboard() {
   const data = await getDashboardData();
 
   const kpis = [
-    { label: "Öppna ärenden", value: data.openTickets, hint: `${data.totalTickets} totalt`, icon: ClipboardList },
-    { label: "Akuta ärenden", value: data.urgentTickets, hint: "Kräver snabb bedömning", icon: AlertTriangle },
-    { label: "Ej tilldelade", value: data.unassignedTickets, hint: "Saknar ansvarig", icon: UserRoundX },
-    { label: "Avslutade i månaden", value: data.closedThisMonth, hint: "Genomförda åtgärder", icon: CheckCircle2 },
+    { label: data.scopedToAssigned ? "Mina öppna ärenden" : "Öppna ärenden", value: data.openTickets, hint: `${data.totalTickets} totalt`, icon: ClipboardList },
+    { label: data.scopedToAssigned ? "Mina akuta ärenden" : "Akuta ärenden", value: data.urgentTickets, hint: "Kräver snabb bedömning", icon: AlertTriangle },
+    ...(data.scopedToAssigned
+      ? []
+      : [{ label: "Ej tilldelade", value: data.unassignedTickets, hint: "Saknar ansvarig", icon: UserRoundX }]),
+    { label: "Avslutade i månaden", value: data.closedThisMonth, hint: data.scopedToAssigned ? "Mina genomförda åtgärder" : "Genomförda åtgärder", icon: CheckCircle2 },
   ];
 
   const attentionItems = [
-    { label: "Försenade ärenden", value: data.overdueTickets, href: "/dashboard/felanmalan", icon: Clock3 },
-    { label: "Akuta ärenden", value: data.urgentTickets, href: "/dashboard/felanmalan", icon: AlertTriangle },
-    { label: "Saknar ansvarig", value: data.unassignedTickets, href: "/dashboard/felanmalan", icon: UserRoundX },
+    { label: data.scopedToAssigned ? "Mina försenade ärenden" : "Försenade ärenden", value: data.overdueTickets, href: "/dashboard/felanmalan", icon: Clock3 },
+    { label: data.scopedToAssigned ? "Mina akuta ärenden" : "Akuta ärenden", value: data.urgentTickets, href: "/dashboard/felanmalan", icon: AlertTriangle },
+    ...(data.scopedToAssigned
+      ? []
+      : [{ label: "Saknar ansvarig", value: data.unassignedTickets, href: "/dashboard/felanmalan", icon: UserRoundX }]),
   ];
 
   return (
@@ -210,7 +217,9 @@ export default async function Dashboard() {
           <div className="flex items-center justify-between border-b border-sand-200 px-6 py-5 sm:px-7">
             <div>
               <h2 className="text-xl font-semibold text-ink-950">Senaste ärenden</h2>
-              <p className="mt-1 text-sm text-ink-500">Senaste aktivitet i organisationens arbetsflöde.</p>
+              <p className="mt-1 text-sm text-ink-500">
+                {data.scopedToAssigned ? "Senaste aktivitet i dina tilldelade ärenden." : "Senaste aktivitet i organisationens arbetsflöde."}
+              </p>
             </div>
             <Link href="/dashboard/felanmalan" className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Visa alla</Link>
           </div>

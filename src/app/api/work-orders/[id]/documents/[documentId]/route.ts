@@ -1,8 +1,9 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { getStorageToken } from "@/lib/storage";
+import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 function contentDisposition(fileName: string) {
   const safeAscii = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -28,13 +29,13 @@ export async function GET(
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const { id, documentId } = await params;
+    if (!await findAccessibleWorkOrder(user as CompanyUser, id)) return notFoundWorkOrder();
     const document = await db.operationalDocument.findFirst({
       where: {
         id: documentId,
         work_order_id: id,
         company_id: user.company_id,
         deleted_at: null,
-        work_order: { deleted_at: null, company_id: user.company_id, property: { deleted_at: null } },
       },
       select: { file_name: true, storage_url: true, content_type: true },
     });

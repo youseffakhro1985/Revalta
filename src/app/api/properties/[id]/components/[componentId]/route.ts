@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 const COMPONENT_STATUSES = new Set(["active", "planned", "inactive", "replaced", "decommissioned"]);
@@ -121,7 +121,34 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     linkedProjects: linkedProjects.length,
   };
 
-  return NextResponse.json({ property, component, events, costs, linkedWorkOrders, linkedProjects, metrics });
+  const includeFinance = canViewFinanceData(user.role);
+  const safeCosts = includeFinance
+    ? costs
+    : costs.map((item) => ({
+        ...item,
+        amount_ex_vat: null,
+      }));
+  const safeWorkOrders = includeFinance
+    ? linkedWorkOrders
+    : linkedWorkOrders.map((item) => ({ ...item, actual_cost: null }));
+  const safeProjects = includeFinance
+    ? linkedProjects
+    : linkedProjects.map((item) => ({
+        ...item,
+        budget: null,
+        forecast: null,
+        actual: null,
+      }));
+
+  return NextResponse.json({
+    property,
+    component: includeFinance ? component : { ...component, replacement_value: null },
+    events,
+    costs: safeCosts,
+    linkedWorkOrders: safeWorkOrders,
+    linkedProjects: safeProjects,
+    metrics: includeFinance ? metrics : { ...metrics, totalCostExVat: null },
+  });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; componentId: string }> }) {

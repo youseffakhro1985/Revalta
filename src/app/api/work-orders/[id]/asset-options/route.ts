@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
+import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -11,9 +12,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const workOrder = await db.workOrder.findFirst({
     where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
-    select: { id: true, property_id: true },
+    select: { id: true, property_id: true, assigned_to_id: true },
   });
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!workOrder) return notFoundWorkOrder();
+  if (!isAssignedWorkAccessible(user, workOrder.assigned_to_id)) return notFoundWorkOrder();
 
   const [buildings, assets] = await Promise.all([
     db.building.findMany({

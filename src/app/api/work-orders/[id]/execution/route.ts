@@ -2,8 +2,9 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, canViewFinanceData, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
+import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import {
   getModernMaterialEntry,
   getModernTimeEntry,
@@ -73,11 +74,14 @@ function nonNegativeNumber(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-async function resolveWorkOrder(id: string, companyId: string) {
-  return db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
-    select: { id: true, title: true, status: true },
+async function resolveWorkOrder(user: CompanyUser, id: string) {
+  const workOrder = await db.workOrder.findFirst({
+    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
+    select: { id: true, title: true, status: true, assigned_to_id: true },
   });
+  if (!workOrder) return null;
+  if (!isAssignedWorkAccessible(user, workOrder.assigned_to_id)) return null;
+  return workOrder;
 }
 
 async function getCompletionState(id: string, companyId: string) {
@@ -115,8 +119,8 @@ export async function GET(
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const workOrder = await resolveWorkOrder(id, user.company_id);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const workOrder = await resolveWorkOrder(user as CompanyUser, id);
+  if (!workOrder) return notFoundWorkOrder();
 
   const [checklist, entries, summaries, slaRows, completion] = await Promise.all([
     db.$queryRaw<ChecklistRow[]>(Prisma.sql`
@@ -160,11 +164,22 @@ export async function GET(
     getCompletionState(id, user.company_id),
   ]);
 
+  const includeFinance = canViewFinanceData(user.role);
+  const { assigned_to_id: _aid, ...workOrderData } = workOrder;
+  void _aid;
+  const visibleEntries = includeFinance
+    ? entries
+    : entries.map((e) => ({ ...e, unit_cost: null, total_amount: null }));
+  const rawSummary = summaries[0] ?? { total_minutes: 0, material_cost: 0, travel_cost: 0, external_cost: 0, total_cost: 0 };
+  const visibleSummary = includeFinance
+    ? rawSummary
+    : { total_minutes: rawSummary.total_minutes, material_cost: null, travel_cost: null, external_cost: null, total_cost: null };
+
   return NextResponse.json({
-    workOrder,
+    workOrder: workOrderData,
     checklist,
-    entries,
-    summary: summaries[0] ?? { total_minutes: 0, material_cost: 0, travel_cost: 0, external_cost: 0, total_cost: 0 },
+    entries: visibleEntries,
+    summary: visibleSummary,
     sla: slaRows[0] ?? { response_due_at: null, completion_due_at: null, responded_at: null, sla_status: "not_set" },
     completion,
   });
@@ -180,8 +195,8 @@ export async function POST(
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const workOrder = await resolveWorkOrder(id, user.company_id);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const workOrder = await resolveWorkOrder(user as CompanyUser, id);
+  if (!workOrder) return notFoundWorkOrder();
 
   const body = await request.json();
   const action = String(body.action || "");

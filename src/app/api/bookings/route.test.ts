@@ -63,6 +63,44 @@ describe("bookings route", () => {
     }));
   });
 
+  it("redacts resident PII for technicians on GET", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    bookingFindManyMock.mockResolvedValue([{
+      id: "booking-1",
+      property_id: "property-1",
+      property: { name: "Storgatan 1" },
+      resource: "Tvättstuga",
+      resident_name: "Anna Boende",
+      unit: "1201",
+      start_at: new Date("2026-07-27T08:00:00Z"),
+      end_at: new Date("2026-07-27T10:00:00Z"),
+      note: "Privat anteckning",
+      status: "confirmed",
+      created_at: new Date("2026-07-20T10:00:00Z"),
+    }]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.bookings[0].resident_name).toBeNull();
+    expect(body.bookings[0].unit).toBe("");
+    expect(body.bookings[0].note).toBe("");
+    expect(body.permissions.canManage).toBe(false);
+    expect(body.permissions.canViewResidentDetails).toBe(false);
+  });
+
+  it("denies technicians from mutating bookings", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "booking-1", status: "cancelled" }),
+    }));
+    expect(response.status).toBe(403);
+    expect(bookingFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("updates modern booking fields on active properties", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     bookingFindFirstMock

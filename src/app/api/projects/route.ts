@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageWorkOrderFinance, canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
@@ -23,7 +23,11 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!canViewOperations(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa projekt" }, { status: 403 });
+    }
 
+    const includeEconomics = canViewFinanceData(user.role);
     const [projects, properties, members] = await Promise.all([
       db.project.findMany({
         where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
@@ -54,13 +58,14 @@ export async function GET() {
         project_manager: project.manager?.name || project.manager?.email || "",
         start_date: project.start_date,
         end_date: project.end_date,
-        budget: Number(project.budget),
-        forecast: Number(project.forecast),
-        actual: Number(project.actual),
-        deviation: Number(project.forecast) - Number(project.budget),
+        budget: includeEconomics ? Number(project.budget) : null,
+        forecast: includeEconomics ? Number(project.forecast) : null,
+        actual: includeEconomics ? Number(project.actual) : null,
+        deviation: includeEconomics ? Number(project.forecast) - Number(project.budget) : null,
       })),
       properties,
       members,
+      permissions: { canViewFinance: includeEconomics, canManage: canManageWorkOrderFinance(user.role) },
     });
   } catch (error) {
     console.error("Get projects error:", error);
@@ -74,7 +79,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const body = await request.json();

@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Clock3, ShieldCheck, UserRoundX } from "lucide-react";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
 import {
   isMissingSchemaColumnError,
   notDeletedFilter,
@@ -64,9 +64,15 @@ export async function DashboardSlaOperations() {
       sqlSoftDeleteGuard(db, "WorkOrder", "w"),
     ]);
     const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
+    const scopedToAssigned = shouldScopeToAssignedWork(user.role);
     [workOrders, enterpriseRows] = await Promise.all([
       db.workOrder.findMany({
-        where: { company_id: user.company_id, ...workOrderActive, property: { deleted_at: null } },
+        where: {
+          company_id: user.company_id,
+          ...workOrderActive,
+          property: { deleted_at: null },
+          ...(scopedToAssigned ? { assigned_to_id: user.id } : {}),
+        },
         take: 300,
         orderBy: { created_at: "desc" },
         select: {
@@ -88,6 +94,7 @@ export async function DashboardSlaOperations() {
         WHERE w."company_id" = ${user.company_id}
           ${workOrderGuard}
           ${propertyGuard}
+          ${scopedToAssigned ? Prisma.sql`AND w."assigned_to_id" = ${user.id}` : Prisma.empty}
         LIMIT 300
       `),
     ]);

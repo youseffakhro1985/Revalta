@@ -42,7 +42,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH } from "./route";
+import { GET, PATCH } from "./route";
 
 describe("vendors route", () => {
   beforeEach(() => {
@@ -51,6 +51,24 @@ describe("vendors route", () => {
     auditFindManyMock.mockResolvedValue([]);
     vendorUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("denies technicians from reading vendor contracts", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(vendorFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians from mutating vendor contracts", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/vendors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vendorId: "vendor-1", contactName: "X" }),
+    }));
+    expect(response.status).toBe(403);
+    expect(vendorFindFirstMock).not.toHaveBeenCalled();
   });
 
   it("updates modern vendor with OR property null / deleted_at null filter", async () => {

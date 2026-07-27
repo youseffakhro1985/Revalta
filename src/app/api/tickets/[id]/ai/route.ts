@@ -3,6 +3,7 @@ import { analyzeTicket } from "@/lib/ai";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { recordAiEvent } from "@/lib/integrations";
+import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -19,12 +20,11 @@ export async function POST(
     const { id } = await params;
     const existing = await db.ticket.findFirst({
       where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, title: true, description: true },
+      select: { id: true, title: true, description: true, assigned_to_id: true },
     });
 
-    if (!existing) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
-    }
+    if (!existing) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
 
     const analysis = await analyzeTicket(existing.description);
     if (!user.company_id) {

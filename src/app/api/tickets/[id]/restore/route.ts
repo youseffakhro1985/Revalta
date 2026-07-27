@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 
 export async function POST(
   _request: Request,
@@ -25,12 +26,14 @@ export async function POST(
         title: true,
         status: true,
         property_id: true,
+        assigned_to_id: true,
         property: { select: { deleted_at: true } },
       },
     });
     if (!existing) {
       return NextResponse.json({ error: "Ärendet hittades inte eller är redan aktivt" }, { status: 404 });
     }
+    if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
     if (existing.property_id && existing.property?.deleted_at) {
       return NextResponse.json(
         { error: "Ärendet kan inte återställas eftersom den kopplade fastigheten är borttagen. Återställ fastigheten först." },

@@ -1,10 +1,11 @@
 import { del, put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { validateUploadFile } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
+import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 export const dynamic = "force-dynamic";
 const categories = new Set(["before", "after", "invoice", "warranty", "manual", "report", "other"]);
@@ -15,11 +16,8 @@ async function context(id: string) {
   const user = await getCurrentUser();
   if (!user) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) } as const;
   if (!user.company_id) return { error: NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 }) } as const;
-  const workOrder = await db.workOrder.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
-    select: { id: true, title: true },
-  });
-  if (!workOrder) return { error: NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 }) } as const;
+  const workOrder = await findAccessibleWorkOrder(user as CompanyUser, id, { id: true, assigned_to_id: true, title: true });
+  if (!workOrder) return { error: notFoundWorkOrder() } as const;
   return { user, workOrder } as const;
 }
 

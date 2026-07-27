@@ -27,6 +27,7 @@ const categories: Record<string, string> = { income: "Intäkter", operations: "D
 export default function BudgetPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState("");
@@ -41,7 +42,11 @@ export default function BudgetPage() {
     setLoading(true);
     const response = await fetch("/api/budget", { cache: "no-store" });
     const data = await readResponseJson(response);
-    if (response.ok) { setEntries(data.entries || []); setProperties(data.properties || []); }
+    if (response.ok) {
+      setEntries(data.entries || []);
+      setProperties(data.properties || []);
+      setCanManage(Boolean(data.permissions?.canManage));
+    }
     else setError(data.error || "Kunde inte hämta budget");
     setLoading(false);
   }
@@ -140,18 +145,21 @@ export default function BudgetPage() {
     </section>
 
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
+    {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra budgetrader.</InlineAlert> : null}
 
-    <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
-      <Panel title="Ny budgetrad" description="Registrera budget, prognos och verkligt utfall per kostnadsslag.">
-        <form onSubmit={submit} className="space-y-4">
-          <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} /><select className={premiumFieldClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-          <input className={premiumFieldClass} placeholder="Konto eller kostnadsslag" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} required />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><input className={premiumFieldClass} type="number" placeholder="Budget" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} /><input className={premiumFieldClass} type="number" placeholder="Prognos" value={form.forecast} onChange={(e) => setForm({ ...form, forecast: e.target.value })} /><input className={premiumFieldClass} type="number" placeholder="Utfall" value={form.actual} onChange={(e) => setForm({ ...form, actual: e.target.value })} /></div>
-          <textarea className={premiumTextareaClass} placeholder="Kommentar" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-          <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara budgetrad"}</button>
-        </form>
-      </Panel>
+    <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+      {canManage ? (
+        <Panel title="Ny budgetrad" description="Registrera budget, prognos och verkligt utfall per kostnadsslag.">
+          <form onSubmit={submit} className="space-y-4">
+            <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} /><select className={premiumFieldClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+            <input className={premiumFieldClass} placeholder="Konto eller kostnadsslag" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} required />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><input className={premiumFieldClass} type="number" placeholder="Budget" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} /><input className={premiumFieldClass} type="number" placeholder="Prognos" value={form.forecast} onChange={(e) => setForm({ ...form, forecast: e.target.value })} /><input className={premiumFieldClass} type="number" placeholder="Utfall" value={form.actual} onChange={(e) => setForm({ ...form, actual: e.target.value })} /></div>
+            <textarea className={premiumTextareaClass} placeholder="Kommentar" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara budgetrad"}</button>
+          </form>
+        </Panel>
+      ) : null}
 
       <Panel title="Ekonomiskt utfall" description="Budget, prognos och utfall per fastighet och kostnadsslag." bodyClassName="p-0">
         {loading ? <p className="p-6 text-sm text-ink-500">Hämtar ekonomi…</p> : entries.length === 0 ? <EmptyState title="Inga budgetrader registrerade" description="Lägg till den första budgetraden för att börja följa ekonomiskt utfall." /> : <div className="divide-y divide-sand-100">{entries.map((item) => {
@@ -171,7 +179,7 @@ export default function BudgetPage() {
               <div className="space-y-2 sm:text-right">
                 <p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(itemVariance)}</p>
                 <p className="text-xs text-ink-400">Avvikelse mot budget</p>
-                {item.source !== "legacy" ? (
+                {canManage && item.source !== "legacy" ? (
                   <>
                     <button type="button" onClick={() => (editingId === item.id ? setEditingId("") : startEdit(item))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">
                       {editingId === item.id ? "Stäng" : "Ändra"}
@@ -183,7 +191,7 @@ export default function BudgetPage() {
                 ) : null}
               </div>
             </div>
-            {editingId === item.id && item.source !== "legacy" ? (
+            {canManage && editingId === item.id && item.source !== "legacy" ? (
               <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input className={premiumFieldClass} type="number" value={editForm.year} onChange={(e) => setEditForm({ ...editForm, year: e.target.value })} />

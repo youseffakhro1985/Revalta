@@ -25,6 +25,7 @@ const number = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 1 });
 export default function EnergyPage() {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState("");
@@ -44,6 +45,7 @@ export default function EnergyPage() {
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta förbrukning");
       setReadings(data.readings || []);
       setProperties(data.properties || []);
+      setCanManage(Boolean(data.permissions?.canManage));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta förbrukning");
     } finally {
@@ -158,8 +160,10 @@ export default function EnergyPage() {
     </section>
 
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
+    {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra avläsningar.</InlineAlert> : null}
 
-    <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
+    <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+      {canManage ? (
       <Panel title="Ny avläsning" description="Registrera en månadsvis förbrukning och kostnad.">
         <form onSubmit={submit} className="space-y-4">
           <select className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
@@ -170,6 +174,7 @@ export default function EnergyPage() {
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara avläsning"}</button>
         </form>
       </Panel>
+      ) : null}
 
       <Panel title="Förbrukningshistorik" description="Senaste registrerade värden per fastighet och period." bodyClassName="p-0">
         {loading ? <div className="p-6 text-sm text-ink-500">Hämtar data…</div> : readings.length === 0 ? <EmptyState title="Inga avläsningar registrerade" description="När den första avläsningen sparas visas historiken här." /> : <div className="divide-y divide-sand-200">{readings.map((row) => {
@@ -187,7 +192,7 @@ export default function EnergyPage() {
               <div className="space-y-2 sm:text-right">
                 <p className="text-xl font-semibold text-ink-900">{number.format(Number(row.value || 0))} {row.unit}</p>
                 <p className="text-xs text-ink-400">{money.format(Number(row.cost || 0))}</p>
-                {row.source !== "legacy" ? (
+                {canManage && row.source !== "legacy" ? (
                   <>
                     <button type="button" onClick={() => (editingId === row.id ? setEditingId("") : startEdit(row))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">
                       {editingId === row.id ? "Stäng" : "Ändra"}
@@ -203,7 +208,7 @@ export default function EnergyPage() {
               {row.value_per_sqm != null ? <span>{number.format(row.value_per_sqm)} {row.unit}/m²</span> : null}
               {row.cost_per_sqm != null ? <span>{money.format(row.cost_per_sqm)}/m²</span> : null}
             </div>
-            {editingId === row.id && row.source !== "legacy" ? (
+            {canManage && editingId === row.id && row.source !== "legacy" ? (
               <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />

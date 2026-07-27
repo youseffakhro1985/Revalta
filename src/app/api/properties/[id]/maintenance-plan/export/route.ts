@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
 
 type PlanRow = { id: string; name: string; version: number; base_year: number; horizon_years: number; annual_index_rate: number };
 type ActionRow = { category: string; title: string; planned_year: number; recurrence_years: number | null; estimated_cost: number; annual_index_rate: number | null; priority: string; risk: string; status: string; contractor: string | null; building_name: string | null; technical_asset_name: string | null };
@@ -47,11 +47,28 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   `);
 
   const rows = [["Fastighet", "Plan", "Version", "Kategori", "Åtgärd", "År", "Byggnad", "Installation", "Kostnad dagens värde", "Indexerad kostnad", "Intervall år", "Prioritet", "Risk", "Status", "Entreprenör"]];
+  const includeFinance = canViewFinanceData(user.role);
   for (const action of actions) {
     const endYear = plan.base_year + plan.horizon_years - 1;
     let year = action.planned_year;
     while (year <= endYear) {
-      rows.push([property.name, plan.name, String(plan.version), action.category, action.title, String(year), action.building_name ?? "Hela fastigheten", action.technical_asset_name ?? "", String(Math.round(action.estimated_cost)), String(indexedCost(action, plan, year)), action.recurrence_years ? String(action.recurrence_years) : "", action.priority, action.risk, action.status, action.contractor ?? ""]);
+      rows.push([
+        property.name,
+        plan.name,
+        String(plan.version),
+        action.category,
+        action.title,
+        String(year),
+        action.building_name ?? "Hela fastigheten",
+        action.technical_asset_name ?? "",
+        includeFinance ? String(Math.round(action.estimated_cost)) : "",
+        includeFinance ? String(indexedCost(action, plan, year)) : "",
+        action.recurrence_years ? String(action.recurrence_years) : "",
+        action.priority,
+        action.risk,
+        action.status,
+        action.contractor ?? "",
+      ]);
       if (!action.recurrence_years) break;
       year += action.recurrence_years;
     }

@@ -22,6 +22,8 @@ const typeOptions = ["Aktivitet", "Arbetsorder", "Rond", "Underhåll", "Avtal", 
 
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [canManage, setCanManage] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState("");
   const [removingId, setRemovingId] = useState("");
@@ -32,11 +34,19 @@ export default function CalendarPage() {
   const [form, setForm] = useState({ title: "", date: "", time: "", type: "Aktivitet", propertyName: "", responsible: "", note: "" });
 
   async function load() {
+    setLoading(true);
     const response = await fetch("/api/calendar", { cache: "no-store" });
-    if (response.ok) setEvents((await readResponseJson(response)).events || []);
+    const data = await readResponseJson(response);
+    if (response.ok) {
+      setEvents(data.events || []);
+      setCanManage(Boolean(data.permissions?.canManage));
+    } else {
+      setError(data.error || "Kunde inte hämta kalendern");
+    }
+    setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
   function startEdit(event: CalendarEvent) {
     setEditingId(event.id);
@@ -169,26 +179,30 @@ export default function CalendarPage() {
         ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <form onSubmit={submit} className="space-y-4 rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Ny aktivitet</p>
-            <h2 className="mt-1 text-lg font-semibold text-ink-950">Planera in</h2>
-          </div>
-          <input required placeholder="Rubrik" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-          <div className="grid grid-cols-2 gap-3">
-            <input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-            <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-          </div>
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm">
-            {typeOptions.map((type) => <option key={type}>{type}</option>)}
-          </select>
-          <input placeholder="Fastighet" value={form.propertyName} onChange={(e) => setForm({ ...form, propertyName: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-          <input placeholder="Ansvarig" value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-          <textarea placeholder="Anteckning" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="min-h-24 w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
-          <button disabled={saving} className="w-full rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara aktivitet"}</button>
-        </form>
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {!canManage && !loading ? <p className="text-sm text-ink-500">Du har läsbehörighet till kalendern. Förvaltare eller administratör kan skapa och ändra aktiviteter.</p> : null}
+
+      <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[380px_1fr]" : "grid-cols-1"}`}>
+        {canManage ? (
+          <form onSubmit={submit} className="space-y-4 rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Ny aktivitet</p>
+              <h2 className="mt-1 text-lg font-semibold text-ink-950">Planera in</h2>
+            </div>
+            <input required placeholder="Rubrik" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <div className="grid grid-cols-2 gap-3">
+              <input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            </div>
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm">
+              {typeOptions.map((type) => <option key={type}>{type}</option>)}
+            </select>
+            <input placeholder="Fastighet" value={form.propertyName} onChange={(e) => setForm({ ...form, propertyName: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <input placeholder="Ansvarig" value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <textarea placeholder="Anteckning" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="min-h-24 w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <button disabled={saving} className="w-full rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara aktivitet"}</button>
+          </form>
+        ) : null}
 
         <div className="rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
           <div className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -216,7 +230,7 @@ export default function CalendarPage() {
                     <span className="inline-flex rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-medium text-ink-600">
                       {statusLabels[event.status || "planned"] || "Planerad"}
                     </span>
-                    {event.source !== "legacy" ? (
+                    {canManage && event.source !== "legacy" ? (
                       <>
                         <select
                           disabled={updatingId === event.id}
@@ -248,7 +262,7 @@ export default function CalendarPage() {
                     ) : null}
                   </div>
                 </div>
-                {editingId === event.id && event.source !== "legacy" ? (
+                {canManage && editingId === event.id && event.source !== "legacy" ? (
                   <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                     <input className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Rubrik" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
                     <div className="grid grid-cols-2 gap-3">

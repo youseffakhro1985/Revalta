@@ -1,8 +1,19 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import {
+  canAssignWorkOrders,
+  canManageTickets,
+  getCurrentUser,
+  requireCompanyUser,
+  tenantWhere,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
+import {
+  isAssignedWorkAccessible,
+  notFoundTicket,
+  redactTicketReporterPii,
+} from "@/lib/assigned-work-access";
 import {
   allowedWorkOrderTransitions,
   canTransitionWorkOrder,
@@ -18,11 +29,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att uppdatera ärenden" }, { status: 403 });
-    }
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 403 });
     const { id } = await params;
 
     const ticket = await db.ticket.findFirst({
@@ -101,21 +111,25 @@ export async function GET(
       },
     });
 
-    if (!ticket) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
-    }
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const normalizedStatus = isWorkOrderStatus(ticket.status) ? ticket.status : "new";
+    const redacted = redactTicketReporterPii(user, ticket);
 
     return NextResponse.json({
       ticket: {
-        ...ticket,
+        ...redacted,
         status: normalizedStatus,
         allowedTransitions: allowedWorkOrderTransitions(normalizedStatus),
         attachments: ticket.attachments.map((attachment) => ({
           ...attachment,
           data_url: `/api/attachments/${attachment.id}`,
         })),
+      },
+      permissions: {
+        canManage: canManageTickets(user.role),
+        canAssign: canAssignWorkOrders(user.role),
       },
     });
   } catch (error) {
@@ -155,12 +169,15 @@ export async function PATCH(
       },
     });
 
-    if (!existing) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
-    }
+    if (!existing) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
 
     const currentStatus: WorkOrderStatus = isWorkOrderStatus(existing.status) ? existing.status : "new";
     const shouldUpdateAssignee = typeof body.assignedToId === "string" || body.assignedToId === null;
+
+    if (shouldUpdateAssignee && !canAssignWorkOrders(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att ändra ansvarig" }, { status: 403 });
+    }
     const normalizedAssignedToId =
       typeof body.assignedToId === "string" && body.assignedToId.trim() ? body.assignedToId.trim() : null;
 
@@ -334,11 +351,10 @@ export async function DELETE(
     const { id } = await params;
     const existing = await db.ticket.findFirst({
       where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, title: true, status: true },
+      select: { id: true, title: true, status: true, assigned_to_id: true },
     });
-    if (!existing) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
-    }
+    if (!existing) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
 
     const deleteResult = await db.ticket.updateMany({
       where: { id: existing.id, company_id: user.company_id, deleted_at: null },

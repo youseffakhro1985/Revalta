@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageLeases, getCurrentUser } from "@/lib/current-user";
+import { canManageLeases, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
 import { emptyHandover, parseHandoverInput, type LeaseHandoverPayload } from "@/lib/lease-handover";
 
 const EVENT_TYPE = "lease_handover_record";
@@ -72,6 +72,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!canViewLeasingData(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa leasingdata" }, { status: 403 });
+    }
 
     const { id } = await params;
     const lease = await getLease(id, user.company_id);

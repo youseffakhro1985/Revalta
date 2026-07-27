@@ -58,6 +58,7 @@ export async function GET() {
         const rightDate = String((right as { date?: string }).date || "");
         return leftDate.localeCompare(rightDate);
       }),
+      permissions: { canManage: canManageTickets(user.role) },
     });
   } catch (error) {
     console.error("Get calendar events error:", error);

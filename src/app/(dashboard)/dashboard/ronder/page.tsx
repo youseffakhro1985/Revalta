@@ -45,6 +45,7 @@ const intervalLabels: Record<string, string> = {
 export default function RoundsPage() {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [form, setForm] = useState({
     title: "",
     propertyId: "",
@@ -72,6 +73,7 @@ export default function RoundsPage() {
       if (!pr.ok) throw new Error(pd.error || "Kunde inte hämta fastigheter");
       setRounds(rd.rounds || []);
       setProperties(pd.properties || []);
+      setCanManage(Boolean(rd.permissions?.canManage));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunde inte hämta ronder");
     } finally {
@@ -252,33 +254,36 @@ export default function RoundsPage() {
       </section>
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
-      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <Panel title="Skapa rond" description="Definiera intervall och kontrollpunkter för en fastighet.">
-          <form onSubmit={submit} className="space-y-4">
-            <Field label="Namn">
-              <input required className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex. Veckorond Brf Solgläntan" />
-            </Field>
-            <Field label="Fastighet">
-              <select required className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
-                <option value="">Välj fastighet</option>
-                {properties.map((p) => <option key={p.id} value={p.id}>{p.name} – {p.city}</option>)}
-              </select>
-            </Field>
-            <Field label="Intervall">
-              <select className={premiumFieldClass} value={form.interval} onChange={(e) => setForm({ ...form, interval: e.target.value })}>
-                <option value="weekly">Varje vecka</option>
-                <option value="monthly">Varje månad</option>
-                <option value="quarterly">Varje kvartal</option>
-                <option value="yearly">Varje år</option>
-              </select>
-            </Field>
-            <Field label="Kontrollpunkter">
-              <textarea rows={7} className={premiumTextareaClass} value={form.checklistText} onChange={(e) => setForm({ ...form, checklistText: e.target.value })} />
-              <span className="mt-1.5 block text-xs text-ink-400">En kontrollpunkt per rad.</span>
-            </Field>
-            <button disabled={busy} className={`${premiumPrimaryButtonClass} w-full`}>{busy ? "Sparar…" : "Skapa rond"}</button>
-          </form>
-        </Panel>
+      {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa ronder, uppdatera checklistor och skapa arbetsorder.</InlineAlert> : null}
+      <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[380px_1fr]" : "grid-cols-1"}`}>
+        {canManage ? (
+          <Panel title="Skapa rond" description="Definiera intervall och kontrollpunkter för en fastighet.">
+            <form onSubmit={submit} className="space-y-4">
+              <Field label="Namn">
+                <input required className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex. Veckorond Brf Solgläntan" />
+              </Field>
+              <Field label="Fastighet">
+                <select required className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
+                  <option value="">Välj fastighet</option>
+                  {properties.map((p) => <option key={p.id} value={p.id}>{p.name} – {p.city}</option>)}
+                </select>
+              </Field>
+              <Field label="Intervall">
+                <select className={premiumFieldClass} value={form.interval} onChange={(e) => setForm({ ...form, interval: e.target.value })}>
+                  <option value="weekly">Varje vecka</option>
+                  <option value="monthly">Varje månad</option>
+                  <option value="quarterly">Varje kvartal</option>
+                  <option value="yearly">Varje år</option>
+                </select>
+              </Field>
+              <Field label="Kontrollpunkter">
+                <textarea rows={7} className={premiumTextareaClass} value={form.checklistText} onChange={(e) => setForm({ ...form, checklistText: e.target.value })} />
+                <span className="mt-1.5 block text-xs text-ink-400">En kontrollpunkt per rad.</span>
+              </Field>
+              <button disabled={busy} className={`${premiumPrimaryButtonClass} w-full`}>{busy ? "Sparar…" : "Skapa rond"}</button>
+            </form>
+          </Panel>
+        ) : null}
         <Panel title="Planerade ronder" description="Samlad kontrollplan för hela beståndet." bodyClassName="p-0">
           {loading ? (
             <div className="p-8 text-sm text-ink-500">Hämtar ronder…</div>
@@ -306,7 +311,7 @@ export default function RoundsPage() {
                         <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">
                           {r.status === "completed" ? "Genomförd" : r.status === "in_progress" ? "Pågående" : "Planerad"}
                         </span>
-                        {r.source !== "legacy" ? (
+                        {canManage && r.source !== "legacy" ? (
                           <button
                             type="button"
                             onClick={() => (editingId === r.id ? setEditingId("") : startEdit(r))}
@@ -317,7 +322,7 @@ export default function RoundsPage() {
                         ) : null}
                       </div>
                     </div>
-                    {editingId === r.id ? (
+                    {canManage && editingId === r.id ? (
                       <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 sm:grid-cols-3">
                         <input
                           className={premiumFieldClass}
@@ -360,60 +365,76 @@ export default function RoundsPage() {
                       <div className="mt-5 space-y-3">
                         {r.checklist.map((item) => (
                           <div key={item.id} className="rounded-xl border border-sand-200 bg-white p-3">
-                            <div className="flex flex-wrap items-center gap-3">
-                              <label className="inline-flex items-center gap-2 text-sm font-medium text-ink-800">
-                                <input
-                                  type="checkbox"
-                                  checked={item.completed}
-                                  onChange={(e) => updateLocalChecklist(r.id, item.id, { completed: e.target.checked })}
-                                />
-                                {item.label}
-                              </label>
-                              <label className="inline-flex items-center gap-2 text-xs font-semibold text-amber-800">
-                                <input
-                                  type="checkbox"
-                                  checked={item.hasDeviation}
-                                  onChange={(e) => updateLocalChecklist(r.id, item.id, {
-                                    hasDeviation: e.target.checked,
-                                    note: e.target.checked ? item.note : "",
-                                  })}
-                                />
-                                Avvikelse
-                              </label>
-                              {item.workOrderId ? (
-                                <span className="text-xs font-semibold text-emerald-800">Arbetsorder skapad</span>
-                              ) : null}
-                            </div>
-                            {item.hasDeviation ? (
-                              <input
-                                value={item.note}
-                                onChange={(e) => updateLocalChecklist(r.id, item.id, { note: e.target.value })}
-                                placeholder="Beskriv avvikelsen"
-                                className={`${premiumFieldClass} mt-3`}
-                              />
-                            ) : null}
+                            {canManage ? (
+                              <>
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <label className="inline-flex items-center gap-2 text-sm font-medium text-ink-800">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.completed}
+                                      onChange={(e) => updateLocalChecklist(r.id, item.id, { completed: e.target.checked })}
+                                    />
+                                    {item.label}
+                                  </label>
+                                  <label className="inline-flex items-center gap-2 text-xs font-semibold text-amber-800">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.hasDeviation}
+                                      onChange={(e) => updateLocalChecklist(r.id, item.id, {
+                                        hasDeviation: e.target.checked,
+                                        note: e.target.checked ? item.note : "",
+                                      })}
+                                    />
+                                    Avvikelse
+                                  </label>
+                                  {item.workOrderId ? (
+                                    <span className="text-xs font-semibold text-emerald-800">Arbetsorder skapad</span>
+                                  ) : null}
+                                </div>
+                                {item.hasDeviation ? (
+                                  <input
+                                    value={item.note}
+                                    onChange={(e) => updateLocalChecklist(r.id, item.id, { note: e.target.value })}
+                                    placeholder="Beskriv avvikelsen"
+                                    className={`${premiumFieldClass} mt-3`}
+                                  />
+                                ) : null}
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-medium text-ink-800">{item.label}</p>
+                                  {item.completed ? <span className="rounded-full bg-petroleum-50 px-2 py-0.5 text-xs font-semibold text-petroleum-800">Utförd</span> : null}
+                                  {item.hasDeviation ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">Avvikelse</span> : null}
+                                  {item.workOrderId ? <span className="text-xs font-semibold text-emerald-800">Arbetsorder skapad</span> : null}
+                                </div>
+                                {item.hasDeviation && item.note ? <p className="mt-2 text-xs text-ink-500">{item.note}</p> : null}
+                              </>
+                            )}
                           </div>
                         ))}
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            disabled={savingId === r.id}
-                            onClick={() => void saveRound(r)}
-                            className="rounded-xl border border-sand-300 px-3 py-2 text-xs font-semibold text-ink-700 hover:bg-sand-50"
-                          >
-                            {savingId === r.id ? "Sparar…" : "Spara kontroll"}
-                          </button>
-                          {openDeviations > 0 ? (
+                        {canManage ? (
+                          <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
                               disabled={savingId === r.id}
-                              onClick={() => void createWorkOrders(r)}
-                              className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900"
+                              onClick={() => void saveRound(r)}
+                              className="rounded-xl border border-sand-300 px-3 py-2 text-xs font-semibold text-ink-700 hover:bg-sand-50"
                             >
-                              Skapa arbetsorder ({openDeviations})
+                              {savingId === r.id ? "Sparar…" : "Spara kontroll"}
                             </button>
-                          ) : null}
-                        </div>
+                            {openDeviations > 0 ? (
+                              <button
+                                type="button"
+                                disabled={savingId === r.id}
+                                onClick={() => void createWorkOrders(r)}
+                                className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900"
+                              >
+                                Skapa arbetsorder ({openDeviations})
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </article>

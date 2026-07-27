@@ -15,6 +15,9 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Företag saknas" }, { status: 400 });
+    if (!canManageBilling(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa abonnemang" }, { status: 403 });
+    }
 
     const [properties, teamMembers, openTickets] = await Promise.all([
       db.property.count({ where: { deleted_at: null, ...tenantWhere(user) } }),

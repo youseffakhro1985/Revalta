@@ -228,8 +228,8 @@ export default function DocumentsPage() {
         <MetricCard icon={Archive} label="Arkiverade" value={archived} hint="Bevarade i historiken" />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <Panel title="Lägg till dokument" description="PDF, bild, Word eller Excel. Max 2 MB. Åtkomsten kontrolleras vid varje nedladdning.">
+      <section className={`grid gap-6 ${data.canManageLifecycle ? "xl:grid-cols-[420px_1fr]" : ""}`}>
+        {data.canManageLifecycle ? <Panel title="Lägg till dokument" description="PDF, bild, Word eller Excel. Max 2 MB. Åtkomsten kontrolleras vid varje nedladdning.">
           <form onSubmit={uploadDocument} className="space-y-4">
             <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Dokumentnamn</span><input required maxLength={200} value={name} onChange={(e) => setName(e.target.value)} className={premiumFieldClass} placeholder="Exempel: Ordningsregler 2026" /></label>
             <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Kategori</span><select value={category} onChange={(e) => setCategory(e.target.value)} className={premiumFieldClass}>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -242,7 +242,7 @@ export default function DocumentsPage() {
             <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fil</span><input required type="file" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx" onChange={(e) => setFile(e.target.files?.[0] || null)} className={premiumFieldClass} /></label>
             <button disabled={submitting} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Sparar dokument…" : "Spara med vald åtkomst"}</button>
           </form>
-        </Panel>
+        </Panel> : null}
 
         <Panel title="Dokumentbibliotek" description="Sök, filtrera och hantera dokumentens hela livscykel." bodyClassName="p-0">
           <div className="grid gap-3 border-b border-sand-200 p-5 xl:grid-cols-[1fr_150px_170px_160px_150px]">

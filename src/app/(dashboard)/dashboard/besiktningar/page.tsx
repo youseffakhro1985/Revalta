@@ -52,6 +52,7 @@ function daysUntil(value?: string) {
 export default function InspectionsPage() {
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingId, setCreatingId] = useState("");
@@ -76,6 +77,7 @@ export default function InspectionsPage() {
       if (!r.ok) throw new Error(d.error || "Kunde inte hämta besiktningar");
       setInspections(d.inspections || []);
       setProperties(d.properties || []);
+      setCanManage(Boolean(d.permissions?.canManage));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunde inte hämta besiktningar");
     } finally {
@@ -227,48 +229,51 @@ export default function InspectionsPage() {
       </section>
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
-      <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
-        <Panel title="Ny kontroll" description="Lägg in förfallodatum, ansvarig och återkommande intervall.">
-          <form onSubmit={submit} className="space-y-4">
-            <Field label="Fastighet">
-              <select required className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
-                <option value="">Välj fastighet</option>
-                {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Kontrolltyp">
-              <select className={premiumFieldClass} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                {Object.entries(typeLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </Field>
-            <Field label="Namn">
-              <input required className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Förfallodatum">
-                <input required type="date" className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+      {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra besiktningar.</InlineAlert> : null}
+      <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+        {canManage ? (
+          <Panel title="Ny kontroll" description="Lägg in förfallodatum, ansvarig och återkommande intervall.">
+            <form onSubmit={submit} className="space-y-4">
+              <Field label="Fastighet">
+                <select required className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
+                  <option value="">Välj fastighet</option>
+                  {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
               </Field>
-              <Field label="Intervall, månader">
-                <input type="number" min="0" max="240" className={premiumFieldClass} value={form.intervalMonths} onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })} />
+              <Field label="Kontrolltyp">
+                <select className={premiumFieldClass} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                  {Object.entries(typeLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
               </Field>
-            </div>
-            <Field label="Ansvarig internt">
-              <input className={premiumFieldClass} value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} placeholder="Namn eller funktion" />
-            </Field>
-            <Field label="Besiktningsföretag">
-              <input className={premiumFieldClass} value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Leverantör eller företag" />
-            </Field>
-            <Field label="Status">
-              <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </Field>
-            <Field label="Anteckning">
-              <textarea className={premiumTextareaClass} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Anteckning eller krav" />
-            </Field>
-            <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara kontroll"}</button>
-          </form>
-        </Panel>
+              <Field label="Namn">
+                <input required className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Förfallodatum">
+                  <input required type="date" className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+                </Field>
+                <Field label="Intervall, månader">
+                  <input type="number" min="0" max="240" className={premiumFieldClass} value={form.intervalMonths} onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })} />
+                </Field>
+              </div>
+              <Field label="Ansvarig internt">
+                <input className={premiumFieldClass} value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} placeholder="Namn eller funktion" />
+              </Field>
+              <Field label="Besiktningsföretag">
+                <input className={premiumFieldClass} value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Leverantör eller företag" />
+              </Field>
+              <Field label="Status">
+                <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+              <Field label="Anteckning">
+                <textarea className={premiumTextareaClass} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Anteckning eller krav" />
+              </Field>
+              <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara kontroll"}</button>
+            </form>
+          </Panel>
+        ) : null}
         <Panel title="Kontrollplan" description="Kommande krav sorterade efter förfallodatum." bodyClassName="p-0">
           {loading ? (
             <div className="p-8 text-sm text-ink-500">Hämtar kontroller…</div>
@@ -307,7 +312,7 @@ export default function InspectionsPage() {
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                       {i.source === "legacy" ? (
                         <p className="text-xs font-medium text-amber-700">Äldre rad – kör backfill innan status eller arbetsorder kan ändras.</p>
-                      ) : (
+                      ) : canManage ? (
                         <>
                           <button
                             type="button"
@@ -330,12 +335,12 @@ export default function InspectionsPage() {
                             </select>
                           </label>
                         </>
-                      )}
+                      ) : null}
                       {i.work_order_id ? (
                         <Link href={`/dashboard/arbetsorder/${i.work_order_id}`} className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">
                           Öppna kopplad arbetsorder
                         </Link>
-                      ) : i.status === "action_required" && i.source !== "legacy" ? (
+                      ) : canManage && i.status === "action_required" && i.source !== "legacy" ? (
                         <button
                           type="button"
                           disabled={creatingId === i.id}
@@ -346,7 +351,7 @@ export default function InspectionsPage() {
                         </button>
                       ) : null}
                     </div>
-                    {editingId === i.id ? (
+                    {canManage && editingId === i.id ? (
                       <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 sm:grid-cols-2">
                         <input className={premiumFieldClass} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} placeholder="Titel" />
                         <select className={premiumFieldClass} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>

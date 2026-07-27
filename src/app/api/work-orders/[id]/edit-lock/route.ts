@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import {
   acquireWorkOrderEditLock,
   getWorkOrderEditLock,
   releaseWorkOrderEditLock,
   renewWorkOrderEditLock,
 } from "@/lib/work-order-edit-lock";
+import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
@@ -20,6 +21,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
+  if (!await findAccessibleWorkOrder(user as CompanyUser, id)) return notFoundWorkOrder();
   const lock = await getWorkOrderEditLock(user.company_id, id);
   return noStore({ lock, ownedByCurrentUser: lock?.userId === user.id });
 }
@@ -31,6 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
+  if (!await findAccessibleWorkOrder(user as CompanyUser, id)) return notFoundWorkOrder();
   const body = (await request.json().catch(() => null)) as { action?: unknown; token?: unknown; leaseSeconds?: unknown } | null;
   const action = typeof body?.action === "string" ? body.action.trim() : "acquire";
 

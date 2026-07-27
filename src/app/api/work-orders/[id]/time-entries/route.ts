@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getModernTimeEntry,
@@ -9,12 +8,13 @@ import {
   upsertTimeEntry,
   type TimeEntryPayload,
 } from "@/lib/work-order-ops-storage";
+import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 const allowedKinds = new Set(["work", "travel", "break"]);
 const allowedActions = new Set(["manual", "start", "stop", "approve", "reject"]);
 
-async function ensureOrder(id: string, companyId: string) {
-  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } }, select: { id: true, title: true } });
+async function ensureOrder(user: CompanyUser, id: string) {
+  return findAccessibleWorkOrder(user, id, { id: true, assigned_to_id: true, title: true });
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const { id } = await params;
-  if (!(await ensureOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
 
   const rows = (await listTimeEntries(user.company_id, id))
     .sort((a, b) => String(b.startedAt ?? b.createdAt).localeCompare(String(a.startedAt ?? a.createdAt)));
@@ -45,8 +45,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const { id } = await params;
-  const order = await ensureOrder(id, user.company_id);
-  if (!order) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const order = await ensureOrder(user as CompanyUser, id);
+  if (!order) return notFoundWorkOrder();
 
   const body = await request.json();
   const action = String(body.action || "manual");

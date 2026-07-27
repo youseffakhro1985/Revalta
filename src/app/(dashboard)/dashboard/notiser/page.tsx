@@ -15,6 +15,7 @@ type NotificationItem = {
   read: boolean;
   source?: "table" | "legacy";
 };
+type Permissions = { canManage: boolean };
 
 type EventItem = {
   id: string;
@@ -41,6 +42,7 @@ function eventTitle(event: EventItem) {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [permissions, setPermissions] = useState<Permissions>({ canManage: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "urgent">("all");
@@ -52,6 +54,7 @@ export default function NotificationsPage() {
     const data = await readResponseJson(response);
     setNotifications(data.notifications || []);
     setEvents(data.recentEvents || []);
+    setPermissions(data.permissions || { canManage: false });
   }
 
   useEffect(() => {
@@ -139,29 +142,31 @@ export default function NotificationsPage() {
         ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <form onSubmit={submit} className="space-y-4 rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Nytt meddelande</p>
-            <h2 className="mt-2 text-lg font-semibold text-ink-950">Publicera intern information</h2>
-          </div>
-          <input required maxLength={120} placeholder="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
-          <textarea required maxLength={2000} rows={6} placeholder="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
-          <div className="grid grid-cols-2 gap-3">
-            <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
-              <option value="normal">Information</option>
-              <option value="important">Viktigt</option>
-              <option value="urgent">Brådskande</option>
-            </select>
-            <select value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
-              <option>Alla användare</option>
-              <option>Förvaltare</option>
-              <option>Fastighetsskötare</option>
-              <option>Administratörer</option>
-            </select>
-          </div>
-          <button disabled={saving} className="w-full rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Publicerar…" : "Publicera meddelande"}</button>
-        </form>
+      <section className={`grid gap-6 ${permissions.canManage ? "xl:grid-cols-[380px_1fr]" : ""}`}>
+        {permissions.canManage ? (
+          <form onSubmit={submit} className="space-y-4 rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Nytt meddelande</p>
+              <h2 className="mt-2 text-lg font-semibold text-ink-950">Publicera intern information</h2>
+            </div>
+            <input required maxLength={120} placeholder="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <textarea required maxLength={2000} rows={6} placeholder="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <div className="grid grid-cols-2 gap-3">
+              <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
+                <option value="normal">Information</option>
+                <option value="important">Viktigt</option>
+                <option value="urgent">Brådskande</option>
+              </select>
+              <select value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
+                <option>Alla användare</option>
+                <option>Förvaltare</option>
+                <option>Fastighetsskötare</option>
+                <option>Administratörer</option>
+              </select>
+            </div>
+            <button disabled={saving} className="w-full rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Publicerar…" : "Publicera meddelande"}</button>
+          </form>
+        ) : null}
 
         <div className="space-y-6">
           <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
@@ -190,7 +195,7 @@ export default function NotificationsPage() {
                           <p className="max-w-xs text-xs font-medium text-amber-700">Äldre notis – kör backfill innan den kan markeras som läst eller tas bort.</p>
                         ) : (
                           <>
-                            <button type="button" onClick={() => void recallNotification(item.notificationId)} className="text-xs font-semibold text-red-700 hover:text-red-900">Ta bort</button>
+                            {permissions.canManage ? <button type="button" onClick={() => void recallNotification(item.notificationId)} className="text-xs font-semibold text-red-700 hover:text-red-900">Ta bort</button> : null}
                             {!item.read ? (
                               <button type="button" onClick={() => void markRead(item.notificationId)} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">
                                 Markera som läst

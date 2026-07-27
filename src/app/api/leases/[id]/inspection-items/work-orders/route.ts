@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
 import type { LeaseInspectionRecord } from "@/lib/lease-inspection-items";
 import { addWorkOrderStatusEvent, allocateWorkOrderNumber, calculateWorkOrderSla, setWorkOrderEnterpriseFields } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
@@ -54,6 +54,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewLeasingData(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa leasingdata" }, { status: 403 });
+  }
   const { id } = await params;
   const lease = await getLease(id, user.company_id);
   if (!lease) return NextResponse.json({ error: "Avtalet hittades inte" }, { status: 404 });

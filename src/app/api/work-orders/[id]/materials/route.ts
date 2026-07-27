@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getMaterialEntry,
@@ -9,12 +8,13 @@ import {
   upsertMaterialEntry,
   type MaterialEntryPayload,
 } from "@/lib/work-order-ops-storage";
+import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 const units = new Set(["st", "m", "m2", "m3", "kg", "l", "förp"]);
 const stocks = new Set(["in_stock", "ordered", "used", "returned"]);
 
-async function ensureOrder(id: string, companyId: string) {
-  return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } }, select: { id: true, title: true } });
+async function ensureOrder(user: CompanyUser, id: string) {
+  return findAccessibleWorkOrder(user, id, { id: true, assigned_to_id: true, title: true });
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +22,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const { id } = await params;
-  if (!(await ensureOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
 
   const rows = (await listMaterialEntries(user.company_id, id))
     .filter((row) => row.status !== "deleted")
@@ -35,9 +35,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return acc;
   }, { total: 0, billable: 0, pending: 0, ordered: 0 });
 
+  const includeFinance = canViewFinanceData(user.role);
+  const visibleRows = includeFinance ? rows : rows.map((row) => ({ ...row, unitPrice: null, total: null }));
+  const visibleSummary = includeFinance
+    ? summary
+    : { total: null, billable: null, pending: summary.pending, ordered: summary.ordered };
+
   return NextResponse.json({
-    materials: rows,
-    summary,
+    materials: visibleRows,
+    summary: visibleSummary,
     canManage: canManageTickets(user.role),
     currentUserId: user.id,
   }, { headers: { "Cache-Control": "private, no-store" } });
@@ -48,7 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const { id } = await params;
-  if (!(await ensureOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
 
   const body = await request.json();
   const action = String(body.action || "create");
@@ -87,7 +93,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       actorId: user.id,
     };
   } else {
-    if (!canManageTickets(user.role) && action !== "delete") return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     const modern = await getModernMaterialEntry(user.company_id, id, entryId);
     const existing = modern ?? await getMaterialEntry(user.company_id, id, entryId);
     if (!existing) return NextResponse.json({ error: "Materialraden hittades inte" }, { status: 404 });
@@ -95,6 +100,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({
         error: "Materialraden finns kvar i äldre lagring. Kör backfill till WorkOrderMaterialEntry innan den kan uppdateras.",
       }, { status: 409 });
+    }
+    if ((action === "approve" || action === "reject") && !canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att attestera material" }, { status: 403 });
     }
     if (action === "delete" && existing.createdById !== user.id && !canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du kan bara ta bort dina egna rader" }, { status: 403 });

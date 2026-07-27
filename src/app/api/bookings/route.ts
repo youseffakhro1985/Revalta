@@ -1,5 +1,12 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import {
+  auditScopedWhere,
+  canManageLeases,
+  canManageTickets,
+  canViewLeasingData,
+  getCurrentUser,
+  tenantWhere,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
@@ -11,7 +18,11 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!canManageTickets(user.role) && !canViewLeasingData(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att visa bokningar" }, { status: 403 });
+    }
 
+    const includeResidentPii = canViewLeasingData(user.role);
     const [rows, legacyLogs, properties] = await Promise.all([
       db.booking.findMany({
         where: { company_id: user.company_id, property: { deleted_at: null } },
@@ -37,30 +48,42 @@ export async function GET() {
       property_id: row.property_id,
       property_name: row.property.name,
       resource: row.resource,
-      resident_name: row.resident_name,
-      unit: row.unit || "",
+      resident_name: includeResidentPii ? row.resident_name : null,
+      unit: includeResidentPii ? (row.unit || "") : "",
       start: row.start_at.toISOString(),
       end: row.end_at.toISOString(),
-      note: row.note || "",
+      note: includeResidentPii ? (row.note || "") : "",
       status: row.status,
       created_at: row.created_at,
       source: "table" as const,
     }));
 
     const modernIds = new Set(modern.map((row) => row.id));
+    const activePropertyIds = new Set(properties.map((property) => property.id));
     const legacy = legacyLogs
       .filter((log) => !isModernStorageMirror(log.metadata, "Booking", modernIds, log.entity_id) && !modernIds.has(log.id))
-      .map((log) => ({
-        id: log.id,
-        property_id: log.entity_id,
-        ...(log.metadata as object),
-        created_at: log.created_at,
-        source: "legacy" as const,
-      }));
+      .filter((log) => !log.entity_id || activePropertyIds.has(log.entity_id))
+      .map((log) => {
+        const metadata = (log.metadata || {}) as Record<string, unknown>;
+        return {
+          id: log.id,
+          property_id: log.entity_id,
+          ...metadata,
+          resident_name: includeResidentPii ? metadata.resident_name ?? metadata.residentName ?? null : null,
+          unit: includeResidentPii ? metadata.unit ?? "" : "",
+          note: includeResidentPii ? metadata.note ?? "" : "",
+          created_at: log.created_at,
+          source: "legacy" as const,
+        };
+      });
 
     return NextResponse.json({
       bookings: mergeByCreatedAt(modern, legacy, 250),
       properties,
+      permissions: {
+        canManage: canManageLeases(user.role),
+        canViewResidentDetails: includeResidentPii,
+      },
     });
   } catch (error) {
     console.error("Get bookings error:", error);
@@ -72,7 +95,7 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
@@ -175,7 +198,7 @@ export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();

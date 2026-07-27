@@ -51,4 +51,18 @@ describe("leases route", () => {
     expect(response.status).toBe(401);
     expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("GET denies technicians from reading leasing data", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("GET allows viewers to read leasing data", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(leaseFindManyMock).toHaveBeenCalled();
+  });
 });

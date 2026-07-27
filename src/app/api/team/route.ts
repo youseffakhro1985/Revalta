@@ -1,16 +1,40 @@
 import db from "@/lib/db";
-import { canManageTeam, getCurrentUser } from "@/lib/current-user";
+import {
+  canAssignWorkOrders,
+  canManageTeam,
+  canViewLeasingData,
+  getCurrentUser,
+} from "@/lib/current-user";
 import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 
-const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer"]);
+const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer", "resident"]);
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+
+    const canSeeFullRoster =
+      canManageTeam(user.role) || canAssignWorkOrders(user.role) || canViewLeasingData(user.role);
+
+    if (!canSeeFullRoster) {
+      const members = await db.user.findMany({
+        where: user.company_id
+          ? { company_id: user.company_id, status: "active", role: { not: "resident" } }
+          : { id: user.id },
+        orderBy: [{ name: "asc" }, { email: "asc" }],
+        select: { id: true, name: true, role: true, status: true },
+      });
+      return NextResponse.json({
+        company: user.company,
+        members,
+        canManage: false,
+        permissions: { canManage: false, canSeeEmails: false },
+      });
+    }
 
     const members = await db.user.findMany({
       where: user.company_id ? { company_id: user.company_id } : { id: user.id },
@@ -39,6 +63,7 @@ export async function GET() {
       company: user.company,
       members,
       canManage: canManageTeam(user.role),
+      permissions: { canManage: canManageTeam(user.role), canSeeEmails: true },
     });
   } catch (error) {
     console.error("Get team error:", error);
