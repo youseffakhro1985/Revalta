@@ -70,6 +70,30 @@ jobs:
           path.write_text(updated)
           PY
 
+      - name: Reconcile work-order role test mocks
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/app/api/work-orders/route.test.ts")
+          source = path.read_text()
+          needle = "  getCurrentUser: getCurrentUserMock,\n"
+          replacement = """  getCurrentUser: getCurrentUserMock,
+  canAssignWorkOrders: (role: string | null | undefined) =>
+    role === "owner" || role === "admin" || role === "manager",
+  canManageTickets: (role: string | null | undefined) =>
+    role === "owner" || role === "admin" || role === "manager" || role === "technician",
+  shouldScopeToAssignedWork: (role: string | null | undefined) => role === "technician",
+"""
+          occurrences = source.count(needle)
+          if occurrences != 1:
+              raise SystemExit(
+                  f"Expected exactly one current-user mock insertion point; found {occurrences}"
+              )
+          path.write_text(source.replace(needle, replacement, 1))
+          PY
+
       - name: Remove temporary workflow from final tree
         run: git rm .github/workflows/integrate-production-hardening.yml
 
