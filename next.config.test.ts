@@ -21,6 +21,12 @@ async function loadGlobalHeaders(vercelEnv: string | undefined, nodeEnv: string)
   return new Map(globalRule!.headers.map((header) => [header.key, header.value]));
 }
 
+function expectBrowserIsolationHeaders(headers: Map<string, string>) {
+  expect(headers.get("Cross-Origin-Opener-Policy")).toBe("same-origin");
+  expect(headers.get("Origin-Agent-Cluster")).toBe("?1");
+  expect(headers.get("X-Permitted-Cross-Domain-Policies")).toBe("none");
+}
+
 describe("Next.js environment security headers", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -33,6 +39,7 @@ describe("Next.js environment security headers", () => {
     expect(headers.get("X-Robots-Tag")).toBe("noindex, nofollow, noarchive, nosnippet");
     expect(headers.get("X-Revalta-Environment")).toBe("preview");
     expect(headers.get("Strict-Transport-Security")).toBe("max-age=63072000; includeSubDomains");
+    expectBrowserIsolationHeaders(headers);
   });
 
   it("identifies Production without adding Preview indexing directives", async () => {
@@ -41,6 +48,7 @@ describe("Next.js environment security headers", () => {
     expect(headers.has("X-Robots-Tag")).toBe(false);
     expect(headers.get("X-Revalta-Environment")).toBe("production");
     expect(headers.get("Strict-Transport-Security")).toBe("max-age=63072000; includeSubDomains");
+    expectBrowserIsolationHeaders(headers);
   });
 
   it("keeps local development usable without deployment markers", async () => {
@@ -52,5 +60,6 @@ describe("Next.js environment security headers", () => {
     expect(headers.has("Strict-Transport-Security")).toBe(false);
     expect(csp).toContain("'unsafe-eval'");
     expect(csp).not.toContain("upgrade-insecure-requests");
+    expectBrowserIsolationHeaders(headers);
   });
 });
