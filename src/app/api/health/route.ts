@@ -52,7 +52,7 @@ function healthResponse(body: unknown, status = 200, release = buildReleaseSnaps
   });
 }
 
-export async function GET(request?: NextRequest) {
+export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   const isPublic = !user;
   const startedAt = Date.now();
@@ -61,7 +61,7 @@ export async function GET(request?: NextRequest) {
   const env = buildEnvSnapshot();
   const logger = createLogger({
     route: "/api/health",
-    requestId: request?.headers.get("x-request-id") ?? undefined,
+    requestId: request.headers.get("x-request-id") ?? undefined,
     release: release.shortCommitSha,
     environment: release.environment,
   });
