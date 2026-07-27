@@ -48,9 +48,11 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { GET } from "./route";
 
+const REQUEST_ID = "11111111-1111-4111-8111-111111111111";
+
 function request() {
   return new Request("https://www.revalta.se/api/public/properties?companySlug=demo", {
-    headers: { "x-request-id": "public-properties-request-1" },
+    headers: { "x-request-id": REQUEST_ID },
   });
 }
 
@@ -137,7 +139,7 @@ describe("GET /api/public/properties", () => {
     expect(response.headers.get("cdn-cache-control")).toBe("no-store");
     expect(response.headers.get("vercel-cdn-cache-control")).toBe("no-store");
     expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
-    expect(response.headers.get("x-request-id")).toBe("public-properties-request-1");
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
   });
 
   it("returns a neutral service error when the portal cannot be resolved", async () => {
