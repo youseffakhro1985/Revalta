@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { generatePublicReference } from "@/lib/public-portal";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
+import { loadLegacyRows } from "@/lib/dual-list";
 
 const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "heating", "access", "noise", "other"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
@@ -105,12 +106,12 @@ export async function GET() {
         take: 500,
         include: { created_by: { select: { name: true, email: true } } },
       }),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { company_id: user.company_id, entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
-      }),
+      })),
     ]);
 
     const modernIds = new Set(managedDocuments.map((row) => row.id));

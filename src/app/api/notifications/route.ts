@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { isModernStorageMirror, mergeByCreatedAt } from "@/lib/dual-list";
+import { isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const createdAction = "notification.created";
@@ -31,24 +31,24 @@ export async function GET() {
             select: { notification_id: true },
           })
         : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...scope, action: createdAction },
         orderBy: { created_at: "desc" },
         take: 100,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-      }),
-      db.auditLog.findMany({
+      })),
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...scope, action: readAction },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { entity_id: true, metadata: true },
-      }),
-      db.auditLog.findMany({
+      })),
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...scope, action: { notIn: [createdAction, readAction] } },
         orderBy: { created_at: "desc" },
         take: 40,
         select: { id: true, action: true, entity_type: true, entity_id: true, metadata: true, created_at: true },
-      }),
+      })),
     ]);
 
     const modernReadIds = new Set(modernReads.map((row) => row.notification_id));

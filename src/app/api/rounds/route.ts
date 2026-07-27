@@ -4,6 +4,7 @@ import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from 
 import { writeAuditLog } from "@/lib/audit";
 import type { Prisma } from "@prisma/client";
 import { buildChecklistFromLabels, normalizeChecklist } from "@/lib/inspection-round-checklist";
+import { loadLegacyRows } from "@/lib/dual-list";
 
 export async function GET() {
   try {
@@ -18,11 +19,11 @@ export async function GET() {
         take: 100,
         include: { property: { select: { name: true } } },
       }),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), entity_type: "round" },
         orderBy: { created_at: "desc" },
         take: 100,
-      }),
+      })),
     ]);
 
     const modernIds = new Set(rows.map((row) => row.id));

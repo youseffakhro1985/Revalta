@@ -3,7 +3,7 @@ import db from "@/lib/db";
 import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
-import { parseOptionalDate } from "@/lib/dual-list";
+import { parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
 import { isProductionRuntime } from "@/lib/runtime-env";
 import { hasStorageConfig, storeAttachment, StorageConfigurationError } from "@/lib/storage";
 import { writeAuditLog } from "@/lib/audit";
@@ -33,12 +33,12 @@ export async function GET() {
             include: { created_by: { select: { name: true, email: true } } },
           })
         : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), entity_type: "document", action: "document.created" },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
-      }),
+      })),
       db.property.findMany({
         where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },

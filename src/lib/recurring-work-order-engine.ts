@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
+import { isModernStorageOnly } from "@/lib/dual-list";
 import {
   addWorkOrderStatusEvent,
   allocateWorkOrderNumber,
@@ -97,12 +98,14 @@ function toSchedule(row: {
 }
 
 async function readLegacySchedules(companyId: string, client: DbClient) {
+  const latest = new Map<string, RecurringSchedule>();
+  if (isModernStorageOnly()) return latest;
+
   const logs = await client.auditLog.findMany({
     where: { company_id: companyId, action: RECURRING_SCHEDULE_ACTION },
     orderBy: { created_at: "asc" },
     select: { id: true, company_id: true, metadata: true, created_at: true },
   });
-  const latest = new Map<string, RecurringSchedule>();
   for (const log of logs) {
     const metadata = (log.metadata ?? {}) as ScheduleMetadata;
     const id = metadata.schedule_id || log.id;
