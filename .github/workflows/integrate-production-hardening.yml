@@ -18,6 +18,12 @@ jobs:
     if: github.head_ref == 'integration/revalta-production-hardening-20260727'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
+      DIRECT_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
+      JWT_SECRET: ci-only-jwt-secret-at-least-32-characters-long
+      CRON_SECRET: ci-only-cron-secret-at-least-32-characters-long
+      NEXT_PUBLIC_APP_URL: https://www.revalta.se
     steps:
       - name: Checkout integration branch
         uses: actions/checkout@v4
@@ -70,12 +76,6 @@ jobs:
 
       - name: Production build
         run: npm run build:ci
-        env:
-          DATABASE_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
-          DIRECT_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
-          JWT_SECRET: ci-only-jwt-secret-at-least-32-characters-long
-          CRON_SECRET: ci-only-cron-secret-at-least-32-characters-long
-          NEXT_PUBLIC_APP_URL: https://www.revalta.se
 
       - name: Commit validated integration
         run: |
