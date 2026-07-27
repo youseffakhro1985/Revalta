@@ -23,7 +23,8 @@
     "postinstall": "prisma generate",
     "smoke:auth": "node scripts/smoke-auth-dashboard.mjs",
     "smoke:cron": "node scripts/smoke-cron.mjs",
-    "smoke:ops": "node scripts/smoke-ops.mjs"
+    "smoke:ops": "node scripts/smoke-ops.mjs",
+    "smoke:production-boundaries": "node scripts/verify-production-boundaries.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",
