@@ -70,7 +70,9 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
+        id: unit-tests
         shell: bash
+        continue-on-error: true
         run: |
           set +e
           npm run test:ci 2>&1 | tee /tmp/revalta-vitest.log
@@ -81,9 +83,25 @@ jobs:
             echo "::group::Vitest failure tail"
             tail -n 250 /tmp/revalta-vitest.log
             echo "::endgroup::"
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "failed=false" >> "$GITHUB_OUTPUT"
           fi
 
           exit "$test_status"
+
+      - name: Upload Vitest failure log
+        if: steps.unit-tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-failure-log
+          path: /tmp/revalta-vitest.log
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Enforce unit test result
+        if: steps.unit-tests.outcome == 'failure'
+        run: exit 1
 
       - name: Type check
         run: npm run typecheck
