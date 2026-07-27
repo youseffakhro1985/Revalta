@@ -95,7 +95,7 @@ jobs:
           PY
 
       - name: Remove temporary workflow from final tree
-        run: git rm .github/workflows/integrate-production-hardening.yml
+        run: git rm --ignore-unmatch .github/workflows/integrate-production-hardening.yml
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
