@@ -70,7 +70,20 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
-        run: npm run test:ci
+        shell: bash
+        run: |
+          set +e
+          npm run test:ci 2>&1 | tee /tmp/revalta-vitest.log
+          test_status=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$test_status" -ne 0 ]; then
+            echo "::group::Vitest failure tail"
+            tail -n 250 /tmp/revalta-vitest.log
+            echo "::endgroup::"
+          fi
+
+          exit "$test_status"
 
       - name: Type check
         run: npm run typecheck
