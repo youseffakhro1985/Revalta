@@ -4,14 +4,11 @@ import {
   canManageTickets,
   getCurrentUser,
   requireCompanyUser,
-  tenantWhere,
 } from "@/lib/current-user";
-import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
 import {
   isAssignedWorkAccessible,
-  notFoundTicket,
   redactTicketReporterPii,
 } from "@/lib/assigned-work-access";
 import {
@@ -22,25 +19,81 @@ import {
   isWorkOrderStatus,
   type WorkOrderStatus,
 } from "@/lib/work-order-lifecycle";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import { resolveRequestId, REQUEST_ID_HEADER } from "@/lib/request-correlation";
+import { createLogger } from "@/lib/structured-logger";
+import {
+  isMissingSchemaColumnError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
+const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
+const assignmentRequiredStatuses = new Set(["assigned", "in_progress", "inspection"]);
+const ticketRoute = "/api/tickets/[id]";
+
+function successHeaders(requestId: string) {
+  return {
+    "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+    "CDN-Cache-Control": "no-store",
+    "Vercel-CDN-Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    [REQUEST_ID_HEADER]: requestId,
+  };
+}
+
+function routeLogger(method: string, requestId: string) {
+  return createLogger({
+    route: ticketRoute,
+    method,
+    requestId,
+    release: process.env.VERCEL_GIT_COMMIT_SHA,
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+  });
+}
+
+function ticketError(status: number, code: (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES], message: string, requestId: string) {
+  return apiErrorResponse({ status, code, message, requestId });
+}
+
 export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const startedAt = Date.now();
+  const requestId = resolveRequestId(request.headers);
+  const logger = routeLogger("GET", requestId);
+
   try {
     const rawUser = await getCurrentUser();
-    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    const user = requireCompanyUser(rawUser);
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 403 });
-    const { id } = await params;
+    if (!rawUser) {
+      logger.warn("ticket detail unauthorized", {
+        eventCode: "tickets.detail.unauthorized",
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(401, API_ERROR_CODES.unauthorized, "Obehörig", requestId);
+    }
 
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      logger.warn("ticket detail forbidden", {
+        eventCode: "tickets.detail.forbidden",
+        role: rawUser.role,
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(403, API_ERROR_CODES.forbidden, "Du saknar behörighet att visa ärendet", requestId);
+    }
+
+    const { id } = await params;
     const ticket = await db.ticket.findFirst({
       where: {
         id,
+        company_id: user.company_id,
         deleted_at: null,
-        ...tenantWhere(user),
-        OR: [{ property_id: null }, { property: { deleted_at: null } }],
+        OR: [
+          { property_id: null },
+          { property: { company_id: user.company_id, deleted_at: null } },
+        ],
       },
       select: {
         id: true,
@@ -65,19 +118,10 @@ export async function GET(
         ai_confidence: true,
         ai_processed_at: true,
         property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-            city: true,
-          },
+          select: { id: true, name: true, address: true, city: true },
         },
         assigned_to: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          select: { id: true, name: true, email: true },
         },
         comments: {
           orderBy: { created_at: "asc" },
@@ -89,12 +133,7 @@ export async function GET(
             author_type: true,
             author_name: true,
             author_email: true,
-            user: {
-              select: {
-                name: true,
-                email: true,
-              },
-            },
+            user: { select: { name: true, email: true } },
           },
         },
         attachments: {
@@ -111,43 +150,89 @@ export async function GET(
       },
     });
 
-    if (!ticket) return notFoundTicket();
-    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
+    if (!ticket || !isAssignedWorkAccessible(user, ticket.assigned_to_id)) {
+      logger.info("ticket detail not found", {
+        eventCode: "tickets.detail.not_found",
+        companyId: user.company_id,
+        ticketId: id,
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(404, API_ERROR_CODES.notFound, "Ärendet hittades inte", requestId);
+    }
 
     const normalizedStatus = isWorkOrderStatus(ticket.status) ? ticket.status : "new";
     const redacted = redactTicketReporterPii(user, ticket);
 
-    return NextResponse.json({
-      ticket: {
-        ...redacted,
-        status: normalizedStatus,
-        allowedTransitions: allowedWorkOrderTransitions(normalizedStatus),
-        attachments: ticket.attachments.map((attachment) => ({
-          ...attachment,
-          data_url: `/api/attachments/${attachment.id}`,
-        })),
-      },
-      permissions: {
-        canManage: canManageTickets(user.role),
-        canAssign: canAssignWorkOrders(user.role),
-      },
+    logger.info("ticket detail succeeded", {
+      eventCode: "tickets.detail.succeeded",
+      companyId: user.company_id,
+      ticketId: ticket.id,
+      latencyMs: Date.now() - startedAt,
     });
+
+    return NextResponse.json(
+      {
+        ticket: {
+          ...redacted,
+          status: normalizedStatus,
+          allowedTransitions: allowedWorkOrderTransitions(normalizedStatus),
+          attachments: ticket.attachments.map((attachment) => ({
+            ...attachment,
+            data_url: `/api/attachments/${attachment.id}`,
+          })),
+        },
+        permissions: {
+          canManage: canManageTickets(user.role),
+          canAssign: canAssignWorkOrders(user.role),
+        },
+        requestId,
+      },
+      { headers: successHeaders(requestId) },
+    );
   } catch (error) {
-    console.error("Get ticket error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    if (isMissingSchemaColumnError(error)) {
+      logger.warn("ticket detail schema unavailable", {
+        eventCode: "tickets.detail.schema_unavailable",
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(503, API_ERROR_CODES.serviceUnavailable, schemaMismatchUserMessage(), requestId);
+    }
+    logger.error("ticket detail failed", error, {
+      eventCode: "tickets.detail.failed",
+      latencyMs: Date.now() - startedAt,
+    });
+    return ticketError(500, API_ERROR_CODES.internalError, "Internt serverfel", requestId);
   }
 }
 
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const startedAt = Date.now();
+  const requestId = resolveRequestId(request.headers);
+  const logger = routeLogger("PATCH", requestId);
+
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att uppdatera ärenden" }, { status: 403 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
+      logger.warn("ticket update unauthorized", {
+        eventCode: "tickets.update.unauthorized",
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(401, API_ERROR_CODES.unauthorized, "Obehörig", requestId);
     }
+
+    const user = requireCompanyUser(rawUser);
+    if (!user || !canManageTickets(user.role)) {
+      logger.warn("ticket update forbidden", {
+        eventCode: "tickets.update.forbidden",
+        role: rawUser.role,
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(403, API_ERROR_CODES.forbidden, "Du saknar behörighet att uppdatera ärenden", requestId);
+    }
+
     const { id } = await params;
     const body = (await request.json().catch(() => null)) as {
       status?: unknown;
@@ -155,10 +240,28 @@ export async function PATCH(
       assignedToId?: unknown;
       transitionReason?: unknown;
     } | null;
-    if (!body) return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
+
+    if (!body) {
+      logger.info("ticket update validation failed", {
+        eventCode: "tickets.update.validation_failed",
+        field: "body",
+        companyId: user.company_id,
+        ticketId: id,
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(400, API_ERROR_CODES.validationFailed, "Ogiltig förfrågan", requestId);
+    }
 
     const existing = await db.ticket.findFirst({
-      where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+      where: {
+        id,
+        company_id: user.company_id,
+        deleted_at: null,
+        OR: [
+          { property_id: null },
+          { property: { company_id: user.company_id, deleted_at: null } },
+        ],
+      },
       select: {
         id: true,
         title: true,
@@ -169,41 +272,47 @@ export async function PATCH(
       },
     });
 
-    if (!existing) return notFoundTicket();
-    if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
+    if (!existing || !isAssignedWorkAccessible(user, existing.assigned_to_id)) {
+      return ticketError(404, API_ERROR_CODES.notFound, "Ärendet hittades inte", requestId);
+    }
 
     const currentStatus: WorkOrderStatus = isWorkOrderStatus(existing.status) ? existing.status : "new";
     const shouldUpdateAssignee = typeof body.assignedToId === "string" || body.assignedToId === null;
 
     if (shouldUpdateAssignee && !canAssignWorkOrders(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att ändra ansvarig" }, { status: 403 });
+      return ticketError(403, API_ERROR_CODES.forbidden, "Du saknar behörighet att ändra ansvarig", requestId);
     }
+
     const normalizedAssignedToId =
-      typeof body.assignedToId === "string" && body.assignedToId.trim() ? body.assignedToId.trim() : null;
+      typeof body.assignedToId === "string" && body.assignedToId.trim()
+        ? body.assignedToId.trim()
+        : null;
 
     if (normalizedAssignedToId) {
       const assignee = await db.user.findFirst({
-        where: user.company_id
-          ? { id: normalizedAssignedToId, company_id: user.company_id }
-          : { id: user.id },
+        where: {
+          id: normalizedAssignedToId,
+          company_id: user.company_id,
+          status: "active",
+        },
         select: { id: true },
       });
-
-      if (!assignee || assignee.id !== normalizedAssignedToId) {
-        return NextResponse.json({ error: "Vald ansvarig hittades inte" }, { status: 400 });
+      if (!assignee) {
+        return ticketError(400, API_ERROR_CODES.validationFailed, "Vald ansvarig hittades inte", requestId);
       }
     }
 
     const requestedStatus = body.status === undefined ? undefined : body.status;
     if (requestedStatus !== undefined && !isWorkOrderStatus(requestedStatus)) {
-      return NextResponse.json({ error: "Ogiltig arbetsorderstatus" }, { status: 400 });
+      return ticketError(400, API_ERROR_CODES.validationFailed, "Ogiltig arbetsorderstatus", requestId);
     }
 
     const normalizedPriority =
-      typeof body.priority === "string" && body.priority.trim() ? body.priority.trim() : undefined;
-    const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
+      typeof body.priority === "string" && body.priority.trim()
+        ? body.priority.trim()
+        : undefined;
     if (normalizedPriority && !allowedPriorities.has(normalizedPriority)) {
-      return NextResponse.json({ error: "Ogiltig prioritet" }, { status: 400 });
+      return ticketError(400, API_ERROR_CODES.validationFailed, "Ogiltig prioritet", requestId);
     }
 
     const nextAssigneeId = shouldUpdateAssignee ? normalizedAssignedToId : existing.assigned_to_id;
@@ -214,45 +323,55 @@ export async function PATCH(
     });
 
     if (!canTransitionWorkOrder(currentStatus, nextStatus)) {
-      return NextResponse.json(
-        {
-          error: "Statusövergången är inte tillåten",
-          currentStatus,
-          requestedStatus: nextStatus,
-          allowedTransitions: allowedWorkOrderTransitions(currentStatus),
-        },
-        { status: 409 },
-      );
+      logger.info("ticket transition conflict", {
+        eventCode: "tickets.update.transition_conflict",
+        companyId: user.company_id,
+        ticketId: id,
+        currentStatus,
+        requestedStatus: nextStatus,
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(409, API_ERROR_CODES.conflict, "Statusövergången är inte tillåten", requestId);
     }
 
-    if (["assigned", "in_progress", "inspection"].includes(nextStatus) && !nextAssigneeId) {
-      return NextResponse.json({ error: "En ansvarig måste väljas för denna status" }, { status: 400 });
+    if (assignmentRequiredStatuses.has(nextStatus) && !nextAssigneeId) {
+      return ticketError(400, API_ERROR_CODES.validationFailed, "En ansvarig måste väljas för denna status", requestId);
     }
 
-    const nextPriority = normalizedPriority || existing.priority;
+    const nextPriority = normalizedPriority ?? existing.priority;
     const priorityChanged = Boolean(normalizedPriority && normalizedPriority !== existing.priority);
     const terminal = isTerminalWorkOrderStatus(nextStatus);
-    const transitionReason = typeof body.transitionReason === "string"
-      ? body.transitionReason.trim().slice(0, 500)
-      : "";
+    const transitionReason =
+      typeof body.transitionReason === "string"
+        ? body.transitionReason.trim().slice(0, 500)
+        : "";
 
     const ticket = await db.$transaction(async (tx) => {
       const updateResult = await tx.ticket.updateMany({
-        where: { id, company_id: user.company_id!, deleted_at: null },
+        where: {
+          id,
+          company_id: user.company_id,
+          deleted_at: null,
+          status: existing.status,
+          assigned_to_id: existing.assigned_to_id,
+        },
         data: {
           status: nextStatus,
           priority: normalizedPriority,
           assigned_to_id: shouldUpdateAssignee ? normalizedAssignedToId : undefined,
           due_date: priorityChanged && !terminal ? calculateDueDate(nextPriority) : undefined,
-          closed_at: nextStatus === "closed" ? new Date() : currentStatus === "closed" ? null : undefined,
+          closed_at:
+            nextStatus === "closed"
+              ? new Date()
+              : currentStatus === "closed"
+                ? null
+                : undefined,
         },
       });
-      if (updateResult.count === 0) {
-        throw new Error("TICKET_NOT_FOUND");
-      }
+      if (updateResult.count === 0) return null;
 
       const updated = await tx.ticket.findFirst({
-        where: { id, company_id: user.company_id!, deleted_at: null },
+        where: { id, company_id: user.company_id, deleted_at: null },
         select: {
           id: true,
           title: true,
@@ -260,18 +379,10 @@ export async function PATCH(
           priority: true,
           due_date: true,
           closed_at: true,
-          assigned_to: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
+          assigned_to: { select: { id: true, name: true, email: true } },
         },
       });
-      if (!updated) {
-        throw new Error("TICKET_NOT_FOUND");
-      }
+      if (!updated) return null;
 
       await tx.auditLog.create({
         data: {
@@ -295,85 +406,172 @@ export async function PATCH(
       });
 
       return updated;
-    }).catch((error) => {
-      if (error instanceof Error && error.message === "TICKET_NOT_FOUND") {
-        return null;
-      }
-      throw error;
     });
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ärende hittades inte" }, { status: 404 });
+      logger.warn("ticket update concurrent conflict", {
+        eventCode: "tickets.update.concurrent_conflict",
+        companyId: user.company_id,
+        ticketId: id,
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(409, API_ERROR_CODES.conflict, "Ärendet ändrades av en annan användare. Ladda om och försök igen.", requestId);
     }
 
-    await writeAuditLog(user, {
-      entityType: "ticket",
-      entityId: ticket.id,
-      action: "ticket.lifecycle_processed",
-      metadata: {
-        status: ticket.status,
-        priority: ticket.priority,
-        assignedToId: ticket.assigned_to?.id ?? null,
-      },
-    });
-    await queueTicketNotification(user, {
+    const notificationResult = await Promise.allSettled([
+      queueTicketNotification(user, {
+        ticketId: ticket.id,
+        title: ticket.title,
+        recipient: user.email,
+        event: "updated",
+      }),
+    ]);
+    if (notificationResult[0]?.status === "rejected") {
+      logger.warn("ticket update partial failure", {
+        eventCode: "tickets.update.partial_failure",
+        companyId: user.company_id,
+        ticketId: ticket.id,
+        failedEffects: 1,
+        latencyMs: Date.now() - startedAt,
+      });
+    }
+
+    logger.info("ticket update succeeded", {
+      eventCode: "tickets.update.succeeded",
+      companyId: user.company_id,
       ticketId: ticket.id,
-      title: ticket.title,
-      recipient: user.email,
-      event: "updated",
+      status: ticket.status,
+      latencyMs: Date.now() - startedAt,
     });
 
-    return NextResponse.json({
-      success: true,
-      ticket,
-      allowedTransitions: allowedWorkOrderTransitions(ticket.status as WorkOrderStatus),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        ticket,
+        allowedTransitions: allowedWorkOrderTransitions(ticket.status as WorkOrderStatus),
+        requestId,
+      },
+      { headers: successHeaders(requestId) },
+    );
   } catch (error) {
-    console.error("Update ticket error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    if (isMissingSchemaColumnError(error)) {
+      logger.warn("ticket update schema unavailable", {
+        eventCode: "tickets.update.schema_unavailable",
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(503, API_ERROR_CODES.serviceUnavailable, schemaMismatchUserMessage(), requestId);
+    }
+    logger.error("ticket update failed", error, {
+      eventCode: "tickets.update.failed",
+      latencyMs: Date.now() - startedAt,
+    });
+    return ticketError(500, API_ERROR_CODES.internalError, "Internt serverfel", requestId);
   }
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const startedAt = Date.now();
+  const requestId = resolveRequestId(request.headers);
+  const logger = routeLogger("DELETE", requestId);
+
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att ta bort ärenden" }, { status: 403 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
+      logger.warn("ticket delete unauthorized", {
+        eventCode: "tickets.delete.unauthorized",
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(401, API_ERROR_CODES.unauthorized, "Obehörig", requestId);
     }
-    if (!user.company_id) {
-      return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+
+    const user = requireCompanyUser(rawUser);
+    if (!user || !canManageTickets(user.role)) {
+      logger.warn("ticket delete forbidden", {
+        eventCode: "tickets.delete.forbidden",
+        role: rawUser.role,
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(403, API_ERROR_CODES.forbidden, "Du saknar behörighet att ta bort ärenden", requestId);
     }
 
     const { id } = await params;
     const existing = await db.ticket.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, title: true, status: true, assigned_to_id: true },
+      where: {
+        id,
+        company_id: user.company_id,
+        deleted_at: null,
+        OR: [
+          { property_id: null },
+          { property: { company_id: user.company_id, deleted_at: null } },
+        ],
+      },
+      select: { id: true, status: true, assigned_to_id: true },
     });
-    if (!existing) return notFoundTicket();
-    if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
 
-    const deleteResult = await db.ticket.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: null },
-      data: { deleted_at: new Date() },
-    });
-    if (deleteResult.count === 0) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    if (!existing || !isAssignedWorkAccessible(user, existing.assigned_to_id)) {
+      return ticketError(404, API_ERROR_CODES.notFound, "Ärendet hittades inte", requestId);
     }
 
-    await writeAuditLog(user, {
-      entityType: "ticket",
-      entityId: existing.id,
-      action: "ticket.deleted",
-      metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+    const deleted = await db.$transaction(async (tx) => {
+      const deleteResult = await tx.ticket.updateMany({
+        where: {
+          id: existing.id,
+          company_id: user.company_id,
+          deleted_at: null,
+          status: existing.status,
+          assigned_to_id: existing.assigned_to_id,
+        },
+        data: { deleted_at: new Date() },
+      });
+      if (deleteResult.count === 0) return false;
+
+      await tx.auditLog.create({
+        data: {
+          actor_user_id: user.id,
+          company_id: user.company_id,
+          entity_type: "ticket",
+          entity_id: existing.id,
+          action: "ticket.deleted",
+          metadata: {
+            previousStatus: existing.status,
+            previousAssignedToId: existing.assigned_to_id,
+            softDelete: true,
+          },
+        },
+      });
+      return true;
     });
 
-    return NextResponse.json({ success: true });
+    if (!deleted) {
+      return ticketError(409, API_ERROR_CODES.conflict, "Ärendet ändrades av en annan användare. Ladda om och försök igen.", requestId);
+    }
+
+    logger.info("ticket delete succeeded", {
+      eventCode: "tickets.delete.succeeded",
+      companyId: user.company_id,
+      ticketId: existing.id,
+      latencyMs: Date.now() - startedAt,
+    });
+
+    return NextResponse.json(
+      { success: true, requestId },
+      { headers: successHeaders(requestId) },
+    );
   } catch (error) {
-    console.error("Delete ticket error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    if (isMissingSchemaColumnError(error)) {
+      logger.warn("ticket delete schema unavailable", {
+        eventCode: "tickets.delete.schema_unavailable",
+        latencyMs: Date.now() - startedAt,
+      });
+      return ticketError(503, API_ERROR_CODES.serviceUnavailable, schemaMismatchUserMessage(), requestId);
+    }
+    logger.error("ticket delete failed", error, {
+      eventCode: "tickets.delete.failed",
+      latencyMs: Date.now() - startedAt,
+    });
+    return ticketError(500, API_ERROR_CODES.internalError, "Internt serverfel", requestId);
   }
 }
