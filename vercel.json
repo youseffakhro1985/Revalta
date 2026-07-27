@@ -1,7 +1,14 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "release-preview": true
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/component-service-reminders",
