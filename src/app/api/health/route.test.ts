@@ -51,6 +51,10 @@ vi.mock("@/lib/structured-logger", () => ({
 
 import { GET } from "./route";
 
+function healthRequest(headers?: HeadersInit) {
+  return new NextRequest("https://www.revalta.se/api/health", { headers });
+}
+
 describe("health route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,7 +74,7 @@ describe("health route", () => {
 
   it("public GET returns lightweight ok payload for uptime monitors", async () => {
     getCurrentUserMock.mockResolvedValue(null);
-    const response = await GET();
+    const response = await GET(healthRequest());
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
@@ -89,7 +93,7 @@ describe("health route", () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("VERCEL_DEPLOYMENT_ID", "dpl_revalta_test");
 
-    const response = await GET();
+    const response = await GET(healthRequest());
     const body = await response.json();
 
     expect(body.release).toEqual({
@@ -117,7 +121,7 @@ describe("health route", () => {
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "blob");
     vi.stubEnv("CRON_SECRET", "cron");
 
-    const response = await GET();
+    const response = await GET(healthRequest());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -142,8 +146,8 @@ describe("health route", () => {
       missing: ["AuditLog.module"],
       checkedAt: new Date().toISOString(),
     });
-    const request = new NextRequest("https://www.revalta.se/api/health", {
-      headers: { "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+    const request = healthRequest({
+      "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     });
 
     const response = await GET(request);
@@ -162,8 +166,8 @@ describe("health route", () => {
   it("logs database failures structurally without exposing env to public callers", async () => {
     getCurrentUserMock.mockResolvedValue(null);
     queryRawMock.mockRejectedValue(new Error("database unavailable"));
-    const request = new NextRequest("https://www.revalta.se/api/health", {
-      headers: { "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+    const request = healthRequest({
+      "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     });
 
     const response = await GET(request);
