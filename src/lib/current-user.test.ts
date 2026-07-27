@@ -21,6 +21,7 @@ import {
   companyScopedWhere,
   companyUserWhere,
   getCurrentUser,
+  requireCompanyMember,
   requireCompanyUser,
   tenantWhere,
 } from "@/lib/current-user";
@@ -143,5 +144,6 @@ describe("tenant scoping helpers", () => {
   it("fail-closes company scope for resident users", () => {
     const residentUser = { ...activeUser, role: "resident" };
     expect(requireCompanyUser(residentUser)).toBeNull();
+    expect(requireCompanyMember(residentUser)?.company_id).toBe("company-1");
   });
 });

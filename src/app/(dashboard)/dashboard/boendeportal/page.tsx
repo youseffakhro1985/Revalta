@@ -270,9 +270,12 @@ export default function ResidentPortalPage() {
                   <div className="flex flex-col items-start gap-2 lg:items-end">
                     <span className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-800">{statusLabels[ticket.status] || ticket.status}</span>
                     {data?.isResident ? (
-                      ticket.public_reference ? (
-                        <p className="text-xs font-semibold text-ink-500">Referens {ticket.public_reference}</p>
-                      ) : null
+                      <Link
+                        href={`/dashboard/boendeportal/arenden/${ticket.id}`}
+                        className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950"
+                      >
+                        Visa ärende
+                      </Link>
                     ) : (
                       <Link href={`/dashboard/felanmalan/${ticket.id}`} className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna ärendet</Link>
                     )}

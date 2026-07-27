@@ -13,6 +13,7 @@ describe("resident-access allowlists", () => {
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/dokument")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/konto")).toBe(true);
+    expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/arenden/ticket-1")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard")).toBe(false);
     expect(isResidentAllowedDashboardPath("/dashboard/fastigheter")).toBe(false);
     expect(isResidentAllowedDashboardPath("/dashboard/felanmalan")).toBe(false);
@@ -29,6 +30,8 @@ describe("resident-access allowlists", () => {
   it("allows resident self-service APIs and blocks company APIs", () => {
     expect(isResidentAllowedApiPath("/api/resident-portal")).toBe(true);
     expect(isResidentAllowedApiPath("/api/resident-portal/documents/abc/download")).toBe(true);
+    expect(isResidentAllowedApiPath("/api/resident-portal/tickets/ticket-1")).toBe(true);
+    expect(isResidentAllowedApiPath("/api/resident-portal/tickets/ticket-1/comments")).toBe(true);
     expect(isResidentAllowedApiPath("/api/settings/profile")).toBe(true);
     expect(isResidentAllowedApiPath("/api/settings/password")).toBe(true);
     expect(isResidentAllowedApiPath("/api/auth/logout")).toBe(true);

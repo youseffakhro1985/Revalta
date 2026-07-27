@@ -79,10 +79,17 @@ export function companyUserWhere(user: CurrentUser) {
   return user.company_id ? { company_id: user.company_id } : { id: user.id };
 }
 
+/** Organisation member with company scope (includes resident self-service). */
+export function requireCompanyMember(user: CurrentUser | null): CompanyUser | null {
+  if (!user?.company_id) return null;
+  return user as CompanyUser;
+}
+
 /** Fail-closed helper for organisation-scoped staff API routes. */
 export function requireCompanyUser(user: CurrentUser | null): CompanyUser | null {
-  if (!user?.company_id || isResident(user.role)) return null;
-  return user as CompanyUser;
+  const member = requireCompanyMember(user);
+  if (!member || isResident(member.role)) return null;
+  return member;
 }
 
 /** Explicit staff-only company scope (alias of requireCompanyUser). */
