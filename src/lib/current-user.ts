@@ -19,6 +19,8 @@ export {
   canManageTeam,
   canManageTickets,
   canViewAudit,
+  canViewFinanceData,
+  canViewLeasingData,
   canViewOperations,
   isResident,
   isStaffRole,

@@ -50,6 +50,16 @@ export function canViewOperations(role: string) {
   return hasRole(role, ["owner", "admin", "manager"]);
 }
 
+/** Leasing/hyresgästdata — not for field technicians. */
+export function canViewLeasingData(role: string) {
+  return hasRole(role, ["owner", "admin", "manager", "viewer"]);
+}
+
+/** Budget, offerter, IMD, skador, hyresavier — commercial/finance read. */
+export function canViewFinanceData(role: string) {
+  return hasRole(role, ["owner", "admin", "manager", "viewer"]);
+}
+
 export function isResident(role: string) {
   return role === "resident";
 }

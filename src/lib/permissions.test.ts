@@ -6,9 +6,12 @@ import {
   canExportTickets,
   canManageAccessCredentials,
   canManageResidentPortal,
+  canManageBilling,
   canManageTeam,
   canManageTickets,
   canViewAudit,
+  canViewFinanceData,
+  canViewLeasingData,
   canViewOperations,
   isResident,
   isStaffRole,
@@ -38,6 +41,24 @@ describe("permissions", () => {
   it.each(["technician", "viewer", "resident", "unknown", ""])("nekar %s operativa ledningsrapporter", (role) => {
     expect(canViewOperations(role)).toBe(false);
     expect(canExportTickets(role)).toBe(false);
+  });
+
+  it.each(["owner", "admin", "manager", "viewer"])("låter %s läsa leasing- och finansdata", (role) => {
+    expect(canViewLeasingData(role)).toBe(true);
+    expect(canViewFinanceData(role)).toBe(true);
+  });
+
+  it.each(["technician", "resident", "unknown", ""])("nekar %s leasing- och finansläsning", (role) => {
+    expect(canViewLeasingData(role)).toBe(false);
+    expect(canViewFinanceData(role)).toBe(false);
+  });
+
+  it.each(["owner", "admin"])("låter %s hantera billing", (role) => {
+    expect(canManageBilling(role)).toBe(true);
+  });
+
+  it.each(["manager", "technician", "viewer", "resident"])("nekar %s billing-administration", (role) => {
+    expect(canManageBilling(role)).toBe(false);
   });
 
   it.each(["owner", "admin", "manager", "technician"])("låter %s arbeta med ärenden", (role) => {
