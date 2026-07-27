@@ -96,7 +96,7 @@ const navigation: NavGroup[] = [
       { href: "/dashboard/arbetsorder/planering", label: "Teknikerplanering", icon: UsersRound },
       { href: "/dashboard/arbetsorder/operationsoversikt", label: "Arbetsorderöversikt", icon: LayoutList, visible: canViewOperations },
       { href: "/dashboard/arbetsorder/aterkommande", label: "Återkommande", icon: Repeat2, visible: canViewOperations },
-      { href: "/dashboard/projekt", label: "Projekt", icon: FolderKanban },
+      { href: "/dashboard/projekt", label: "Projekt", icon: FolderKanban, visible: canViewOperations },
       { href: "/dashboard/skador", label: "Skador & försäkring", icon: ShieldAlert, visible: canViewFinanceData },
       { href: "/dashboard/kalender", label: "Kalender", icon: CalendarDays },
       { href: "/dashboard/bokningar", label: "Bokningar", icon: CalendarCheck2 },

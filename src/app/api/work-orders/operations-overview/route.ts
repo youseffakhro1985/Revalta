@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { normalizeWorkOrderPriority, normalizeWorkOrderStatus, workOrderRisk, workOrderSlaDeadline, WORK_ORDER_PRIORITY_LABELS, WORK_ORDER_STATUS_LABELS } from "@/lib/work-order-workflow";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,11 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewOperations(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa arbetsorderöversikten" }, { status: 403 });
+  }
 
+  const includeCosts = canViewFinanceData(user.role);
   const rows = await db.workOrder.findMany({
     where: { deleted_at: null, company_id: user.company_id, property: { deleted_at: null } },
     orderBy: [{ scheduled_start: "asc" }, { created_at: "desc" }],
@@ -40,8 +44,8 @@ export async function GET() {
       property: row.property,
       unit: row.unit,
       assignee: row.assigned_to,
-      estimatedCost: row.estimated_cost?.toString() ?? null,
-      actualCost: row.actual_cost?.toString() ?? null,
+      estimatedCost: includeCosts ? (row.estimated_cost?.toString() ?? null) : null,
+      actualCost: includeCosts ? (row.actual_cost?.toString() ?? null) : null,
       href: `/dashboard/arbetsorder/${row.id}`,
     };
   });
@@ -56,5 +60,8 @@ export async function GET() {
     unassigned: open.filter((item) => !item.assignee).length,
   };
 
-  return NextResponse.json({ summary, workOrders }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json(
+    { summary, workOrders, permissions: { canViewFinance: includeCosts } },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }

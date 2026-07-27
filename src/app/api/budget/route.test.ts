@@ -65,6 +65,17 @@ describe("budget route", () => {
     expect(budgetFindManyMock).not.toHaveBeenCalled();
   });
 
+  it("denies technicians from mutating budget data", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/budget", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId: "entry-1", budget: 1 }),
+    }));
+    expect(response.status).toBe(403);
+    expect(budgetFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("updates modern budget fields and scopes active properties", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     budgetFindFirstMock.mockResolvedValue({

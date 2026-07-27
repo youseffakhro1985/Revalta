@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageWorkOrderFinance, canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 
 const allowedStatuses = new Set(["planned", "active", "paused", "completed", "cancelled"]);
@@ -23,6 +23,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewOperations(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa projekt" }, { status: 403 });
+  }
 
   const { id } = await params;
   const project = await db.project.findFirst({
@@ -35,13 +38,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     },
   });
   if (!project) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
-  return NextResponse.json({ project });
+  if (!canViewFinanceData(user.role)) {
+    const { budget: _b, forecast: _f, actual: _a, ...rest } = project;
+    return NextResponse.json({
+      project: { ...rest, budget: null, forecast: null, actual: null },
+      permissions: { canViewFinance: false, canManage: false },
+    });
+  }
+  return NextResponse.json({
+    project,
+    permissions: { canViewFinance: true, canManage: canManageWorkOrderFinance(user.role) },
+  });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
@@ -100,7 +113,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;

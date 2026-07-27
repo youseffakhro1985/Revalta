@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+
+const financeMetadataKeys = new Set(["budget", "forecast", "actual", "deviation"]);
+
+function redactHistoryMetadata(metadata: unknown, includeFinance: boolean) {
+  if (includeFinance || !metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return metadata;
+  }
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata as Record<string, unknown>)) {
+    if (!financeMetadataKeys.has(key)) next[key] = value;
+  }
+  return next;
+}
 
 export async function GET(
   _request: Request,
@@ -10,6 +23,9 @@ export async function GET(
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewOperations(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa projekt" }, { status: 403 });
+  }
 
   const { id } = await params;
   const project = await db.project.findFirst({
@@ -18,6 +34,7 @@ export async function GET(
   });
   if (!project) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
 
+  const includeFinance = canViewFinanceData(user.role);
   const [comments, history] = await Promise.all([
     db.projectComment.findMany({
       where: { company_id: user.company_id, project_id: id },
@@ -44,7 +61,13 @@ export async function GET(
     }),
   ]);
 
-  return NextResponse.json({ comments, history });
+  return NextResponse.json({
+    comments,
+    history: history.map((row) => ({
+      ...row,
+      metadata: redactHistoryMetadata(row.metadata, includeFinance),
+    })),
+  });
 }
 
 export async function POST(
@@ -53,7 +76,7 @@ export async function POST(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;

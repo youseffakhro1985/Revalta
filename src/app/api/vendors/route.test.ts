@@ -60,6 +60,17 @@ describe("vendors route", () => {
     expect(vendorFindManyMock).not.toHaveBeenCalled();
   });
 
+  it("denies technicians from mutating vendor contracts", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/vendors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vendorId: "vendor-1", contactName: "X" }),
+    }));
+    expect(response.status).toBe(403);
+    expect(vendorFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("updates modern vendor with OR property null / deleted_at null filter", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     vendorFindFirstMock.mockResolvedValue({
