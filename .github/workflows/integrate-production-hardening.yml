@@ -1,0 +1,163 @@
+name: Integrate production hardening
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: integrate-production-hardening
+  cancel-in-progress: false
+
+jobs:
+  integrate-and-validate:
+    if: github.head_ref == 'integration/revalta-production-hardening-20260727'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
+      DIRECT_URL: postgresql://revalta:revalta@localhost:5432/revalta_ci
+      JWT_SECRET: ci-only-jwt-secret-at-least-32-characters-long
+      CRON_SECRET: ci-only-cron-secret-at-least-32-characters-long
+      NEXT_PUBLIC_APP_URL: https://www.revalta.se
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: integration/revalta-production-hardening-20260727
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch source branches
+        run: |
+          git fetch --quiet origin \
+            cursor/product-hardening-followthrough-6157 \
+            cursor/wo-board-role-scope-6157 \
+            cursor/staff-read-hardening-6157
+
+      - name: Merge reviewed feature stacks
+        run: |
+          set -euo pipefail
+          git merge --no-edit --no-ff -X theirs origin/cursor/product-hardening-followthrough-6157
+          git merge --no-edit --no-ff -X theirs origin/cursor/wo-board-role-scope-6157
+          git merge --no-edit --no-ff -X theirs origin/cursor/staff-read-hardening-6157
+
+      - name: Reconcile dashboard shell merge residue
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("src/components/dashboard/dashboard-shell.tsx")
+          source = path.read_text()
+          pattern = re.compile(
+              r'(?ms)^  const roleLabel = role === "owner" \? "Ägare".*?^\s*: role;\n\n?'
+          )
+          updated, replacements = pattern.subn("", source)
+          if replacements != 1:
+              raise SystemExit(
+                  f"Expected exactly one stale roleLabel declaration after stack merge; found {replacements}"
+              )
+          path.write_text(updated)
+          PY
+
+      - name: Reconcile work-order role test mocks
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/app/api/work-orders/route.test.ts")
+          source = path.read_text()
+          needle = "  getCurrentUser: getCurrentUserMock,\n"
+          replacement = """  getCurrentUser: getCurrentUserMock,
+          canAssignWorkOrders: (role: string | null | undefined) =>
+            role === "owner" || role === "admin" || role === "manager",
+          canManageTickets: (role: string | null | undefined) =>
+            role === "owner" || role === "admin" || role === "manager" || role === "technician",
+          shouldScopeToAssignedWork: (role: string | null | undefined) => role === "technician",
+          """
+          occurrences = source.count(needle)
+          if occurrences != 1:
+              raise SystemExit(
+                  f"Expected exactly one current-user mock insertion point; found {occurrences}"
+              )
+          path.write_text(source.replace(needle, replacement, 1))
+          PY
+
+      - name: Remove temporary workflow from final tree
+        run: git rm .github/workflows/integrate-production-hardening.yml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npm run db:validate
+
+      - name: Lint
+        id: lint
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-output.txt
+
+      - name: Upload lint diagnostics
+        if: steps.lint.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-diagnostics
+          path: lint-output.txt
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Stop on lint failure
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
+
+      - name: Unit and route tests
+        id: tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:ci 2>&1 | tee test-output.txt
+
+      - name: Upload test diagnostics
+        if: steps.tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics
+          path: test-output.txt
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Stop on test failure
+        if: steps.tests.outcome == 'failure'
+        run: exit 1
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build:ci
+
+      - name: Commit validated integration
+        run: |
+          git commit -m "feat: integrate production hardening and resident security stack"
+          git push origin HEAD:integration/revalta-production-hardening-20260727
