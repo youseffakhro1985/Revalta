@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
 import {
@@ -33,7 +33,7 @@ type WorkOrderRow = {
   closed_at: Date | null;
 };
 
-async function rowsFor(companyId: string) {
+async function rowsFor(companyId: string, assignedToId?: string | null) {
   const [propertyGuard, workOrderGuard] = await Promise.all([
     sqlSoftDeleteGuard(db, "Property", "p"),
     sqlSoftDeleteGuard(db, "WorkOrder", "w"),
@@ -49,6 +49,7 @@ async function rowsFor(companyId: string) {
       ${propertyGuard}
       ${workOrderGuard}
       AND w."status" NOT IN ('completed', 'invoiced', 'cancelled')
+      ${assignedToId ? Prisma.sql`AND w."assigned_to_id" = ${assignedToId}` : Prisma.empty}
     LIMIT 500
   `);
 }
@@ -63,9 +64,9 @@ function descriptionFor(row: WorkOrderRow, risk: string, assigned: boolean) {
   return `${reference} · ${riskText} · ${row.property_name}, ${row.property_address}, ${row.property_city}${assigned ? "" : " · Saknar ansvarig"}`;
 }
 
-async function notificationsFor(companyId: string) {
+async function notificationsFor(companyId: string, assignedToId?: string | null) {
   const now = new Date();
-  const rows = await rowsFor(companyId);
+  const rows = await rowsFor(companyId, assignedToId);
   const evaluated = rows.map((row) => {
     const sla = evaluateWorkOrderSla({
       status: row.status,
@@ -105,8 +106,9 @@ export async function GET(request: Request) {
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const filter = new URL(request.url).searchParams.get("filter") || "all";
+  const assignedScope = shouldScopeToAssignedWork(user.role) ? user.id : null;
   const [base, ux] = await Promise.all([
-    notificationsFor(user.company_id),
+    notificationsFor(user.company_id, assignedScope),
     getNotificationUxState(user.company_id, user.id, "work_order_sla"),
   ]);
 
@@ -136,7 +138,8 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => ({})) as { key?: unknown; all?: unknown; action?: unknown; snoozedUntil?: unknown };
   const action = typeof body.action === "string" ? body.action : "read";
-  const current = await notificationsFor(user.company_id);
+  const assignedScope = shouldScopeToAssignedWork(user.role) ? user.id : null;
+  const current = await notificationsFor(user.company_id, assignedScope);
   const validKeys = new Set(current.map((item) => item.key));
   const keys = body.all === true ? Array.from(validKeys) : [typeof body.key === "string" ? body.key.trim() : ""].filter(Boolean);
   if (!keys.length || keys.some((key) => key.length > 300 || !validKeys.has(key))) return NextResponse.json({ error: "Ogiltig eller obehörig SLA-avisering" }, { status: 400 });

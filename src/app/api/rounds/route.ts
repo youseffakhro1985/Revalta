@@ -65,6 +65,7 @@ export async function GET() {
       rounds: [...modern, ...legacy]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 100),
+      permissions: { canManage: canManageTickets(user.role) },
     });
   } catch (error) {
     console.error("Get rounds error:", error);

@@ -88,7 +88,12 @@ describe("global search tenant isolation", () => {
 
     expect(response.status).toBe(200);
     expect(propertyFindManyMock).toHaveBeenCalled();
-    expect(ticketFindManyMock).toHaveBeenCalled();
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-a",
+        assigned_to_id: "tech-1",
+      }),
+    }));
     expect(userFindManyMock).not.toHaveBeenCalled();
     expect(leaseHolderFindManyMock).not.toHaveBeenCalled();
     expect(body.results.every((item: { type: string }) => item.type === "property" || item.type === "ticket")).toBe(true);

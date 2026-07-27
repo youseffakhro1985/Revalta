@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { auditScopedWhere, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canViewOperations, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { activePropertyRelationFilter, notDeletedFilter } from "@/lib/schema-readiness";
 import { redirect } from "next/navigation";
 
@@ -19,6 +19,7 @@ function formatDays(milliseconds: number) {
 export default async function ReportsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!canViewOperations(user.role)) redirect("/dashboard");
 
   const where = tenantWhere(user);
   const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000);

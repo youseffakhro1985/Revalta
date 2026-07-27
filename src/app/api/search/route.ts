@@ -3,6 +3,7 @@ import {
   canViewLeasingData,
   companyUserWhere,
   getCurrentUser,
+  shouldScopeToAssignedWork,
   tenantWhere,
 } from "@/lib/current-user";
 import { NextResponse } from "next/server";
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
 
     const contains = { contains: query, mode: "insensitive" as const };
     const includeDirectory = canViewLeasingData(user.role);
+    const scopedToAssigned = shouldScopeToAssignedWork(user.role);
 
     const [properties, tickets, users, leaseHolders] = await Promise.all([
       db.property.findMany({
@@ -39,6 +41,7 @@ export async function GET(request: Request) {
         where: {
           deleted_at: null,
           ...tenantWhere(user),
+          ...(scopedToAssigned ? { assigned_to_id: user.id } : {}),
           AND: [
             { OR: [{ property_id: null }, { property: { deleted_at: null } }] },
             {
