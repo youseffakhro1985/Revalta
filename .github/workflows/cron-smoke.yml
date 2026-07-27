@@ -1,0 +1,36 @@
+name: Cron Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revalta-cron-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Run production cron smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: Production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run signed cron smoke
+        env:
+          BASE_URL: https://www.revalta.se
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: npm run smoke:cron
