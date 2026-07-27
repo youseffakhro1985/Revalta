@@ -89,17 +89,20 @@ export function isStaffRole(role: string) {
   return hasRole(role, ["owner", "admin", "manager", "technician", "viewer"]);
 }
 
-/** Authenticated portal access for staff workspace and resident self-service. */
+/**
+ * Resident self-service, or staff with leasing read (not field technicians).
+ * Technicians must not use the portal as a company-wide lease/PII dump.
+ */
 export function canAccessResidentPortal(role: string) {
-  return isResident(role) || isStaffRole(role);
+  return isResident(role) || canViewLeasingData(role);
 }
 
 /** Staff may create tickets on behalf of any active lease. */
 export function canManageResidentPortal(role: string) {
-  return canManageTickets(role);
+  return canManageLeases(role);
 }
 
-/** Residents create tickets for their own matched leases; staff keep current rights. */
+/** Residents create tickets for their own matched leases; leasing staff keep rights. */
 export function canCreateResidentPortalTicket(role: string) {
   return canManageResidentPortal(role) || isResident(role);
 }

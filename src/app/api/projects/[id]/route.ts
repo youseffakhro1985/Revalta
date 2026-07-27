@@ -38,16 +38,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     },
   });
   if (!project) return NextResponse.json({ error: "Projektet hittades inte" }, { status: 404 });
-  if (!canViewFinanceData(user.role)) {
-    const { budget: _b, forecast: _f, actual: _a, ...rest } = project;
-    return NextResponse.json({
-      project: { ...rest, budget: null, forecast: null, actual: null },
-      permissions: { canViewFinance: false, canManage: false },
-    });
-  }
+  const includeEconomics = canViewFinanceData(user.role);
   return NextResponse.json({
-    project,
-    permissions: { canViewFinance: true, canManage: canManageWorkOrderFinance(user.role) },
+    project: includeEconomics
+      ? project
+      : { ...project, budget: null, forecast: null, actual: null },
+    permissions: {
+      canViewFinance: includeEconomics,
+      canManage: canManageWorkOrderFinance(user.role),
+    },
   });
 }
 

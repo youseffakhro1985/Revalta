@@ -115,7 +115,7 @@ const navigation: NavGroup[] = [
   {
     label: "Organisation",
     items: [
-      { href: "/dashboard/boendeportal", label: "Boendeportal", icon: MessageSquareText },
+      { href: "/dashboard/boendeportal", label: "Boendeportal", icon: MessageSquareText, visible: canViewLeasingData },
       { href: "/dashboard/aviseringscenter", label: "Aviseringscenter", icon: BellRing },
       { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness, visible: canViewOperations },
       { href: "/dashboard/team", label: "Team", icon: Users, visible: (role) => canManageTeam(role) || canViewLeasingData(role) },

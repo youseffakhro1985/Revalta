@@ -8,7 +8,7 @@ describe("resident-portal-tickets helpers", () => {
   it("allows residents and ticket managers to comment", () => {
     expect(canCommentOnResidentPortalTicket("resident")).toBe(true);
     expect(canCommentOnResidentPortalTicket("manager")).toBe(true);
-    expect(canCommentOnResidentPortalTicket("technician")).toBe(true);
+    expect(canCommentOnResidentPortalTicket("technician")).toBe(false);
     expect(canCommentOnResidentPortalTicket("viewer")).toBe(false);
   });
 

@@ -133,6 +133,19 @@ describe("resident-portal route", () => {
     expect(body.canManage).toBe(true);
   });
 
+  it("denies technicians from reading company-wide resident portal leases", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+      email: "tekniker@exempel.se",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("lets a resident create a ticket only for a matched lease", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "user-1",

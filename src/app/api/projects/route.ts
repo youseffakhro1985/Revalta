@@ -52,26 +52,17 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
-      projects: projects.map((project) => {
-        const base = {
-          ...project,
-          property_name: project.property.name,
-          project_manager: project.manager?.name || project.manager?.email || "",
-          start_date: project.start_date,
-          end_date: project.end_date,
-        };
-        if (!includeEconomics) {
-          const { budget: _b, forecast: _f, actual: _a, ...rest } = base;
-          return { ...rest, budget: null, forecast: null, actual: null, deviation: null };
-        }
-        return {
-          ...base,
-          budget: Number(project.budget),
-          forecast: Number(project.forecast),
-          actual: Number(project.actual),
-          deviation: Number(project.forecast) - Number(project.budget),
-        };
-      }),
+      projects: projects.map((project) => ({
+        ...project,
+        property_name: project.property.name,
+        project_manager: project.manager?.name || project.manager?.email || "",
+        start_date: project.start_date,
+        end_date: project.end_date,
+        budget: includeEconomics ? Number(project.budget) : null,
+        forecast: includeEconomics ? Number(project.forecast) : null,
+        actual: includeEconomics ? Number(project.actual) : null,
+        deviation: includeEconomics ? Number(project.forecast) - Number(project.budget) : null,
+      })),
       properties,
       members,
       permissions: { canViewFinance: includeEconomics, canManage: canManageWorkOrderFinance(user.role) },

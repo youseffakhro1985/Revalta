@@ -121,19 +121,19 @@ describe("permissions", () => {
     expect(isStaffRole("resident")).toBe(false);
   });
 
-  it.each(["owner", "admin", "manager", "technician", "viewer", "resident"])("låter %s öppna boendeportalen", (role) => {
+  it.each(["owner", "admin", "manager", "viewer", "resident"])("låter %s öppna boendeportalen", (role) => {
     expect(canAccessResidentPortal(role)).toBe(true);
   });
 
-  it("nekar okänd roll till boendeportalen", () => {
-    expect(canAccessResidentPortal("unknown")).toBe(false);
+  it.each(["technician", "unknown", ""])("nekar %s till boendeportalen", (role) => {
+    expect(canAccessResidentPortal(role)).toBe(false);
   });
 
-  it.each(["owner", "admin", "manager", "technician", "resident"])("låter %s skapa boendeärenden", (role) => {
+  it.each(["owner", "admin", "manager", "resident"])("låter %s skapa boendeärenden", (role) => {
     expect(canCreateResidentPortalTicket(role)).toBe(true);
   });
 
-  it.each(["viewer", "unknown", ""])("nekar %s att skapa boendeärenden", (role) => {
+  it.each(["technician", "viewer", "unknown", ""])("nekar %s att skapa boendeärenden", (role) => {
     expect(canCreateResidentPortalTicket(role)).toBe(false);
     expect(canManageResidentPortal(role)).toBe(false);
   });
