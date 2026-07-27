@@ -5,6 +5,7 @@ type LogContext = Record<string, unknown>;
 const REDACTED = "[REDACTED]";
 const MAX_DEPTH = 6;
 const SENSITIVE_KEY = /(authorization|cookie|password|secret|token|api[-_]?key|session|database[_-]?url|direct[_-]?url)/i;
+const RESERVED_KEYS = new Set(["timestamp", "level", "service", "message"]);
 
 function sanitizeValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (depth > MAX_DEPTH) return "[MAX_DEPTH]";
@@ -16,7 +17,7 @@ function sanitizeValue(value: unknown, depth = 0, seen = new WeakSet<object>()):
     return {
       name: value.name,
       message: value.message,
-      stack: process.env.NODE_ENV === "production" ? undefined : value.stack,
+      ...(process.env.NODE_ENV === "production" ? {} : { stack: value.stack }),
     };
   }
   if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, depth + 1, seen));
@@ -34,7 +35,8 @@ function sanitizeValue(value: unknown, depth = 0, seen = new WeakSet<object>()):
 }
 
 export function sanitizeLogContext(context: LogContext = {}): LogContext {
-  return sanitizeValue(context) as LogContext;
+  const sanitized = sanitizeValue(context) as LogContext;
+  return Object.fromEntries(Object.entries(sanitized).filter(([key]) => !RESERVED_KEYS.has(key)));
 }
 
 export function serializeError(error: unknown): LogContext {
@@ -43,7 +45,7 @@ export function serializeError(error: unknown): LogContext {
       error: {
         name: error.name,
         message: error.message,
-        stack: error.stack,
+        ...(process.env.NODE_ENV === "production" ? {} : { stack: error.stack }),
         cause: error.cause,
       },
     });
@@ -56,12 +58,12 @@ export function createLogger(baseContext: LogContext = {}) {
 
   function write(level: LogLevel, message: string, context: LogContext = {}) {
     const payload = {
+      ...base,
+      ...sanitizeLogContext(context),
       timestamp: new Date().toISOString(),
       level,
       service: "revalta",
       message,
-      ...base,
-      ...sanitizeLogContext(context),
     };
     const line = JSON.stringify(payload);
     if (level === "error") console.error(line);
