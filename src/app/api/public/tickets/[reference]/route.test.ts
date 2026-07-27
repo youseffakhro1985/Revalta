@@ -76,6 +76,7 @@ function ticket(overrides: Record<string, unknown> = {}) {
     ai_summary: null,
     property: null,
     comments: [],
+    attachments: [],
     ...overrides,
   };
 }
@@ -121,7 +122,7 @@ describe("GET /api/public/tickets/[reference]", () => {
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 
-  it("scopes legacy email tracking and selects only bounded public comments", async () => {
+  it("scopes legacy email tracking and selects bounded public comments and attachments", async () => {
     const response = await GET(request(), { params });
     const body = await response.json();
 
@@ -143,6 +144,18 @@ describe("GET /api/public/tickets/[reference]", () => {
           take: 200,
           orderBy: [{ created_at: "asc" }, { id: "asc" }],
         }),
+        attachments: {
+          where: { visibility: "public" },
+          take: 100,
+          orderBy: [{ created_at: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            file_name: true,
+            content_type: true,
+            size_bytes: true,
+            created_at: true,
+          },
+        },
       }),
     }));
     expect(createPortalTrackingTokenMock).toHaveBeenCalledWith({
@@ -150,6 +163,37 @@ describe("GET /api/public/tickets/[reference]", () => {
       email: "boende@example.se",
       companyId: "company-1",
     });
+  });
+
+  it("returns safe public attachment metadata without storage URLs", async () => {
+    ticketFindFirstMock.mockResolvedValue(ticket({
+      attachments: [{
+        id: "attachment_123",
+        file_name: "skada bild.jpg",
+        content_type: "image/jpeg",
+        size_bytes: 1234,
+        created_at: new Date("2026-07-01T13:00:00Z"),
+      }],
+    }));
+
+    const response = await GET(request(), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.attachments).toEqual([{
+      id: "attachment_123",
+      file_name: "skada bild.jpg",
+      content_type: "image/jpeg",
+      size_bytes: 1234,
+      created_at: "2026-07-01T13:00:00.000Z",
+      download_url: "/api/public/tickets/RV-2026-TEST/attachments/attachment_123",
+    }]);
+    expect(JSON.stringify(body)).not.toContain("data_url");
+    expect(JSON.stringify(body)).not.toContain("blob");
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "public ticket tracking succeeded",
+      expect.objectContaining({ attachmentCount: 1 }),
+    );
   });
 
   it("binds a valid tracking token to reference, email and company", async () => {
