@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
-import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
+import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const entityType = "vendor_contract";
@@ -22,12 +22,12 @@ export async function GET() {
             take: 200,
           })
         : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), entity_type: entityType },
         orderBy: { created_at: "desc" },
         take: 200,
         select: { id: true, created_at: true, metadata: true, entity_id: true },
-      }),
+      })),
     ]);
 
     const modern = rows.map((row) => ({

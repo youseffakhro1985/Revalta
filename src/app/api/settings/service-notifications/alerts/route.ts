@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { loadLegacyRows } from "@/lib/dual-list";
 
 export const dynamic = "force-dynamic";
 
@@ -39,18 +40,18 @@ export async function GET() {
       orderBy: { created_at: "desc" },
       take: 50,
     }),
-    db.integrationEvent.findMany({
+    loadLegacyRows(() => db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "component_service_delivery_alert" },
       orderBy: { created_at: "desc" },
       take: 50,
       select: { id: true, status: true, payload: true, created_at: true },
-    }),
+    })),
     db.componentServiceDeliveryAlertAck.findMany({
       where: { company_id: user.company_id, user_id: user.id },
       select: { alert_id: true },
       take: 200,
     }),
-    db.integrationEvent.findMany({
+    loadLegacyRows(() => db.integrationEvent.findMany({
       where: {
         company_id: user.company_id,
         type: "component_service_delivery_alert_acknowledgement",
@@ -60,13 +61,13 @@ export async function GET() {
       orderBy: { created_at: "desc" },
       take: 200,
       select: { payload: true },
-    }),
-    db.integrationEvent.findMany({
+    })),
+    loadLegacyRows(() => db.integrationEvent.findMany({
       where: { company_id: user.company_id, type: "component_service_delivery_recovery" },
       orderBy: { created_at: "desc" },
       take: 20,
       select: { id: true, payload: true, created_at: true },
-    }),
+    })),
   ]);
 
   const acknowledged = new Set<string>([

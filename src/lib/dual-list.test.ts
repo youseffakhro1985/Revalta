@@ -3,6 +3,7 @@ import {
   asNumber,
   isModernStorageMirror,
   isModernStorageOnly,
+  loadLegacyRows,
   mergeByCreatedAt,
   parseDateOnly,
   parseOptionalDate,
@@ -36,6 +37,17 @@ describe("dual-list helpers", () => {
     const modern = [{ id: "a", created_at: new Date("2026-07-20T10:00:00.000Z") }];
     const legacy = [{ id: "b", created_at: new Date("2026-07-21T10:00:00.000Z") }];
     expect(mergeByCreatedAt(modern, legacy, 10).map((row) => row.id)).toEqual(["a"]);
+  });
+
+  it("loadLegacyRows skips the query when modern-storage-only is on", async () => {
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "1");
+    const load = vi.fn(async () => [{ id: "legacy" }]);
+    await expect(loadLegacyRows(load)).resolves.toEqual([]);
+    expect(load).not.toHaveBeenCalled();
+
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "0");
+    await expect(loadLegacyRows(load)).resolves.toEqual([{ id: "legacy" }]);
+    expect(load).toHaveBeenCalledOnce();
   });
 
   it("mergeByCreatedAt prioriterar moderna rader och sorterar nyast först", () => {

@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseDateOnly } from "@/lib/dual-list";
+import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const noticeAction = "rent_notice.created";
@@ -20,12 +20,12 @@ export async function GET() {
             include: { property: { select: { name: true } } },
           })
         : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action: noticeAction },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-      }),
+      })),
       user.company_id
         ? db.lease.findMany({
             where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },

@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { asNumber } from "@/lib/dual-list";
+import { asNumber, loadLegacyRows } from "@/lib/dual-list";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { NextResponse } from "next/server";
 
@@ -38,11 +38,11 @@ export async function GET() {
             include: { property: { select: { name: true } } },
           })
         : Promise.resolve([]),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "asc" },
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-      }),
+      })),
       db.property.findMany({
         where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
@@ -217,11 +217,11 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "Underhållsåtgärden hittades inte" }, { status: 404 });
       }
 
-      const logs = await db.auditLog.findMany({
+      const logs = await loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         select: { id: true, metadata: true },
         take: 1000,
-      });
+      }));
       const legacy = logs.some((log) => {
         const metadata = (log.metadata ?? {}) as MaintenanceMetadata;
         return metadata.item_id === itemId || log.id === itemId;

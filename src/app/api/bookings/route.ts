@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { isModernStorageMirror, mergeByCreatedAt } from "@/lib/dual-list";
+import { isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
 
 const action = "booking.created";
@@ -19,12 +19,12 @@ export async function GET() {
         take: 250,
         include: { property: { select: { name: true } } },
       }),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "desc" },
         take: 250,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-      }),
+      })),
       db.property.findMany({
         where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
@@ -110,11 +110,11 @@ export async function POST(request: Request) {
         },
         select: { id: true },
       }),
-      db.auditLog.findMany({
+      loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action, entity_id: propertyId },
         select: { metadata: true },
         take: 250,
-      }),
+      })),
     ]);
 
     if (tableConflicts) {
