@@ -200,7 +200,9 @@ describe("GET /api/public/tickets/[reference]", () => {
 
     const mismatchBody = await mismatch.json();
     const missingBody = await missing.json();
-    expect(mismatchBody.message).toBe(missingBody.message);
+    expect(mismatchBody.error).toBe(missingBody.error);
+    expect(mismatchBody.errorCode).toBe("NOT_FOUND");
+    expect(missingBody.errorCode).toBe("NOT_FOUND");
   });
 
   it("falls back to audit authors only for legacy public comments", async () => {
