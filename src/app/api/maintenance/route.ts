@@ -6,6 +6,7 @@ import {
   canManageTickets,
   canManageWorkOrderFinance,
   canViewFinanceData,
+  canViewOperations,
   getCurrentUser,
   tenantWhere,
 } from "@/lib/current-user";
@@ -105,8 +106,7 @@ export async function GET() {
       items: [...modern, ...latest.values()],
       properties,
       permissions: {
-        canManage: canManageTickets(user.role),
-        canManageFinance: canManageWorkOrderFinance(user.role),
+        canManage: canViewOperations(user.role),
         canViewFinance: includeFinance,
       },
     }, { headers: { "Cache-Control": "private, no-store" } });
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null);
@@ -191,7 +191,7 @@ export async function PATCH(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null);

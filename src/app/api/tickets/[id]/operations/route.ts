@@ -9,6 +9,7 @@ import {
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, loadLegacyRows } from "@/lib/dual-list";
+import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 
 const allowedTypes = new Set(["time", "cost", "checklist", "note"]);
 
@@ -48,17 +49,15 @@ export async function GET(
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    }
 
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
       where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, company_id: true },
+      select: { id: true, company_id: true, assigned_to_id: true },
     });
 
-    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const [rows, logs] = await Promise.all([
       user.company_id
@@ -153,9 +152,10 @@ export async function POST(
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
       where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, title: true },
+      select: { id: true, title: true, assigned_to_id: true },
     });
-    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const body = await request.json();
     const type = typeof body.type === "string" ? body.type.trim() : "";
@@ -259,9 +259,10 @@ export async function PATCH(
 
     const ticket = await db.ticket.findFirst({
       where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, title: true },
+      select: { id: true, title: true, assigned_to_id: true },
     });
-    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const existing = await db.ticketOperation.findFirst({
       where: {
@@ -416,9 +417,10 @@ export async function DELETE(
 
     const ticket = await db.ticket.findFirst({
       where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true },
+      select: { id: true, assigned_to_id: true },
     });
-    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const existing = await db.ticketOperation.findFirst({
       where: {

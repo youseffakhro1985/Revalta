@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canViewAudit, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
@@ -17,7 +17,8 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const scope = scopeFor(user);
-    const [modern, modernReads, notifications, readLogs, recentEvents] = await Promise.all([
+    const includeAudit = canViewAudit(user.role);
+    const [modern, modernReads, notifications, readLogs, recentEventsRaw] = await Promise.all([
       user.company_id
         ? db.appNotification.findMany({
             where: { company_id: user.company_id, deleted_at: null },
@@ -43,12 +44,14 @@ export async function GET() {
         take: 500,
         select: { entity_id: true, metadata: true },
       })),
-      loadLegacyRows(() => db.auditLog.findMany({
-        where: { ...scope, action: { notIn: [createdAction, readAction] } },
-        orderBy: { created_at: "desc" },
-        take: 40,
-        select: { id: true, action: true, entity_type: true, entity_id: true, metadata: true, created_at: true },
-      })),
+      includeAudit
+        ? loadLegacyRows(() => db.auditLog.findMany({
+            where: { ...scope, action: { notIn: [createdAction, readAction] } },
+            orderBy: { created_at: "desc" },
+            take: 40,
+            select: { id: true, action: true, entity_type: true, entity_id: true, metadata: true, created_at: true },
+          }))
+        : Promise.resolve([]),
     ]);
 
     const modernReadIds = new Set(modernReads.map((row) => row.notification_id));
@@ -93,14 +96,19 @@ export async function GET() {
           return typeof storage === "string" ? storage : null;
         },
       }),
-      recentEvents: recentEvents.map((row) => ({
-        id: row.id,
-        action: row.action,
-        entityType: row.entity_type,
-        entityId: row.entity_id,
-        created_at: row.created_at,
-        metadata: row.metadata,
-      })),
+      recentEvents: includeAudit
+        ? recentEventsRaw.map((row) => ({
+            id: row.id,
+            action: row.action,
+            entityType: row.entity_type,
+            entityId: row.entity_id,
+            created_at: row.created_at,
+            metadata: row.metadata,
+          }))
+        : [],
+      permissions: {
+        canManage: canViewOperations(user.role),
+      },
     });
   } catch (error) {
     console.error("Get notifications error:", error);
@@ -112,7 +120,7 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
@@ -204,7 +212,7 @@ export async function DELETE(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => ({}));

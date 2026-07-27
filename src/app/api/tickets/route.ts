@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
+import { canExportTickets, canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
@@ -79,7 +79,13 @@ export async function GET(request: Request) {
         },
       },
     });
-    return NextResponse.json({ tickets });
+    return NextResponse.json({
+      tickets,
+      permissions: {
+        canManage: canManageTickets(user.role),
+        canExport: canExportTickets(user.role),
+      },
+    });
   } catch (error) {
     console.error("Get tickets error:", error);
     if (isMissingSchemaColumnError(error)) {

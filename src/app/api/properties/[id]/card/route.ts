@@ -2,7 +2,13 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import {
+  canCreateProperties,
+  canViewFinanceData,
+  canViewOperations,
+  getCurrentUser,
+  tenantWhere,
+} from "@/lib/current-user";
 
 const assetCategories = new Set(["elevator", "ventilation", "heating", "electricity", "water", "fire", "access", "other"]);
 const criticalities = new Set(["low", "normal", "high", "critical"]);
@@ -146,13 +152,40 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     agreementsEnding180Days: agreements.filter((item) => inDays(item.ends_at, 180)).length,
   };
 
-  return NextResponse.json({ property, entrances, assets, warranties, inspections, agreements, metrics });
+  const includeFinance = canViewFinanceData(user.role);
+  const safeProperty = includeFinance
+    ? property
+    : {
+        ...property,
+        work_orders: property.work_orders.map((order) => ({ ...order, actual_cost: null })),
+        projects: property.projects.map((project) => ({
+          ...project,
+          budget: null,
+          forecast: null,
+          actual: null,
+        })),
+      };
+  const safeAgreements = includeFinance
+    ? agreements
+    : agreements.map((item) => ({ ...item, cost_amount: null }));
+
+  return NextResponse.json({
+    property: safeProperty,
+    entrances,
+    assets,
+    warranties,
+    inspections,
+    agreements: safeAgreements,
+    metrics,
+  });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canCreateProperties(user.role) && !canViewOperations(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  }
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id: propertyId } = await params;

@@ -16,6 +16,7 @@ type Ticket = {
   property_id: string | null; assigned_to_id: string | null; due_date: string | null; created_at: string; updated_at: string;
   property: Property | null; assigned_to: TeamMember | null; _count: { comments: number };
 };
+type Permissions = { canManage: boolean; canExport: boolean };
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 const statusLabels = TICKET_STATUS_LABELS;
@@ -36,6 +37,7 @@ export default function FelanmalanPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [permissions, setPermissions] = useState<Permissions>({ canManage: false, canExport: false });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -64,6 +66,7 @@ export default function FelanmalanPage() {
         if (!propertiesResponse.ok) throw new Error(propertiesData.error || "Kunde inte hämta fastigheter");
         if (!teamResponse.ok) throw new Error(teamData.error || "Kunde inte hämta teamet");
         setTickets(ticketsData.tickets || []);
+        setPermissions(ticketsData.permissions || { canManage: false, canExport: false });
         setProperties(propertiesData.properties || []);
         setMembers(teamData.members || []);
       } catch (err) {
@@ -119,20 +122,22 @@ export default function FelanmalanPage() {
       detailPath={(id) => `/dashboard/felanmalan/${id}`}
     />
 
-    <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
-      <Panel title="Nytt ärende" description="Registrera en tydlig felanmälan och fördela den direkt." bodyClassName="p-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Fastighet</span><select className={premiumFieldClass} value={propertyId} onChange={(event) => setPropertyId(event.target.value)}><option value="">Ingen vald fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.address}</option>)}</select></label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Kategori</span><select className={premiumFieldClass} value={category} onChange={(event) => setCategory(event.target.value)}><option value="other">Övrigt</option><option value="vvs">VVS</option><option value="electricity">El</option><option value="elevator">Hiss</option><option value="security">Säkerhet</option><option value="cleaning">Städning</option></select></label>
-            <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Prioritet</span><select className={premiumFieldClass} value={priority} onChange={(event) => setPriority(event.target.value)}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="urgent">Akut</option></select></label>
-          </div>
-          <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Ansvarig</span><select className={premiumFieldClass} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select></label>
-          <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Titel</span><input required minLength={3} className={premiumFieldClass} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Exempel: Läckande kran i köket" /></label>
-          <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Beskrivning</span><textarea required minLength={10} className={premiumTextareaClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Beskriv problemet, platsen och hur brådskande det är." /></label>
-          <button type="submit" disabled={submitting} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skapar ärende…" : "Skapa ärende"}</button>
-        </form>
-      </Panel>
+    <section className={`grid gap-6 ${permissions.canManage ? "xl:grid-cols-[390px_1fr]" : ""}`}>
+      {permissions.canManage ? (
+        <Panel title="Nytt ärende" description="Registrera en tydlig felanmälan och fördela den direkt." bodyClassName="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Fastighet</span><select className={premiumFieldClass} value={propertyId} onChange={(event) => setPropertyId(event.target.value)}><option value="">Ingen vald fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.address}</option>)}</select></label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Kategori</span><select className={premiumFieldClass} value={category} onChange={(event) => setCategory(event.target.value)}><option value="other">Övrigt</option><option value="vvs">VVS</option><option value="electricity">El</option><option value="elevator">Hiss</option><option value="security">Säkerhet</option><option value="cleaning">Städning</option></select></label>
+              <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Prioritet</span><select className={premiumFieldClass} value={priority} onChange={(event) => setPriority(event.target.value)}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="urgent">Akut</option></select></label>
+            </div>
+            <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Ansvarig</span><select className={premiumFieldClass} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select></label>
+            <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Titel</span><input required minLength={3} className={premiumFieldClass} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Exempel: Läckande kran i köket" /></label>
+            <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">Beskrivning</span><textarea required minLength={10} className={premiumTextareaClass} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Beskriv problemet, platsen och hur brådskande det är." /></label>
+            <button type="submit" disabled={submitting} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skapar ärende…" : "Skapa ärende"}</button>
+          </form>
+        </Panel>
+      ) : null}
 
       <Panel title="Ärendelista" description="Filtrera och öppna ett ärende för full historik och uppföljning." bodyClassName="p-0">
         <div className="border-b border-sand-200 p-5">
@@ -142,7 +147,7 @@ export default function FelanmalanPage() {
             <select className={premiumFieldClass} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="">Alla prioriteter</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs font-medium text-ink-400">{tickets.length} träffar</p><button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Exportera CSV</button></div>
+          <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs font-medium text-ink-400">{tickets.length} träffar</p>{permissions.canExport ? <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Exportera CSV</button> : null}</div>
         </div>
 
         {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-sand-100" />)}</div> : tickets.length === 0 ? <EmptyState title="Inga ärenden hittades" description="Skapa ett nytt ärende eller ändra filtreringen." /> : <div className="divide-y divide-sand-100">{tickets.map((ticket) => <Link key={ticket.id} href={`/dashboard/felanmalan/${ticket.id}`} className="block p-5 transition hover:bg-sand-50/70 sm:p-6">

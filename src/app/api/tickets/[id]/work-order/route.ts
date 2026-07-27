@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import {
   addWorkOrderStatusEvent,
   allocateWorkOrderNumber,
@@ -16,9 +17,6 @@ export async function GET(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) {
-    return NextResponse.json({ error: "Du saknar behörighet att visa arbetsordrar" }, { status: 403 });
-  }
   if (!user.company_id) {
     return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   }
@@ -33,7 +31,8 @@ export async function GET(
     },
   });
 
-  if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+  if (!ticket) return notFoundTicket();
+  if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
   const workOrder = await db.workOrder.findFirst({
     where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
@@ -106,7 +105,8 @@ export async function POST(
       priority: true,
     },
   });
-  if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+  if (!ticket) return notFoundTicket();
+  if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
   if (!ticket.property_id) {
     return NextResponse.json(
       { error: "Ärendet måste kopplas till en fastighet innan en arbetsorder kan skapas" },

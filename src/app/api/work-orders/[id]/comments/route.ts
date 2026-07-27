@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 export async function GET(
   _request: Request,
@@ -12,11 +13,7 @@ export async function GET(
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const workOrder = await db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
-    select: { id: true },
-  });
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!await findAccessibleWorkOrder(user as CompanyUser, id)) return notFoundWorkOrder();
 
   const [comments, history] = await Promise.all([
     db.workOrderComment.findMany({
@@ -57,11 +54,8 @@ export async function POST(
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const workOrder = await db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
-    select: { id: true, title: true },
-  });
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const workOrder = await findAccessibleWorkOrder(user as CompanyUser, id, { id: true, assigned_to_id: true, title: true });
+  if (!workOrder) return notFoundWorkOrder();
 
   const body = await request.json();
   const text = String(body.body || "").trim();

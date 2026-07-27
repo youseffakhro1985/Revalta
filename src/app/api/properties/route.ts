@@ -40,7 +40,10 @@ export async function GET() {
       select: propertyListSelect(ticketActive),
     });
 
-    return NextResponse.json({ properties });
+    return NextResponse.json({
+      properties,
+      permissions: { canCreate: canCreateProperties(user.role) },
+    });
   } catch (error) {
     console.error("Get properties error:", error);
     if (isMissingSchemaColumnError(error)) {

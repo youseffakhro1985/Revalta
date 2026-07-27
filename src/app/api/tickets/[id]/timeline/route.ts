@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getWorkOrderEnterpriseState, getWorkOrderStatusEvents } from "@/lib/work-order-enterprise-core";
 import { buildTicketWorkOrderTimeline } from "@/lib/ticket-work-order-timeline";
+import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
 
 type TimelineItem = {
@@ -31,6 +32,7 @@ export async function GET(
         id: true,
         title: true,
         created_at: true,
+        assigned_to_id: true,
         comments: {
           orderBy: { created_at: "asc" },
           select: {
@@ -48,9 +50,8 @@ export async function GET(
       },
     });
 
-    if (!ticket) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
-    }
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const workOrder = await db.workOrder.findFirst({
       where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },

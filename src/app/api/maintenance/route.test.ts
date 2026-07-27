@@ -79,7 +79,7 @@ describe("maintenance route", () => {
     expect(response.status).toBe(200);
     expect(body.items[0].estimated_cost).toBeNull();
     expect(body.permissions.canViewFinance).toBe(false);
-    expect(body.permissions.canManageFinance).toBe(false);
+    expect(body.permissions.canManage).toBe(false);
   });
 
   it("denies technician cost mutations on PATCH", async () => {

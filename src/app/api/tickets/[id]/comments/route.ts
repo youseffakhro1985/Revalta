@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification } from "@/lib/integrations";
+import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
 
 export async function POST(
@@ -24,12 +25,11 @@ export async function POST(
 
     const ticket = await db.ticket.findFirst({
       where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, title: true },
+      select: { id: true, title: true, assigned_to_id: true },
     });
 
-    if (!ticket) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
-    }
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const authorName = user.name || user.email;
     const comment = await db.ticketComment.create({

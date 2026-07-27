@@ -2,7 +2,8 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import {
   createInvoiceDraft,
   getProfitabilitySettings,
@@ -13,20 +14,24 @@ import {
 
 const signerRoles = new Set(["executor", "contractor", "customer"]);
 
-async function resolveWorkOrder(id: string, companyId: string) {
-  return db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
+async function resolveWorkOrder(user: CompanyUser, id: string) {
+  const workOrder = await db.workOrder.findFirst({
+    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
     include: {
       property: { select: { id: true, name: true, address: true, city: true } },
       unit: { select: { id: true, designation: true } },
       assigned_to: { select: { id: true, name: true, email: true } },
     },
   });
+  if (!workOrder) return null;
+  if (!isAssignedWorkAccessible(user, workOrder.assigned_to_id)) return null;
+  return workOrder;
 }
 
 
-async function buildSnapshot(id: string, companyId: string) {
-  const workOrder = await resolveWorkOrder(id, companyId);
+async function buildSnapshot(user: CompanyUser, id: string) {
+  const companyId = user.company_id;
+  const workOrder = await resolveWorkOrder(user, id);
   if (!workOrder) return null;
 
   const [checklist, entries, documents, signatures] = await Promise.all([
@@ -75,8 +80,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const workOrder = await resolveWorkOrder(id, user.company_id);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const workOrder = await resolveWorkOrder(user as CompanyUser, id);
+  if (!workOrder) return notFoundWorkOrder();
 
   const [signatures, reports, invoiceBases] = await Promise.all([
     db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
@@ -111,8 +116,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const workOrder = await resolveWorkOrder(id, user.company_id);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const workOrder = await resolveWorkOrder(user as CompanyUser, id);
+  if (!workOrder) return notFoundWorkOrder();
 
   const body = await request.json();
   const action = String(body.action || "");
@@ -142,8 +147,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   if (action === "report.create") {
-    const snapshot = await buildSnapshot(id, user.company_id);
-    if (!snapshot) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    const snapshot = await buildSnapshot(user as CompanyUser, id);
+    if (!snapshot) return notFoundWorkOrder();
     const versions = await db.$queryRaw<{ next_version: number }[]>(Prisma.sql`
       SELECT COALESCE(MAX("version"), 0) + 1 AS "next_version"
       FROM "WorkOrderReport"
@@ -175,8 +180,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   if (action === "invoice.create") {
-    const snapshot = await buildSnapshot(id, user.company_id);
-    if (!snapshot) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    const snapshot = await buildSnapshot(user as CompanyUser, id);
+    if (!snapshot) return notFoundWorkOrder();
 
     // Canonical invoice path: approved/billable time + material → WorkOrderInvoiceDraft (exportable).
     // WorkOrderInvoiceBasis remains an archival report snapshot with the same totals.

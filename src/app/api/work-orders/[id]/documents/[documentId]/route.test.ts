@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findFirstMock, getCurrentUserMock, getBlobMock } = vi.hoisted(() => ({
+const { findFirstMock, getCurrentUserMock, getBlobMock, findAccessibleWorkOrderMock } = vi.hoisted(() => ({
   findFirstMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
   getBlobMock: vi.fn(),
+  findAccessibleWorkOrderMock: vi.fn(),
 }));
 
 vi.mock("@vercel/blob", () => ({ get: getBlobMock }));
 vi.mock("@/lib/current-user", () => ({ getCurrentUser: getCurrentUserMock }));
+vi.mock("@/lib/assigned-work-access", () => ({
+  findAccessibleWorkOrder: findAccessibleWorkOrderMock,
+  notFoundWorkOrder: () => new Response(JSON.stringify({ error: "Arbetsordern hittades inte" }), { status: 404, headers: { "Content-Type": "application/json" } }),
+}));
 vi.mock("@/lib/db", () => ({
   default: { operationalDocument: { findFirst: findFirstMock } },
 }));
@@ -21,6 +26,8 @@ describe("work-order document download", () => {
     findFirstMock.mockReset();
     getCurrentUserMock.mockReset();
     getBlobMock.mockReset();
+    findAccessibleWorkOrderMock.mockReset();
+    findAccessibleWorkOrderMock.mockResolvedValue({ id: "work-order-1", assigned_to_id: null });
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "private-token");
     vi.stubEnv("STORAGE_PROVIDER_KEY", "");
   });
@@ -46,11 +53,6 @@ describe("work-order document download", () => {
         id: "document-1",
         work_order_id: "work-order-1",
         company_id: "company-1",
-        work_order: {
-          deleted_at: null,
-          company_id: "company-1",
-          property: { deleted_at: null },
-        },
       },
     }));
     expect(getBlobMock).not.toHaveBeenCalled();

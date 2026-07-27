@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canAssignWorkOrders, canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canAssignWorkOrders, canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { getAllowedWorkOrderTransitions } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
+import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 export async function GET(
   _request: Request,
@@ -26,7 +27,8 @@ export async function GET(
       }),
     ]);
 
-    if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    if (!workOrder) return notFoundWorkOrder();
+    if (!isAssignedWorkAccessible(user as CompanyUser, workOrder.assigned_to_id)) return notFoundWorkOrder();
 
     const currentStatus = normalizeWorkOrderStatus(workOrder.status);
     return NextResponse.json(

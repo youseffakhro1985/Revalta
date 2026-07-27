@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canViewFinanceData, canViewOperations, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 
 type PlanRow = {
@@ -154,20 +154,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     ORDER BY "name" ASC
   `);
 
+  const includeFinance = canViewFinanceData(user.role);
+
   return NextResponse.json({
     property,
     plans,
     activePlan,
-    actions,
+    actions: includeFinance
+      ? actions
+      : actions.map((action) => ({ ...action, estimated_cost: null })),
     assets,
-    forecast: activePlan ? calculateForecast(activePlan, actions) : null,
+    forecast: includeFinance ? (activePlan ? calculateForecast(activePlan, actions) : null) : null,
   });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;

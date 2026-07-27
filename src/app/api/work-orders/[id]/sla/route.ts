@@ -2,9 +2,10 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { getWorkOrderEnterpriseState } from "@/lib/work-order-enterprise-core";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
+import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 function optionalDate(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
@@ -12,7 +13,8 @@ function optionalDate(value: unknown) {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
-async function resolveSla(id: string, companyId: string) {
+async function resolveSla(user: CompanyUser, id: string) {
+  const companyId = user.company_id;
   const [workOrder, enterprise] = await Promise.all([
     db.workOrder.findFirst({
       where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
@@ -22,12 +24,14 @@ async function resolveSla(id: string, companyId: string) {
         priority: true,
         created_at: true,
         completed_at: true,
+        assigned_to_id: true,
       },
     }),
     getWorkOrderEnterpriseState(db, companyId, id),
   ]);
 
   if (!workOrder) return null;
+  if (!isAssignedWorkAccessible(user, workOrder.assigned_to_id)) return null;
   const evaluatedAt = new Date();
   const sla = evaluateWorkOrderSla({
     status: workOrder.status,
@@ -52,8 +56,8 @@ export async function GET(
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const result = await resolveSla(id, user.company_id);
-  if (!result) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const result = await resolveSla(user as CompanyUser, id);
+  if (!result) return notFoundWorkOrder();
 
   const auditHistory = await db.auditLog.findMany({
     where: {
@@ -107,8 +111,8 @@ export async function PATCH(
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ändra SLA" }, { status: 403 });
 
   const { id } = await params;
-  const current = await resolveSla(id, user.company_id);
-  if (!current) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  const current = await resolveSla(user as CompanyUser, id);
+  if (!current) return notFoundWorkOrder();
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -161,7 +165,7 @@ export async function PATCH(
     metadata: { before, after, reason },
   });
 
-  const updated = await resolveSla(id, user.company_id);
+  const updated = await resolveSla(user as CompanyUser, id);
   return NextResponse.json(
     {
       success: true,

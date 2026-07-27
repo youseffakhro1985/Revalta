@@ -46,7 +46,7 @@ import { DELETE, GET, PATCH } from "./route";
 describe("ticket operations route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", company_id: "company-1", title: "Läckage" });
+    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", company_id: "company-1", title: "Läckage", assigned_to_id: null });
     auditFindManyMock.mockResolvedValue([]);
   });
 
@@ -79,6 +79,7 @@ describe("ticket operations route", () => {
 
   it("redacts cost amounts for technicians on GET", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    ticketFindFirstMock.mockResolvedValueOnce({ id: "ticket-1", company_id: "company-1", title: "Läckage", assigned_to_id: "tech-1" });
     operationFindManyMock.mockResolvedValue([
       {
         id: "op-cost",
@@ -103,6 +104,7 @@ describe("ticket operations route", () => {
 
   it("denies technician cost amount updates on PATCH", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    ticketFindFirstMock.mockResolvedValueOnce({ id: "ticket-1", company_id: "company-1", title: "Läckage", assigned_to_id: "tech-1" });
     operationFindFirstMock.mockResolvedValue({
       id: "op-cost",
       operation_type: "cost",
