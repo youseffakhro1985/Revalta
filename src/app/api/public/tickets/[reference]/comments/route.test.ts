@@ -58,13 +58,14 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 import { POST } from "./route";
 
 const params = Promise.resolve({ reference: "rv-2026-test" });
+const REQUEST_ID = "99999999-9999-4999-8999-999999999999";
 
 function request(body: Record<string, unknown> = {}, rawBody?: string) {
   return new Request("https://www.revalta.se/api/public/tickets/RV-2026-TEST/comments", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-request-id": "public-comment-request-1",
+      "x-request-id": REQUEST_ID,
     },
     body: rawBody ?? JSON.stringify({
       email: "boende@example.se",
@@ -161,7 +162,7 @@ describe("POST /api/public/tickets/[reference]/comments", () => {
       }),
     }));
     expect(response.headers.get("cache-control")).toContain("private, no-store");
-    expect(response.headers.get("x-request-id")).toBe("public-comment-request-1");
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
   });
 
   it("binds a valid tracking token to reference, email and company", async () => {
