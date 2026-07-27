@@ -55,21 +55,19 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("src/components/dashboard/dashboard-shell.tsx")
           source = path.read_text()
-          stale = '''  const roleLabel = role === "owner" ? "Ägare"
-            : role === "admin" ? "Administratör"
-              : role === "manager" ? "Förvaltare"
-                : role === "technician" ? "Tekniker"
-                  : role === "viewer" ? "Läsbehörighet"
-                    : role === "resident" ? "Boende"
-                      : role;
-
-          '''
-          if source.count(stale) != 1:
-              raise SystemExit("Expected exactly one stale roleLabel block after stack merge")
-          path.write_text(source.replace(stale, ""))
+          pattern = re.compile(
+              r'(?ms)^  const roleLabel = role === "owner" \? "Ägare".*?^\s*: role;\n\n?'
+          )
+          updated, replacements = pattern.subn("", source)
+          if replacements != 1:
+              raise SystemExit(
+                  f"Expected exactly one stale roleLabel declaration after stack merge; found {replacements}"
+              )
+          path.write_text(updated)
           PY
 
       - name: Remove temporary workflow from final tree
