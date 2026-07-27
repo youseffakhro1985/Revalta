@@ -1,6 +1,13 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
 const DEFAULT_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const MAX_TTL_MS = 1000 * 60 * 60 * 24 * 90;
+const MAX_TOKEN_LENGTH = 2_048;
+const MAX_REFERENCE_LENGTH = 120;
+const MAX_EMAIL_LENGTH = 254;
+const MAX_COMPANY_ID_LENGTH = 191;
+const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function trackingSecret() {
   return (
@@ -17,66 +24,143 @@ function sign(payload: string) {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
+function normalizeTokenInput(input: {
+  reference: string;
+  email: string;
+  companyId: string;
+  ttlMs?: number;
+}) {
+  const reference = input.reference.trim().toUpperCase();
+  const email = input.email.trim().toLowerCase();
+  const companyId = input.companyId.trim();
+  const ttlMs = input.ttlMs ?? DEFAULT_TTL_MS;
+
+  if (
+    !reference ||
+    reference.length > MAX_REFERENCE_LENGTH ||
+    reference.includes("|") ||
+    !EMAIL_PATTERN.test(email) ||
+    email.length > MAX_EMAIL_LENGTH ||
+    email.includes("|") ||
+    !companyId ||
+    companyId.length > MAX_COMPANY_ID_LENGTH ||
+    companyId.includes("|") ||
+    !Number.isSafeInteger(ttlMs) ||
+    ttlMs <= 0 ||
+    ttlMs > MAX_TTL_MS
+  ) {
+    throw new Error("Invalid portal tracking token input");
+  }
+
+  return { reference, email, companyId, ttlMs };
+}
+
 export function createPortalTrackingToken(input: {
   reference: string;
   email: string;
   companyId: string;
   ttlMs?: number;
 }) {
-  const exp = Date.now() + (input.ttlMs ?? DEFAULT_TTL_MS);
+  const normalized = normalizeTokenInput(input);
+  const exp = Date.now() + normalized.ttlMs;
   const body = [
-    input.reference.trim().toUpperCase(),
-    input.email.trim().toLowerCase(),
-    input.companyId,
+    normalized.reference,
+    normalized.email,
+    normalized.companyId,
     String(exp),
   ].join("|");
-  return `${Buffer.from(body, "utf8").toString("base64url")}.${sign(body)}`;
+  const encodedBody = Buffer.from(body, "utf8").toString("base64url");
+  const token = `${encodedBody}.${sign(body)}`;
+
+  if (token.length > MAX_TOKEN_LENGTH) {
+    throw new Error("Portal tracking token exceeds maximum length");
+  }
+
+  return token;
 }
 
 export function verifyPortalTrackingToken(token: string | null | undefined) {
-  if (!token || !token.includes(".")) return null;
+  if (!token || token.length > MAX_TOKEN_LENGTH) return null;
+
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+
+  const [encodedBody, signature] = parts;
+  if (
+    !encodedBody ||
+    !signature ||
+    !BASE64URL_PATTERN.test(encodedBody) ||
+    !BASE64URL_PATTERN.test(signature)
+  ) {
+    return null;
+  }
+
   const secret = trackingSecret();
   if (!secret) return null;
-
-  const [encodedBody, signature] = token.split(".");
-  if (!encodedBody || !signature) return null;
 
   let body: string;
   try {
     body = Buffer.from(encodedBody, "base64url").toString("utf8");
+    if (Buffer.from(body, "utf8").toString("base64url") !== encodedBody) return null;
   } catch {
     return null;
   }
 
   const expected = sign(body);
-  const left = Buffer.from(signature);
-  const right = Buffer.from(expected);
-  if (left.length !== right.length || !timingSafeEqual(left, right)) return null;
+  let suppliedSignature: Buffer;
+  let expectedSignature: Buffer;
+  try {
+    suppliedSignature = Buffer.from(signature, "base64url");
+    expectedSignature = Buffer.from(expected, "base64url");
+  } catch {
+    return null;
+  }
 
-  const [reference, email, companyId, expRaw] = body.split("|");
+  if (
+    suppliedSignature.length !== expectedSignature.length ||
+    !timingSafeEqual(suppliedSignature, expectedSignature)
+  ) {
+    return null;
+  }
+
+  const fields = body.split("|");
+  if (fields.length !== 4) return null;
+
+  const [referenceRaw, emailRaw, companyIdRaw, expRaw] = fields;
+  const reference = referenceRaw.trim().toUpperCase();
+  const email = emailRaw.trim().toLowerCase();
+  const companyId = companyIdRaw.trim();
   const exp = Number(expRaw);
-  if (!reference || !email?.includes("@") || !companyId || !Number.isFinite(exp)) return null;
-  if (Date.now() > exp) return null;
+  const now = Date.now();
 
-  return {
-    reference: reference.toUpperCase(),
-    email: email.toLowerCase(),
-    companyId,
-    exp,
-  };
+  if (
+    !reference ||
+    reference.length > MAX_REFERENCE_LENGTH ||
+    !EMAIL_PATTERN.test(email) ||
+    email.length > MAX_EMAIL_LENGTH ||
+    !companyId ||
+    companyId.length > MAX_COMPANY_ID_LENGTH ||
+    !Number.isSafeInteger(exp) ||
+    exp <= now ||
+    exp - now > MAX_TTL_MS
+  ) {
+    return null;
+  }
+
+  return { reference, email, companyId, exp };
 }
 
 export function extractPortalTrackingToken(request: Request, formData?: FormData | null) {
   const header = request.headers.get("x-portal-tracking-token")?.trim();
-  if (header) return header;
+  if (header && header.length <= MAX_TOKEN_LENGTH) return header;
 
   const url = new URL(request.url);
   const queryToken = url.searchParams.get("token")?.trim();
-  if (queryToken) return queryToken;
+  if (queryToken && queryToken.length <= MAX_TOKEN_LENGTH) return queryToken;
 
   if (formData) {
     const formToken = String(formData.get("token") || "").trim();
-    if (formToken) return formToken;
+    if (formToken && formToken.length <= MAX_TOKEN_LENGTH) return formToken;
   }
 
   return null;
