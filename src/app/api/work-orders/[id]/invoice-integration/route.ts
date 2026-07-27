@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageWorkOrderFinance, canViewFinanceData, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getLatestInvoiceDraft,
@@ -28,6 +28,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewFinanceData(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa fakturaexport" }, { status: 403 });
+  }
   const { id } = await params;
   if (!(await getOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
@@ -47,7 +50,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     hasInvoiceBasis: Boolean(invoice),
     invoiceStatus: typeof invoice?.status === "string" ? invoice.status : null,
     invoiceSource: invoice?.source ?? null,
-    canManage: canManageTickets(user.role),
+    canManage: canManageWorkOrderFinance(user.role),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -55,7 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   const { id } = await params;
   if (!(await getOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 

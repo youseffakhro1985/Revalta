@@ -46,10 +46,33 @@ import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import { NotificationMenu } from "@/components/dashboard/notification-menu";
 import { WorkOrderLockIndicator } from "@/components/dashboard/work-order-lock-indicator";
-import { isResident } from "@/lib/permissions";
+import {
+  canManageAccessCredentials,
+  canManageBilling,
+  canManageCompany,
+  canManageIntegrations,
+  canManageTeam,
+  canViewAudit,
+  canViewFinanceData,
+  canViewLeasingData,
+  canViewOperations,
+  isResident,
+} from "@/lib/permissions";
 import { isStaffOnlyDashboardPath, residentHomePath } from "@/lib/resident-access";
 
-const residentNavigation = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof CircleGauge;
+  visible?: (role: string) => boolean;
+};
+
+type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+const residentNavigation: NavGroup[] = [
   {
     label: "Min portal",
     items: [
@@ -60,7 +83,7 @@ const residentNavigation = [
   },
 ];
 
-const navigation = [
+const navigation: NavGroup[] = [
   {
     label: "Arbetsyta",
     items: [
@@ -69,22 +92,22 @@ const navigation = [
       { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
       { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
       { href: "/dashboard/arbetsorder/planering", label: "Teknikerplanering", icon: UsersRound },
-      { href: "/dashboard/arbetsorder/operationsoversikt", label: "Arbetsorderöversikt", icon: LayoutList },
-      { href: "/dashboard/arbetsorder/aterkommande", label: "Återkommande", icon: Repeat2 },
+      { href: "/dashboard/arbetsorder/operationsoversikt", label: "Arbetsorderöversikt", icon: LayoutList, visible: canViewOperations },
+      { href: "/dashboard/arbetsorder/aterkommande", label: "Återkommande", icon: Repeat2, visible: canViewOperations },
       { href: "/dashboard/projekt", label: "Projekt", icon: FolderKanban },
-      { href: "/dashboard/skador", label: "Skador & försäkring", icon: ShieldAlert },
+      { href: "/dashboard/skador", label: "Skador & försäkring", icon: ShieldAlert, visible: canViewFinanceData },
       { href: "/dashboard/kalender", label: "Kalender", icon: CalendarDays },
       { href: "/dashboard/bokningar", label: "Bokningar", icon: CalendarCheck2 },
       { href: "/dashboard/ronder", label: "Ronder", icon: ClipboardCheck },
       { href: "/dashboard/besiktningar", label: "Besiktningar", icon: ClipboardSignature },
-      { href: "/dashboard/nycklar", label: "Nycklar & passage", icon: KeyRound },
-      { href: "/dashboard/uthyrning", label: "Uthyrning", icon: DoorOpen },
-      { href: "/dashboard/hyresavisering", label: "Hyresavisering", icon: HandCoins },
+      { href: "/dashboard/nycklar", label: "Nycklar & passage", icon: KeyRound, visible: canManageAccessCredentials },
+      { href: "/dashboard/uthyrning", label: "Uthyrning", icon: DoorOpen, visible: canViewLeasingData },
+      { href: "/dashboard/hyresavisering", label: "Hyresavisering", icon: HandCoins, visible: canViewLeasingData },
       { href: "/dashboard/underhall", label: "Underhåll", icon: Hammer },
       { href: "/dashboard/energi", label: "Energi", icon: Gauge },
-      { href: "/dashboard/imd", label: "Mätare & IMD", icon: Gauge },
+      { href: "/dashboard/imd", label: "Mätare & IMD", icon: Gauge, visible: canViewFinanceData },
       { href: "/dashboard/dokument", label: "Dokument", icon: FileArchive },
-      { href: "/dashboard/offerter", label: "Offerter", icon: ReceiptText },
+      { href: "/dashboard/offerter", label: "Offerter", icon: ReceiptText, visible: canViewFinanceData },
     ],
   },
   {
@@ -92,21 +115,21 @@ const navigation = [
     items: [
       { href: "/dashboard/boendeportal", label: "Boendeportal", icon: MessageSquareText },
       { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness },
-      { href: "/dashboard/team", label: "Team", icon: Users },
-      { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck },
-      { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug },
+      { href: "/dashboard/team", label: "Team", icon: Users, visible: (role) => canManageTeam(role) || canViewLeasingData(role) },
+      { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck, visible: canManageCompany },
+      { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug, visible: canManageIntegrations },
     ],
   },
   {
     label: "Administration",
     items: [
-      { href: "/dashboard/budget", label: "Budget & prognos", icon: WalletCards },
-      { href: "/dashboard/rapporter", label: "Rapporter", icon: BarChart3 },
+      { href: "/dashboard/budget", label: "Budget & prognos", icon: WalletCards, visible: canViewFinanceData },
+      { href: "/dashboard/rapporter", label: "Rapporter", icon: BarChart3, visible: canViewOperations },
       { href: "/dashboard/notiser", label: "Notiser", icon: BellRing },
-      { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock },
-      { href: "/dashboard/drift", label: "Driftstatus", icon: Activity },
-      { href: "/dashboard/arbetsorder/redigeringslas", label: "Redigeringslås", icon: LockKeyhole },
-      { href: "/dashboard/billing", label: "Abonnemang", icon: CreditCard },
+      { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock, visible: canViewAudit },
+      { href: "/dashboard/drift", label: "Driftstatus", icon: Activity, visible: canManageCompany },
+      { href: "/dashboard/arbetsorder/redigeringslas", label: "Redigeringslås", icon: LockKeyhole, visible: canViewOperations },
+      { href: "/dashboard/billing", label: "Abonnemang", icon: CreditCard, visible: canManageBilling },
       { href: "/dashboard/installningar", label: "Inställningar", icon: Settings },
     ],
   },
@@ -134,10 +157,15 @@ function NavigationContent({
   role: string;
   onNavigate?: () => void;
 }) {
-  const groups = useMemo(
-    () => (isResident(role) ? residentNavigation : navigation),
-    [role],
-  );
+  const groups = useMemo(() => {
+    const source = isResident(role) ? residentNavigation : navigation;
+    return source
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => !item.visible || item.visible(role)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [role]);
 
   return <>
     {groups.map((group, groupIndex) => (

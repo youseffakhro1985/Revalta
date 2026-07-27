@@ -9,6 +9,7 @@ import {
   canManageBilling,
   canManageTeam,
   canManageTickets,
+  canManageWorkOrderFinance,
   canViewAudit,
   canViewFinanceData,
   canViewLeasingData,
@@ -59,6 +60,14 @@ describe("permissions", () => {
 
   it.each(["manager", "technician", "viewer", "resident"])("nekar %s billing-administration", (role) => {
     expect(canManageBilling(role)).toBe(false);
+  });
+
+  it.each(["owner", "admin", "manager"])("låter %s hantera WO-finans", (role) => {
+    expect(canManageWorkOrderFinance(role)).toBe(true);
+  });
+
+  it.each(["technician", "viewer", "resident"])("nekar %s WO-finansmutationer", (role) => {
+    expect(canManageWorkOrderFinance(role)).toBe(false);
   });
 
   it.each(["owner", "admin", "manager", "technician"])("låter %s arbeta med ärenden", (role) => {

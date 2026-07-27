@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { canViewFinanceData, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
 
@@ -17,6 +17,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewFinanceData(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att exportera faktureringsunderlag" }, { status: 403 });
+  }
   const { id } = await params;
   const order = await db.workOrder.findFirst({
     where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },

@@ -18,6 +18,7 @@ export {
   canManageResidentPortal,
   canManageTeam,
   canManageTickets,
+  canManageWorkOrderFinance,
   canViewAudit,
   canViewFinanceData,
   canViewLeasingData,

@@ -60,6 +60,11 @@ export function canViewFinanceData(role: string) {
   return hasRole(role, ["owner", "admin", "manager", "viewer"]);
 }
 
+/** WO profitability, invoice basis and export mutations — ops leadership. */
+export function canManageWorkOrderFinance(role: string) {
+  return hasRole(role, ["owner", "admin", "manager"]);
+}
+
 export function isResident(role: string) {
   return role === "resident";
 }
