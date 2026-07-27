@@ -1,7 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, canManageTickets } from "@/lib/current-user";
+import {
+  canAssignWorkOrders,
+  canManageTickets,
+  getCurrentUser,
+  shouldScopeToAssignedWork,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   addWorkOrderStatusEvent,
@@ -66,8 +71,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     getWorkOrderAssetLink(db, user.company_id, id),
   ]);
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (shouldScopeToAssignedWork(user.role) && workOrder.assigned_to_id !== user.id) {
+    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
   return NextResponse.json(
-    { workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents }, users, canManage: canManageTickets(user.role) },
+    {
+      workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
+      users,
+      canManage: canManageTickets(user.role),
+      canAssign: canAssignWorkOrders(user.role),
+    },
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }
@@ -102,6 +115,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     getWorkOrderAssetLink(db, user.company_id, id),
   ]);
   if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (shouldScopeToAssignedWork(user.role) && existing.assigned_to_id !== user.id) {
+    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
@@ -157,11 +173,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   if (body.assignedToId !== undefined) {
     const assignedToId = body.assignedToId ? String(body.assignedToId).trim() : null;
-    if (assignedToId) {
-      const assignee = await db.user.findFirst({ where: { id: assignedToId, company_id: user.company_id, status: "active" }, select: { id: true } });
-      if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
+    if (assignedToId !== existing.assigned_to_id) {
+      if (!canAssignWorkOrders(user.role)) {
+        return NextResponse.json({ error: "Du saknar behörighet att tilldela arbetsordrar" }, { status: 403 });
+      }
+      if (assignedToId) {
+        const assignee = await db.user.findFirst({
+          where: {
+            id: assignedToId,
+            company_id: user.company_id,
+            status: "active",
+            role: { in: ["owner", "admin", "manager", "technician"] },
+          },
+          select: { id: true },
+        });
+        if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
+      }
+      data.assigned_to_id = assignedToId;
     }
-    data.assigned_to_id = assignedToId;
   }
   if (body.scheduledStart !== undefined) {
     const value = parseOptionalDate(body.scheduledStart);
@@ -333,9 +362,12 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const { id } = await params;
   const existing = await db.workOrder.findFirst({
     where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
-    select: { id: true, title: true, status: true },
+    select: { id: true, title: true, status: true, assigned_to_id: true },
   });
   if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (shouldScopeToAssignedWork(user.role) && existing.assigned_to_id !== user.id) {
+    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  }
 
   const deleteResult = await db.workOrder.updateMany({
     where: { id: existing.id, company_id: user.company_id, deleted_at: null },

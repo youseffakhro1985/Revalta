@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, UserRoundX } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
+import { WorkOrderQuickActions, type QuickActionUser } from "@/components/dashboard/work-order-quick-actions";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type SlaRisk = "overdue" | "critical" | "soon" | "normal" | "fulfilled" | "paused" | "not_configured";
@@ -15,7 +16,7 @@ type WorkOrder = {
   enterprise: { work_order_number: string | null } | null;
   sla: { risk: SlaRisk; label: string; dueAt: string | null; remainingMinutes: number | null; overdueMinutes: number | null };
   property: { name: string; address: string; city: string };
-  assigned_to: { id: string; name: string | null; email: string } | null;
+  assigned_to: QuickActionUser | null;
 };
 
 type Group = {
@@ -55,6 +56,10 @@ function badge(risk: SlaRisk) {
 
 export default function TechnicianPlanningPage() {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
+  const [assignees, setAssignees] = useState<QuickActionUser[]>([]);
+  const [canManage, setCanManage] = useState(false);
+  const [canAssign, setCanAssign] = useState(false);
+  const [scopedToAssigned, setScopedToAssigned] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -63,9 +68,18 @@ export default function TechnicianPlanningPage() {
     setError("");
     try {
       const response = await fetch("/api/work-orders", { cache: "no-store" });
-      const body = await readResponseJson(response);
+      const body = await readResponseJson<{
+        error?: string;
+        workOrders?: WorkOrder[];
+        assignees?: QuickActionUser[];
+        permissions?: { canManage?: boolean; canAssign?: boolean; scopedToAssigned?: boolean };
+      }>(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte hämta arbetsordrar");
       setOrders(body.workOrders || []);
+      setAssignees(body.assignees || []);
+      setCanManage(Boolean(body.permissions?.canManage));
+      setCanAssign(Boolean(body.permissions?.canAssign));
+      setScopedToAssigned(Boolean(body.permissions?.scopedToAssigned));
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte hämta arbetsordrar");
     } finally {
@@ -115,9 +129,29 @@ export default function TechnicianPlanningPage() {
   const unassigned = active.filter((item) => !item.assigned_to).length;
   const ready = active.filter((item) => item.assigned_to && !["overdue", "critical", "soon"].includes(item.sla.risk)).length;
 
+  function updateOrder(id: string, patch: { status?: string; assigned_to?: QuickActionUser | null }) {
+    setOrders((current) => current.map((order) => (
+      order.id === id
+        ? {
+            ...order,
+            ...(patch.status ? { status: patch.status } : {}),
+            ...(patch.assigned_to !== undefined ? { assigned_to: patch.assigned_to } : {}),
+          }
+        : order
+    )));
+  }
+
   return <div className="space-y-8">
-    <PageHeader eyebrow="Operativ resursplanering" title="Teknikerplanering" description="Fördela arbetsbelastningen efter ansvarig, SLA-risk och nästa deadline." action={<button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>} />
+    <PageHeader
+      eyebrow="Operativ resursplanering"
+      title="Teknikerplanering"
+      description={scopedToAssigned
+        ? "Din tilldelade arbetsbelastning efter SLA-risk och nästa deadline."
+        : "Fördela arbetsbelastningen efter ansvarig, SLA-risk och nästa deadline. Tilldela direkt i listan."}
+      action={<button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>}
+    />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
+    {scopedToAssigned ? <InlineAlert tone="info">Du ser endast arbetsordrar som är tilldelade dig.</InlineAlert> : null}
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={AlertTriangle} label="SLA passerad" value={overdue} hint="Måste omprioriteras direkt" />
@@ -139,13 +173,27 @@ export default function TechnicianPlanningPage() {
             <div className="flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-sand-50 px-2.5 py-1 text-ink-600">{group.orders.length} aktiva</span>{group.overdue ? <span className="rounded-full bg-red-50 px-2.5 py-1 text-red-700">{group.overdue} passerade</span> : null}{group.critical ? <span className="rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">{group.critical} kritiska</span> : null}</div>
           </header>
           <div className="divide-y divide-sand-100">
-            {group.orders.slice(0, 8).map((order) => <Link key={order.id} href={`/dashboard/arbetsorder/${order.id}`} className="block p-5 transition hover:bg-sand-50/70">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-petroleum-700">{order.enterprise?.work_order_number || "Arbetsorder"}</p><h3 className="mt-1 truncate font-semibold text-ink-950">{order.title}</h3><p className="mt-1 truncate text-sm text-ink-500">{order.property.name} · {order.property.address}, {order.property.city}</p></div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${badge(order.sla.risk)}`}>{order.sla.label}</span>
+            {group.orders.slice(0, 8).map((order) => (
+              <div key={order.id} className="p-5">
+                <Link href={`/dashboard/arbetsorder/${order.id}`} className="block transition hover:opacity-90">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-petroleum-700">{order.enterprise?.work_order_number || "Arbetsorder"}</p><h3 className="mt-1 truncate font-semibold text-ink-950">{order.title}</h3><p className="mt-1 truncate text-sm text-ink-500">{order.property.name} · {order.property.address}, {order.property.city}</p></div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${badge(order.sla.risk)}`}>{order.sla.label}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-ink-600">{duration(order)}</span><span className="text-ink-400">{order.sla.dueAt ? dateTime.format(new Date(order.sla.dueAt)) : "Deadline saknas"}</span></div>
+                </Link>
+                <WorkOrderQuickActions
+                  workOrderId={order.id}
+                  status={order.status}
+                  assignedToId={order.assigned_to?.id || null}
+                  users={assignees}
+                  canManage={canManage}
+                  canAssign={canAssign}
+                  compact
+                  onUpdated={(patch) => updateOrder(order.id, patch)}
+                />
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-ink-600">{duration(order)}</span><span className="text-ink-400">{order.sla.dueAt ? dateTime.format(new Date(order.sla.dueAt)) : "Deadline saknas"}</span></div>
-            </Link>)}
+            ))}
           </div>
         </section>)}
       </div>

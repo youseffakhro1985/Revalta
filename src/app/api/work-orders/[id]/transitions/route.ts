@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canAssignWorkOrders, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { getAllowedWorkOrderTransitions } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 
@@ -34,8 +34,11 @@ export async function GET(
         currentStatus,
         allowedStatuses: getAllowedWorkOrderTransitions(currentStatus),
         assignedToId: workOrder.assigned_to_id,
-        users,
+        users: canAssignWorkOrders(user.role)
+          ? users.filter((member) => ["owner", "admin", "manager", "technician"].includes(member.role))
+          : [],
         canManage: canManageTickets(user.role),
+        canAssign: canAssignWorkOrders(user.role),
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );

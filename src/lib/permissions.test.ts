@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAssignWorkOrders,
   canExportTickets,
   canManageAccessCredentials,
   canManageTeam,
   canManageTickets,
   canViewAudit,
   canViewOperations,
+  shouldScopeToAssignedWork,
   USER_ROLES,
 } from "@/lib/permissions";
 
@@ -48,5 +50,21 @@ describe("permissions", () => {
 
   it.each(["technician", "viewer", "resident", "unknown", ""])("nekar %s hantering av nycklar och passage", (role) => {
     expect(canManageAccessCredentials(role)).toBe(false);
+  });
+
+  it.each(["technician", "resident"])("scopesar %s till tilldelat arbete", (role) => {
+    expect(shouldScopeToAssignedWork(role)).toBe(true);
+  });
+
+  it.each(["owner", "admin", "manager", "viewer"])("scopesar inte %s till endast tilldelat arbete", (role) => {
+    expect(shouldScopeToAssignedWork(role)).toBe(false);
+  });
+
+  it.each(["owner", "admin", "manager"])("låter %s tilldela arbetsordrar", (role) => {
+    expect(canAssignWorkOrders(role)).toBe(true);
+  });
+
+  it.each(["technician", "viewer", "resident", "unknown", ""])("nekar %s att tilldela arbetsordrar", (role) => {
+    expect(canAssignWorkOrders(role)).toBe(false);
   });
 });

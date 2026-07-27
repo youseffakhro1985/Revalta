@@ -4,6 +4,7 @@ import { verifyToken } from "@/lib/session";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
 
 export {
+  canAssignWorkOrders,
   canCreateProperties,
   canExportTickets,
   canManageBilling,
@@ -15,6 +16,8 @@ export {
   canManageTickets,
   canViewAudit,
   canViewOperations,
+  canWriteOperations,
+  shouldScopeToAssignedWork,
 } from "@/lib/permissions";
 
 export async function getCurrentUser() {
