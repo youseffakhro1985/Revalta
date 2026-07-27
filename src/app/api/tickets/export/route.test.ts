@@ -40,11 +40,13 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/schema-readiness", () => ({
   notDeletedFilter: notDeletedFilterMock,
   isMissingSchemaColumnError: isMissingSchemaColumnErrorMock,
-  schemaMismatchUserMessage: "Databasen är inte redo",
+  schemaMismatchUserMessage: vi.fn(() => "Databasen är inte redo"),
 }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { GET } from "./route";
+
+const REQUEST_ID = "33333333-3333-4333-8333-333333333333";
 
 const user = {
   id: "user-1",
@@ -56,7 +58,7 @@ const user = {
 
 function request() {
   return new Request("https://revalta.test/api/tickets/export", {
-    headers: { "x-request-id": "export-request-1" },
+    headers: { "x-request-id": REQUEST_ID },
   });
 }
 
@@ -141,7 +143,7 @@ describe("GET /api/tickets/export", () => {
     const csv = await response.text();
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-request-id")).toBe("export-request-1");
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
     expect(response.headers.get("cache-control")).toContain("private, no-store");
     expect(response.headers.get("cross-origin-resource-policy")).toBe("same-origin");
     expect(csv.startsWith("\uFEFF")).toBe(true);
@@ -184,6 +186,6 @@ describe("GET /api/tickets/export", () => {
 
     expect(response.status).toBe(503);
     expect(payload.errorCode).toBe("SERVICE_UNAVAILABLE");
-    expect(payload.requestId).toBe("export-request-1");
+    expect(payload.requestId).toBe(REQUEST_ID);
   });
 });
