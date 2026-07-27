@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const {
   getCurrentUserMock,
@@ -7,6 +8,9 @@ const {
   isModernStorageOnlyMock,
   hasStorageConfigMock,
   getStorageTokenMock,
+  loggerWarnMock,
+  loggerErrorMock,
+  createLoggerMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   queryRawMock: vi.fn(),
@@ -14,6 +18,9 @@ const {
   isModernStorageOnlyMock: vi.fn(),
   hasStorageConfigMock: vi.fn(),
   getStorageTokenMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
+  createLoggerMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -38,6 +45,10 @@ vi.mock("@/lib/storage", () => ({
   getStorageToken: getStorageTokenMock,
 }));
 
+vi.mock("@/lib/structured-logger", () => ({
+  createLogger: createLoggerMock,
+}));
+
 import { GET } from "./route";
 
 describe("health route", () => {
@@ -49,6 +60,12 @@ describe("health route", () => {
     hasStorageConfigMock.mockReturnValue(true);
     getStorageTokenMock.mockReturnValue("blob-token");
     getSchemaReadinessMock.mockResolvedValue({ ready: true, missing: [], checkedAt: new Date().toISOString() });
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
   });
 
   it("public GET returns lightweight ok payload for uptime monitors", async () => {
@@ -116,5 +133,49 @@ describe("health route", () => {
       modernStorageOnly: true,
     });
     expect(body.readiness.criticalReady).toBe(true);
+  });
+
+  it("logs degraded schema readiness with correlation context", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
+    getSchemaReadinessMock.mockResolvedValue({
+      ready: false,
+      missing: ["AuditLog.module"],
+      checkedAt: new Date().toISOString(),
+    });
+    const request = new NextRequest("https://www.revalta.se/api/health", {
+      headers: { "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+    });
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(503);
+    expect(createLoggerMock).toHaveBeenCalledWith(expect.objectContaining({
+      route: "/api/health",
+      requestId: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    }));
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "health schema readiness degraded",
+      expect.objectContaining({ missingSchemaItems: ["AuditLog.module"] }),
+    );
+  });
+
+  it("logs database failures structurally without exposing env to public callers", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+    queryRawMock.mockRejectedValue(new Error("database unavailable"));
+    const request = new NextRequest("https://www.revalta.se/api/health", {
+      headers: { "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479" },
+    });
+
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toMatchObject({ status: "error", ok: false, database: "error" });
+    expect(body.env).toBeUndefined();
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "health check failed",
+      expect.any(Error),
+      expect.objectContaining({ audience: "public" }),
+    );
   });
 });
