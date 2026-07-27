@@ -19,21 +19,73 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check production health
+      - name: Check production health and release identity
         env:
           HEALTH_URL: https://www.revalta.se/api/health
         run: |
           set -euo pipefail
-          response="$(curl -sS -f --max-time 20 -H 'accept: application/json' "$HEALTH_URL")"
-          echo "$response" | python3 - <<'PY'
-          import json, sys
-          body = sys.stdin.read()
-          data = json.loads(body)
+          headers_file="$(mktemp)"
+          body_file="$(mktemp)"
+          trap 'rm -f "$headers_file" "$body_file"' EXIT
+
+          curl -sS -f --max-time 20 \
+            -H 'accept: application/json' \
+            -D "$headers_file" \
+            -o "$body_file" \
+            "$HEALTH_URL"
+
+          python3 - "$headers_file" "$body_file" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          headers_path = Path(sys.argv[1])
+          body_path = Path(sys.argv[2])
+
+          headers = {}
+          for line in headers_path.read_text(encoding="utf-8").splitlines():
+              if ":" not in line:
+                  continue
+              key, value = line.split(":", 1)
+              headers[key.strip().lower()] = value.strip()
+
+          data = json.loads(body_path.read_text(encoding="utf-8"))
+          release = data.get("release") or {}
           status = data.get("status")
           database = data.get("database")
-          sha = (data.get("release") or {}).get("commitSha")
+          sha = release.get("commitSha")
+          short_sha = release.get("shortCommitSha")
+          environment = release.get("environment")
           modern = data.get("modernStorageOnly")
-          print(f"status={status} database={database} sha={sha} modernStorageOnly={modern}")
+
+          header_sha = headers.get("x-revalta-release")
+          header_environment = headers.get("x-revalta-environment")
+          cache_control = headers.get("cache-control", "").lower()
+          cdn_cache_control = headers.get("cdn-cache-control", "").lower()
+          vercel_cache_control = headers.get("vercel-cdn-cache-control", "").lower()
+          content_type_options = headers.get("x-content-type-options", "").lower()
+
+          print(
+              f"status={status} database={database} sha={sha} "
+              f"environment={environment} modernStorageOnly={modern}"
+          )
+
           if status != "ok" or database != "ok":
               raise SystemExit("Production health is not ok")
+          if not sha or sha == "local" or not short_sha:
+              raise SystemExit("Production release identity is missing")
+          if environment != "production":
+              raise SystemExit(f"Unexpected Vercel environment: {environment!r}")
+          if header_sha != short_sha:
+              raise SystemExit("X-Revalta-Release does not match the JSON release")
+          if header_environment != environment:
+              raise SystemExit("X-Revalta-Environment does not match the JSON release")
+          if "no-store" not in cache_control:
+              raise SystemExit("Browser cache protection is missing")
+          if "no-store" not in cdn_cache_control:
+              raise SystemExit("CDN cache protection is missing")
+          if "no-store" not in vercel_cache_control:
+              raise SystemExit("Vercel CDN cache protection is missing")
+          if content_type_options != "nosniff":
+              raise SystemExit("nosniff response protection is missing")
           PY
