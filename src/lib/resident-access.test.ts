@@ -14,6 +14,8 @@ describe("resident-access allowlists", () => {
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/dokument")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/konto")).toBe(true);
+    expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/avier")).toBe(true);
+    expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/bokningar")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard/boendeportal/arenden/ticket-1")).toBe(true);
     expect(isResidentAllowedDashboardPath("/dashboard")).toBe(false);
     expect(isResidentAllowedDashboardPath("/dashboard/fastigheter")).toBe(false);

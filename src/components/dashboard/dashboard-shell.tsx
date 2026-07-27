@@ -78,6 +78,8 @@ const residentNavigation: NavGroup[] = [
     items: [
       { href: "/dashboard/boendeportal", label: "Mina ärenden", icon: MessageSquareText },
       { href: "/dashboard/boendeportal/dokument", label: "Mina dokument", icon: FileText },
+      { href: "/dashboard/boendeportal/avier", label: "Mina avier", icon: HandCoins },
+      { href: "/dashboard/boendeportal/bokningar", label: "Mina bokningar", icon: CalendarCheck2 },
       { href: "/dashboard/boendeportal/konto", label: "Mitt konto", icon: UserRound },
     ],
   },

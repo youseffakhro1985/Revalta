@@ -10,6 +10,12 @@ export default function ResidentPortalLayout({ children }: { children: React.Rea
         <Link href="/dashboard/boendeportal/dokument" className="rounded-xl px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 hover:text-petroleum-800">
           Boendedokument
         </Link>
+        <Link href="/dashboard/boendeportal/avier" className="rounded-xl px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 hover:text-petroleum-800">
+          Mina avier
+        </Link>
+        <Link href="/dashboard/boendeportal/bokningar" className="rounded-xl px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 hover:text-petroleum-800">
+          Mina bokningar
+        </Link>
         <Link href="/dashboard/boendeportal/konto" className="rounded-xl px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 hover:text-petroleum-800">
           Mitt konto
         </Link>
