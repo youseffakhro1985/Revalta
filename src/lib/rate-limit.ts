@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
+import { createLogger } from "@/lib/structured-logger";
 
 type Bucket = {
   count: number;
@@ -16,6 +17,12 @@ export type RateLimitResult = {
 
 const fallbackBuckets = new Map<string, Bucket>();
 let cleanupCounter = 0;
+
+const logger = createLogger({
+  component: "rate-limit",
+  release: process.env.VERCEL_GIT_COMMIT_SHA,
+  environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
+});
 
 function hashKey(key: string) {
   return createHash("sha256").update(key).digest("hex");
@@ -44,7 +51,23 @@ function checkMemoryFallback(keyHash: string, limit: number, windowMs: number): 
   };
 }
 
+function scheduleCleanup() {
+  cleanupCounter += 1;
+  if (cleanupCounter % 100 !== 0) return;
+
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  void db.rateLimitAttempt
+    .deleteMany({ where: { created_at: { lt: cutoff } } })
+    .catch((error) => {
+      logger.warn("rate limit cleanup failed", {
+        eventCode: "rate_limit.cleanup_failed",
+        error,
+      });
+    });
+}
+
 export async function checkRateLimit(key: string, limit: number, windowMs: number): Promise<RateLimitResult> {
+  const startedAt = Date.now();
   const keyHash = hashKey(key);
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
@@ -83,17 +106,21 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
       return { allowed: true, remaining: Math.max(0, limit - count - 1), resetAt };
     });
 
-    cleanupCounter += 1;
-    if (cleanupCounter % 100 === 0) {
-      void db.rateLimitAttempt
-        .deleteMany({ where: { created_at: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } } })
-        .catch(() => undefined);
-    }
+    scheduleCleanup();
 
     return { ...result, source: "database" };
   } catch (error) {
-    console.error("Persistent rate limiter unavailable; using bounded in-memory fallback", error);
-    return checkMemoryFallback(keyHash, limit, windowMs);
+    const fallback = checkMemoryFallback(keyHash, limit, windowMs);
+    logger.warn("persistent rate limiter unavailable; using bounded memory fallback", {
+      eventCode: "rate_limit.database_unavailable",
+      limit,
+      windowMs,
+      fallbackAllowed: fallback.allowed,
+      fallbackRemaining: fallback.remaining,
+      latencyMs: Date.now() - startedAt,
+      error,
+    });
+    return fallback;
   }
 }
 
