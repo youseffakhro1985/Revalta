@@ -75,6 +75,7 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 import { POST } from "./route";
 
 const params = Promise.resolve({ reference: "rv-2026-test" });
+const REQUEST_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const attachment = {
   id: "attachment-1",
   file_name: "photo.png",
@@ -101,7 +102,7 @@ function uploadRequest(options?: {
 
   return new Request("https://www.revalta.se/api/public/tickets/RV-2026-TEST/attachments", {
     method: "POST",
-    headers: { "x-request-id": options?.requestId ?? "attachment-request-1" },
+    headers: { "x-request-id": options?.requestId ?? REQUEST_ID },
     body: formData,
   });
 }
@@ -235,7 +236,7 @@ describe("POST /api/public/tickets/[reference]/attachments", () => {
       }),
     }));
     expect(response.headers.get("cache-control")).toContain("private, no-store");
-    expect(response.headers.get("x-request-id")).toBe("attachment-request-1");
+    expect(response.headers.get("x-request-id")).toBe(REQUEST_ID);
   });
 
   it("deletes the stored blob when the database transaction fails", async () => {
