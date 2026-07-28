@@ -1,0 +1,60 @@
+name: Strict Release Boundary Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Exact HTTPS origin for the deployed release
+        required: true
+        type: string
+      expected_sha:
+        description: Full 40-character deployed Git SHA
+        required: true
+        type: string
+      expected_environment:
+        description: Expected Vercel environment
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+      expected_branch:
+        description: Expected deployed Git branch
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: strict-release-boundary-${{ inputs.expected_environment }}-${{ inputs.expected_branch }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Validate target and deployed boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_URL: ${{ inputs.base_url }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      EXPECTED_ENVIRONMENT: ${{ inputs.expected_environment }}
+      EXPECTED_BRANCH: ${{ inputs.expected_branch }}
+
+    steps:
+      - name: Check out exact release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Validate exact release target
+        run: node scripts/validate-release-target.mjs
+
+      - name: Verify exact deployed boundaries
+        run: node scripts/verify-release-boundaries.mjs
