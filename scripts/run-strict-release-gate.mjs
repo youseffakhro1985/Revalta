@@ -5,8 +5,13 @@ import { pathToFileURL } from "node:url";
 import { validateReleaseTarget } from "./validate-release-target.mjs";
 import { renderMarkdownSummary, runReleaseBoundarySmoke } from "./verify-release-boundaries.mjs";
 
-const ATTESTATION_VERSION = 3;
+const ATTESTATION_VERSION = 4;
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
+const BOUNDARY_REQUESTS = Object.freeze({
+  "public-home": Object.freeze({ method: "GET", path: "/" }),
+  "dashboard-boundary": Object.freeze({ method: "GET", path: "/dashboard" }),
+  "health-api": Object.freeze({ method: "GET", path: "/api/health" }),
+});
 const DASHBOARD_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const DASHBOARD_DENIAL_STATUSES = new Set([401, 403]);
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -93,8 +98,12 @@ export function normalizeBoundaryOutcome(result, releaseOrigin) {
     invariant(result.location === null || result.location === undefined, "dashboard-boundary: denial must not include redirectLocation");
   }
 
+  const request = BOUNDARY_REQUESTS[result.label];
+  invariant(request, `${result.label}: request contract is missing`);
+
   return {
     name: result.label,
+    request: { method: request.method, path: request.path },
     httpStatus: result.status,
     durationMs: result.durationMs,
     redirectLocation,
