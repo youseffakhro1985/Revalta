@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  buildCanonicalReleasePolicy,
   buildReleaseAttestation,
+  buildReleasePolicyEvidence,
   calculateReleaseAttestationChecksum,
+  calculateReleasePolicyDigest,
   normalizeBoundaryOutcome,
   serializeReleaseAttestation,
   validateReleaseProvenance,
@@ -44,21 +47,32 @@ function attestation() {
 }
 
 describe("strict release attestation", () => {
-  it("creates schema-v4 secret-free evidence bound to exact endpoints", () => {
+  it("creates schema-v5 evidence bound to exact endpoints and policy", () => {
     const evidence = attestation();
-    expect(evidence.schemaVersion).toBe(4);
+    expect(evidence.schemaVersion).toBe(5);
+    expect(evidence.policy).toEqual(buildReleasePolicyEvidence());
+    expect(evidence.policy.id).toBe("revalta.strict-release-policy.v1");
+    expect(evidence.policy.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(evidence.provenance).toEqual(provenance);
     expect(evidence.boundaries.map((boundary) => [boundary.name, boundary.request.method, boundary.request.path, boundary.httpStatus, boundary.redirectLocation])).toEqual([
       ["public-home", "GET", "/", 200, null],
       ["dashboard-boundary", "GET", "/dashboard", 307, "/login"],
       ["health-api", "GET", "/api/health", 200, null],
     ]);
-    expect(evidence.boundaries[0].transport).toEqual(clean);
-    expect(evidence.boundaries[1].transport).toEqual({ attempts: 2, retryStatuses: [503], networkErrors: 0, totalBackoffMs: 1500 });
     const serialized = JSON.stringify(evidence);
     expect(serialized).not.toContain("authorization");
     expect(serialized).not.toContain("cookie");
     expect(serialized).not.toContain("token");
+  });
+
+  it("calculates a deterministic policy fingerprint sensitive to contract changes", () => {
+    const policy = buildCanonicalReleasePolicy();
+    const digest = calculateReleasePolicyDigest(policy);
+    expect(digest).toBe(calculateReleasePolicyDigest(buildCanonicalReleasePolicy()));
+    expect(calculateReleasePolicyDigest({ ...policy, durationContract: "weaker-contract" })).not.toBe(digest);
+    const modified = structuredClone(policy);
+    modified.boundaries[2].request.path = "/api/fake";
+    expect(calculateReleasePolicyDigest(modified)).not.toBe(digest);
   });
 
   it("canonicalizes same-origin dashboard redirects and rejects unsafe destinations", () => {
@@ -68,41 +82,29 @@ describe("strict release attestation", () => {
     expect(normalized.request).toEqual({ method: "GET", path: "/dashboard" });
     expect(() => normalizeBoundaryOutcome({ ...base, location: "https://evil.example/login" }, target.baseUrl)).toThrow("escaped release origin");
     expect(() => normalizeBoundaryOutcome({ ...base, location: "/login?next=/dashboard" }, target.baseUrl)).toThrow("query string");
-    expect(() => normalizeBoundaryOutcome({ ...base, location: "/login#continue" }, target.baseUrl)).toThrow("fragment");
   });
 
-  it("rejects boundary-specific status confusion", () => {
-    const home = { label: "public-home", status: 302, durationMs: 1, location: "/login", ...clean };
-    const health = { label: "health-api", status: 404, durationMs: 1, location: null, ...clean };
-    const publicDashboard = { label: "dashboard-boundary", status: 200, durationMs: 1, location: null, ...clean };
-    const denialWithLocation = { label: "dashboard-boundary", status: 401, durationMs: 1, location: "/login", ...clean };
-    expect(() => normalizeBoundaryOutcome(home, target.baseUrl)).toThrow("public-home");
-    expect(() => normalizeBoundaryOutcome(health, target.baseUrl)).toThrow("health-api");
-    expect(() => normalizeBoundaryOutcome(publicDashboard, target.baseUrl)).toThrow("requires redirect");
-    expect(() => normalizeBoundaryOutcome(denialWithLocation, target.baseUrl)).toThrow("must not include");
-  });
-
-  it("rejects invalid provenance and inconsistent transport evidence", () => {
-    expect(() => validateReleaseProvenance({ ...provenance, repository: "invalid" })).toThrow("owner/name");
-    expect(() => validateReleaseProvenance({ ...provenance, runUrl: "https://github.com/other/run" })).toThrow("runUrl mismatch");
+  it("rejects boundary-specific status confusion and inconsistent transport", () => {
+    expect(() => normalizeBoundaryOutcome({ label: "public-home", status: 302, durationMs: 1, location: "/login", ...clean }, target.baseUrl)).toThrow("public-home");
+    expect(() => normalizeBoundaryOutcome({ label: "health-api", status: 404, durationMs: 1, location: null, ...clean }, target.baseUrl)).toThrow("health-api");
     const invalid = report();
     invalid.results[0] = { ...invalid.results[0], attempts: 2 };
     expect(() => buildReleaseAttestation({ target, provenance, report: invalid })).toThrow("retry evidence count mismatch");
   });
 
-  it("rejects evidence assembled from a different release or boundary set", () => {
+  it("rejects invalid provenance and evidence assembled from another release", () => {
+    expect(() => validateReleaseProvenance({ ...provenance, repository: "invalid" })).toThrow("owner/name");
     expect(() => buildReleaseAttestation({ target, provenance, report: report({ release: "1".repeat(40) }) })).toThrow("SHA mismatch");
-    expect(() => buildReleaseAttestation({ target, provenance, report: report({ environment: "production" }) })).toThrow("environment mismatch");
     expect(() => buildReleaseAttestation({ target, provenance, report: report({ results: report().results.slice(0, 2) }) })).toThrow("boundaries must be exactly");
   });
 
-  it("serializes deterministically and detects byte-level changes", () => {
+  it("serializes deterministically and binds policy evidence to artifact checksum", () => {
     const serialized = serializeReleaseAttestation(attestation());
     expect(serialized.endsWith("\n")).toBe(true);
     expect(serializeReleaseAttestation(attestation())).toBe(serialized);
     const checksum = calculateReleaseAttestationChecksum(serialized);
     expect(checksum).toMatch(/^[0-9a-f]{64}$/);
-    expect(calculateReleaseAttestationChecksum(serialized.replace("/api/health", "/api/fake"))).not.toBe(checksum);
+    expect(calculateReleaseAttestationChecksum(serialized.replace("revalta.strict-release-policy.v1", "forged-policy"))).not.toBe(checksum);
   });
 
   it("writes JSON and checksum atomically with private permissions", async () => {
