@@ -57,11 +57,13 @@ jobs:
       - name: Run strict release gate and create attestation
         run: node scripts/run-strict-release-gate.mjs
 
-      - name: Upload release boundary attestation
+      - name: Upload release boundary attestation and checksum
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: release-boundary-${{ inputs.expected_environment }}-${{ inputs.expected_sha }}
-          path: artifacts/release-boundary-attestation.json
-          if-no-files-found: warn
+          path: |
+            artifacts/release-boundary-attestation.json
+            artifacts/release-boundary-attestation.json.sha256
+          if-no-files-found: error
           retention-days: 30
