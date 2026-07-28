@@ -3,13 +3,47 @@ import { pathToFileURL } from "node:url";
 import { verifyReleaseAttestationFiles } from "./verify-release-attestation.mjs";
 
 const MAX_ATTESTATION_BYTES = 1024 * 1024;
+const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf]);
+const CANONICAL_KEY_ORDER = [
+  "schemaVersion", "kind", "verdict", "checkedAt", "policy", "release", "provenance", "boundaries",
+  "id", "sha256",
+  "commitSha", "shortCommitSha", "environment", "branch", "origin",
+  "repository", "workflow", "workflowRef", "runId", "runAttempt", "serverUrl", "runUrl",
+  "name", "request", "httpStatus", "durationMs", "redirectLocation", "transport",
+  "method", "path",
+  "attempts", "retryStatuses", "networkErrors", "totalBackoffMs",
+];
+const CANONICAL_KEY_PRIORITY = new Map(CANONICAL_KEY_ORDER.map((key, index) => [key, index]));
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function compareCanonicalKeys(left, right) {
+  const leftPriority = CANONICAL_KEY_PRIORITY.get(left);
+  const rightPriority = CANONICAL_KEY_PRIORITY.get(right);
+  if (leftPriority !== undefined || rightPriority !== undefined) {
+    if (leftPriority === undefined) return 1;
+    if (rightPriority === undefined) return -1;
+    if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+  }
+  return left.localeCompare(right, "en");
+}
+
+export function canonicalizeJsonValue(value) {
+  if (Array.isArray(value)) return value.map((entry) => canonicalizeJsonValue(entry));
+  if (value && typeof value === "object") {
+    const output = {};
+    for (const key of Object.keys(value).sort(compareCanonicalKeys)) {
+      output[key] = canonicalizeJsonValue(value[key]);
+    }
+    return output;
+  }
+  return value;
+}
+
 export function serializeCanonicalJson(value) {
-  return `${JSON.stringify(value, null, 2)}\n`;
+  return `${JSON.stringify(canonicalizeJsonValue(value), null, 2)}\n`;
 }
 
 export function verifyCanonicalAttestationBytes(bytes, { maxBytes = MAX_ATTESTATION_BYTES } = {}) {
@@ -18,13 +52,15 @@ export function verifyCanonicalAttestationBytes(bytes, { maxBytes = MAX_ATTESTAT
   invariant(bytes.byteLength > 0, "Release attestation must not be empty");
   invariant(bytes.byteLength <= maxBytes, `Release attestation exceeds ${maxBytes} byte canonical limit`);
 
+  const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  invariant(!(buffer.length >= UTF8_BOM.length && buffer.subarray(0, UTF8_BOM.length).equals(UTF8_BOM)), "Release attestation must not contain a UTF-8 BOM");
+
   let text;
   try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     throw new Error("Release attestation is not valid UTF-8");
   }
-  invariant(!text.startsWith("\uFEFF"), "Release attestation must not contain a UTF-8 BOM");
 
   let parsed;
   try {
