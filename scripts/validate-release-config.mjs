@@ -9,6 +9,7 @@ const paths = {
   boundaryVerifier: new URL("scripts/verify-release-boundaries.mjs", root),
   strictGateRunner: new URL("scripts/run-strict-release-gate.mjs", root),
   attestationVerifier: new URL("scripts/verify-release-attestation.mjs", root),
+  canonicalVerifier: new URL("scripts/verify-canonical-release-attestation.mjs", root),
 };
 function fail(message) { console.error(message); process.exit(1); }
 async function readJson(path, label) { let raw; try { raw = await readFile(path, "utf8"); } catch (error) { fail(`${label} could not be read: ${error instanceof Error ? error.message : String(error)}`); } try { return JSON.parse(raw); } catch (error) { fail(`${label} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`); } }
@@ -30,6 +31,7 @@ await assertFileExists(paths.targetValidator, "Release target validator");
 await assertFileExists(paths.boundaryVerifier, "Release boundary verifier");
 await assertFileExists(paths.strictGateRunner, "Strict release gate runner");
 await assertFileExists(paths.attestationVerifier, "Release attestation verifier");
+await assertFileExists(paths.canonicalVerifier, "Canonical release attestation verifier");
 await assertFileExists(paths.strictWorkflow, "Strict Release Boundary Gate workflow");
 await assertFileMissing(paths.legacyWorkflow, "Legacy Release Boundary Smoke workflow");
 
@@ -100,10 +102,21 @@ for (const [fragment, message] of [
   ["MAX_ATTESTATION_AGE_SECONDS", "Verifier must support replay-age limits"],
 ]) requireText(verifier, fragment, message);
 
+const canonicalVerifier = await readFile(paths.canonicalVerifier, "utf8");
+for (const [fragment, message] of [
+  ["const MAX_ATTESTATION_BYTES = 1024 * 1024", "Canonical verifier must retain the 1 MiB size ceiling"],
+  ["new TextDecoder(\"utf-8\", { fatal: true })", "Canonical verifier must reject invalid UTF-8"],
+  ["must not contain a UTF-8 BOM", "Canonical verifier must reject BOM-prefixed artifacts"],
+  ["serializeCanonicalJson", "Canonical verifier must deterministically reserialize JSON"],
+  ["text === canonical", "Canonical verifier must compare raw and canonical bytes exactly"],
+  ["duplicate keys, alternate key order or non-canonical whitespace are forbidden", "Canonical verifier must reject parser-ambiguous JSON"],
+  ["verifyReleaseAttestationFiles", "Canonical verifier must delegate to semantic and checksum verification"],
+]) requireText(canonicalVerifier, fragment, message);
+
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");
-if (scripts["verify:release-attestation"] !== "node scripts/verify-release-attestation.mjs") fail("package.json must expose verify:release-attestation");
+if (scripts["verify:release-attestation"] !== "node scripts/verify-canonical-release-attestation.mjs") fail("package.json must route release verification through canonical bytes");
 if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") fail("package.json must expose smoke:release-boundaries");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must run release configuration validation first");
 
-console.log("Release configuration, schema-v6 exact object shapes, policy fingerprints, endpoint identity, boundary semantics, monotonic timing, transport telemetry, provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, schema-v6 exact object shapes, canonical JSON bytes, duplicate-key resistance, policy fingerprints, endpoint identity, boundary semantics, monotonic timing, transport telemetry, provenance, checksum-backed attestations, offline verification and replay protection are valid");
