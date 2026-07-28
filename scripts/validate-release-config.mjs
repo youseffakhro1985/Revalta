@@ -123,6 +123,11 @@ requireText(boundary, "readBoundedJsonResponse", "Health release boundary must u
 requireText(boundary, "Content-Length must be a non-negative integer", "Health release boundary must validate declared response length");
 requireText(boundary, "new TextDecoder(\"utf-8\", { fatal: true })", "Health release boundary must reject invalid UTF-8");
 requireText(boundary, "response exceeds ${maxBytes} byte limit", "Health release boundary must fail closed on oversized streamed responses");
+requireText(boundary, "RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])", "Release smoke must retain the controlled transient HTTP retry allowlist");
+requireText(boundary, "const MAX_RETRY_DELAY_MS = 10_000", "Release smoke must cap server-directed retry delays");
+requireText(boundary, "parseRetryAfterMs", "Release smoke must parse bounded Retry-After instructions");
+requireText(boundary, "await cancelResponseBody(response)", "Release smoke must cancel discarded retry response bodies");
+requireText(boundary, "retryable HTTP ${lastRetryableStatus}", "Release smoke must fail closed after persistent transient HTTP responses");
 
 const verifier = await readFile(paths.attestationVerifier, "utf8");
 requireText(verifier, "attestation.schemaVersion === 2", "Release verifier must require schema version 2");
@@ -146,4 +151,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration, bounded response parsing, strict response contracts, smoke governance, schema-v2 provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, bounded HTTP retries, bounded response parsing, strict response contracts, smoke governance, schema-v2 provenance, checksum-backed attestations, offline verification and replay protection are valid");
