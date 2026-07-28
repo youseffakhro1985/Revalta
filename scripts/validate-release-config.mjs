@@ -13,7 +13,6 @@ const paths = {
 };
 
 function fail(message) { console.error(message); process.exit(1); }
-
 async function readJson(path, label) {
   let raw;
   try { raw = await readFile(path, "utf8"); }
@@ -21,17 +20,11 @@ async function readJson(path, label) {
   try { return JSON.parse(raw); }
   catch (error) { fail(`${label} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`); }
 }
-
-async function assertFileExists(path, label) {
-  try { await access(path); }
-  catch { fail(`${label} is required by the controlled release contract`); }
-}
-
+async function assertFileExists(path, label) { try { await access(path); } catch { fail(`${label} is required by the controlled release contract`); } }
 async function assertFileMissing(path, label) {
   try { await access(path); fail(`${label} must not exist because Strict Release Boundary Gate is the only authoritative release workflow`); }
   catch (error) { if (error?.code !== "ENOENT") throw error; }
 }
-
 function requireText(source, fragment, message) { if (!source.includes(fragment)) fail(message); }
 
 const config = await readJson(paths.vercel, "vercel.json");
@@ -76,6 +69,12 @@ requireText(runner, "GITHUB_WORKFLOW_REF", "Strict release runner must bind evid
 requireText(runner, "GITHUB_RUN_ID", "Strict release runner must bind evidence to the workflow run ID");
 requireText(runner, "GITHUB_RUN_ATTEMPT", "Strict release runner must bind evidence to the workflow run attempt");
 requireText(runner, "validateBoundaryTransport", "Strict release runner must validate transport evidence");
+requireText(runner, "normalizeBoundaryOutcome", "Strict release runner must normalize boundary-specific outcomes");
+requireText(runner, "public-home: passed attestation requires HTTP 200", "Strict release runner must require public-home HTTP 200");
+requireText(runner, "health-api: passed attestation requires HTTP 200", "Strict release runner must require health-api HTTP 200");
+requireText(runner, "dashboard-boundary: redirect escaped release origin", "Strict release runner must reject escaped dashboard redirects");
+requireText(runner, "redirectLocation = \"/login\"", "Strict release runner must canonicalize dashboard redirects");
+requireText(runner, "Attestation boundaries must be exactly", "Strict release runner must enforce the exact boundary set");
 requireText(runner, "createHash(\"sha256\")", "Strict release runner must calculate a SHA-256 checksum");
 requireText(runner, "`${outputPath}.sha256`", "Strict release runner must write the controlled checksum path");
 requireText(runner, "mode: 0o600", "Release evidence files must retain private filesystem permissions");
@@ -105,6 +104,11 @@ requireText(verifier, "EXPECTED_WORKFLOW = \"Strict Release Boundary Gate\"", "R
 requireText(verifier, "Release provenance runUrl mismatch", "Release verifier must validate the provenance run URL");
 requireText(verifier, "timingSafeEqual", "Release attestation verifier must use timing-safe checksum comparison");
 requireText(verifier, "validateBoundaryTransport", "Release verifier must validate boundary transport evidence");
+requireText(verifier, "validateBoundaryOutcome", "Release verifier must validate boundary-specific final outcomes");
+requireText(verifier, "public-home: passed attestation requires HTTP 200", "Release verifier must require public-home HTTP 200");
+requireText(verifier, "health-api: passed attestation requires HTTP 200", "Release verifier must require health-api HTTP 200");
+requireText(verifier, "redirectLocation must be canonical /login", "Release verifier must require canonical dashboard redirect evidence");
+requireText(verifier, "dashboard-boundary: denial must not include redirectLocation", "Release verifier must reject redirect evidence on dashboard denials");
 requireText(verifier, "durationMs cannot be shorter than totalBackoffMs", "Release verifier must reject temporally impossible evidence");
 requireText(verifier, "CANONICAL_ISO_PATTERN", "Release attestation verifier must require canonical UTC timestamps");
 requireText(verifier, "MAX_ATTESTATION_AGE_SECONDS", "Release attestation verifier must support explicit replay-age limits");
@@ -115,4 +119,4 @@ if (scripts["verify:release-attestation"] !== "node scripts/verify-release-attes
 if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") fail("package.json must expose the controlled smoke:release-boundaries command");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must run release configuration validation before all other checks");
 
-console.log("Release configuration, monotonic timing evidence, transport telemetry, bounded HTTP retries, bounded response parsing, strict response contracts, schema-v3 provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, exact boundary outcome semantics, canonical redirect evidence, monotonic timing evidence, transport telemetry, bounded HTTP retries, bounded response parsing, schema-v3 provenance, checksum-backed attestations, offline verification and replay protection are valid");
