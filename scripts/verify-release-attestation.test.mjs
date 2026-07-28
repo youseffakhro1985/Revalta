@@ -6,6 +6,7 @@ import {
   calculateSha256,
   parseChecksumFile,
   validateAttestationFreshness,
+  validateBoundaryOutcome,
   validateBoundaryTransport,
   validateReleaseAttestation,
   validateReleaseProvenance,
@@ -75,6 +76,15 @@ describe("release attestation verifier", () => {
     expect(() => validateBoundaryTransport({ attempts: 1, retryStatuses: [], networkErrors: 0, totalBackoffMs: 1 }, "home")).toThrow("cannot include backoff");
   });
 
+  it("rejects boundary-specific status and redirect confusion", () => {
+    expect(() => validateBoundaryOutcome({ name: "public-home", httpStatus: 302, redirectLocation: "/login" })).toThrow("HTTP 200");
+    expect(() => validateBoundaryOutcome({ name: "health-api", httpStatus: 404, redirectLocation: null })).toThrow("HTTP 200");
+    expect(() => validateBoundaryOutcome({ name: "dashboard-boundary", httpStatus: 200, redirectLocation: null })).toThrow("requires redirect");
+    expect(() => validateBoundaryOutcome({ name: "dashboard-boundary", httpStatus: 307, redirectLocation: "https://evil.example/login" })).toThrow("canonical /login");
+    expect(() => validateBoundaryOutcome({ name: "dashboard-boundary", httpStatus: 401, redirectLocation: "/login" })).toThrow("must not include");
+    expect(() => validateBoundaryOutcome({ name: "dashboard-boundary", httpStatus: 403, redirectLocation: null })).not.toThrow();
+  });
+
   it("rejects duration evidence shorter than recorded backoff", () => {
     const impossible = attestation();
     impossible.boundaries[1] = { ...impossible.boundaries[1], durationMs: 1_499 };
@@ -97,7 +107,7 @@ describe("release attestation verifier", () => {
     await writeFile(checksumPath, `${hash}  release.json\n`);
     const verified = await verifyReleaseAttestationFiles({ attestationPath: jsonPath, checksumPath, now: NOW, maxAgeSeconds: 300 });
     expect(verified.checksum).toBe(hash);
-    expect(verified.attestation.boundaries[1].transport.retryStatuses).toEqual([503]);
+    expect(verified.attestation.boundaries[1].redirectLocation).toBe("/login");
     await writeFile(jsonPath, Buffer.concat([bytes, Buffer.from(" ")]));
     await expect(verifyReleaseAttestationFiles({ attestationPath: jsonPath, checksumPath, now: NOW })).rejects.toThrow("checksum mismatch");
     expect(await readFile(checksumPath, "utf8")).toContain(hash);
