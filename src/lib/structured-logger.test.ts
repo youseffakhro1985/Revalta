@@ -40,6 +40,14 @@ describe("structured server logger", () => {
     expect(payload.message).toBe("upstream rejected Bearer [REDACTED]");
   });
 
+  it("redacts inline secrets from arbitrary context strings", () => {
+    expect(sanitizeLogContext({
+      upstream: "request failed password=plain-text&api_key=provider-key",
+    })).toEqual({
+      upstream: "request failed password=[REDACTED]&api_key=[REDACTED]",
+    });
+  });
+
   it("prevents context from overriding reserved log fields", () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const logger = createLogger({ service: "attacker", level: "error", requestId: "req-1" });
