@@ -8,6 +8,12 @@ const paths = {
   codeql: new URL(".github/workflows/codeql.yml", root),
 };
 
+const CHECKOUT_SHA = "11d5960a326750d5838078e36cf38b85af677262";
+const SETUP_NODE_SHA = "49933ea5288caeca8642d1e84afbd3f7d6820020";
+const CODEQL_SHA = "4187e74d05793876e9989daffde9c3e66b4acd07";
+const POSTGRES_DIGEST = "sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777";
+const ACTION_REFERENCE_PATTERN = /^\s*uses:\s+([^\s@]+)@([0-9a-f]{40})(?:\s+#\s*.+)?\s*$/gm;
+
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -37,6 +43,15 @@ function requireOrder(source, first, second, message) {
   if (firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex) fail(message);
 }
 
+function validatePinnedActions(source, label) {
+  const usesLines = source.split("\n").filter((line) => /^\s*uses:/.test(line));
+  if (usesLines.length === 0) fail(`${label} must use at least one external action`);
+  for (const line of usesLines) {
+    ACTION_REFERENCE_PATTERN.lastIndex = 0;
+    if (!ACTION_REFERENCE_PATTERN.test(line)) fail(`${label} action references must use immutable 40-character commit SHAs: ${line.trim()}`);
+  }
+}
+
 const [vercel, packageJson, ci, codeql] = await Promise.all([
   readJson(paths.vercel, "vercel.json"),
   readJson(paths.package, "package.json"),
@@ -62,6 +77,9 @@ for (const [fragment, message] of [
   ["workflow_dispatch:", "CI must support controlled manual execution"],
   ["contents: read", "CI permissions must remain read-only"],
   ["persist-credentials: false", "CI checkout must not persist credentials"],
+  [`image: postgres:16-alpine@${POSTGRES_DIGEST}`, "CI PostgreSQL service must use the verified immutable digest"],
+  [`uses: actions/checkout@${CHECKOUT_SHA} # v4`, "CI checkout action must use the verified commit"],
+  [`uses: actions/setup-node@${SETUP_NODE_SHA} # v4`, "CI setup-node action must use the verified commit"],
   ["run: npm ci", "CI must use reproducible dependency installation"],
   ["run: npm run validate:release-config", "CI must validate release configuration"],
   ["run: npx prisma migrate deploy", "CI must apply migrations to a clean database"],
@@ -71,6 +89,7 @@ for (const [fragment, message] of [
   ["run: npm run build:ci", "CI must build the production application"],
 ]) requireText(ci, fragment, message);
 requireOrder(ci, "run: npm run validate:release-config", "run: npx prisma generate", "Release configuration validation must run before Prisma and build work");
+validatePinnedActions(ci, "Revalta CI");
 
 for (const [fragment, message] of [
   ["name: CodeQL", "CodeQL workflow name changed unexpectedly"],
@@ -80,12 +99,14 @@ for (const [fragment, message] of [
   ["workflow_dispatch:", "CodeQL must support controlled manual execution"],
   ["security-events: write", "CodeQL must be able to publish security findings"],
   ["persist-credentials: false", "CodeQL checkout must not persist credentials"],
-  ["github/codeql-action/init@v3", "CodeQL initialization must remain enabled"],
-  ["github/codeql-action/analyze@v3", "CodeQL analysis must remain enabled"],
+  [`uses: actions/checkout@${CHECKOUT_SHA} # v4`, "CodeQL checkout action must use the verified commit"],
+  [`uses: github/codeql-action/init@${CODEQL_SHA} # v3`, "CodeQL initialization must use the verified commit"],
+  [`uses: github/codeql-action/analyze@${CODEQL_SHA} # v3`, "CodeQL analysis must use the verified commit"],
 ]) requireText(codeql, fragment, message);
+validatePinnedActions(codeql, "CodeQL");
 
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must validate release configuration first");
 
-console.log("Release configuration is valid: Vercel commands and cron contracts, main/release-preview CI coverage, least-privilege checkout, database migration checks, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
+console.log("Release configuration is valid: Vercel commands and cron contracts, main/release-preview CI coverage, immutable GitHub Action pins, digest-pinned PostgreSQL, least-privilege checkout, database migration checks, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
