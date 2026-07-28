@@ -9,6 +9,11 @@ const CANONICAL_ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
+const BOUNDARY_REQUESTS = Object.freeze({
+  "public-home": Object.freeze({ method: "GET", path: "/" }),
+  "dashboard-boundary": Object.freeze({ method: "GET", path: "/dashboard" }),
+  "health-api": Object.freeze({ method: "GET", path: "/api/health" }),
+});
 const DASHBOARD_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const DASHBOARD_DENIAL_STATUSES = new Set([401, 403]);
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -83,6 +88,18 @@ export function validateBoundaryTransport(transport, label) {
   return transport;
 }
 
+export function validateBoundaryRequest(request, label) {
+  invariant(request && typeof request === "object" && !Array.isArray(request), `${label}: request evidence is required`);
+  const keys = Object.keys(request).sort();
+  invariant(JSON.stringify(keys) === JSON.stringify(["method", "path"]), `${label}: request evidence must contain only method and path`);
+  const expected = BOUNDARY_REQUESTS[label];
+  invariant(expected, `Unexpected boundary ${label}`);
+  invariant(request.method === expected.method, `${label}: request method must be ${expected.method}`);
+  invariant(request.path === expected.path, `${label}: request path must be ${expected.path}`);
+  invariant(request.path.startsWith("/") && !request.path.includes("?") && !request.path.includes("#"), `${label}: request path must be canonical`);
+  return request;
+}
+
 export function validateBoundaryOutcome(boundary) {
   invariant(Number.isInteger(boundary.httpStatus) && boundary.httpStatus >= 100 && boundary.httpStatus <= 599, `${boundary.name}: invalid HTTP status`);
   if (boundary.name === "public-home") {
@@ -106,7 +123,7 @@ export function validateBoundaryOutcome(boundary) {
 
 export function validateReleaseAttestation(attestation, expected = {}, options = {}) {
   invariant(attestation && typeof attestation === "object" && !Array.isArray(attestation), "Attestation must be a JSON object");
-  invariant(attestation.schemaVersion === 3, "Unsupported release attestation schemaVersion");
+  invariant(attestation.schemaVersion === 4, "Unsupported release attestation schemaVersion");
   invariant(attestation.kind === "revalta.release-boundary-attestation", "Unexpected release attestation kind");
   invariant(attestation.verdict === "passed", "Release attestation verdict must be passed");
   const freshness = validateAttestationFreshness(attestation.checkedAt, options);
@@ -131,6 +148,7 @@ export function validateReleaseAttestation(attestation, expected = {}, options =
   invariant(JSON.stringify(names) === JSON.stringify(EXPECTED_BOUNDARIES), `Release boundaries must be exactly ${EXPECTED_BOUNDARIES.join(", ")}`);
   for (const boundary of attestation.boundaries) {
     invariant(Number.isInteger(boundary.durationMs) && boundary.durationMs >= 0, `${boundary.name}: durationMs must be a non-negative integer`);
+    validateBoundaryRequest(boundary.request, boundary.name);
     validateBoundaryOutcome(boundary);
     const transport = validateBoundaryTransport(boundary.transport, boundary.name);
     invariant(boundary.durationMs >= transport.totalBackoffMs, `${boundary.name}: durationMs cannot be shorter than totalBackoffMs`);
@@ -186,7 +204,7 @@ async function main() {
   console.log(`SHA-256: ${result.checksum}`);
   console.log(`Age: ${Math.floor(result.freshness.ageMs / 1000)} seconds`);
   console.log(`Provenance: ${result.provenance.runUrl} attempt ${result.provenance.runAttempt}`);
-  for (const boundary of result.attestation.boundaries) console.log(`- ${boundary.name}: HTTP ${boundary.httpStatus}, ${boundary.transport.attempts} attempt(s), ${boundary.transport.totalBackoffMs} ms backoff`);
+  for (const boundary of result.attestation.boundaries) console.log(`- ${boundary.name}: ${boundary.request.method} ${boundary.request.path}, HTTP ${boundary.httpStatus}, ${boundary.transport.attempts} attempt(s), ${boundary.transport.totalBackoffMs} ms backoff`);
 }
 
 const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
