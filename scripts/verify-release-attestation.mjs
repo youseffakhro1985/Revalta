@@ -6,8 +6,13 @@ import { pathToFileURL } from "node:url";
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
 const CANONICAL_ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
 const PRODUCTION_ORIGIN = "https://www.revalta.se";
+const EXPECTED_REPOSITORY = "youseffakhro1985/Revalta";
+const EXPECTED_WORKFLOW = "Strict Release Boundary Gate";
+const EXPECTED_WORKFLOW_PATH = "/.github/workflows/strict-release-boundary-gate.yml@";
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function invariant(condition, message) {
@@ -50,9 +55,32 @@ export function validateAttestationFreshness(checkedAt, { now = new Date(), maxA
   return { checkedAtMs, ageMs: Math.max(0, nowMs - checkedAtMs) };
 }
 
+export function validateReleaseProvenance(provenance, expected = {}) {
+  invariant(provenance && typeof provenance === "object" && !Array.isArray(provenance), "Release provenance is required");
+  invariant(REPOSITORY_PATTERN.test(provenance.repository), "Release provenance repository must use owner/name format");
+  invariant(provenance.repository === EXPECTED_REPOSITORY, `Release provenance repository must be ${EXPECTED_REPOSITORY}`);
+  invariant(provenance.workflow === EXPECTED_WORKFLOW, `Release provenance workflow must be ${EXPECTED_WORKFLOW}`);
+  invariant(typeof provenance.workflowRef === "string" && provenance.workflowRef.startsWith(`${EXPECTED_REPOSITORY}${EXPECTED_WORKFLOW_PATH}`), "Release provenance workflowRef is not the controlled workflow");
+  invariant(POSITIVE_INTEGER_PATTERN.test(String(provenance.runId)), "Release provenance runId must be a positive integer");
+  invariant(Number.isSafeInteger(provenance.runAttempt) && provenance.runAttempt > 0, "Release provenance runAttempt must be a positive integer");
+
+  const serverUrl = new URL(provenance.serverUrl);
+  invariant(serverUrl.protocol === "https:" && serverUrl.origin === provenance.serverUrl, "Release provenance serverUrl must be a clean HTTPS origin");
+  invariant(serverUrl.hostname === "github.com", "Release provenance serverUrl must be https://github.com");
+  const expectedRunUrl = `${serverUrl.origin}/${provenance.repository}/actions/runs/${provenance.runId}`;
+  invariant(provenance.runUrl === expectedRunUrl, "Release provenance runUrl mismatch");
+
+  if (expected.repository) invariant(provenance.repository === expected.repository, "Attestation repository does not match expected provenance");
+  if (expected.workflow) invariant(provenance.workflow === expected.workflow, "Attestation workflow does not match expected provenance");
+  if (expected.runId) invariant(String(provenance.runId) === String(expected.runId), "Attestation runId does not match expected provenance");
+  if (expected.runAttempt) invariant(provenance.runAttempt === expected.runAttempt, "Attestation runAttempt does not match expected provenance");
+
+  return provenance;
+}
+
 export function validateReleaseAttestation(attestation, expected = {}, options = {}) {
   invariant(attestation && typeof attestation === "object" && !Array.isArray(attestation), "Attestation must be a JSON object");
-  invariant(attestation.schemaVersion === 1, "Unsupported release attestation schemaVersion");
+  invariant(attestation.schemaVersion === 2, "Unsupported release attestation schemaVersion");
   invariant(attestation.kind === "revalta.release-boundary-attestation", "Unexpected release attestation kind");
   invariant(attestation.verdict === "passed", "Release attestation verdict must be passed");
   const freshness = validateAttestationFreshness(attestation.checkedAt, options);
@@ -74,6 +102,8 @@ export function validateReleaseAttestation(attestation, expected = {}, options =
     invariant(origin.hostname.endsWith(".vercel.app"), "Preview attestation must target a Vercel preview hostname");
   }
 
+  const provenance = validateReleaseProvenance(attestation.provenance, expected.provenance ?? {});
+
   invariant(Array.isArray(attestation.boundaries), "Release boundaries must be an array");
   const names = attestation.boundaries.map((boundary) => boundary?.name);
   invariant(JSON.stringify(names) === JSON.stringify(EXPECTED_BOUNDARIES), `Release boundaries must be exactly ${EXPECTED_BOUNDARIES.join(", ")}`);
@@ -88,7 +118,7 @@ export function validateReleaseAttestation(attestation, expected = {}, options =
   if (expected.branch) invariant(release.branch === expected.branch, "Attestation branch does not match expected release");
   if (expected.origin) invariant(release.origin === expected.origin, "Attestation origin does not match expected release");
 
-  return { attestation, freshness };
+  return { attestation, freshness, provenance };
 }
 
 export async function verifyReleaseAttestationFiles({ attestationPath, checksumPath, expected = {}, now, maxAgeSeconds }) {
@@ -111,6 +141,7 @@ export async function verifyReleaseAttestationFiles({ attestationPath, checksumP
   return {
     attestation: validation.attestation,
     freshness: validation.freshness,
+    provenance: validation.provenance,
     checksum,
     attestationPath: resolvedAttestationPath,
     checksumPath: resolvedChecksumPath,
@@ -138,11 +169,18 @@ async function main() {
       environment: process.env.EXPECTED_ENVIRONMENT?.trim() || undefined,
       branch: process.env.EXPECTED_BRANCH?.trim() || undefined,
       origin: process.env.BASE_URL?.trim() || undefined,
+      provenance: {
+        repository: process.env.EXPECTED_REPOSITORY?.trim() || undefined,
+        workflow: process.env.EXPECTED_WORKFLOW?.trim() || undefined,
+        runId: process.env.EXPECTED_RUN_ID?.trim() || undefined,
+        runAttempt: parseOptionalPositiveInteger(process.env.EXPECTED_RUN_ATTEMPT, "EXPECTED_RUN_ATTEMPT"),
+      },
     },
   });
   console.log(`Release attestation verified: ${result.attestation.release.commitSha}`);
   console.log(`SHA-256: ${result.checksum}`);
   console.log(`Age: ${Math.floor(result.freshness.ageMs / 1000)} seconds`);
+  console.log(`Provenance: ${result.provenance.runUrl} attempt ${result.provenance.runAttempt}`);
 }
 
 const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
