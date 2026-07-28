@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  parseRetryAfterMs,
   readBoundedJsonResponse,
   requestWithRetry,
   runReleaseBoundarySmoke,
@@ -155,6 +156,67 @@ describe("release boundary smoke", () => {
     await expect(readBoundedJsonResponse(new Response(new Uint8Array([0xff])), { label: "health-api" })).rejects.toThrow("valid UTF-8");
     await expect(readBoundedJsonResponse(new Response("not-json"), { label: "health-api" })).rejects.toThrow("valid JSON");
     await expect(readBoundedJsonResponse(new Response("{}"), { label: "health-api", maxBytes: 0 })).rejects.toThrow("positive integer");
+  });
+
+  it("parses and bounds Retry-After without trusting unbounded delays", () => {
+    const nowMs = Date.parse("2026-07-28T12:00:00.000Z");
+    expect(parseRetryAfterMs("3", { nowMs })).toBe(3_000);
+    expect(parseRetryAfterMs("30", { nowMs })).toBe(10_000);
+    expect(parseRetryAfterMs("Mon, 28 Jul 2026 12:00:04 GMT", { nowMs })).toBe(4_000);
+    expect(parseRetryAfterMs("Mon, 28 Jul 2026 11:59:00 GMT", { nowMs })).toBe(0);
+    expect(parseRetryAfterMs("invalid", { nowMs })).toBeUndefined();
+    expect(parseRetryAfterMs(null, { nowMs })).toBeUndefined();
+  });
+
+  it("retries only transient HTTP statuses and respects bounded Retry-After", async () => {
+    const sleeps = [];
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(new Response("busy", { status: 429, headers: { "retry-after": "2" } }))
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+
+    const response = await requestWithRetry("https://preview.example", {}, {
+      fetchImpl,
+      attempts: 3,
+      retryDelayMs: 100,
+      timeoutMs: 100,
+      sleepImpl: async (ms) => sleeps.push(ms),
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(sleeps).toEqual([2_000, 200]);
+  });
+
+  it("returns non-retryable HTTP responses immediately", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response("missing", { status: 404 }));
+    const response = await requestWithRetry("https://preview.example", {}, {
+      fetchImpl,
+      attempts: 3,
+      retryDelayMs: 0,
+      timeoutMs: 100,
+    });
+    expect(response.status).toBe(404);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed after a persistent retryable HTTP response", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 }));
+    await expect(requestWithRetry("https://preview.example", {}, {
+      fetchImpl,
+      attempts: 2,
+      retryDelayMs: 0,
+      timeoutMs: 100,
+    })).rejects.toThrow("retryable HTTP 503");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("validates retry controls before making requests", async () => {
+    const fetchImpl = vi.fn();
+    await expect(requestWithRetry("https://preview.example", {}, { fetchImpl, attempts: 0 })).rejects.toThrow("attempts");
+    await expect(requestWithRetry("https://preview.example", {}, { fetchImpl, timeoutMs: 0 })).rejects.toThrow("timeoutMs");
+    await expect(requestWithRetry("https://preview.example", {}, { fetchImpl, retryDelayMs: -1 })).rejects.toThrow("retryDelayMs");
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("verifies a complete preview release against the exact SHA", async () => {
