@@ -97,10 +97,17 @@ requireText(workflow, "node scripts/run-strict-release-gate.mjs", "Strict releas
 requireText(workflow, "RELEASE_ATTESTATION_PATH: artifacts/release-boundary-attestation.json", "Strict release workflow must use the controlled attestation path");
 requireText(workflow, "uses: actions/upload-artifact@v4", "Strict release workflow must persist release evidence as an artifact");
 requireText(workflow, "name: release-boundary-${{ inputs.expected_environment }}-${{ inputs.expected_sha }}", "Release artifact name must bind environment and full SHA");
+requireText(workflow, "artifacts/release-boundary-attestation.json.sha256", "Release artifact must include the SHA-256 checksum file");
+requireText(workflow, "if-no-files-found: error", "Missing release evidence must fail the artifact step");
 requireText(workflow, "if: always()", "Release artifact upload must run even when the gate fails");
 requireText(workflow, "retention-days: 30", "Release evidence must retain the controlled 30-day audit window");
 requireText(workflow, "contents: read", "Strict release workflow must retain least-privilege contents permissions");
 requireText(workflow, "cancel-in-progress: false", "Release evidence runs must not cancel one another");
+
+const runner = await readFile(paths.strictGateRunner, "utf8");
+requireText(runner, "createHash(\"sha256\")", "Strict release runner must calculate a SHA-256 checksum");
+requireText(runner, "`${outputPath}.sha256`", "Strict release runner must write the controlled checksum path");
+requireText(runner, "mode: 0o600", "Release evidence files must retain private filesystem permissions");
 
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") {
@@ -113,4 +120,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration, smoke governance and attestation retention are valid");
+console.log("Release configuration, smoke governance and checksum-backed attestation retention are valid");
