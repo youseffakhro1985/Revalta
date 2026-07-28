@@ -117,6 +117,10 @@ requireText(verifier, "revalta.release-boundary-attestation", "Release attestati
 requireText(verifier, "EXPECTED_BOUNDARIES", "Release attestation verifier must enforce the exact boundary set");
 requireText(verifier, "Production attestation must target", "Release attestation verifier must enforce canonical production identity");
 requireText(verifier, "Preview attestation must target", "Release attestation verifier must enforce controlled preview identity");
+requireText(verifier, "CANONICAL_ISO_PATTERN", "Release attestation verifier must require canonical UTC timestamps");
+requireText(verifier, "MAX_CLOCK_SKEW_MS", "Release attestation verifier must reject evidence too far in the future");
+requireText(verifier, "MAX_ATTESTATION_AGE_SECONDS", "Release attestation verifier must support explicit replay-age limits");
+requireText(verifier, "Release attestation is older than", "Release attestation verifier must fail closed on stale evidence");
 
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") {
@@ -132,4 +136,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration, smoke governance, checksum-backed attestations and offline verification are valid");
+console.log("Release configuration, smoke governance, checksum-backed attestations, offline verification and replay protection are valid");
