@@ -118,6 +118,11 @@ requireText(boundary, "validateSecurityHeaders(response.headers, \"health-api\")
 requireText(boundary, "login redirect must not contain a query string", "Dashboard release boundary must reject login redirect query strings");
 requireText(boundary, "login redirect must not contain a fragment", "Dashboard release boundary must reject login redirect fragments");
 requireText(boundary, "destination.origin === baseUrl.origin", "Dashboard release boundary must retain same-origin redirect enforcement");
+requireText(boundary, "const MAX_HEALTH_BODY_BYTES = 32 * 1024", "Health release boundary must retain the controlled response-size ceiling");
+requireText(boundary, "readBoundedJsonResponse", "Health release boundary must use bounded JSON response parsing");
+requireText(boundary, "Content-Length must be a non-negative integer", "Health release boundary must validate declared response length");
+requireText(boundary, "new TextDecoder(\"utf-8\", { fatal: true })", "Health release boundary must reject invalid UTF-8");
+requireText(boundary, "response exceeds ${maxBytes} byte limit", "Health release boundary must fail closed on oversized streamed responses");
 
 const verifier = await readFile(paths.attestationVerifier, "utf8");
 requireText(verifier, "attestation.schemaVersion === 2", "Release verifier must require schema version 2");
@@ -141,4 +146,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration, strict response contracts, smoke governance, schema-v2 provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, bounded response parsing, strict response contracts, smoke governance, schema-v2 provenance, checksum-backed attestations, offline verification and replay protection are valid");
