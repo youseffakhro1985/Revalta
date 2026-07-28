@@ -20,6 +20,10 @@ function securityHeaders(extra = {}) {
   });
 }
 
+function htmlHeaders(extra = {}) {
+  return securityHeaders({ "content-type": "text/html; charset=utf-8", ...extra });
+}
+
 function privateHeaders(extra = {}) {
   return securityHeaders({
     "cache-control": "private, no-store, max-age=0, must-revalidate",
@@ -29,7 +33,7 @@ function privateHeaders(extra = {}) {
   });
 }
 
-function healthResponse({ environment = "preview", branch = "release-preview", sha = SHA } = {}) {
+function healthResponse({ environment = "preview", branch = "release-preview", sha = SHA, contentType = "application/json; charset=utf-8" } = {}) {
   return new Response(JSON.stringify({
     ok: true,
     status: "ok",
@@ -42,14 +46,14 @@ function healthResponse({ environment = "preview", branch = "release-preview", s
     },
   }), {
     status: 200,
-    headers: {
-      "content-type": "application/json",
+    headers: securityHeaders({
+      "content-type": contentType,
       "cache-control": "no-store, max-age=0",
       "cdn-cache-control": "no-store",
       "vercel-cdn-cache-control": "no-store",
       "x-revalta-release": sha.slice(0, 7),
       "x-revalta-environment": environment,
-    },
+    }),
   });
 }
 
@@ -75,17 +79,20 @@ describe("release boundary smoke", () => {
     })).toThrow("branch main");
   });
 
-  it("requires noindex on preview and forbids it in production", () => {
-    const preview = new Response("ok", { status: 200, headers: securityHeaders({ "x-robots-tag": "noindex, nofollow" }) });
+  it("requires HTML, noindex on preview and forbids noindex in production", () => {
+    const preview = new Response("ok", { status: 200, headers: htmlHeaders({ "x-robots-tag": "noindex, nofollow" }) });
     expect(() => validateHomeBoundary(preview, "preview")).not.toThrow();
     expect(() => validateHomeBoundary(preview, "production")).toThrow("must not emit noindex");
 
-    const production = new Response("ok", { status: 200, headers: securityHeaders() });
+    const production = new Response("ok", { status: 200, headers: htmlHeaders() });
     expect(() => validateHomeBoundary(production, "production")).not.toThrow();
     expect(() => validateHomeBoundary(production, "preview")).toThrow("must emit noindex");
+
+    const wrongType = new Response("ok", { status: 200, headers: securityHeaders({ "content-type": "text/plain", "x-robots-tag": "noindex" }) });
+    expect(() => validateHomeBoundary(wrongType, "preview")).toThrow("Content-Type text/html");
   });
 
-  it("rejects a public dashboard and cross-origin login redirects", () => {
+  it("rejects a public dashboard, escaped redirects and non-canonical login redirects", () => {
     const publicDashboard = new Response("dashboard", { status: 200, headers: privateHeaders() });
     expect(() => validateDashboardBoundary(publicDashboard, new URL("https://preview.example"))).toThrow("redirect/401/403");
 
@@ -94,9 +101,15 @@ describe("release boundary smoke", () => {
       headers: privateHeaders({ location: "https://evil.example/login" }),
     });
     expect(() => validateDashboardBoundary(escaped, new URL("https://preview.example"))).toThrow("escaped origin");
+
+    const query = new Response(null, { status: 307, headers: privateHeaders({ location: "/login?next=/dashboard" }) });
+    expect(() => validateDashboardBoundary(query, new URL("https://preview.example"))).toThrow("query string");
+
+    const fragment = new Response(null, { status: 307, headers: privateHeaders({ location: "/login#continue" }) });
+    expect(() => validateDashboardBoundary(fragment, new URL("https://preview.example"))).toThrow("fragment");
   });
 
-  it("rejects stale releases and environment or branch mismatches", async () => {
+  it("rejects stale releases, wrong MIME and environment or branch mismatches", async () => {
     const expected = {
       expectedSha: SHA,
       expectedEnvironment: "preview",
@@ -110,13 +123,16 @@ describe("release boundary smoke", () => {
 
     const wrongEnvironment = healthResponse({ environment: "production" });
     await expect(wrongEnvironment.clone().json().then((payload) => validateHealthBoundary(wrongEnvironment, payload, expected))).rejects.toThrow("expected environment");
+
+    const wrongType = healthResponse({ contentType: "text/plain" });
+    await expect(wrongType.clone().json().then((payload) => validateHealthBoundary(wrongType, payload, expected))).rejects.toThrow("Content-Type application/json");
   });
 
   it("verifies a complete preview release against the exact SHA", async () => {
     const fetchImpl = vi.fn(async (url) => {
       const pathname = new URL(url).pathname;
       if (pathname === "/") {
-        return new Response("home", { status: 200, headers: securityHeaders({ "x-robots-tag": "noindex, nofollow" }) });
+        return new Response("home", { status: 200, headers: htmlHeaders({ "x-robots-tag": "noindex, nofollow" }) });
       }
       if (pathname === "/dashboard") {
         return new Response(null, { status: 307, headers: privateHeaders({ location: "/login" }) });
