@@ -3,7 +3,8 @@ import { canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { isModernStorageOnly } from "@/lib/dual-list";
 import { getSchemaReadiness } from "@/lib/schema-readiness";
 import { getStorageToken, hasStorageConfig } from "@/lib/storage";
-import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+import { NextRequest, NextResponse } from "next/server";
 
 function buildEnvSnapshot() {
   const blobToken = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
@@ -51,13 +52,19 @@ function healthResponse(body: unknown, status = 200, release = buildReleaseSnaps
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
   const isPublic = !user;
   const startedAt = Date.now();
   const release = buildReleaseSnapshot();
   const modernStorageOnly = isModernStorageOnly();
   const env = buildEnvSnapshot();
+  const logger = createLogger({
+    route: "/api/health",
+    requestId: request.headers.get("x-request-id") ?? undefined,
+    release: release.shortCommitSha,
+    environment: release.environment,
+  });
 
   try {
     await db.$queryRaw`SELECT 1`;
@@ -88,6 +95,13 @@ export async function GET() {
       && schema.ready,
     );
 
+    if (!schema.ready) {
+      logger.warn("health schema readiness degraded", {
+        latencyMs: Date.now() - startedAt,
+        missingSchemaItems: schema.missing,
+      });
+    }
+
     return healthResponse({
       status: schema.ready ? "ok" : "degraded",
       ok: schema.ready,
@@ -105,7 +119,10 @@ export async function GET() {
       checkedAt: new Date().toISOString(),
     }, schema.ready ? 200 : 503, release);
   } catch (error) {
-    console.error("Health check error:", error);
+    logger.error("health check failed", error, {
+      latencyMs: Date.now() - startedAt,
+      audience: isPublic ? "public" : "operations",
+    });
     return healthResponse({
       status: "error",
       ok: false,
