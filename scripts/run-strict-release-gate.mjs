@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { validateReleaseTarget } from "./validate-release-target.mjs";
 import { renderMarkdownSummary, runReleaseBoundarySmoke } from "./verify-release-boundaries.mjs";
 
-const ATTESTATION_VERSION = 5;
+const ATTESTATION_VERSION = 6;
 const RELEASE_POLICY_ID = "revalta.strict-release-policy.v1";
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
 const BOUNDARY_REQUESTS = Object.freeze({
@@ -21,6 +21,14 @@ const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 
 function invariant(condition, message) { if (!condition) throw new Error(message); }
 
+export function assertExactKeys(value, expectedKeys, label) {
+  invariant(value && typeof value === "object" && !Array.isArray(value), `${label} must be an object`);
+  const actual = Object.keys(value).sort();
+  const expected = [...expectedKeys].sort();
+  invariant(JSON.stringify(actual) === JSON.stringify(expected), `${label} must contain exactly ${expected.join(", ")}`);
+  return value;
+}
+
 export function buildCanonicalReleasePolicy() {
   return {
     id: RELEASE_POLICY_ID,
@@ -33,6 +41,7 @@ export function buildCanonicalReleasePolicy() {
     retryableHttpStatuses: [408, 425, 429, 500, 502, 503, 504],
     transportEvidence: ["attempts", "retryStatuses", "networkErrors", "totalBackoffMs"],
     durationContract: "monotonic-duration-gte-total-backoff",
+    objectShapeContract: "exact-keys-no-extensions",
   };
 }
 
@@ -47,7 +56,7 @@ export function buildReleasePolicyEvidence() {
 }
 
 export function validateReleaseProvenance(provenance) {
-  invariant(provenance && typeof provenance === "object" && !Array.isArray(provenance), "Release provenance is required");
+  assertExactKeys(provenance, ["repository", "workflow", "workflowRef", "runId", "runAttempt", "serverUrl", "runUrl"], "Release provenance");
   invariant(REPOSITORY_PATTERN.test(provenance.repository), "Release provenance repository must use owner/name format");
   invariant(typeof provenance.workflow === "string" && provenance.workflow.trim().length > 0, "Release provenance workflow is required");
   invariant(typeof provenance.workflowRef === "string" && provenance.workflowRef.includes("/.github/workflows/"), "Release provenance workflowRef is invalid");
@@ -57,15 +66,7 @@ export function validateReleaseProvenance(provenance) {
   invariant(serverUrl.protocol === "https:" && serverUrl.origin === provenance.serverUrl, "Release provenance serverUrl must be a clean HTTPS origin");
   const expectedRunUrl = `${serverUrl.origin}/${provenance.repository}/actions/runs/${provenance.runId}`;
   invariant(provenance.runUrl === expectedRunUrl, "Release provenance runUrl mismatch");
-  return {
-    repository: provenance.repository,
-    workflow: provenance.workflow.trim(),
-    workflowRef: provenance.workflowRef,
-    runId: String(provenance.runId),
-    runAttempt: Number(provenance.runAttempt),
-    serverUrl: serverUrl.origin,
-    runUrl: expectedRunUrl,
-  };
+  return { repository: provenance.repository, workflow: provenance.workflow.trim(), workflowRef: provenance.workflowRef, runId: String(provenance.runId), runAttempt: Number(provenance.runAttempt), serverUrl: serverUrl.origin, runUrl: expectedRunUrl };
 }
 
 export function buildReleaseProvenance(env = process.env) {
@@ -88,12 +89,7 @@ function validateBoundaryTransport(result) {
   invariant(result.retryStatuses.length + result.networkErrors === result.attempts - 1, `${result.label}: retry evidence count mismatch`);
   for (const status of result.retryStatuses) invariant(RETRYABLE_HTTP_STATUSES.has(status), `${result.label}: non-retryable status in retry evidence`);
   if (result.attempts === 1) invariant(result.totalBackoffMs === 0, `${result.label}: first-attempt success cannot include backoff`);
-  return {
-    attempts: result.attempts,
-    retryStatuses: [...result.retryStatuses],
-    networkErrors: result.networkErrors,
-    totalBackoffMs: result.totalBackoffMs,
-  };
+  return { attempts: result.attempts, retryStatuses: [...result.retryStatuses], networkErrors: result.networkErrors, totalBackoffMs: result.totalBackoffMs };
 }
 
 export function normalizeBoundaryOutcome(result, releaseOrigin) {
@@ -102,7 +98,6 @@ export function normalizeBoundaryOutcome(result, releaseOrigin) {
   invariant(Number.isInteger(result.durationMs) && result.durationMs >= 0, `${result.label}: durationMs must be a non-negative integer`);
   const transport = validateBoundaryTransport(result);
   invariant(result.durationMs >= transport.totalBackoffMs, `${result.label}: durationMs cannot be shorter than totalBackoffMs`);
-
   let redirectLocation = null;
   if (result.label === "public-home") {
     invariant(result.status === 200, "public-home: passed attestation requires HTTP 200");
@@ -123,17 +118,23 @@ export function normalizeBoundaryOutcome(result, releaseOrigin) {
     invariant(DASHBOARD_DENIAL_STATUSES.has(result.status), "dashboard-boundary: passed attestation requires redirect, 401 or 403");
     invariant(result.location === null || result.location === undefined, "dashboard-boundary: denial must not include redirectLocation");
   }
-
   const request = BOUNDARY_REQUESTS[result.label];
   invariant(request, `${result.label}: request contract is missing`);
-  return {
-    name: result.label,
-    request: { method: request.method, path: request.path },
-    httpStatus: result.status,
-    durationMs: result.durationMs,
-    redirectLocation,
-    transport,
-  };
+  return { name: result.label, request: { method: request.method, path: request.path }, httpStatus: result.status, durationMs: result.durationMs, redirectLocation, transport };
+}
+
+export function validateCanonicalAttestationShape(attestation) {
+  assertExactKeys(attestation, ["schemaVersion", "kind", "verdict", "checkedAt", "policy", "release", "provenance", "boundaries"], "Release attestation");
+  assertExactKeys(attestation.policy, ["id", "sha256"], "Release policy evidence");
+  assertExactKeys(attestation.release, ["commitSha", "shortCommitSha", "environment", "branch", "origin"], "Release metadata");
+  assertExactKeys(attestation.provenance, ["repository", "workflow", "workflowRef", "runId", "runAttempt", "serverUrl", "runUrl"], "Release provenance");
+  invariant(Array.isArray(attestation.boundaries), "Release boundaries must be an array");
+  for (const boundary of attestation.boundaries) {
+    assertExactKeys(boundary, ["name", "request", "httpStatus", "durationMs", "redirectLocation", "transport"], `${boundary?.name ?? "boundary"} evidence`);
+    assertExactKeys(boundary.request, ["method", "path"], `${boundary.name} request evidence`);
+    assertExactKeys(boundary.transport, ["attempts", "retryStatuses", "networkErrors", "totalBackoffMs"], `${boundary.name} transport evidence`);
+  }
+  return attestation;
 }
 
 export function buildReleaseAttestation({ target, report, provenance, checkedAt = new Date() }) {
@@ -145,26 +146,20 @@ export function buildReleaseAttestation({ target, report, provenance, checkedAt 
   invariant(Array.isArray(report.results), "Attestation boundary results are required");
   const names = report.results.map((result) => result?.label);
   invariant(JSON.stringify(names) === JSON.stringify(EXPECTED_BOUNDARIES), `Attestation boundaries must be exactly ${EXPECTED_BOUNDARIES.join(", ")}`);
-  return {
+  return validateCanonicalAttestationShape({
     schemaVersion: ATTESTATION_VERSION,
     kind: "revalta.release-boundary-attestation",
     verdict: "passed",
     checkedAt: checkedAt.toISOString(),
     policy: buildReleasePolicyEvidence(),
-    release: {
-      commitSha: target.expectedSha,
-      shortCommitSha: target.expectedSha.slice(0, 7),
-      environment: target.environment,
-      branch: target.branch,
-      origin: target.baseUrl,
-    },
+    release: { commitSha: target.expectedSha, shortCommitSha: target.expectedSha.slice(0, 7), environment: target.environment, branch: target.branch, origin: target.baseUrl },
     provenance: validateReleaseProvenance(provenance),
     boundaries: report.results.map((result) => normalizeBoundaryOutcome(result, target.baseUrl)),
-  };
+  });
 }
 
 export function serializeReleaseAttestation(attestation) {
-  invariant(attestation && typeof attestation === "object", "Release attestation is required");
+  validateCanonicalAttestationShape(attestation);
   return `${JSON.stringify(attestation, null, 2)}\n`;
 }
 
@@ -194,12 +189,7 @@ export async function writeReleaseAttestation(path, attestation) {
 
 export async function runStrictReleaseGate(input, dependencies = {}) {
   const target = validateReleaseTarget(input);
-  const report = await runReleaseBoundarySmoke({
-    baseUrl: target.baseUrl,
-    expectedSha: target.expectedSha,
-    expectedEnvironment: target.environment,
-    expectedBranch: target.branch,
-  }, dependencies);
+  const report = await runReleaseBoundarySmoke({ baseUrl: target.baseUrl, expectedSha: target.expectedSha, expectedEnvironment: target.environment, expectedBranch: target.branch }, dependencies);
   const provenance = dependencies.provenance ?? buildReleaseProvenance(dependencies.env);
   const attestation = buildReleaseAttestation({ target, report, provenance, checkedAt: dependencies.checkedAt });
   let writtenAttestation = null;
@@ -209,29 +199,14 @@ export async function runStrictReleaseGate(input, dependencies = {}) {
 
 async function main() {
   const attestationPath = process.env.RELEASE_ATTESTATION_PATH || "artifacts/release-boundary-attestation.json";
-  const result = await runStrictReleaseGate({
-    baseUrl: process.env.BASE_URL,
-    expectedSha: process.env.EXPECTED_SHA,
-    environment: process.env.EXPECTED_ENVIRONMENT,
-    branch: process.env.EXPECTED_BRANCH,
-  }, { attestationPath });
+  const result = await runStrictReleaseGate({ baseUrl: process.env.BASE_URL, expectedSha: process.env.EXPECTED_SHA, environment: process.env.EXPECTED_ENVIRONMENT, branch: process.env.EXPECTED_BRANCH }, { attestationPath });
   console.log(`Strict release gate passed for ${result.attestation.release.commitSha}`);
   console.log(`Release attestation written to ${result.writtenAttestation.outputPath}`);
   console.log(`Release attestation SHA-256: ${result.writtenAttestation.checksum}`);
   console.log(`Release policy: ${result.attestation.policy.id} (${result.attestation.policy.sha256})`);
   console.log(`Release provenance: ${result.attestation.provenance.runUrl} attempt ${result.attestation.provenance.runAttempt}`);
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const summary = [
-      renderMarkdownSummary(result.report), "", "### Release attestation", "",
-      `- Verdict: \`${result.attestation.verdict}\``,
-      `- Checked at: \`${result.attestation.checkedAt}\``,
-      `- Policy: \`${result.attestation.policy.id}\``,
-      `- Policy SHA-256: \`${result.attestation.policy.sha256}\``,
-      `- Artifact: \`${attestationPath}\``,
-      `- SHA-256: \`${result.writtenAttestation.checksum}\``,
-      `- Provenance: ${result.attestation.provenance.runUrl}`,
-      `- Run attempt: \`${result.attestation.provenance.runAttempt}\``, "",
-    ].join("\n");
+    const summary = [renderMarkdownSummary(result.report), "", "### Release attestation", "", `- Verdict: \`${result.attestation.verdict}\``, `- Checked at: \`${result.attestation.checkedAt}\``, `- Policy: \`${result.attestation.policy.id}\``, `- Policy SHA-256: \`${result.attestation.policy.sha256}\``, `- Artifact: \`${attestationPath}\``, `- SHA-256: \`${result.writtenAttestation.checksum}\``, `- Provenance: ${result.attestation.provenance.runUrl}`, `- Run attempt: \`${result.attestation.provenance.runAttempt}\``, ""].join("\n");
     await writeFile(process.env.GITHUB_STEP_SUMMARY, summary, { encoding: "utf8", flag: "a" });
   }
 }
