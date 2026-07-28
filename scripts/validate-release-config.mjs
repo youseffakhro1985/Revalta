@@ -111,6 +111,14 @@ requireText(runner, "createHash(\"sha256\")", "Strict release runner must calcul
 requireText(runner, "`${outputPath}.sha256`", "Strict release runner must write the controlled checksum path");
 requireText(runner, "mode: 0o600", "Release evidence files must retain private filesystem permissions");
 
+const boundary = await readFile(paths.boundaryVerifier, "utf8");
+requireText(boundary, "validateContentType(response.headers, \"text/html\", \"public-home\")", "Public release boundary must enforce HTML content type");
+requireText(boundary, "validateContentType(response.headers, \"application/json\", \"health-api\")", "Health release boundary must enforce JSON content type");
+requireText(boundary, "validateSecurityHeaders(response.headers, \"health-api\")", "Health release boundary must enforce security headers");
+requireText(boundary, "login redirect must not contain a query string", "Dashboard release boundary must reject login redirect query strings");
+requireText(boundary, "login redirect must not contain a fragment", "Dashboard release boundary must reject login redirect fragments");
+requireText(boundary, "destination.origin === baseUrl.origin", "Dashboard release boundary must retain same-origin redirect enforcement");
+
 const verifier = await readFile(paths.attestationVerifier, "utf8");
 requireText(verifier, "attestation.schemaVersion === 2", "Release verifier must require schema version 2");
 requireText(verifier, "EXPECTED_REPOSITORY = \"youseffakhro1985/Revalta\"", "Release verifier must bind evidence to the controlled repository");
@@ -133,4 +141,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration, smoke governance, schema-v2 provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, strict response contracts, smoke governance, schema-v2 provenance, checksum-backed attestations, offline verification and replay protection are valid");
