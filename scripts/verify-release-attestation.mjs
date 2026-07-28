@@ -9,6 +9,8 @@ const CANONICAL_ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
+const DASHBOARD_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const DASHBOARD_DENIAL_STATUSES = new Set([401, 403]);
 const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const PRODUCTION_ORIGIN = "https://www.revalta.se";
 const EXPECTED_REPOSITORY = "youseffakhro1985/Revalta";
@@ -81,6 +83,27 @@ export function validateBoundaryTransport(transport, label) {
   return transport;
 }
 
+export function validateBoundaryOutcome(boundary) {
+  invariant(Number.isInteger(boundary.httpStatus) && boundary.httpStatus >= 100 && boundary.httpStatus <= 599, `${boundary.name}: invalid HTTP status`);
+  if (boundary.name === "public-home") {
+    invariant(boundary.httpStatus === 200, "public-home: passed attestation requires HTTP 200");
+    invariant(boundary.redirectLocation === null, "public-home: redirectLocation must be null");
+  } else if (boundary.name === "health-api") {
+    invariant(boundary.httpStatus === 200, "health-api: passed attestation requires HTTP 200");
+    invariant(boundary.redirectLocation === null, "health-api: redirectLocation must be null");
+  } else if (boundary.name === "dashboard-boundary") {
+    if (DASHBOARD_REDIRECT_STATUSES.has(boundary.httpStatus)) {
+      invariant(boundary.redirectLocation === "/login", "dashboard-boundary: redirectLocation must be canonical /login");
+    } else {
+      invariant(DASHBOARD_DENIAL_STATUSES.has(boundary.httpStatus), "dashboard-boundary: passed attestation requires redirect, 401 or 403");
+      invariant(boundary.redirectLocation === null, "dashboard-boundary: denial must not include redirectLocation");
+    }
+  } else {
+    throw new Error(`Unexpected boundary ${boundary.name}`);
+  }
+  return boundary;
+}
+
 export function validateReleaseAttestation(attestation, expected = {}, options = {}) {
   invariant(attestation && typeof attestation === "object" && !Array.isArray(attestation), "Attestation must be a JSON object");
   invariant(attestation.schemaVersion === 3, "Unsupported release attestation schemaVersion");
@@ -107,9 +130,8 @@ export function validateReleaseAttestation(attestation, expected = {}, options =
   const names = attestation.boundaries.map((boundary) => boundary?.name);
   invariant(JSON.stringify(names) === JSON.stringify(EXPECTED_BOUNDARIES), `Release boundaries must be exactly ${EXPECTED_BOUNDARIES.join(", ")}`);
   for (const boundary of attestation.boundaries) {
-    invariant(Number.isInteger(boundary.httpStatus) && boundary.httpStatus >= 100 && boundary.httpStatus <= 599, `${boundary.name}: invalid HTTP status`);
     invariant(Number.isInteger(boundary.durationMs) && boundary.durationMs >= 0, `${boundary.name}: durationMs must be a non-negative integer`);
-    invariant(boundary.redirectLocation === null || typeof boundary.redirectLocation === "string", `${boundary.name}: invalid redirectLocation`);
+    validateBoundaryOutcome(boundary);
     const transport = validateBoundaryTransport(boundary.transport, boundary.name);
     invariant(boundary.durationMs >= transport.totalBackoffMs, `${boundary.name}: durationMs cannot be shorter than totalBackoffMs`);
   }
@@ -164,7 +186,7 @@ async function main() {
   console.log(`SHA-256: ${result.checksum}`);
   console.log(`Age: ${Math.floor(result.freshness.ageMs / 1000)} seconds`);
   console.log(`Provenance: ${result.provenance.runUrl} attempt ${result.provenance.runAttempt}`);
-  for (const boundary of result.attestation.boundaries) console.log(`- ${boundary.name}: ${boundary.transport.attempts} attempt(s), ${boundary.transport.totalBackoffMs} ms backoff`);
+  for (const boundary of result.attestation.boundaries) console.log(`- ${boundary.name}: HTTP ${boundary.httpStatus}, ${boundary.transport.attempts} attempt(s), ${boundary.transport.totalBackoffMs} ms backoff`);
 }
 
 const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
