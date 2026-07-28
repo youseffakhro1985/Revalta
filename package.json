@@ -19,6 +19,7 @@
     "test": "vitest",
     "test:ci": "vitest run",
     "validate:release-config": "node scripts/validate-release-config.mjs",
+    "verify:release-attestation": "node scripts/verify-release-attestation.mjs",
     "audit:prod": "npm audit --omit=dev",
     "quality": "npm run validate:release-config && npm run lint && npm run test:ci && npm run typecheck && npm run audit:prod && npm run build:ci",
     "postinstall": "prisma generate",
