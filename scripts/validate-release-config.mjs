@@ -9,6 +9,7 @@ const paths = {
   targetValidator: new URL("scripts/validate-release-target.mjs", root),
   boundaryVerifier: new URL("scripts/verify-release-boundaries.mjs", root),
   strictGateRunner: new URL("scripts/run-strict-release-gate.mjs", root),
+  attestationVerifier: new URL("scripts/verify-release-attestation.mjs", root),
 };
 
 function fail(message) {
@@ -85,6 +86,7 @@ if (config.buildCommand !== "npm run build" || config.installCommand !== "npm ci
 await assertFileExists(paths.targetValidator, "Release target validator");
 await assertFileExists(paths.boundaryVerifier, "Release boundary verifier");
 await assertFileExists(paths.strictGateRunner, "Strict release gate runner");
+await assertFileExists(paths.attestationVerifier, "Release attestation verifier");
 await assertFileExists(paths.strictWorkflow, "Strict Release Boundary Gate workflow");
 await assertFileMissing(paths.legacyWorkflow, "Legacy Release Boundary Smoke workflow");
 
@@ -109,9 +111,19 @@ requireText(runner, "createHash(\"sha256\")", "Strict release runner must calcul
 requireText(runner, "`${outputPath}.sha256`", "Strict release runner must write the controlled checksum path");
 requireText(runner, "mode: 0o600", "Release evidence files must retain private filesystem permissions");
 
+const verifier = await readFile(paths.attestationVerifier, "utf8");
+requireText(verifier, "timingSafeEqual", "Release attestation verifier must use timing-safe checksum comparison");
+requireText(verifier, "revalta.release-boundary-attestation", "Release attestation verifier must validate the controlled evidence kind");
+requireText(verifier, "EXPECTED_BOUNDARIES", "Release attestation verifier must enforce the exact boundary set");
+requireText(verifier, "Production attestation must target", "Release attestation verifier must enforce canonical production identity");
+requireText(verifier, "Preview attestation must target", "Release attestation verifier must enforce controlled preview identity");
+
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") {
   fail("package.json must expose the controlled validate:release-config command");
+}
+if (scripts["verify:release-attestation"] !== "node scripts/verify-release-attestation.mjs") {
+  fail("package.json must expose the controlled verify:release-attestation command");
 }
 if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") {
   fail("package.json must expose the controlled smoke:release-boundaries command");
@@ -120,4 +132,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration, smoke governance and checksum-backed attestation retention are valid");
+console.log("Release configuration, smoke governance, checksum-backed attestations and offline verification are valid");
