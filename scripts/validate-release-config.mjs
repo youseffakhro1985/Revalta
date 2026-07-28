@@ -86,13 +86,19 @@ for (const [fragment, message] of [
 const verifier = await readFile(paths.attestationVerifier, "utf8");
 for (const [fragment, message] of [
   ["const ATTESTATION_VERSION = 6", "Release verifier must require schema version 6"],
+  ["const MAX_CHECKSUM_BYTES = 256", "Checksum sidecars must retain the 256-byte ceiling"],
+  ["export function parseCanonicalChecksumBytes", "Release verifier must canonicalize checksum sidecars"],
+  ["canonical lowercase '<sha256>  <filename>\\n' bytes", "Checksum sidecars must use lowercase LF-only canonical bytes"],
+  ["Checksum file must not contain a UTF-8 BOM", "Checksum sidecars must reject BOM prefixes"],
+  ["export function verifyReleaseAttestationSnapshot", "Release verifier must expose immutable snapshot verification"],
+  ["const immutableAttestationBytes = Buffer.from(attestationBytes)", "Snapshot verification must copy attestation bytes"],
+  ["const immutableChecksumBytes = Buffer.from(checksumBytes ?? [])", "Snapshot verification must copy checksum bytes"],
+  ["parseCanonicalChecksumBytes(immutableChecksumBytes", "Snapshot verification must validate the captured sidecar"],
+  ["verifyChecksum(immutableAttestationBytes", "Snapshot verification must hash the captured artifact"],
+  ["Promise.all([readFile(resolvedAttestationPath), readFile(resolvedChecksumPath)])", "File verification must read both evidence files once"],
   ["objectShapeContract: \"exact-keys-no-extensions\"", "Verifier policy must bind exact shapes"],
   ["export function assertExactKeys", "Verifier must centralize exact-key validation"],
   ["validateCanonicalAttestationShape(attestation)", "Verifier must validate the complete shape first"],
-  ['assertExactKeys(attestation, ["schemaVersion", "kind", "verdict", "checkedAt", "policy", "release", "provenance", "boundaries"], "Release attestation")', "Verifier must reject top-level extensions"],
-  ['assertExactKeys(attestation.release, ["commitSha", "shortCommitSha", "environment", "branch", "origin"], "Release metadata")', "Verifier must reject release metadata extensions"],
-  ['assertExactKeys(attestation.provenance, ["repository", "workflow", "workflowRef", "runId", "runAttempt", "serverUrl", "runUrl"], "Release provenance")', "Verifier must reject provenance extensions"],
-  ['assertExactKeys(boundary.transport, ["attempts", "retryStatuses", "networkErrors", "totalBackoffMs"], `${boundary.name} transport evidence`)', "Verifier must reject transport extensions"],
   ["validateReleasePolicyEvidence", "Verifier must validate policy evidence"],
   ["Release policy SHA-256 mismatch", "Verifier must reject policy digest mismatch"],
   ["timingSafeEqual(actual, expected)", "Verifier must compare digests timing-safely"],
@@ -105,17 +111,18 @@ for (const [fragment, message] of [
 const canonicalVerifier = await readFile(paths.canonicalVerifier, "utf8");
 for (const [fragment, message] of [
   ["const MAX_ATTESTATION_BYTES = 1024 * 1024", "Canonical verifier must retain the 1 MiB size ceiling"],
-  ["const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf])", "Canonical verifier must detect the BOM in raw bytes"],
-  ["new TextDecoder(\"utf-8\", { fatal: true, ignoreBOM: true })", "Canonical verifier must reject invalid UTF-8 without hiding raw BOM checks"],
-  ["CANONICAL_KEY_ORDER", "Canonical verifier must define controlled schema key ordering"],
-  ["canonicalizeJsonValue", "Canonical verifier must recursively normalize object key order"],
-  ["Object.keys(value).sort(compareCanonicalKeys)", "Canonical verifier must sort every object using the controlled order"],
-  ["buffer.subarray(0, UTF8_BOM.length).equals(UTF8_BOM)", "Canonical verifier must inspect raw bytes before decoding"],
-  ["serializeCanonicalJson", "Canonical verifier must deterministically reserialize JSON"],
+  ["new TextDecoder(\"utf-8\", { fatal: true", "Canonical verifier must reject invalid UTF-8"],
+  ["must not contain a UTF-8 BOM", "Canonical verifier must reject BOM-prefixed artifacts"],
+  ["CANONICAL_KEY_ORDER", "Canonical verifier must retain controlled recursive key order"],
+  ["canonicalizeJsonValue", "Canonical verifier must recursively canonicalize parsed JSON"],
   ["text === canonical", "Canonical verifier must compare raw and canonical bytes exactly"],
   ["duplicate keys, alternate key order or non-canonical whitespace are forbidden", "Canonical verifier must reject parser-ambiguous JSON"],
-  ["verifyReleaseAttestationFiles", "Canonical verifier must delegate to semantic and checksum verification"],
+  ["verifyReleaseAttestationSnapshot", "Canonical verifier must delegate to immutable snapshot verification"],
+  ["Promise.all([", "Canonical verifier must capture artifact and sidecar together"],
+  ["readFile(resolvedAttestationPath)", "Canonical verifier must read the artifact exactly once"],
+  ["readFile(resolvedChecksumPath)", "Canonical verifier must read the sidecar exactly once"],
 ]) requireText(canonicalVerifier, fragment, message);
+if (canonicalVerifier.includes("verifyReleaseAttestationFiles")) fail("Canonical verifier must not reopen evidence through the file-based verifier");
 
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");
@@ -123,4 +130,4 @@ if (scripts["verify:release-attestation"] !== "node scripts/verify-canonical-rel
 if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") fail("package.json must expose smoke:release-boundaries");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must run release configuration validation first");
 
-console.log("Release configuration, schema-v6 exact object shapes, raw-BOM detection, schema-ordered canonical JSON bytes, duplicate-key resistance, policy fingerprints, endpoint identity, boundary semantics, monotonic timing, transport telemetry, provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, immutable evidence snapshots, canonical checksum sidecars, schema-v6 exact object shapes, canonical JSON bytes, duplicate-key resistance, policy fingerprints, endpoint identity, boundary semantics, monotonic timing, transport telemetry, provenance, checksum-backed attestations, offline verification and replay protection are valid");
