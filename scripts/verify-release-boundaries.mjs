@@ -1,4 +1,5 @@
 import { appendFile } from "node:fs/promises";
+import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_ATTEMPTS = 3;
@@ -179,7 +180,6 @@ export async function requestWithRetryEvidence(url, options = {}, dependencies =
   let lastError;
   let lastRetryableStatus;
   const evidence = { attempts: 0, retryStatuses: [], networkErrors: 0, totalBackoffMs: 0 };
-
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     evidence.attempts = attempt;
     try {
@@ -215,8 +215,17 @@ export async function requestWithRetry(url, options = {}, dependencies = {}) {
   return (await requestWithRetryEvidence(url, options, dependencies)).response;
 }
 
+export function measureMonotonicDuration(startedAt, finishedAt, minimumMs = 0) {
+  invariant(Number.isFinite(startedAt) && Number.isFinite(finishedAt), "Monotonic release clock must return finite numbers");
+  invariant(finishedAt >= startedAt, "Monotonic release clock moved backwards");
+  invariant(Number.isSafeInteger(minimumMs) && minimumMs >= 0, "minimumMs must be a non-negative safe integer");
+  const measured = Math.ceil(finishedAt - startedAt);
+  return Math.max(measured, minimumMs);
+}
+
 export async function runReleaseBoundarySmoke(options, dependencies = {}) {
   const expected = validateOptions(options);
+  const monotonicNowImpl = dependencies.monotonicNowImpl ?? (() => performance.now());
   const routes = [
     { label: "public-home", path: "/" },
     { label: "dashboard-boundary", path: "/dashboard" },
@@ -224,7 +233,7 @@ export async function runReleaseBoundarySmoke(options, dependencies = {}) {
   ];
   const results = [];
   for (const route of routes) {
-    const startedAt = Date.now();
+    const startedAt = monotonicNowImpl();
     const { response, evidence } = await requestWithRetryEvidence(new URL(route.path, expected.baseUrl), { method: "GET" }, dependencies);
     if (route.label === "public-home") validateHomeBoundary(response, expected.expectedEnvironment);
     if (route.label === "dashboard-boundary") validateDashboardBoundary(response, expected.baseUrl);
@@ -232,10 +241,11 @@ export async function runReleaseBoundarySmoke(options, dependencies = {}) {
       const payload = await readBoundedJsonResponse(response, { label: "health-api" });
       validateHealthBoundary(response, payload, expected);
     }
+    const durationMs = measureMonotonicDuration(startedAt, monotonicNowImpl(), evidence.totalBackoffMs);
     results.push({
       label: route.label,
       status: response.status,
-      durationMs: Date.now() - startedAt,
+      durationMs,
       location: response.headers.get("location"),
       attempts: evidence.attempts,
       retryStatuses: evidence.retryStatuses,
