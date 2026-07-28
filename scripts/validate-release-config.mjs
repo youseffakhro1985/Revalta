@@ -62,7 +62,12 @@ requireText(workflow, "contents: read", "Strict release workflow must retain lea
 requireText(workflow, "cancel-in-progress: false", "Release evidence runs must not cancel one another");
 
 const runner = await readFile(paths.strictGateRunner, "utf8");
-requireText(runner, "const ATTESTATION_VERSION = 3", "Strict release runner must emit schema version 3 attestations");
+requireText(runner, "const ATTESTATION_VERSION = 4", "Strict release runner must emit schema version 4 attestations");
+requireText(runner, "BOUNDARY_REQUESTS", "Strict release runner must define the controlled endpoint identity map");
+requireText(runner, '"public-home": Object.freeze({ method: "GET", path: "/" })', "Strict release runner must bind public-home to GET /");
+requireText(runner, '"dashboard-boundary": Object.freeze({ method: "GET", path: "/dashboard" })', "Strict release runner must bind dashboard-boundary to GET /dashboard");
+requireText(runner, '"health-api": Object.freeze({ method: "GET", path: "/api/health" })', "Strict release runner must bind health-api to GET /api/health");
+requireText(runner, "request: { method: request.method, path: request.path }", "Strict release runner must persist endpoint identity in the attestation");
 requireText(runner, "buildReleaseProvenance", "Strict release runner must collect GitHub Actions provenance");
 requireText(runner, "GITHUB_REPOSITORY", "Strict release runner must bind evidence to the GitHub repository");
 requireText(runner, "GITHUB_WORKFLOW_REF", "Strict release runner must bind evidence to the workflow ref");
@@ -96,9 +101,19 @@ requireText(boundary, "from \"node:perf_hooks\"", "Release smoke must use the No
 requireText(boundary, "measureMonotonicDuration", "Release smoke must centralize monotonic duration validation");
 requireText(boundary, "Monotonic release clock moved backwards", "Release smoke must fail closed on a backwards monotonic clock");
 requireText(boundary, "Math.max(measured, minimumMs)", "Release smoke duration must include recorded backoff");
+requireText(boundary, '{ label: "public-home", path: "/" }', "Release smoke must retain the controlled public-home route");
+requireText(boundary, '{ label: "dashboard-boundary", path: "/dashboard" }', "Release smoke must retain the controlled dashboard route");
+requireText(boundary, '{ label: "health-api", path: "/api/health" }', "Release smoke must retain the controlled health route");
+requireText(boundary, '{ method: "GET" }', "Release smoke must retain GET requests for controlled boundaries");
 
 const verifier = await readFile(paths.attestationVerifier, "utf8");
-requireText(verifier, "attestation.schemaVersion === 3", "Release verifier must require schema version 3");
+requireText(verifier, "attestation.schemaVersion === 4", "Release verifier must require schema version 4");
+requireText(verifier, "BOUNDARY_REQUESTS", "Release verifier must define the controlled endpoint identity map");
+requireText(verifier, "validateBoundaryRequest", "Release verifier must validate endpoint identity");
+requireText(verifier, "request evidence must contain only method and path", "Release verifier must reject extra request evidence fields");
+requireText(verifier, "request method must be", "Release verifier must require the exact HTTP method");
+requireText(verifier, "request path must be", "Release verifier must require the exact request path");
+requireText(verifier, "request path must be canonical", "Release verifier must reject non-canonical request paths");
 requireText(verifier, "EXPECTED_REPOSITORY = \"youseffakhro1985/Revalta\"", "Release verifier must bind evidence to the controlled repository");
 requireText(verifier, "EXPECTED_WORKFLOW = \"Strict Release Boundary Gate\"", "Release verifier must bind evidence to the controlled workflow");
 requireText(verifier, "Release provenance runUrl mismatch", "Release verifier must validate the provenance run URL");
@@ -119,4 +134,4 @@ if (scripts["verify:release-attestation"] !== "node scripts/verify-release-attes
 if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") fail("package.json must expose the controlled smoke:release-boundaries command");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must run release configuration validation before all other checks");
 
-console.log("Release configuration, exact boundary outcome semantics, canonical redirect evidence, monotonic timing evidence, transport telemetry, bounded HTTP retries, bounded response parsing, schema-v3 provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, schema-v4 endpoint identity, exact boundary outcome semantics, canonical redirect evidence, monotonic timing evidence, transport telemetry, bounded HTTP retries, bounded response parsing, provenance, checksum-backed attestations, offline verification and replay protection are valid");
