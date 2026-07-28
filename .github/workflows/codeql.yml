@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - main
+      - release-preview
+  workflow_dispatch:
   schedule:
     - cron: "17 3 * * 1"
 
@@ -15,7 +17,7 @@ permissions:
   security-events: write
 
 concurrency:
-  group: revalta-codeql-${{ github.workflow }}-${{ github.ref }}
+  group: revalta-codeql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,6 +29,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
