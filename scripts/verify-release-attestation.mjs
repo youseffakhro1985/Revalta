@@ -110,7 +110,8 @@ export function validateReleaseAttestation(attestation, expected = {}, options =
     invariant(Number.isInteger(boundary.httpStatus) && boundary.httpStatus >= 100 && boundary.httpStatus <= 599, `${boundary.name}: invalid HTTP status`);
     invariant(Number.isInteger(boundary.durationMs) && boundary.durationMs >= 0, `${boundary.name}: durationMs must be a non-negative integer`);
     invariant(boundary.redirectLocation === null || typeof boundary.redirectLocation === "string", `${boundary.name}: invalid redirectLocation`);
-    validateBoundaryTransport(boundary.transport, boundary.name);
+    const transport = validateBoundaryTransport(boundary.transport, boundary.name);
+    invariant(boundary.durationMs >= transport.totalBackoffMs, `${boundary.name}: durationMs cannot be shorter than totalBackoffMs`);
   }
   if (expected.commitSha) invariant(release.commitSha === expected.commitSha.toLowerCase(), "Attestation commit SHA does not match expected release");
   if (expected.environment) invariant(release.environment === expected.environment, "Attestation environment does not match expected release");
