@@ -1,5 +1,6 @@
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const PRODUCTION_ORIGIN = "https://www.revalta.se";
+const VERCEL_PREVIEW_SUFFIX = ".vercel.app";
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -30,6 +31,10 @@ export function validateReleaseTarget(input) {
   } else {
     invariant(branch === "release-preview", "Preview smoke must target branch release-preview");
     invariant(url.origin !== PRODUCTION_ORIGIN, "Preview smoke must not target the production origin");
+    invariant(
+      url.hostname.endsWith(VERCEL_PREVIEW_SUFFIX) && url.hostname.length > VERCEL_PREVIEW_SUFFIX.length,
+      "Preview smoke must target a Vercel preview hostname ending in .vercel.app",
+    );
   }
 
   return {
