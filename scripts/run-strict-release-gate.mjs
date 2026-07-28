@@ -5,13 +5,51 @@ import { pathToFileURL } from "node:url";
 import { validateReleaseTarget } from "./validate-release-target.mjs";
 import { renderMarkdownSummary, runReleaseBoundarySmoke } from "./verify-release-boundaries.mjs";
 
-const ATTESTATION_VERSION = 1;
+const ATTESTATION_VERSION = 2;
+const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-export function buildReleaseAttestation({ target, report, checkedAt = new Date() }) {
+export function validateReleaseProvenance(provenance) {
+  invariant(provenance && typeof provenance === "object" && !Array.isArray(provenance), "Release provenance is required");
+  invariant(REPOSITORY_PATTERN.test(provenance.repository), "Release provenance repository must use owner/name format");
+  invariant(typeof provenance.workflow === "string" && provenance.workflow.trim().length > 0, "Release provenance workflow is required");
+  invariant(typeof provenance.workflowRef === "string" && provenance.workflowRef.includes("/.github/workflows/"), "Release provenance workflowRef is invalid");
+  invariant(POSITIVE_INTEGER_PATTERN.test(String(provenance.runId)), "Release provenance runId must be a positive integer");
+  invariant(POSITIVE_INTEGER_PATTERN.test(String(provenance.runAttempt)), "Release provenance runAttempt must be a positive integer");
+
+  const serverUrl = new URL(provenance.serverUrl);
+  invariant(serverUrl.protocol === "https:" && serverUrl.origin === provenance.serverUrl, "Release provenance serverUrl must be a clean HTTPS origin");
+  const expectedRunUrl = `${serverUrl.origin}/${provenance.repository}/actions/runs/${provenance.runId}`;
+  invariant(provenance.runUrl === expectedRunUrl, "Release provenance runUrl mismatch");
+
+  return {
+    repository: provenance.repository,
+    workflow: provenance.workflow.trim(),
+    workflowRef: provenance.workflowRef,
+    runId: String(provenance.runId),
+    runAttempt: Number(provenance.runAttempt),
+    serverUrl: serverUrl.origin,
+    runUrl: expectedRunUrl,
+  };
+}
+
+export function buildReleaseProvenance(env = process.env) {
+  return validateReleaseProvenance({
+    repository: env.GITHUB_REPOSITORY,
+    workflow: env.GITHUB_WORKFLOW,
+    workflowRef: env.GITHUB_WORKFLOW_REF,
+    runId: env.GITHUB_RUN_ID,
+    runAttempt: env.GITHUB_RUN_ATTEMPT,
+    serverUrl: env.GITHUB_SERVER_URL,
+    runUrl: `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`,
+  });
+}
+
+export function buildReleaseAttestation({ target, report, provenance, checkedAt = new Date() }) {
   invariant(target && report, "Target and boundary report are required");
   invariant(report.release === target.expectedSha, "Attestation release SHA mismatch");
   invariant(report.environment === target.environment, "Attestation environment mismatch");
@@ -30,6 +68,7 @@ export function buildReleaseAttestation({ target, report, checkedAt = new Date()
       branch: target.branch,
       origin: target.baseUrl,
     },
+    provenance: validateReleaseProvenance(provenance),
     boundaries: report.results.map((result) => ({
       name: result.label,
       httpStatus: result.status,
@@ -79,9 +118,11 @@ export async function runStrictReleaseGate(input, dependencies = {}) {
     expectedBranch: target.branch,
   }, dependencies);
 
+  const provenance = dependencies.provenance ?? buildReleaseProvenance(dependencies.env);
   const attestation = buildReleaseAttestation({
     target,
     report,
+    provenance,
     checkedAt: dependencies.checkedAt,
   });
 
@@ -105,6 +146,7 @@ async function main() {
   console.log(`Strict release gate passed for ${result.attestation.release.commitSha}`);
   console.log(`Release attestation written to ${result.writtenAttestation.outputPath}`);
   console.log(`Release attestation SHA-256: ${result.writtenAttestation.checksum}`);
+  console.log(`Release provenance: ${result.attestation.provenance.runUrl} attempt ${result.attestation.provenance.runAttempt}`);
 
   if (process.env.GITHUB_STEP_SUMMARY) {
     const summary = [
@@ -116,6 +158,8 @@ async function main() {
       `- Checked at: \`${result.attestation.checkedAt}\``,
       `- Artifact: \`${attestationPath}\``,
       `- SHA-256: \`${result.writtenAttestation.checksum}\``,
+      `- Provenance: ${result.attestation.provenance.runUrl}`,
+      `- Run attempt: \`${result.attestation.provenance.runAttempt}\``,
       "",
     ].join("\n");
     await writeFile(process.env.GITHUB_STEP_SUMMARY, summary, { encoding: "utf8", flag: "a" });
