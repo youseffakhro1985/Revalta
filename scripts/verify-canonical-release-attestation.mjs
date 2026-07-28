@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
+import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { verifyReleaseAttestationFiles } from "./verify-release-attestation.mjs";
+import { verifyReleaseAttestationSnapshot } from "./verify-release-attestation.mjs";
 
 const MAX_ATTESTATION_BYTES = 1024 * 1024;
 const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf]);
@@ -82,11 +83,25 @@ function parseOptionalPositiveInteger(value, label) {
   return parsed;
 }
 
-export async function verifyCanonicalReleaseAttestationFiles({ attestationPath, checksumPath, expected = {}, now, maxAgeSeconds, maxBytes } = {}) {
+export async function verifyCanonicalReleaseAttestationFiles({ attestationPath, checksumPath, expected = {}, now, maxAgeSeconds, maxBytes, maxChecksumBytes } = {}) {
   invariant(typeof attestationPath === "string" && attestationPath.length > 0, "attestationPath is required");
-  const bytes = await readFile(attestationPath);
-  verifyCanonicalAttestationBytes(bytes, { maxBytes });
-  return verifyReleaseAttestationFiles({ attestationPath, checksumPath, expected, now, maxAgeSeconds });
+  const resolvedAttestationPath = resolve(attestationPath);
+  const resolvedChecksumPath = resolve(checksumPath ?? `${attestationPath}.sha256`);
+  const [attestationBytes, checksumBytes] = await Promise.all([
+    readFile(resolvedAttestationPath),
+    readFile(resolvedChecksumPath),
+  ]);
+  verifyCanonicalAttestationBytes(attestationBytes, { maxBytes });
+  const verified = verifyReleaseAttestationSnapshot({
+    attestationBytes,
+    checksumBytes,
+    expectedFilename: basename(resolvedAttestationPath),
+    expected,
+    now,
+    maxAgeSeconds,
+    maxChecksumBytes,
+  });
+  return { ...verified, attestationPath: resolvedAttestationPath, checksumPath: resolvedChecksumPath };
 }
 
 async function main() {
@@ -94,11 +109,13 @@ async function main() {
   const checksumPath = process.env.RELEASE_ATTESTATION_CHECKSUM_PATH || process.argv[3] || `${attestationPath}.sha256`;
   const maxAgeSeconds = parseOptionalPositiveInteger(process.env.MAX_ATTESTATION_AGE_SECONDS, "MAX_ATTESTATION_AGE_SECONDS");
   const maxBytes = parseOptionalPositiveInteger(process.env.MAX_ATTESTATION_BYTES, "MAX_ATTESTATION_BYTES");
+  const maxChecksumBytes = parseOptionalPositiveInteger(process.env.MAX_CHECKSUM_BYTES, "MAX_CHECKSUM_BYTES");
   const result = await verifyCanonicalReleaseAttestationFiles({
     attestationPath,
     checksumPath,
     maxAgeSeconds,
     maxBytes,
+    maxChecksumBytes,
     expected: {
       commitSha: process.env.EXPECTED_SHA?.trim().toLowerCase() || undefined,
       environment: process.env.EXPECTED_ENVIRONMENT?.trim() || undefined,
