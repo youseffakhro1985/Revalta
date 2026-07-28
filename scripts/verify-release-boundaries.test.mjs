@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  readBoundedJsonResponse,
   requestWithRetry,
   runReleaseBoundarySmoke,
   validateDashboardBoundary,
@@ -126,6 +127,34 @@ describe("release boundary smoke", () => {
 
     const wrongType = healthResponse({ contentType: "text/plain" });
     await expect(wrongType.clone().json().then((payload) => validateHealthBoundary(wrongType, payload, expected))).rejects.toThrow("Content-Type application/json");
+  });
+
+  it("bounds declared and streamed JSON response sizes", async () => {
+    const valid = new Response('{"ok":true}', { headers: { "content-length": "11" } });
+    await expect(readBoundedJsonResponse(valid, { label: "health-api", maxBytes: 11 })).resolves.toEqual({ ok: true });
+
+    const declaredTooLarge = new Response("{}", { headers: { "content-length": "13" } });
+    await expect(readBoundedJsonResponse(declaredTooLarge, { label: "health-api", maxBytes: 12 })).rejects.toThrow("exceeds 12 byte limit");
+
+    const invalidLength = new Response("{}", { headers: { "content-length": "12.5" } });
+    await expect(readBoundedJsonResponse(invalidLength, { label: "health-api", maxBytes: 12 })).rejects.toThrow("Content-Length");
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"value":"'));
+        controller.enqueue(new TextEncoder().encode("x".repeat(20)));
+        controller.enqueue(new TextEncoder().encode('"}'));
+        controller.close();
+      },
+    });
+    await expect(readBoundedJsonResponse(new Response(stream), { label: "health-api", maxBytes: 16 })).rejects.toThrow("exceeds 16 byte limit");
+  });
+
+  it("rejects missing bodies, invalid UTF-8 and invalid JSON", async () => {
+    await expect(readBoundedJsonResponse(new Response(null), { label: "health-api" })).rejects.toThrow("body is missing");
+    await expect(readBoundedJsonResponse(new Response(new Uint8Array([0xff])), { label: "health-api" })).rejects.toThrow("valid UTF-8");
+    await expect(readBoundedJsonResponse(new Response("not-json"), { label: "health-api" })).rejects.toThrow("valid JSON");
+    await expect(readBoundedJsonResponse(new Response("{}"), { label: "health-api", maxBytes: 0 })).rejects.toThrow("positive integer");
   });
 
   it("verifies a complete preview release against the exact SHA", async () => {
