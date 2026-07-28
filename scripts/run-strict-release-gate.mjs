@@ -5,13 +5,11 @@ import { pathToFileURL } from "node:url";
 import { validateReleaseTarget } from "./validate-release-target.mjs";
 import { renderMarkdownSummary, runReleaseBoundarySmoke } from "./verify-release-boundaries.mjs";
 
-const ATTESTATION_VERSION = 2;
+const ATTESTATION_VERSION = 3;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 
-function invariant(condition, message) {
-  if (!condition) throw new Error(message);
-}
+function invariant(condition, message) { if (!condition) throw new Error(message); }
 
 export function validateReleaseProvenance(provenance) {
   invariant(provenance && typeof provenance === "object" && !Array.isArray(provenance), "Release provenance is required");
@@ -20,12 +18,10 @@ export function validateReleaseProvenance(provenance) {
   invariant(typeof provenance.workflowRef === "string" && provenance.workflowRef.includes("/.github/workflows/"), "Release provenance workflowRef is invalid");
   invariant(POSITIVE_INTEGER_PATTERN.test(String(provenance.runId)), "Release provenance runId must be a positive integer");
   invariant(POSITIVE_INTEGER_PATTERN.test(String(provenance.runAttempt)), "Release provenance runAttempt must be a positive integer");
-
   const serverUrl = new URL(provenance.serverUrl);
   invariant(serverUrl.protocol === "https:" && serverUrl.origin === provenance.serverUrl, "Release provenance serverUrl must be a clean HTTPS origin");
   const expectedRunUrl = `${serverUrl.origin}/${provenance.repository}/actions/runs/${provenance.runId}`;
   invariant(provenance.runUrl === expectedRunUrl, "Release provenance runUrl mismatch");
-
   return {
     repository: provenance.repository,
     workflow: provenance.workflow.trim(),
@@ -49,13 +45,27 @@ export function buildReleaseProvenance(env = process.env) {
   });
 }
 
+function validateBoundaryTransport(result) {
+  invariant(Number.isSafeInteger(result.attempts) && result.attempts > 0, `${result.label}: attempts must be a positive integer`);
+  invariant(Array.isArray(result.retryStatuses), `${result.label}: retryStatuses must be an array`);
+  invariant(result.retryStatuses.length === result.attempts - 1 - result.networkErrors, `${result.label}: retry evidence count mismatch`);
+  for (const status of result.retryStatuses) invariant(Number.isInteger(status) && status >= 100 && status <= 599, `${result.label}: invalid retry status`);
+  invariant(Number.isSafeInteger(result.networkErrors) && result.networkErrors >= 0, `${result.label}: networkErrors must be non-negative`);
+  invariant(Number.isSafeInteger(result.totalBackoffMs) && result.totalBackoffMs >= 0, `${result.label}: totalBackoffMs must be non-negative`);
+  return {
+    attempts: result.attempts,
+    retryStatuses: [...result.retryStatuses],
+    networkErrors: result.networkErrors,
+    totalBackoffMs: result.totalBackoffMs,
+  };
+}
+
 export function buildReleaseAttestation({ target, report, provenance, checkedAt = new Date() }) {
   invariant(target && report, "Target and boundary report are required");
   invariant(report.release === target.expectedSha, "Attestation release SHA mismatch");
   invariant(report.environment === target.environment, "Attestation environment mismatch");
   invariant(report.branch === target.branch, "Attestation branch mismatch");
   invariant(report.baseUrl === target.baseUrl, "Attestation base URL mismatch");
-
   return {
     schemaVersion: ATTESTATION_VERSION,
     kind: "revalta.release-boundary-attestation",
@@ -74,6 +84,7 @@ export function buildReleaseAttestation({ target, report, provenance, checkedAt 
       httpStatus: result.status,
       durationMs: result.durationMs,
       redirectLocation: result.location ?? null,
+      transport: validateBoundaryTransport(result),
     })),
   };
 }
@@ -102,10 +113,8 @@ export async function writeReleaseAttestation(path, attestation) {
   const serialized = serializeReleaseAttestation(attestation);
   const checksum = calculateReleaseAttestationChecksum(serialized);
   const checksumPath = `${outputPath}.sha256`;
-
   await writeAtomic(outputPath, serialized);
   await writeAtomic(checksumPath, `${checksum}  ${basename(outputPath)}\n`);
-
   return { outputPath, checksumPath, checksum };
 }
 
@@ -117,20 +126,10 @@ export async function runStrictReleaseGate(input, dependencies = {}) {
     expectedEnvironment: target.environment,
     expectedBranch: target.branch,
   }, dependencies);
-
   const provenance = dependencies.provenance ?? buildReleaseProvenance(dependencies.env);
-  const attestation = buildReleaseAttestation({
-    target,
-    report,
-    provenance,
-    checkedAt: dependencies.checkedAt,
-  });
-
+  const attestation = buildReleaseAttestation({ target, report, provenance, checkedAt: dependencies.checkedAt });
   let writtenAttestation = null;
-  if (dependencies.attestationPath) {
-    writtenAttestation = await writeReleaseAttestation(dependencies.attestationPath, attestation);
-  }
-
+  if (dependencies.attestationPath) writtenAttestation = await writeReleaseAttestation(dependencies.attestationPath, attestation);
   return { target, report, attestation, writtenAttestation };
 }
 
@@ -142,34 +141,23 @@ async function main() {
     environment: process.env.EXPECTED_ENVIRONMENT,
     branch: process.env.EXPECTED_BRANCH,
   }, { attestationPath });
-
   console.log(`Strict release gate passed for ${result.attestation.release.commitSha}`);
   console.log(`Release attestation written to ${result.writtenAttestation.outputPath}`);
   console.log(`Release attestation SHA-256: ${result.writtenAttestation.checksum}`);
   console.log(`Release provenance: ${result.attestation.provenance.runUrl} attempt ${result.attestation.provenance.runAttempt}`);
-
   if (process.env.GITHUB_STEP_SUMMARY) {
     const summary = [
-      renderMarkdownSummary(result.report),
-      "",
-      "### Release attestation",
-      "",
+      renderMarkdownSummary(result.report), "", "### Release attestation", "",
       `- Verdict: \`${result.attestation.verdict}\``,
       `- Checked at: \`${result.attestation.checkedAt}\``,
       `- Artifact: \`${attestationPath}\``,
       `- SHA-256: \`${result.writtenAttestation.checksum}\``,
       `- Provenance: ${result.attestation.provenance.runUrl}`,
-      `- Run attempt: \`${result.attestation.provenance.runAttempt}\``,
-      "",
+      `- Run attempt: \`${result.attestation.provenance.runAttempt}\``, "",
     ].join("\n");
     await writeFile(process.env.GITHUB_STEP_SUMMARY, summary, { encoding: "utf8", flag: "a" });
   }
 }
 
 const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (isDirectExecution) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
-}
+if (isDirectExecution) main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
