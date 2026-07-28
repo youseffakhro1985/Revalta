@@ -10,6 +10,8 @@ const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 const ATTESTATION_VERSION = 6;
 const RELEASE_POLICY_ID = "revalta.strict-release-policy.v1";
+const MAX_CHECKSUM_BYTES = 256;
+const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
 const BOUNDARY_REQUESTS = Object.freeze({
   "public-home": Object.freeze({ method: "GET", path: "/" }),
@@ -72,6 +74,24 @@ export function parseChecksumFile(value, expectedFilename) {
   invariant(match[2] === expectedFilename, `Checksum filename mismatch: expected ${expectedFilename}`);
   return match[1].toLowerCase();
 }
+
+export function parseCanonicalChecksumBytes(bytes, expectedFilename, { maxBytes = MAX_CHECKSUM_BYTES } = {}) {
+  invariant(Buffer.isBuffer(bytes) || bytes instanceof Uint8Array, "Checksum bytes are required");
+  invariant(typeof expectedFilename === "string" && expectedFilename.length > 0 && basename(expectedFilename) === expectedFilename, "Expected checksum filename must be a basename");
+  invariant(Number.isSafeInteger(maxBytes) && maxBytes > 0, "Checksum maxBytes must be a positive integer");
+  const buffer = Buffer.from(bytes);
+  invariant(buffer.byteLength > 0, "Checksum file must not be empty");
+  invariant(buffer.byteLength <= maxBytes, `Checksum file exceeds ${maxBytes} byte limit`);
+  invariant(!(buffer.byteLength >= UTF8_BOM.length && buffer.subarray(0, UTF8_BOM.length).equals(UTF8_BOM)), "Checksum file must not contain a UTF-8 BOM");
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer); }
+  catch { throw new Error("Checksum file is not valid UTF-8"); }
+  const match = text.match(/^([0-9a-f]{64})  ([^\r\n]+)\n$/);
+  invariant(match, "Checksum file must use canonical lowercase '<sha256>  <filename>\\n' bytes");
+  invariant(match[2] === expectedFilename, `Checksum filename mismatch: expected ${expectedFilename}`);
+  return match[1];
+}
+
 export function calculateSha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 export function verifyChecksum(bytes, expectedHash) {
   invariant(SHA256_PATTERN.test(expectedHash), "Expected checksum must be a 64-character SHA-256 value");
@@ -206,16 +226,28 @@ export function validateReleaseAttestation(attestation, expected = {}, options =
   return { attestation, policy, freshness, provenance };
 }
 
-export async function verifyReleaseAttestationFiles({ attestationPath, checksumPath, expected = {}, now, maxAgeSeconds }) {
+export function verifyReleaseAttestationSnapshot({ attestationBytes, checksumBytes, expectedFilename, expected = {}, now, maxAgeSeconds, maxChecksumBytes }) {
+  invariant(Buffer.isBuffer(attestationBytes) || attestationBytes instanceof Uint8Array, "Release attestation bytes are required");
+  const immutableAttestationBytes = Buffer.from(attestationBytes);
+  const immutableChecksumBytes = Buffer.from(checksumBytes ?? []);
+  const expectedHash = parseCanonicalChecksumBytes(immutableChecksumBytes, expectedFilename, { maxBytes: maxChecksumBytes });
+  const checksum = verifyChecksum(immutableAttestationBytes, expectedHash);
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(immutableAttestationBytes); }
+  catch { throw new Error("Release attestation is not valid UTF-8"); }
+  let attestation;
+  try { attestation = JSON.parse(text); }
+  catch { throw new Error("Release attestation is not valid JSON"); }
+  const validation = validateReleaseAttestation(attestation, expected, { now, maxAgeSeconds });
+  return { attestation: validation.attestation, policy: validation.policy, freshness: validation.freshness, provenance: validation.provenance, checksum };
+}
+
+export async function verifyReleaseAttestationFiles({ attestationPath, checksumPath, expected = {}, now, maxAgeSeconds, maxChecksumBytes }) {
   const resolvedAttestationPath = resolve(attestationPath);
   const resolvedChecksumPath = resolve(checksumPath ?? `${attestationPath}.sha256`);
-  const [bytes, checksumText] = await Promise.all([readFile(resolvedAttestationPath), readFile(resolvedChecksumPath, "utf8")]);
-  const expectedHash = parseChecksumFile(checksumText, basename(resolvedAttestationPath));
-  const checksum = verifyChecksum(bytes, expectedHash);
-  let attestation;
-  try { attestation = JSON.parse(bytes.toString("utf8")); } catch { throw new Error("Release attestation is not valid JSON"); }
-  const validation = validateReleaseAttestation(attestation, expected, { now, maxAgeSeconds });
-  return { attestation: validation.attestation, policy: validation.policy, freshness: validation.freshness, provenance: validation.provenance, checksum, attestationPath: resolvedAttestationPath, checksumPath: resolvedChecksumPath };
+  const [attestationBytes, checksumBytes] = await Promise.all([readFile(resolvedAttestationPath), readFile(resolvedChecksumPath)]);
+  const verified = verifyReleaseAttestationSnapshot({ attestationBytes, checksumBytes, expectedFilename: basename(resolvedAttestationPath), expected, now, maxAgeSeconds, maxChecksumBytes });
+  return { ...verified, attestationPath: resolvedAttestationPath, checksumPath: resolvedChecksumPath };
 }
 
 function parseOptionalPositiveInteger(value, label) {
@@ -230,7 +262,8 @@ async function main() {
   const attestationPath = process.env.RELEASE_ATTESTATION_PATH || process.argv[2] || "artifacts/release-boundary-attestation.json";
   const checksumPath = process.env.RELEASE_ATTESTATION_CHECKSUM_PATH || process.argv[3] || `${attestationPath}.sha256`;
   const maxAgeSeconds = parseOptionalPositiveInteger(process.env.MAX_ATTESTATION_AGE_SECONDS, "MAX_ATTESTATION_AGE_SECONDS");
-  const result = await verifyReleaseAttestationFiles({ attestationPath, checksumPath, maxAgeSeconds, expected: { commitSha: process.env.EXPECTED_SHA?.trim().toLowerCase() || undefined, environment: process.env.EXPECTED_ENVIRONMENT?.trim() || undefined, branch: process.env.EXPECTED_BRANCH?.trim() || undefined, origin: process.env.BASE_URL?.trim() || undefined, provenance: { repository: process.env.EXPECTED_REPOSITORY?.trim() || undefined, workflow: process.env.EXPECTED_WORKFLOW?.trim() || undefined, runId: process.env.EXPECTED_RUN_ID?.trim() || undefined, runAttempt: parseOptionalPositiveInteger(process.env.EXPECTED_RUN_ATTEMPT, "EXPECTED_RUN_ATTEMPT") } } });
+  const maxChecksumBytes = parseOptionalPositiveInteger(process.env.MAX_CHECKSUM_BYTES, "MAX_CHECKSUM_BYTES");
+  const result = await verifyReleaseAttestationFiles({ attestationPath, checksumPath, maxAgeSeconds, maxChecksumBytes, expected: { commitSha: process.env.EXPECTED_SHA?.trim().toLowerCase() || undefined, environment: process.env.EXPECTED_ENVIRONMENT?.trim() || undefined, branch: process.env.EXPECTED_BRANCH?.trim() || undefined, origin: process.env.BASE_URL?.trim() || undefined, provenance: { repository: process.env.EXPECTED_REPOSITORY?.trim() || undefined, workflow: process.env.EXPECTED_WORKFLOW?.trim() || undefined, runId: process.env.EXPECTED_RUN_ID?.trim() || undefined, runAttempt: parseOptionalPositiveInteger(process.env.EXPECTED_RUN_ATTEMPT, "EXPECTED_RUN_ATTEMPT") } } });
   console.log(`Release attestation verified: ${result.attestation.release.commitSha}`);
   console.log(`SHA-256: ${result.checksum}`);
   console.log(`Policy: ${result.policy.id} (${result.policy.sha256})`);
