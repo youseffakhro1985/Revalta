@@ -41,8 +41,8 @@ function attestation(overrides = {}) {
     provenance,
     boundaries: [
       { name: "public-home", httpStatus: 200, durationMs: 10, redirectLocation: null, transport: clean },
-      { name: "dashboard-boundary", httpStatus: 307, durationMs: 8, redirectLocation: "/login", transport: { attempts: 2, retryStatuses: [503], networkErrors: 0, totalBackoffMs: 1500 } },
-      { name: "health-api", httpStatus: 200, durationMs: 12, redirectLocation: null, transport: { attempts: 2, retryStatuses: [], networkErrors: 1, totalBackoffMs: 1500 } },
+      { name: "dashboard-boundary", httpStatus: 307, durationMs: 1_508, redirectLocation: "/login", transport: { attempts: 2, retryStatuses: [503], networkErrors: 0, totalBackoffMs: 1_500 } },
+      { name: "health-api", httpStatus: 200, durationMs: 1_512, redirectLocation: null, transport: { attempts: 2, retryStatuses: [], networkErrors: 1, totalBackoffMs: 1_500 } },
     ],
     ...overrides,
   };
@@ -73,6 +73,12 @@ describe("release attestation verifier", () => {
     expect(() => validateBoundaryTransport({ attempts: 2, retryStatuses: [], networkErrors: 0, totalBackoffMs: 1 }, "home")).toThrow("count mismatch");
     expect(() => validateBoundaryTransport({ attempts: 2, retryStatuses: [404], networkErrors: 0, totalBackoffMs: 1 }, "home")).toThrow("non-retryable");
     expect(() => validateBoundaryTransport({ attempts: 1, retryStatuses: [], networkErrors: 0, totalBackoffMs: 1 }, "home")).toThrow("cannot include backoff");
+  });
+
+  it("rejects duration evidence shorter than recorded backoff", () => {
+    const impossible = attestation();
+    impossible.boundaries[1] = { ...impossible.boundaries[1], durationMs: 1_499 };
+    expect(() => validateReleaseAttestation(impossible, {}, { now: NOW })).toThrow("durationMs cannot be shorter than totalBackoffMs");
   });
 
   it("enforces canonical timestamps and replay limits", () => {
