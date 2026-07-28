@@ -36,6 +36,11 @@ export function validateOptions(options) {
   return { baseUrl, expectedSha, expectedEnvironment, expectedBranch };
 }
 
+function validateContentType(headers, expected, label) {
+  const value = (headers.get("content-type") ?? "").toLowerCase();
+  invariant(value.split(";", 1)[0].trim() === expected, `${label}: expected Content-Type ${expected}`);
+}
+
 function validateSecurityHeaders(headers, label) {
   const required = new Map([
     ["x-content-type-options", "nosniff"],
@@ -63,6 +68,7 @@ function validatePrivateNoStore(headers, label) {
 
 export function validateHomeBoundary(response, expectedEnvironment) {
   invariant(response.status === 200, `public-home: expected HTTP 200, received ${response.status}`);
+  validateContentType(response.headers, "text/html", "public-home");
   validateSecurityHeaders(response.headers, "public-home");
   const robots = (response.headers.get("x-robots-tag") ?? "").toLowerCase();
   if (expectedEnvironment === "production") {
@@ -85,11 +91,15 @@ export function validateDashboardBoundary(response, baseUrl) {
     const destination = new URL(location, baseUrl);
     invariant(destination.origin === baseUrl.origin, `dashboard-boundary: redirect escaped origin to ${destination.origin}`);
     invariant(destination.pathname === "/login", `dashboard-boundary: expected /login, received ${destination.pathname}`);
+    invariant(destination.search === "", "dashboard-boundary: login redirect must not contain a query string");
+    invariant(destination.hash === "", "dashboard-boundary: login redirect must not contain a fragment");
   }
 }
 
 export function validateHealthBoundary(response, payload, expected) {
   invariant(response.status === 200, `health-api: expected HTTP 200, received ${response.status}`);
+  validateContentType(response.headers, "application/json", "health-api");
+  validateSecurityHeaders(response.headers, "health-api");
   invariant(payload?.ok === true && payload?.status === "ok" && payload?.database === "ok", "health-api: service or database is not healthy");
   invariant(payload?.release?.commitSha?.toLowerCase() === expected.expectedSha, "health-api: deployed commit SHA does not match release candidate");
   invariant(payload?.release?.shortCommitSha === expected.expectedSha.slice(0, 7), "health-api: short commit SHA mismatch");
