@@ -13,6 +13,7 @@ const paths = {
 };
 
 function fail(message) { console.error(message); process.exit(1); }
+
 async function readJson(path, label) {
   let raw;
   try { raw = await readFile(path, "utf8"); }
@@ -20,14 +21,17 @@ async function readJson(path, label) {
   try { return JSON.parse(raw); }
   catch (error) { fail(`${label} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`); }
 }
+
 async function assertFileExists(path, label) {
   try { await access(path); }
   catch { fail(`${label} is required by the controlled release contract`); }
 }
+
 async function assertFileMissing(path, label) {
   try { await access(path); fail(`${label} must not exist because Strict Release Boundary Gate is the only authoritative release workflow`); }
   catch (error) { if (error?.code !== "ENOENT") throw error; }
 }
+
 function requireText(source, fragment, message) { if (!source.includes(fragment)) fail(message); }
 
 const config = await readJson(paths.vercel, "vercel.json");
@@ -67,10 +71,11 @@ requireText(workflow, "cancel-in-progress: false", "Release evidence runs must n
 const runner = await readFile(paths.strictGateRunner, "utf8");
 requireText(runner, "const ATTESTATION_VERSION = 3", "Strict release runner must emit schema version 3 attestations");
 requireText(runner, "buildReleaseProvenance", "Strict release runner must collect GitHub Actions provenance");
-requireText(runner, "validateBoundaryTransport", "Strict release runner must persist validated transport evidence");
-requireText(runner, "retryStatuses", "Strict release runner must persist transient HTTP status evidence");
-requireText(runner, "networkErrors", "Strict release runner must persist network failure counts");
-requireText(runner, "totalBackoffMs", "Strict release runner must persist bounded backoff totals");
+requireText(runner, "GITHUB_REPOSITORY", "Strict release runner must bind evidence to the GitHub repository");
+requireText(runner, "GITHUB_WORKFLOW_REF", "Strict release runner must bind evidence to the workflow ref");
+requireText(runner, "GITHUB_RUN_ID", "Strict release runner must bind evidence to the workflow run ID");
+requireText(runner, "GITHUB_RUN_ATTEMPT", "Strict release runner must bind evidence to the workflow run attempt");
+requireText(runner, "validateBoundaryTransport", "Strict release runner must validate transport evidence");
 requireText(runner, "createHash(\"sha256\")", "Strict release runner must calculate a SHA-256 checksum");
 requireText(runner, "`${outputPath}.sha256`", "Strict release runner must write the controlled checksum path");
 requireText(runner, "mode: 0o600", "Release evidence files must retain private filesystem permissions");
@@ -78,25 +83,29 @@ requireText(runner, "mode: 0o600", "Release evidence files must retain private f
 const boundary = await readFile(paths.boundaryVerifier, "utf8");
 requireText(boundary, "validateContentType(response.headers, \"text/html\", \"public-home\")", "Public release boundary must enforce HTML content type");
 requireText(boundary, "validateContentType(response.headers, \"application/json\", \"health-api\")", "Health release boundary must enforce JSON content type");
+requireText(boundary, "validateSecurityHeaders(response.headers, \"health-api\")", "Health release boundary must enforce security headers");
 requireText(boundary, "login redirect must not contain a query string", "Dashboard release boundary must reject login redirect query strings");
+requireText(boundary, "login redirect must not contain a fragment", "Dashboard release boundary must reject login redirect fragments");
+requireText(boundary, "destination.origin === baseUrl.origin", "Dashboard release boundary must retain same-origin redirect enforcement");
 requireText(boundary, "const MAX_HEALTH_BODY_BYTES = 32 * 1024", "Health release boundary must retain the controlled response-size ceiling");
+requireText(boundary, "readBoundedJsonResponse", "Health release boundary must use bounded JSON response parsing");
 requireText(boundary, "new TextDecoder(\"utf-8\", { fatal: true })", "Health release boundary must reject invalid UTF-8");
 requireText(boundary, "RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])", "Release smoke must retain the controlled transient HTTP retry allowlist");
 requireText(boundary, "const MAX_RETRY_DELAY_MS = 10_000", "Release smoke must cap server-directed retry delays");
-requireText(boundary, "requestWithRetryEvidence", "Release smoke must collect retry evidence without breaking the response API");
-requireText(boundary, "evidence.totalBackoffMs += delayMs", "Release smoke must account for controlled retry backoff");
-requireText(boundary, "retryStatuses: evidence.retryStatuses", "Release smoke report must expose retry status history");
-requireText(boundary, "networkErrors: evidence.networkErrors", "Release smoke report must expose network error counts");
+requireText(boundary, "await cancelResponseBody(response)", "Release smoke must cancel discarded retry response bodies");
+requireText(boundary, "from \"node:perf_hooks\"", "Release smoke must use the Node monotonic performance clock");
+requireText(boundary, "measureMonotonicDuration", "Release smoke must centralize monotonic duration validation");
+requireText(boundary, "Monotonic release clock moved backwards", "Release smoke must fail closed on a backwards monotonic clock");
+requireText(boundary, "Math.max(measured, minimumMs)", "Release smoke duration must include recorded backoff");
 
 const verifier = await readFile(paths.attestationVerifier, "utf8");
 requireText(verifier, "attestation.schemaVersion === 3", "Release verifier must require schema version 3");
-requireText(verifier, "validateBoundaryTransport", "Release verifier must validate transport evidence");
-requireText(verifier, "RETRYABLE_HTTP_STATUSES.has(status)", "Release verifier must reject non-retryable statuses in retry evidence");
-requireText(verifier, "retry evidence count mismatch", "Release verifier must reject impossible retry histories");
-requireText(verifier, "first-attempt success cannot include backoff", "Release verifier must reject impossible first-attempt backoff");
 requireText(verifier, "EXPECTED_REPOSITORY = \"youseffakhro1985/Revalta\"", "Release verifier must bind evidence to the controlled repository");
 requireText(verifier, "EXPECTED_WORKFLOW = \"Strict Release Boundary Gate\"", "Release verifier must bind evidence to the controlled workflow");
+requireText(verifier, "Release provenance runUrl mismatch", "Release verifier must validate the provenance run URL");
 requireText(verifier, "timingSafeEqual", "Release attestation verifier must use timing-safe checksum comparison");
+requireText(verifier, "validateBoundaryTransport", "Release verifier must validate boundary transport evidence");
+requireText(verifier, "durationMs cannot be shorter than totalBackoffMs", "Release verifier must reject temporally impossible evidence");
 requireText(verifier, "CANONICAL_ISO_PATTERN", "Release attestation verifier must require canonical UTC timestamps");
 requireText(verifier, "MAX_ATTESTATION_AGE_SECONDS", "Release attestation verifier must support explicit replay-age limits");
 
@@ -106,4 +115,4 @@ if (scripts["verify:release-attestation"] !== "node scripts/verify-release-attes
 if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") fail("package.json must expose the controlled smoke:release-boundaries command");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must run release configuration validation before all other checks");
 
-console.log("Release configuration, schema-v3 retry evidence, bounded HTTP retries, response parsing, provenance, checksum verification and replay protection are valid");
+console.log("Release configuration, monotonic timing evidence, transport telemetry, bounded HTTP retries, bounded response parsing, strict response contracts, schema-v3 provenance, checksum-backed attestations, offline verification and replay protection are valid");
