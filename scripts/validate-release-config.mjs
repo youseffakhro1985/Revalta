@@ -1,20 +1,62 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 
-const configPath = new URL("../vercel.json", import.meta.url);
-const raw = await readFile(configPath, "utf8");
-let config;
+const root = new URL("../", import.meta.url);
+const paths = {
+  vercel: new URL("vercel.json", root),
+  package: new URL("package.json", root),
+  strictWorkflow: new URL(".github/workflows/strict-release-boundary-gate.yml", root),
+  legacyWorkflow: new URL(".github/workflows/release-boundary-smoke.yml", root),
+  targetValidator: new URL("scripts/validate-release-target.mjs", root),
+  boundaryVerifier: new URL("scripts/verify-release-boundaries.mjs", root),
+};
 
-try {
-  config = JSON.parse(raw);
-} catch (error) {
-  console.error("vercel.json is not valid JSON", error);
+function fail(message) {
+  console.error(message);
   process.exit(1);
 }
 
+async function readJson(path, label) {
+  let raw;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (error) {
+    fail(`${label} could not be read: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    fail(`${label} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function assertFileExists(path, label) {
+  try {
+    await access(path);
+  } catch {
+    fail(`${label} is required by the controlled release contract`);
+  }
+}
+
+async function assertFileMissing(path, label) {
+  try {
+    await access(path);
+    fail(`${label} must not exist because Strict Release Boundary Gate is the only authoritative release workflow`);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+}
+
+function requireText(source, fragment, message) {
+  if (!source.includes(fragment)) fail(message);
+}
+
+const config = await readJson(paths.vercel, "vercel.json");
+const packageJson = await readJson(paths.package, "package.json");
+
 const deploymentEnabled = config?.git?.deploymentEnabled;
 if (!deploymentEnabled || typeof deploymentEnabled !== "object" || Array.isArray(deploymentEnabled)) {
-  console.error("vercel.json must define git.deploymentEnabled as an explicit branch map");
-  process.exit(1);
+  fail("vercel.json must define git.deploymentEnabled as an explicit branch map");
 }
 
 const enabledBranches = Object.entries(deploymentEnabled)
@@ -24,25 +66,45 @@ const enabledBranches = Object.entries(deploymentEnabled)
 const expectedBranches = ["main", "release-preview"];
 
 if (JSON.stringify(enabledBranches) !== JSON.stringify(expectedBranches)) {
-  console.error(
-    `Automatic Vercel deployments must be limited to ${expectedBranches.join(", ")}; received ${enabledBranches.join(", ") || "none"}`,
-  );
-  process.exit(1);
+  fail(`Automatic Vercel deployments must be limited to ${expectedBranches.join(", ")}; received ${enabledBranches.join(", ") || "none"}`);
 }
 
 if (Object.hasOwn(deploymentEnabled, "*")) {
-  console.error("Wildcard Vercel deployment rules are not allowed");
-  process.exit(1);
+  fail("Wildcard Vercel deployment rules are not allowed");
 }
 
 if (config.framework !== "nextjs") {
-  console.error("Vercel framework must remain nextjs");
-  process.exit(1);
+  fail("Vercel framework must remain nextjs");
 }
 
 if (config.buildCommand !== "npm run build" || config.installCommand !== "npm ci") {
-  console.error("Vercel install/build commands differ from the controlled release contract");
-  process.exit(1);
+  fail("Vercel install/build commands differ from the controlled release contract");
 }
 
-console.log("Release configuration is valid");
+await assertFileExists(paths.targetValidator, "Release target validator");
+await assertFileExists(paths.boundaryVerifier, "Release boundary verifier");
+await assertFileExists(paths.strictWorkflow, "Strict Release Boundary Gate workflow");
+await assertFileMissing(paths.legacyWorkflow, "Legacy Release Boundary Smoke workflow");
+
+const workflow = await readFile(paths.strictWorkflow, "utf8");
+requireText(workflow, "name: Strict Release Boundary Gate", "Strict release workflow name changed unexpectedly");
+requireText(workflow, "workflow_dispatch:", "Strict release workflow must remain manually and explicitly dispatched");
+requireText(workflow, "ref: ${{ inputs.expected_sha }}", "Strict release workflow must check out the exact expected SHA");
+requireText(workflow, "persist-credentials: false", "Strict release workflow must not persist GitHub credentials");
+requireText(workflow, "node scripts/validate-release-target.mjs", "Strict release workflow must validate the exact release target first");
+requireText(workflow, "node scripts/verify-release-boundaries.mjs", "Strict release workflow must verify deployed release boundaries");
+requireText(workflow, "contents: read", "Strict release workflow must retain least-privilege contents permissions");
+requireText(workflow, "cancel-in-progress: false", "Release evidence runs must not cancel one another");
+
+const scripts = packageJson?.scripts ?? {};
+if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") {
+  fail("package.json must expose the controlled validate:release-config command");
+}
+if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") {
+  fail("package.json must expose the controlled smoke:release-boundaries command");
+}
+if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) {
+  fail("The quality command must run release configuration validation before all other checks");
+}
+
+console.log("Release configuration and smoke governance are valid");
