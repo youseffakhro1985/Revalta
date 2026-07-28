@@ -36,12 +36,12 @@ describe("validateReleaseTarget", () => {
 
   it("rejects unsafe or ambiguous URLs", () => {
     const invalidUrls = [
-      "http://preview.example",
-      "https://user:pass@preview.example",
-      "https://preview.example:8443",
-      "https://preview.example/path",
-      "https://preview.example?target=other",
-      "https://preview.example#fragment",
+      "http://preview.example.vercel.app",
+      "https://user:pass@preview.example.vercel.app",
+      "https://preview.example.vercel.app:8443",
+      "https://preview.example.vercel.app/path",
+      "https://preview.example.vercel.app?target=other",
+      "https://preview.example.vercel.app#fragment",
     ];
 
     for (const baseUrl of invalidUrls) {
@@ -54,9 +54,25 @@ describe("validateReleaseTarget", () => {
     }
   });
 
+  it("rejects non-Vercel preview origins", () => {
+    for (const baseUrl of [
+      "https://preview.example",
+      "https://vercel.app",
+      "https://vercel.app.evil.example",
+      "https://revalta-preview.example.com",
+    ]) {
+      expect(() => validateReleaseTarget({
+        baseUrl,
+        expectedSha: SHA,
+        environment: "preview",
+        branch: "release-preview",
+      })).toThrow(".vercel.app");
+    }
+  });
+
   it("rejects branch and environment confusion", () => {
     expect(() => validateReleaseTarget({
-      baseUrl: "https://preview.example",
+      baseUrl: "https://revalta-release-preview.vercel.app",
       expectedSha: SHA,
       environment: "preview",
       branch: "main",
@@ -72,7 +88,7 @@ describe("validateReleaseTarget", () => {
 
   it("requires a full commit SHA", () => {
     expect(() => validateReleaseTarget({
-      baseUrl: "https://preview.example",
+      baseUrl: "https://revalta-release-preview.vercel.app",
       expectedSha: "2d06e56",
       environment: "preview",
       branch: "release-preview",
