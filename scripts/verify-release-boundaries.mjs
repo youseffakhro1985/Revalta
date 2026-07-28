@@ -4,7 +4,9 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_ATTEMPTS = 3;
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_RETRY_DELAY_MS = 1_500;
+const MAX_RETRY_DELAY_MS = 10_000;
 const MAX_HEALTH_BODY_BYTES = 32 * 1024;
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
 
 function invariant(condition, message) {
@@ -168,28 +170,86 @@ async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function parseRetryAfterMs(value, { nowMs = Date.now(), maxDelayMs = MAX_RETRY_DELAY_MS } = {}) {
+  if (value === null || value === undefined || String(value).trim() === "") return undefined;
+  invariant(Number.isSafeInteger(maxDelayMs) && maxDelayMs >= 0, "maxDelayMs must be a non-negative safe integer");
+
+  const normalized = String(value).trim();
+  let delayMs;
+  if (/^\d+$/.test(normalized)) {
+    const seconds = Number(normalized);
+    if (!Number.isSafeInteger(seconds)) return undefined;
+    delayMs = seconds * 1000;
+  } else {
+    const targetMs = Date.parse(normalized);
+    if (Number.isNaN(targetMs)) return undefined;
+    delayMs = Math.max(0, targetMs - nowMs);
+  }
+
+  if (!Number.isSafeInteger(delayMs) || delayMs < 0) return undefined;
+  return Math.min(delayMs, maxDelayMs);
+}
+
+async function cancelResponseBody(response) {
+  if (!response?.body) return;
+  await response.body.cancel().catch(() => undefined);
+}
+
 export async function requestWithRetry(url, options = {}, dependencies = {}) {
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const attempts = dependencies.attempts ?? DEFAULT_ATTEMPTS;
   const timeoutMs = dependencies.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const retryDelayMs = dependencies.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
+  const maxRetryDelayMs = dependencies.maxRetryDelayMs ?? MAX_RETRY_DELAY_MS;
+  const sleepImpl = dependencies.sleepImpl ?? sleep;
+  const nowImpl = dependencies.nowImpl ?? Date.now;
+
+  invariant(Number.isSafeInteger(attempts) && attempts > 0, "attempts must be a positive safe integer");
+  invariant(Number.isSafeInteger(timeoutMs) && timeoutMs > 0, "timeoutMs must be a positive safe integer");
+  invariant(Number.isSafeInteger(retryDelayMs) && retryDelayMs >= 0, "retryDelayMs must be a non-negative safe integer");
+  invariant(Number.isSafeInteger(maxRetryDelayMs) && maxRetryDelayMs >= 0, "maxRetryDelayMs must be a non-negative safe integer");
+
   let lastError;
+  let lastRetryableStatus;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const headers = new Headers(options.headers);
       headers.set("user-agent", "Revalta-Release-Boundary-Smoke/1.0");
       if (!headers.has("accept")) headers.set("accept", "*/*");
-      return await fetchImpl(url, {
+      const response = await fetchImpl(url, {
         ...options,
         headers,
         redirect: "manual",
         signal: AbortSignal.timeout(timeoutMs),
       });
+
+      if (!RETRYABLE_HTTP_STATUSES.has(response.status)) return response;
+      lastRetryableStatus = response.status;
+      if (attempt === attempts) {
+        await cancelResponseBody(response);
+        break;
+      }
+
+      const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"), {
+        nowMs: nowImpl(),
+        maxDelayMs: maxRetryDelayMs,
+      });
+      const backoffMs = Math.min(retryDelayMs * attempt, maxRetryDelayMs);
+      await cancelResponseBody(response);
+      const delayMs = retryAfterMs ?? backoffMs;
+      if (delayMs > 0) await sleepImpl(delayMs);
     } catch (error) {
       lastError = error;
-      if (attempt < attempts && retryDelayMs > 0) await sleep(retryDelayMs * attempt);
+      if (attempt < attempts) {
+        const delayMs = Math.min(retryDelayMs * attempt, maxRetryDelayMs);
+        if (delayMs > 0) await sleepImpl(delayMs);
+      }
     }
+  }
+
+  if (lastRetryableStatus !== undefined) {
+    throw new Error(`Request failed after ${attempts} attempts with retryable HTTP ${lastRetryableStatus}`);
   }
   throw new Error(`Request failed after ${attempts} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
