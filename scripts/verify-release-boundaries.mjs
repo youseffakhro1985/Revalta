@@ -28,14 +28,10 @@ export function validateOptions(options) {
   const expectedSha = String(options.expectedSha ?? "").trim().toLowerCase();
   const expectedEnvironment = String(options.expectedEnvironment ?? "").trim();
   const expectedBranch = String(options.expectedBranch ?? "").trim();
-
   invariant(SHA_PATTERN.test(expectedSha), "EXPECTED_SHA must be a full 40-character Git commit SHA");
   invariant(["preview", "production"].includes(expectedEnvironment), "EXPECTED_ENVIRONMENT must be preview or production");
   invariant(expectedBranch.length > 0, "EXPECTED_BRANCH is required");
-  if (expectedEnvironment === "production") {
-    invariant(expectedBranch === "main", "Production smoke must target branch main");
-  }
-
+  if (expectedEnvironment === "production") invariant(expectedBranch === "main", "Production smoke must target branch main");
   return { baseUrl, expectedSha, expectedEnvironment, expectedBranch };
 }
 
@@ -50,10 +46,7 @@ function validateSecurityHeaders(headers, label) {
     ["x-frame-options", "DENY"],
     ["referrer-policy", "strict-origin-when-cross-origin"],
   ]);
-  for (const [name, expected] of required) {
-    invariant(headers.get(name) === expected, `${label}: expected ${name}=${expected}`);
-  }
-
+  for (const [name, expected] of required) invariant(headers.get(name) === expected, `${label}: expected ${name}=${expected}`);
   const csp = headers.get("content-security-policy") ?? "";
   invariant(csp.includes("default-src 'self'"), `${label}: CSP is missing default-src 'self'`);
   invariant(csp.includes("object-src 'none'"), `${label}: CSP is missing object-src 'none'`);
@@ -62,9 +55,7 @@ function validateSecurityHeaders(headers, label) {
 
 function validatePrivateNoStore(headers, label) {
   const value = (headers.get("cache-control") ?? "").toLowerCase();
-  for (const directive of ["private", "no-store", "max-age=0", "must-revalidate"]) {
-    invariant(value.includes(directive), `${label}: Cache-Control is missing ${directive}`);
-  }
+  for (const directive of ["private", "no-store", "max-age=0", "must-revalidate"]) invariant(value.includes(directive), `${label}: Cache-Control is missing ${directive}`);
   invariant((headers.get("cdn-cache-control") ?? "").toLowerCase().includes("no-store"), `${label}: CDN-Cache-Control must be no-store`);
   invariant((headers.get("vercel-cdn-cache-control") ?? "").toLowerCase().includes("no-store"), `${label}: Vercel-CDN-Cache-Control must be no-store`);
 }
@@ -74,11 +65,8 @@ export function validateHomeBoundary(response, expectedEnvironment) {
   validateContentType(response.headers, "text/html", "public-home");
   validateSecurityHeaders(response.headers, "public-home");
   const robots = (response.headers.get("x-robots-tag") ?? "").toLowerCase();
-  if (expectedEnvironment === "production") {
-    invariant(!robots.includes("noindex"), "public-home: production must not emit noindex");
-  } else {
-    invariant(robots.includes("noindex"), "public-home: preview must emit noindex");
-  }
+  if (expectedEnvironment === "production") invariant(!robots.includes("noindex"), "public-home: production must not emit noindex");
+  else invariant(robots.includes("noindex"), "public-home: preview must emit noindex");
 }
 
 export function validateDashboardBoundary(response, baseUrl) {
@@ -87,7 +75,6 @@ export function validateDashboardBoundary(response, baseUrl) {
   invariant(redirects.has(response.status) || denials.has(response.status), `dashboard-boundary: expected redirect/401/403, received ${response.status}`);
   validateSecurityHeaders(response.headers, "dashboard-boundary");
   validatePrivateNoStore(response.headers, "dashboard-boundary");
-
   if (redirects.has(response.status)) {
     const location = response.headers.get("location");
     invariant(location, "dashboard-boundary: redirect is missing Location");
@@ -118,7 +105,6 @@ export function validateHealthBoundary(response, payload, expected) {
 
 export async function readBoundedJsonResponse(response, { label = "response", maxBytes = MAX_HEALTH_BODY_BYTES } = {}) {
   invariant(Number.isSafeInteger(maxBytes) && maxBytes > 0, `${label}: maxBytes must be a positive integer`);
-
   const declaredLength = response.headers.get("content-length");
   if (declaredLength !== null) {
     invariant(/^\d+$/.test(declaredLength), `${label}: Content-Length must be a non-negative integer`);
@@ -126,12 +112,10 @@ export async function readBoundedJsonResponse(response, { label = "response", ma
     invariant(Number.isSafeInteger(parsedLength), `${label}: Content-Length is outside the safe integer range`);
     invariant(parsedLength <= maxBytes, `${label}: response exceeds ${maxBytes} byte limit`);
   }
-
   invariant(response.body, `${label}: response body is missing`);
   const reader = response.body.getReader();
   const chunks = [];
   let totalBytes = 0;
-
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -144,36 +128,21 @@ export async function readBoundedJsonResponse(response, { label = "response", ma
     await reader.cancel().catch(() => undefined);
     throw error;
   }
-
   const bytes = new Uint8Array(totalBytes);
   let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
   let text;
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw new Error(`${label}: response is not valid UTF-8`);
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`${label}: response is not valid JSON`);
-  }
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+  catch { throw new Error(`${label}: response is not valid UTF-8`); }
+  try { return JSON.parse(text); }
+  catch { throw new Error(`${label}: response is not valid JSON`); }
 }
 
-async function sleep(ms) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
+async function sleep(ms) { await new Promise((resolve) => setTimeout(resolve, ms)); }
 
 export function parseRetryAfterMs(value, { nowMs = Date.now(), maxDelayMs = MAX_RETRY_DELAY_MS } = {}) {
   if (value === null || value === undefined || String(value).trim() === "") return undefined;
   invariant(Number.isSafeInteger(maxDelayMs) && maxDelayMs >= 0, "maxDelayMs must be a non-negative safe integer");
-
   const normalized = String(value).trim();
   let delayMs;
   if (/^\d+$/.test(normalized)) {
@@ -185,7 +154,6 @@ export function parseRetryAfterMs(value, { nowMs = Date.now(), maxDelayMs = MAX_
     if (Number.isNaN(targetMs)) return undefined;
     delayMs = Math.max(0, targetMs - nowMs);
   }
-
   if (!Number.isSafeInteger(delayMs) || delayMs < 0) return undefined;
   return Math.min(delayMs, maxDelayMs);
 }
@@ -195,7 +163,7 @@ async function cancelResponseBody(response) {
   await response.body.cancel().catch(() => undefined);
 }
 
-export async function requestWithRetry(url, options = {}, dependencies = {}) {
+export async function requestWithRetryEvidence(url, options = {}, dependencies = {}) {
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const attempts = dependencies.attempts ?? DEFAULT_ATTEMPTS;
   const timeoutMs = dependencies.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -203,7 +171,6 @@ export async function requestWithRetry(url, options = {}, dependencies = {}) {
   const maxRetryDelayMs = dependencies.maxRetryDelayMs ?? MAX_RETRY_DELAY_MS;
   const sleepImpl = dependencies.sleepImpl ?? sleep;
   const nowImpl = dependencies.nowImpl ?? Date.now;
-
   invariant(Number.isSafeInteger(attempts) && attempts > 0, "attempts must be a positive safe integer");
   invariant(Number.isSafeInteger(timeoutMs) && timeoutMs > 0, "timeoutMs must be a positive safe integer");
   invariant(Number.isSafeInteger(retryDelayMs) && retryDelayMs >= 0, "retryDelayMs must be a non-negative safe integer");
@@ -211,47 +178,41 @@ export async function requestWithRetry(url, options = {}, dependencies = {}) {
 
   let lastError;
   let lastRetryableStatus;
+  const evidence = { attempts: 0, retryStatuses: [], networkErrors: 0, totalBackoffMs: 0 };
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    evidence.attempts = attempt;
     try {
       const headers = new Headers(options.headers);
       headers.set("user-agent", "Revalta-Release-Boundary-Smoke/1.0");
       if (!headers.has("accept")) headers.set("accept", "*/*");
-      const response = await fetchImpl(url, {
-        ...options,
-        headers,
-        redirect: "manual",
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-
-      if (!RETRYABLE_HTTP_STATUSES.has(response.status)) return response;
+      const response = await fetchImpl(url, { ...options, headers, redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
+      if (!RETRYABLE_HTTP_STATUSES.has(response.status)) return { response, evidence };
       lastRetryableStatus = response.status;
-      if (attempt === attempts) {
-        await cancelResponseBody(response);
-        break;
-      }
-
-      const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"), {
-        nowMs: nowImpl(),
-        maxDelayMs: maxRetryDelayMs,
-      });
+      evidence.retryStatuses.push(response.status);
+      if (attempt === attempts) { await cancelResponseBody(response); break; }
+      const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"), { nowMs: nowImpl(), maxDelayMs: maxRetryDelayMs });
       const backoffMs = Math.min(retryDelayMs * attempt, maxRetryDelayMs);
       await cancelResponseBody(response);
       const delayMs = retryAfterMs ?? backoffMs;
+      evidence.totalBackoffMs += delayMs;
       if (delayMs > 0) await sleepImpl(delayMs);
     } catch (error) {
       lastError = error;
+      evidence.networkErrors += 1;
       if (attempt < attempts) {
         const delayMs = Math.min(retryDelayMs * attempt, maxRetryDelayMs);
+        evidence.totalBackoffMs += delayMs;
         if (delayMs > 0) await sleepImpl(delayMs);
       }
     }
   }
-
-  if (lastRetryableStatus !== undefined) {
-    throw new Error(`Request failed after ${attempts} attempts with retryable HTTP ${lastRetryableStatus}`);
-  }
+  if (lastRetryableStatus !== undefined) throw new Error(`Request failed after ${attempts} attempts with retryable HTTP ${lastRetryableStatus}`);
   throw new Error(`Request failed after ${attempts} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+}
+
+export async function requestWithRetry(url, options = {}, dependencies = {}) {
+  return (await requestWithRetryEvidence(url, options, dependencies)).response;
 }
 
 export async function runReleaseBoundarySmoke(options, dependencies = {}) {
@@ -262,10 +223,9 @@ export async function runReleaseBoundarySmoke(options, dependencies = {}) {
     { label: "health-api", path: "/api/health" },
   ];
   const results = [];
-
   for (const route of routes) {
     const startedAt = Date.now();
-    const response = await requestWithRetry(new URL(route.path, expected.baseUrl), { method: "GET" }, dependencies);
+    const { response, evidence } = await requestWithRetryEvidence(new URL(route.path, expected.baseUrl), { method: "GET" }, dependencies);
     if (route.label === "public-home") validateHomeBoundary(response, expected.expectedEnvironment);
     if (route.label === "dashboard-boundary") validateDashboardBoundary(response, expected.baseUrl);
     if (route.label === "health-api") {
@@ -277,32 +237,23 @@ export async function runReleaseBoundarySmoke(options, dependencies = {}) {
       status: response.status,
       durationMs: Date.now() - startedAt,
       location: response.headers.get("location"),
+      attempts: evidence.attempts,
+      retryStatuses: evidence.retryStatuses,
+      networkErrors: evidence.networkErrors,
+      totalBackoffMs: evidence.totalBackoffMs,
     });
   }
-
-  return {
-    baseUrl: expected.baseUrl.origin,
-    release: expected.expectedSha,
-    environment: expected.expectedEnvironment,
-    branch: expected.expectedBranch,
-    results,
-  };
+  return { baseUrl: expected.baseUrl.origin, release: expected.expectedSha, environment: expected.expectedEnvironment, branch: expected.expectedBranch, results };
 }
 
 export function renderMarkdownSummary(report) {
-  const rows = report.results.map((result) => `| ${result.label} | ${result.status} | ${result.durationMs} ms | ${result.location ?? "—"} |`).join("\n");
+  const rows = report.results.map((result) => `| ${result.label} | ${result.status} | ${result.durationMs} ms | ${result.attempts} | ${result.retryStatuses.join(", ") || "—"} | ${result.networkErrors} | ${result.totalBackoffMs} ms | ${result.location ?? "—"} |`).join("\n");
   return [
-    "## Revalta release boundary smoke",
-    "",
-    `- URL: \`${report.baseUrl}\``,
-    `- SHA: \`${report.release}\``,
-    `- Environment: \`${report.environment}\``,
-    `- Branch: \`${report.branch}\``,
-    "",
-    "| Boundary | HTTP | Duration | Location |",
-    "| --- | ---: | ---: | --- |",
-    rows,
-    "",
+    "## Revalta release boundary smoke", "",
+    `- URL: \`${report.baseUrl}\``, `- SHA: \`${report.release}\``, `- Environment: \`${report.environment}\``, `- Branch: \`${report.branch}\``, "",
+    "| Boundary | HTTP | Duration | Attempts | Retry statuses | Network errors | Backoff | Location |",
+    "| --- | ---: | ---: | ---: | --- | ---: | ---: | --- |",
+    rows, "",
   ].join("\n");
 }
 
@@ -314,14 +265,11 @@ async function main() {
     expectedBranch: process.env.EXPECTED_BRANCH,
   });
   console.log(`Release boundary smoke passed for ${report.release} (${report.environment}/${report.branch})`);
-  for (const result of report.results) console.log(`- ${result.label}: HTTP ${result.status} (${result.durationMs} ms)`);
+  for (const result of report.results) console.log(`- ${result.label}: HTTP ${result.status} (${result.durationMs} ms, ${result.attempts} attempt(s), ${result.totalBackoffMs} ms backoff)`);
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, renderMarkdownSummary(report));
 }
 
 const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectExecution) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
+  main().catch((error) => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });
 }
