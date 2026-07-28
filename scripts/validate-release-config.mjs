@@ -105,8 +105,12 @@ for (const [fragment, message] of [
 const canonicalVerifier = await readFile(paths.canonicalVerifier, "utf8");
 for (const [fragment, message] of [
   ["const MAX_ATTESTATION_BYTES = 1024 * 1024", "Canonical verifier must retain the 1 MiB size ceiling"],
-  ["new TextDecoder(\"utf-8\", { fatal: true })", "Canonical verifier must reject invalid UTF-8"],
-  ["must not contain a UTF-8 BOM", "Canonical verifier must reject BOM-prefixed artifacts"],
+  ["const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf])", "Canonical verifier must detect the BOM in raw bytes"],
+  ["new TextDecoder(\"utf-8\", { fatal: true, ignoreBOM: true })", "Canonical verifier must reject invalid UTF-8 without hiding raw BOM checks"],
+  ["CANONICAL_KEY_ORDER", "Canonical verifier must define controlled schema key ordering"],
+  ["canonicalizeJsonValue", "Canonical verifier must recursively normalize object key order"],
+  ["Object.keys(value).sort(compareCanonicalKeys)", "Canonical verifier must sort every object using the controlled order"],
+  ["buffer.subarray(0, UTF8_BOM.length).equals(UTF8_BOM)", "Canonical verifier must inspect raw bytes before decoding"],
   ["serializeCanonicalJson", "Canonical verifier must deterministically reserialize JSON"],
   ["text === canonical", "Canonical verifier must compare raw and canonical bytes exactly"],
   ["duplicate keys, alternate key order or non-canonical whitespace are forbidden", "Canonical verifier must reject parser-ambiguous JSON"],
@@ -119,4 +123,4 @@ if (scripts["verify:release-attestation"] !== "node scripts/verify-canonical-rel
 if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") fail("package.json must expose smoke:release-boundaries");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must run release configuration validation first");
 
-console.log("Release configuration, schema-v6 exact object shapes, canonical JSON bytes, duplicate-key resistance, policy fingerprints, endpoint identity, boundary semantics, monotonic timing, transport telemetry, provenance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, schema-v6 exact object shapes, raw-BOM detection, schema-ordered canonical JSON bytes, duplicate-key resistance, policy fingerprints, endpoint identity, boundary semantics, monotonic timing, transport telemetry, provenance, checksum-backed attestations, offline verification and replay protection are valid");
