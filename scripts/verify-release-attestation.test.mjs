@@ -6,6 +6,7 @@ import {
   buildCanonicalReleasePolicy,
   calculateReleasePolicyDigest,
   calculateSha256,
+  parseCanonicalChecksumBytes,
   parseChecksumFile,
   validateAttestationFreshness,
   validateBoundaryOutcome,
@@ -16,6 +17,7 @@ import {
   validateReleasePolicyEvidence,
   validateReleaseProvenance,
   verifyReleaseAttestationFiles,
+  verifyReleaseAttestationSnapshot,
 } from "./verify-release-attestation.mjs";
 
 const SHA = "9d3ce1f5530a55e9e817c85933f2683dab69bb77";
@@ -42,6 +44,14 @@ function attestation(overrides = {}) {
   };
 }
 
+function evidenceBytes() {
+  return Buffer.from(`${JSON.stringify(attestation(), null, 2)}\n`, "utf8");
+}
+
+function checksumBytes(bytes = evidenceBytes(), filename = "release.json") {
+  return Buffer.from(`${calculateSha256(bytes)}  ${filename}\n`, "utf8");
+}
+
 describe("release attestation verifier", () => {
   it("parses checksum files and validates schema v6", () => {
     const hash = "a".repeat(64);
@@ -49,6 +59,33 @@ describe("release attestation verifier", () => {
     const result = validateReleaseAttestation(attestation(), { commitSha: SHA, environment: "preview", branch: "release-preview", origin: "https://revalta-release-preview.vercel.app", provenance: { runId: provenance.runId, runAttempt: 1 } }, { now: NOW });
     expect(result.policy).toEqual(policyEvidence);
     expect(() => validateReleaseAttestation(attestation({ schemaVersion: 5 }), {}, { now: NOW })).toThrow("schemaVersion");
+  });
+
+  it("requires a canonical lowercase checksum sidecar", () => {
+    const bytes = evidenceBytes();
+    const hash = calculateSha256(bytes);
+    expect(parseCanonicalChecksumBytes(Buffer.from(`${hash}  release.json\n`), "release.json")).toBe(hash);
+    expect(() => parseCanonicalChecksumBytes(Buffer.from(`${hash.toUpperCase()}  release.json\n`), "release.json")).toThrow("canonical lowercase");
+    expect(() => parseCanonicalChecksumBytes(Buffer.from(`${hash}  release.json\r\n`), "release.json")).toThrow("canonical lowercase");
+    expect(() => parseCanonicalChecksumBytes(Buffer.from(`${hash}  release.json\n\n`), "release.json")).toThrow("canonical lowercase");
+    expect(() => parseCanonicalChecksumBytes(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), checksumBytes(bytes)]), "release.json")).toThrow("UTF-8 BOM");
+    expect(() => parseCanonicalChecksumBytes(checksumBytes(bytes, "other.json"), "release.json")).toThrow("filename mismatch");
+    expect(() => parseCanonicalChecksumBytes(checksumBytes(bytes), "release.json", { maxBytes: 8 })).toThrow("exceeds 8 byte");
+  });
+
+  it("verifies checksum and semantics from one immutable snapshot", () => {
+    const bytes = evidenceBytes();
+    const verified = verifyReleaseAttestationSnapshot({
+      attestationBytes: bytes,
+      checksumBytes: checksumBytes(bytes),
+      expectedFilename: "release.json",
+      now: NOW,
+      maxAgeSeconds: 300,
+    });
+    expect(verified.checksum).toBe(calculateSha256(bytes));
+    const changed = Buffer.from(bytes);
+    changed[changed.length - 2] = 0x20;
+    expect(() => verifyReleaseAttestationSnapshot({ attestationBytes: changed, checksumBytes: checksumBytes(bytes), expectedFilename: "release.json", now: NOW })).toThrow("checksum mismatch");
   });
 
   it("rejects unknown fields at every critical evidence level", () => {
@@ -90,7 +127,7 @@ describe("release attestation verifier", () => {
     const directory = await mkdtemp(join(tmpdir(), "revalta-attestation-verify-"));
     const jsonPath = join(directory, "release.json");
     const checksumPath = `${jsonPath}.sha256`;
-    const bytes = Buffer.from(`${JSON.stringify(attestation(), null, 2)}\n`, "utf8");
+    const bytes = evidenceBytes();
     const hash = calculateSha256(bytes);
     await writeFile(jsonPath, bytes);
     await writeFile(checksumPath, `${hash}  release.json\n`);
