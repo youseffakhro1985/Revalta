@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { mkdir, rename, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateReleaseTarget } from "./validate-release-target.mjs";
 import { renderMarkdownSummary, runReleaseBoundarySmoke } from "./verify-release-boundaries.mjs";
@@ -38,16 +39,35 @@ export function buildReleaseAttestation({ target, report, checkedAt = new Date()
   };
 }
 
-export async function writeReleaseAttestation(path, attestation) {
+export function serializeReleaseAttestation(attestation) {
+  invariant(attestation && typeof attestation === "object", "Release attestation is required");
+  return `${JSON.stringify(attestation, null, 2)}\n`;
+}
+
+export function calculateReleaseAttestationChecksum(serializedAttestation) {
+  invariant(typeof serializedAttestation === "string" && serializedAttestation.length > 0, "Serialized release attestation is required");
+  return createHash("sha256").update(serializedAttestation, "utf8").digest("hex");
+}
+
+async function writeAtomic(path, content) {
   const outputPath = resolve(path);
   const temporaryPath = `${outputPath}.tmp-${process.pid}`;
   await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(temporaryPath, `${JSON.stringify(attestation, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
+  await writeFile(temporaryPath, content, { encoding: "utf8", mode: 0o600 });
   await rename(temporaryPath, outputPath);
   return outputPath;
+}
+
+export async function writeReleaseAttestation(path, attestation) {
+  const outputPath = resolve(path);
+  const serialized = serializeReleaseAttestation(attestation);
+  const checksum = calculateReleaseAttestationChecksum(serialized);
+  const checksumPath = `${outputPath}.sha256`;
+
+  await writeAtomic(outputPath, serialized);
+  await writeAtomic(checksumPath, `${checksum}  ${basename(outputPath)}\n`);
+
+  return { outputPath, checksumPath, checksum };
 }
 
 export async function runStrictReleaseGate(input, dependencies = {}) {
@@ -65,11 +85,12 @@ export async function runStrictReleaseGate(input, dependencies = {}) {
     checkedAt: dependencies.checkedAt,
   });
 
+  let writtenAttestation = null;
   if (dependencies.attestationPath) {
-    await writeReleaseAttestation(dependencies.attestationPath, attestation);
+    writtenAttestation = await writeReleaseAttestation(dependencies.attestationPath, attestation);
   }
 
-  return { target, report, attestation };
+  return { target, report, attestation, writtenAttestation };
 }
 
 async function main() {
@@ -82,7 +103,8 @@ async function main() {
   }, { attestationPath });
 
   console.log(`Strict release gate passed for ${result.attestation.release.commitSha}`);
-  console.log(`Release attestation written to ${resolve(attestationPath)}`);
+  console.log(`Release attestation written to ${result.writtenAttestation.outputPath}`);
+  console.log(`Release attestation SHA-256: ${result.writtenAttestation.checksum}`);
 
   if (process.env.GITHUB_STEP_SUMMARY) {
     const summary = [
@@ -93,6 +115,7 @@ async function main() {
       `- Verdict: \`${result.attestation.verdict}\``,
       `- Checked at: \`${result.attestation.checkedAt}\``,
       `- Artifact: \`${attestationPath}\``,
+      `- SHA-256: \`${result.writtenAttestation.checksum}\``,
       "",
     ].join("\n");
     await writeFile(process.env.GITHUB_STEP_SUMMARY, summary, { encoding: "utf8", flag: "a" });
@@ -102,7 +125,7 @@ async function main() {
 const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectExecution) {
   main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   });
 }
