@@ -5,8 +5,10 @@ import { pathToFileURL } from "node:url";
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
+const CANONICAL_ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
 const PRODUCTION_ORIGIN = "https://www.revalta.se";
+const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -31,12 +33,29 @@ export function verifyChecksum(bytes, expectedHash) {
   return actual.toString("hex");
 }
 
-export function validateReleaseAttestation(attestation, expected = {}) {
+export function validateAttestationFreshness(checkedAt, { now = new Date(), maxAgeSeconds } = {}) {
+  invariant(typeof checkedAt === "string" && CANONICAL_ISO_PATTERN.test(checkedAt), "Release attestation checkedAt must be a canonical UTC ISO timestamp");
+  const checkedAtMs = Date.parse(checkedAt);
+  invariant(!Number.isNaN(checkedAtMs) && new Date(checkedAtMs).toISOString() === checkedAt, "Release attestation checkedAt must be a real canonical UTC timestamp");
+
+  const nowMs = now instanceof Date ? now.getTime() : Number(now);
+  invariant(Number.isFinite(nowMs), "Attestation verification clock must be valid");
+  invariant(checkedAtMs <= nowMs + MAX_CLOCK_SKEW_MS, "Release attestation checkedAt is too far in the future");
+
+  if (maxAgeSeconds !== undefined) {
+    invariant(Number.isInteger(maxAgeSeconds) && maxAgeSeconds > 0, "maxAgeSeconds must be a positive integer");
+    invariant(nowMs - checkedAtMs <= maxAgeSeconds * 1000, `Release attestation is older than ${maxAgeSeconds} seconds`);
+  }
+
+  return { checkedAtMs, ageMs: Math.max(0, nowMs - checkedAtMs) };
+}
+
+export function validateReleaseAttestation(attestation, expected = {}, options = {}) {
   invariant(attestation && typeof attestation === "object" && !Array.isArray(attestation), "Attestation must be a JSON object");
   invariant(attestation.schemaVersion === 1, "Unsupported release attestation schemaVersion");
   invariant(attestation.kind === "revalta.release-boundary-attestation", "Unexpected release attestation kind");
   invariant(attestation.verdict === "passed", "Release attestation verdict must be passed");
-  invariant(typeof attestation.checkedAt === "string" && !Number.isNaN(Date.parse(attestation.checkedAt)), "Release attestation checkedAt must be a valid ISO timestamp");
+  const freshness = validateAttestationFreshness(attestation.checkedAt, options);
 
   const release = attestation.release;
   invariant(release && typeof release === "object", "Release metadata is required");
@@ -69,10 +88,10 @@ export function validateReleaseAttestation(attestation, expected = {}) {
   if (expected.branch) invariant(release.branch === expected.branch, "Attestation branch does not match expected release");
   if (expected.origin) invariant(release.origin === expected.origin, "Attestation origin does not match expected release");
 
-  return attestation;
+  return { attestation, freshness };
 }
 
-export async function verifyReleaseAttestationFiles({ attestationPath, checksumPath, expected = {} }) {
+export async function verifyReleaseAttestationFiles({ attestationPath, checksumPath, expected = {}, now, maxAgeSeconds }) {
   const resolvedAttestationPath = resolve(attestationPath);
   const resolvedChecksumPath = resolve(checksumPath ?? `${attestationPath}.sha256`);
   const [bytes, checksumText] = await Promise.all([
@@ -88,16 +107,32 @@ export async function verifyReleaseAttestationFiles({ attestationPath, checksumP
   } catch {
     throw new Error("Release attestation is not valid JSON");
   }
-  validateReleaseAttestation(attestation, expected);
-  return { attestation, checksum, attestationPath: resolvedAttestationPath, checksumPath: resolvedChecksumPath };
+  const validation = validateReleaseAttestation(attestation, expected, { now, maxAgeSeconds });
+  return {
+    attestation: validation.attestation,
+    freshness: validation.freshness,
+    checksum,
+    attestationPath: resolvedAttestationPath,
+    checksumPath: resolvedChecksumPath,
+  };
+}
+
+function parseOptionalPositiveInteger(value, label) {
+  if (value === undefined || value === "") return undefined;
+  invariant(/^\d+$/.test(value), `${label} must be a positive integer`);
+  const parsed = Number(value);
+  invariant(Number.isSafeInteger(parsed) && parsed > 0, `${label} must be a positive integer`);
+  return parsed;
 }
 
 async function main() {
   const attestationPath = process.env.RELEASE_ATTESTATION_PATH || process.argv[2] || "artifacts/release-boundary-attestation.json";
   const checksumPath = process.env.RELEASE_ATTESTATION_CHECKSUM_PATH || process.argv[3] || `${attestationPath}.sha256`;
+  const maxAgeSeconds = parseOptionalPositiveInteger(process.env.MAX_ATTESTATION_AGE_SECONDS, "MAX_ATTESTATION_AGE_SECONDS");
   const result = await verifyReleaseAttestationFiles({
     attestationPath,
     checksumPath,
+    maxAgeSeconds,
     expected: {
       commitSha: process.env.EXPECTED_SHA?.trim().toLowerCase() || undefined,
       environment: process.env.EXPECTED_ENVIRONMENT?.trim() || undefined,
@@ -107,6 +142,7 @@ async function main() {
   });
   console.log(`Release attestation verified: ${result.attestation.release.commitSha}`);
   console.log(`SHA-256: ${result.checksum}`);
+  console.log(`Age: ${Math.floor(result.freshness.ageMs / 1000)} seconds`);
 }
 
 const isDirectExecution = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
