@@ -8,6 +8,7 @@ const paths = {
   legacyWorkflow: new URL(".github/workflows/release-boundary-smoke.yml", root),
   targetValidator: new URL("scripts/validate-release-target.mjs", root),
   boundaryVerifier: new URL("scripts/verify-release-boundaries.mjs", root),
+  strictGateRunner: new URL("scripts/run-strict-release-gate.mjs", root),
 };
 
 function fail(message) {
@@ -83,6 +84,7 @@ if (config.buildCommand !== "npm run build" || config.installCommand !== "npm ci
 
 await assertFileExists(paths.targetValidator, "Release target validator");
 await assertFileExists(paths.boundaryVerifier, "Release boundary verifier");
+await assertFileExists(paths.strictGateRunner, "Strict release gate runner");
 await assertFileExists(paths.strictWorkflow, "Strict Release Boundary Gate workflow");
 await assertFileMissing(paths.legacyWorkflow, "Legacy Release Boundary Smoke workflow");
 
@@ -91,8 +93,12 @@ requireText(workflow, "name: Strict Release Boundary Gate", "Strict release work
 requireText(workflow, "workflow_dispatch:", "Strict release workflow must remain manually and explicitly dispatched");
 requireText(workflow, "ref: ${{ inputs.expected_sha }}", "Strict release workflow must check out the exact expected SHA");
 requireText(workflow, "persist-credentials: false", "Strict release workflow must not persist GitHub credentials");
-requireText(workflow, "node scripts/validate-release-target.mjs", "Strict release workflow must validate the exact release target first");
-requireText(workflow, "node scripts/verify-release-boundaries.mjs", "Strict release workflow must verify deployed release boundaries");
+requireText(workflow, "node scripts/run-strict-release-gate.mjs", "Strict release workflow must run the attesting strict gate orchestrator");
+requireText(workflow, "RELEASE_ATTESTATION_PATH: artifacts/release-boundary-attestation.json", "Strict release workflow must use the controlled attestation path");
+requireText(workflow, "uses: actions/upload-artifact@v4", "Strict release workflow must persist release evidence as an artifact");
+requireText(workflow, "name: release-boundary-${{ inputs.expected_environment }}-${{ inputs.expected_sha }}", "Release artifact name must bind environment and full SHA");
+requireText(workflow, "if: always()", "Release artifact upload must run even when the gate fails");
+requireText(workflow, "retention-days: 30", "Release evidence must retain the controlled 30-day audit window");
 requireText(workflow, "contents: read", "Strict release workflow must retain least-privilege contents permissions");
 requireText(workflow, "cancel-in-progress: false", "Release evidence runs must not cancel one another");
 
@@ -107,4 +113,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration and smoke governance are valid");
+console.log("Release configuration, smoke governance and attestation retention are valid");
