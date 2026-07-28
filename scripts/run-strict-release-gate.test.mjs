@@ -6,6 +6,7 @@ import {
   buildReleaseAttestation,
   calculateReleaseAttestationChecksum,
   serializeReleaseAttestation,
+  validateReleaseProvenance,
   writeReleaseAttestation,
 } from "./run-strict-release-gate.mjs";
 
@@ -15,6 +16,15 @@ const target = {
   expectedSha: SHA,
   environment: "preview",
   branch: "release-preview",
+};
+const provenance = {
+  repository: "youseffakhro1985/Revalta",
+  workflow: "Strict Release Boundary Gate",
+  workflowRef: "youseffakhro1985/Revalta/.github/workflows/strict-release-boundary-gate.yml@refs/heads/release-preview",
+  runId: "30320000000",
+  runAttempt: 1,
+  serverUrl: "https://github.com",
+  runUrl: "https://github.com/youseffakhro1985/Revalta/actions/runs/30320000000",
 };
 
 function report(overrides = {}) {
@@ -36,16 +46,17 @@ function attestation() {
   return buildReleaseAttestation({
     target,
     report: report(),
+    provenance,
     checkedAt: new Date("2026-07-28T00:00:00.000Z"),
   });
 }
 
 describe("strict release attestation", () => {
-  it("creates a stable, secret-free passed attestation", () => {
+  it("creates stable, secret-free evidence with controlled provenance", () => {
     const evidence = attestation();
 
     expect(evidence).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "revalta.release-boundary-attestation",
       verdict: "passed",
       checkedAt: "2026-07-28T00:00:00.000Z",
@@ -56,6 +67,7 @@ describe("strict release attestation", () => {
         branch: "release-preview",
         origin: target.baseUrl,
       },
+      provenance,
       boundaries: [
         { name: "public-home", httpStatus: 200, durationMs: 12, redirectLocation: null },
         { name: "dashboard-boundary", httpStatus: 307, durationMs: 8, redirectLocation: "/login" },
@@ -69,23 +81,23 @@ describe("strict release attestation", () => {
     expect(serialized).not.toContain("token");
   });
 
+  it("rejects invalid or internally inconsistent provenance", () => {
+    expect(() => validateReleaseProvenance({ ...provenance, repository: "invalid" })).toThrow("owner/name");
+    expect(() => validateReleaseProvenance({ ...provenance, workflowRef: "invalid" })).toThrow("workflowRef");
+    expect(() => validateReleaseProvenance({ ...provenance, runId: "0" })).toThrow("runId");
+    expect(() => validateReleaseProvenance({ ...provenance, runAttempt: 0 })).toThrow("runAttempt");
+    expect(() => validateReleaseProvenance({ ...provenance, runUrl: "https://github.com/other/run" })).toThrow("runUrl mismatch");
+  });
+
   it("rejects evidence assembled from a different release", () => {
     expect(() => buildReleaseAttestation({
       target,
+      provenance,
       report: report({ release: "1111111111111111111111111111111111111111" }),
     })).toThrow("SHA mismatch");
-    expect(() => buildReleaseAttestation({
-      target,
-      report: report({ environment: "production" }),
-    })).toThrow("environment mismatch");
-    expect(() => buildReleaseAttestation({
-      target,
-      report: report({ branch: "main" }),
-    })).toThrow("branch mismatch");
-    expect(() => buildReleaseAttestation({
-      target,
-      report: report({ baseUrl: "https://other.vercel.app" }),
-    })).toThrow("base URL mismatch");
+    expect(() => buildReleaseAttestation({ target, provenance, report: report({ environment: "production" }) })).toThrow("environment mismatch");
+    expect(() => buildReleaseAttestation({ target, provenance, report: report({ branch: "main" }) })).toThrow("branch mismatch");
+    expect(() => buildReleaseAttestation({ target, provenance, report: report({ baseUrl: "https://other.vercel.app" }) })).toThrow("base URL mismatch");
   });
 
   it("serializes deterministically and detects byte-level changes", () => {
