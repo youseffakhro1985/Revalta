@@ -2,7 +2,12 @@ import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildReleaseAttestation, writeReleaseAttestation } from "./run-strict-release-gate.mjs";
+import {
+  buildReleaseAttestation,
+  calculateReleaseAttestationChecksum,
+  serializeReleaseAttestation,
+  writeReleaseAttestation,
+} from "./run-strict-release-gate.mjs";
 
 const SHA = "3faf049f8ba51b577824d53a18fff71ac6a34420";
 const target = {
@@ -27,15 +32,19 @@ function report(overrides = {}) {
   };
 }
 
+function attestation() {
+  return buildReleaseAttestation({
+    target,
+    report: report(),
+    checkedAt: new Date("2026-07-28T00:00:00.000Z"),
+  });
+}
+
 describe("strict release attestation", () => {
   it("creates a stable, secret-free passed attestation", () => {
-    const attestation = buildReleaseAttestation({
-      target,
-      report: report(),
-      checkedAt: new Date("2026-07-28T00:00:00.000Z"),
-    });
+    const evidence = attestation();
 
-    expect(attestation).toEqual({
+    expect(evidence).toEqual({
       schemaVersion: 1,
       kind: "revalta.release-boundary-attestation",
       verdict: "passed",
@@ -54,7 +63,7 @@ describe("strict release attestation", () => {
       ],
     });
 
-    const serialized = JSON.stringify(attestation);
+    const serialized = JSON.stringify(evidence);
     expect(serialized).not.toContain("authorization");
     expect(serialized).not.toContain("cookie");
     expect(serialized).not.toContain("token");
@@ -79,18 +88,31 @@ describe("strict release attestation", () => {
     })).toThrow("base URL mismatch");
   });
 
-  it("writes deterministic JSON atomically with private permissions", async () => {
+  it("serializes deterministically and detects byte-level changes", () => {
+    const serialized = serializeReleaseAttestation(attestation());
+    expect(serialized.endsWith("\n")).toBe(true);
+    expect(serializeReleaseAttestation(attestation())).toBe(serialized);
+
+    const checksum = calculateReleaseAttestationChecksum(serialized);
+    expect(checksum).toMatch(/^[0-9a-f]{64}$/);
+    expect(calculateReleaseAttestationChecksum(serialized)).toBe(checksum);
+    expect(calculateReleaseAttestationChecksum(serialized.replace("passed", "failed"))).not.toBe(checksum);
+  });
+
+  it("writes JSON and checksum atomically with private permissions", async () => {
     const directory = await mkdtemp(join(tmpdir(), "revalta-release-attestation-"));
     const path = join(directory, "nested", "attestation.json");
-    const attestation = buildReleaseAttestation({
-      target,
-      report: report(),
-      checkedAt: new Date("2026-07-28T00:00:00.000Z"),
-    });
+    const evidence = attestation();
+    const serialized = serializeReleaseAttestation(evidence);
+    const expectedChecksum = calculateReleaseAttestationChecksum(serialized);
 
-    const writtenPath = await writeReleaseAttestation(path, attestation);
-    expect(writtenPath).toBe(path);
-    expect(JSON.parse(await readFile(path, "utf8"))).toEqual(attestation);
+    const written = await writeReleaseAttestation(path, evidence);
+    expect(written.outputPath).toBe(path);
+    expect(written.checksumPath).toBe(`${path}.sha256`);
+    expect(written.checksum).toBe(expectedChecksum);
+    expect(await readFile(path, "utf8")).toBe(serialized);
+    expect(await readFile(`${path}.sha256`, "utf8")).toBe(`${expectedChecksum}  attestation.json\n`);
     expect((await stat(path)).mode & 0o777).toBe(0o600);
+    expect((await stat(`${path}.sha256`)).mode & 0o777).toBe(0o600);
   });
 });
