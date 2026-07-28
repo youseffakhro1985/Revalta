@@ -7,6 +7,7 @@ import {
   parseChecksumFile,
   validateAttestationFreshness,
   validateBoundaryOutcome,
+  validateBoundaryRequest,
   validateBoundaryTransport,
   validateReleaseAttestation,
   validateReleaseProvenance,
@@ -28,7 +29,7 @@ const clean = { attempts: 1, retryStatuses: [], networkErrors: 0, totalBackoffMs
 
 function attestation(overrides = {}) {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     kind: "revalta.release-boundary-attestation",
     verdict: "passed",
     checkedAt: "2026-07-28T00:00:00.000Z",
@@ -41,9 +42,9 @@ function attestation(overrides = {}) {
     },
     provenance,
     boundaries: [
-      { name: "public-home", httpStatus: 200, durationMs: 10, redirectLocation: null, transport: clean },
-      { name: "dashboard-boundary", httpStatus: 307, durationMs: 1_508, redirectLocation: "/login", transport: { attempts: 2, retryStatuses: [503], networkErrors: 0, totalBackoffMs: 1_500 } },
-      { name: "health-api", httpStatus: 200, durationMs: 1_512, redirectLocation: null, transport: { attempts: 2, retryStatuses: [], networkErrors: 1, totalBackoffMs: 1_500 } },
+      { name: "public-home", request: { method: "GET", path: "/" }, httpStatus: 200, durationMs: 10, redirectLocation: null, transport: clean },
+      { name: "dashboard-boundary", request: { method: "GET", path: "/dashboard" }, httpStatus: 307, durationMs: 1_508, redirectLocation: "/login", transport: { attempts: 2, retryStatuses: [503], networkErrors: 0, totalBackoffMs: 1_500 } },
+      { name: "health-api", request: { method: "GET", path: "/api/health" }, httpStatus: 200, durationMs: 1_512, redirectLocation: null, transport: { attempts: 2, retryStatuses: [], networkErrors: 1, totalBackoffMs: 1_500 } },
     ],
     ...overrides,
   };
@@ -56,7 +57,7 @@ describe("release attestation verifier", () => {
     expect(() => parseChecksumFile(`${hash} release.json`, "release.json")).toThrow("format");
   });
 
-  it("validates schema v3, identity, provenance and exact boundaries", () => {
+  it("validates schema v4, identity, provenance, endpoints and exact boundaries", () => {
     expect(() => validateReleaseAttestation(attestation(), {
       commitSha: SHA,
       environment: "preview",
@@ -64,8 +65,17 @@ describe("release attestation verifier", () => {
       origin: "https://revalta-release-preview.vercel.app",
       provenance: { runId: provenance.runId, runAttempt: 1 },
     }, { now: NOW })).not.toThrow();
-    expect(() => validateReleaseAttestation(attestation({ schemaVersion: 2 }), {}, { now: NOW })).toThrow("schemaVersion");
+    expect(() => validateReleaseAttestation(attestation({ schemaVersion: 3 }), {}, { now: NOW })).toThrow("schemaVersion");
     expect(() => validateReleaseAttestation(attestation({ boundaries: [] }), {}, { now: NOW })).toThrow("exactly");
+  });
+
+  it("rejects forged endpoint identity and non-canonical request evidence", () => {
+    expect(() => validateBoundaryRequest({ method: "POST", path: "/" }, "public-home")).toThrow("method must be GET");
+    expect(() => validateBoundaryRequest({ method: "GET", path: "/admin" }, "dashboard-boundary")).toThrow("path must be /dashboard");
+    expect(() => validateBoundaryRequest({ method: "GET", path: "/api/health?full=1" }, "health-api")).toThrow("path must be /api/health");
+    expect(() => validateBoundaryRequest({ method: "GET", path: "https://evil.example/api/health" }, "health-api")).toThrow("path must be /api/health");
+    expect(() => validateBoundaryRequest({ method: "GET", path: "/", headers: {} }, "public-home")).toThrow("only method and path");
+    expect(() => validateBoundaryRequest(null, "public-home")).toThrow("request evidence is required");
   });
 
   it("rejects forged provenance and impossible retry evidence", () => {
@@ -107,7 +117,7 @@ describe("release attestation verifier", () => {
     await writeFile(checksumPath, `${hash}  release.json\n`);
     const verified = await verifyReleaseAttestationFiles({ attestationPath: jsonPath, checksumPath, now: NOW, maxAgeSeconds: 300 });
     expect(verified.checksum).toBe(hash);
-    expect(verified.attestation.boundaries[1].redirectLocation).toBe("/login");
+    expect(verified.attestation.boundaries[2].request).toEqual({ method: "GET", path: "/api/health" });
     await writeFile(jsonPath, Buffer.concat([bytes, Buffer.from(" ")]));
     await expect(verifyReleaseAttestationFiles({ attestationPath: jsonPath, checksumPath, now: NOW })).rejects.toThrow("checksum mismatch");
     expect(await readFile(checksumPath, "utf8")).toContain(hash);
