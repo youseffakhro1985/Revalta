@@ -71,14 +71,8 @@ if (JSON.stringify(enabledBranches) !== JSON.stringify(expectedBranches)) {
   fail(`Automatic Vercel deployments must be limited to ${expectedBranches.join(", ")}; received ${enabledBranches.join(", ") || "none"}`);
 }
 
-if (Object.hasOwn(deploymentEnabled, "*")) {
-  fail("Wildcard Vercel deployment rules are not allowed");
-}
-
-if (config.framework !== "nextjs") {
-  fail("Vercel framework must remain nextjs");
-}
-
+if (Object.hasOwn(deploymentEnabled, "*")) fail("Wildcard Vercel deployment rules are not allowed");
+if (config.framework !== "nextjs") fail("Vercel framework must remain nextjs");
 if (config.buildCommand !== "npm run build" || config.installCommand !== "npm ci") {
   fail("Vercel install/build commands differ from the controlled release contract");
 }
@@ -107,33 +101,36 @@ requireText(workflow, "contents: read", "Strict release workflow must retain lea
 requireText(workflow, "cancel-in-progress: false", "Release evidence runs must not cancel one another");
 
 const runner = await readFile(paths.strictGateRunner, "utf8");
+requireText(runner, "const ATTESTATION_VERSION = 2", "Strict release runner must emit schema version 2 attestations");
+requireText(runner, "buildReleaseProvenance", "Strict release runner must collect GitHub Actions provenance");
+requireText(runner, "GITHUB_REPOSITORY", "Strict release runner must bind evidence to the GitHub repository");
+requireText(runner, "GITHUB_WORKFLOW_REF", "Strict release runner must bind evidence to the workflow ref");
+requireText(runner, "GITHUB_RUN_ID", "Strict release runner must bind evidence to the workflow run ID");
+requireText(runner, "GITHUB_RUN_ATTEMPT", "Strict release runner must bind evidence to the workflow run attempt");
 requireText(runner, "createHash(\"sha256\")", "Strict release runner must calculate a SHA-256 checksum");
 requireText(runner, "`${outputPath}.sha256`", "Strict release runner must write the controlled checksum path");
 requireText(runner, "mode: 0o600", "Release evidence files must retain private filesystem permissions");
 
 const verifier = await readFile(paths.attestationVerifier, "utf8");
+requireText(verifier, "attestation.schemaVersion === 2", "Release verifier must require schema version 2");
+requireText(verifier, "EXPECTED_REPOSITORY = \"youseffakhro1985/Revalta\"", "Release verifier must bind evidence to the controlled repository");
+requireText(verifier, "EXPECTED_WORKFLOW = \"Strict Release Boundary Gate\"", "Release verifier must bind evidence to the controlled workflow");
+requireText(verifier, "EXPECTED_WORKFLOW_PATH", "Release verifier must validate the controlled workflow ref");
+requireText(verifier, "Release provenance runUrl mismatch", "Release verifier must validate the provenance run URL");
+requireText(verifier, "serverUrl.hostname === \"github.com\"", "Release verifier must require github.com provenance");
 requireText(verifier, "timingSafeEqual", "Release attestation verifier must use timing-safe checksum comparison");
-requireText(verifier, "revalta.release-boundary-attestation", "Release attestation verifier must validate the controlled evidence kind");
 requireText(verifier, "EXPECTED_BOUNDARIES", "Release attestation verifier must enforce the exact boundary set");
-requireText(verifier, "Production attestation must target", "Release attestation verifier must enforce canonical production identity");
-requireText(verifier, "Preview attestation must target", "Release attestation verifier must enforce controlled preview identity");
 requireText(verifier, "CANONICAL_ISO_PATTERN", "Release attestation verifier must require canonical UTC timestamps");
 requireText(verifier, "MAX_CLOCK_SKEW_MS", "Release attestation verifier must reject evidence too far in the future");
 requireText(verifier, "MAX_ATTESTATION_AGE_SECONDS", "Release attestation verifier must support explicit replay-age limits");
 requireText(verifier, "Release attestation is older than", "Release attestation verifier must fail closed on stale evidence");
 
 const scripts = packageJson?.scripts ?? {};
-if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") {
-  fail("package.json must expose the controlled validate:release-config command");
-}
-if (scripts["verify:release-attestation"] !== "node scripts/verify-release-attestation.mjs") {
-  fail("package.json must expose the controlled verify:release-attestation command");
-}
-if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") {
-  fail("package.json must expose the controlled smoke:release-boundaries command");
-}
+if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose the controlled validate:release-config command");
+if (scripts["verify:release-attestation"] !== "node scripts/verify-release-attestation.mjs") fail("package.json must expose the controlled verify:release-attestation command");
+if (scripts["smoke:release-boundaries"] !== "node scripts/verify-release-boundaries.mjs") fail("package.json must expose the controlled smoke:release-boundaries command");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) {
   fail("The quality command must run release configuration validation before all other checks");
 }
 
-console.log("Release configuration, smoke governance, checksum-backed attestations, offline verification and replay protection are valid");
+console.log("Release configuration, smoke governance, schema-v2 provenance, checksum-backed attestations, offline verification and replay protection are valid");
