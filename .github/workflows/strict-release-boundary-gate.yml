@@ -40,6 +40,7 @@ jobs:
       EXPECTED_SHA: ${{ inputs.expected_sha }}
       EXPECTED_ENVIRONMENT: ${{ inputs.expected_environment }}
       EXPECTED_BRANCH: ${{ inputs.expected_branch }}
+      RELEASE_ATTESTATION_PATH: artifacts/release-boundary-attestation.json
 
     steps:
       - name: Check out exact release commit
@@ -53,8 +54,14 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Validate exact release target
-        run: node scripts/validate-release-target.mjs
+      - name: Run strict release gate and create attestation
+        run: node scripts/run-strict-release-gate.mjs
 
-      - name: Verify exact deployed boundaries
-        run: node scripts/verify-release-boundaries.mjs
+      - name: Upload release boundary attestation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-boundary-${{ inputs.expected_environment }}-${{ inputs.expected_sha }}
+          path: artifacts/release-boundary-attestation.json
+          if-no-files-found: warn
+          retention-days: 30
