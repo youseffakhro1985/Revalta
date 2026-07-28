@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 const DEFAULT_ATTEMPTS = 3;
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_RETRY_DELAY_MS = 1_500;
+const MAX_HEALTH_BODY_BYTES = 32 * 1024;
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
 
 function invariant(condition, message) {
@@ -113,6 +114,56 @@ export function validateHealthBoundary(response, payload, expected) {
   invariant((response.headers.get("vercel-cdn-cache-control") ?? "").toLowerCase().includes("no-store"), "health-api: Vercel CDN cache must be disabled");
 }
 
+export async function readBoundedJsonResponse(response, { label = "response", maxBytes = MAX_HEALTH_BODY_BYTES } = {}) {
+  invariant(Number.isSafeInteger(maxBytes) && maxBytes > 0, `${label}: maxBytes must be a positive integer`);
+
+  const declaredLength = response.headers.get("content-length");
+  if (declaredLength !== null) {
+    invariant(/^\d+$/.test(declaredLength), `${label}: Content-Length must be a non-negative integer`);
+    const parsedLength = Number(declaredLength);
+    invariant(Number.isSafeInteger(parsedLength), `${label}: Content-Length is outside the safe integer range`);
+    invariant(parsedLength <= maxBytes, `${label}: response exceeds ${maxBytes} byte limit`);
+  }
+
+  invariant(response.body, `${label}: response body is missing`);
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      invariant(totalBytes <= maxBytes, `${label}: response exceeds ${maxBytes} byte limit`);
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(`${label}: response is not valid UTF-8`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${label}: response is not valid JSON`);
+  }
+}
+
 async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -158,12 +209,7 @@ export async function runReleaseBoundarySmoke(options, dependencies = {}) {
     if (route.label === "public-home") validateHomeBoundary(response, expected.expectedEnvironment);
     if (route.label === "dashboard-boundary") validateDashboardBoundary(response, expected.baseUrl);
     if (route.label === "health-api") {
-      let payload;
-      try {
-        payload = await response.json();
-      } catch {
-        throw new Error("health-api: response is not valid JSON");
-      }
+      const payload = await readBoundedJsonResponse(response, { label: "health-api" });
       validateHealthBoundary(response, payload, expected);
     }
     results.push({
