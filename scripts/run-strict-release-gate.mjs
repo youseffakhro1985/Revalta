@@ -5,7 +5,8 @@ import { pathToFileURL } from "node:url";
 import { validateReleaseTarget } from "./validate-release-target.mjs";
 import { renderMarkdownSummary, runReleaseBoundarySmoke } from "./verify-release-boundaries.mjs";
 
-const ATTESTATION_VERSION = 4;
+const ATTESTATION_VERSION = 5;
+const RELEASE_POLICY_ID = "revalta.strict-release-policy.v1";
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
 const BOUNDARY_REQUESTS = Object.freeze({
   "public-home": Object.freeze({ method: "GET", path: "/" }),
@@ -19,6 +20,31 @@ const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 
 function invariant(condition, message) { if (!condition) throw new Error(message); }
+
+export function buildCanonicalReleasePolicy() {
+  return {
+    id: RELEASE_POLICY_ID,
+    attestationSchemaVersion: ATTESTATION_VERSION,
+    boundaries: [
+      { name: "public-home", request: { method: "GET", path: "/" }, allowedFinalStatuses: [200], redirect: "forbidden" },
+      { name: "dashboard-boundary", request: { method: "GET", path: "/dashboard" }, allowedFinalStatuses: [301, 302, 303, 307, 308, 401, 403], redirect: "canonical-/login-or-null-denial" },
+      { name: "health-api", request: { method: "GET", path: "/api/health" }, allowedFinalStatuses: [200], redirect: "forbidden" },
+    ],
+    retryableHttpStatuses: [408, 425, 429, 500, 502, 503, 504],
+    transportEvidence: ["attempts", "retryStatuses", "networkErrors", "totalBackoffMs"],
+    durationContract: "monotonic-duration-gte-total-backoff",
+  };
+}
+
+export function calculateReleasePolicyDigest(policy = buildCanonicalReleasePolicy()) {
+  invariant(policy && typeof policy === "object" && !Array.isArray(policy), "Release policy is required");
+  return createHash("sha256").update(JSON.stringify(policy), "utf8").digest("hex");
+}
+
+export function buildReleasePolicyEvidence() {
+  const policy = buildCanonicalReleasePolicy();
+  return { id: policy.id, sha256: calculateReleasePolicyDigest(policy) };
+}
 
 export function validateReleaseProvenance(provenance) {
   invariant(provenance && typeof provenance === "object" && !Array.isArray(provenance), "Release provenance is required");
@@ -100,7 +126,6 @@ export function normalizeBoundaryOutcome(result, releaseOrigin) {
 
   const request = BOUNDARY_REQUESTS[result.label];
   invariant(request, `${result.label}: request contract is missing`);
-
   return {
     name: result.label,
     request: { method: request.method, path: request.path },
@@ -125,6 +150,7 @@ export function buildReleaseAttestation({ target, report, provenance, checkedAt 
     kind: "revalta.release-boundary-attestation",
     verdict: "passed",
     checkedAt: checkedAt.toISOString(),
+    policy: buildReleasePolicyEvidence(),
     release: {
       commitSha: target.expectedSha,
       shortCommitSha: target.expectedSha.slice(0, 7),
@@ -192,12 +218,15 @@ async function main() {
   console.log(`Strict release gate passed for ${result.attestation.release.commitSha}`);
   console.log(`Release attestation written to ${result.writtenAttestation.outputPath}`);
   console.log(`Release attestation SHA-256: ${result.writtenAttestation.checksum}`);
+  console.log(`Release policy: ${result.attestation.policy.id} (${result.attestation.policy.sha256})`);
   console.log(`Release provenance: ${result.attestation.provenance.runUrl} attempt ${result.attestation.provenance.runAttempt}`);
   if (process.env.GITHUB_STEP_SUMMARY) {
     const summary = [
       renderMarkdownSummary(result.report), "", "### Release attestation", "",
       `- Verdict: \`${result.attestation.verdict}\``,
       `- Checked at: \`${result.attestation.checkedAt}\``,
+      `- Policy: \`${result.attestation.policy.id}\``,
+      `- Policy SHA-256: \`${result.attestation.policy.sha256}\``,
       `- Artifact: \`${attestationPath}\``,
       `- SHA-256: \`${result.writtenAttestation.checksum}\``,
       `- Provenance: ${result.attestation.provenance.runUrl}`,
