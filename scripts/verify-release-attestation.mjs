@@ -8,6 +8,8 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/i;
 const CANONICAL_ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
+const ATTESTATION_VERSION = 5;
+const RELEASE_POLICY_ID = "revalta.strict-release-policy.v1";
 const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
 const BOUNDARY_REQUESTS = Object.freeze({
   "public-home": Object.freeze({ method: "GET", path: "/" }),
@@ -24,6 +26,38 @@ const EXPECTED_WORKFLOW_PATH = "/.github/workflows/strict-release-boundary-gate.
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function invariant(condition, message) { if (!condition) throw new Error(message); }
+
+export function buildCanonicalReleasePolicy() {
+  return {
+    id: RELEASE_POLICY_ID,
+    attestationSchemaVersion: ATTESTATION_VERSION,
+    boundaries: [
+      { name: "public-home", request: { method: "GET", path: "/" }, allowedFinalStatuses: [200], redirect: "forbidden" },
+      { name: "dashboard-boundary", request: { method: "GET", path: "/dashboard" }, allowedFinalStatuses: [301, 302, 303, 307, 308, 401, 403], redirect: "canonical-/login-or-null-denial" },
+      { name: "health-api", request: { method: "GET", path: "/api/health" }, allowedFinalStatuses: [200], redirect: "forbidden" },
+    ],
+    retryableHttpStatuses: [408, 425, 429, 500, 502, 503, 504],
+    transportEvidence: ["attempts", "retryStatuses", "networkErrors", "totalBackoffMs"],
+    durationContract: "monotonic-duration-gte-total-backoff",
+  };
+}
+
+export function calculateReleasePolicyDigest(policy = buildCanonicalReleasePolicy()) {
+  invariant(policy && typeof policy === "object" && !Array.isArray(policy), "Release policy is required");
+  return createHash("sha256").update(JSON.stringify(policy), "utf8").digest("hex");
+}
+
+export function validateReleasePolicyEvidence(policyEvidence) {
+  invariant(policyEvidence && typeof policyEvidence === "object" && !Array.isArray(policyEvidence), "Release policy evidence is required");
+  const keys = Object.keys(policyEvidence).sort();
+  invariant(JSON.stringify(keys) === JSON.stringify(["id", "sha256"]), "Release policy evidence must contain only id and sha256");
+  invariant(policyEvidence.id === RELEASE_POLICY_ID, `Release policy id must be ${RELEASE_POLICY_ID}`);
+  invariant(SHA256_PATTERN.test(policyEvidence.sha256), "Release policy sha256 must be a 64-character SHA-256 value");
+  const actual = Buffer.from(policyEvidence.sha256.toLowerCase(), "hex");
+  const expected = Buffer.from(calculateReleasePolicyDigest(), "hex");
+  invariant(actual.length === expected.length && timingSafeEqual(actual, expected), "Release policy SHA-256 mismatch");
+  return { id: policyEvidence.id, sha256: actual.toString("hex") };
+}
 
 export function parseChecksumFile(value, expectedFilename) {
   const match = String(value).trim().match(/^([0-9a-fA-F]{64})  (.+)$/);
@@ -123,9 +157,10 @@ export function validateBoundaryOutcome(boundary) {
 
 export function validateReleaseAttestation(attestation, expected = {}, options = {}) {
   invariant(attestation && typeof attestation === "object" && !Array.isArray(attestation), "Attestation must be a JSON object");
-  invariant(attestation.schemaVersion === 4, "Unsupported release attestation schemaVersion");
+  invariant(attestation.schemaVersion === ATTESTATION_VERSION, "Unsupported release attestation schemaVersion");
   invariant(attestation.kind === "revalta.release-boundary-attestation", "Unexpected release attestation kind");
   invariant(attestation.verdict === "passed", "Release attestation verdict must be passed");
+  const policy = validateReleasePolicyEvidence(attestation.policy);
   const freshness = validateAttestationFreshness(attestation.checkedAt, options);
   const release = attestation.release;
   invariant(release && typeof release === "object", "Release metadata is required");
@@ -157,7 +192,7 @@ export function validateReleaseAttestation(attestation, expected = {}, options =
   if (expected.environment) invariant(release.environment === expected.environment, "Attestation environment does not match expected release");
   if (expected.branch) invariant(release.branch === expected.branch, "Attestation branch does not match expected release");
   if (expected.origin) invariant(release.origin === expected.origin, "Attestation origin does not match expected release");
-  return { attestation, freshness, provenance };
+  return { attestation, policy, freshness, provenance };
 }
 
 export async function verifyReleaseAttestationFiles({ attestationPath, checksumPath, expected = {}, now, maxAgeSeconds }) {
@@ -170,7 +205,7 @@ export async function verifyReleaseAttestationFiles({ attestationPath, checksumP
   try { attestation = JSON.parse(bytes.toString("utf8")); }
   catch { throw new Error("Release attestation is not valid JSON"); }
   const validation = validateReleaseAttestation(attestation, expected, { now, maxAgeSeconds });
-  return { attestation: validation.attestation, freshness: validation.freshness, provenance: validation.provenance, checksum, attestationPath: resolvedAttestationPath, checksumPath: resolvedChecksumPath };
+  return { attestation: validation.attestation, policy: validation.policy, freshness: validation.freshness, provenance: validation.provenance, checksum, attestationPath: resolvedAttestationPath, checksumPath: resolvedChecksumPath };
 }
 
 function parseOptionalPositiveInteger(value, label) {
@@ -202,6 +237,7 @@ async function main() {
   });
   console.log(`Release attestation verified: ${result.attestation.release.commitSha}`);
   console.log(`SHA-256: ${result.checksum}`);
+  console.log(`Policy: ${result.policy.id} (${result.policy.sha256})`);
   console.log(`Age: ${Math.floor(result.freshness.ageMs / 1000)} seconds`);
   console.log(`Provenance: ${result.provenance.runUrl} attempt ${result.provenance.runAttempt}`);
   for (const boundary of result.attestation.boundaries) console.log(`- ${boundary.name}: ${boundary.request.method} ${boundary.request.path}, HTTP ${boundary.httpStatus}, ${boundary.transport.attempts} attempt(s), ${boundary.transport.totalBackoffMs} ms backoff`);
