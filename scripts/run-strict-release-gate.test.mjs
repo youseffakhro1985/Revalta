@@ -44,14 +44,14 @@ function attestation() {
 }
 
 describe("strict release attestation", () => {
-  it("creates schema-v3 secret-free evidence with canonical outcomes and retry telemetry", () => {
+  it("creates schema-v4 secret-free evidence bound to exact endpoints", () => {
     const evidence = attestation();
-    expect(evidence.schemaVersion).toBe(3);
+    expect(evidence.schemaVersion).toBe(4);
     expect(evidence.provenance).toEqual(provenance);
-    expect(evidence.boundaries.map((boundary) => [boundary.name, boundary.httpStatus, boundary.redirectLocation])).toEqual([
-      ["public-home", 200, null],
-      ["dashboard-boundary", 307, "/login"],
-      ["health-api", 200, null],
+    expect(evidence.boundaries.map((boundary) => [boundary.name, boundary.request.method, boundary.request.path, boundary.httpStatus, boundary.redirectLocation])).toEqual([
+      ["public-home", "GET", "/", 200, null],
+      ["dashboard-boundary", "GET", "/dashboard", 307, "/login"],
+      ["health-api", "GET", "/api/health", 200, null],
     ]);
     expect(evidence.boundaries[0].transport).toEqual(clean);
     expect(evidence.boundaries[1].transport).toEqual({ attempts: 2, retryStatuses: [503], networkErrors: 0, totalBackoffMs: 1500 });
@@ -63,7 +63,9 @@ describe("strict release attestation", () => {
 
   it("canonicalizes same-origin dashboard redirects and rejects unsafe destinations", () => {
     const base = { label: "dashboard-boundary", status: 307, durationMs: 5, attempts: 1, retryStatuses: [], networkErrors: 0, totalBackoffMs: 0 };
-    expect(normalizeBoundaryOutcome({ ...base, location: `${target.baseUrl}/login` }, target.baseUrl).redirectLocation).toBe("/login");
+    const normalized = normalizeBoundaryOutcome({ ...base, location: `${target.baseUrl}/login` }, target.baseUrl);
+    expect(normalized.redirectLocation).toBe("/login");
+    expect(normalized.request).toEqual({ method: "GET", path: "/dashboard" });
     expect(() => normalizeBoundaryOutcome({ ...base, location: "https://evil.example/login" }, target.baseUrl)).toThrow("escaped release origin");
     expect(() => normalizeBoundaryOutcome({ ...base, location: "/login?next=/dashboard" }, target.baseUrl)).toThrow("query string");
     expect(() => normalizeBoundaryOutcome({ ...base, location: "/login#continue" }, target.baseUrl)).toThrow("fragment");
@@ -100,7 +102,7 @@ describe("strict release attestation", () => {
     expect(serializeReleaseAttestation(attestation())).toBe(serialized);
     const checksum = calculateReleaseAttestationChecksum(serialized);
     expect(checksum).toMatch(/^[0-9a-f]{64}$/);
-    expect(calculateReleaseAttestationChecksum(serialized.replace("passed", "failed"))).not.toBe(checksum);
+    expect(calculateReleaseAttestationChecksum(serialized.replace("/api/health", "/api/fake"))).not.toBe(checksum);
   });
 
   it("writes JSON and checksum atomically with private permissions", async () => {
