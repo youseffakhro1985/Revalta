@@ -6,6 +6,10 @@ import { validateReleaseTarget } from "./validate-release-target.mjs";
 import { renderMarkdownSummary, runReleaseBoundarySmoke } from "./verify-release-boundaries.mjs";
 
 const ATTESTATION_VERSION = 3;
+const EXPECTED_BOUNDARIES = ["public-home", "dashboard-boundary", "health-api"];
+const DASHBOARD_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const DASHBOARD_DENIAL_STATUSES = new Set([401, 403]);
+const RETRYABLE_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/;
 
@@ -48,15 +52,53 @@ export function buildReleaseProvenance(env = process.env) {
 function validateBoundaryTransport(result) {
   invariant(Number.isSafeInteger(result.attempts) && result.attempts > 0, `${result.label}: attempts must be a positive integer`);
   invariant(Array.isArray(result.retryStatuses), `${result.label}: retryStatuses must be an array`);
-  invariant(result.retryStatuses.length === result.attempts - 1 - result.networkErrors, `${result.label}: retry evidence count mismatch`);
-  for (const status of result.retryStatuses) invariant(Number.isInteger(status) && status >= 100 && status <= 599, `${result.label}: invalid retry status`);
   invariant(Number.isSafeInteger(result.networkErrors) && result.networkErrors >= 0, `${result.label}: networkErrors must be non-negative`);
   invariant(Number.isSafeInteger(result.totalBackoffMs) && result.totalBackoffMs >= 0, `${result.label}: totalBackoffMs must be non-negative`);
+  invariant(result.retryStatuses.length + result.networkErrors === result.attempts - 1, `${result.label}: retry evidence count mismatch`);
+  for (const status of result.retryStatuses) invariant(RETRYABLE_HTTP_STATUSES.has(status), `${result.label}: non-retryable status in retry evidence`);
+  if (result.attempts === 1) invariant(result.totalBackoffMs === 0, `${result.label}: first-attempt success cannot include backoff`);
   return {
     attempts: result.attempts,
     retryStatuses: [...result.retryStatuses],
     networkErrors: result.networkErrors,
     totalBackoffMs: result.totalBackoffMs,
+  };
+}
+
+export function normalizeBoundaryOutcome(result, releaseOrigin) {
+  invariant(result && typeof result === "object" && !Array.isArray(result), "Boundary result is required");
+  invariant(EXPECTED_BOUNDARIES.includes(result.label), `Unexpected boundary ${result.label}`);
+  invariant(Number.isInteger(result.durationMs) && result.durationMs >= 0, `${result.label}: durationMs must be a non-negative integer`);
+  const transport = validateBoundaryTransport(result);
+  invariant(result.durationMs >= transport.totalBackoffMs, `${result.label}: durationMs cannot be shorter than totalBackoffMs`);
+
+  let redirectLocation = null;
+  if (result.label === "public-home") {
+    invariant(result.status === 200, "public-home: passed attestation requires HTTP 200");
+    invariant(result.location === null || result.location === undefined, "public-home: redirectLocation must be null");
+  } else if (result.label === "health-api") {
+    invariant(result.status === 200, "health-api: passed attestation requires HTTP 200");
+    invariant(result.location === null || result.location === undefined, "health-api: redirectLocation must be null");
+  } else if (DASHBOARD_REDIRECT_STATUSES.has(result.status)) {
+    invariant(typeof result.location === "string" && result.location.length > 0, "dashboard-boundary: redirect requires Location");
+    const destination = new URL(result.location, releaseOrigin);
+    const origin = new URL(releaseOrigin);
+    invariant(destination.origin === origin.origin, "dashboard-boundary: redirect escaped release origin");
+    invariant(destination.pathname === "/login", "dashboard-boundary: redirect must target /login");
+    invariant(destination.search === "", "dashboard-boundary: redirect must not contain a query string");
+    invariant(destination.hash === "", "dashboard-boundary: redirect must not contain a fragment");
+    redirectLocation = "/login";
+  } else {
+    invariant(DASHBOARD_DENIAL_STATUSES.has(result.status), "dashboard-boundary: passed attestation requires redirect, 401 or 403");
+    invariant(result.location === null || result.location === undefined, "dashboard-boundary: denial must not include redirectLocation");
+  }
+
+  return {
+    name: result.label,
+    httpStatus: result.status,
+    durationMs: result.durationMs,
+    redirectLocation,
+    transport,
   };
 }
 
@@ -66,6 +108,9 @@ export function buildReleaseAttestation({ target, report, provenance, checkedAt 
   invariant(report.environment === target.environment, "Attestation environment mismatch");
   invariant(report.branch === target.branch, "Attestation branch mismatch");
   invariant(report.baseUrl === target.baseUrl, "Attestation base URL mismatch");
+  invariant(Array.isArray(report.results), "Attestation boundary results are required");
+  const names = report.results.map((result) => result?.label);
+  invariant(JSON.stringify(names) === JSON.stringify(EXPECTED_BOUNDARIES), `Attestation boundaries must be exactly ${EXPECTED_BOUNDARIES.join(", ")}`);
   return {
     schemaVersion: ATTESTATION_VERSION,
     kind: "revalta.release-boundary-attestation",
@@ -79,13 +124,7 @@ export function buildReleaseAttestation({ target, report, provenance, checkedAt 
       origin: target.baseUrl,
     },
     provenance: validateReleaseProvenance(provenance),
-    boundaries: report.results.map((result) => ({
-      name: result.label,
-      httpStatus: result.status,
-      durationMs: result.durationMs,
-      redirectLocation: result.location ?? null,
-      transport: validateBoundaryTransport(result),
-    })),
+    boundaries: report.results.map((result) => normalizeBoundaryOutcome(result, target.baseUrl)),
   };
 }
 
