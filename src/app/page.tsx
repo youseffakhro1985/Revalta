@@ -83,14 +83,14 @@ export default function Home() {
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/register"
-                  className="inline-flex h-12 items-center justify-center gap-2.5 rounded-lg bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-colors hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
+                  className="inline-flex h-12 items-center justify-center gap-2.5 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
                 >
                   Boka en personlig visning
                   <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
                 </Link>
                 <Link
                   href="#plattform"
-                  className="inline-flex h-12 items-center justify-center rounded-lg border border-sand-300 bg-white px-5 text-[14px] font-semibold text-ink-700 shadow-[0_1px_2px_rgba(17,34,31,0.03)] transition-colors hover:border-sand-400 hover:text-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/20 focus-visible:ring-offset-2"
+                  className="inline-flex h-12 items-center justify-center rounded-lg border border-sand-300 bg-white px-5 text-[14px] font-semibold text-ink-700 shadow-[0_1px_2px_rgba(17,34,31,0.03)] transition-[background-color,border-color,color,box-shadow] duration-200 ease-in-out hover:border-sand-400 hover:bg-sand-50/60 hover:text-petroleum-800 hover:shadow-premium-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/20 focus-visible:ring-offset-2"
                 >
                   Se plattformen
                 </Link>
@@ -153,7 +153,7 @@ export default function Home() {
                 return (
                   <article
                     key={module.title}
-                    className={`group min-h-[240px] border-sand-200 px-1 py-9 sm:p-8 lg:p-9 ${
+                    className={`group min-h-[240px] border-sand-200 px-1 py-9 transition-colors duration-200 ease-in-out hover:bg-sand-50/35 sm:p-8 lg:p-9 ${
                       index < 5 ? "border-b" : ""
                     } ${index === 4 ? "sm:border-b-0" : ""} ${
                       index >= 3 ? "lg:border-b-0" : ""
@@ -189,7 +189,7 @@ export default function Home() {
             </div>
             <Link
               href="/register"
-              className="inline-flex h-12 w-fit items-center gap-2.5 rounded-lg bg-petroleum-700 px-5 text-[14px] font-semibold text-white transition-colors hover:bg-petroleum-800"
+              className="inline-flex h-12 w-fit items-center gap-2.5 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
             >
               Boka personlig visning
               <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />

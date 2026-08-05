@@ -145,8 +145,8 @@ export default async function Dashboard() {
   ];
 
   return (
-    <div className="animate-fade-in-soft space-y-6">
-      <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+    <div className="animate-fade-in-soft space-y-6 sm:space-y-7">
+      <header className="overflow-hidden rounded-2xl border border-sand-200/90 bg-white shadow-premium-md">
         <div className="relative p-7 sm:p-8">
           <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-sand-50/70 lg:block" />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -160,10 +160,10 @@ export default async function Dashboard() {
               </p>
             </div>
             <div className="relative flex flex-wrap gap-3">
-              <Link href="/dashboard/fastigheter" className="rounded-lg border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 transition hover:bg-sand-50">
+              <Link href="/dashboard/fastigheter" className="rounded-lg border border-sand-200/90 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-[0_1px_2px_rgba(17,34,31,0.025)] transition-[background-color,border-color,box-shadow] duration-200 ease-in-out hover:border-sand-300 hover:bg-sand-50/80 hover:shadow-premium-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200 focus-visible:ring-offset-2">
                 Visa bestånd
               </Link>
-              <Link href="/dashboard/felanmalan" className="rounded-lg bg-petroleum-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-petroleum-800">
+              <Link href="/dashboard/felanmalan" className="rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-4 py-2.5 text-sm font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200 focus-visible:ring-offset-2">
                 Ny felanmälan
               </Link>
             </div>
@@ -194,15 +194,15 @@ export default async function Dashboard() {
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <article key={kpi.label} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+            <article key={kpi.label} className="group rounded-2xl border border-sand-200/90 bg-white p-6 shadow-premium-sm transition-[border-color,box-shadow] duration-200 ease-in-out hover:border-sand-300/80 hover:shadow-premium-md">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-ink-500">{kpi.label}</p>
                   <p className="mt-2 text-[30px] font-semibold tracking-[-0.04em] text-ink-950">{kpi.value}</p>
                   <p className="mt-1 text-xs text-ink-400">{kpi.hint}</p>
                 </div>
-                <div className="rounded-xl bg-sand-50 p-3 text-petroleum-700">
-                  <Icon className="h-5 w-5" strokeWidth={1.7} />
+                <div className="rounded-xl border border-sand-100 bg-sand-50 p-3 text-petroleum-700 transition-colors duration-200 ease-in-out group-hover:border-petroleum-100 group-hover:bg-petroleum-50/70">
+                  <Icon className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
                 </div>
               </div>
             </article>
@@ -227,7 +227,7 @@ export default async function Dashboard() {
           {data.latestTickets.length > 0 ? (
             <div className="divide-y divide-sand-100">
               {data.latestTickets.map((ticket) => (
-                <Link key={ticket.id} href={`/dashboard/felanmalan/${ticket.id}`} className="flex items-center justify-between gap-4 px-6 py-5 transition hover:bg-sand-50/70 sm:px-7">
+                <Link key={ticket.id} href={`/dashboard/felanmalan/${ticket.id}`} className="group flex items-center justify-between gap-4 px-6 py-5 outline-none transition-colors duration-200 ease-in-out hover:bg-sand-50/70 focus-visible:bg-petroleum-50/60 sm:px-7">
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-ink-900">{ticket.title}</p>
                     <p className="mt-1 text-sm text-ink-500">
@@ -238,7 +238,7 @@ export default async function Dashboard() {
                     <span className="hidden rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-xs font-semibold text-ink-600 sm:inline-flex">
                       {statusLabel(ticket.status)}
                     </span>
-                    <ArrowRight className="h-4 w-4 text-ink-300" />
+                    <ArrowRight className="h-4 w-4 text-ink-300 transition-colors duration-200 ease-in-out group-hover:text-petroleum-600" aria-hidden="true" />
                   </div>
                 </Link>
               ))}
@@ -265,9 +265,9 @@ export default async function Dashboard() {
             {attentionItems.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.label} href={item.href} className="flex items-center justify-between rounded-xl border border-sand-200 px-4 py-3.5 transition hover:bg-sand-50">
+                <Link key={item.label} href={item.href} className="flex items-center justify-between rounded-xl border border-sand-200/90 px-4 py-3.5 outline-none transition-[background-color,border-color,box-shadow] duration-200 ease-in-out hover:border-sand-300 hover:bg-sand-50/80 hover:shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-200">
                   <span className="flex items-center gap-3 text-sm font-medium text-ink-700">
-                    <Icon className="h-4 w-4 text-petroleum-700" />
+                    <Icon className="h-4 w-4 text-petroleum-700" aria-hidden="true" />
                     {item.label}
                   </span>
                   <span className="min-w-8 rounded-full bg-petroleum-50 px-2.5 py-1 text-center text-xs font-semibold text-petroleum-800">{item.value}</span>
@@ -292,7 +292,7 @@ export default async function Dashboard() {
         {data.propertyWorkload.length > 0 ? (
           <div className="grid grid-cols-1 divide-y divide-sand-100 md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-5">
             {data.propertyWorkload.map((property) => (
-              <Link key={property.id} href={`/dashboard/fastigheter/${property.id}`} className="p-5 transition hover:bg-sand-50/70">
+              <Link key={property.id} href={`/dashboard/fastigheter/${property.id}`} className="p-5 outline-none transition-colors duration-200 ease-in-out hover:bg-sand-50/70 focus-visible:bg-petroleum-50/60">
                 <p className="truncate font-semibold text-ink-900">{property.name}</p>
                 <p className="mt-1 text-sm text-ink-500">{property.city}</p>
                 <p className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-petroleum-700">{property._count.tickets} ärenden</p>

@@ -50,9 +50,9 @@ const tickets = [
 
 export function DashboardPreview() {
   return (
-    <div className="relative mx-auto w-full max-w-[760px] lg:mx-0">
-      <div className="absolute -bottom-5 left-12 right-12 h-16 rounded-full bg-petroleum-950/10 blur-2xl" />
-      <div className="relative overflow-hidden rounded-[18px] border border-sand-300/90 bg-white shadow-[0_24px_70px_-32px_rgba(17,34,31,0.34)]">
+    <div className="landing-dashboard-stage relative mx-auto w-full max-w-[760px] lg:mx-0">
+      <div className="landing-dashboard-shadow absolute -bottom-5 left-12 right-12 h-16 rounded-full bg-petroleum-950/10 blur-2xl" aria-hidden="true" />
+      <div className="landing-dashboard-float landing-dashboard-frame relative overflow-hidden rounded-[18px] border border-sand-300/90 bg-white shadow-[0_24px_70px_-32px_rgba(17,34,31,0.34)]">
         <div className="flex h-11 items-center justify-between border-b border-sand-200 bg-[#F8F8F5] px-4">
           <div className="flex items-center gap-1.5" aria-hidden="true">
             <span className="h-2 w-2 rounded-full border border-sand-400 bg-white" />
@@ -212,7 +212,7 @@ export function DashboardPreview() {
         </div>
       </div>
 
-      <div className="absolute -right-3 top-20 hidden w-[148px] rounded-xl border border-sand-200 bg-white p-3 shadow-premium-lg xl:block">
+      <div className="landing-dashboard-detail absolute -right-3 top-20 hidden w-[148px] rounded-xl border border-sand-200 bg-white p-3 shadow-premium-lg xl:block">
         <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-petroleum-50">
             <Building2 aria-hidden="true" className="h-3 w-3 text-petroleum-700" strokeWidth={1.7} />
