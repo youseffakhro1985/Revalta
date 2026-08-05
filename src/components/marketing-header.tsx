@@ -14,7 +14,7 @@ export function MarketingHeader() {
         <Link
           href="/"
           aria-label="Revalta – startsida"
-          className="group flex items-center gap-3 text-ink-950"
+          className="group flex items-center gap-3 rounded-md text-ink-950 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/25 focus-visible:ring-offset-4"
         >
           <span className="font-display text-[22px] font-semibold tracking-[-0.04em]">
             Revalta
@@ -32,7 +32,7 @@ export function MarketingHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="text-[13px] font-medium text-ink-600 transition-colors hover:text-petroleum-700"
+              className="rounded-md text-[13px] font-medium text-ink-600 outline-none transition-colors duration-200 ease-in-out hover:text-petroleum-700 focus-visible:ring-2 focus-visible:ring-petroleum-600/25 focus-visible:ring-offset-4"
             >
               {item.label}
             </Link>
@@ -42,13 +42,13 @@ export function MarketingHeader() {
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/login"
-            className="hidden rounded-lg px-3 py-2 text-[13px] font-medium text-ink-600 transition-colors hover:bg-white hover:text-ink-950 sm:inline-flex"
+            className="hidden rounded-lg px-3 py-2 text-[13px] font-medium text-ink-600 outline-none transition-colors duration-200 ease-in-out hover:bg-white hover:text-ink-950 focus-visible:ring-2 focus-visible:ring-petroleum-600/25 focus-visible:ring-offset-2 sm:inline-flex"
           >
             Logga in
           </Link>
           <Link
             href="/register"
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-petroleum-700 px-4 text-[13px] font-semibold text-white shadow-premium-sm transition-colors hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-4 text-[13px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
           >
             Boka visning
             <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />
