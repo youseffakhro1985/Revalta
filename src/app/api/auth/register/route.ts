@@ -1,20 +1,36 @@
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import { getPublicAppUrl } from "@/lib/app-url";
 import db from "@/lib/db";
 import { createResetToken, hashPassword, hashResetToken } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { queueTicketNotification } from "@/lib/integrations";
+import { queueEmailVerification } from "@/lib/integrations";
+import { createRouteObservability } from "@/lib/route-observability";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 
 export async function POST(request: Request) {
+  const observability = createRouteObservability(request, "/api/auth/register");
   try {
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
-      return NextResponse.json({ error: "För många registreringar. Vänta en stund och prova igen." }, { status: 429 });
+      observability.logger.warn("auth registration rate limited", observability.elapsed({
+        event: "auth.registration.rate_limited",
+      }));
+      return apiErrorResponse({
+        status: 429,
+        code: API_ERROR_CODES.rateLimited,
+        message: "För många registreringar. Vänta en stund och prova igen.",
+        requestId: observability.requestId,
+        headers: {
+          "Retry-After": String(Math.max(1, Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000))),
+        },
+      });
     }
 
-    const { name, email, password, companyName } = await request.json();
+    const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+    const { name, email, password, companyName } = body;
     const normalizedEmail = normalizeEmail(email);
     const normalizedName = typeof name === "string" ? name.trim() : null;
     const normalizedCompanyName =
@@ -23,17 +39,40 @@ export async function POST(request: Request) {
         : normalizedName
           ? `${normalizedName}s bolag`
           : "Mitt företag";
-    
+
+    if ((normalizedName?.length ?? 0) > 120 || normalizedCompanyName.length > 160) {
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Namn eller företagsnamn är för långt",
+        requestId: observability.requestId,
+      });
+    }
     if (!isValidEmail(normalizedEmail)) {
-      return NextResponse.json({ error: "En giltig e-postadress krävs" }, { status: 400 });
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "En giltig e-postadress krävs",
+        requestId: observability.requestId,
+      });
     }
     if (!isStrongPassword(password)) {
-      return NextResponse.json({ error: passwordPolicyMessage }, { status: 400 });
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: passwordPolicyMessage,
+        requestId: observability.requestId,
+      });
     }
 
     const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
-      return NextResponse.json({ error: "E-postadressen används redan" }, { status: 400 });
+      return apiErrorResponse({
+        status: 409,
+        code: API_ERROR_CODES.conflict,
+        message: "E-postadressen används redan",
+        requestId: observability.requestId,
+      });
     }
 
     const hashedPassword = await hashPassword(password);
@@ -58,39 +97,48 @@ export async function POST(request: Request) {
     });
 
     const owner = company.users[0];
-    if (owner) {
-      const verifyToken = createResetToken();
-      await db.emailVerificationToken.create({
-        data: {
-          user_id: owner.id,
-          token_hash: hashResetToken(verifyToken),
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
-      });
-      await writeAuditLog(owner, {
-        entityType: "company",
-        entityId: company.id,
-        action: "company.created",
-        metadata: { companyName: normalizedCompanyName },
-      });
-      await queueTicketNotification(owner, {
-        ticketId: owner.id,
-        title: "Verifiera e-postadress",
-        recipient: owner.email,
-        event: "email_verification",
-      });
+    if (!owner) throw new Error("Company creation completed without an owner");
 
-      const verifyUrl = `${new URL(request.url).origin}/verify-email?token=${verifyToken}`;
-      const canExposeVerifyUrl = !process.env.EMAIL_PROVIDER_API_KEY && process.env.NODE_ENV !== "production";
-      return NextResponse.json({
-        success: true,
-        verifyUrl: canExposeVerifyUrl ? verifyUrl : undefined,
-      }, { status: 201 });
-    }
+    const verifyToken = createResetToken();
+    await db.emailVerificationToken.create({
+      data: {
+        user_id: owner.id,
+        token_hash: hashResetToken(verifyToken),
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    await writeAuditLog(owner, {
+      entityType: "company",
+      entityId: company.id,
+      action: "company.created",
+      metadata: { companyName: normalizedCompanyName },
+    });
+    const verifyUrl = `${getPublicAppUrl(request.url)}/verify-email?token=${encodeURIComponent(verifyToken)}`;
+    await queueEmailVerification(owner, {
+      recipient: owner.email,
+      verificationUrl: verifyUrl,
+    });
 
-    return NextResponse.json({ success: true }, { status: 201 });
+    const canExposeVerifyUrl = !process.env.EMAIL_PROVIDER_API_KEY && process.env.NODE_ENV !== "production";
+    const response = NextResponse.json({
+      success: true,
+      verifyUrl: canExposeVerifyUrl ? verifyUrl : undefined,
+    }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    observability.logger.info("auth registration succeeded", observability.elapsed({
+      event: "auth.registration.succeeded",
+      userId: owner.id,
+      companyId: company.id,
+    }));
+    return observability.correlate(response);
   } catch (error) {
-    console.error("Register error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("auth registration failed", error, observability.elapsed({
+      event: "auth.registration.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }

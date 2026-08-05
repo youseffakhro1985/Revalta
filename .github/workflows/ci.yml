@@ -78,6 +78,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Audit UI interactions
+        run: npm run audit:ui-interactions
+
       - name: Unit tests
         run: npm run test:ci
 

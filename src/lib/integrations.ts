@@ -15,6 +15,8 @@ const configured = {
   ai: Boolean(process.env.AI_PROVIDER_API_KEY),
 };
 
+const DELIVERY_TIMEOUT_MS = 12_000;
+
 /** Dev may mock; production records a hard failure instead of pretending delivery succeeded. */
 function mockOrFail() {
   if (allowIntegrationMocks()) {
@@ -44,6 +46,7 @@ async function sendEmail(payload: {
       subject: payload.subject,
       text: payload.text,
     }),
+    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
   });
   const data = await response.json().catch(() => ({}));
 
@@ -72,6 +75,7 @@ async function sendSms(payload: { recipient?: string; message: string }) {
         to: payload.recipient,
         message: payload.message,
       }),
+      signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
     });
     const data = await response.json().catch(() => ({}));
 
@@ -92,6 +96,7 @@ async function sendSms(payload: { recipient?: string; message: string }) {
       to: payload.recipient,
       message: payload.message,
     }),
+    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
   });
   const data = await response.json().catch(() => ({}));
 
@@ -151,6 +156,46 @@ export async function queueTicketNotification(
     { ...payload, delivery },
     payload.recipient,
     delivery.status
+  );
+}
+
+export async function queueEmailVerification(
+  user: IntegrationUser,
+  payload: {
+    recipient: string;
+    verificationUrl: string;
+  },
+) {
+  const delivery = await sendEmail({
+    recipient: payload.recipient,
+    subject: "Verifiera din e-postadress i Revalta",
+    text: [
+      "Hej!",
+      "",
+      "Verifiera din e-postadress för att slutföra registreringen i Revalta.",
+      "",
+      payload.verificationUrl,
+      "",
+      "Länken gäller i 24 timmar och kan bara användas en gång.",
+      "Om du inte skapade kontot kan du bortse från meddelandet.",
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  });
+
+  return recordIntegrationEvent(
+    user,
+    "email",
+    {
+      event: "email_verification",
+      delivery: {
+        status: delivery.status,
+        providerId: delivery.providerId,
+      },
+    },
+    payload.recipient,
+    delivery.status,
   );
 }
 
