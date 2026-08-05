@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { comparePassword, signToken } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { createRouteObservability } from "@/lib/route-observability";
 import { isValidEmail, normalizeEmail } from "@/lib/security";
 import {
   LEGACY_SESSION_COOKIE_NAME,
@@ -11,16 +13,8 @@ import {
   sessionCookieOptions,
 } from "@/lib/session-policy";
 
-function rateLimitHeaders(resetAt: Date, remaining: number) {
-  return {
-    "Cache-Control": "no-store",
-    "Retry-After": String(Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))),
-    "X-RateLimit-Remaining": String(Math.max(0, remaining)),
-    "X-Content-Type-Options": "nosniff",
-  };
-}
-
 export async function POST(request: Request) {
+  const observability = createRouteObservability(request, "/api/auth/login");
   try {
     const ip = getClientIp(request);
     const body = await request.json().catch(() => ({})) as { email?: unknown; password?: unknown };
@@ -33,20 +27,38 @@ export async function POST(request: Request) {
     ]);
     const strictest = ipLimit.resetAt > accountLimit.resetAt ? ipLimit : accountLimit;
     if (!ipLimit.allowed || !accountLimit.allowed) {
-      return NextResponse.json(
-        { error: "För många inloggningsförsök. Vänta en stund och prova igen." },
-        { status: 429, headers: rateLimitHeaders(strictest.resetAt, strictest.remaining) },
-      );
+      observability.logger.warn("auth login rate limited", observability.elapsed({
+        event: "auth.login.rate_limited",
+      }));
+      return apiErrorResponse({
+        status: 429,
+        code: API_ERROR_CODES.rateLimited,
+        message: "För många inloggningsförsök. Vänta en stund och prova igen.",
+        requestId: observability.requestId,
+        headers: {
+          "Retry-After": String(Math.max(1, Math.ceil((strictest.resetAt.getTime() - Date.now()) / 1000))),
+        },
+      });
     }
 
     if (!isValidEmail(normalizedEmail) || password.length < 1 || password.length > 512) {
-      return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Ogiltiga uppgifter",
+        requestId: observability.requestId,
+      });
     }
 
     const user = await db.user.findUnique({ where: { email: normalizedEmail }, include: { company: { select: { status: true } } } });
     const valid = user ? await comparePassword(password, user.password) : false;
     if (!user || !valid || user.status !== "active" || (user.company && user.company.status !== "active")) {
-      return NextResponse.json({ error: "Ogiltiga uppgifter" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Ogiltiga uppgifter",
+        requestId: observability.requestId,
+      });
     }
 
     const latestPasswordChange = await db.auditLog.findFirst({
@@ -70,12 +82,24 @@ export async function POST(request: Request) {
     cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
     cookieStore.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role } },
       { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
     );
+    observability.logger.info("auth login succeeded", observability.elapsed({
+      event: "auth.login.succeeded",
+      userId: user.id,
+    }));
+    return observability.correlate(response);
   } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500, headers: { "Cache-Control": "no-store" } });
+    observability.logger.error("auth login failed", error, observability.elapsed({
+      event: "auth.login.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }

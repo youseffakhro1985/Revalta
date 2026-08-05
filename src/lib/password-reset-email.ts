@@ -1,6 +1,4 @@
-function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://www.revalta.se").replace(/\/$/, "");
-}
+import { getPublicAppUrl } from "@/lib/app-url";
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char] || char));
@@ -11,7 +9,7 @@ export async function sendPasswordResetEmail(email: string, token: string) {
   const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) throw new Error("Password reset email provider is not configured");
 
-  const resetUrl = `${appUrl()}/reset-password?token=${encodeURIComponent(token)}`;
+  const resetUrl = `${getPublicAppUrl()}/reset-password?token=${encodeURIComponent(token)}`;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },

@@ -4,6 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { AuthAlert, AuthShell, authButtonClass } from "@/components/auth/auth-shell";
 
 function VerifyEmailForm() {
   const searchParams = useSearchParams();
@@ -28,7 +29,7 @@ function VerifyEmailForm() {
         setError(data.error || "Kunde inte verifiera e-post");
         return;
       }
-      setMessage("E-postadressen är verifierad. Du kan fortsätta till dashboarden.");
+      setMessage("E-postadressen är verifierad. Du kan nu fortsätta till inloggningen.");
     } catch {
       setError("Kunde inte kontakta servern");
     } finally {
@@ -37,29 +38,30 @@ function VerifyEmailForm() {
   }
 
   return (
-    <section className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-8 shadow-card-lg">
-      <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-brand-600">Verifiering</p>
-      <h1 className="text-3xl font-extrabold text-slate-950">Verifiera e-post</h1>
-      <p className="mt-3 text-sm leading-6 text-slate-500">Bekräfta din e-postadress för högre säkerhet i organisationen.</p>
-      {(error || message) && (
-        <div className={`mt-6 rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-600" : "border-success-500 bg-success-50 text-success-600"}`}>
-          {error || message}
-        </div>
-      )}
-      <button disabled={loading || !token} onClick={verify} className="mt-6 w-full rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700 disabled:opacity-70">
-        {loading ? "Verifierar..." : "Verifiera e-post"}
+    <AuthShell
+      eyebrow="E-postverifiering"
+      title="Verifiera din e-postadress"
+      description="Bekräfta adressen med den tidsbegränsade engångslänken för att stärka organisationens kontosäkerhet."
+      footer={
+        <Link href="/login" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+          Till inloggningen
+        </Link>
+      }
+    >
+      {error ? <AuthAlert>{error}</AuthAlert> : null}
+      {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
+      {!token ? <AuthAlert tone="neutral">Verifieringslänken saknar en giltig token. Öppna länken från e-postmeddelandet igen.</AuthAlert> : null}
+      <button type="button" disabled={loading || !token || Boolean(message)} onClick={verify} className={`${authButtonClass} mt-7`}>
+        {loading ? "Verifierar..." : message ? "Verifierad" : "Verifiera e-post"}
       </button>
-      <Link href="/dashboard" className="mt-6 block text-center text-sm font-semibold text-brand-600">Till dashboard</Link>
-    </section>
+    </AuthShell>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <Suspense fallback={<div className="h-64 w-full max-w-md animate-pulse rounded-3xl bg-slate-100" />}>
-        <VerifyEmailForm />
-      </Suspense>
-    </main>
+    <Suspense fallback={<main className="min-h-screen bg-[#FAFAF8] p-8"><div className="mx-auto h-[620px] max-w-[1080px] animate-pulse rounded-[28px] border border-sand-200 bg-white" /></main>}>
+      <VerifyEmailForm />
+    </Suspense>
   );
 }

@@ -7,8 +7,8 @@ import {
   ClipboardCheck,
   FileCheck2,
   Landmark,
+  ScanSearch,
   ShieldCheck,
-  Sparkles,
   Users,
 } from "lucide-react";
 import { DashboardPreview } from "@/components/landing/dashboard-preview";
@@ -42,7 +42,7 @@ const modules = [
     description: "Följ nyckeltal, vakans och utveckling utan att bygga egna kalkylblad.",
   },
   {
-    icon: Sparkles,
+    icon: ScanSearch,
     title: "AI-insikter",
     description: "Upptäck avvikelser och få konkreta förslag med människan kvar i kontroll.",
   },

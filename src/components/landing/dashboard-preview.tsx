@@ -8,7 +8,6 @@ import {
   FileText,
   Landmark,
   Search,
-  Sparkles,
   Users,
 } from "lucide-react";
 
@@ -187,7 +186,7 @@ export function DashboardPreview() {
                 <div className="hidden rounded-[10px] border border-petroleum-200 bg-petroleum-50/60 p-3.5 xl:block">
                   <div className="flex items-center gap-2">
                     <div className="flex h-6 w-6 items-center justify-center rounded-md border border-petroleum-200 bg-white">
-                      <Sparkles aria-hidden="true" className="h-3 w-3 text-petroleum-700" strokeWidth={1.7} />
+                      <BarChart3 aria-hidden="true" className="h-3 w-3 text-petroleum-700" strokeWidth={1.7} />
                     </div>
                     <div>
                       <p className="text-[9px] font-semibold text-petroleum-900">Revalta Insikt</p>

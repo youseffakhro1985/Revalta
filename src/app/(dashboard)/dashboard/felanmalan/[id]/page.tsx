@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Bot, BriefcaseBusiness, CheckCircle2, Clock3, FileText, Paperclip, Send, UserRound } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Clock3, FileSearch, FileText, Paperclip, Send, UserRound } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
@@ -416,7 +416,7 @@ export default function TicketDetailPage() {
         </Panel>
 
         <Panel title="AI-insikt" description="Prioritering och rekommenderad åtgärd baserad på ärendets innehåll." bodyClassName="p-6 sm:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><Bot className="h-5 w-5 text-petroleum-700" /><p className="text-sm text-ink-600">Analysera ärendet och uppdatera rekommendationen.</p></div><button type="button" onClick={runAiAnalysis} disabled={analyzing} className={premiumPrimaryButtonClass}>{analyzing ? "Analyserar…" : "AI-analysera"}</button></div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><FileSearch aria-hidden="true" className="h-5 w-5 text-petroleum-700" /><p className="text-sm text-ink-600">Analysera ärendet och uppdatera rekommendationen.</p></div><button type="button" onClick={runAiAnalysis} disabled={analyzing} className={premiumPrimaryButtonClass}>{analyzing ? "Analyserar…" : "AI-analysera"}</button></div>
           {ticket.ai_summary ? <div className="mt-5 grid gap-4 md:grid-cols-3"><Insight label="Sammanfattning" value={ticket.ai_summary} /><Insight label="Rekommenderad åtgärd" value={ticket.ai_recommended_action || "Saknas"} /><Insight label="Konfidens" value={`${Math.round((ticket.ai_confidence || 0) * 100)} %`} /></div> : null}
         </Panel>
 
