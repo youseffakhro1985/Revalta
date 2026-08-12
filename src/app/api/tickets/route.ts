@@ -10,6 +10,15 @@ import {
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
+
+function positiveInteger(value: string | null, fallback: number, max?: number) {
+  const parsed = Number.parseInt(value || "", 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) return fallback;
+  return max ? Math.min(parsed, max) : parsed;
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -20,6 +29,8 @@ export async function GET(request: Request) {
     const priority = searchParams.get("priority")?.trim();
     const propertyId = searchParams.get("propertyId")?.trim();
     const assignedToId = searchParams.get("assignedToId")?.trim();
+    const page = positiveInteger(searchParams.get("page"), 1);
+    const pageSize = positiveInteger(searchParams.get("pageSize"), DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     const ticketActive = await notDeletedFilter("Ticket");
     const scopedAssignedToId = shouldScopeToAssignedWork(user.role) ? user.id : assignedToId;
     const where = {
@@ -42,10 +53,13 @@ export async function GET(request: Request) {
       ],
     };
 
-    const tickets = await db.ticket.findMany({
-      where,
-      orderBy: { created_at: "desc" },
-      select: {
+    const [tickets, total] = await Promise.all([
+      db.ticket.findMany({
+        where,
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
         id: true,
         title: true,
         description: true,
@@ -77,10 +91,18 @@ export async function GET(request: Request) {
             comments: true,
           },
         },
-      },
-    });
+        },
+      }),
+      db.ticket.count({ where }),
+    ]);
     return NextResponse.json({
       tickets,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
       permissions: {
         canManage: canManageTickets(user.role),
         canExport: canExportTickets(user.role),
