@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
+import { findAccessibleWorkOrder } from "@/lib/assigned-work-access";
+import type { CompanyUser } from "@/lib/current-user";
+import { canViewOperations } from "@/lib/permissions";
 
 type OperationalDocumentParentRefs = {
   work_order_id: string | null;
@@ -63,4 +66,16 @@ export async function isOperationalDocumentParentActive(
   }
 
   return false;
+}
+
+/** Enforces technician assignment scope in addition to tenant and parent activity. */
+export async function isOperationalDocumentAccessible(
+  user: CompanyUser,
+  document: OperationalDocumentParentRefs,
+) {
+  if (document.work_order_id) {
+    return Boolean(await findAccessibleWorkOrder(user, document.work_order_id));
+  }
+  if (document.project_id && !canViewOperations(user.role)) return false;
+  return isOperationalDocumentParentActive(user.company_id, document);
 }
