@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canAssignWorkOrders, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import {
   isMissingSchemaColumnError,
   notDeletedFilter,
@@ -19,6 +19,7 @@ export async function GET() {
     }
 
     const propertyActive = await notDeletedFilter("Property");
+    const canAssign = canAssignWorkOrders(user.role);
     const [properties, users] = await Promise.all([
       db.property.findMany({
         where: { company_id: user.company_id, status: "active", ...propertyActive },
@@ -39,15 +40,17 @@ export async function GET() {
           },
         },
       }),
-      db.user.findMany({
-        where: { company_id: user.company_id, status: "active" },
-        orderBy: [{ name: "asc" }, { email: "asc" }],
-        select: { id: true, name: true, email: true, role: true },
-      }),
+      canAssign
+        ? db.user.findMany({
+            where: { company_id: user.company_id, status: "active" },
+            orderBy: [{ name: "asc" }, { email: "asc" }],
+            select: { id: true, name: true, email: true, role: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     return NextResponse.json(
-      { properties, users },
+      { properties, users, permissions: { canAssign } },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
