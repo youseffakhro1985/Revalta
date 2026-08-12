@@ -1130,6 +1130,7 @@ model IntegrationEvent {
 
   @@index([company_id, type, created_at])
   @@index([company_id, status, created_at])
+  @@index([type, recipient])
 }
 
 model PasswordResetToken {
@@ -1181,19 +1182,6 @@ model RateLimitAttempt {
 
   @@index([key_hash, created_at])
   @@index([created_at])
-}
-
-model WebhookReceipt {
-  id           String    @id @default(uuid())
-  provider     String
-  event_id     String
-  event_type   String
-  status       String    @default("processing")
-  received_at  DateTime  @default(now())
-  processed_at DateTime?
-
-  @@unique([provider, event_id])
-  @@index([provider, status, received_at])
 }
 
 model AccessCredential {
