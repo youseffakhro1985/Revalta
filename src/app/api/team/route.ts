@@ -106,15 +106,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "E-postadressen används redan" }, { status: 400 });
     }
 
-    const member = await db.user.create({
-      data: {
-        email: normalizedEmail,
-        password: await hashPassword(password),
-        name: normalizedName,
-        role: normalizedRole,
-        company_id: user.company_id,
-      },
-      select: {
+    const passwordHash = await hashPassword(password);
+    const member = await db.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          password: passwordHash,
+          name: normalizedName,
+          role: normalizedRole,
+          company_id: user.company_id,
+        },
+        select: {
         id: true,
         name: true,
         email: true,
@@ -131,14 +133,15 @@ export async function POST(request: Request) {
             },
           },
         },
-      },
-    });
-
-    await writeAuditLog(user, {
-      entityType: "user",
-      entityId: member.id,
-      action: "team.member_created",
-      metadata: { email: member.email, role: member.role },
+        },
+      });
+      await writeAuditLog(user, {
+        entityType: "user",
+        entityId: created.id,
+        action: "team.member_created",
+        metadata: { email: created.email, role: created.role },
+      }, tx);
+      return created;
     });
 
     return NextResponse.json({ success: true, member }, { status: 201 });
