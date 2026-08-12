@@ -63,6 +63,11 @@ export async function analyzeTicket(description: string): Promise<TicketAnalysis
           { role: "user", content: description },
         ],
       }),
+      // Matches the fail-fast pattern used by the other outbound integrations
+      // (email/SMS: 12s, invoice export: 20s) — without this, a slow or hanging
+      // AI provider could stall the request well past typical serverless limits
+      // instead of falling back to the deterministic analysis below.
+      signal: AbortSignal.timeout(15_000),
     });
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
