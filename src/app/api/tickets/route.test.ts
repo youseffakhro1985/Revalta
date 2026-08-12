@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, userFindFirstMock, ticketCreateMock, transactionMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, userFindFirstMock, ticketCreateMock, ticketFindManyMock, ticketCountMock, transactionMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   userFindFirstMock: vi.fn(),
   ticketCreateMock: vi.fn(),
+  ticketFindManyMock: vi.fn(),
+  ticketCountMock: vi.fn(),
   transactionMock: vi.fn(),
 }));
 
@@ -14,14 +16,18 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 vi.mock("@/lib/db", () => ({
   default: {
     user: { findFirst: userFindFirstMock },
-    ticket: { create: ticketCreateMock },
+    ticket: { create: ticketCreateMock, findMany: ticketFindManyMock, count: ticketCountMock },
     $transaction: transactionMock,
   },
 }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/lib/integrations", () => ({ queueTicketNotification: vi.fn(), recordAiEvent: vi.fn() }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  notDeletedFilter: vi.fn(async () => ({ deleted_at: null })),
+}));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 function request(overrides: Record<string, unknown> = {}) {
   return new Request("https://www.revalta.se/api/tickets", {
@@ -90,5 +96,24 @@ describe("POST /api/tickets", () => {
     expect(response.status).toBe(201);
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(ticketCreateMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GET /api/tickets pagination", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    ticketFindManyMock.mockResolvedValue([]);
+    ticketCountMock.mockResolvedValue(245);
+  });
+
+  it("bounds page size and returns tenant-scoped pagination metadata", async () => {
+    const response = await GET(new Request("https://www.revalta.se/api/tickets?page=3&pageSize=1000"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ skip: 200, take: 100 }));
+    expect(ticketCountMock).toHaveBeenCalledWith(expect.objectContaining({ where: expect.any(Object) }));
+    expect(body.pagination).toEqual({ page: 3, pageSize: 100, total: 245, totalPages: 3 });
   });
 });
