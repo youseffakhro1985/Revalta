@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isDeclaredRequestBodyTooLarge,
+  isCronRequestAuthorized,
   isTrustedMutationRequest,
   requestBodyLimitBytes,
 } from "@/lib/request-security";
@@ -68,5 +69,18 @@ describe("request body limits", () => {
       "content-length": "1000000",
     }))).toBe(false);
     expect(isDeclaredRequestBodyTooLarge(request({ "content-type": "application/json" }))).toBe(false);
+  });
+});
+
+describe("cron authorization", () => {
+  it("fails closed when the secret is missing", () => {
+    expect(isCronRequestAuthorized(request({ authorization: "Bearer value" }))).toBe(false);
+  });
+
+  it("accepts only the exact bearer credential", () => {
+    process.env.CRON_SECRET = "long-random-cron-secret";
+    expect(isCronRequestAuthorized(request({ authorization: "Bearer long-random-cron-secret" }))).toBe(true);
+    expect(isCronRequestAuthorized(request({ authorization: "Bearer wrong" }))).toBe(false);
+    delete process.env.CRON_SECRET;
   });
 });
