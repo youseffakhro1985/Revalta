@@ -6,9 +6,12 @@ import { createPortalTrackingToken } from "@/lib/portal-tracking";
 import { extractPortalCompanySlug, generatePublicReference, resolvePublicPortalCompany } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { calculateDueDate } from "@/lib/sla";
+import { isValidEmail } from "@/lib/security";
+import { createRouteObservability } from "@/lib/route-observability";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
+  const observability = createRouteObservability(request, "/api/public/tickets");
   try {
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(`public-ticket:${ip}`, 5, 60 * 60 * 1000);
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Boendeportalen är inte konfigurerad ännu" }, { status: 503 });
     }
 
-    if (!normalizedReporterName || !normalizedReporterEmail.includes("@") || !normalizedTitle || normalizedDescription.length < 10) {
+    if (!normalizedReporterName || !isValidEmail(normalizedReporterEmail) || !normalizedTitle || normalizedDescription.length < 10) {
       return NextResponse.json({ error: "Namn, e-post, titel och tydlig beskrivning krävs" }, { status: 400 });
     }
     if (
@@ -133,9 +136,16 @@ export async function POST(request: Request) {
       companyId: portal.company.id,
     });
 
+    observability.logger.info("public ticket created", observability.elapsed({
+      event: "public.ticket.created",
+      ticketId: ticket.id,
+      companyId: portal.company.id,
+    }));
     return NextResponse.json({ success: true, ticket, trackingToken }, { status: 201 });
   } catch (error) {
-    console.error("Create public ticket error:", error);
+    observability.logger.error("public ticket creation failed", error, observability.elapsed({
+      event: "public.ticket.failed",
+    }));
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
