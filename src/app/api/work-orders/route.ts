@@ -82,8 +82,7 @@ export async function GET() {
     const canManageFinance = canManageWorkOrderFinance(user.role);
     const assignedScope = scopedToAssigned ? { assigned_to_id: user.id } : {};
 
-    const [workOrders, enterpriseRows, assignees] = await Promise.all([
-      db.workOrder.findMany({
+    const workOrders = await db.workOrder.findMany({
         where: {
           company_id: user.company_id,
           ...workOrderActive,
@@ -111,8 +110,14 @@ export async function GET() {
             select: { id: true, name: true, status: true },
           },
         },
-      }),
-      db.$queryRaw<EnterpriseListRow[]>(Prisma.sql`
+      });
+
+    // Only enrich the rows that can actually be returned. Previously this query
+    // scanned every work order in the tenant even though the list is capped.
+    const workOrderIds = workOrders.map((workOrder) => workOrder.id);
+    const [enterpriseRows, assignees] = await Promise.all([
+      workOrderIds.length > 0
+        ? db.$queryRaw<EnterpriseListRow[]>(Prisma.sql`
         SELECT w."id", w."work_order_number", w."work_type", w."source", w."sla_response_due_at", w."sla_resolution_due_at",
                w."responded_at", w."paused_at", w."pause_reason", w."closed_at", w."building_id", b."name" AS "building_name",
                w."technical_asset_id", a."name" AS "technical_asset_name", a."category" AS "technical_asset_category",
@@ -122,10 +127,12 @@ export async function GET() {
         LEFT JOIN "Building" b ON b."id" = w."building_id"
         LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
         WHERE w."company_id" = ${user.company_id}
+          AND w."id" IN (${Prisma.join(workOrderIds)})
           ${workOrderGuard}
           ${propertyGuard}
           ${scopedToAssigned ? Prisma.sql`AND w."assigned_to_id" = ${user.id}` : Prisma.empty}
-      `),
+      `)
+        : Promise.resolve([] as EnterpriseListRow[]),
       canAssign
         ? db.user.findMany({
             where: {
