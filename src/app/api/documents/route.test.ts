@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   getCurrentUserMock,
   managedFindManyMock,
+  managedCountMock,
+  managedGroupByMock,
   auditFindManyMock,
   propertyFindManyMock,
   leaseFindManyMock,
@@ -10,6 +12,8 @@ const {
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   managedFindManyMock: vi.fn(),
+  managedCountMock: vi.fn(),
+  managedGroupByMock: vi.fn(),
   auditFindManyMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   leaseFindManyMock: vi.fn(),
@@ -24,7 +28,7 @@ vi.mock("@/lib/document-lifecycle", () => ({ getDocumentLifecycleMap: lifecycleM
 vi.mock("@/lib/document-file-security", () => ({ validateDocumentFile: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   default: {
-    managedDocument: { findMany: managedFindManyMock },
+    managedDocument: { findMany: managedFindManyMock, count: managedCountMock, groupBy: managedGroupByMock },
     auditLog: { findMany: auditFindManyMock },
     property: { findMany: propertyFindManyMock },
     lease: { findMany: leaseFindManyMock },
@@ -36,7 +40,10 @@ import { GET } from "./route";
 describe("documents route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "0");
     managedFindManyMock.mockResolvedValue([]);
+    managedCountMock.mockResolvedValue(0);
+    managedGroupByMock.mockResolvedValue([]);
     auditFindManyMock.mockResolvedValue([
       {
         id: "doc-1",
@@ -99,7 +106,7 @@ describe("documents route", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.revalta.se/api/documents"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -122,7 +129,7 @@ describe("documents route", () => {
 
   it("scopes document audit logs by actor for solo users and never returns dataUrl", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
-    const response = await GET();
+    const response = await GET(new Request("https://www.revalta.se/api/documents"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -136,11 +143,41 @@ describe("documents route", () => {
 
   it("omits company lease dump for technicians", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
-    const response = await GET();
+    const response = await GET(new Request("https://www.revalta.se/api/documents"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(leaseFindManyMock).not.toHaveBeenCalled();
     expect(body.leases).toEqual([]);
+  });
+
+  it("uses database pagination, filters and global summaries after modern cutover", async () => {
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "1");
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    managedCountMock.mockResolvedValueOnce(73).mockResolvedValueOnce(4);
+    managedGroupByMock.mockResolvedValue([
+      { lifecycle_state: "active", _count: { _all: 12 } },
+      { lifecycle_state: "unpublished", _count: { _all: 3 } },
+      { lifecycle_state: "archived", _count: { _all: 8 } },
+    ]);
+
+    const response = await GET(new Request("https://www.revalta.se/api/documents?page=2&pageSize=25&search=OVK&category=ovk&lifecycle=active"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(managedFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      skip: 25,
+      take: 25,
+      orderBy: [{ created_at: "desc" }, { id: "desc" }],
+      where: expect.objectContaining({
+        company_id: "company-1",
+        category: "ovk",
+        lifecycle_state: "active",
+        AND: expect.any(Array),
+      }),
+    }));
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+    expect(body.pagination).toEqual({ page: 2, pageSize: 25, total: 73, totalPages: 3 });
+    expect(body.summary).toEqual({ active: 12, unpublished: 3, archived: 8, residentPublished: 4 });
   });
 });
