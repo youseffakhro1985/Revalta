@@ -17,6 +17,7 @@ type Ticket = {
   property: Property | null; assigned_to: TeamMember | null; _count: { comments: number };
 };
 type Permissions = { canManage: boolean; canExport: boolean };
+type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 const statusLabels = TICKET_STATUS_LABELS;
@@ -38,6 +39,8 @@ export default function FelanmalanPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [permissions, setPermissions] = useState<Permissions>({ canManage: false, canExport: false });
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +56,8 @@ export default function FelanmalanPage() {
       if (statusFilter) params.set("status", statusFilter);
       if (priorityFilter) params.set("priority", priorityFilter);
       if (propertyFilter) params.set("propertyId", propertyFilter);
+      params.set("page", String(page));
+      params.set("pageSize", "50");
       try {
         const [ticketsResponse, propertiesResponse, teamResponse] = await Promise.all([
           fetch(`/api/tickets${params.toString() ? `?${params.toString()}` : ""}`, { cache: "no-store" }),
@@ -66,6 +71,7 @@ export default function FelanmalanPage() {
         if (!propertiesResponse.ok) throw new Error(propertiesData.error || "Kunde inte hämta fastigheter");
         if (!teamResponse.ok) throw new Error(teamData.error || "Kunde inte hämta teamet");
         setTickets(ticketsData.tickets || []);
+        setPagination(ticketsData.pagination || { page: 1, pageSize: 50, total: 0, totalPages: 1 });
         setPermissions(ticketsData.permissions || { canManage: false, canExport: false });
         setProperties(propertiesData.properties || []);
         setMembers(teamData.members || []);
@@ -77,7 +83,7 @@ export default function FelanmalanPage() {
     }
     const timer = window.setTimeout(() => void loadData(), search ? 250 : 0);
     return () => { mounted = false; window.clearTimeout(timer); };
-  }, [priorityFilter, propertyFilter, router, search, statusFilter]);
+  }, [page, priorityFilter, propertyFilter, router, search, statusFilter]);
 
   const summary = useMemo(() => ({
     total: tickets.length,
@@ -142,12 +148,12 @@ export default function FelanmalanPage() {
       <Panel title="Ärendelista" description="Filtrera och öppna ett ärende för full historik och uppföljning." bodyClassName="p-0">
         <div className="border-b border-sand-200 p-5">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input className={`${premiumFieldClass} pl-9`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök ärende" aria-label="Sök ärenden" /></div>
-            <select className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select className={premiumFieldClass} value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)}><option value="">Alla prioriteter</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+            <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input className={`${premiumFieldClass} pl-9`} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Sök ärende" aria-label="Sök ärenden" /></div>
+            <select aria-label="Filtrera på status" className={premiumFieldClass} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select aria-label="Filtrera på prioritet" className={premiumFieldClass} value={priorityFilter} onChange={(event) => { setPriorityFilter(event.target.value); setPage(1); }}><option value="">Alla prioriteter</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select aria-label="Filtrera på fastighet" className={premiumFieldClass} value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(1); }}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs font-medium text-ink-400">{tickets.length} träffar</p>{permissions.canExport ? <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Exportera CSV</button> : null}</div>
+          <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs font-medium text-ink-400">{pagination.total.toLocaleString("sv-SE")} träffar</p>{permissions.canExport ? <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Exportera CSV</button> : null}</div>
         </div>
 
         {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-2xl bg-sand-100" />)}</div> : tickets.length === 0 ? <EmptyState title="Inga ärenden hittades" description="Skapa ett nytt ärende eller ändra filtreringen." /> : <div className="divide-y divide-sand-100">{tickets.map((ticket) => <Link key={ticket.id} href={`/dashboard/felanmalan/${ticket.id}`} className="block p-5 transition hover:bg-sand-50/70 sm:p-6">
@@ -156,6 +162,11 @@ export default function FelanmalanPage() {
             <p className="shrink-0 text-xs font-medium text-ink-400">{dateFormatter.format(new Date(ticket.created_at))}</p>
           </div>
         </Link>)}</div>}
+        {!loading && pagination.totalPages > 1 ? <nav aria-label="Sidnavigering för ärenden" className="flex items-center justify-between gap-4 border-t border-sand-200 px-5 py-4 sm:px-6">
+          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-sand-200 bg-white px-3.5 py-2 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-40">Föregående</button>
+          <p className="text-xs font-medium text-ink-500">Sida {pagination.page} av {pagination.totalPages}</p>
+          <button type="button" disabled={page >= pagination.totalPages} onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))} className="rounded-lg border border-sand-200 bg-white px-3.5 py-2 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-40">Nästa</button>
+        </nav> : null}
       </Panel>
     </section>
   </div>;
