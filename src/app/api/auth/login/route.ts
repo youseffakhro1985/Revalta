@@ -13,6 +13,9 @@ import {
   sessionCookieOptions,
 } from "@/lib/session-policy";
 
+// Fixed bcrypt cost/hash used only to equalize the missing-account code path.
+const INVALID_ACCOUNT_PASSWORD_HASH = "$2a$10$FJbQnDGAGV2VKWMTHazxDOdHo5WvcroaPaabBeTUArU48dQcRWqdW";
+
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, "/api/auth/login");
   try {
@@ -51,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const user = await db.user.findUnique({ where: { email: normalizedEmail }, include: { company: { select: { status: true } } } });
-    const valid = user ? await comparePassword(password, user.password) : false;
+    const valid = await comparePassword(password, user?.password || INVALID_ACCOUNT_PASSWORD_HASH);
     if (!user || !valid || user.status !== "active" || (user.company && user.company.status !== "active")) {
       return apiErrorResponse({
         status: 401,
