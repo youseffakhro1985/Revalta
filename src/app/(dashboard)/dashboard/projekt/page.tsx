@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BriefcaseBusiness, CircleDollarSign, FolderKanban, TrendingUp, WalletCards } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
@@ -25,6 +25,8 @@ type Project = {
 };
 type Property = { id: string; name: string };
 type Member = { id: string; name: string | null; email: string };
+type ProjectSummary = { active: number; budget: number | null; forecast: number | null; actual: number | null };
+type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 const date = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" });
@@ -44,30 +46,29 @@ export default function ProjectsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [summary, setSummary] = useState<ProjectSummary>({ active: 0, budget: 0, forecast: 0, actual: 0 });
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
+  const [page, setPage] = useState(1);
 
-  async function load() {
+  const load = useCallback(async (requestedPage: number) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/projects", { cache: "no-store" });
-      const data = await readResponseJson<{ error?: string; projects?: Project[]; properties?: Property[]; members?: Member[] }>(response);
+      const response = await fetch(`/api/projects?page=${requestedPage}&pageSize=50`, { cache: "no-store" });
+      const data = await readResponseJson<{ error?: string; projects?: Project[]; properties?: Property[]; members?: Member[]; summary?: ProjectSummary; pagination?: Pagination }>(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta projekt");
       setProjects(data.projects || []);
       setProperties(data.properties || []);
       setMembers(data.members || []);
+      setSummary(data.summary || { active: 0, budget: 0, forecast: 0, actual: 0 });
+      setPagination(data.pagination || { page: requestedPage, pageSize: 50, total: 0, totalPages: 1 });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta projekt");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
-
-  const totals = useMemo(() => projects.reduce((sum, project) => ({
-    budget: sum.budget + Number(project.budget || 0),
-    forecast: sum.forecast + Number(project.forecast || 0),
-    actual: sum.actual + Number(project.actual || 0),
-  }), { budget: 0, forecast: 0, actual: 0 }), [projects]);
+  useEffect(() => { void load(page); }, [load, page]);
 
   async function createProject(formData: FormData) {
     setSaving(true); setError(""); setSuccess("");
@@ -77,7 +78,8 @@ export default function ProjectsPage() {
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa projektet");
       setSuccess("Projektet har skapats och kopplats till projektportföljen.");
-      await load();
+      if (page === 1) await load(1);
+      else setPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte skapa projektet");
     } finally {
@@ -116,10 +118,10 @@ export default function ProjectsPage() {
   return <div className="space-y-8">
     <PageHeader eyebrow="Projektstyrning" title="Projekt och entreprenader" description="Samla investeringar, renoveringar, entreprenörer, tidsplaner och ekonomi i en relationell projektportfölj." />
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard icon={BriefcaseBusiness} label="Aktiva projekt" value={String(projects.filter((project) => !["completed", "cancelled"].includes(project.status)).length)} />
-      <MetricCard icon={WalletCards} label="Budget" value={money.format(totals.budget)} />
-      <MetricCard icon={TrendingUp} label="Prognos" value={money.format(totals.forecast)} />
-      <MetricCard icon={CircleDollarSign} label="Utfall" value={money.format(totals.actual)} />
+      <MetricCard icon={BriefcaseBusiness} label="Aktiva projekt" value={String(summary.active)} />
+      <MetricCard icon={WalletCards} label="Budget" value={summary.budget === null ? "Dold" : money.format(summary.budget)} />
+      <MetricCard icon={TrendingUp} label="Prognos" value={summary.forecast === null ? "Dold" : money.format(summary.forecast)} />
+      <MetricCard icon={CircleDollarSign} label="Utfall" value={summary.actual === null ? "Dold" : money.format(summary.actual)} />
     </section>
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     <SoftDeleteUndoBanner
@@ -146,7 +148,7 @@ export default function ProjectsPage() {
     </Panel>
 
     <Panel title="Projektportfölj" description="Samlad översikt över ansvar, tidsplan, ekonomi, ursprungsarbetsorder och risk." bodyClassName="p-0">
-      {loading ? <p className="p-6 text-sm text-ink-500">Laddar projekt…</p> : projects.length === 0 ? <EmptyState title="Inga projekt registrerade" description="Skapa det första projektet eller omvandla en större arbetsorder till projekt." /> : <div className="divide-y divide-sand-100">{projects.map((project) => <article key={project.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
+      {loading ? <p className="p-6 text-sm text-ink-500">Laddar projekt…</p> : projects.length === 0 ? <EmptyState title="Inga projekt registrerade" description="Skapa det första projektet eller omvandla en större arbetsorder till projekt." /> : <><div className="divide-y divide-sand-100">{projects.map((project) => <article key={project.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
         <div className="flex flex-col justify-between gap-5 lg:flex-row">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2"><Link href={`/dashboard/projekt/${project.id}`} className="font-semibold text-ink-900 transition hover:text-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200 focus:ring-offset-2">{project.name}</Link><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{statusLabels[project.status] || project.status}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${project.risk === "high" ? "bg-red-50 text-red-800" : "bg-sand-100 text-ink-600"}`}>Risk {riskLabels[project.risk] || project.risk}</span></div>
@@ -168,7 +170,7 @@ export default function ProjectsPage() {
           </div>
           <select value={project.status} disabled={updatingId === project.id} onChange={(event) => void changeStatus(project.id, event.target.value)} className={`${premiumFieldClass} sm:w-44`} aria-label={`Ändra status för ${project.name}`}><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option><option value="cancelled">Avbruten</option></select>
         </div>
-      </article>)}</div>}
+      </article>)}</div><nav className="flex flex-col gap-3 border-t border-sand-100 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between" aria-label="Projektpaginering"><p className="text-ink-500">Visar sida {pagination.page} av {pagination.totalPages} · {pagination.total} projekt</p><div className="flex gap-2"><button type="button" disabled={loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Föregående</button><button type="button" disabled={loading || page >= pagination.totalPages} onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Nästa</button></div></nav></>}
     </Panel>
   </div>;
 }
