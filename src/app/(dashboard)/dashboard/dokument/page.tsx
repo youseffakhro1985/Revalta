@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Archive, Download, FileText, RotateCcw, Search, UsersRound, EyeOff } from "lucide-react";
 import {
   EmptyState,
@@ -44,7 +44,9 @@ type DocumentItem = {
   createdAt: string;
   source?: "table" | "legacy";
 };
-type Payload = { documents: DocumentItem[]; properties: Property[]; leases: Lease[]; canManageLifecycle: boolean };
+type DocumentSummary = { active: number; residentPublished: number; unpublished: number; archived: number };
+type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
+type Payload = { documents: DocumentItem[]; properties: Property[]; leases: Lease[]; summary: DocumentSummary; pagination: Pagination; canManageLifecycle: boolean };
 type Visibility = "internal" | "resident_all" | "resident_property" | "resident_unit" | "resident_lease";
 
 const categoryLabels: Record<string, string> = {
@@ -74,8 +76,10 @@ function formatBytes(value: number) {
 }
 
 export default function DocumentsPage() {
-  const [data, setData] = useState<Payload>({ documents: [], properties: [], leases: [], canManageLifecycle: false });
+  const [data, setData] = useState<Payload>({ documents: [], properties: [], leases: [], summary: { active: 0, residentPublished: 0, unpublished: 0, archived: 0 }, pagination: { page: 1, pageSize: 25, total: 0, totalPages: 1 }, canManageLifecycle: false });
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [propertyFilter, setPropertyFilter] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState("");
@@ -96,40 +100,43 @@ export default function DocumentsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const loadDocuments = useCallback(async () => {
+  const loadDocuments = useCallback(async (requestedPage: number, requestedSearch: string) => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/documents", { cache: "no-store" });
+      const searchParams = new URLSearchParams({ page: String(requestedPage), pageSize: "25" });
+      if (requestedSearch) searchParams.set("search", requestedSearch);
+      if (categoryFilter) searchParams.set("category", categoryFilter);
+      if (propertyFilter) searchParams.set("propertyId", propertyFilter);
+      if (visibilityFilter) searchParams.set("visibility", visibilityFilter);
+      if (lifecycleFilter) searchParams.set("lifecycle", lifecycleFilter);
+      const response = await fetch(`/api/documents?${searchParams.toString()}`, { cache: "no-store" });
       const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte hämta dokument");
       setData({
         documents: payload.documents || [], properties: payload.properties || [], leases: payload.leases || [],
+        summary: payload.summary || { active: 0, residentPublished: 0, unpublished: 0, archived: 0 },
+        pagination: payload.pagination || { page: requestedPage, pageSize: 25, total: 0, totalPages: 1 },
         canManageLifecycle: Boolean(payload.canManageLifecycle),
       });
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte hämta dokument");
     } finally { setLoading(false); }
-  }, []);
+  }, [categoryFilter, lifecycleFilter, propertyFilter, visibilityFilter]);
 
-  useEffect(() => { void loadDocuments(); }, [loadDocuments]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setDebouncedSearch(search.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => { void loadDocuments(page, debouncedSearch); }, [debouncedSearch, loadDocuments, page]);
 
   const selectedProperty = data.properties.find((property) => property.id === propertyId) || null;
   const availableUnits = selectedProperty?.units || [];
   const availableLeases = data.leases.filter((lease) => visibility !== "resident_unit" || lease.unit_id === unitId);
-  const filtered = useMemo(() => data.documents.filter((document) => {
-    const text = `${document.name} ${document.fileName || ""} ${document.property?.name || ""} ${document.unit?.designation || ""} ${document.lease?.leaseNumber || ""}`.toLowerCase();
-    return (!search || text.includes(search.toLowerCase()))
-      && (!categoryFilter || document.category === categoryFilter)
-      && (!propertyFilter || document.property?.id === propertyFilter)
-      && (!visibilityFilter || document.visibility === visibilityFilter)
-      && (!lifecycleFilter || document.lifecycleState === lifecycleFilter);
-  }), [data.documents, search, categoryFilter, propertyFilter, visibilityFilter, lifecycleFilter]);
-
-  const active = data.documents.filter((document) => document.lifecycleState === "active").length;
-  const residentPublished = data.documents.filter((document) => document.lifecycleState === "active" && document.visibility !== "internal").length;
-  const archived = data.documents.filter((document) => document.lifecycleState === "archived").length;
-
   function changeVisibility(next: Visibility) { setVisibility(next); setPropertyId(""); setUnitId(""); setLeaseId(""); }
   function resetForm() { setName(""); setCategory("other"); setVisibility("internal"); setPropertyId(""); setUnitId(""); setLeaseId(""); setValidUntil(""); setFile(null); }
 
@@ -145,7 +152,8 @@ export default function DocumentsPage() {
       const response = await fetch("/api/documents", { method: "POST", body: formData });
       const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte ladda upp dokumentet");
-      resetForm(); setMessage("Dokumentet har sparats med vald åtkomstnivå."); await loadDocuments();
+      resetForm(); setMessage("Dokumentet har sparats med vald åtkomstnivå.");
+      if (page === 1) await loadDocuments(1, debouncedSearch); else setPage(1);
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte ladda upp dokumentet"); }
     finally { setSubmitting(false); }
   }
@@ -187,7 +195,7 @@ export default function DocumentsPage() {
       if (!response.ok) throw new Error(payload.error || "Kunde inte uppdatera dokumentet");
       setEditingId("");
       setMessage("Dokumentet har uppdaterats.");
-      await loadDocuments();
+      await loadDocuments(page, debouncedSearch);
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte uppdatera dokumentet");
     } finally {
@@ -210,7 +218,7 @@ export default function DocumentsPage() {
       const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte ändra dokumentstatus");
       setMessage(`Dokumentet är nu ${lifecycleLabels[payload.state as LifecycleState]?.toLowerCase() || "uppdaterat"}.`);
-      await loadDocuments();
+      await loadDocuments(page, debouncedSearch);
     } catch (value) { setError(value instanceof Error ? value.message : "Kunde inte ändra dokumentstatus"); }
     finally { setChangingId(""); }
   }
@@ -222,10 +230,10 @@ export default function DocumentsPage() {
       {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={FileText} label="Aktiva dokument" value={active} hint="Tillgängliga internt" />
-        <MetricCard icon={UsersRound} label="Publicerade till boende" value={residentPublished} hint="Aktiva externa målgrupper" />
-        <MetricCard icon={EyeOff} label="Avpublicerade" value={data.documents.filter((item) => item.lifecycleState === "unpublished").length} hint="Dolda från boende" />
-        <MetricCard icon={Archive} label="Arkiverade" value={archived} hint="Bevarade i historiken" />
+        <MetricCard icon={FileText} label="Aktiva dokument" value={data.summary.active} hint="Tillgängliga internt" />
+        <MetricCard icon={UsersRound} label="Publicerade till boende" value={data.summary.residentPublished} hint="Aktiva externa målgrupper" />
+        <MetricCard icon={EyeOff} label="Avpublicerade" value={data.summary.unpublished} hint="Dolda från boende" />
+        <MetricCard icon={Archive} label="Arkiverade" value={data.summary.archived} hint="Bevarade i historiken" />
       </section>
 
       <section className={`grid gap-6 ${data.canManageLifecycle ? "xl:grid-cols-[420px_1fr]" : ""}`}>
@@ -246,15 +254,15 @@ export default function DocumentsPage() {
 
         <Panel title="Dokumentbibliotek" description="Sök, filtrera och hantera dokumentens hela livscykel." bodyClassName="p-0">
           <div className="grid gap-3 border-b border-sand-200 p-5 xl:grid-cols-[1fr_150px_170px_160px_150px]">
-            <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input value={search} onChange={(e) => setSearch(e.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, objekt eller avtal" /></label>
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select value={lifecycleFilter} onChange={(e) => setLifecycleFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla statusar</option>{Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla fastigheter</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+            <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input maxLength={200} value={search} onChange={(e) => setSearch(e.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokumentnamn eller filnamn" /></label>
+            <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={visibilityFilter} onChange={(e) => { setVisibilityFilter(e.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={lifecycleFilter} onChange={(e) => { setLifecycleFilter(e.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla statusar</option>{Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={propertyFilter} onChange={(e) => { setPropertyFilter(e.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla fastigheter</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           </div>
 
-          {loading ? <div className="space-y-3 p-6">{[1,2,3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div> : filtered.length === 0 ? <EmptyState title="Inga dokument matchar" description="Ladda upp ett dokument eller justera filtreringen." /> : (
-            <div className="divide-y divide-sand-100">{filtered.map((document) => {
+          {loading ? <div className="space-y-3 p-6">{[1,2,3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div> : data.documents.length === 0 ? <EmptyState title="Inga dokument matchar" description="Ladda upp ett dokument eller justera filtreringen." /> : (
+            <><div className="divide-y divide-sand-100">{data.documents.map((document) => {
               const scope = document.lease ? `${document.lease.leaseNumber} · ${document.lease.unit} · ${document.lease.holder}` : document.unit ? `${document.property?.name || "Fastighet"} · ${document.unit.designation}` : document.property?.name || visibilityLabels[document.visibility as Visibility] || document.visibility;
               const inactive = document.lifecycleState !== "active";
               return <article key={document.id} className={`space-y-3 p-5 sm:p-6 ${inactive ? "bg-sand-50/60" : "hover:bg-sand-50/70"}`}>
@@ -287,7 +295,7 @@ export default function DocumentsPage() {
                   </div>
                 ) : null}
               </article>;
-            })}</div>
+            })}</div><nav className="flex flex-col gap-3 border-t border-sand-100 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between" aria-label="Dokumentpaginering"><p className="text-ink-500">Sida {data.pagination.page} av {data.pagination.totalPages} · {data.pagination.total} dokument</p><div className="flex gap-2"><button type="button" disabled={loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Föregående</button><button type="button" disabled={loading || page >= data.pagination.totalPages} onClick={() => setPage((current) => Math.min(data.pagination.totalPages, current + 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Nästa</button></div></nav></>
           )}
         </Panel>
       </section>
