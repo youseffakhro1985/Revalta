@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, userFindFirstMock, ticketCreateMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, userFindFirstMock, ticketCreateMock, transactionMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   userFindFirstMock: vi.fn(),
   ticketCreateMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -14,6 +15,7 @@ vi.mock("@/lib/db", () => ({
   default: {
     user: { findFirst: userFindFirstMock },
     ticket: { create: ticketCreateMock },
+    $transaction: transactionMock,
   },
 }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: vi.fn() }));
@@ -36,7 +38,13 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 describe("POST /api/tickets", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionMock.mockImplementation(async (callback) => callback({
+      ticket: { create: ticketCreateMock },
+      auditLog: { create: vi.fn() },
+    }));
+  });
 
   it("prevents technicians from assigning a new ticket to another user", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
@@ -60,5 +68,27 @@ describe("POST /api/tickets", () => {
     expect(categoryResponse.status).toBe(400);
     expect(priorityResponse.status).toBe(400);
     expect(ticketCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("creates the ticket inside the same transaction as its audit record", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.se",
+      company_id: "company-1",
+      role: "manager",
+    });
+    ticketCreateMock.mockResolvedValue({
+      id: "ticket-1",
+      title: "Läckande kran",
+      category: "vvs",
+      priority: "normal",
+      assigned_to_id: null,
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(201);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(ticketCreateMock).toHaveBeenCalledTimes(1);
   });
 });
