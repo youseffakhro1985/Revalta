@@ -34,27 +34,31 @@ async function sendEmail(payload: {
     return mockOrFail();
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.EMAIL_PROVIDER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: process.env.EMAIL_FROM,
-      to: payload.recipient,
-      subject: payload.subject,
-      text: payload.text,
-    }),
-    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
-  });
-  const data = await response.json().catch(() => ({}));
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.EMAIL_PROVIDER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM,
+        to: payload.recipient,
+        subject: payload.subject,
+        text: payload.text,
+      }),
+      signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+    });
+    const data = await response.json().catch(() => ({})) as { id?: unknown };
 
-  if (!response.ok) {
-    return { status: "failed", providerId: null, providerResponse: data };
+    if (!response.ok) {
+      return { status: "failed" as const, providerId: null, reason: "provider_rejected", providerStatus: response.status };
+    }
+
+    return { status: "sent" as const, providerId: typeof data.id === "string" ? data.id : null };
+  } catch {
+    return { status: "failed" as const, providerId: null, reason: "provider_unavailable" };
   }
-
-  return { status: "sent", providerId: typeof data.id === "string" ? data.id : null, providerResponse: data };
 }
 
 async function sendSms(payload: { recipient?: string; message: string }) {
@@ -64,47 +68,55 @@ async function sendSms(payload: { recipient?: string; message: string }) {
 
   if (process.env.SMS_PROVIDER_API_KEY?.startsWith("46elks:")) {
     const [, username, password, from = "Revalta"] = process.env.SMS_PROVIDER_API_KEY.split(":");
-    const response = await fetch(process.env.SMS_PROVIDER_WEBHOOK_URL || "https://api.46elks.com/a1/sms", {
+    try {
+      const response = await fetch(process.env.SMS_PROVIDER_WEBHOOK_URL || "https://api.46elks.com/a1/sms", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          from,
+          to: payload.recipient,
+          message: payload.message,
+        }),
+        signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
+      });
+      const data = await response.json().catch(() => ({})) as { id?: unknown };
+
+      if (!response.ok) {
+        return { status: "failed" as const, providerId: null, reason: "provider_rejected", providerStatus: response.status };
+      }
+
+      return { status: "sent" as const, providerId: typeof data.id === "string" ? data.id : null };
+    } catch {
+      return { status: "failed" as const, providerId: null, reason: "provider_unavailable" };
+    }
+  }
+
+  try {
+    const response = await fetch(process.env.SMS_PROVIDER_WEBHOOK_URL as string, {
       method: "POST",
       headers: {
-        Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${process.env.SMS_PROVIDER_API_KEY}`,
+        "Content-Type": "application/json",
       },
-      body: new URLSearchParams({
-        from,
+      body: JSON.stringify({
         to: payload.recipient,
         message: payload.message,
       }),
       signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await response.json().catch(() => ({})) as { id?: unknown };
 
     if (!response.ok) {
-      return { status: "failed", providerId: null, providerResponse: data };
+      return { status: "failed" as const, providerId: null, reason: "provider_rejected", providerStatus: response.status };
     }
 
-    return { status: "sent", providerId: typeof data.id === "string" ? data.id : null, providerResponse: data };
+    return { status: "sent" as const, providerId: typeof data.id === "string" ? data.id : null };
+  } catch {
+    return { status: "failed" as const, providerId: null, reason: "provider_unavailable" };
   }
-
-  const response = await fetch(process.env.SMS_PROVIDER_WEBHOOK_URL as string, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.SMS_PROVIDER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      to: payload.recipient,
-      message: payload.message,
-    }),
-    signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    return { status: "failed", providerId: null, providerResponse: data };
-  }
-
-  return { status: "sent", providerId: typeof data.id === "string" ? data.id : null, providerResponse: data };
 }
 
 async function recordIntegrationEvent(
