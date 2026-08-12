@@ -1,18 +1,23 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, canViewOperations, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { validateUploadFile } from "@/lib/document-file-security";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
+import { findAccessibleWorkOrder } from "@/lib/assigned-work-access";
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const ENTITY_TYPES = new Set(["work_order", "project", "property", "technical_asset"]);
 
-async function resolveEntity(companyId: string, entityType: string, entityId: string) {
-  if (entityType === "work_order") return db.workOrder.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId, property: { deleted_at: null } }, select: { id: true } });
-  if (entityType === "project") return db.project.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId, property: { deleted_at: null } }, select: { id: true } });
+async function resolveEntity(user: CompanyUser, entityType: string, entityId: string) {
+  const companyId = user.company_id;
+  if (entityType === "work_order") return findAccessibleWorkOrder(user, entityId);
+  if (entityType === "project") {
+    if (!canViewOperations(user.role)) return null;
+    return db.project.findFirst({ where: { deleted_at: null, id: entityId, company_id: companyId, property: { deleted_at: null } }, select: { id: true } });
+  }
   if (entityType === "property") return db.property.findFirst({ where: { id: entityId, company_id: companyId, deleted_at: null }, select: { id: true } });
   if (entityType === "technical_asset") {
     const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
@@ -50,7 +55,7 @@ export async function GET(request: Request) {
   const entityId = url.searchParams.get("entityId") || "";
   if (!entityId || !ENTITY_TYPES.has(entityType)) return NextResponse.json({ error: "Ogiltig dokumentkoppling" }, { status: 400 });
 
-  const entity = await resolveEntity(user.company_id, entityType, entityId);
+  const entity = await resolveEntity(user as CompanyUser, entityType, entityId);
   if (!entity) return NextResponse.json({ error: "Objektet hittades inte" }, { status: 404 });
 
   if (entityType === "property" || entityType === "technical_asset") {
@@ -115,7 +120,7 @@ export async function POST(request: Request) {
     });
     if (!validation.ok) return NextResponse.json({ error: validation.error }, { status: 400 });
 
-    const entity = await resolveEntity(user.company_id, entityType, entityId);
+    const entity = await resolveEntity(user as CompanyUser, entityType, entityId);
     if (!entity) return NextResponse.json({ error: "Objektet hittades inte" }, { status: 404 });
 
     const stored = await storeAttachment({
