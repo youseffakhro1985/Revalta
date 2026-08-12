@@ -15,6 +15,7 @@ export const metadata: Metadata = {
     template: "%s | Revalta",
   },
   description: siteDescription,
+  alternates: { canonical: "/" },
   manifest: "/manifest.webmanifest",
   applicationName: "Revalta",
   category: "business",
@@ -24,6 +25,7 @@ export const metadata: Metadata = {
     siteName: "Revalta",
     title: "Revalta | Fastighetssystem för svensk förvaltning",
     description: siteDescription,
+    url: "/",
   },
   twitter: {
     card: "summary_large_image",
