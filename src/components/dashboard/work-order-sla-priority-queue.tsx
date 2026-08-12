@@ -48,7 +48,7 @@ export function WorkOrderSlaPriorityQueue() {
     let mounted = true;
     async function load() {
       try {
-        const response = await fetch("/api/work-orders", { cache: "no-store" });
+        const response = await fetch("/api/work-orders?view=priority", { cache: "no-store" });
         const data = await readResponseJson<{ error?: string; workOrders?: WorkOrder[] }>(response);
         if (!response.ok) throw new Error(data.error || "Kunde inte hämta SLA-prioriteringen");
         if (mounted) setItems(Array.isArray(data.workOrders) ? data.workOrders : []);

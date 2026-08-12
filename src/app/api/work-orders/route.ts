@@ -62,7 +62,9 @@ type EnterpriseListRow = {
   technical_asset_location: string | null;
 };
 
-export async function GET() {
+const ACTIVE_WORK_ORDER_STATUSES = ["completed", "invoiced", "cancelled"] as const;
+
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
@@ -81,6 +83,8 @@ export async function GET() {
     const includeFinance = canViewFinanceData(user.role);
     const canManageFinance = canManageWorkOrderFinance(user.role);
     const assignedScope = scopedToAssigned ? { assigned_to_id: user.id } : {};
+    const view = new URL(request.url).searchParams.get("view");
+    const activeOnly = view === "planning" || view === "priority";
 
     const workOrders = await db.workOrder.findMany({
         where: {
@@ -88,6 +92,7 @@ export async function GET() {
           ...workOrderActive,
           property: { deleted_at: null },
           ...assignedScope,
+          ...(activeOnly ? { status: { notIn: [...ACTIVE_WORK_ORDER_STATUSES] } } : {}),
         },
         orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
         take: 500,
@@ -201,6 +206,7 @@ export async function GET() {
           scopedToAssigned,
         },
         currentUserId: user.id,
+        resultScope: activeOnly ? "active" : "default",
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
