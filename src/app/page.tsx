@@ -55,8 +55,22 @@ const assurances = [
 ];
 
 export default function Home() {
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Revalta",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: "https://www.revalta.se/",
+    description: "Fastighetssystem för svenska fastighetsägare, BRF:er och förvaltare.",
+    offers: { "@type": "Offer", priceCurrency: "SEK", availability: "https://schema.org/OnlineOnly" },
+  };
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema).replace(/</g, "\\u003c") }}
+      />
       <main className="min-h-screen overflow-hidden bg-[#FAFAF8] text-ink-950 selection:bg-petroleum-100 selection:text-petroleum-950">
         <MarketingHeader />
 
