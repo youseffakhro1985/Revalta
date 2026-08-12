@@ -1,5 +1,19 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 function firstHeaderValue(value: string | null) {
   return value?.split(",", 1)[0]?.trim() || "";
+}
+
+function constantTimeEqual(left: string, right: string) {
+  const leftDigest = createHash("sha256").update(left).digest();
+  const rightDigest = createHash("sha256").update(right).digest();
+  return timingSafeEqual(leftDigest, rightDigest);
+}
+
+export function isCronRequestAuthorized(request: Request) {
+  const secret = process.env.CRON_SECRET;
+  const authorization = request.headers.get("authorization");
+  return Boolean(secret && authorization) && constantTimeEqual(authorization!, `Bearer ${secret}`);
 }
 
 const JSON_BODY_LIMIT_BYTES = 1_000_000;
