@@ -237,7 +237,19 @@ export async function GET(request: Request) {
       continue;
     }
 
-    await saveJob(companyId, modernJob, "processing", { processingStartedAt: new Date().toISOString() });
+    // Atomic claim: guards against a concurrent/retried cron invocation processing
+    // the same job twice (which would submit the same invoice to Fortnox/Visma/the
+    // webhook provider more than once). The WHERE clause only matches a row that is
+    // still "queued", so at most one concurrent request can flip it to "processing";
+    // a losing request sees count 0 and skips instead of re-sending.
+    const claim = await db.workOrderInvoiceExportJob.updateMany({
+      where: { id: modernJob.jobId, company_id: companyId, status: "queued" },
+      data: { status: "processing", processing_started_at: new Date() },
+    });
+    if (claim.count === 0) {
+      result.skipped += 1;
+      continue;
+    }
 
     try {
       const workOrder = await db.workOrder.findFirst({
