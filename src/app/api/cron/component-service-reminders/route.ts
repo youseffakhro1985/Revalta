@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { deliverServiceEmail, type ServiceEmailDelivery } from "@/lib/component-service-email";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
+import { isCronRequestAuthorized } from "@/lib/request-security";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,7 +22,6 @@ const PROCESSING_LEASE_MS = 15 * 60_000;
 
 function noStore(body: unknown, init?: ResponseInit) { return NextResponse.json(body, { ...init, headers: { "Cache-Control": "private, no-store", ...(init?.headers || {}) } }); }
 function dateKey(date = new Date()) { return date.toISOString().slice(0, 10); }
-function authorized(request: Request) { const secret = process.env.CRON_SECRET; return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`; }
 function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 function toJson(value: unknown): Prisma.InputJsonValue { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
 
@@ -166,7 +166,7 @@ async function finalizeRun(input: {
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
   const now = new Date();
   const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
   const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
