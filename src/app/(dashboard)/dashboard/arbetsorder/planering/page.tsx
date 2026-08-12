@@ -67,7 +67,7 @@ export default function TechnicianPlanningPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/work-orders", { cache: "no-store" });
+      const response = await fetch("/api/work-orders?view=planning", { cache: "no-store" });
       const body = await readResponseJson<{
         error?: string;
         workOrders?: WorkOrder[];
