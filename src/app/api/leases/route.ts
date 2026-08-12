@@ -55,6 +55,10 @@ export async function GET(request: Request) {
         where: { ...where, status: { in: ["reserved", "active", "notice"] } },
         orderBy: [{ updated_at: "desc" }, { id: "asc" }],
         include: leaseInclude,
+        // Safety cap: this list drives the occupancy view (not the paginated table
+        // above) and is naturally bounded by unit count, but must not be truly
+        // unbounded for a very large portfolio.
+        take: 5000,
       }),
       db.lease.count({ where }),
       db.lease.aggregate({

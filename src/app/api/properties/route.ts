@@ -38,6 +38,9 @@ export async function GET() {
       where: { ...propertyActive, ...tenantWhere(user) },
       orderBy: { created_at: "desc" },
       select: propertyListSelect(ticketActive),
+      // Safety cap: the property list is not yet paginated client-side, but must
+      // not be truly unbounded for a very large multi-property landlord/company.
+      take: 2000,
     });
 
     return NextResponse.json({

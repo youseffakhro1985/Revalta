@@ -48,12 +48,16 @@ export async function GET() {
             where: { company_id: user.company_id, property: { deleted_at: null } },
             orderBy: { created_at: "asc" },
             include: { property: { select: { name: true } } },
+            take: 2000,
           })
         : Promise.resolve([]),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "asc" },
         select: { id: true, entity_id: true, metadata: true, created_at: true },
+        // Matches the cap used by every sibling "legacy audit rows" read in this
+        // module family (rent-notices, energy, budget, calendar, imd-readings, etc.).
+        take: 500,
       })),
       db.property.findMany({
         where: { deleted_at: null, ...tenantWhere(user) },

@@ -18,6 +18,11 @@ export async function GET() {
     const tickets = await db.ticket.findMany({
       where: { deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       orderBy: { created_at: "desc" },
+      // Safety cap: a full, unbounded CSV export of a company's entire ticket
+      // history is a real memory/latency risk as history grows. 50k rows is
+      // generous enough that no real tenant should hit it in practice; if this
+      // ever needs to be truly unlimited, switch to a streamed/paginated export.
+      take: 50_000,
       select: {
         public_reference: true,
         title: true,
