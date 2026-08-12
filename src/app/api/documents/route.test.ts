@@ -180,4 +180,16 @@ describe("documents route", () => {
     expect(body.pagination).toEqual({ page: 2, pageSize: 25, total: 73, totalPages: 3 });
     expect(body.summary).toEqual({ active: 12, unpublished: 3, archived: 8, residentPublished: 4 });
   });
+
+  it("caps modern document pages at 100 rows", async () => {
+    vi.stubEnv("REVALTA_MODERN_STORAGE_ONLY", "1");
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+
+    const response = await GET(new Request("https://www.revalta.se/api/documents?pageSize=5000"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(managedFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }));
+    expect(body.pagination.pageSize).toBe(100);
+  });
 });
