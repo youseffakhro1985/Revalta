@@ -92,6 +92,8 @@ model User {
   work_order_lock_notifications_received WorkOrderLockNotification[] @relation("WorkOrderLockNotificationRecipient")
   work_order_lock_notifications_released WorkOrderLockNotification[] @relation("WorkOrderLockNotificationReleasedBy")
   service_escalation_admin_actions ServiceEscalationAdminAction[] @relation("ServiceEscalationAdminActionRequestedBy")
+
+  @@index([company_id, status])
 }
 
 model Company {
@@ -1095,6 +1097,8 @@ model TicketAttachment {
   visibility   String   @default("internal")
   created_at   DateTime @default(now())
   ticket       Ticket   @relation(fields: [ticket_id], references: [id])
+
+  @@index([ticket_id, created_at])
 }
 
 model AuditLog {
@@ -1108,6 +1112,10 @@ model AuditLog {
   created_at    DateTime @default(now())
   company       Company? @relation(fields: [company_id], references: [id])
   actor         User?    @relation(fields: [actor_user_id], references: [id])
+
+  @@index([company_id, created_at])
+  @@index([company_id, entity_type, entity_id, created_at])
+  @@index([actor_user_id, entity_type, entity_id, action, created_at])
 }
 
 model IntegrationEvent {
@@ -1119,6 +1127,9 @@ model IntegrationEvent {
   payload    Json?
   created_at DateTime @default(now())
   company    Company? @relation(fields: [company_id], references: [id])
+
+  @@index([company_id, type, created_at])
+  @@index([company_id, status, created_at])
 }
 
 model PasswordResetToken {
@@ -1129,6 +1140,8 @@ model PasswordResetToken {
   used_at    DateTime?
   created_at DateTime  @default(now())
   user       User      @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, used_at])
 }
 
 model EmailVerificationToken {
@@ -1139,6 +1152,8 @@ model EmailVerificationToken {
   used_at    DateTime?
   created_at DateTime  @default(now())
   user       User      @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, used_at])
 }
 
 model TeamInvite {
@@ -1154,6 +1169,9 @@ model TeamInvite {
   created_at    DateTime  @default(now())
   company       Company   @relation(fields: [company_id], references: [id])
   invited_by    User      @relation(fields: [invited_by_id], references: [id])
+
+  @@index([company_id, email, accepted_at])
+  @@index([expires_at])
 }
 
 model RateLimitAttempt {
