@@ -77,20 +77,26 @@ export async function POST(
       }
     }
 
-    const restoreResult = await db.workOrder.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
-      data: { deleted_at: null },
+    // Restore + audit log in one transaction: an audit-write failure must never
+    // leave the work order un-deleted while the caller is told the request failed.
+    const restored = await db.$transaction(async (tx) => {
+      const restoreResult = await tx.workOrder.updateMany({
+        where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
+        data: { deleted_at: null },
+      });
+      if (restoreResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: existing.id,
+        action: "work_order.restored",
+        metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+      }, tx);
+      return true;
     });
-    if (restoreResult.count === 0) {
+    if (!restored) {
       return NextResponse.json({ error: "Arbetsordern hittades inte eller är redan aktiv" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: existing.id,
-      action: "work_order.restored",
-      metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
-    });
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {

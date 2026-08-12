@@ -56,25 +56,31 @@ export async function POST(
       );
     }
 
-    const restoreResult = await db.leaseHolder.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
-      data: { deleted_at: null, status: "active" },
+    // Restore + audit log in one transaction: an audit-write failure must never
+    // leave the contact un-deleted while the caller is told the request failed.
+    const restored = await db.$transaction(async (tx) => {
+      const restoreResult = await tx.leaseHolder.updateMany({
+        where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
+        data: { deleted_at: null, status: "active" },
+      });
+      if (restoreResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "lease_holder",
+        entityId: existing.id,
+        action: "lease_holder.restored",
+        metadata: {
+          name: existing.name,
+          partyType: existing.party_type,
+          previousStatus: existing.status,
+          softDelete: true,
+        },
+      }, tx);
+      return true;
     });
-    if (restoreResult.count === 0) {
+    if (!restored) {
       return NextResponse.json({ error: "Kontakten hittades inte eller är redan aktiv" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "lease_holder",
-      entityId: existing.id,
-      action: "lease_holder.restored",
-      metadata: {
-        name: existing.name,
-        partyType: existing.party_type,
-        previousStatus: existing.status,
-        softDelete: true,
-      },
-    });
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {

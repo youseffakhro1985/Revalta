@@ -53,25 +53,31 @@ export async function POST(
       readAuditPreviousStatus(deleteAudit?.metadata),
     );
 
-    const restoreResult = await db.project.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
-      data: { deleted_at: null, status: restoredStatus },
+    // Restore + audit log in one transaction: an audit-write failure must never
+    // leave the project un-deleted while the caller is told the request failed.
+    const restored = await db.$transaction(async (tx) => {
+      const restoreResult = await tx.project.updateMany({
+        where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
+        data: { deleted_at: null, status: restoredStatus },
+      });
+      if (restoreResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "project",
+        entityId: existing.id,
+        action: "project.restored",
+        metadata: {
+          name: existing.name,
+          previousStatus: existing.status,
+          status: restoredStatus,
+          softDelete: true,
+        },
+      }, tx);
+      return true;
     });
-    if (restoreResult.count === 0) {
+    if (!restored) {
       return NextResponse.json({ error: "Projektet hittades inte eller är redan aktivt" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "project",
-      entityId: existing.id,
-      action: "project.restored",
-      metadata: {
-        name: existing.name,
-        previousStatus: existing.status,
-        status: restoredStatus,
-        softDelete: true,
-      },
-    });
 
     return NextResponse.json({ success: true, id: existing.id, status: restoredStatus });
   } catch (error) {

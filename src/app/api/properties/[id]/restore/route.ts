@@ -26,20 +26,26 @@ export async function POST(
       return NextResponse.json({ error: "Fastigheten hittades inte eller är redan aktiv" }, { status: 404 });
     }
 
-    const restoreResult = await db.property.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
-      data: { deleted_at: null },
+    // Restore + audit log in one transaction: an audit-write failure must never
+    // leave the property un-deleted while the caller is told the request failed.
+    const restored = await db.$transaction(async (tx) => {
+      const restoreResult = await tx.property.updateMany({
+        where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
+        data: { deleted_at: null },
+      });
+      if (restoreResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: existing.id,
+        action: "property.restored",
+        metadata: { name: existing.name, previousStatus: existing.status, softDelete: true },
+      }, tx);
+      return true;
     });
-    if (restoreResult.count === 0) {
+    if (!restored) {
       return NextResponse.json({ error: "Fastigheten hittades inte eller är redan aktiv" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: existing.id,
-      action: "property.restored",
-      metadata: { name: existing.name, previousStatus: existing.status, softDelete: true },
-    });
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {

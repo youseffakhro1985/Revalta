@@ -58,20 +58,26 @@ export async function POST(
       }
     }
 
-    const restoreResult = await db.lease.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
-      data: { deleted_at: null },
+    // Restore + audit log in one transaction: an audit-write failure must never
+    // leave the lease un-deleted while the caller is told the request failed.
+    const restored = await db.$transaction(async (tx) => {
+      const restoreResult = await tx.lease.updateMany({
+        where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
+        data: { deleted_at: null },
+      });
+      if (restoreResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "lease",
+        entityId: existing.id,
+        action: "lease.restored",
+        metadata: { leaseNumber: existing.lease_number, previousStatus: existing.status, softDelete: true },
+      }, tx);
+      return true;
     });
-    if (restoreResult.count === 0) {
+    if (!restored) {
       return NextResponse.json({ error: "Avtalet hittades inte eller är redan aktivt" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "lease",
-      entityId: existing.id,
-      action: "lease.restored",
-      metadata: { leaseNumber: existing.lease_number, previousStatus: existing.status, softDelete: true },
-    });
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {

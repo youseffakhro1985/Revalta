@@ -6,12 +6,14 @@ const {
   workOrderUpdateManyMock,
   ticketFindFirstMock,
   writeAuditLogMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
   workOrderUpdateManyMock: vi.fn(),
   ticketFindFirstMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -23,8 +25,8 @@ vi.mock("@/lib/audit", () => ({
   writeAuditLog: writeAuditLogMock,
 }));
 
-vi.mock("@/lib/db", () => ({
-  default: {
+vi.mock("@/lib/db", () => {
+  const dbMock = {
     workOrder: {
       findFirst: workOrderFindFirstMock,
       updateMany: workOrderUpdateManyMock,
@@ -32,8 +34,11 @@ vi.mock("@/lib/db", () => ({
     ticket: {
       findFirst: ticketFindFirstMock,
     },
-  },
-}));
+    $transaction: transactionMock,
+  };
+  transactionMock.mockImplementation((callback: (tx: typeof dbMock) => unknown) => callback(dbMock));
+  return { default: dbMock };
+});
 
 import { POST } from "./route";
 
@@ -68,6 +73,7 @@ describe("work-orders/[id]/restore", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ action: "work_order.restored" }),
+      expect.anything(),
     );
   });
 
@@ -86,5 +92,23 @@ describe("work-orders/[id]/restore", () => {
     const response = await POST(new Request("http://localhost/api/work-orders/wo-1/restore", { method: "POST" }), { params });
     expect(response.status).toBe(409);
     expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not report success when the audit log write fails inside the transaction", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    workOrderFindFirstMock
+      .mockResolvedValueOnce({
+        id: "wo-1",
+        title: "Åtgärd",
+        status: "planned",
+        ticket_id: null,
+        property: { deleted_at: null },
+      });
+    writeAuditLogMock.mockRejectedValue(new Error("audit db unavailable"));
+
+    const response = await POST(new Request("http://localhost/api/work-orders/wo-1/restore", { method: "POST" }), { params });
+
+    expect(response.status).toBe(500);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 });
