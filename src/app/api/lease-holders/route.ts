@@ -28,40 +28,65 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Du saknar behörighet att visa hyresparter" }, { status: 403 });
     }
 
-    const propertyId = new URL(request.url).searchParams.get("propertyId");
+    const searchParams = new URL(request.url).searchParams;
+    const propertyId = searchParams.get("propertyId");
+    const search = (searchParams.get("search") || "").trim().slice(0, 160);
+    const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const requestedPageSize = Number.parseInt(searchParams.get("pageSize") || "25", 10);
+    const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const pageSize = Number.isFinite(requestedPageSize) ? Math.min(100, Math.max(10, requestedPageSize)) : 25;
     if (propertyId) {
       const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
       if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
     }
 
-    const holders = await db.leaseHolder.findMany({
-      where: {
-        company_id: user.company_id,
-        deleted_at: null,
-        ...(propertyId ? { leases: { some: { property_id: propertyId, deleted_at: null } } } : {}),
-      },
-      orderBy: [{ status: "asc" }, { name: "asc" }],
-      take: 1_000,
-      include: {
-        leases: {
-          where: { deleted_at: null, ...(propertyId ? { property_id: propertyId } : {}) },
-          orderBy: { updated_at: "desc" },
-          take: 20,
-          select: {
-            id: true,
-            lease_number: true,
-            status: true,
-            start_date: true,
-            end_date: true,
-            property: { select: { id: true, name: true } },
-            unit: { select: { id: true, designation: true, unit_type: true } },
-          },
-        },
-        _count: { select: { leases: { where: { deleted_at: null } } } },
-      },
-    });
+    const where = {
+      company_id: user.company_id,
+      deleted_at: null,
+      ...(propertyId ? { leases: { some: { property_id: propertyId, deleted_at: null } } } : {}),
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: "insensitive" as const } },
+          { contact_name: { contains: search, mode: "insensitive" as const } },
+          { email: { contains: search, mode: "insensitive" as const } },
+          { phone: { contains: search, mode: "insensitive" as const } },
+          { organization_number: { contains: search, mode: "insensitive" as const } },
+        ],
+      } : {}),
+    };
 
-    return NextResponse.json({ holders, permissions: { canManage: canManageLeases(user.role) } });
+    const [holders, total] = await Promise.all([
+      db.leaseHolder.findMany({
+        where,
+        orderBy: [{ status: "asc" }, { name: "asc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          leases: {
+            where: { deleted_at: null, ...(propertyId ? { property_id: propertyId } : {}) },
+            orderBy: { updated_at: "desc" },
+            take: 20,
+            select: {
+              id: true,
+              lease_number: true,
+              status: true,
+              start_date: true,
+              end_date: true,
+              property: { select: { id: true, name: true } },
+              unit: { select: { id: true, designation: true, unit_type: true } },
+            },
+          },
+          _count: { select: { leases: { where: { deleted_at: null } } } },
+        },
+      }),
+      db.leaseHolder.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      holders,
+      permissions: { canManage: canManageLeases(user.role) },
+      pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    });
   } catch (error) {
     console.error("Get lease holders error:", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
