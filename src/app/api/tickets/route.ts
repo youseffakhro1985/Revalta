@@ -158,19 +158,20 @@ export async function POST(request: Request) {
       }
     }
 
-    const ticket = await db.ticket.create({
-      data: {
-        title: normalizedTitle,
-        description: normalizedDescription,
-        category: normalizedCategory,
-        priority: normalizedPriority,
-        due_date: calculateDueDate(normalizedPriority),
-        property_id: normalizedPropertyId,
-        assigned_to_id: normalizedAssignedToId,
-        company_id: user.company_id,
-        user_id: user.id,
-      },
-      select: {
+    const ticket = await db.$transaction(async (tx) => {
+      const created = await tx.ticket.create({
+        data: {
+          title: normalizedTitle,
+          description: normalizedDescription,
+          category: normalizedCategory,
+          priority: normalizedPriority,
+          due_date: calculateDueDate(normalizedPriority),
+          property_id: normalizedPropertyId,
+          assigned_to_id: normalizedAssignedToId,
+          company_id: user.company_id,
+          user_id: user.id,
+        },
+        select: {
         id: true,
         title: true,
         description: true,
@@ -202,19 +203,20 @@ export async function POST(request: Request) {
             comments: true,
           },
         },
-      },
-    });
-
-    await writeAuditLog(user, {
-      entityType: "ticket",
-      entityId: ticket.id,
-      action: "ticket.created",
-      metadata: {
-        title: ticket.title,
-        priority: ticket.priority,
-        category: ticket.category,
-        assignedToId: ticket.assigned_to_id,
-      },
+        },
+      });
+      await writeAuditLog(user, {
+        entityType: "ticket",
+        entityId: created.id,
+        action: "ticket.created",
+        metadata: {
+          title: created.title,
+          priority: created.priority,
+          category: created.category,
+          assignedToId: created.assigned_to_id,
+        },
+      }, tx);
+      return created;
     });
     await queueTicketNotification(user, {
       ticketId: ticket.id,

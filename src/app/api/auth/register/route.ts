@@ -77,41 +77,44 @@ export async function POST(request: Request) {
 
     const hashedPassword = await hashPassword(password);
 
-    const company = await db.company.create({
-      data: {
-        name: normalizedCompanyName,
-        users: {
-          create: {
-            email: normalizedEmail,
-            password: hashedPassword,
-            name: normalizedName,
-            role: "owner",
+    const verifyToken = createResetToken();
+    const { company, owner } = await db.$transaction(async (tx) => {
+      const createdCompany = await tx.company.create({
+        data: {
+          name: normalizedCompanyName,
+          users: {
+            create: {
+              email: normalizedEmail,
+              password: hashedPassword,
+              name: normalizedName,
+              role: "owner",
+            },
           },
         },
-      },
-      include: {
-        users: {
-          select: { id: true, email: true, company_id: true },
+        include: {
+          users: {
+            select: { id: true, email: true, company_id: true },
+          },
         },
-      },
-    });
+      });
 
-    const owner = company.users[0];
-    if (!owner) throw new Error("Company creation completed without an owner");
+      const createdOwner = createdCompany.users[0];
+      if (!createdOwner) throw new Error("Company creation completed without an owner");
 
-    const verifyToken = createResetToken();
-    await db.emailVerificationToken.create({
-      data: {
-        user_id: owner.id,
-        token_hash: hashResetToken(verifyToken),
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    });
-    await writeAuditLog(owner, {
-      entityType: "company",
-      entityId: company.id,
-      action: "company.created",
-      metadata: { companyName: normalizedCompanyName },
+      await tx.emailVerificationToken.create({
+        data: {
+          user_id: createdOwner.id,
+          token_hash: hashResetToken(verifyToken),
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+      await writeAuditLog(createdOwner, {
+        entityType: "company",
+        entityId: createdCompany.id,
+        action: "company.created",
+        metadata: { companyName: normalizedCompanyName },
+      }, tx);
+      return { company: createdCompany, owner: createdOwner };
     });
     const verifyUrl = `${getPublicAppUrl(request.url)}/verify-email?token=${encodeURIComponent(verifyToken)}`;
     await queueEmailVerification(owner, {

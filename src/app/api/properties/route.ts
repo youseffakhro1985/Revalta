@@ -80,23 +80,25 @@ export async function POST(request: Request) {
     }
 
     const ticketActive = await notDeletedFilter("Ticket");
-    const property = await db.property.create({
-      data: {
-        name: normalizedName,
-        address: normalizedAddress,
-        postal_code: normalizedPostalCode,
-        city: normalizedCity,
-        company_id: user.company_id,
-        user_id: user.id,
-      },
-      select: propertyListSelect(ticketActive),
-    });
-
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: property.id,
-      action: "property.created",
-      metadata: { name: property.name, address: property.address, city: property.city },
+    const property = await db.$transaction(async (tx) => {
+      const created = await tx.property.create({
+        data: {
+          name: normalizedName,
+          address: normalizedAddress,
+          postal_code: normalizedPostalCode,
+          city: normalizedCity,
+          company_id: user.company_id,
+          user_id: user.id,
+        },
+        select: propertyListSelect(ticketActive),
+      });
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: created.id,
+        action: "property.created",
+        metadata: { name: created.name, address: created.address, city: created.city },
+      }, tx);
+      return created;
     });
 
     return NextResponse.json({ success: true, property }, { status: 201 });
