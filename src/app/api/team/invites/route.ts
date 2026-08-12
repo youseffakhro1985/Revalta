@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     if (!user.company_id || !canManageTeam(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att bjuda in teammedlemmar" }, { status: 403 });
     }
+    const companyId = user.company_id;
 
     const { name, email, role } = await request.json();
     const normalizedEmail = normalizeEmail(email);
@@ -68,26 +69,29 @@ export async function POST(request: Request) {
     }
 
     const token = createResetToken();
-    const invite = await db.teamInvite.create({
-      data: {
-        company_id: user.company_id,
-        invited_by_id: user.id,
-        email: normalizedEmail,
-        name: normalizedName,
-        role: normalizedRole,
-        token_hash: hashResetToken(token),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      },
-      select: { id: true, email: true, name: true, role: true, expires_at: true },
+    const invite = await db.$transaction(async (tx) => {
+      const created = await tx.teamInvite.create({
+        data: {
+          company_id: companyId,
+          invited_by_id: user.id,
+          email: normalizedEmail,
+          name: normalizedName,
+          role: normalizedRole,
+          token_hash: hashResetToken(token),
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+        select: { id: true, email: true, name: true, role: true, expires_at: true },
+      });
+      await writeAuditLog(user, {
+        entityType: "team_invite",
+        entityId: created.id,
+        action: "team.invite_created",
+        metadata: { email: created.email, role: created.role },
+      }, tx);
+      return created;
     });
 
     const inviteUrl = `${new URL(request.url).origin}/accept-invite?token=${token}`;
-    await writeAuditLog(user, {
-      entityType: "team_invite",
-      entityId: invite.id,
-      action: "team.invite_created",
-      metadata: { email: invite.email, role: invite.role },
-    });
     await queueTicketNotification(user, {
       ticketId: invite.id,
       title: "Inbjudan till Revalta",
