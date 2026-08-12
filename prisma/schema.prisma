@@ -1183,6 +1183,19 @@ model RateLimitAttempt {
   @@index([created_at])
 }
 
+model WebhookReceipt {
+  id           String    @id @default(uuid())
+  provider     String
+  event_id     String
+  event_type   String
+  status       String    @default("processing")
+  received_at  DateTime  @default(now())
+  processed_at DateTime?
+
+  @@unique([provider, event_id])
+  @@index([provider, status, received_at])
+}
+
 model AccessCredential {
   id              String    @id @default(uuid())
   company_id      String
