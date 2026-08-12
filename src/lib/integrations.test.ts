@@ -95,4 +95,28 @@ describe("queueEmailVerification", () => {
       }),
     });
   });
+
+  it("records provider outages without failing the business request or persisting provider details", async () => {
+    vi.stubEnv("EMAIL_PROVIDER_API_KEY", "provider-key");
+    vi.stubEnv("EMAIL_FROM", "Revalta <noreply@revalta.se>");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("upstream secret detail")));
+    const { queueEmailVerification } = await loadIntegrations();
+
+    await expect(queueEmailVerification(
+      { company_id: "company-1" },
+      {
+        recipient: "owner@example.se",
+        verificationUrl: "https://www.revalta.se/verify-email?token=one-time-secret",
+      },
+    )).resolves.toBeDefined();
+
+    const eventInput = integrationEventCreateMock.mock.calls[0][0];
+    expect(eventInput.data.status).toBe("failed");
+    expect(eventInput.data.payload.delivery).toEqual({
+      status: "failed",
+      providerId: null,
+    });
+    expect(JSON.stringify(eventInput)).not.toContain("upstream secret detail");
+    expect(JSON.stringify(eventInput)).not.toContain("one-time-secret");
+  });
 });
