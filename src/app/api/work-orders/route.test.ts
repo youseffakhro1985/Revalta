@@ -67,7 +67,7 @@ describe("work-orders GET role scoping", () => {
   it("scopes technicians to assigned work and omits assignees", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -91,7 +91,7 @@ describe("work-orders GET role scoping", () => {
   it("lets managers see all work orders and assignable users", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -130,11 +130,26 @@ describe("work-orders GET role scoping", () => {
       projects: [],
     }]);
 
-    const response = await GET();
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders"));
 
     expect(response.status).toBe(200);
     expect(queryRawMock).toHaveBeenCalledTimes(1);
     expect(queryRawMock.mock.calls[0][0].values).toContain("work-order-1");
+  });
+
+  it("excludes terminal work orders from planning reads", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders?view=planning"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        status: { notIn: ["completed", "invoiced", "cancelled"] },
+      }),
+    }));
+    expect(body.resultScope).toBe("active");
   });
 });
 
