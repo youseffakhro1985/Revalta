@@ -22,6 +22,9 @@ export async function PATCH(request: Request) {
 
     const { name } = await request.json();
     const normalizedName = typeof name === "string" && name.trim() ? name.trim() : null;
+    if ((normalizedName?.length ?? 0) > 120) {
+      return NextResponse.json({ error: "Namnet får vara högst 120 tecken" }, { status: 400 });
+    }
 
     const updatedUser = await db.user.update({
       where: { id: user.id },

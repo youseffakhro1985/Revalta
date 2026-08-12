@@ -1,7 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 export async function GET(
   _request: Request,
@@ -30,5 +31,8 @@ export async function GET(
 
   const report = reports[0];
   if (!report) return NextResponse.json({ error: "Rapporten hittades inte" }, { status: 404 });
+  if (!await findAccessibleWorkOrder(user as CompanyUser, report.work_order_id)) {
+    return notFoundWorkOrder();
+  }
   return NextResponse.json({ report });
 }

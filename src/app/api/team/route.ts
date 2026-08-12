@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import {
   canAssignWorkOrders,
+  canGrantTeamRole,
   canManageTeam,
   canViewLeasingData,
   getCurrentUser,
@@ -82,10 +83,19 @@ export async function POST(request: Request) {
     const { name, email, role, password } = await request.json();
     const normalizedEmail = normalizeEmail(email);
     const normalizedName = typeof name === "string" ? name.trim() : null;
-    const normalizedRole = typeof role === "string" && allowedRoles.has(role) ? role : "viewer";
+    const normalizedRole = typeof role === "string" ? role : "";
 
     if (!isValidEmail(normalizedEmail)) {
       return NextResponse.json({ error: "En giltig e-postadress krävs" }, { status: 400 });
+    }
+    if ((normalizedName?.length ?? 0) > 120) {
+      return NextResponse.json({ error: "Namnet får vara högst 120 tecken" }, { status: 400 });
+    }
+    if (!allowedRoles.has(normalizedRole)) {
+      return NextResponse.json({ error: "Ogiltig användarroll" }, { status: 400 });
+    }
+    if (!canGrantTeamRole(user.role, normalizedRole)) {
+      return NextResponse.json({ error: "Du saknar behörighet att tilldela ägarrollen" }, { status: 403 });
     }
     if (!isStrongPassword(password)) {
       return NextResponse.json({ error: passwordPolicyMessage }, { status: 400 });

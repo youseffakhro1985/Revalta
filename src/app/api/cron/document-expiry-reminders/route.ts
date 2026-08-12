@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { isCronRequestAuthorized } from "@/lib/request-security";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-function cronAuthorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 function daysUntil(date: Date) {
   return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
 export async function GET(request: Request) {
-  if (!cronAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
   try {
     const horizon = new Date();

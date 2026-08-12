@@ -52,7 +52,7 @@ vi.mock("@/lib/work-order-sla", () => ({
   }),
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 describe("work-orders GET role scoping", () => {
   beforeEach(() => {
@@ -110,5 +110,28 @@ describe("work-orders GET role scoping", () => {
       scopedToAssigned: false,
     });
     expect(body.assignees).toHaveLength(1);
+  });
+});
+
+describe("work-orders POST assignment authorization", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("prevents a technician from assigning newly created work to another user", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("https://www.revalta.se/api/work-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-1",
+        title: "Kontrollera läckage",
+        description: "Kontrollera och dokumentera",
+        assignedToId: "tech-2",
+      }),
+    }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Du saknar behörighet att tilldela arbetsorder till andra",
+    });
   });
 });

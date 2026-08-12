@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { isCronRequestAuthorized } from "@/lib/request-security";
 import {
   getInvoiceDraftByVersion,
   getModernInvoiceDraftByVersion,
@@ -49,11 +50,6 @@ type InvoicePayload = Obj & {
   vat?: number;
   total?: number;
 };
-
-function authorized(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  return Boolean(secret) && request.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 function object(value: unknown): Obj | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Obj : null;
@@ -214,7 +210,7 @@ async function saveJob(companyId: string, job: Job, status: string, extra: Parti
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
   const queuedRaw = await listQueuedInvoiceExportJobs(MAX_JOBS_PER_RUN);
   const queued = queuedRaw

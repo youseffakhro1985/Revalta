@@ -50,10 +50,16 @@ export async function POST(request: Request) {
     const { name, email, role } = await request.json();
     const normalizedEmail = normalizeEmail(email);
     const normalizedName = typeof name === "string" && name.trim() ? name.trim() : null;
-    const normalizedRole = typeof role === "string" && allowedRoles.has(role) ? role : "viewer";
+    const normalizedRole = typeof role === "string" ? role : "";
 
     if (!isValidEmail(normalizedEmail)) {
       return NextResponse.json({ error: "Giltig e-post krävs" }, { status: 400 });
+    }
+    if ((normalizedName?.length ?? 0) > 120) {
+      return NextResponse.json({ error: "Namnet får vara högst 120 tecken" }, { status: 400 });
+    }
+    if (!allowedRoles.has(normalizedRole)) {
+      return NextResponse.json({ error: "Ogiltig användarroll" }, { status: 400 });
     }
 
     const existingUser = await db.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });

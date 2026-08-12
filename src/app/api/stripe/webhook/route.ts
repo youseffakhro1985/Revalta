@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { verifyStripeSignature } from "@/lib/stripe";
 import { NextResponse } from "next/server";
@@ -10,12 +11,27 @@ type StripeObject = {
   metadata?: Record<string, string>;
 };
 
+type StripeEvent = {
+  id?: string;
+  type?: string;
+  data?: { object?: StripeObject };
+};
+
+const supportedEvents = new Set([
+  "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_succeeded",
+  "invoice.payment_failed",
+]);
+
 function getPlanFromMetadata(object: StripeObject) {
   const plan = object.metadata?.plan;
   return plan === "start" || plan === "professional" || plan === "enterprise" ? plan : undefined;
 }
 
-async function resolveCompanyForStripeObject(object: StripeObject) {
+async function resolveCompanyForStripeObject(client: Prisma.TransactionClient, object: StripeObject) {
   const customerId = typeof object.customer === "string" ? object.customer : null;
   const subscriptionId =
     typeof object.subscription === "string"
@@ -26,7 +42,7 @@ async function resolveCompanyForStripeObject(object: StripeObject) {
   const metadataCompanyId = object.metadata?.companyId?.trim() || null;
 
   if (subscriptionId) {
-    const bySubscription = await db.company.findFirst({
+    const bySubscription = await client.company.findFirst({
       where: { stripe_subscription_id: subscriptionId },
       select: { id: true, stripe_customer_id: true, stripe_subscription_id: true },
     });
@@ -42,7 +58,7 @@ async function resolveCompanyForStripeObject(object: StripeObject) {
   }
 
   if (customerId) {
-    const byCustomer = await db.company.findFirst({
+    const byCustomer = await client.company.findFirst({
       where: { stripe_customer_id: customerId },
       select: { id: true, stripe_customer_id: true, stripe_subscription_id: true },
     });
@@ -56,7 +72,7 @@ async function resolveCompanyForStripeObject(object: StripeObject) {
 
   // First binding only: accept metadata companyId when no Stripe ids are mapped yet.
   if (metadataCompanyId && (customerId || subscriptionId)) {
-    const byMetadata = await db.company.findFirst({
+    const byMetadata = await client.company.findFirst({
       where: {
         id: metadataCompanyId,
         OR: [
@@ -72,12 +88,12 @@ async function resolveCompanyForStripeObject(object: StripeObject) {
   return null;
 }
 
-async function updateCompanyFromStripeObject(object: StripeObject) {
-  const company = await resolveCompanyForStripeObject(object);
+async function updateCompanyFromStripeObject(client: Prisma.TransactionClient, object: StripeObject) {
+  const company = await resolveCompanyForStripeObject(client, object);
   if (!company) return null;
 
   const plan = getPlanFromMetadata(object);
-  return db.company.update({
+  return client.company.update({
     where: { id: company.id },
     data: {
       ...(plan ? { plan } : {}),
@@ -98,34 +114,46 @@ export async function POST(request: Request) {
   }
 
   try {
-    const event = JSON.parse(payload) as { type: string; data?: { object?: StripeObject } };
+    const event = JSON.parse(payload) as StripeEvent;
+    if (typeof event.id !== "string" || !event.id.startsWith("evt_") || typeof event.type !== "string") {
+      return NextResponse.json({ error: "Ogiltig Stripe-payload" }, { status: 400 });
+    }
     const object = event.data?.object;
 
-    if (object && [
-      "checkout.session.completed",
-      "customer.subscription.created",
-      "customer.subscription.updated",
-      "customer.subscription.deleted",
-      "invoice.payment_succeeded",
-      "invoice.payment_failed",
-    ].includes(event.type)) {
-      const company = await updateCompanyFromStripeObject(object);
-      await db.integrationEvent.create({
-        data: {
-          company_id: company?.id,
-          type: "stripe",
-          status: company ? "received" : "ignored",
-          payload: {
-            eventType: event.type,
-            objectId: object.id,
-            customer: object.customer,
-            subscription: object.subscription,
-            status: object.status,
-            matchedCompany: Boolean(company),
-            metadataCompanyId: object.metadata?.companyId || null,
-          },
-        },
-      });
+    if (object && supportedEvents.has(event.type)) {
+      const duplicate = await db.$transaction(async (tx) => {
+          // Serialize deliveries of the same Stripe event without requiring a new
+          // database table to exist before this application version is deployed.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe:${event.id}`}))`;
+          const existingEvent = await tx.integrationEvent.findFirst({
+            where: { type: "stripe", recipient: event.id },
+            select: { id: true },
+          });
+          if (existingEvent) return true;
+
+          const company = await updateCompanyFromStripeObject(tx, object);
+          await tx.integrationEvent.create({
+            data: {
+              company_id: company?.id,
+              type: "stripe",
+              status: company ? "received" : "ignored",
+              recipient: event.id,
+              payload: {
+                eventType: event.type,
+                objectId: object.id,
+                customer: object.customer,
+                subscription: object.subscription,
+                status: object.status,
+                matchedCompany: Boolean(company),
+                metadataCompanyId: object.metadata?.companyId || null,
+              },
+            },
+          });
+          return false;
+        });
+      if (duplicate) {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
     }
 
     return NextResponse.json({ received: true });

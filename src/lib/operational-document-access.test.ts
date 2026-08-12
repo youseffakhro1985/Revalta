@@ -6,11 +6,17 @@ const {
   projectFindFirstMock,
   propertyFindFirstMock,
   queryRawMock,
+  findAccessibleWorkOrderMock,
 } = vi.hoisted(() => ({
   workOrderFindFirstMock: vi.fn(),
   projectFindFirstMock: vi.fn(),
   propertyFindFirstMock: vi.fn(),
   queryRawMock: vi.fn(),
+  findAccessibleWorkOrderMock: vi.fn(),
+}));
+
+vi.mock("@/lib/assigned-work-access", () => ({
+  findAccessibleWorkOrder: findAccessibleWorkOrderMock,
 }));
 
 vi.mock("@/lib/soft-delete-compat", () => ({
@@ -26,7 +32,10 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { isOperationalDocumentParentActive } from "./operational-document-access";
+import {
+  isOperationalDocumentAccessible,
+  isOperationalDocumentParentActive,
+} from "./operational-document-access";
 
 describe("isOperationalDocumentParentActive", () => {
   beforeEach(() => {
@@ -70,5 +79,34 @@ describe("isOperationalDocumentParentActive", () => {
       technical_asset_id: "asset-1",
     })).resolves.toBe(true);
     expect(queryRawMock).toHaveBeenCalled();
+  });
+});
+
+describe("isOperationalDocumentAccessible", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("requires assignment-scoped work-order access for technicians", async () => {
+    const user = { id: "tech-1", role: "technician", company_id: "company-1" };
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+
+    await expect(isOperationalDocumentAccessible(user as never, {
+      work_order_id: "wo-2",
+      project_id: null,
+      property_id: null,
+      technical_asset_id: null,
+    })).resolves.toBe(false);
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(user, "wo-2");
+  });
+
+  it("hides project documents from roles without project access", async () => {
+    const user = { id: "tech-1", role: "technician", company_id: "company-1" };
+
+    await expect(isOperationalDocumentAccessible(user as never, {
+      work_order_id: null,
+      project_id: "project-1",
+      property_id: null,
+      technical_asset_id: null,
+    })).resolves.toBe(false);
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
   });
 });

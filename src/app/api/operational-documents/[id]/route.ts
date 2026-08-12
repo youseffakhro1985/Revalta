@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
-import { isOperationalDocumentParentActive } from "@/lib/operational-document-access";
+import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { isOperationalDocumentAccessible } from "@/lib/operational-document-access";
 
 export async function DELETE(
   _request: Request,
@@ -28,7 +28,7 @@ export async function DELETE(
       },
     });
     if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
-    if (!(await isOperationalDocumentParentActive(user.company_id, document))) {
+    if (!(await isOperationalDocumentAccessible(user as CompanyUser, document))) {
       return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
     }
 

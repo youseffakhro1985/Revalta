@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isTrustedMutationRequest } from "@/lib/request-security";
+import {
+  isDeclaredRequestBodyTooLarge,
+  isCronRequestAuthorized,
+  isTrustedMutationRequest,
+  requestBodyLimitBytes,
+} from "@/lib/request-security";
 
 function request(headers: Record<string, string>) {
   return new Request("https://internal.vercel.test/api/auth/login", { method: "POST", headers });
@@ -37,5 +42,45 @@ describe("mutation origin protection", () => {
 
   it("allows server-to-server calls without browser origin metadata", () => {
     expect(isTrustedMutationRequest(request({}))).toBe(true);
+  });
+});
+
+describe("request body limits", () => {
+  it("uses strict JSON and bounded multipart limits", () => {
+    expect(requestBodyLimitBytes(request({ "content-type": "application/json; charset=utf-8" }))).toBe(1_000_000);
+    expect(requestBodyLimitBytes(request({ "content-type": "multipart/form-data; boundary=test" }))).toBe(20 * 1024 * 1024);
+    expect(requestBodyLimitBytes(request({ "content-type": "text/plain" }))).toBe(2_000_000);
+  });
+
+  it("rejects oversized or malformed declared lengths", () => {
+    expect(isDeclaredRequestBodyTooLarge(request({
+      "content-type": "application/json",
+      "content-length": "1000001",
+    }))).toBe(true);
+    expect(isDeclaredRequestBodyTooLarge(request({
+      "content-type": "application/json",
+      "content-length": "not-a-number",
+    }))).toBe(true);
+  });
+
+  it("accepts bounded and streaming requests for platform enforcement", () => {
+    expect(isDeclaredRequestBodyTooLarge(request({
+      "content-type": "application/json",
+      "content-length": "1000000",
+    }))).toBe(false);
+    expect(isDeclaredRequestBodyTooLarge(request({ "content-type": "application/json" }))).toBe(false);
+  });
+});
+
+describe("cron authorization", () => {
+  it("fails closed when the secret is missing", () => {
+    expect(isCronRequestAuthorized(request({ authorization: "Bearer value" }))).toBe(false);
+  });
+
+  it("accepts only the exact bearer credential", () => {
+    process.env.CRON_SECRET = "long-random-cron-secret";
+    expect(isCronRequestAuthorized(request({ authorization: "Bearer long-random-cron-secret" }))).toBe(true);
+    expect(isCronRequestAuthorized(request({ authorization: "Bearer wrong" }))).toBe(false);
+    delete process.env.CRON_SECRET;
   });
 });

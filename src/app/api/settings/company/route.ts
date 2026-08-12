@@ -35,6 +35,9 @@ export async function PATCH(request: Request) {
     if (!normalizedName) {
       return NextResponse.json({ error: "Organisationsnamn krävs" }, { status: 400 });
     }
+    if (normalizedName.length > 160 || (normalizedOrgNumber?.length ?? 0) > 50) {
+      return NextResponse.json({ error: "Organisationsnamn eller organisationsnummer är för långt" }, { status: 400 });
+    }
 
     const company = await db.company.update({
       where: { id: user.company_id },

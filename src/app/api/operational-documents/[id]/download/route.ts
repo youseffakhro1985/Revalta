@@ -1,8 +1,8 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
-import { isOperationalDocumentParentActive } from "@/lib/operational-document-access";
+import { getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { isOperationalDocumentAccessible } from "@/lib/operational-document-access";
 import { getStorageToken } from "@/lib/storage";
 
 function contentDisposition(fileName: string) {
@@ -42,7 +42,7 @@ export async function GET(
       },
     });
     if (!document) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
-    if (!(await isOperationalDocumentParentActive(user.company_id, document))) {
+    if (!(await isOperationalDocumentAccessible(user as CompanyUser, document))) {
       return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
     }
 

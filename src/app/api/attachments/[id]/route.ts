@@ -2,6 +2,7 @@ import { get } from "@vercel/blob";
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getStorageToken } from "@/lib/storage";
+import { isAssignedWorkAccessible } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
 
 function contentDisposition(fileName: string) {
@@ -19,11 +20,26 @@ export async function GET(
 
     const { id } = await params;
     const attachment = await db.ticketAttachment.findFirst({
-      where: { id, ticket: tenantWhere(user) },
-      select: { file_name: true, content_type: true, data_url: true },
+      where: {
+        id,
+        ticket: {
+          ...tenantWhere(user),
+          deleted_at: null,
+          OR: [{ property_id: null }, { property: { deleted_at: null } }],
+        },
+      },
+      select: {
+        file_name: true,
+        content_type: true,
+        data_url: true,
+        ticket: { select: { assigned_to_id: true } },
+      },
     });
 
     if (!attachment) return NextResponse.json({ error: "Bilagan hittades inte" }, { status: 404 });
+    if (!isAssignedWorkAccessible(user, attachment.ticket.assigned_to_id)) {
+      return NextResponse.json({ error: "Bilagan hittades inte" }, { status: 404 });
+    }
 
     const headers = new Headers({
       "Content-Type": attachment.content_type,

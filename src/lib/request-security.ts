@@ -1,5 +1,43 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
 function firstHeaderValue(value: string | null) {
   return value?.split(",", 1)[0]?.trim() || "";
+}
+
+function constantTimeEqual(left: string, right: string) {
+  const leftDigest = createHash("sha256").update(left).digest();
+  const rightDigest = createHash("sha256").update(right).digest();
+  return timingSafeEqual(leftDigest, rightDigest);
+}
+
+export function isCronRequestAuthorized(request: Request) {
+  const secret = process.env.CRON_SECRET;
+  const authorization = request.headers.get("authorization");
+  return Boolean(secret && authorization) && constantTimeEqual(authorization!, `Bearer ${secret}`);
+}
+
+const JSON_BODY_LIMIT_BYTES = 1_000_000;
+const MULTIPART_BODY_LIMIT_BYTES = 20 * 1024 * 1024;
+const DEFAULT_BODY_LIMIT_BYTES = 2_000_000;
+
+export function requestBodyLimitBytes(request: Request) {
+  const contentType = request.headers.get("content-type")?.toLowerCase() || "";
+  if (contentType.startsWith("multipart/form-data")) return MULTIPART_BODY_LIMIT_BYTES;
+  if (contentType.includes("application/json")) return JSON_BODY_LIMIT_BYTES;
+  return DEFAULT_BODY_LIMIT_BYTES;
+}
+
+/**
+ * Reject declared oversized payloads before route handlers buffer JSON or files.
+ * The platform remains the final guard for chunked requests without Content-Length.
+ */
+export function isDeclaredRequestBodyTooLarge(request: Request) {
+  const rawLength = request.headers.get("content-length");
+  if (!rawLength) return false;
+  if (!/^\d+$/.test(rawLength)) return true;
+
+  const length = Number(rawLength);
+  return !Number.isSafeInteger(length) || length < 0 || length > requestBodyLimitBytes(request);
 }
 
 export function isTrustedMutationRequest(request: Request) {

@@ -5,6 +5,7 @@ import {
   canCreateResidentPortalTicket,
   canDownloadResidentDocuments,
   canExportTickets,
+  canGrantTeamRole,
   canManageAccessCredentials,
   canManageBilling,
   canManageResidentPortal,
@@ -30,6 +31,12 @@ describe("permissions", () => {
   it.each(["owner", "admin"])("låter %s administrera team och granska audit", (role) => {
     expect(canManageTeam(role)).toBe(true);
     expect(canViewAudit(role)).toBe(true);
+  });
+
+  it("reserverar ägarrollen för befintliga ägare", () => {
+    expect(canGrantTeamRole("owner", "owner")).toBe(true);
+    expect(canGrantTeamRole("admin", "owner")).toBe(false);
+    expect(canGrantTeamRole("admin", "manager")).toBe(true);
   });
 
   it.each(["manager", "technician", "viewer", "resident", "unknown"])("nekar %s administrativ åtkomst", (role) => {

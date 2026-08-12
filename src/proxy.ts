@@ -12,7 +12,10 @@ import {
   resolveRequestId,
   withRequestCorrelation,
 } from "@/lib/request-correlation";
-import { isTrustedMutationRequest } from "@/lib/request-security";
+import {
+  isDeclaredRequestBodyTooLarge,
+  isTrustedMutationRequest,
+} from "@/lib/request-security";
 import { verifyToken } from "@/lib/session";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
 
@@ -34,6 +37,14 @@ export async function proxy(request: NextRequest) {
     withRequestCorrelation(response, requestId) as T;
 
   if (pathname.startsWith("/api/") && pathname !== "/api/stripe/webhook" && unsafeMethod) {
+    if (isDeclaredRequestBodyTooLarge(request)) {
+      return apiErrorResponse({
+        status: 413,
+        code: API_ERROR_CODES.payloadTooLarge,
+        message: "Förfrågan är för stor",
+        requestId,
+      });
+    }
     if (!isTrustedMutationRequest(request)) {
       return apiErrorResponse({
         status: 403,
