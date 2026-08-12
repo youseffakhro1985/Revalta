@@ -26,7 +26,7 @@ jobs:
       NEXT_PUBLIC_APP_URL: https://www.revalta.se
     steps:
       - name: Checkout integration branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           ref: integration/revalta-production-hardening-20260727
@@ -181,7 +181,7 @@ jobs:
         run: git rm --ignore-unmatch .github/workflows/integrate-production-hardening.yml
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -202,7 +202,7 @@ jobs:
 
       - name: Upload lint diagnostics
         if: steps.lint.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: lint-diagnostics
           path: lint-output.txt
@@ -223,7 +223,7 @@ jobs:
 
       - name: Upload test diagnostics
         if: steps.tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-diagnostics
           path: test-output.txt
@@ -244,7 +244,7 @@ jobs:
 
       - name: Upload TypeScript diagnostics
         if: steps.typecheck.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: typecheck-diagnostics
           path: typecheck-output.txt
