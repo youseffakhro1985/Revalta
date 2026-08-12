@@ -3,7 +3,7 @@ import db from "@/lib/db";
 import { auditScopedWhere, canViewLeasingData, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
-import { parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
+import { isModernStorageOnly, parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
 import { isProductionRuntime } from "@/lib/runtime-env";
 import { hasStorageConfig, storeAttachment, StorageConfigurationError } from "@/lib/storage";
 import { writeAuditLog } from "@/lib/audit";
@@ -16,21 +16,43 @@ const allowedVisibilities = new Set([
   "resident_lease",
 ]);
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
     const includeLeases = canViewLeasingData(user.role);
-    const [rows, logs, properties, leases] = await Promise.all([
+    const searchParams = new URL(request.url).searchParams;
+    const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const requestedPageSize = Number.parseInt(searchParams.get("pageSize") || "25", 10);
+    const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const pageSize = Number.isFinite(requestedPageSize) ? Math.min(100, Math.max(10, requestedPageSize)) : 25;
+    const search = (searchParams.get("search") || "").trim().slice(0, 200);
+    const category = (searchParams.get("category") || "").trim();
+    const propertyId = (searchParams.get("propertyId") || "").trim();
+    const visibility = (searchParams.get("visibility") || "").trim();
+    const lifecycle = (searchParams.get("lifecycle") || "").trim();
+    const modernOnly = isModernStorageOnly();
+    const baseWhere = user.company_id ? {
+      company_id: user.company_id,
+      OR: [{ property_id: null }, { property: { deleted_at: null } }],
+    } : null;
+    const filteredWhere = baseWhere ? {
+      ...baseWhere,
+      ...(search ? { AND: [{ OR: [{ name: { contains: search, mode: "insensitive" as const } }, { file_name: { contains: search, mode: "insensitive" as const } }] }] } : {}),
+      ...(category ? { category } : {}),
+      ...(propertyId ? { property_id: propertyId } : {}),
+      ...(visibility ? { visibility } : {}),
+      ...(lifecycle ? { lifecycle_state: lifecycle } : {}),
+    } : null;
+
+    const [rows, logs, modernTotal, lifecycleGroups, residentPublished, properties, leases] = await Promise.all([
       user.company_id
         ? db.managedDocument.findMany({
-            where: {
-              company_id: user.company_id,
-              OR: [{ property_id: null }, { property: { deleted_at: null } }],
-            },
-            orderBy: { created_at: "desc" },
-            take: 500,
+            where: modernOnly ? filteredWhere! : baseWhere!,
+            orderBy: [{ created_at: "desc" }, { id: "desc" }],
+            skip: modernOnly ? (page - 1) * pageSize : 0,
+            take: modernOnly ? pageSize : 500,
             include: { created_by: { select: { name: true, email: true } } },
           })
         : Promise.resolve([]),
@@ -40,6 +62,9 @@ export async function GET() {
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true, actor: { select: { name: true, email: true } } },
       })),
+      modernOnly && filteredWhere ? db.managedDocument.count({ where: filteredWhere }) : Promise.resolve(0),
+      modernOnly && baseWhere ? db.managedDocument.groupBy({ by: ["lifecycle_state"], where: baseWhere, _count: { _all: true } }) : Promise.resolve([]),
+      modernOnly && baseWhere ? db.managedDocument.count({ where: { ...baseWhere, lifecycle_state: "active", visibility: { not: "internal" } } }) : Promise.resolve(0),
       db.property.findMany({
         where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
@@ -155,12 +180,44 @@ export async function GET() {
         };
       });
 
-    const documents = [...modern, ...legacy]
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-      .slice(0, 500);
+    const matchesFilters = (document: (typeof modern)[number] | (typeof legacy)[number]) => {
+      const normalizedSearch = search.toLowerCase();
+      return (!normalizedSearch || `${document.name} ${document.fileName || ""}`.toLowerCase().includes(normalizedSearch))
+        && (!category || document.category === category)
+        && (!propertyId || document.property?.id === propertyId)
+        && (!visibility || document.visibility === visibility)
+        && (!lifecycle || document.lifecycleState === lifecycle);
+    };
+    const allDualReadDocuments = [...modern, ...legacy]
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    const dualReadDocuments = allDualReadDocuments.filter(matchesFilters);
+    const documents = modernOnly
+      ? modern
+      : dualReadDocuments.slice((page - 1) * pageSize, page * pageSize);
+    const total = modernOnly ? modernTotal : dualReadDocuments.length;
+    const summary = modernOnly
+      ? {
+          active: lifecycleGroups.find((group) => group.lifecycle_state === "active")?._count._all ?? 0,
+          unpublished: lifecycleGroups.find((group) => group.lifecycle_state === "unpublished")?._count._all ?? 0,
+          archived: lifecycleGroups.find((group) => group.lifecycle_state === "archived")?._count._all ?? 0,
+          residentPublished,
+        }
+      : {
+          active: allDualReadDocuments.filter((document) => document.lifecycleState === "active").length,
+          unpublished: allDualReadDocuments.filter((document) => document.lifecycleState === "unpublished").length,
+          archived: allDualReadDocuments.filter((document) => document.lifecycleState === "archived").length,
+          residentPublished: allDualReadDocuments.filter((document) => document.lifecycleState === "active" && document.visibility !== "internal").length,
+        };
 
     return NextResponse.json(
-      { documents, properties, leases, canManageLifecycle: Boolean(user.company_id && ["owner", "admin", "manager"].includes(user.role)) },
+      {
+        documents,
+        properties,
+        leases,
+        summary,
+        pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+        canManageLifecycle: Boolean(user.company_id && ["owner", "admin", "manager"].includes(user.role)),
+      },
       { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } },
     );
   } catch (error) {
