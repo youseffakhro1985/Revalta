@@ -21,7 +21,7 @@ function leaseResponse(lease: {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
@@ -30,17 +30,40 @@ export async function GET() {
       return NextResponse.json({ error: "Du saknar behörighet att visa uthyrningsdata" }, { status: 403 });
     }
 
-    const [leases, properties, holders] = await Promise.all([
+    const searchParams = new URL(request.url).searchParams;
+    const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const requestedPageSize = Number.parseInt(searchParams.get("pageSize") || "50", 10);
+    const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const pageSize = Number.isFinite(requestedPageSize) ? Math.min(100, Math.max(10, requestedPageSize)) : 50;
+    const where = { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } };
+    const leaseInclude = {
+      property: { select: { id: true, name: true, address: true, city: true } },
+      unit: { select: { id: true, designation: true, unit_type: true, floor: true, area: true, status: true } },
+      lease_holder: true,
+      created_by: { select: { id: true, name: true, email: true } },
+    } satisfies Prisma.LeaseInclude;
+
+    const [leases, occupyingLeases, total, rentTotals, activeHolderGroups, properties, holders] = await Promise.all([
       db.lease.findMany({
-        where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
-        orderBy: [{ status: "asc" }, { updated_at: "desc" }],
-        take: 1_000,
-        include: {
-          property: { select: { id: true, name: true, address: true, city: true } },
-          unit: { select: { id: true, designation: true, unit_type: true, floor: true, area: true, status: true } },
-          lease_holder: true,
-          created_by: { select: { id: true, name: true, email: true } },
-        },
+        where,
+        orderBy: [{ status: "asc" }, { updated_at: "desc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: leaseInclude,
+      }),
+      db.lease.findMany({
+        where: { ...where, status: { in: ["reserved", "active", "notice"] } },
+        orderBy: [{ updated_at: "desc" }, { id: "asc" }],
+        include: leaseInclude,
+      }),
+      db.lease.count({ where }),
+      db.lease.aggregate({
+        where: { ...where, status: { in: ["active", "notice"] } },
+        _sum: { monthly_rent: true },
+      }),
+      db.lease.groupBy({
+        by: ["lease_holder_id"],
+        where: { ...where, status: { in: ["active", "notice"] } },
       }),
       db.property.findMany({
         where: { company_id: user.company_id, status: { not: "sold" }, deleted_at: null },
@@ -66,9 +89,20 @@ export async function GET() {
 
     return NextResponse.json({
       leases: leases.map(leaseResponse),
+      occupyingLeases: occupyingLeases.map(leaseResponse),
       properties,
       holders,
       permissions: { canManage: canManageLeases(user.role) },
+      summary: {
+        activeHolders: activeHolderGroups.length,
+        annualRent: Number(rentTotals._sum.monthly_rent ?? 0) * 12,
+      },
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
     });
   } catch (error) {
     console.error("Get leases error:", error);
