@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { verifyStripeSignature } from "@/lib/stripe";
 import { NextResponse } from "next/server";
+import { createRouteObservability } from "@/lib/route-observability";
 
 type StripeObject = {
   id?: string;
@@ -106,6 +107,7 @@ async function updateCompanyFromStripeObject(client: Prisma.TransactionClient, o
 }
 
 export async function POST(request: Request) {
+  const observability = createRouteObservability(request, "/api/stripe/webhook");
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature");
 
@@ -152,13 +154,26 @@ export async function POST(request: Request) {
           return false;
         });
       if (duplicate) {
+        observability.logger.info("stripe webhook duplicate acknowledged", observability.elapsed({
+          event: "stripe.webhook.duplicate",
+          stripeEventId: event.id,
+          stripeEventType: event.type,
+        }));
         return NextResponse.json({ received: true, duplicate: true });
       }
     }
 
+    observability.logger.info("stripe webhook received", observability.elapsed({
+      event: "stripe.webhook.received",
+      stripeEventId: event.id,
+      stripeEventType: event.type,
+      supported: supportedEvents.has(event.type),
+    }));
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Stripe webhook error:", error);
+    observability.logger.error("stripe webhook failed", error, observability.elapsed({
+      event: "stripe.webhook.failed",
+    }));
     return NextResponse.json({ error: "Ogiltig Stripe-payload" }, { status: 400 });
   }
 }

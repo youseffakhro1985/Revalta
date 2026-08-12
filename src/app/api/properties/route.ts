@@ -70,6 +70,14 @@ export async function POST(request: Request) {
     if (!normalizedName || !normalizedAddress || !normalizedCity) {
       return NextResponse.json({ error: "Namn, adress och ort krävs" }, { status: 400 });
     }
+    if (
+      normalizedName.length > 160
+      || normalizedAddress.length > 240
+      || (normalizedPostalCode?.length ?? 0) > 32
+      || normalizedCity.length > 120
+    ) {
+      return NextResponse.json({ error: "En eller flera fastighetsuppgifter är för långa" }, { status: 400 });
+    }
 
     const ticketActive = await notDeletedFilter("Ticket");
     const property = await db.property.create({
