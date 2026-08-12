@@ -12,6 +12,7 @@ const {
   queueEmailVerificationMock,
   userFindUniqueMock,
   writeAuditLogMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   checkRateLimitMock: vi.fn(),
   companyCreateMock: vi.fn(),
@@ -24,6 +25,7 @@ const {
   queueEmailVerificationMock: vi.fn(),
   userFindUniqueMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -31,6 +33,7 @@ vi.mock("@/lib/db", () => ({
     company: { create: companyCreateMock },
     emailVerificationToken: { create: emailVerificationTokenCreateMock },
     user: { findUnique: userFindUniqueMock },
+    $transaction: transactionMock,
   },
 }));
 vi.mock("@/lib/auth", () => ({
@@ -84,6 +87,11 @@ describe("POST /api/auth/register", () => {
     emailVerificationTokenCreateMock.mockResolvedValue({ id: "verification-1" });
     writeAuditLogMock.mockResolvedValue(undefined);
     queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1" });
+    transactionMock.mockImplementation(async (callback) => callback({
+      company: { create: companyCreateMock },
+      emailVerificationToken: { create: emailVerificationTokenCreateMock },
+      auditLog: { create: vi.fn() },
+    }));
   });
 
   afterEach(() => {
@@ -164,7 +172,9 @@ describe("POST /api/auth/register", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "user-1", company_id: "company-1" }),
       expect.objectContaining({ action: "company.created", entityId: "company-1" }),
+      expect.anything(),
     );
+    expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(queueEmailVerificationMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "user-1" }),
       {
