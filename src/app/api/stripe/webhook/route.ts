@@ -26,8 +26,6 @@ const supportedEvents = new Set([
   "invoice.payment_failed",
 ]);
 
-class DuplicateWebhookEvent extends Error {}
-
 function getPlanFromMetadata(object: StripeObject) {
   const plan = object.metadata?.plan;
   return plan === "start" || plan === "professional" || plan === "enterprise" ? plan : undefined;
@@ -123,18 +121,15 @@ export async function POST(request: Request) {
     const object = event.data?.object;
 
     if (object && supportedEvents.has(event.type)) {
-      try {
-        await db.$transaction(async (tx) => {
-          try {
-            await tx.webhookReceipt.create({
-              data: { provider: "stripe", event_id: event.id!, event_type: event.type! },
-            });
-          } catch (error) {
-            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-              throw new DuplicateWebhookEvent();
-            }
-            throw error;
-          }
+      const duplicate = await db.$transaction(async (tx) => {
+          // Serialize deliveries of the same Stripe event without requiring a new
+          // database table to exist before this application version is deployed.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe:${event.id}`}))`;
+          const existingEvent = await tx.integrationEvent.findFirst({
+            where: { type: "stripe", recipient: event.id },
+            select: { id: true },
+          });
+          if (existingEvent) return true;
 
           const company = await updateCompanyFromStripeObject(tx, object);
           await tx.integrationEvent.create({
@@ -154,16 +149,10 @@ export async function POST(request: Request) {
               },
             },
           });
-          await tx.webhookReceipt.update({
-            where: { provider_event_id: { provider: "stripe", event_id: event.id! } },
-            data: { status: "processed", processed_at: new Date() },
-          });
+          return false;
         });
-      } catch (error) {
-        if (error instanceof DuplicateWebhookEvent) {
-          return NextResponse.json({ received: true, duplicate: true });
-        }
-        throw error;
+      if (duplicate) {
+        return NextResponse.json({ received: true, duplicate: true });
       }
     }
 
