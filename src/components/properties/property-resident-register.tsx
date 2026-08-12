@@ -1,7 +1,7 @@
 "use client";
 
 import { readResponseJson } from "@/lib/fetch-json";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Building2, Mail, Phone, RefreshCw, Search, UserRound } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
@@ -27,6 +27,7 @@ type Holder = {
   leases: Lease[];
   _count: { leases: number };
 };
+type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
 type FormState = {
   partyType: string;
@@ -53,21 +54,27 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 25, total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [canManage, setCanManage] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (requestedPage: number, requestedSearch: string) => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/lease-holders?propertyId=${encodeURIComponent(propertyId)}`, { cache: "no-store" });
+      const searchParams = new URLSearchParams({ propertyId, page: String(requestedPage), pageSize: "25" });
+      if (requestedSearch) searchParams.set("search", requestedSearch);
+      const response = await fetch(`/api/lease-holders?${searchParams.toString()}`, { cache: "no-store" });
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta boenderegistret");
       setHolders(data.holders || []);
       setCanManage(Boolean(data.permissions?.canManage));
+      setPagination(data.pagination || { page: requestedPage, pageSize: 25, total: 0, totalPages: 1 });
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte hämta boenderegistret");
     } finally {
@@ -76,18 +83,16 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
   }, [propertyId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setDebouncedQuery(query.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return holders;
-    return holders.filter((holder) =>
-      [holder.name, holder.contact_name, holder.email, holder.phone, holder.organization_number]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized)),
-    );
-  }, [holders, query]);
+  useEffect(() => {
+    void load(page, debouncedQuery);
+  }, [debouncedQuery, load, page]);
 
   function startEdit(holder: Holder) {
     setEditingId(holder.id);
@@ -125,7 +130,8 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
       if (!response.ok) throw new Error(data.error || "Kunde inte spara kontakten");
       setMessage(editingId ? "Kontakten har uppdaterats." : "Kontakten har lagts till i registret.");
       resetForm();
-      await load();
+      if (page === 1) await load(1, debouncedQuery);
+      else setPage(1);
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte spara kontakten");
     } finally {
@@ -144,7 +150,9 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
       if (!response.ok) throw new Error(data.error || "Kunde inte ta bort kontakten");
       setMessage("Kontakten har tagits bort.");
       if (editingId === holder.id) resetForm();
-      await load();
+      const nextPage = holders.length === 1 && page > 1 ? page - 1 : page;
+      if (nextPage === page) await load(page, debouncedQuery);
+      else setPage(nextPage);
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte ta bort kontakten");
     } finally {
@@ -160,7 +168,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
           <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-ink-950">Kontaktregister</h2>
           <p className="mt-1 text-sm text-ink-500">Hyresparter och boendekontakter med koppling till fastighetens avtal och objekt.</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50">
+        <button type="button" onClick={() => void load(page, debouncedQuery)} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera
         </button>
       </div>
@@ -203,16 +211,16 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
           ) : <p className="text-sm text-ink-500">Du har läsbehörighet till registret men saknar rättighet att ändra kontakter.</p>}
         </Panel>
 
-        <Panel title="Boende och avtalsparter" description={`${holders.length} registrerade kontakter på fastigheten`} bodyClassName="p-0">
+        <Panel title="Boende och avtalsparter" description={`${pagination.total} registrerade kontakter på fastigheten`} bodyClassName="p-0">
           <div className="border-b border-sand-100 p-4">
             <label className="relative block">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-              <input className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök namn, e-post, telefon eller organisationsnummer" />
+              <input className={`${premiumFieldClass} pl-9`} maxLength={160} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök namn, e-post, telefon eller organisationsnummer" />
             </label>
           </div>
-          {loading ? <div className="space-y-3 p-5">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div> : filtered.length === 0 ? <EmptyState title="Inga kontakter hittades" description="Kontakter visas här när de kopplas till avtal på fastigheten." /> : (
-            <div className="divide-y divide-sand-100">
-              {filtered.map((holder) => (
+          {loading ? <div className="space-y-3 p-5">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div> : holders.length === 0 ? <EmptyState title="Inga kontakter hittades" description={debouncedQuery ? "Ingen kontakt matchar sökningen." : "Kontakter visas här när de kopplas till avtal på fastigheten."} /> : (
+            <><div className="divide-y divide-sand-100">
+              {holders.map((holder) => (
                 <article key={holder.id} className="p-5 sm:p-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
@@ -234,7 +242,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
                   </div>
                 </article>
               ))}
-            </div>
+            </div><nav className="flex flex-col gap-3 border-t border-sand-100 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between" aria-label="Kontaktpaginering"><p className="text-ink-500">Sida {pagination.page} av {pagination.totalPages} · {pagination.total} kontakter</p><div className="flex gap-2"><button type="button" disabled={loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Föregående</button><button type="button" disabled={loading || page >= pagination.totalPages} onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Nästa</button></div></nav></>
           )}
         </Panel>
       </div>
