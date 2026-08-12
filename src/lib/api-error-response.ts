@@ -10,6 +10,7 @@ export const API_ERROR_CODES = {
   notFound: "NOT_FOUND",
   conflict: "CONFLICT",
   rateLimited: "RATE_LIMITED",
+  payloadTooLarge: "PAYLOAD_TOO_LARGE",
   internalError: "INTERNAL_ERROR",
   serviceUnavailable: "SERVICE_UNAVAILABLE",
 } as const;
