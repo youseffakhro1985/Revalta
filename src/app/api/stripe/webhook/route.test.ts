@@ -1,18 +1,30 @@
 import { createHmac } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { companyUpdateMock, companyFindFirstMock, integrationCreateMock } = vi.hoisted(() => ({
+const {
+  companyUpdateMock,
+  companyFindFirstMock,
+  integrationCreateMock,
+  transactionMock,
+  webhookReceiptCreateMock,
+  webhookReceiptUpdateMock,
+} = vi.hoisted(() => ({
   companyUpdateMock: vi.fn(),
   companyFindFirstMock: vi.fn(),
   integrationCreateMock: vi.fn(),
+  transactionMock: vi.fn(),
+  webhookReceiptCreateMock: vi.fn(),
+  webhookReceiptUpdateMock: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({
-  default: {
+vi.mock("@/lib/db", () => {
+  const transactionClient = {
     company: { update: companyUpdateMock, findFirst: companyFindFirstMock },
     integrationEvent: { create: integrationCreateMock },
-  },
-}));
+    webhookReceipt: { create: webhookReceiptCreateMock, update: webhookReceiptUpdateMock },
+  };
+  return { default: { $transaction: transactionMock, ...transactionClient } };
+});
 
 import { POST } from "./route";
 
@@ -28,7 +40,14 @@ describe("Stripe webhook route", () => {
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test");
     companyUpdateMock.mockResolvedValue({ id: "company-1" });
     integrationCreateMock.mockResolvedValue({});
+    webhookReceiptCreateMock.mockResolvedValue({});
+    webhookReceiptUpdateMock.mockResolvedValue({});
     companyFindFirstMock.mockResolvedValue(null);
+    transactionMock.mockImplementation(async (callback) => callback({
+      company: { update: companyUpdateMock, findFirst: companyFindFirstMock },
+      integrationEvent: { create: integrationCreateMock },
+      webhookReceipt: { create: webhookReceiptCreateMock, update: webhookReceiptUpdateMock },
+    }));
   });
 
   it("rejects missing signatures", async () => {
@@ -60,6 +79,7 @@ describe("Stripe webhook route", () => {
       .mockResolvedValueOnce({ id: "company-1", stripe_customer_id: null, stripe_subscription_id: null });
 
     const payload = JSON.stringify({
+      id: "evt_checkout_1",
       type: "checkout.session.completed",
       data: {
         object: {
@@ -87,6 +107,10 @@ describe("Stripe webhook route", () => {
       }),
     }));
     expect(integrationCreateMock).toHaveBeenCalled();
+    expect(webhookReceiptCreateMock).toHaveBeenCalledWith({
+      data: { provider: "stripe", event_id: "evt_checkout_1", event_type: "checkout.session.completed" },
+    });
+    expect(webhookReceiptUpdateMock).toHaveBeenCalled();
   });
 
   it("rejects metadata company mismatch against mapped Stripe customer", async () => {
@@ -95,6 +119,7 @@ describe("Stripe webhook route", () => {
       .mockResolvedValueOnce({ id: "company-1", stripe_customer_id: "cus_1", stripe_subscription_id: "sub_1" });
 
     const payload = JSON.stringify({
+      id: "evt_subscription_1",
       type: "customer.subscription.updated",
       data: {
         object: {
@@ -116,5 +141,17 @@ describe("Stripe webhook route", () => {
     expect(integrationCreateMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: "ignored" }),
     }));
+  });
+
+  it("rejects signed events without a Stripe event id", async () => {
+    const payload = JSON.stringify({ type: "customer.subscription.updated", data: { object: {} } });
+    const response = await POST(new Request("https://www.revalta.se/api/stripe/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": signature(payload) },
+      body: payload,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });
