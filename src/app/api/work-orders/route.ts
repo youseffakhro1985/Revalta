@@ -29,6 +29,7 @@ import {
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
+import { findAccessibleTicket } from "@/lib/assigned-work-access";
 
 function parseOptionalDate(value: unknown) {
   if (!value) return null;
@@ -218,7 +219,7 @@ export async function POST(request: Request) {
   const buildingId = body.buildingId ? String(body.buildingId).trim() : null;
   const technicalAssetId = body.technicalAssetId ? String(body.technicalAssetId).trim() : null;
   const unitId = body.unitId ? String(body.unitId).trim() : null;
-  const assignedToId = body.assignedToId ? String(body.assignedToId).trim() : null;
+  const requestedAssigneeId = body.assignedToId ? String(body.assignedToId).trim() : null;
   const ticketId = body.ticketId ? String(body.ticketId).trim() : null;
   const title = String(body.title || "").trim();
   const description = String(body.description || "").trim();
@@ -233,6 +234,11 @@ export async function POST(request: Request) {
   const scheduledStart = parseOptionalDate(body.scheduledStart);
   const scheduledEnd = parseOptionalDate(body.scheduledEnd);
   const estimatedCost = parseOptionalMoney(body.estimatedCost);
+  const canAssign = canAssignWorkOrders(user.role);
+  if (!canAssign && requestedAssigneeId && requestedAssigneeId !== user.id) {
+    return NextResponse.json({ error: "Du saknar behörighet att tilldela arbetsorder till andra" }, { status: 403 });
+  }
+  const assignedToId = canAssign ? requestedAssigneeId : user.id;
 
   if (!propertyId || !title || !description) return NextResponse.json({ error: "Fastighet, rubrik och beskrivning krävs" }, { status: 400 });
   if (title.length > 180) return NextResponse.json({ error: "Rubriken får vara högst 180 tecken" }, { status: 400 });
@@ -261,7 +267,7 @@ export async function POST(request: Request) {
     if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
   }
   if (ticketId) {
-    const ticket = await db.ticket.findFirst({ where: { id: ticketId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
+    const ticket = await findAccessibleTicket(user, ticketId);
     if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
   }
   try {
