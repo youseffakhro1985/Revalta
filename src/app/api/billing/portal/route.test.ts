@@ -1,18 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const {
-  getCurrentUserMock,
-  recordPaymentEventMock,
-  isStripeReadyMock,
-  createCheckoutSessionMock,
-  writeAuditLogMock,
-} = vi.hoisted(() => ({
-  getCurrentUserMock: vi.fn(),
-  recordPaymentEventMock: vi.fn(),
-  isStripeReadyMock: vi.fn(),
-  createCheckoutSessionMock: vi.fn(),
-  writeAuditLogMock: vi.fn(),
-}));
+const { getCurrentUserMock, recordPaymentEventMock, isStripeReadyMock, createCustomerPortalSessionMock, dbFindUniqueMock } =
+  vi.hoisted(() => ({
+    getCurrentUserMock: vi.fn(),
+    recordPaymentEventMock: vi.fn(),
+    isStripeReadyMock: vi.fn(),
+    createCustomerPortalSessionMock: vi.fn(),
+    dbFindUniqueMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
@@ -21,13 +16,15 @@ vi.mock("@/lib/current-user", () => ({
 vi.mock("@/lib/integrations", () => ({ recordPaymentEvent: recordPaymentEventMock }));
 vi.mock("@/lib/stripe", () => ({
   isStripeReady: isStripeReadyMock,
-  createCheckoutSession: createCheckoutSessionMock,
+  createCustomerPortalSession: createCustomerPortalSessionMock,
 }));
-vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+vi.mock("@/lib/db", () => ({
+  default: { company: { findUnique: dbFindUniqueMock } },
+}));
 
 import { POST } from "./route";
 
-describe("billing checkout fail-closed", () => {
+describe("billing portal fail-closed", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCurrentUserMock.mockResolvedValue({
@@ -37,64 +34,47 @@ describe("billing checkout fail-closed", () => {
       company_id: "company-1",
     });
     recordPaymentEventMock.mockResolvedValue({});
+    dbFindUniqueMock.mockResolvedValue({ stripe_customer_id: null });
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("returns 503 in production when Stripe is not configured", async () => {
+  it("returns 503 in production when Stripe/customer is not configured", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "production");
     isStripeReadyMock.mockReturnValue(false);
 
-    const response = await POST(
-      new Request("https://www.revalta.se/api/billing/checkout", {
-        method: "POST",
-        body: JSON.stringify({ plan: "professional" }),
-      }),
-    );
+    const response = await POST(new Request("https://www.revalta.se/api/billing/portal", { method: "POST" }));
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
-      error: "Stripe är inte konfigurerad i produktion",
+      error: "Stripe-kundportal är inte tillgänglig i produktion",
     });
   });
 
-  it("allows mock checkout outside production", async () => {
+  it("allows mock portal outside production", async () => {
     vi.stubEnv("NODE_ENV", "test");
     isStripeReadyMock.mockReturnValue(false);
 
-    const response = await POST(
-      new Request("https://www.revalta.se/api/billing/checkout", {
-        method: "POST",
-        body: JSON.stringify({ plan: "professional" }),
-      }),
-    );
+    const response = await POST(new Request("https://www.revalta.se/api/billing/portal", { method: "POST" }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, mode: "mock" });
   });
 
   it("still returns 503 in production even when ALLOW_INTEGRATION_MOCKS=1 is set", async () => {
-    // Regression test: a money flow must never return a fake "success" checkout
-    // to a real customer just because a mock-enabling env var leaked into a
-    // production Vercel environment group (e.g. copied from preview).
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("ALLOW_INTEGRATION_MOCKS", "1");
     isStripeReadyMock.mockReturnValue(false);
 
-    const response = await POST(
-      new Request("https://www.revalta.se/api/billing/checkout", {
-        method: "POST",
-        body: JSON.stringify({ plan: "professional" }),
-      }),
-    );
+    const response = await POST(new Request("https://www.revalta.se/api/billing/portal", { method: "POST" }));
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
-      error: "Stripe är inte konfigurerad i produktion",
+      error: "Stripe-kundportal är inte tillgänglig i produktion",
     });
   });
 });
