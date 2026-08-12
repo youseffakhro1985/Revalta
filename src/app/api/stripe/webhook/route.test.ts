@@ -5,23 +5,23 @@ const {
   companyUpdateMock,
   companyFindFirstMock,
   integrationCreateMock,
+  integrationFindFirstMock,
   transactionMock,
-  webhookReceiptCreateMock,
-  webhookReceiptUpdateMock,
+  executeRawMock,
 } = vi.hoisted(() => ({
   companyUpdateMock: vi.fn(),
   companyFindFirstMock: vi.fn(),
   integrationCreateMock: vi.fn(),
+  integrationFindFirstMock: vi.fn(),
   transactionMock: vi.fn(),
-  webhookReceiptCreateMock: vi.fn(),
-  webhookReceiptUpdateMock: vi.fn(),
+  executeRawMock: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => {
   const transactionClient = {
     company: { update: companyUpdateMock, findFirst: companyFindFirstMock },
-    integrationEvent: { create: integrationCreateMock },
-    webhookReceipt: { create: webhookReceiptCreateMock, update: webhookReceiptUpdateMock },
+    integrationEvent: { create: integrationCreateMock, findFirst: integrationFindFirstMock },
+    $executeRaw: executeRawMock,
   };
   return { default: { $transaction: transactionMock, ...transactionClient } };
 });
@@ -40,13 +40,13 @@ describe("Stripe webhook route", () => {
     vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test");
     companyUpdateMock.mockResolvedValue({ id: "company-1" });
     integrationCreateMock.mockResolvedValue({});
-    webhookReceiptCreateMock.mockResolvedValue({});
-    webhookReceiptUpdateMock.mockResolvedValue({});
+    integrationFindFirstMock.mockResolvedValue(null);
+    executeRawMock.mockResolvedValue(1);
     companyFindFirstMock.mockResolvedValue(null);
     transactionMock.mockImplementation(async (callback) => callback({
       company: { update: companyUpdateMock, findFirst: companyFindFirstMock },
-      integrationEvent: { create: integrationCreateMock },
-      webhookReceipt: { create: webhookReceiptCreateMock, update: webhookReceiptUpdateMock },
+      integrationEvent: { create: integrationCreateMock, findFirst: integrationFindFirstMock },
+      $executeRaw: executeRawMock,
     }));
   });
 
@@ -107,10 +107,11 @@ describe("Stripe webhook route", () => {
       }),
     }));
     expect(integrationCreateMock).toHaveBeenCalled();
-    expect(webhookReceiptCreateMock).toHaveBeenCalledWith({
-      data: { provider: "stripe", event_id: "evt_checkout_1", event_type: "checkout.session.completed" },
+    expect(executeRawMock).toHaveBeenCalled();
+    expect(integrationFindFirstMock).toHaveBeenCalledWith({
+      where: { type: "stripe", recipient: "evt_checkout_1" },
+      select: { id: true },
     });
-    expect(webhookReceiptUpdateMock).toHaveBeenCalled();
   });
 
   it("rejects metadata company mismatch against mapped Stripe customer", async () => {
@@ -153,5 +154,24 @@ describe("Stripe webhook route", () => {
 
     expect(response.status).toBe(400);
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges duplicate deliveries without applying them twice", async () => {
+    integrationFindFirstMock.mockResolvedValue({ id: "integration-event-1" });
+    const payload = JSON.stringify({
+      id: "evt_duplicate_1",
+      type: "customer.subscription.updated",
+      data: { object: { id: "sub_1", customer: "cus_1", status: "active" } },
+    });
+    const response = await POST(new Request("https://www.revalta.se/api/stripe/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": signature(payload) },
+      body: payload,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true, duplicate: true });
+    expect(companyUpdateMock).not.toHaveBeenCalled();
+    expect(integrationCreateMock).not.toHaveBeenCalled();
   });
 });
