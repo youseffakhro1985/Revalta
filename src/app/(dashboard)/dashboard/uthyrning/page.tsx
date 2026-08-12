@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, CircleDollarSign, ClipboardSignature, DoorOpen, FileSignature, Pencil, Plus, Search, UsersRound, X } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
@@ -30,6 +30,8 @@ type Lease = {
   unit: Unit;
   lease_holder: Holder;
 };
+type LeaseSummary = { activeHolders: number; annualRent: number };
+type Pagination = { page: number; pageSize: number; total: number; totalPages: number };
 
 type LeaseForm = {
   id: string;
@@ -76,6 +78,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 export default function LeasingPage() {
   const [leases, setLeases] = useState<Lease[]>([]);
+  const [occupyingLeases, setOccupyingLeases] = useState<Lease[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [holders, setHolders] = useState<Holder[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -92,31 +95,37 @@ export default function LeasingPage() {
   const [occupancyFilter, setOccupancyFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("");
   const [form, setForm] = useState<LeaseForm>(emptyForm);
+  const [leaseSummary, setLeaseSummary] = useState<LeaseSummary>({ activeHolders: 0, annualRent: 0 });
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 50, total: 0, totalPages: 1 });
+  const [page, setPage] = useState(1);
 
-  async function load() {
+  const load = useCallback(async (requestedPage: number) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/leases", { cache: "no-store" });
+      const response = await fetch(`/api/leases?page=${requestedPage}&pageSize=50`, { cache: "no-store" });
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta uthyrningen");
       setLeases(data.leases || []);
+      setOccupyingLeases(data.occupyingLeases || []);
       setProperties(data.properties || []);
       setHolders(data.holders || []);
       setCanManage(Boolean(data.permissions?.canManage));
+      setLeaseSummary(data.summary || { activeHolders: 0, annualRent: 0 });
+      setPagination(data.pagination || { page: requestedPage, pageSize: 50, total: 0, totalPages: 1 });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Kunde inte hämta uthyrningen");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(page); }, [load, page]);
 
   const currentLeaseByUnit = useMemo(() => {
     const map = new Map<string, Lease>();
-    for (const lease of leases) if (occupyingStatuses.has(lease.status) && !map.has(lease.unit_id)) map.set(lease.unit_id, lease);
+    for (const lease of occupyingLeases) if (occupyingStatuses.has(lease.status) && !map.has(lease.unit_id)) map.set(lease.unit_id, lease);
     return map;
-  }, [leases]);
+  }, [occupyingLeases]);
 
   const unitRows = useMemo(() => properties.flatMap((property) => property.units.map((unit) => ({ property, unit, lease: currentLeaseByUnit.get(unit.id) || null }))), [properties, currentLeaseByUnit]);
 
@@ -134,15 +143,14 @@ export default function LeasingPage() {
 
   const summary = useMemo(() => {
     const occupied = unitRows.filter((row) => row.lease);
-    const active = leases.filter((lease) => lease.status === "active" || lease.status === "notice");
     return {
       objects: unitRows.length,
       occupied: occupied.length,
       vacant: unitRows.length - occupied.length,
-      holders: new Set(active.map((lease) => lease.lease_holder_id)).size,
-      annualRent: active.reduce((sum, lease) => sum + Number(lease.annual_rent || 0), 0),
+      holders: leaseSummary.activeHolders,
+      annualRent: leaseSummary.annualRent,
     };
-  }, [unitRows, leases]);
+  }, [leaseSummary, unitRows]);
 
   const formUnits = properties.find((property) => property.id === form.propertyId)?.units || [];
 
@@ -210,7 +218,8 @@ export default function LeasingPage() {
       const wasEditing = Boolean(form.id);
       setForm(emptyForm);
       setSuccess(wasEditing ? "Avtalet har uppdaterats." : "Avtalet har skapats och kopplats till objektet.");
-      await load();
+      if (page === 1) await load(1);
+      else setPage(1);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Kunde inte spara avtalet");
     } finally {
@@ -240,7 +249,7 @@ export default function LeasingPage() {
       setUndoHolderId(null);
       setUndoLeaseId(lease.id);
       setSuccess("Avtalet har tagits bort.");
-      await load();
+      await load(page);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Kunde inte ta bort avtalet");
     } finally {
@@ -266,7 +275,7 @@ export default function LeasingPage() {
       setUndoLeaseId(null);
       setUndoHolderId(holderId);
       setSuccess("Hyresparten har tagits bort.");
-      await load();
+      await load(page);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Kunde inte ta bort hyresparten");
     } finally {
@@ -284,7 +293,7 @@ export default function LeasingPage() {
       if (!response.ok) throw new Error(data.error || "Kunde inte återställa avtalet");
       setUndoLeaseId(null);
       setSuccess("Avtalet har återställts.");
-      await load();
+      await load(page);
     } catch (restoreError) {
       setError(restoreError instanceof Error ? restoreError.message : "Kunde inte återställa avtalet");
     } finally {
@@ -302,7 +311,7 @@ export default function LeasingPage() {
       if (!response.ok) throw new Error(data.error || "Kunde inte återställa hyresparten");
       setUndoHolderId(null);
       setSuccess("Hyresparten har återställts.");
-      await load();
+      await load(page);
     } catch (restoreError) {
       setError(restoreError instanceof Error ? restoreError.message : "Kunde inte återställa hyresparten");
     } finally {
@@ -458,7 +467,7 @@ export default function LeasingPage() {
     </section>
 
     <Panel title="Avtalshistorik" description="Alla utkast, pågående, avslutade och makulerade avtal i organisationen." bodyClassName="p-0">
-      {loading ? <p className="p-6 text-sm text-ink-500">Hämtar avtal…</p> : leases.length === 0 ? <EmptyState title="Inga avtal registrerade" description="Skapa det första avtalet från formuläret ovan." /> : <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="border-b border-sand-200 bg-sand-50/70 text-[11px] uppercase tracking-[0.08em] text-ink-500"><tr><th className="px-5 py-3 font-semibold">Avtal</th><th className="px-5 py-3 font-semibold">Hyrespart</th><th className="px-5 py-3 font-semibold">Objekt</th><th className="px-5 py-3 font-semibold">Period</th><th className="px-5 py-3 font-semibold">Hyra</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"><span className="sr-only">Åtgärd</span></th></tr></thead><tbody className="divide-y divide-sand-100">{leases.map((lease) => <tr key={lease.id} className="hover:bg-sand-50/60"><td className="whitespace-nowrap px-5 py-4 font-semibold text-ink-900">{lease.lease_number}</td><td className="px-5 py-4 text-ink-700">{lease.lease_holder.name}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{lease.property.name} · {lease.unit.designation}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{dateValue(lease.start_date) || "–"} – {dateValue(lease.end_date) || "Löpande"}</td><td className="whitespace-nowrap px-5 py-4 text-ink-700">{money.format(lease.monthly_rent)}</td><td className="px-5 py-4"><span className="rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-700">{statusLabels[lease.status] || lease.status}</span></td><td className="px-5 py-4 text-right">{canManage ? <div className="flex items-center justify-end gap-3"><button type="button" onClick={() => editLease(lease)} className="font-semibold text-petroleum-700 hover:text-petroleum-900">Redigera</button>{softDeletableLeaseStatuses.has(lease.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease(lease)} className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort"}</button> : null}</div> : null}</td></tr>)}</tbody></table></div>}
+      {loading ? <p className="p-6 text-sm text-ink-500">Hämtar avtal…</p> : leases.length === 0 ? <EmptyState title="Inga avtal registrerade" description="Skapa det första avtalet från formuläret ovan." /> : <><div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="border-b border-sand-200 bg-sand-50/70 text-[11px] uppercase tracking-[0.08em] text-ink-500"><tr><th className="px-5 py-3 font-semibold">Avtal</th><th className="px-5 py-3 font-semibold">Hyrespart</th><th className="px-5 py-3 font-semibold">Objekt</th><th className="px-5 py-3 font-semibold">Period</th><th className="px-5 py-3 font-semibold">Hyra</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"><span className="sr-only">Åtgärd</span></th></tr></thead><tbody className="divide-y divide-sand-100">{leases.map((lease) => <tr key={lease.id} className="hover:bg-sand-50/60"><td className="whitespace-nowrap px-5 py-4 font-semibold text-ink-900">{lease.lease_number}</td><td className="px-5 py-4 text-ink-700">{lease.lease_holder.name}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{lease.property.name} · {lease.unit.designation}</td><td className="whitespace-nowrap px-5 py-4 text-ink-500">{dateValue(lease.start_date) || "–"} – {dateValue(lease.end_date) || "Löpande"}</td><td className="whitespace-nowrap px-5 py-4 text-ink-700">{money.format(lease.monthly_rent)}</td><td className="px-5 py-4"><span className="rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-700">{statusLabels[lease.status] || lease.status}</span></td><td className="px-5 py-4 text-right">{canManage ? <div className="flex items-center justify-end gap-3"><button type="button" onClick={() => editLease(lease)} className="font-semibold text-petroleum-700 hover:text-petroleum-900">Redigera</button>{softDeletableLeaseStatuses.has(lease.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease(lease)} className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort"}</button> : null}</div> : null}</td></tr>)}</tbody></table></div><nav className="flex flex-col gap-3 border-t border-sand-100 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between" aria-label="Avtalspaginering"><p className="text-ink-500">Visar sida {pagination.page} av {pagination.totalPages} · {pagination.total} avtal</p><div className="flex gap-2"><button type="button" disabled={loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Föregående</button><button type="button" disabled={loading || page >= pagination.totalPages} onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))} className="h-10 rounded-xl border border-sand-200 bg-white px-4 font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">Nästa</button></div></nav></>}
     </Panel>
   </div>;
 }
