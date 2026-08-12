@@ -137,6 +137,20 @@ describe("POST /api/auth/login", () => {
     expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("secret-value");
   });
 
+  it("performs a password comparison for missing accounts to reduce timing enumeration", async () => {
+    userFindUniqueMock.mockResolvedValue(null);
+    comparePasswordMock.mockResolvedValue(false);
+
+    const response = await POST(loginRequest({ email: "missing@example.se", password: "secret-value" }));
+
+    expect(response.status).toBe(401);
+    expect(comparePasswordMock).toHaveBeenCalledTimes(1);
+    expect(comparePasswordMock).toHaveBeenCalledWith(
+      "secret-value",
+      expect.stringMatching(/^\$2a\$10\$/),
+    );
+  });
+
   it("returns a stable internal error without exposing failure details", async () => {
     userFindUniqueMock.mockRejectedValue(new Error("database connection contains sensitive detail"));
 
