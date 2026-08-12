@@ -10,6 +10,11 @@ export function canManageTeam(role: string) {
   return hasRole(role, ["owner", "admin"]);
 }
 
+/** Admins manage the team but cannot mint another account with owner authority. */
+export function canGrantTeamRole(actorRole: string, targetRole: string) {
+  return canManageTeam(actorRole) && (targetRole !== "owner" || actorRole === "owner");
+}
+
 export function canManageTickets(role: string) {
   return hasRole(role, ["owner", "admin", "manager", "technician"]);
 }
