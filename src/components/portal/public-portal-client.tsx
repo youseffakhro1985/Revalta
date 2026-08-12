@@ -257,7 +257,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
 
           <div className="space-y-6 animate-slide-up-soft" style={{ animationDelay: "200ms" }}>
             {(error || success) && (
-              <div className={`rounded-xl border p-4 text-sm font-semibold shadow-sm ${error ? "border-danger-200 bg-danger-50 text-danger-700" : "border-success-200 bg-success-50 text-success-700"}`}>
+              <div role={error ? "alert" : "status"} aria-live="polite" className={`rounded-xl border p-4 text-sm font-semibold shadow-sm ${error ? "border-danger-200 bg-danger-50 text-danger-700" : "border-success-200 bg-success-50 text-success-700"}`}>
                 {error || success}
               </div>
             )}
@@ -274,12 +274,12 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
               <h2 className="text-2xl font-semibold text-ink-950">Skapa felanmälan</h2>
               <form onSubmit={createTicket} className="mt-6 space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <input required value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Ditt namn" />
-                  <input required type="email" value={reporterEmail} onChange={(event) => setReporterEmail(event.target.value)} className="rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="E-post" />
-                  <input value={reporterPhone} onChange={(event) => setReporterPhone(event.target.value)} className="rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Telefon" />
-                  <input value={reporterUnit} onChange={(event) => setReporterUnit(event.target.value)} className="rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Lägenhet/lokal" />
+                  <label><span className="sr-only">Ditt namn</span><input required autoComplete="name" maxLength={120} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Ditt namn" /></label>
+                  <label><span className="sr-only">E-post</span><input required type="email" autoComplete="email" maxLength={254} value={reporterEmail} onChange={(event) => setReporterEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="E-post" /></label>
+                  <label><span className="sr-only">Telefon</span><input type="tel" autoComplete="tel" maxLength={40} value={reporterPhone} onChange={(event) => setReporterPhone(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Telefon" /></label>
+                  <label><span className="sr-only">Lägenhet eller lokal</span><input autoComplete="address-line2" maxLength={80} value={reporterUnit} onChange={(event) => setReporterUnit(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Lägenhet/lokal" /></label>
                 </div>
-                <select value={propertyId} onChange={(event) => setPropertyId(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all text-ink-900">
+                <label className="block"><span className="sr-only">Fastighet</span><select value={propertyId} onChange={(event) => setPropertyId(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all text-ink-900">
                   <option value="">Välj fastighet om den finns i listan</option>
                   {properties.map((property) => (
                     <option key={property.id} value={property.id}>
@@ -287,10 +287,10 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                       {property.company?.name ? ` (${property.company.name})` : ""}
                     </option>
                   ))}
-                </select>
-                <input required minLength={3} value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Rubrik, t.ex. Trasig portlampa" />
-                <textarea required minLength={10} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Beskriv felet tydligt..." />
-                <button disabled={loading} className="w-full rounded-xl bg-petroleum-600 px-6 py-3.5 text-sm font-semibold text-white shadow-premium-sm transition-all hover:bg-petroleum-700 disabled:opacity-70 mt-2">
+                </select></label>
+                <label className="block"><span className="sr-only">Ärendets rubrik</span><input required minLength={3} maxLength={180} value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Rubrik, t.ex. Trasig portlampa" /></label>
+                <label className="block"><span className="sr-only">Beskriv felet</span><textarea required minLength={10} maxLength={5_000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Beskriv felet tydligt..." /></label>
+                <button type="submit" disabled={loading} className="w-full rounded-xl bg-petroleum-600 px-6 py-3.5 text-sm font-semibold text-white shadow-premium-sm transition-all hover:bg-petroleum-700 disabled:opacity-70 mt-2">
                   {loading ? "Skickar..." : "Skicka felanmälan"}
                 </button>
               </form>
@@ -299,9 +299,9 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
             <div className="rounded-2xl border border-sand-200 bg-sand-50/50 p-6 sm:p-8">
               <h2 className="text-xl font-semibold text-ink-950">Följ ditt ärende</h2>
               <form onSubmit={trackTicket} className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                <input required value={reference} onChange={(event) => setReference(event.target.value)} className="rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="RV-2026-XXXXXX" />
-                <input required type="email" value={trackEmail} onChange={(event) => setTrackEmail(event.target.value)} className="rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="Din e-post" />
-                <button disabled={loading} className="rounded-xl border border-sand-200 bg-white px-5 py-3 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-sand-100 disabled:opacity-70">
+                <label><span className="sr-only">Ärendets referensnummer</span><input required autoComplete="off" maxLength={32} value={reference} onChange={(event) => setReference(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="RV-2026-XXXXXX" /></label>
+                <label><span className="sr-only">E-post som användes för ärendet</span><input required type="email" autoComplete="email" maxLength={254} value={trackEmail} onChange={(event) => setTrackEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="Din e-post" /></label>
+                <button type="submit" disabled={loading} className="rounded-xl border border-sand-200 bg-white px-5 py-3 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-sand-100 disabled:opacity-70">
                   Följ
                 </button>
               </form>
