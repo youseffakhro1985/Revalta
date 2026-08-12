@@ -6,6 +6,8 @@ type AuditUser = {
   company_id: string | null;
 };
 
+type AuditClient = Pick<Prisma.TransactionClient, "auditLog">;
+
 export async function writeAuditLog(
   user: AuditUser,
   input: {
@@ -13,9 +15,10 @@ export async function writeAuditLog(
     entityId?: string | null;
     action: string;
     metadata?: Record<string, unknown>;
-  }
+  },
+  client: AuditClient = db,
 ) {
-  await db.auditLog.create({
+  await client.auditLog.create({
     data: {
       company_id: user.company_id,
       actor_user_id: user.id,
