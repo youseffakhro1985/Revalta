@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canExportTickets, canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
+import { canAssignWorkOrders, canExportTickets, canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { calculateDueDate } from "@/lib/sla";
@@ -109,10 +109,24 @@ export async function POST(request: Request) {
     const normalizedPropertyId = typeof propertyId === "string" && propertyId.trim() ? propertyId.trim() : null;
     const normalizedCategory = typeof category === "string" && category.trim() ? category.trim() : "other";
     const normalizedPriority = typeof priority === "string" && priority.trim() ? priority.trim() : "normal";
-    const normalizedAssignedToId = typeof assignedToId === "string" && assignedToId.trim() ? assignedToId.trim() : null;
+    const requestedAssigneeId = typeof assignedToId === "string" && assignedToId.trim() ? assignedToId.trim() : null;
+    const canAssign = canAssignWorkOrders(user.role);
+    if (!canAssign && requestedAssigneeId && requestedAssigneeId !== user.id) {
+      return NextResponse.json({ error: "Du saknar behörighet att tilldela ärenden till andra" }, { status: 403 });
+    }
+    const normalizedAssignedToId = canAssign ? requestedAssigneeId : user.id;
 
     if (!normalizedTitle || !normalizedDescription) {
       return NextResponse.json({ error: "Titel och beskrivning krävs" }, { status: 400 });
+    }
+    if (normalizedTitle.length > 180 || normalizedDescription.length > 10_000) {
+      return NextResponse.json({ error: "Titel eller beskrivning är för lång" }, { status: 400 });
+    }
+    if (!new Set(["other", "vvs", "electricity", "elevator", "security", "cleaning"]).has(normalizedCategory)) {
+      return NextResponse.json({ error: "Ogiltig ärendekategori" }, { status: 400 });
+    }
+    if (!new Set(["low", "normal", "high", "urgent"]).has(normalizedPriority)) {
+      return NextResponse.json({ error: "Ogiltig prioritet" }, { status: 400 });
     }
 
     if (normalizedPropertyId) {
