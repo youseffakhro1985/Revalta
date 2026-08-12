@@ -18,7 +18,7 @@ function parseMoney(value: unknown) {
   return Number.isFinite(number) && number >= 0 ? number : undefined;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
@@ -28,16 +28,34 @@ export async function GET() {
     }
 
     const includeEconomics = canViewFinanceData(user.role);
-    const [projects, properties, members] = await Promise.all([
+    const searchParams = new URL(request.url).searchParams;
+    const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const requestedPageSize = Number.parseInt(searchParams.get("pageSize") || "50", 10);
+    const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+    const pageSize = Number.isFinite(requestedPageSize) ? Math.min(100, Math.max(10, requestedPageSize)) : 50;
+    const where = { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } };
+
+    const [projects, total, economics, active, properties, members] = await Promise.all([
       db.project.findMany({
-        where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
-        orderBy: [{ status: "asc" }, { start_date: "asc" }, { created_at: "desc" }],
-        take: 500,
+        where,
+        orderBy: [{ status: "asc" }, { start_date: "asc" }, { created_at: "desc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
         include: {
           property: { select: { id: true, name: true } },
           manager: { select: { id: true, name: true, email: true } },
           source_work_order: { select: { id: true, title: true, status: true } },
         },
+      }),
+      db.project.count({ where }),
+      includeEconomics
+        ? db.project.aggregate({
+            where,
+            _sum: { budget: true, forecast: true, actual: true },
+          })
+        : Promise.resolve(null),
+      db.project.count({
+        where: { ...where, status: { notIn: ["completed", "cancelled"] } },
       }),
       db.property.findMany({
         where: { company_id: user.company_id, deleted_at: null },
@@ -66,6 +84,18 @@ export async function GET() {
       properties,
       members,
       permissions: { canViewFinance: includeEconomics, canManage: canManageWorkOrderFinance(user.role) },
+      summary: {
+        active,
+        budget: includeEconomics ? Number(economics?._sum.budget ?? 0) : null,
+        forecast: includeEconomics ? Number(economics?._sum.forecast ?? 0) : null,
+        actual: includeEconomics ? Number(economics?._sum.actual ?? 0) : null,
+      },
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
     });
   } catch (error) {
     console.error("Get projects error:", error);
