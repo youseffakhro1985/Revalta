@@ -111,6 +111,31 @@ describe("work-orders GET role scoping", () => {
     });
     expect(body.assignees).toHaveLength(1);
   });
+
+  it("limits enterprise enrichment to work orders in the returned list", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    workOrderFindManyMock.mockResolvedValue([{
+      id: "work-order-1",
+      title: "Kontrollera ventilation",
+      status: "planned",
+      priority: "normal",
+      estimated_cost: null,
+      completed_at: null,
+      scheduled_start: null,
+      created_at: new Date("2026-08-12T00:00:00Z"),
+      property: { id: "property-1", name: "Fastigheten", address: "Storgatan 1", city: "Stockholm" },
+      unit: null,
+      ticket: null,
+      assigned_to: null,
+      projects: [],
+    }]);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(queryRawMock).toHaveBeenCalledTimes(1);
+    expect(queryRawMock.mock.calls[0][0].values).toContain("work-order-1");
+  });
 });
 
 describe("work-orders POST assignment authorization", () => {
