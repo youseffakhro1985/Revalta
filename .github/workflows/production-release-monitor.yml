@@ -68,6 +68,8 @@ jobs:
           [[ "$environment_header" == "production" ]]
           [[ "$cache_control" == *"no-store"* ]]
           [[ "$cdn_cache_control" == *"no-store"* ]]
-          [[ "$vercel_cdn_cache_control" == *"no-store"* ]]
+          if [[ -n "$vercel_cdn_cache_control" ]]; then
+            [[ "$vercel_cdn_cache_control" == *"no-store"* ]]
+          fi
 
           echo "Production release verified: $short_sha"

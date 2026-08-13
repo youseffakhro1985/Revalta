@@ -25,9 +25,9 @@ jobs:
         run: |
           set -euo pipefail
           response="$(curl -sS -f --max-time 20 -H 'accept: application/json' "$HEALTH_URL")"
-          echo "$response" | python3 - <<'PY'
-          import json, sys
-          body = sys.stdin.read()
+          HEALTH_RESPONSE="$response" python3 - <<'PY'
+          import json, os
+          body = os.environ["HEALTH_RESPONSE"]
           data = json.loads(body)
           status = data.get("status")
           database = data.get("database")
