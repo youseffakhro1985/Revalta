@@ -189,17 +189,17 @@ export default function CalendarPage() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Ny aktivitet</p>
               <h2 className="mt-1 text-lg font-semibold text-ink-950">Planera in</h2>
             </div>
-            <input required placeholder="Rubrik" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <input required placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
             <div className="grid grid-cols-2 gap-3">
-              <input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-              <input type="time" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+              <input required type="date" aria-label="Datum" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+              <input type="time" aria-label="Tid" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm" />
             </div>
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm">
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" aria-label="Typ">
               {typeOptions.map((type) => <option key={type}>{type}</option>)}
             </select>
-            <input placeholder="Fastighet" value={form.propertyName} onChange={(e) => setForm({ ...form, propertyName: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-            <input placeholder="Ansvarig" value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
-            <textarea placeholder="Anteckning" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="min-h-24 w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <input placeholder="Fastighet" aria-label="Fastighet" value={form.propertyName} onChange={(e) => setForm({ ...form, propertyName: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <input placeholder="Ansvarig" aria-label="Ansvarig" value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
+            <textarea placeholder="Anteckning" aria-label="Anteckning" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} className="min-h-24 w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" />
             <button disabled={saving} className="w-full rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara aktivitet"}</button>
           </form>
         ) : null}
@@ -207,7 +207,7 @@ export default function CalendarPage() {
         <div className="rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
           <div className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div><h2 className="font-semibold text-ink-950">Planerade aktiviteter</h2><p className="mt-1 text-xs text-ink-400">Sorterade i datumordning</p></div>
-            <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-xl border border-sand-200 px-3 py-2 text-sm">
+            <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-xl border border-sand-200 px-3 py-2 text-sm" aria-label="Filtrera efter typ">
               <option>Alla</option>
               {typeOptions.map((type) => <option key={type}>{type}</option>)}
             </select>
@@ -264,14 +264,14 @@ export default function CalendarPage() {
                 </div>
                 {canManage && editingId === event.id && event.source !== "legacy" ? (
                   <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
-                    <input className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Rubrik" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+                    <input className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Rubrik" aria-label="Rubrik" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
                     <div className="grid grid-cols-2 gap-3">
-                      <input type="date" className="rounded-xl border border-sand-200 px-4 py-3 text-sm" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
-                      <input type="time" className="rounded-xl border border-sand-200 px-4 py-3 text-sm" value={editForm.time} onChange={(e) => setEditForm({ ...editForm, time: e.target.value })} />
+                      <input type="date" className="rounded-xl border border-sand-200 px-4 py-3 text-sm" aria-label="Datum" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
+                      <input type="time" className="rounded-xl border border-sand-200 px-4 py-3 text-sm" aria-label="Tid" value={editForm.time} onChange={(e) => setEditForm({ ...editForm, time: e.target.value })} />
                     </div>
-                    <input className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Fastighet" value={editForm.propertyName} onChange={(e) => setEditForm({ ...editForm, propertyName: e.target.value })} />
-                    <input className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Ansvarig" value={editForm.responsible} onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })} />
-                    <textarea className="min-h-20 w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                    <input className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Fastighet" aria-label="Fastighet" value={editForm.propertyName} onChange={(e) => setEditForm({ ...editForm, propertyName: e.target.value })} />
+                    <input className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Ansvarig" aria-label="Ansvarig" value={editForm.responsible} onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })} />
+                    <textarea className="min-h-20 w-full rounded-xl border border-sand-200 px-4 py-3 text-sm" placeholder="Anteckning" aria-label="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
                     <button
                       type="button"
                       disabled={updatingId === event.id}

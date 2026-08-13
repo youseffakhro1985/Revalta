@@ -132,17 +132,17 @@ export default function ProjectsPage() {
 
     <Panel title="Nytt projekt" description="Registrera ansvar, entreprenör, tidsplan, risk och ekonomiska ramar.">
       <form action={createProject} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <select name="propertyId" required className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-        <input name="name" required placeholder="Projektnamn" className={premiumFieldClass} />
-        <select name="managerId" className={premiumFieldClass}><option value="">Välj projektledare</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>
-        <input name="contractor" placeholder="Entreprenör" className={premiumFieldClass} />
-        <input name="startDate" type="date" className={premiumFieldClass} />
-        <input name="endDate" type="date" className={premiumFieldClass} />
-        <select name="status" className={premiumFieldClass}><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option></select>
-        <select name="risk" className={premiumFieldClass}><option value="low">Låg risk</option><option value="medium">Medelrisk</option><option value="high">Hög risk</option></select>
-        <input name="budget" type="number" min="0" step="0.01" placeholder="Budget" className={premiumFieldClass} />
-        <input name="forecast" type="number" min="0" step="0.01" placeholder="Prognos" className={premiumFieldClass} />
-        <input name="actual" type="number" min="0" step="0.01" placeholder="Utfall" className={premiumFieldClass} />
+        <select name="propertyId" required className={premiumFieldClass} aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+        <input name="name" required placeholder="Projektnamn" className={premiumFieldClass} aria-label="Projektnamn" />
+        <select name="managerId" className={premiumFieldClass} aria-label="Välj projektledare"><option value="">Välj projektledare</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>
+        <input name="contractor" placeholder="Entreprenör" className={premiumFieldClass} aria-label="Entreprenör" />
+        <input name="startDate" type="date" className={premiumFieldClass} aria-label="Startdatum" />
+        <input name="endDate" type="date" className={premiumFieldClass} aria-label="Slutdatum" />
+        <select name="status" className={premiumFieldClass} aria-label="Status"><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option></select>
+        <select name="risk" className={premiumFieldClass} aria-label="Risk"><option value="low">Låg risk</option><option value="medium">Medelrisk</option><option value="high">Hög risk</option></select>
+        <input name="budget" type="number" min="0" step="0.01" placeholder="Budget" className={premiumFieldClass} aria-label="Budget" />
+        <input name="forecast" type="number" min="0" step="0.01" placeholder="Prognos" className={premiumFieldClass} aria-label="Prognos" />
+        <input name="actual" type="number" min="0" step="0.01" placeholder="Utfall" className={premiumFieldClass} aria-label="Utfall" />
         <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till projekt"}</button>
       </form>
     </Panel>

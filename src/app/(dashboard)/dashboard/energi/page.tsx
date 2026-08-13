@@ -166,11 +166,11 @@ export default function EnergyPage() {
       {canManage ? (
       <Panel title="Ny avläsning" description="Registrera en månadsvis förbrukning och kostnad.">
         <form onSubmit={submit} className="space-y-4">
-          <select className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><select className={premiumFieldClass} value={form.type} onChange={(event) => { const type = event.target.value; setForm({ ...form, type, unit: type === "water" ? "m³" : "kWh" }); }}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input className={premiumFieldClass} type="month" value={form.period} onChange={(event) => setForm({ ...form, period: event.target.value })} required /></div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} required /><input className={premiumFieldClass} value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} required /></div>
-          <input className={premiumFieldClass} type="number" min="0" step="1" placeholder="Kostnad i SEK" value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} />
-          <textarea className={premiumTextareaClass} placeholder="Anteckning" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+          <select className={premiumFieldClass} aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><select className={premiumFieldClass} aria-label="Typ av avläsning" value={form.type} onChange={(event) => { const type = event.target.value; setForm({ ...form, type, unit: type === "water" ? "m³" : "kWh" }); }}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input className={premiumFieldClass} type="month" aria-label="Period" value={form.period} onChange={(event) => setForm({ ...form, period: event.target.value })} required /></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" aria-label="Förbrukning" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} required /><input className={premiumFieldClass} aria-label="Enhet" value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} required /></div>
+          <input className={premiumFieldClass} type="number" min="0" step="1" placeholder="Kostnad i SEK" aria-label="Kostnad i SEK" value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} />
+          <textarea className={premiumTextareaClass} placeholder="Anteckning" aria-label="Anteckning" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara avläsning"}</button>
         </form>
       </Panel>
@@ -211,11 +211,11 @@ export default function EnergyPage() {
             {canManage && editingId === row.id && row.source !== "legacy" ? (
               <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />
-                  <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} />
-                  <input className={premiumFieldClass} type="number" min="0" placeholder="Kostnad" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} />
+                  <input className={premiumFieldClass} type="month" aria-label="Period" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />
+                  <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" aria-label="Förbrukning" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} />
+                  <input className={premiumFieldClass} type="number" min="0" placeholder="Kostnad" aria-label="Kostnad" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} />
                 </div>
-                <textarea className={premiumTextareaClass} placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                <textarea className={premiumTextareaClass} placeholder="Anteckning" aria-label="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
                 <button type="button" disabled={updatingId === row.id} onClick={() => void saveEdit(row)} className={`${premiumPrimaryButtonClass} sm:w-auto`}>
                   {updatingId === row.id ? "Sparar…" : "Spara ändringar"}
                 </button>
