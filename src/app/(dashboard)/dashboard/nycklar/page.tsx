@@ -237,6 +237,7 @@ export default function KeysPage() {
               value={form.propertyId}
               onChange={(e) => setForm({ ...form, propertyId: e.target.value })}
               required
+              aria-label="Välj fastighet"
             >
               <option value="">Välj fastighet</option>
               {properties.map((property) => (
@@ -252,11 +253,13 @@ export default function KeysPage() {
                 value={form.identifier}
                 onChange={(e) => setForm({ ...form, identifier: e.target.value })}
                 required
+                aria-label="Nyckel-/taggnummer"
               />
               <select
                 className={field}
                 value={form.credentialType}
                 onChange={(e) => setForm({ ...form, credentialType: e.target.value })}
+                aria-label="Typ av behörighet"
               >
                 {Object.entries(typeLabels).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -269,6 +272,7 @@ export default function KeysPage() {
               className={field}
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value })}
+              aria-label="Status"
             >
               {Object.entries(statusLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -281,6 +285,7 @@ export default function KeysPage() {
               placeholder="Mottagare eller innehavare"
               value={form.holder}
               onChange={(e) => setForm({ ...form, holder: e.target.value })}
+              aria-label="Mottagare eller innehavare"
             />
             <div className="grid grid-cols-2 gap-3">
               <input
@@ -288,12 +293,14 @@ export default function KeysPage() {
                 placeholder="Lägenhet/lokal"
                 value={form.unit}
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                aria-label="Lägenhet/lokal"
               />
               <input
                 className={field}
                 placeholder="Behörighetsområde"
                 value={form.accessArea}
                 onChange={(e) => setForm({ ...form, accessArea: e.target.value })}
+                aria-label="Behörighetsområde"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -321,6 +328,7 @@ export default function KeysPage() {
               placeholder="Anteckning eller kvittensreferens"
               value={form.note}
               onChange={(e) => setForm({ ...form, note: e.target.value })}
+              aria-label="Anteckning eller kvittensreferens"
             />
             {error ? <p className="text-sm text-red-700">{error}</p> : null}
             <button
@@ -343,6 +351,7 @@ export default function KeysPage() {
               placeholder="Sök nummer, mottagare eller fastighet"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              aria-label="Sök nummer, mottagare eller fastighet"
             />
           </div>
           <div className="divide-y divide-sand-200">
@@ -400,6 +409,7 @@ export default function KeysPage() {
                               if (value) void updateStatus(item, value);
                               event.target.value = "";
                             }}
+                            aria-label="Ändra status"
                           >
                             <option value="" disabled>
                               Ändra status
@@ -425,11 +435,13 @@ export default function KeysPage() {
                         value={editForm.identifier}
                         onChange={(e) => setEditForm({ ...editForm, identifier: e.target.value })}
                         placeholder="Identitet"
+                        aria-label="Identitet"
                       />
                       <select
                         className={field}
                         value={editForm.credentialType}
                         onChange={(e) => setEditForm({ ...editForm, credentialType: e.target.value })}
+                        aria-label="Typ av behörighet"
                       >
                         {Object.entries(typeLabels).map(([value, label]) => (
                           <option key={value} value={value}>
@@ -442,36 +454,42 @@ export default function KeysPage() {
                         value={editForm.holder}
                         onChange={(e) => setEditForm({ ...editForm, holder: e.target.value })}
                         placeholder="Mottagare"
+                        aria-label="Mottagare"
                       />
                       <input
                         className={field}
                         value={editForm.unit}
                         onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
                         placeholder="Lägenhet/lokal"
+                        aria-label="Lägenhet/lokal"
                       />
                       <input
                         className={field}
                         value={editForm.accessArea}
                         onChange={(e) => setEditForm({ ...editForm, accessArea: e.target.value })}
                         placeholder="Behörighetsområde"
+                        aria-label="Behörighetsområde"
                       />
                       <input
                         className={field}
                         type="date"
                         value={editForm.issuedAt}
                         onChange={(e) => setEditForm({ ...editForm, issuedAt: e.target.value })}
+                        aria-label="Utlämnad"
                       />
                       <input
                         className={field}
                         type="date"
                         value={editForm.returnDue}
                         onChange={(e) => setEditForm({ ...editForm, returnDue: e.target.value })}
+                        aria-label="Åter senast"
                       />
                       <textarea
                         className="min-h-20 w-full rounded-lg border border-sand-200 bg-white px-3 py-3 text-sm outline-none focus:border-petroleum-500 sm:col-span-2"
                         value={editForm.note}
                         onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
                         placeholder="Anteckning"
+                        aria-label="Anteckning"
                       />
                       <button
                         type="button"
