@@ -150,6 +150,74 @@
     will-change: transform;
     animation: revalta-dashboard-detail 18s cubic-bezier(0.45, 0, 0.55, 1) 350ms infinite;
   }
+
+  .landing-demo-live-dot,
+  .landing-demo-sync-dot {
+    box-shadow: 0 0 0 0 rgb(74 139 125 / 0.28);
+    animation: revalta-live-pulse 2.8s ease-out infinite;
+  }
+
+  .landing-demo-bell svg {
+    transform-origin: 50% 18%;
+    animation: revalta-demo-bell 16s ease-in-out infinite;
+  }
+
+  .landing-demo-notification {
+    opacity: 0;
+    transform: scale(0.45);
+    animation: revalta-demo-notification 16s ease-in-out infinite;
+  }
+
+  .landing-demo-toast {
+    opacity: 0;
+    transform: translate3d(12px, -3px, 0) scale(0.97);
+    will-change: transform, opacity;
+    animation: revalta-demo-toast 16s cubic-bezier(0.2, 0.75, 0.25, 1) infinite;
+  }
+
+  .landing-demo-ticket-row-new {
+    animation: revalta-demo-surface-update 16s ease-in-out infinite;
+  }
+
+  .landing-demo-nav-count,
+  .landing-demo-ticket-status,
+  .landing-demo-metric-update {
+    will-change: transform, opacity;
+  }
+
+  .landing-demo-nav-count {
+    animation: revalta-demo-count 16s ease-in-out infinite;
+  }
+
+  .landing-demo-metric-update {
+    opacity: 0;
+    transform: translate3d(-3px, 0, 0) scale(0.9);
+    animation: revalta-demo-metric-update 16s ease-in-out infinite;
+  }
+
+  .landing-demo-ticket-status {
+    animation: revalta-demo-status 16s ease-in-out infinite;
+  }
+
+  .landing-demo-chart-bar {
+    transform-origin: center bottom;
+    animation: revalta-demo-chart 4.8s cubic-bezier(0.2, 0.75, 0.25, 1) infinite alternate;
+  }
+
+  .landing-demo-chart-bar:nth-child(2) { animation-delay: 120ms; }
+  .landing-demo-chart-bar:nth-child(3) { animation-delay: 240ms; }
+  .landing-demo-chart-bar:nth-child(4) { animation-delay: 360ms; }
+  .landing-demo-chart-bar:nth-child(5) { animation-delay: 480ms; }
+  .landing-demo-chart-bar:nth-child(6) { animation-delay: 600ms; }
+  .landing-demo-chart-bar:nth-child(7) { animation-delay: 720ms; }
+  .landing-demo-chart-bar:nth-child(8) { animation-delay: 840ms; }
+  .landing-demo-chart-bar:nth-child(9) { animation-delay: 960ms; }
+  .landing-demo-chart-bar:nth-child(10) { animation-delay: 1080ms; }
+
+  .landing-demo-occupancy-bar {
+    transform-origin: left center;
+    animation: revalta-demo-occupancy 7s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  }
 }
 
 @keyframes revalta-dashboard-float {
@@ -184,6 +252,134 @@
   }
 }
 
+@keyframes revalta-live-pulse {
+  0%,
+  55% {
+    box-shadow: 0 0 0 0 rgb(74 139 125 / 0.28);
+  }
+  100% {
+    box-shadow: 0 0 0 5px rgb(74 139 125 / 0);
+  }
+}
+
+@keyframes revalta-demo-bell {
+  0%,
+  18%,
+  26%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% { transform: rotate(8deg); }
+  22% { transform: rotate(-7deg); }
+  24% { transform: rotate(4deg); }
+}
+
+@keyframes revalta-demo-notification {
+  0%,
+  17%,
+  72%,
+  100% {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  21%,
+  66% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes revalta-demo-toast {
+  0%,
+  21%,
+  48%,
+  100% {
+    opacity: 0;
+    transform: translate3d(12px, -3px, 0) scale(0.97);
+  }
+  25%,
+  43% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes revalta-demo-surface-update {
+  0%,
+  24%,
+  52%,
+  100% {
+    background-color: rgb(255 255 255);
+    box-shadow: none;
+  }
+  30%,
+  46% {
+    background-color: rgb(240 247 244 / 0.8);
+    box-shadow: inset 2px 0 0 rgb(74 139 125 / 0.5);
+  }
+}
+
+@keyframes revalta-demo-count {
+  0%,
+  24%,
+  52%,
+  100% {
+    transform: scale(1);
+  }
+  31%,
+  40% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes revalta-demo-metric-update {
+  0%,
+  26%,
+  50%,
+  100% {
+    opacity: 0;
+    transform: translate3d(-3px, 0, 0) scale(0.9);
+  }
+  31%,
+  45% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes revalta-demo-status {
+  0%,
+  28%,
+  48%,
+  100% {
+    transform: scale(1);
+  }
+  34%,
+  41% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes revalta-demo-chart {
+  0% {
+    opacity: 0.68;
+    transform: scaleY(0.58);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes revalta-demo-occupancy {
+  0% {
+    transform: scaleX(0.76);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing-dashboard-float,
   .landing-dashboard-shadow,
@@ -191,5 +387,30 @@
     animation: none !important;
     transform: none;
     will-change: auto;
+  }
+
+  .landing-demo-live-dot,
+  .landing-demo-sync-dot,
+  .landing-demo-bell svg,
+  .landing-demo-notification,
+  .landing-demo-toast,
+  .landing-demo-nav-tickets,
+  .landing-demo-live-metric,
+  .landing-demo-ticket-row-new,
+  .landing-demo-insight,
+  .landing-demo-nav-count,
+  .landing-demo-metric-update,
+  .landing-demo-ticket-status,
+  .landing-demo-chart-bar,
+  .landing-demo-occupancy-bar {
+    animation: none !important;
+    transform: none;
+    will-change: auto;
+  }
+
+  .landing-demo-notification,
+  .landing-demo-toast,
+  .landing-demo-metric-update {
+    display: none;
   }
 }
