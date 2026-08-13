@@ -7,6 +7,9 @@ import {
   requireCompanyMember,
 } from "@/lib/current-user";
 import { listResidentMatchedLeases } from "@/lib/resident-portal-leases";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/resident-portal/notices" });
 
 const publishedStatuses = new Set(["sent", "paid", "overdue", "cancelled", "issued", "published"]);
 
@@ -78,7 +81,7 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    console.error("Get resident notices error:", error);
+    logger.error("Get resident notices error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

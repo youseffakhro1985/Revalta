@@ -6,6 +6,9 @@ import {
 } from "@/lib/portal-tracking";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/public/tickets/[reference]" });
 
 type PublicCommentAuditMetadata = {
   commentId?: unknown;
@@ -149,7 +152,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Get public ticket error:", error);
+    logger.error("Get public ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -7,6 +7,9 @@ import {
   tenantWhere,
 } from "@/lib/current-user";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/search" });
 
 export async function GET(request: Request) {
   try {
@@ -130,7 +133,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ results });
   } catch (error) {
-    console.error("Global search error:", error);
+    logger.error("Global search error", error);
     return NextResponse.json({ error: "Sökningen kunde inte genomföras" }, { status: 500 });
   }
 }

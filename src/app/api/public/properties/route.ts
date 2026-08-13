@@ -1,6 +1,9 @@
 import db from "@/lib/db";
 import { extractPortalCompanySlug, resolvePublicPortalCompany, toPortalSlug } from "@/lib/public-portal";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/public/properties" });
 
 export async function GET(request: Request) {
   try {
@@ -32,7 +35,7 @@ export async function GET(request: Request) {
       properties,
     });
   } catch (error) {
-    console.error("Get public properties error:", error);
+    logger.error("Get public properties error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

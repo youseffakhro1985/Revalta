@@ -3,6 +3,9 @@ import { canViewAudit, canViewOperations, getCurrentUser } from "@/lib/current-u
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/notifications" });
 
 const createdAction = "notification.created";
 const readAction = "notification.read";
@@ -111,7 +114,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Get notifications error:", error);
+    logger.error("Get notifications error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -154,7 +157,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, notificationId: notification.id }, { status: 201 });
   } catch (error) {
-    console.error("Create notification error:", error);
+    logger.error("Create notification error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -203,7 +206,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ error: "Notisen hittades inte" }, { status: 404 });
   } catch (error) {
-    console.error("Mark notification read error:", error);
+    logger.error("Mark notification read error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -252,7 +255,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete notification error:", error);
+    logger.error("Delete notification error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

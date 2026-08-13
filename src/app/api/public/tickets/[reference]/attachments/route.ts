@@ -6,6 +6,9 @@ import { extractPortalTrackingToken, verifyPortalTrackingToken } from "@/lib/por
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/public/tickets/[reference]/attachments" });
 
 export async function POST(
   request: Request,
@@ -105,7 +108,7 @@ export async function POST(
     if (error instanceof StorageConfigurationError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    console.error("Create public attachment error:", error);
+    logger.error("Create public attachment error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

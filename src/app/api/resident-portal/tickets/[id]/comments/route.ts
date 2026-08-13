@@ -13,6 +13,9 @@ import {
   canCommentOnResidentPortalTicket,
   findAccessibleResidentPortalTicket,
 } from "@/lib/resident-portal-tickets";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/resident-portal/tickets/[id]/comments" });
 
 export async function POST(
   request: Request,
@@ -106,7 +109,7 @@ export async function POST(
       },
     }, { status: 201 });
   } catch (error) {
-    console.error("Create resident portal comment error:", error);
+    logger.error("Create resident portal comment error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

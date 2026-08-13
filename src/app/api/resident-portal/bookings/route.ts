@@ -9,6 +9,9 @@ import {
 } from "@/lib/current-user";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { listResidentMatchedLeases } from "@/lib/resident-portal-leases";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/resident-portal/bookings" });
 
 const action = "booking.created";
 
@@ -66,7 +69,7 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    console.error("Get resident bookings error:", error);
+    logger.error("Get resident bookings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -190,7 +193,7 @@ export async function POST(request: Request) {
       },
     }, { status: 201 });
   } catch (error) {
-    console.error("Create resident booking error:", error);
+    logger.error("Create resident booking error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -238,7 +241,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, booking: updated });
   } catch (error) {
-    console.error("Cancel resident booking error:", error);
+    logger.error("Cancel resident booking error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
