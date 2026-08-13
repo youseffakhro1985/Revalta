@@ -329,11 +329,13 @@ export default function RoundsPage() {
                           value={editForm.title}
                           onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                           placeholder="Titel"
+                          aria-label="Titel"
                         />
                         <select
                           className={premiumFieldClass}
                           value={editForm.interval}
                           onChange={(e) => setEditForm({ ...editForm, interval: e.target.value })}
+                          aria-label="Intervall"
                         >
                           <option value="weekly">Varje vecka</option>
                           <option value="monthly">Varje månad</option>
@@ -345,6 +347,7 @@ export default function RoundsPage() {
                           className={premiumFieldClass}
                           value={editForm.nextDue}
                           onChange={(e) => setEditForm({ ...editForm, nextDue: e.target.value })}
+                          aria-label="Nästa datum"
                         />
                         <button
                           type="button"
@@ -396,6 +399,7 @@ export default function RoundsPage() {
                                     value={item.note}
                                     onChange={(e) => updateLocalChecklist(r.id, item.id, { note: e.target.value })}
                                     placeholder="Beskriv avvikelsen"
+                                    aria-label="Beskriv avvikelsen"
                                     className={`${premiumFieldClass} mt-3`}
                                   />
                                 ) : null}

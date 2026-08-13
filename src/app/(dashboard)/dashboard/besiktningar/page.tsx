@@ -353,15 +353,15 @@ export default function InspectionsPage() {
                     </div>
                     {canManage && editingId === i.id ? (
                       <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 sm:grid-cols-2">
-                        <input className={premiumFieldClass} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} placeholder="Titel" />
-                        <select className={premiumFieldClass} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>
+                        <input className={premiumFieldClass} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} placeholder="Titel" aria-label="Titel" />
+                        <select className={premiumFieldClass} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} aria-label="Kontrolltyp">
                           {Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                         </select>
-                        <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
-                        <input className={premiumFieldClass} value={editForm.intervalMonths} onChange={(e) => setEditForm({ ...editForm, intervalMonths: e.target.value })} placeholder="Intervall (månader)" />
-                        <input className={premiumFieldClass} value={editForm.responsible} onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })} placeholder="Ansvarig" />
-                        <input className={premiumFieldClass} value={editForm.supplier} onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} placeholder="Leverantör" />
-                        <textarea className={`${premiumTextareaClass} sm:col-span-2`} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} placeholder="Anteckning" />
+                        <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} aria-label="Förfallodatum" />
+                        <input className={premiumFieldClass} value={editForm.intervalMonths} onChange={(e) => setEditForm({ ...editForm, intervalMonths: e.target.value })} placeholder="Intervall (månader)" aria-label="Intervall (månader)" />
+                        <input className={premiumFieldClass} value={editForm.responsible} onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })} placeholder="Ansvarig" aria-label="Ansvarig" />
+                        <input className={premiumFieldClass} value={editForm.supplier} onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} placeholder="Leverantör" aria-label="Leverantör" />
+                        <textarea className={`${premiumTextareaClass} sm:col-span-2`} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} placeholder="Anteckning" aria-label="Anteckning" />
                         <button
                           type="button"
                           disabled={updatingId === i.id}

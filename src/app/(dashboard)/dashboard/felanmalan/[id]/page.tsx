@@ -454,7 +454,7 @@ export default function TicketDetailPage() {
           </div>
         </Panel>
 
-        <Panel title="Ny kommentar" description="Dokumentera nästa åtgärd." bodyClassName="p-6"><form onSubmit={addComment}><textarea required minLength={2} rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className={premiumTextareaClass} placeholder="Skriv en uppdatering…" /><button disabled={saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Send className="h-4 w-4" />Lägg till kommentar</button></form></Panel>
+        <Panel title="Ny kommentar" description="Dokumentera nästa åtgärd." bodyClassName="p-6"><form onSubmit={addComment}><textarea required minLength={2} rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className={premiumTextareaClass} placeholder="Skriv en uppdatering…" aria-label="Skriv en uppdatering…" /><button disabled={saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Send className="h-4 w-4" />Lägg till kommentar</button></form></Panel>
 
         <Panel title="Operativa registreringar" description={workOrder ? "Checklista och anteckningar. Tid och kostnad registreras på den kopplade arbetsordern." : "Tid, kostnad, checklista eller anteckning."} bodyClassName="space-y-4 p-6">
           {workOrder ? (
@@ -467,15 +467,15 @@ export default function TicketDetailPage() {
             </div>
           ) : null}
           <form onSubmit={addOperation} className="space-y-3">
-            <select value={operationType} onChange={(event) => setOperationType(event.target.value)} className={premiumFieldClass}>
+            <select value={operationType} onChange={(event) => setOperationType(event.target.value)} className={premiumFieldClass} aria-label="Typ av registrering">
               {Object.entries(operationTypeLabels)
                 .filter(([value]) => !workOrder || value === "checklist" || value === "note")
                 .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            {operationType === "time" ? <input type="number" min="1" max="1440" required value={operationMinutes} onChange={(event) => setOperationMinutes(event.target.value)} placeholder="Minuter" className={premiumFieldClass} /> : null}
-            {operationType === "cost" ? <input type="number" min="0" step="0.01" required value={operationAmount} onChange={(event) => setOperationAmount(event.target.value)} placeholder="Belopp (SEK)" className={premiumFieldClass} /> : null}
+            {operationType === "time" ? <input type="number" min="1" max="1440" required value={operationMinutes} onChange={(event) => setOperationMinutes(event.target.value)} placeholder="Minuter" className={premiumFieldClass} aria-label="Minuter" /> : null}
+            {operationType === "cost" ? <input type="number" min="0" step="0.01" required value={operationAmount} onChange={(event) => setOperationAmount(event.target.value)} placeholder="Belopp (SEK)" className={premiumFieldClass} aria-label="Belopp (SEK)" /> : null}
             {operationType === "checklist" ? <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" checked={operationCompleted} onChange={(event) => setOperationCompleted(event.target.checked)} /> Markerad som klar</label> : null}
-            <textarea required={operationType === "checklist" || operationType === "note"} minLength={operationType === "checklist" || operationType === "note" ? 2 : 0} rows={3} value={operationDescription} onChange={(event) => setOperationDescription(event.target.value)} className={premiumTextareaClass} placeholder="Kort beskrivning" />
+            <textarea required={operationType === "checklist" || operationType === "note"} minLength={operationType === "checklist" || operationType === "note" ? 2 : 0} rows={3} value={operationDescription} onChange={(event) => setOperationDescription(event.target.value)} className={premiumTextareaClass} placeholder="Kort beskrivning" aria-label="Kort beskrivning" />
             <button disabled={savingOperation} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{savingOperation ? "Sparar…" : "Spara registrering"}</button>
           </form>
           <div className="space-y-2 border-t border-sand-200 pt-4">
@@ -528,6 +528,7 @@ export default function TicketDetailPage() {
                           onChange={(event) => setEditOperationMinutes(event.target.value)}
                           placeholder="Minuter"
                           className={premiumFieldClass}
+                          aria-label="Minuter"
                         />
                       ) : null}
                       {type === "cost" ? (
@@ -540,6 +541,7 @@ export default function TicketDetailPage() {
                           onChange={(event) => setEditOperationAmount(event.target.value)}
                           placeholder="Belopp (SEK)"
                           className={premiumFieldClass}
+                          aria-label="Belopp (SEK)"
                         />
                       ) : null}
                       {type === "checklist" ? (
@@ -556,6 +558,7 @@ export default function TicketDetailPage() {
                         onChange={(event) => setEditOperationDescription(event.target.value)}
                         className={premiumTextareaClass}
                         placeholder="Kort beskrivning"
+                        aria-label="Kort beskrivning"
                       />
                       <button
                         type="button"
@@ -573,7 +576,7 @@ export default function TicketDetailPage() {
           </div>
         </Panel>
 
-        <Panel title="Ladda upp bilaga" description="PNG, JPG, WebP, PDF eller TXT." bodyClassName="p-6"><form onSubmit={uploadAttachment}><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(event) => setFile(event.target.files?.[0] || null)} className="block w-full text-sm text-ink-500 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-2 file:font-semibold file:text-ink-700" /><button disabled={!file || saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Paperclip className="h-4 w-4" />Ladda upp</button></form></Panel>
+        <Panel title="Ladda upp bilaga" description="PNG, JPG, WebP, PDF eller TXT." bodyClassName="p-6"><form onSubmit={uploadAttachment}><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf,text/plain" onChange={(event) => setFile(event.target.files?.[0] || null)} className="block w-full text-sm text-ink-500 file:mr-3 file:rounded-lg file:border-0 file:bg-sand-100 file:px-3 file:py-2 file:font-semibold file:text-ink-700" aria-label="Ladda upp bilaga" /><button disabled={!file || saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Paperclip className="h-4 w-4" />Ladda upp</button></form></Panel>
       </aside>
     </section>
   </div>;

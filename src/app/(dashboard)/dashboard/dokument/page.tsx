@@ -246,11 +246,11 @@ export default function DocumentsPage() {
 
         <Panel title="Dokumentbibliotek" description="Sök, filtrera och hantera dokumentens hela livscykel." bodyClassName="p-0">
           <div className="grid gap-3 border-b border-sand-200 p-5 xl:grid-cols-[1fr_150px_170px_160px_150px]">
-            <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input value={search} onChange={(e) => setSearch(e.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, objekt eller avtal" /></label>
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select value={lifecycleFilter} onChange={(e) => setLifecycleFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla statusar</option>{Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-            <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className={premiumFieldClass}><option value="">Alla fastigheter</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+            <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input value={search} onChange={(e) => setSearch(e.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, objekt eller avtal" aria-label="Sök dokument, objekt eller avtal" /></label>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={premiumFieldClass} aria-label="Alla kategorier"><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value)} className={premiumFieldClass} aria-label="Alla synligheter"><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={lifecycleFilter} onChange={(e) => setLifecycleFilter(e.target.value)} className={premiumFieldClass} aria-label="Alla statusar"><option value="">Alla statusar</option>{Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className={premiumFieldClass} aria-label="Alla fastigheter"><option value="">Alla fastigheter</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           </div>
 
           {loading ? <div className="space-y-3 p-6">{[1,2,3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div> : filtered.length === 0 ? <EmptyState title="Inga dokument matchar" description="Ladda upp ett dokument eller justera filtreringen." /> : (
@@ -276,11 +276,11 @@ export default function DocumentsPage() {
                 </div>
                 {editingId === document.id ? (
                   <div className="grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 md:grid-cols-3">
-                    <input className={premiumFieldClass} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Dokumentnamn" />
-                    <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                    <input className={premiumFieldClass} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Dokumentnamn" aria-label="Dokumentnamn" />
+                    <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} aria-label="Kategori">
                       {Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
-                    <input className={premiumFieldClass} type="date" value={editForm.validUntil} onChange={(e) => setEditForm({ ...editForm, validUntil: e.target.value })} />
+                    <input className={premiumFieldClass} type="date" value={editForm.validUntil} onChange={(e) => setEditForm({ ...editForm, validUntil: e.target.value })} aria-label="Giltigt till" />
                     <button type="button" disabled={changingId === document.id} onClick={() => void saveEdit(document)} className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900 md:col-span-3">
                       {changingId === document.id ? "Sparar…" : "Spara ändringar"}
                     </button>
