@@ -18,6 +18,7 @@ Minimikrav i Vercel Production:
 - `DIRECT_URL`
 - `JWT_SECRET`
 - `EMAIL_FROM`
+- `CRON_SECRET` (skyddar `/api/cron/*` — utan den avvisas alla schemalagda jobb)
 
 Valfria live-integrationer:
 

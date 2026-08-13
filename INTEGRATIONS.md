@@ -86,9 +86,10 @@ Aktivera minst dessa events i Stripe:
 
 Miljövariabel:
 
-- `STORAGE_PROVIDER_KEY`
+- `BLOB_READ_WRITE_TOKEN` (privat Vercel Blob-token — detta är den aktiva lagringen i produktion)
+- `STORAGE_PROVIDER_KEY` (stöds endast som övergångsreserv om `BLOB_READ_WRITE_TOKEN` saknas)
 
-I nuvarande version sparas små dev-bilagor som data-URL för att flödet ska vara testbart. Nästa steg är att ersätta lagringen med Vercel Blob, S3 eller Supabase Storage.
+Bilagor laddas upp till privat Vercel Blob-lagring via `src/lib/storage.ts` (`storeAttachment`). Utan någon av nycklarna kastas `StorageConfigurationError` och uppladdning är inte möjlig.
 
 ## AI
 

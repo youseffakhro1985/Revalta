@@ -16,6 +16,7 @@ I Vercel-projektet för `revalta.se`:
    - `DIRECT_URL`
    - `JWT_SECRET`
    - `EMAIL_FROM`
+   - `CRON_SECRET` (krävs för att de schemalagda jobben i `vercel.json` ska tillåtas köra — utan den avvisas alla cron-anrop)
 3. Lägg in dessa när riktiga leverantörer ska kopplas:
    - `EMAIL_PROVIDER_API_KEY`
    - `SMS_PROVIDER_API_KEY`
@@ -28,7 +29,7 @@ I Vercel-projektet för `revalta.se`:
 
 Vercel ska använda:
 
-- Node.js: `22.x`
+- Node.js: `24.x` (pinnad i `.nvmrc` och `package.json` → `engines.node`; håll Vercel-projektets Node-inställning i synk med dessa)
 - Install Command: `npm ci`
 - Build Command: `npm run build`
 
@@ -67,5 +68,6 @@ Vanliga orsaker:
 - Databasen är inte PostgreSQL.
 - Den gamla databasen har en schema-struktur som krockar med nya migrationer.
 - `JWT_SECRET` saknas i production.
+- `CRON_SECRET` saknas i production — bygget lyckas men de schemalagda jobben (`/api/cron/...`) svarar 401 på varje körning.
 
 Läs den fullständiga byggloggen och åtgärda den verifierade grundorsaken. Byt eller radera aldrig produktionsdatabasen för att få ett bygge att passera.
