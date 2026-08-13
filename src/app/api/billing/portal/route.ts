@@ -4,6 +4,9 @@ import { canManageBilling, getCurrentUser } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { isProductionRuntime } from "@/lib/runtime-env";
 import { createCustomerPortalSession, isStripeReady } from "@/lib/stripe";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/billing/portal" });
 
 export async function POST(request: Request) {
   try {
@@ -42,7 +45,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, mode: "live", url: session.url });
   } catch (error) {
-    console.error("Create customer portal error:", error);
+    logger.error("Create customer portal error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

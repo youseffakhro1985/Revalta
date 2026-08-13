@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -43,6 +44,33 @@ const pages: Record<string, { title: string; intro: string; sections: Array<{ ti
 
 export function generateStaticParams() {
   return Object.keys(pages).map((slug) => ({ slug }));
+}
+
+// Without this, every /juridik/[slug] page silently inherits the root
+// layout's metadata — including `alternates.canonical: "/"` — which tells
+// search engines each legal page is a duplicate of the homepage and its
+// canonical version lives there instead. Give each page its own identity.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const page = pages[slug];
+  if (!page) return {};
+
+  const path = `/juridik/${slug}`;
+  return {
+    title: page.title,
+    description: page.intro,
+    alternates: { canonical: path },
+    openGraph: {
+      type: "article",
+      title: page.title,
+      description: page.intro,
+      url: path,
+    },
+  };
 }
 
 export default async function LegalPage({ params }: { params: Promise<{ slug: string }> }) {
