@@ -2,9 +2,11 @@ import db from "@/lib/db";
 import { auditScopedWhere, canManageAccessCredentials, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { loadLegacyRows } from "@/lib/dual-list";
+import { createLogger } from "@/lib/structured-logger";
 import { NextResponse } from "next/server";
 
 const legacyAction = "access.credential.created";
+const logger = createLogger({ route: "/api/access-credentials" });
 
 function parseOptionalDate(value: string) {
   if (!value) return null;
@@ -116,7 +118,7 @@ export async function GET() {
 
     return NextResponse.json({ credentials, properties });
   } catch (error) {
-    console.error("Get access credentials error:", error);
+    logger.error("Get access credentials error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -201,7 +203,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, credential }, { status: 201 });
   } catch (error) {
-    console.error("Create access credential error:", error);
+    logger.error("Create access credential error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -374,7 +376,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Update access credential error:", error);
+    logger.error("Update access credential error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

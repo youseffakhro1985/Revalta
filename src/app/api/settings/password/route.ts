@@ -5,12 +5,15 @@ import { comparePassword, hashPassword, signToken } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/current-user";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { isStrongPassword, passwordPolicyMessage } from "@/lib/security";
+import { createLogger } from "@/lib/structured-logger";
 import {
   LEGACY_SESSION_COOKIE_NAME,
   SESSION_COOKIE_NAME,
   expiredSessionCookieOptions,
   sessionCookieOptions,
 } from "@/lib/session-policy";
+
+const logger = createLogger({ route: "/api/settings/password" });
 
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",
@@ -102,7 +105,7 @@ export async function PATCH(request: Request) {
       { headers: NO_STORE_HEADERS },
     );
   } catch (error) {
-    console.error("Change password error:", error);
+    logger.error("Change password error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500, headers: NO_STORE_HEADERS });
   }
 }
