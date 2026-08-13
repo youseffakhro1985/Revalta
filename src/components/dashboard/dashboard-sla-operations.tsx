@@ -153,10 +153,10 @@ export async function DashboardSlaOperations() {
 
       <div className="grid gap-px bg-sand-200 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "SLA passerad", value: summary.overdue, icon: AlertTriangle, tone: "text-red-700" },
-          { label: "Kritiska inom 4 h", value: summary.critical, icon: Clock3, tone: "text-orange-700" },
-          { label: "Inom 24 timmar", value: summary.soon, icon: Clock3, tone: "text-amber-700" },
-          { label: "Ej tilldelade", value: summary.unassigned, icon: UserRoundX, tone: "text-petroleum-700" },
+          { label: "SLA passerad", value: summary.overdue, icon: AlertTriangle, tone: summary.overdue > 0 ? "text-red-700" : "text-ink-400" },
+          { label: "Kritiska inom 4 h", value: summary.critical, icon: Clock3, tone: summary.critical > 0 ? "text-orange-700" : "text-ink-400" },
+          { label: "Inom 24 timmar", value: summary.soon, icon: Clock3, tone: summary.soon > 0 ? "text-amber-700" : "text-ink-400" },
+          { label: "Ej tilldelade", value: summary.unassigned, icon: UserRoundX, tone: summary.unassigned > 0 ? "text-petroleum-700" : "text-ink-400" },
         ].map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="bg-white p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-ink-500">{label}</p><Icon className={`h-5 w-5 ${tone}`} /></div>
