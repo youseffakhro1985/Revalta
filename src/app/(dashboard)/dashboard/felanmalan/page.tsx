@@ -153,6 +153,7 @@ export default function FelanmalanPage() {
             <select aria-label="Filtrera på prioritet" className={premiumFieldClass} value={priorityFilter} onChange={(event) => { setPriorityFilter(event.target.value); setPage(1); }}><option value="">Alla prioriteter</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             <select aria-label="Filtrera på fastighet" className={premiumFieldClass} value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(1); }}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           </div>
+          {/* eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full navigation triggers the CSV file download from the API route; a router.push() soft-navigation would not download the file */}
           <div className="mt-4 flex items-center justify-between gap-3"><p className="text-xs font-medium text-ink-500">{pagination.total.toLocaleString("sv-SE")} träffar</p>{permissions.canExport ? <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Exportera CSV</button> : null}</div>
         </div>
 
