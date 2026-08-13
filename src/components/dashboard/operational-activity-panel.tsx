@@ -116,7 +116,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
               required
               placeholder="Skriv en tydlig kommentar eller ett beslut…"
               aria-label="Skriv en kommentar"
-              className="min-h-28 w-full resize-y rounded-xl border border-sand-200 bg-white px-4 py-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
+              className="min-h-28 w-full resize-y rounded-xl border border-sand-200 bg-white px-4 py-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-500 focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
             />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <label className="inline-flex items-center gap-2 text-sm text-ink-600">
@@ -143,7 +143,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
                       <div className="rounded-xl bg-petroleum-50 p-2 text-petroleum-700"><MessageSquareText className="h-4 w-4" /></div>
                       <div>
                         <p className="text-sm font-semibold text-ink-900">{actorName(comment.user)}</p>
-                        <p className="text-xs text-ink-400">{formatDate(comment.created_at)}</p>
+                        <p className="text-xs text-ink-500">{formatDate(comment.created_at)}</p>
                       </div>
                     </div>
                     <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${comment.is_internal ? "bg-sand-100 text-ink-600" : "bg-petroleum-50 text-petroleum-800"}`}>

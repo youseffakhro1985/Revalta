@@ -95,9 +95,9 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
                   </div>
                   <p className="mt-2 text-sm text-ink-500">Basår {plan.base_year} · {plan.horizon_years} år · index {plan.annual_index_rate}%</p>
                   <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                    <div><p className="text-xs text-ink-400">Åtgärder</p><p className="mt-1 font-semibold text-ink-800">{plan.action_count}</p></div>
-                    <div><p className="text-xs text-ink-400">Grundkostnad</p><p className="mt-1 font-semibold text-ink-800">{money.format(plan.estimated_total)}</p></div>
-                    <div><p className="text-xs text-ink-400">Skapad</p><p className="mt-1 font-semibold text-ink-800">{date.format(new Date(plan.created_at))}</p></div>
+                    <div><p className="text-xs text-ink-500">Åtgärder</p><p className="mt-1 font-semibold text-ink-800">{plan.action_count}</p></div>
+                    <div><p className="text-xs text-ink-500">Grundkostnad</p><p className="mt-1 font-semibold text-ink-800">{money.format(plan.estimated_total)}</p></div>
+                    <div><p className="text-xs text-ink-500">Skapad</p><p className="mt-1 font-semibold text-ink-800">{date.format(new Date(plan.created_at))}</p></div>
                   </div>
                   {plan.approved_at ? <p className="mt-4 text-xs leading-5 text-ink-500">Godkänd {date.format(new Date(plan.approved_at))}{plan.approved_by_name ? ` av ${plan.approved_by_name}` : ""}.</p> : null}
                 </div>

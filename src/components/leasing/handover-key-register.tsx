@@ -17,7 +17,7 @@ export function HandoverKeyRegister({ keys, onChange, disabled = false }: { keys
         <Count label="Totalt" value={key.quantity} disabled={disabled} onChange={(value) => update(key.id, { quantity: value })} />
         <Count label="Utlämnat" value={key.handedOut} disabled={disabled} onChange={(value) => update(key.id, { handedOut: value })} />
         <Count label="Åter" value={key.returned} disabled={disabled} onChange={(value) => update(key.id, { returned: value })} />
-        {!disabled ? <button type="button" aria-label="Ta bort nyckelpost" onClick={() => onChange(keys.filter((item) => item.id !== key.id))} className="rounded-lg p-2 text-ink-400 hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button> : <span />}
+        {!disabled ? <button type="button" aria-label="Ta bort nyckelpost" onClick={() => onChange(keys.filter((item) => item.id !== key.id))} className="rounded-lg p-2 text-ink-500 hover:bg-red-50 hover:text-red-700"><Trash2 className="h-4 w-4" /></button> : <span />}
       </div>
       <input placeholder="Anteckning" aria-label="Anteckning" className={`${premiumFieldClass} mt-2`} value={key.note} disabled={disabled} onChange={(event) => update(key.id, { note: event.target.value })} />
     </div>)}</div>

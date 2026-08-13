@@ -302,7 +302,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             <div>
               <p className="text-sm text-ink-500">Attesterad tid</p>
               <p className="mt-2 text-2xl font-semibold text-ink-950">{Math.round((profit?.approvedMinutes || 0) / 60 * 10) / 10} h</p>
-              <p className="mt-1 text-xs text-ink-400">{profit?.billableMinutes || 0} min debiterbara</p>
+              <p className="mt-1 text-xs text-ink-500">{profit?.billableMinutes || 0} min debiterbara</p>
             </div>
             <Clock3 className="h-5 w-5 text-petroleum-700" />
           </div>
@@ -330,7 +330,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             <div>
               <p className="text-sm text-ink-500">Marginal</p>
               <p className="mt-2 text-2xl font-semibold text-ink-950">{money.format(profit?.margin || 0)}</p>
-              <p className="mt-1 text-xs text-ink-400">{profit?.marginPercent ?? 0}%</p>
+              <p className="mt-1 text-xs text-ink-500">{profit?.marginPercent ?? 0}%</p>
             </div>
             <Percent className="h-5 w-5 text-petroleum-700" />
           </div>

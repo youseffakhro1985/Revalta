@@ -187,9 +187,9 @@ export function MaintenancePortfolioPanel() {
           {portfolio.properties.map((property) => (
             <article key={property.id} className="grid gap-4 p-5 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center sm:px-6">
               <div><Link href={`/dashboard/fastigheter/${property.id}`} className="font-semibold text-ink-900 hover:text-petroleum-700">{property.name}</Link><p className="mt-1 text-xs text-ink-500">{property.actions.size} planerade åtgärder</p></div>
-              <div className="sm:text-right"><p className="text-xs text-ink-400">Investeringsbehov</p><p className="mt-1 font-semibold text-ink-900">{money.format(property.total)}</p></div>
-              <div className="sm:text-right"><p className="text-xs text-ink-400">Underhållsskuld</p><p className={`mt-1 font-semibold ${property.debt > 0 ? "text-amber-800" : "text-ink-900"}`}>{money.format(property.debt)}</p></div>
-              <div className="sm:text-right"><p className="text-xs text-ink-400">Högriskposter</p><p className="mt-1 font-semibold text-ink-900">{property.critical}</p></div>
+              <div className="sm:text-right"><p className="text-xs text-ink-500">Investeringsbehov</p><p className="mt-1 font-semibold text-ink-900">{money.format(property.total)}</p></div>
+              <div className="sm:text-right"><p className="text-xs text-ink-500">Underhållsskuld</p><p className={`mt-1 font-semibold ${property.debt > 0 ? "text-amber-800" : "text-ink-900"}`}>{money.format(property.debt)}</p></div>
+              <div className="sm:text-right"><p className="text-xs text-ink-500">Högriskposter</p><p className="mt-1 font-semibold text-ink-900">{property.critical}</p></div>
             </article>
           ))}
         </div>}
@@ -199,7 +199,7 @@ export function MaintenancePortfolioPanel() {
 }
 
 function FilterField({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
 }
 
 function SummaryRow({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {

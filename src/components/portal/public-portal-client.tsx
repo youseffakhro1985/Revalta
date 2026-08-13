@@ -338,7 +338,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                       <p className="text-xs font-semibold text-ink-900 uppercase tracking-wide">Uppdateringar</p>
                       {trackedTicket.comments.map((comment) => (
                         <div key={comment.id} className="rounded-lg border border-sand-100 bg-sand-50/50 p-3.5">
-                           <p className="text-xs font-medium text-ink-950 mb-1">{comment.author?.name || comment.user?.name || "Förvaltningen"} <span className="text-[10px] text-ink-400 font-normal ml-2">{dateFormatter.format(new Date(comment.created_at))}</span></p>
+                           <p className="text-xs font-medium text-ink-950 mb-1">{comment.author?.name || comment.user?.name || "Förvaltningen"} <span className="text-[10px] text-ink-500 font-normal ml-2">{dateFormatter.format(new Date(comment.created_at))}</span></p>
                            <p className="text-sm text-ink-700">{comment.body}</p>
                         </div>
                       ))}

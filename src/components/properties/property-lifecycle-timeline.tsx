@@ -108,7 +108,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-semibold ${overdue ? "text-amber-800" : "text-ink-800"}`}>{dateFormatter.format(item.date)}</p>
-                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink-400">{overdue ? "Försenad" : config[item.kind].label}</p>
+                      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">{overdue ? "Försenad" : config[item.kind].label}</p>
                     </div>
                   </div>
                 </div>

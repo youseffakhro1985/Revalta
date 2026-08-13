@@ -73,7 +73,7 @@ export function ComponentEntryCorrections({ propertyId, componentId }: { propert
           <CorrectionList title="Kostnadsposter" rows={costs} kind="cost" onEdit={(row) => setEditing({ kind: "cost", row })} />
         </div>
       )}
-      <p className="mt-5 border-t border-sand-100 pt-4 text-xs text-ink-400">Poster tas inte bort. Ursprungsvärden och vem som gjorde korrigeringen bevaras i revisionsloggen.</p>
+      <p className="mt-5 border-t border-sand-100 pt-4 text-xs text-ink-500">Poster tas inte bort. Ursprungsvärden och vem som gjorde korrigeringen bevaras i revisionsloggen.</p>
     </Panel>
   );
 }

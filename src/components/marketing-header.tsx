@@ -20,7 +20,7 @@ export function MarketingHeader() {
             Revalta
           </span>
           <span className="hidden h-5 w-px bg-sand-300 sm:block" />
-          <span className="hidden text-[10px] font-semibold uppercase leading-[1.15] tracking-[0.14em] text-ink-400 sm:block">
+          <span className="hidden text-[10px] font-semibold uppercase leading-[1.15] tracking-[0.14em] text-ink-500 sm:block">
             Svenskt
             <br />
             fastighetssystem

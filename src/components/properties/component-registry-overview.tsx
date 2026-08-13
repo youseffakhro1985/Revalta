@@ -88,10 +88,10 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
                       <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${warning ? "bg-amber-50 text-amber-800" : "bg-petroleum-50 text-petroleum-800"}`}>{condition ? `Skick ${condition}/5` : "Ej bedömd"}</span>
                     </div>
                     <p className="mt-1 text-xs text-ink-500">{text(asset, "component_class") || labels[text(asset, "category")] || text(asset, "category") || "Komponent"}{text(asset, "building_name") ? ` · ${text(asset, "building_name")}` : ""}{text(asset, "location") ? ` · ${text(asset, "location")}` : ""}</p>
-                    <p className="mt-2 text-xs text-ink-400">Senaste händelse {formatDate(asset.last_event_at)} · {number(asset, "event_count")} livscykelhändelser</p>
+                    <p className="mt-2 text-xs text-ink-500">Senaste händelse {formatDate(asset.last_event_at)} · {number(asset, "event_count")} livscykelhändelser</p>
                   </div>
-                  <div className="sm:text-right"><p className="text-xs text-ink-400">Beräknat byte</p><p className="mt-1 font-semibold text-ink-900">{replacementYear || "Ej satt"}</p></div>
-                  <div className="sm:text-right"><p className="text-xs text-ink-400">Återanskaffning</p><p className="mt-1 font-semibold text-ink-900">{number(asset, "replacement_value") ? money.format(number(asset, "replacement_value")) : "Ej satt"}</p><p className="mt-1 text-xs font-semibold text-petroleum-700">Öppna komponent</p></div>
+                  <div className="sm:text-right"><p className="text-xs text-ink-500">Beräknat byte</p><p className="mt-1 font-semibold text-ink-900">{replacementYear || "Ej satt"}</p></div>
+                  <div className="sm:text-right"><p className="text-xs text-ink-500">Återanskaffning</p><p className="mt-1 font-semibold text-ink-900">{number(asset, "replacement_value") ? money.format(number(asset, "replacement_value")) : "Ej satt"}</p><p className="mt-1 text-xs font-semibold text-petroleum-700">Öppna komponent</p></div>
                 </Link>
               );
             })}

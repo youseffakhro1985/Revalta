@@ -11,7 +11,7 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
     default: "bg-petroleum-600 text-white hover:bg-petroleum-700",
     secondary: "bg-sand-100 text-ink-900 hover:bg-sand-200",
     outline: "border-sand-200 bg-white text-ink-900",
-    destructive: "border-red-200 bg-red-50 text-red-600 hover:bg-red-100",
+    destructive: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
     success: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
     warning: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
   };

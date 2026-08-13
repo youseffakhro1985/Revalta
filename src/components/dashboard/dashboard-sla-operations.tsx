@@ -177,7 +177,7 @@ export async function DashboardSlaOperations() {
                   <p className="mt-1 truncate font-semibold text-ink-900">{item.title}</p>
                   <p className="mt-1 text-xs text-ink-500">{item.property?.name || "Ingen fastighet"} · {item.assigned_to?.name || item.assigned_to?.email || "Saknar ansvarig"}</p>
                 </div>
-                <div className="sm:text-right"><p className={`text-sm font-semibold ${item.sla.risk === "overdue" ? "text-red-700" : item.sla.risk === "critical" ? "text-orange-700" : "text-amber-700"}`}>{timeText}</p>{item.sla.dueAt ? <p className="mt-1 text-[11px] text-ink-400">{dateTime.format(new Date(item.sla.dueAt))}</p> : null}</div>
+                <div className="sm:text-right"><p className={`text-sm font-semibold ${item.sla.risk === "overdue" ? "text-red-700" : item.sla.risk === "critical" ? "text-orange-700" : "text-amber-700"}`}>{timeText}</p>{item.sla.dueAt ? <p className="mt-1 text-[11px] text-ink-500">{dateTime.format(new Date(item.sla.dueAt))}</p> : null}</div>
               </Link>
             );
           })}
