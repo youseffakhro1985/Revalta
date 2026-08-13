@@ -12,6 +12,9 @@ import {
   expiredSessionCookieOptions,
   sessionCookieOptions,
 } from "@/lib/session-policy";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/team/invites/accept" });
 
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
@@ -70,7 +73,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Preview team invite error:", error);
+    logger.error("Preview team invite error", error);
     return noStore({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -170,7 +173,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Accept team invite error:", error);
+    logger.error("Accept team invite error", error);
     return noStore({ error: "Internt serverfel" }, { status: 500 });
   }
 }

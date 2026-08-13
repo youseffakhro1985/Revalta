@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/properties/[id]/units" });
 
 const allowedTypes = new Set(["apartment", "commercial", "storage", "garage", "parking", "technical", "other"]);
 
@@ -60,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ success: true, unit }, { status: 201 });
   } catch (error) {
-    console.error("Create unit error:", error);
+    logger.error("Create unit error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

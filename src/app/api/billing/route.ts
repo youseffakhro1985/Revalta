@@ -3,6 +3,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { canManageBilling, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/billing" });
 
 const plans = {
   start: { label: "Start", price: 495, propertyLimit: 10, teamLimit: 3 },
@@ -51,7 +54,7 @@ export async function GET() {
       subscriptionStatus: company?.subscription_status || null,
     });
   } catch (error) {
-    console.error("Get billing error:", error);
+    logger.error("Get billing error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -85,7 +88,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, company });
   } catch (error) {
-    console.error("Update billing error:", error);
+    logger.error("Update billing error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

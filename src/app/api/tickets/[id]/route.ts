@@ -23,6 +23,9 @@ import {
   type WorkOrderStatus,
 } from "@/lib/work-order-lifecycle";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]" });
 
 export async function GET(
   _request: Request,
@@ -133,7 +136,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Get ticket error:", error);
+    logger.error("Get ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -329,7 +332,7 @@ export async function PATCH(
       allowedTransitions: allowedWorkOrderTransitions(ticket.status as WorkOrderStatus),
     });
   } catch (error) {
-    console.error("Update ticket error:", error);
+    logger.error("Update ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -373,7 +376,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete ticket error:", error);
+    logger.error("Delete ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

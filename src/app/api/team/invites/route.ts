@@ -5,8 +5,11 @@ import { canManageTeam, getCurrentUser } from "@/lib/current-user";
 import { queueTicketNotification } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 import { isValidEmail, normalizeEmail } from "@/lib/security";
+import { createLogger } from "@/lib/structured-logger";
 
 const allowedRoles = new Set(["admin", "manager", "technician", "viewer", "resident"]);
+
+const logger = createLogger({ route: "/api/team/invites" });
 
 export async function GET() {
   try {
@@ -34,7 +37,7 @@ export async function GET() {
 
     return NextResponse.json({ invites });
   } catch (error) {
-    console.error("Get team invites error:", error);
+    logger.error("Get team invites error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
       inviteUrl: canExposeInviteUrl ? inviteUrl : undefined,
     }, { status: 201 });
   } catch (error) {
-    console.error("Create team invite error:", error);
+    logger.error("Create team invite error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

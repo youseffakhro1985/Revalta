@@ -3,6 +3,9 @@ import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCur
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/energy" });
 
 const action = "energy.reading.created";
 
@@ -64,7 +67,7 @@ export async function GET() {
 
     return NextResponse.json({ readings: mergeByCreatedAt(modern, legacy, 500), properties, permissions: { canManage: canManageWorkOrderFinance(user.role) } });
   } catch (error) {
-    console.error("Get energy readings error:", error);
+    logger.error("Get energy readings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -141,7 +144,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, reading }, { status: 201 });
   } catch (error) {
-    console.error("Create energy reading error:", error);
+    logger.error("Create energy reading error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -264,7 +267,7 @@ export async function PATCH(request: Request) {
       cost_per_sqm: costPerSqm,
     });
   } catch (error) {
-    console.error("Update energy reading error:", error);
+    logger.error("Update energy reading error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -325,7 +328,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
-    console.error("Delete energy reading error:", error);
+    logger.error("Delete energy reading error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

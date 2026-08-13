@@ -284,7 +284,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
 }
 
 function FilterField({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
 }
 
 function BudgetRow({ name, amount, total }: { name: string; amount: number; total: number }) {

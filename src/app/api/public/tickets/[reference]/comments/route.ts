@@ -4,6 +4,9 @@ import { queueTicketNotification } from "@/lib/integrations";
 import { extractPortalTrackingToken, verifyPortalTrackingToken } from "@/lib/portal-tracking";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/public/tickets/[reference]/comments" });
 
 export async function POST(
   request: Request,
@@ -107,7 +110,7 @@ export async function POST(
       },
     }, { status: 201 });
   } catch (error) {
-    console.error("Create public comment error:", error);
+    logger.error("Create public comment error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

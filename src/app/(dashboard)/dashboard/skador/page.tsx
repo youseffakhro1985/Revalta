@@ -136,9 +136,9 @@ export default function InsuranceClaimsPage() {
   const field = "h-11 w-full rounded-lg border border-sand-200 bg-white px-3 text-sm text-ink-800 outline-none transition focus:border-petroleum-500";
 
   return <div className="space-y-8">
-    <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-400">Risk och försäkring</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-ink-900">Skador och försäkringsärenden</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Samlad uppföljning av skador, kostnader, självrisker, ersättningar och kontakt med försäkringsbolag.</p></div>
+    <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Risk och försäkring</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-ink-900">Skador och försäkringsärenden</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Samlad uppföljning av skador, kostnader, självrisker, ersättningar och kontakt med försäkringsbolag.</p></div>
 
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["Öppna ärenden", openClaims], ["Beräknad kostnad", money.format(totalEstimated)], ["Försäkringsersättning", money.format(totalCompensation)], ["Nettokostnad", money.format(totalNet)]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-sand-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,34,31,0.04)]"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">{label}</p><p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink-900">{value}</p></div>)}</div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["Öppna ärenden", openClaims], ["Beräknad kostnad", money.format(totalEstimated)], ["Försäkringsersättning", money.format(totalCompensation)], ["Nettokostnad", money.format(totalNet)]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-sand-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,34,31,0.04)]"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">{label}</p><p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink-900">{value}</p></div>)}</div>
 
     {error ? <InlineAlert tone="error">{error}</InlineAlert> : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra skadeärenden.</InlineAlert> : null}
@@ -147,20 +147,20 @@ export default function InsuranceClaimsPage() {
     <form onSubmit={submit} className="rounded-xl border border-sand-200 bg-white p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)]">
       <div className="mb-5"><h2 className="font-display text-xl font-semibold text-ink-900">Registrera skadeärende</h2><p className="mt-1 text-sm text-ink-500">Dokumentera händelsen och den ekonomiska bedömningen.</p></div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <select name="propertyId" required className={field}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-        <input name="title" required placeholder="Rubrik" className={field} />
-        <select name="damageType" className={field}>{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <input name="incidentDate" type="date" className={field} />
-        <input name="location" placeholder="Skadeplats" className={field} />
-        <input name="insurer" placeholder="Försäkringsbolag" className={field} />
-        <input name="claimNumber" placeholder="Skadenummer" className={field} />
-        <input name="responsible" placeholder="Ansvarig" className={field} />
-        <select name="status" className={field}>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <input name="estimatedCost" type="number" min="0" placeholder="Beräknad kostnad" className={field} />
-        <input name="deductible" type="number" min="0" placeholder="Självrisk" className={field} />
-        <input name="compensation" type="number" min="0" placeholder="Ersättning" className={field} />
+        <select name="propertyId" required className={field} aria-label="Fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+        <input name="title" required placeholder="Rubrik" className={field} aria-label="Rubrik" />
+        <select name="damageType" className={field} aria-label="Skadetyp">{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <input name="incidentDate" type="date" className={field} aria-label="Skadedatum" />
+        <input name="location" placeholder="Skadeplats" className={field} aria-label="Skadeplats" />
+        <input name="insurer" placeholder="Försäkringsbolag" className={field} aria-label="Försäkringsbolag" />
+        <input name="claimNumber" placeholder="Skadenummer" className={field} aria-label="Skadenummer" />
+        <input name="responsible" placeholder="Ansvarig" className={field} aria-label="Ansvarig" />
+        <select name="status" className={field} aria-label="Status">{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <input name="estimatedCost" type="number" min="0" placeholder="Beräknad kostnad" className={field} aria-label="Beräknad kostnad" />
+        <input name="deductible" type="number" min="0" placeholder="Självrisk" className={field} aria-label="Självrisk" />
+        <input name="compensation" type="number" min="0" placeholder="Ersättning" className={field} aria-label="Ersättning" />
       </div>
-      <textarea name="note" placeholder="Anteckning och nästa steg" className="mt-4 min-h-24 w-full rounded-lg border border-sand-200 bg-white px-3 py-3 text-sm outline-none focus:border-petroleum-500" />
+      <textarea name="note" placeholder="Anteckning och nästa steg" className="mt-4 min-h-24 w-full rounded-lg border border-sand-200 bg-white px-3 py-3 text-sm outline-none focus:border-petroleum-500" aria-label="Anteckning och nästa steg" />
       <div className="mt-4 flex justify-end"><button disabled={saving} className="rounded-lg bg-petroleum-800 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{saving ? "Sparar…" : "Registrera skadeärende"}</button></div>
     </form>
     ) : null}
@@ -182,11 +182,11 @@ export default function InsuranceClaimsPage() {
                     ) : null}
                   </div>
                   <div>
-                    <p className="text-xs text-ink-400">Försäkringsbolag</p>
+                    <p className="text-xs text-ink-500">Försäkringsbolag</p>
                     <p className="mt-1 text-sm text-ink-700">{claim.insurer || "Ej angivet"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-ink-400">Ekonomi</p>
+                    <p className="text-xs text-ink-500">Ekonomi</p>
                     <p className="mt-1 text-sm text-ink-700">Netto {money.format(Number(claim.net_cost || 0))}</p>
                   </div>
                   <div className="space-y-2">
@@ -221,14 +221,14 @@ export default function InsuranceClaimsPage() {
                 </div>
                 {canManage && editingId === claim.id && canEditFields ? (
                   <div className="mt-4 grid gap-3 border-t border-sand-100 pt-4 md:grid-cols-2 xl:grid-cols-4">
-                    <input className={field} placeholder="Rubrik" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-                    <input className={field} placeholder="Skadeplats" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
-                    <input className={field} placeholder="Försäkringsbolag" value={editForm.insurer} onChange={(e) => setEditForm({ ...editForm, insurer: e.target.value })} />
-                    <input className={field} placeholder="Skadenummer" value={editForm.claimNumber} onChange={(e) => setEditForm({ ...editForm, claimNumber: e.target.value })} />
-                    <input className={field} type="number" min="0" placeholder="Beräknad kostnad" value={editForm.estimatedCost} onChange={(e) => setEditForm({ ...editForm, estimatedCost: e.target.value })} />
-                    <input className={field} type="number" min="0" placeholder="Självrisk" value={editForm.deductible} onChange={(e) => setEditForm({ ...editForm, deductible: e.target.value })} />
-                    <input className={field} type="number" min="0" placeholder="Ersättning" value={editForm.compensation} onChange={(e) => setEditForm({ ...editForm, compensation: e.target.value })} />
-                    <textarea className="min-h-11 rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500 md:col-span-2 xl:col-span-1" placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                    <input className={field} placeholder="Rubrik" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} aria-label="Rubrik" />
+                    <input className={field} placeholder="Skadeplats" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} aria-label="Skadeplats" />
+                    <input className={field} placeholder="Försäkringsbolag" value={editForm.insurer} onChange={(e) => setEditForm({ ...editForm, insurer: e.target.value })} aria-label="Försäkringsbolag" />
+                    <input className={field} placeholder="Skadenummer" value={editForm.claimNumber} onChange={(e) => setEditForm({ ...editForm, claimNumber: e.target.value })} aria-label="Skadenummer" />
+                    <input className={field} type="number" min="0" placeholder="Beräknad kostnad" value={editForm.estimatedCost} onChange={(e) => setEditForm({ ...editForm, estimatedCost: e.target.value })} aria-label="Beräknad kostnad" />
+                    <input className={field} type="number" min="0" placeholder="Självrisk" value={editForm.deductible} onChange={(e) => setEditForm({ ...editForm, deductible: e.target.value })} aria-label="Självrisk" />
+                    <input className={field} type="number" min="0" placeholder="Ersättning" value={editForm.compensation} onChange={(e) => setEditForm({ ...editForm, compensation: e.target.value })} aria-label="Ersättning" />
+                    <textarea className="min-h-11 rounded-lg border border-sand-200 bg-white px-3 py-2 text-sm outline-none focus:border-petroleum-500 md:col-span-2 xl:col-span-1" placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} aria-label="Anteckning" />
                     <button
                       type="button"
                       disabled={updatingId === claim.id}

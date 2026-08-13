@@ -139,7 +139,7 @@ export default function SettingsPage() {
       </header>
 
       {(error || success) && (
-        <div className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-600" : "border-success-500 bg-success-50 text-success-600"}`}>
+        <div className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>
           {error || success}
         </div>
       )}
@@ -149,7 +149,7 @@ export default function SettingsPage() {
           <h2 className="text-xl font-semibold text-ink-950">Profil</h2>
           <p className="mt-2 text-sm text-ink-500">Dina personliga uppgifter i Revalta.</p>
           <label className="mt-6 block text-sm font-medium text-ink-700">Namn</label>
-          <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+          <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Namn" />
           <div className="mt-4 rounded-lg bg-sand-50 p-4 text-sm text-ink-600">
             <p>{profile?.email}</p>
             <p className="mt-1">Roll: {profile?.role}</p>
@@ -164,11 +164,11 @@ export default function SettingsPage() {
           <fieldset disabled={!canManageCompany || loading} className="mt-6 space-y-4 disabled:opacity-60">
             <div>
               <label className="block text-sm font-medium text-ink-700">Namn</label>
-              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Namn" />
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Organisationsnummer</label>
-              <input value={orgNumber} onChange={(event) => setOrgNumber(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" placeholder="556000-0000" />
+              <input value={orgNumber} onChange={(event) => setOrgNumber(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" placeholder="556000-0000" aria-label="Organisationsnummer" />
             </div>
             <div className="rounded-lg bg-sand-50 p-4 text-sm text-ink-600">Plan: {company?.plan}</div>
             <button className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800">Spara organisation</button>
@@ -181,16 +181,16 @@ export default function SettingsPage() {
           <div className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-ink-700">Nuvarande lösenord</label>
-              <input required autoComplete="current-password" type="password" maxLength={512} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+              <input required autoComplete="current-password" type="password" maxLength={512} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Nuvarande lösenord" />
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Nytt lösenord</label>
-              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Nytt lösenord" />
               <p className="mt-2 text-xs text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Bekräfta nytt lösenord</label>
-              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" />
+              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Bekräfta nytt lösenord" />
             </div>
             <button disabled={loading} className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">{loading ? "Uppdaterar…" : "Byt lösenord säkert"}</button>
           </div>

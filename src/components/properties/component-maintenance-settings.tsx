@@ -79,9 +79,9 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
         {saved ? <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" /> Inställningarna är sparade</div> : null}
 
         <div className="grid gap-4 rounded-2xl border border-sand-200 bg-sand-50 p-4 sm:grid-cols-3">
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Senast genomförd service</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings.last_service_completed_at)}</p></div>
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Servicecykel flyttad</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings.maintenance_cycle_advanced_at)}</p></div>
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Nästa service</p><p className="mt-2 text-sm font-semibold text-petroleum-800">{formatDate(settings.next_service_at)}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Senast genomförd service</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings.last_service_completed_at)}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Servicecykel flyttad</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings.maintenance_cycle_advanced_at)}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Nästa service</p><p className="mt-2 text-sm font-semibold text-petroleum-800">{formatDate(settings.next_service_at)}</p></div>
           {settings.last_service_work_order_id ? <div className="sm:col-span-3 border-t border-sand-200 pt-3"><Link href={`/dashboard/arbetsorder/${settings.last_service_work_order_id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-800 hover:text-petroleum-950">{settings.last_service_work_order_number || "Öppna avslutad arbetsorder"}<ExternalLink className="h-4 w-4" /></Link></div> : null}
         </div>
 
@@ -91,7 +91,7 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
           <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Framförhållning, dagar</span><input type="number" min="0" max="365" value={form.serviceLeadDays} onChange={(event) => setForm((current) => ({ ...current, serviceLeadDays: event.target.value }))} className={premiumFieldClass} /></label>
         </div>
         <label className="flex items-start gap-3 rounded-2xl border border-sand-200 bg-sand-50 p-4"><input type="checkbox" checked={form.autoCreateServiceWorkOrders} onChange={(event) => setForm((current) => ({ ...current, autoCreateServiceWorkOrders: event.target.checked }))} className="mt-1 h-4 w-4 rounded border-sand-300 text-petroleum-700" /><span><span className="block text-sm font-semibold text-ink-900">Skapa arbetsorder automatiskt</span><span className="mt-1 block text-sm text-ink-500">Revalta skapar en förebyggande arbetsorder när servicedatumet når vald framförhållning. Dubbletter förhindras per servicecykel.</span></span></label>
-        <div className="flex flex-col gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="inline-flex items-center gap-2 text-xs text-ink-400"><CalendarClock className="h-4 w-4" /> Ändringar registreras i revisionsloggen.</p><button type="submit" disabled={saving || !dirty} className={premiumPrimaryButtonClass}><RefreshCw className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} /> {saving ? "Sparar…" : "Spara underhållsplan"}</button></div>
+        <div className="flex flex-col gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="inline-flex items-center gap-2 text-xs text-ink-500"><CalendarClock className="h-4 w-4" /> Ändringar registreras i revisionsloggen.</p><button type="submit" disabled={saving || !dirty} className={premiumPrimaryButtonClass}><RefreshCw className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} /> {saving ? "Sparar…" : "Spara underhållsplan"}</button></div>
       </form>
     </Panel>
   );

@@ -161,19 +161,19 @@ export default function VendorsPage() {
     <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
       <Panel title="Lägg till leverantör" description="Registrera leverantör, kontakt och avtalsbevakning.">
         <form onSubmit={submit} className="space-y-4">
-          <input required placeholder="Företagsnamn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={premiumFieldClass} />
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={premiumFieldClass}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
-          <input placeholder="Kontaktperson" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className={premiumFieldClass} />
-          <div className="grid gap-3 sm:grid-cols-2"><input type="email" placeholder="E-post" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={premiumFieldClass} /><input placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={premiumFieldClass} /></div>
-          <input placeholder="Avtalsnamn" value={form.contractTitle} onChange={(e) => setForm({ ...form, contractTitle: e.target.value })} className={premiumFieldClass} />
-          <div className="grid gap-3 sm:grid-cols-2"><input type="number" min="0" placeholder="Årsvärde exkl. moms" value={form.contractValue} onChange={(e) => setForm({ ...form, contractValue: e.target.value })} className={premiumFieldClass} /><input type="number" min="0" placeholder="Uppsägning månader" value={form.noticeMonths} onChange={(e) => setForm({ ...form, noticeMonths: e.target.value })} className={premiumFieldClass} /></div>
-          <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className={premiumFieldClass} />
+          <input required placeholder="Företagsnamn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={premiumFieldClass} aria-label="Företagsnamn" />
+          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={premiumFieldClass} aria-label="Kategori">{categories.map((item) => <option key={item}>{item}</option>)}</select>
+          <input placeholder="Kontaktperson" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className={premiumFieldClass} aria-label="Kontaktperson" />
+          <div className="grid gap-3 sm:grid-cols-2"><input type="email" placeholder="E-post" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={premiumFieldClass} aria-label="E-post" /><input placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={premiumFieldClass} aria-label="Telefon" /></div>
+          <input placeholder="Avtalsnamn" value={form.contractTitle} onChange={(e) => setForm({ ...form, contractTitle: e.target.value })} className={premiumFieldClass} aria-label="Avtalsnamn" />
+          <div className="grid gap-3 sm:grid-cols-2"><input type="number" min="0" placeholder="Årsvärde exkl. moms" value={form.contractValue} onChange={(e) => setForm({ ...form, contractValue: e.target.value })} className={premiumFieldClass} aria-label="Årsvärde exkl. moms" /><input type="number" min="0" placeholder="Uppsägning månader" value={form.noticeMonths} onChange={(e) => setForm({ ...form, noticeMonths: e.target.value })} className={premiumFieldClass} aria-label="Uppsägning månader" /></div>
+          <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className={premiumFieldClass} aria-label="Slutdatum" />
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara leverantör"}</button>
         </form>
       </Panel>
 
       <Panel title="Leverantörsregister" description="Sök avtal, kategorier och kontaktpersoner." bodyClassName="p-0">
-        <div className="border-b border-sand-200 p-5"><input placeholder="Sök leverantör, kategori eller kontaktperson" value={query} onChange={(e) => setQuery(e.target.value)} className={premiumFieldClass} /></div>
+        <div className="border-b border-sand-200 p-5"><input placeholder="Sök leverantör, kategori eller kontaktperson" value={query} onChange={(e) => setQuery(e.target.value)} className={premiumFieldClass} aria-label="Sök leverantör, kategori eller kontaktperson" /></div>
         {loading ? <div className="space-y-3 p-6">{[1,2,3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}</div> : visible.length === 0 ? <EmptyState title="Inga leverantörer" description="När en leverantör registreras visas den här." /> : (
           <div className="divide-y divide-sand-100">
             {visible.map((vendor) => {
@@ -196,7 +196,7 @@ export default function VendorsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-ink-800">{vendor.contractTitle || "Inget avtal angivet"}</p>
-                      <p className="mt-1 text-xs text-ink-400">Uppsägning {vendor.noticeMonths || 0} mån · {vendor.endDate ? `slut ${new Date(vendor.endDate).toLocaleDateString("sv-SE")}` : "inget slutdatum"}</p>
+                      <p className="mt-1 text-xs text-ink-500">Uppsägning {vendor.noticeMonths || 0} mån · {vendor.endDate ? `slut ${new Date(vendor.endDate).toLocaleDateString("sv-SE")}` : "inget slutdatum"}</p>
                       {vendor.source !== "legacy" ? (
                         <select
                           disabled={updatingId === vendor.id}
@@ -228,28 +228,28 @@ export default function VendorsPage() {
                     <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                       {isActive ? (
                         <>
-                          <input className={premiumFieldClass} placeholder="Företagsnamn" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-                          <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                          <input className={premiumFieldClass} placeholder="Företagsnamn" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} aria-label="Företagsnamn" />
+                          <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} aria-label="Kategori">
                             {categories.map((item) => <option key={item}>{item}</option>)}
                           </select>
                         </>
                       ) : null}
-                      <input className={premiumFieldClass} placeholder="Kontaktperson" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} />
+                      <input className={premiumFieldClass} placeholder="Kontaktperson" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} aria-label="Kontaktperson" />
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <input className={premiumFieldClass} type="email" placeholder="E-post" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
-                        <input className={premiumFieldClass} placeholder="Telefon" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                        <input className={premiumFieldClass} type="email" placeholder="E-post" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} aria-label="E-post" />
+                        <input className={premiumFieldClass} placeholder="Telefon" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} aria-label="Telefon" />
                       </div>
                       {isActive ? (
                         <>
-                          <input className={premiumFieldClass} placeholder="Avtalsnamn" value={editForm.contractTitle} onChange={(e) => setEditForm({ ...editForm, contractTitle: e.target.value })} />
+                          <input className={premiumFieldClass} placeholder="Avtalsnamn" value={editForm.contractTitle} onChange={(e) => setEditForm({ ...editForm, contractTitle: e.target.value })} aria-label="Avtalsnamn" />
                           <div className="grid gap-3 sm:grid-cols-2">
-                            <input className={premiumFieldClass} type="number" min="0" placeholder="Årsvärde" value={editForm.contractValue} onChange={(e) => setEditForm({ ...editForm, contractValue: e.target.value })} />
-                            <input className={premiumFieldClass} type="number" min="0" placeholder="Uppsägning mån" value={editForm.noticeMonths} onChange={(e) => setEditForm({ ...editForm, noticeMonths: e.target.value })} />
+                            <input className={premiumFieldClass} type="number" min="0" placeholder="Årsvärde" value={editForm.contractValue} onChange={(e) => setEditForm({ ...editForm, contractValue: e.target.value })} aria-label="Årsvärde" />
+                            <input className={premiumFieldClass} type="number" min="0" placeholder="Uppsägning mån" value={editForm.noticeMonths} onChange={(e) => setEditForm({ ...editForm, noticeMonths: e.target.value })} aria-label="Uppsägning mån" />
                           </div>
-                          <input className={premiumFieldClass} type="date" value={editForm.endDate} onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })} />
+                          <input className={premiumFieldClass} type="date" value={editForm.endDate} onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })} aria-label="Slutdatum" />
                         </>
                       ) : (
-                        <p className="text-xs text-ink-400">Avslutade avtal: endast kontaktuppgifter kan ändras.</p>
+                        <p className="text-xs text-ink-500">Avslutade avtal: endast kontaktuppgifter kan ändras.</p>
                       )}
                       <button
                         type="button"

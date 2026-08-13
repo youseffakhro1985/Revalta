@@ -69,7 +69,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               </div>
               <h1 className="text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">{property.name}</h1>
               <p className="mt-3 flex items-center gap-2 text-base text-ink-600"><MapPin className="h-4 w-4 text-petroleum-700" />{property.address}{property.postal_code ? `, ${property.postal_code}` : ""} {property.city}</p>
-              {property.property_identifier && <p className="mt-2 text-sm font-medium text-ink-400">Fastighetsbeteckning: {property.property_identifier}</p>}
+              {property.property_identifier && <p className="mt-2 text-sm font-medium text-ink-500">Fastighetsbeteckning: {property.property_identifier}</p>}
             </div>
             <Link href={`/dashboard/felanmalan?property=${property.id}`} className="relative rounded-lg bg-petroleum-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-petroleum-800">Skapa ärende</Link>
           </div>
@@ -94,7 +94,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-5 text-sm sm:grid-cols-2">
             {[
               ["Fastighetstyp", property.property_type], ["Byggår", property.construction_year?.toString() || "Ej angivet"], ["Total area", property.total_area ? `${property.total_area} m²` : "Ej angivet"], ["BOA / LOA", `${property.boa ? `${property.boa} m²` : "–"} / ${property.loa ? `${property.loa} m²` : "–"}`], ["Ansvarig förvaltare", property.manager_name || "Ej angivet"], ["Kontaktperson", property.contact_name || "Ej angivet"], ["E-post", property.contact_email || "Ej angivet"], ["Registrerad", formatDate(property.created_at)],
-            ].map(([label, value]) => <div key={label} className="border-b border-sand-100 pb-4"><dt className="text-ink-400">{label}</dt><dd className="mt-1 font-semibold text-ink-900">{value}</dd></div>)}
+            ].map(([label, value]) => <div key={label} className="border-b border-sand-100 pb-4"><dt className="text-ink-500">{label}</dt><dd className="mt-1 font-semibold text-ink-900">{value}</dd></div>)}
           </dl>
         </section>
 

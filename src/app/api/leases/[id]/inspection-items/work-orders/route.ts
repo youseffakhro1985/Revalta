@@ -5,6 +5,9 @@ import type { LeaseInspectionRecord } from "@/lib/lease-inspection-items";
 import { addWorkOrderStatusEvent, allocateWorkOrderNumber, calculateWorkOrderSla, setWorkOrderEnterpriseFields } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases/[id]/inspection-items/work-orders" });
 
 const RECORD_EVENT = "lease_inspection_items";
 const LINK_EVENT = "lease_inspection_item_work_order";
@@ -242,7 +245,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ created, skipped: items.length - pending.length }, { status: 201 });
   } catch (error) {
-    console.error("Create inspection item work orders error:", error);
+    logger.error("Create inspection item work orders error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -75,7 +75,7 @@ export function ComponentRegistryManager({ propertyId }: { propertyId: string })
         {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-          <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">Komponent</span><select value={assetId} onChange={(event) => setAssetId(event.target.value)} className={premiumFieldClass}>{assets.map((item) => <option key={String(item.id)} value={String(item.id)}>{text(item, "name")}{text(item, "building_name") ? ` · ${text(item, "building_name")}` : ""}</option>)}</select></label>
+          <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Komponent</span><select value={assetId} onChange={(event) => setAssetId(event.target.value)} className={premiumFieldClass}>{assets.map((item) => <option key={String(item.id)} value={String(item.id)}>{text(item, "name")}{text(item, "building_name") ? ` · ${text(item, "building_name")}` : ""}</option>)}</select></label>
           <div className="grid grid-cols-3 rounded-xl bg-sand-50 p-1">
             <ModeButton active={mode === "update"} onClick={() => setMode("update")} icon={Settings2}>Grunddata</ModeButton>
             <ModeButton active={mode === "event"} onClick={() => setMode("event")} icon={ClipboardCheck}>Händelse</ModeButton>
@@ -102,7 +102,7 @@ function UpdateFields({ asset }: { asset?: Asset }) {
     <Field label="Teknisk livslängd, år" name="technicalLifetimeYears" type="number" defaultValue={text(asset, "technical_lifetime_years")} />
     <Field label="Ekonomisk livslängd, år" name="economicLifetimeYears" type="number" defaultValue={text(asset, "economic_lifetime_years")} />
     <Field label="Beräknat utbytesår" name="expectedReplacementYear" type="number" defaultValue={text(asset, "expected_replacement_year")} />
-    <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">Skick 1–5</span><select name="conditionGrade" defaultValue={text(asset, "condition_grade")} className={premiumFieldClass}><option value="">Ej bedömt</option>{[1,2,3,4,5].map((value) => <option key={value} value={value}>{value} – {value <= 2 ? "Gott" : value === 3 ? "Godtagbart" : value === 4 ? "Dåligt" : "Kritiskt"}</option>)}</select></label>
+    <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Skick 1–5</span><select name="conditionGrade" defaultValue={text(asset, "condition_grade")} className={premiumFieldClass}><option value="">Ej bedömt</option>{[1,2,3,4,5].map((value) => <option key={value} value={value}>{value} – {value <= 2 ? "Gott" : value === 3 ? "Godtagbart" : value === 4 ? "Dåligt" : "Kritiskt"}</option>)}</select></label>
     <Field label="Återanskaffningsvärde exkl. moms" name="replacementValue" type="number" defaultValue={text(asset, "replacement_value")} />
     <Field label="Ansvarig leverantör" name="responsibleSupplier" defaultValue={text(asset, "responsible_supplier")} />
   </div>;
@@ -110,20 +110,20 @@ function UpdateFields({ asset }: { asset?: Asset }) {
 
 function EventFields() {
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-    <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">Händelsetyp</span><select name="eventType" className={premiumFieldClass}>{Object.entries(eventLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Händelsetyp</span><select name="eventType" className={premiumFieldClass}>{Object.entries(eventLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     <Field label="Datum" name="eventDate" type="date" required />
     <Field label="Rubrik" name="title" required />
     <Field label="Leverantör/utförare" name="provider" />
     <Field label="Resultat" name="result" />
     <Field label="Nästa förfallodatum" name="nextDueAt" type="date" />
     <Field label="Mätarställning" name="meterReading" type="number" />
-    <label className="block sm:col-span-2 xl:col-span-3"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">Beskrivning</span><textarea name="description" rows={3} className={premiumFieldClass} /></label>
+    <label className="block sm:col-span-2 xl:col-span-3"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Beskrivning</span><textarea name="description" rows={3} className={premiumFieldClass} /></label>
   </div>;
 }
 
 function CostFields() {
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-    <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">Kostnadstyp</span><select name="costType" className={premiumFieldClass}>{Object.entries(costLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Kostnadstyp</span><select name="costType" className={premiumFieldClass}>{Object.entries(costLabels).map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     <Field label="Kostnadsdatum" name="costDate" type="date" required />
     <Field label="Belopp exkl. moms" name="amountExVat" type="number" required />
     <Field label="Moms %" name="vatRate" type="number" defaultValue="25" />
@@ -133,7 +133,7 @@ function CostFields() {
 }
 
 function Field({ label, name, type = "text", defaultValue = "", required = false }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-400">{label}</span><input name={name} type={type} defaultValue={defaultValue} required={required} min={type === "number" ? 0 : undefined} step={type === "number" ? "any" : undefined} className={premiumFieldClass} /></label>;
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><input name={name} type={type} defaultValue={defaultValue} required={required} min={type === "number" ? 0 : undefined} step={type === "number" ? "any" : undefined} className={premiumFieldClass} /></label>;
 }
 
 function ModeButton({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: typeof Settings2; children: React.ReactNode }) {

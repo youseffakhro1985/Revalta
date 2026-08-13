@@ -96,7 +96,7 @@ export function WorkOrderQuickActions({
     <div className={compact ? "mt-3 space-y-2" : "mt-3 space-y-2 border-t border-sand-100 pt-3"} onClick={(event) => event.preventDefault()}>
       {canManage ? (
         <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">Status</span>
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-500">Status</span>
           <select
             className={`${premiumFieldClass} h-9 text-xs`}
             value={currentStatus}
@@ -114,7 +114,7 @@ export function WorkOrderQuickActions({
       ) : null}
       {canAssign ? (
         <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">Ansvarig</span>
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-500">Ansvarig</span>
           <select
             className={`${premiumFieldClass} h-9 text-xs`}
             value={assignedToId || ""}
@@ -131,7 +131,7 @@ export function WorkOrderQuickActions({
           </select>
         </label>
       ) : null}
-      {busy ? <p className="text-[11px] text-ink-400">Sparar…</p> : null}
+      {busy ? <p className="text-[11px] text-ink-500">Sparar…</p> : null}
       {error ? <p className="text-[11px] font-medium text-red-700">{error}</p> : null}
     </div>
   );

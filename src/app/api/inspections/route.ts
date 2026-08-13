@@ -3,6 +3,9 @@ import { auditScopedWhere, canManageTickets, getCurrentUser, tenantWhere } from 
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/inspections" });
 
 const action = "inspection.created";
 
@@ -66,7 +69,7 @@ export async function GET() {
       permissions: { canManage: canManageTickets(user.role) },
     });
   } catch (error) {
-    console.error("Get inspections error:", error);
+    logger.error("Get inspections error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -144,7 +147,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, inspection }, { status: 201 });
   } catch (error) {
-    console.error("Create inspection error:", error);
+    logger.error("Create inspection error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -4,6 +4,9 @@ import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { getStorageToken } from "@/lib/storage";
 import { isAssignedWorkAccessible } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/attachments/[id]" });
 
 function contentDisposition(fileName: string) {
   const safeAscii = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -67,7 +70,7 @@ export async function GET(
 
     return new Response(blob.stream, { headers });
   } catch (error) {
-    console.error("Download attachment error:", error);
+    logger.error("Download attachment error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

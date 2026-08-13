@@ -4,6 +4,9 @@ import db from "@/lib/db";
 import { auditScopedWhere, getCurrentUser } from "@/lib/current-user";
 import { safeDocumentFileName } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/documents/[id]/download" });
 
 function contentDisposition(fileName: string) {
   const safeAscii = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -123,7 +126,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Download document error:", error);
+    logger.error("Download document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

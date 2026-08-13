@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { createInspectionWorkOrders, InspectionWorkOrderError } from "@/lib/create-inspection-work-orders";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases/[id]/inspection-work-orders" });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -22,7 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof InspectionWorkOrderError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("Create inspection work orders error:", error);
+    logger.error("Create inspection work orders error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

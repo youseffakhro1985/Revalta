@@ -1,6 +1,9 @@
 import db from "@/lib/db";
 import { canExportTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/export" });
 
 function csvCell(value: unknown) {
   const text = value == null ? "" : String(value);
@@ -18,6 +21,11 @@ export async function GET() {
     const tickets = await db.ticket.findMany({
       where: { deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
       orderBy: { created_at: "desc" },
+      // Safety cap: a full, unbounded CSV export of a company's entire ticket
+      // history is a real memory/latency risk as history grows. 50k rows is
+      // generous enough that no real tenant should hit it in practice; if this
+      // ever needs to be truly unlimited, switch to a streamed/paginated export.
+      take: 50_000,
       select: {
         public_reference: true,
         title: true,
@@ -54,7 +62,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Export tickets error:", error);
+    logger.error("Export tickets error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

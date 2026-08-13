@@ -162,7 +162,7 @@ export default function ResidentDocumentsPage() {
         <div className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row">
           <label className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök dokumentnamn, fil eller kategori" className={`${premiumFieldClass} pl-9`} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök dokumentnamn, fil eller kategori" aria-label="Sök dokumentnamn, fil eller kategori" className={`${premiumFieldClass} pl-9`} />
           </label>
           <button type="button" onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50">
             <RefreshCw className="h-4 w-4" /> Uppdatera
@@ -189,7 +189,7 @@ export default function ResidentDocumentsPage() {
                       {expired ? <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800">Utgånget</span> : null}
                     </div>
                     <p className="mt-2 text-sm text-ink-500">{document.fileName || "Dokumentfil"} · {formatBytes(document.sizeBytes)}</p>
-                    <p className="mt-1 text-xs text-ink-400">
+                    <p className="mt-1 text-xs text-ink-500">
                       Publicerat {dateFormatter.format(new Date(document.createdAt))} av {document.uploadedBy}
                       {document.validUntil ? ` · giltigt till ${dateFormatter.format(new Date(document.validUntil))}` : ""}
                     </p>

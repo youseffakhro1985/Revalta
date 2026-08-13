@@ -174,7 +174,7 @@ function NavigationContent({
   return <>
     {groups.map((group, groupIndex) => (
       <div key={group.label} className={groupIndex > 0 ? "mt-7" : ""}>
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-400">{group.label}</p>
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">{group.label}</p>
         <div className="space-y-1">
           {group.items.map((item) => {
             const Icon = item.icon;
@@ -246,7 +246,7 @@ export function DashboardShell({
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] border-r border-sand-200/90 bg-[#F1F1EC] lg:flex lg:flex-col">
         <div className="flex h-[72px] items-center border-b border-sand-200 px-6">
           <Link href={homeHref} className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Revalta dashboard">
-            <span className="font-display text-[21px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</span><span className="h-5 w-px bg-sand-300" aria-hidden="true" /><span className="text-[8px] font-semibold uppercase leading-[1.2] tracking-[0.13em] text-ink-400">Förvaltning<br />Sverige</span>
+            <span className="font-display text-[21px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</span><span className="h-5 w-px bg-sand-300" aria-hidden="true" /><span className="text-[8px] font-semibold uppercase leading-[1.2] tracking-[0.13em] text-ink-500">Förvaltning<br />Sverige</span>
           </Link>
         </div>
         <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} /></nav>
@@ -255,7 +255,7 @@ export function DashboardShell({
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">{initials(userName, userEmail)}</div>
             <div className="min-w-0">
               <p className="truncate text-[12px] font-semibold text-ink-800">{displayName}</p>
-              <p className="truncate text-[10px] text-ink-400">{roleLabel}</p>
+              <p className="truncate text-[10px] text-ink-500">{roleLabel}</p>
             </div>
           </div>
           <LogoutButton className="w-full justify-start" />
@@ -268,7 +268,7 @@ export function DashboardShell({
         <header className="sticky top-0 z-30 border-b border-sand-200/90 bg-[#FAFAF8]/95 shadow-[0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-md">
           <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
             <div className="flex items-center gap-3 lg:hidden"><button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button><Link href={homeHref} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link></div>
-            <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-400">{resident ? "Boendeportal" : "Fastighetsförvaltning"}</p><p className="mt-1 text-[12px] font-medium text-ink-600">{resident ? "Självservice" : "Samlad arbetsyta"}</p></div>
+            <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-500">{resident ? "Boendeportal" : "Fastighetsförvaltning"}</p><p className="mt-1 text-[12px] font-medium text-ink-600">{resident ? "Självservice" : "Samlad arbetsyta"}</p></div>
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               {resident ? null : <WorkOrderLockIndicator />}
               {resident ? null : <GlobalSearch />}

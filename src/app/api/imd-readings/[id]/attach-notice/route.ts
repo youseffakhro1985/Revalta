@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { auditScopedWhere, canManageLeases, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, parseDateOnly } from "@/lib/dual-list";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/imd-readings/[id]/attach-notice" });
 
 export async function POST(
   request: Request,
@@ -177,7 +180,7 @@ export async function POST(
     if (error instanceof Error && error.message === "debit_already_linked") {
       return NextResponse.json({ error: "Debiteringsraden är redan kopplad" }, { status: 409 });
     }
-    console.error("Attach IMD debit error:", error);
+    logger.error("Attach IMD debit error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

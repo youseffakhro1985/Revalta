@@ -121,7 +121,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
 
             {selected ? (
               <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Vald åtgärd</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Vald åtgärd</p>
                 <p className="mt-2 font-semibold text-ink-900">{selected.title}</p>
                 <p className="mt-1 text-sm text-ink-500">
                   {selected.category}

@@ -7,6 +7,9 @@ import { parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
 import { isProductionRuntime } from "@/lib/runtime-env";
 import { hasStorageConfig, storeAttachment, StorageConfigurationError } from "@/lib/storage";
 import { writeAuditLog } from "@/lib/audit";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/documents" });
 
 const allowedVisibilities = new Set([
   "internal",
@@ -164,7 +167,7 @@ export async function GET() {
       { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } },
     );
   } catch (error) {
-    console.error("Get documents error:", error);
+    logger.error("Get documents error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -291,7 +294,7 @@ export async function POST(request: Request) {
     if (error instanceof StorageConfigurationError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    console.error("Create document error:", error);
+    logger.error("Create document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -417,7 +420,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
-    console.error("Update document error:", error);
+    logger.error("Update document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

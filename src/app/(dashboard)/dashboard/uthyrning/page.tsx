@@ -455,7 +455,7 @@ export default function LeasingPage() {
               </div>
               <p className="mt-1 text-sm text-ink-500">{property.name} · {property.address}</p>
               <p className="mt-2 text-sm font-medium text-ink-800">{lease?.lease_holder.name || "Ingen hyrespart"}</p>
-              <p className="mt-1 text-xs text-ink-400">{lease ? `${lease.lease_number}${lease.start_date ? ` · från ${dateValue(lease.start_date)}` : ""}` : `${unit.area ? `${unit.area.toLocaleString("sv-SE")} m² · ` : ""}klart för nytt avtal`}</p>
+              <p className="mt-1 text-xs text-ink-500">{lease ? `${lease.lease_number}${lease.start_date ? ` · från ${dateValue(lease.start_date)}` : ""}` : `${unit.area ? `${unit.area.toLocaleString("sv-SE")} m² · ` : ""}klart för nytt avtal`}</p>
             </div>
             <div className="flex items-center justify-between gap-5 lg:justify-end">
               <div className="lg:text-right"><p className="text-lg font-semibold text-ink-900">{lease ? `${money.format(lease.monthly_rent)}/mån` : "–"}</p>{lease?.notice_date ? <p className="text-xs text-amber-700">Uppsagt {dateValue(lease.notice_date)}</p> : null}</div>

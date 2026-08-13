@@ -132,17 +132,17 @@ export default function ProjectsPage() {
 
     <Panel title="Nytt projekt" description="Registrera ansvar, entreprenör, tidsplan, risk och ekonomiska ramar.">
       <form action={createProject} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <select name="propertyId" required className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-        <input name="name" required placeholder="Projektnamn" className={premiumFieldClass} />
-        <select name="managerId" className={premiumFieldClass}><option value="">Välj projektledare</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>
-        <input name="contractor" placeholder="Entreprenör" className={premiumFieldClass} />
-        <input name="startDate" type="date" className={premiumFieldClass} />
-        <input name="endDate" type="date" className={premiumFieldClass} />
-        <select name="status" className={premiumFieldClass}><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option></select>
-        <select name="risk" className={premiumFieldClass}><option value="low">Låg risk</option><option value="medium">Medelrisk</option><option value="high">Hög risk</option></select>
-        <input name="budget" type="number" min="0" step="0.01" placeholder="Budget" className={premiumFieldClass} />
-        <input name="forecast" type="number" min="0" step="0.01" placeholder="Prognos" className={premiumFieldClass} />
-        <input name="actual" type="number" min="0" step="0.01" placeholder="Utfall" className={premiumFieldClass} />
+        <select name="propertyId" required className={premiumFieldClass} aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+        <input name="name" required placeholder="Projektnamn" className={premiumFieldClass} aria-label="Projektnamn" />
+        <select name="managerId" className={premiumFieldClass} aria-label="Välj projektledare"><option value="">Välj projektledare</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>
+        <input name="contractor" placeholder="Entreprenör" className={premiumFieldClass} aria-label="Entreprenör" />
+        <input name="startDate" type="date" className={premiumFieldClass} aria-label="Startdatum" />
+        <input name="endDate" type="date" className={premiumFieldClass} aria-label="Slutdatum" />
+        <select name="status" className={premiumFieldClass} aria-label="Status"><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option></select>
+        <select name="risk" className={premiumFieldClass} aria-label="Risk"><option value="low">Låg risk</option><option value="medium">Medelrisk</option><option value="high">Hög risk</option></select>
+        <input name="budget" type="number" min="0" step="0.01" placeholder="Budget" className={premiumFieldClass} aria-label="Budget" />
+        <input name="forecast" type="number" min="0" step="0.01" placeholder="Prognos" className={premiumFieldClass} aria-label="Prognos" />
+        <input name="actual" type="number" min="0" step="0.01" placeholder="Utfall" className={premiumFieldClass} aria-label="Utfall" />
         <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till projekt"}</button>
       </form>
     </Panel>
@@ -153,7 +153,7 @@ export default function ProjectsPage() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2"><Link href={`/dashboard/projekt/${project.id}`} className="font-semibold text-ink-900 transition hover:text-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200 focus:ring-offset-2">{project.name}</Link><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{statusLabels[project.status] || project.status}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${project.risk === "high" ? "bg-red-50 text-red-800" : "bg-sand-100 text-ink-600"}`}>Risk {riskLabels[project.risk] || project.risk}</span></div>
             <p className="mt-1 text-sm text-ink-500">{project.property_name}</p>
-            <p className="mt-3 text-xs text-ink-400">{formatDate(project.start_date)} – {formatDate(project.end_date)}</p>
+            <p className="mt-3 text-xs text-ink-500">{formatDate(project.start_date)} – {formatDate(project.end_date)}</p>
             {project.source_work_order ? <Link href={`/dashboard/arbetsorder/${project.source_work_order.id}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-sand-50 px-3 py-2 text-xs text-ink-600 transition hover:bg-sand-100 hover:text-petroleum-800"><FolderKanban className="h-4 w-4 text-petroleum-700" />Från arbetsorder: {project.source_work_order.title}</Link> : null}
           </div>
           <div className="grid grid-cols-2 gap-4 text-xs text-ink-500 sm:grid-cols-4 lg:min-w-[520px]">
@@ -165,7 +165,7 @@ export default function ProjectsPage() {
         </div>
         <div className="mt-5 flex flex-col gap-3 border-t border-sand-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            <p className="text-xs text-ink-400">Budget {money.format(Number(project.budget || 0))} · Utfall {money.format(Number(project.actual || 0))}</p>
+            <p className="text-xs text-ink-500">Budget {money.format(Number(project.budget || 0))} · Utfall {money.format(Number(project.actual || 0))}</p>
             <Link href={`/dashboard/projekt/${project.id}`} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Öppna projektdetalj</Link>
           </div>
           <select value={project.status} disabled={updatingId === project.id} onChange={(event) => void changeStatus(project.id, event.target.value)} className={`${premiumFieldClass} sm:w-44`} aria-label={`Ändra status för ${project.name}`}><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option><option value="cancelled">Avbruten</option></select>

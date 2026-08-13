@@ -136,7 +136,7 @@ export default function NotificationsPage() {
       <section className="grid gap-4 md:grid-cols-3">
         {[['Olästa notiser', unread], ['Brådskande', urgent], ['Senaste händelser', events.length]].map(([label, value]) => (
           <div key={String(label)} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-            <p className="text-xs font-medium text-ink-400">{label}</p>
+            <p className="text-xs font-medium text-ink-500">{label}</p>
             <p className="mt-2 text-2xl font-semibold text-ink-950">{value}</p>
           </div>
         ))}
@@ -149,15 +149,15 @@ export default function NotificationsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Nytt meddelande</p>
               <h2 className="mt-2 text-lg font-semibold text-ink-950">Publicera intern information</h2>
             </div>
-            <input required maxLength={120} placeholder="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
-            <textarea required maxLength={2000} rows={6} placeholder="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <input required maxLength={120} placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <textarea required maxLength={2000} rows={6} placeholder="Meddelande" aria-label="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
             <div className="grid grid-cols-2 gap-3">
-              <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
+              <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} aria-label="Prioritet" className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
                 <option value="normal">Information</option>
                 <option value="important">Viktigt</option>
                 <option value="urgent">Brådskande</option>
               </select>
-              <select value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
+              <select value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value })} aria-label="Målgrupp" className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
                 <option>Alla användare</option>
                 <option>Förvaltare</option>
                 <option>Fastighetsskötare</option>
@@ -175,7 +175,7 @@ export default function NotificationsPage() {
             </div>
             <div className="divide-y divide-sand-200">
               {visible.length === 0 ? (
-                <p className="p-8 text-sm text-ink-400">Inga meddelanden i den valda vyn.</p>
+                <p className="p-8 text-sm text-ink-500">Inga meddelanden i den valda vyn.</p>
               ) : visible.map((item) => {
                 const priority = item.priority || "normal";
                 return (
@@ -188,7 +188,7 @@ export default function NotificationsPage() {
                         </div>
                         <h3 className="mt-3 text-base font-semibold text-ink-950">{item.title || "Meddelande"}</h3>
                         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-600">{item.message}</p>
-                        <p className="mt-3 text-xs text-ink-400">{item.audience || "Alla användare"} · {item.author_name || "Revalta"} · {new Date(item.created_at).toLocaleString("sv-SE")}</p>
+                        <p className="mt-3 text-xs text-ink-500">{item.audience || "Alla användare"} · {item.author_name || "Revalta"} · {new Date(item.created_at).toLocaleString("sv-SE")}</p>
                       </div>
                       <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                         {item.source === "legacy" ? (
@@ -216,13 +216,13 @@ export default function NotificationsPage() {
               <h2 className="text-sm font-semibold text-ink-950">Senaste aktivitet</h2>
             </div>
             <div className="divide-y divide-sand-200">
-              {events.length === 0 ? <p className="p-8 text-sm text-ink-400">Ingen aktivitet registrerad ännu.</p> : events.slice(0, 12).map((event) => (
+              {events.length === 0 ? <p className="p-8 text-sm text-ink-500">Ingen aktivitet registrerad ännu.</p> : events.slice(0, 12).map((event) => (
                 <div key={event.id} className="flex items-center justify-between gap-4 p-4">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink-800">{eventTitle(event)}</p>
-                    <p className="mt-1 text-xs text-ink-400">{event.entityType} · {event.action}</p>
+                    <p className="mt-1 text-xs text-ink-500">{event.entityType} · {event.action}</p>
                   </div>
-                  <time className="shrink-0 text-xs text-ink-400">{new Date(event.created_at).toLocaleDateString("sv-SE")}</time>
+                  <time className="shrink-0 text-xs text-ink-500">{new Date(event.created_at).toLocaleDateString("sv-SE")}</time>
                 </div>
               ))}
             </div>

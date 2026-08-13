@@ -13,6 +13,9 @@ import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { loadLegacyRows } from "@/lib/dual-list";
 import { leaseHolderEmailMatch, reporterEmailMatch } from "@/lib/resident-portal-scope";
 import { normalizeEmail } from "@/lib/security";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/resident-portal" });
 
 const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "heating", "access", "noise", "other"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
@@ -235,7 +238,7 @@ export async function GET() {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error("Get resident portal workspace error:", error);
+    logger.error("Get resident portal workspace error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -344,7 +347,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ticket }, { status: 201 });
   } catch (error) {
-    console.error("Create resident portal ticket error:", error);
+    logger.error("Create resident portal ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -13,7 +13,7 @@ Revalta är en svensk plattform för fastighetsförvaltning. Applikationen samla
 
 ## Kom igång lokalt
 
-Förutsättningar: Node.js 22 samt PostgreSQL.
+Förutsättningar: Node.js 24 (se `.nvmrc`) samt PostgreSQL.
 
 ```bash
 npm ci

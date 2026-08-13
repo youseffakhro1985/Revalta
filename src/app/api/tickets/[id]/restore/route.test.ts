@@ -5,11 +5,13 @@ const {
   ticketFindFirstMock,
   ticketUpdateManyMock,
   writeAuditLogMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   ticketFindFirstMock: vi.fn(),
   ticketUpdateManyMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -21,14 +23,17 @@ vi.mock("@/lib/audit", () => ({
   writeAuditLog: writeAuditLogMock,
 }));
 
-vi.mock("@/lib/db", () => ({
-  default: {
+vi.mock("@/lib/db", () => {
+  const dbMock = {
     ticket: {
       findFirst: ticketFindFirstMock,
       updateMany: ticketUpdateManyMock,
     },
-  },
-}));
+    $transaction: transactionMock,
+  };
+  transactionMock.mockImplementation((callback: (tx: typeof dbMock) => unknown) => callback(dbMock));
+  return { default: dbMock };
+});
 
 import { POST } from "./route";
 
@@ -63,6 +68,7 @@ describe("tickets/[id]/restore", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "user-1" }),
       expect.objectContaining({ action: "ticket.restored", entityId: "ticket-1" }),
+      expect.anything(),
     );
   });
 
@@ -87,5 +93,22 @@ describe("tickets/[id]/restore", () => {
 
     const response = await POST(new Request("http://localhost/api/tickets/ticket-1/restore", { method: "POST" }), { params });
     expect(response.status).toBe(404);
+  });
+
+  it("does not report success when the audit log write fails inside the transaction", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      title: "Läckage",
+      status: "open",
+      property_id: null,
+      property: null,
+    });
+    writeAuditLogMock.mockRejectedValue(new Error("audit db unavailable"));
+
+    const response = await POST(new Request("http://localhost/api/tickets/ticket-1/restore", { method: "POST" }), { params });
+
+    expect(response.status).toBe(500);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,6 +7,9 @@ import { countDeviations, normalizeChecklist } from "@/lib/inspection-round-chec
 import { addWorkOrderStatusEvent, allocateWorkOrderNumber, calculateWorkOrderSla, setWorkOrderEnterpriseFields } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/rounds/[id]/work-orders" });
 
 export async function POST(
   request: Request,
@@ -147,7 +150,7 @@ export async function POST(
       deviations: countDeviations(created.checklist),
     }, { status: 201 });
   } catch (error) {
-    console.error("Create round work orders error:", error);
+    logger.error("Create round work orders error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

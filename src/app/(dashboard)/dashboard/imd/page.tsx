@@ -254,11 +254,12 @@ export default function ImdPage() {
               value={propertyId}
               onChange={(event) => { setPropertyId(event.target.value); setLeaseId(""); }}
               className={premiumFieldClass}
+              aria-label="Välj fastighet"
             >
               <option value="">Välj fastighet</option>
               {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
             </select>
-            <select value={leaseId} onChange={(event) => setLeaseId(event.target.value)} className={premiumFieldClass}>
+            <select value={leaseId} onChange={(event) => setLeaseId(event.target.value)} className={premiumFieldClass} aria-label="Valfritt hyresavtal">
               <option value="">Valfritt hyresavtal</option>
               {availableLeases.map((lease) => (
                 <option key={lease.id} value={lease.id}>
@@ -266,16 +267,16 @@ export default function ImdPage() {
                 </option>
               ))}
             </select>
-            <input name="unit" required placeholder="Lägenhet eller lokal" className={premiumFieldClass} />
-            <input name="meterId" required placeholder="Mätar-ID" className={premiumFieldClass} />
-            <select name="type" className={premiumFieldClass}>
+            <input name="unit" required placeholder="Lägenhet eller lokal" className={premiumFieldClass} aria-label="Lägenhet eller lokal" />
+            <input name="meterId" required placeholder="Mätar-ID" className={premiumFieldClass} aria-label="Mätar-ID" />
+            <select name="type" className={premiumFieldClass} aria-label="Mätartyp">
               {Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <input name="period" required type="month" className={premiumFieldClass} />
-            <input name="previousReading" required type="number" min="0" step="0.001" placeholder="Föregående avläsning" className={premiumFieldClass} />
-            <input name="currentReading" required type="number" min="0" step="0.001" placeholder="Aktuell avläsning" className={premiumFieldClass} />
-            <input name="unitPrice" required type="number" min="0" step="0.01" placeholder="Pris per enhet" className={premiumFieldClass} />
-            <input name="note" placeholder="Anteckning" className={`${premiumFieldClass} md:col-span-2 xl:col-span-2`} />
+            <input name="period" required type="month" className={premiumFieldClass} aria-label="Period" />
+            <input name="previousReading" required type="number" min="0" step="0.001" placeholder="Föregående avläsning" className={premiumFieldClass} aria-label="Föregående avläsning" />
+            <input name="currentReading" required type="number" min="0" step="0.001" placeholder="Aktuell avläsning" className={premiumFieldClass} aria-label="Aktuell avläsning" />
+            <input name="unitPrice" required type="number" min="0" step="0.01" placeholder="Pris per enhet" className={premiumFieldClass} aria-label="Pris per enhet" />
+            <input name="note" placeholder="Anteckning" className={`${premiumFieldClass} md:col-span-2 xl:col-span-2`} aria-label="Anteckning" />
             <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Spara avläsning"}</button>
           </div>
         </form>
@@ -290,7 +291,7 @@ export default function ImdPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="bg-sand-50 text-xs uppercase tracking-[0.08em] text-ink-400">
+              <thead className="bg-sand-50 text-xs uppercase tracking-[0.08em] text-ink-500">
                 <tr>
                   {["Fastighet", "Objekt", "Mätare", "Typ", "Period", "Förbrukning", "Belopp", "Debitering", ""].map((head) => (
                     <th key={head || "actions"} className="px-5 py-3 font-semibold">{head}</th>
@@ -328,7 +329,7 @@ export default function ImdPage() {
                       ) : item.source === "legacy" ? (
                         <span className="text-xs font-medium text-amber-800">Äldre rad – kör backfill innan ändring</span>
                       ) : (
-                        <span className="text-xs text-ink-400">Saknas</span>
+                        <span className="text-xs text-ink-500">Saknas</span>
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
@@ -352,7 +353,7 @@ export default function ImdPage() {
                             {voidingId === item.id ? "Makulerar…" : "Makulera"}
                           </button>
                         ) : item.source === "legacy" ? (
-                          <span className="text-xs text-ink-400">—</span>
+                          <span className="text-xs text-ink-500">—</span>
                         ) : null}
                       </div>
                     </td>
@@ -361,13 +362,13 @@ export default function ImdPage() {
                     <tr className="bg-sand-50/70">
                       <td colSpan={9} className="px-5 py-4">
                         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-                          <input className={premiumFieldClass} value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} placeholder="Objekt" />
-                          <input className={premiumFieldClass} value={editForm.meterId} onChange={(e) => setEditForm({ ...editForm, meterId: e.target.value })} placeholder="Mätar-ID" />
-                          <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />
-                          <input className={premiumFieldClass} type="number" min="0" step="0.001" value={editForm.previousReading} onChange={(e) => setEditForm({ ...editForm, previousReading: e.target.value })} placeholder="Föregående" />
-                          <input className={premiumFieldClass} type="number" min="0" step="0.001" value={editForm.currentReading} onChange={(e) => setEditForm({ ...editForm, currentReading: e.target.value })} placeholder="Aktuell" />
-                          <input className={premiumFieldClass} type="number" min="0" step="0.01" value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} placeholder="Pris" />
-                          <input className={`${premiumFieldClass} md:col-span-2 xl:col-span-4`} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} placeholder="Anteckning" />
+                          <input className={premiumFieldClass} value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} placeholder="Objekt" aria-label="Objekt" />
+                          <input className={premiumFieldClass} value={editForm.meterId} onChange={(e) => setEditForm({ ...editForm, meterId: e.target.value })} placeholder="Mätar-ID" aria-label="Mätar-ID" />
+                          <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} aria-label="Period" />
+                          <input className={premiumFieldClass} type="number" min="0" step="0.001" value={editForm.previousReading} onChange={(e) => setEditForm({ ...editForm, previousReading: e.target.value })} placeholder="Föregående" aria-label="Föregående" />
+                          <input className={premiumFieldClass} type="number" min="0" step="0.001" value={editForm.currentReading} onChange={(e) => setEditForm({ ...editForm, currentReading: e.target.value })} placeholder="Aktuell" aria-label="Aktuell" />
+                          <input className={premiumFieldClass} type="number" min="0" step="0.01" value={editForm.unitPrice} onChange={(e) => setEditForm({ ...editForm, unitPrice: e.target.value })} placeholder="Pris" aria-label="Pris" />
+                          <input className={`${premiumFieldClass} md:col-span-2 xl:col-span-4`} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} placeholder="Anteckning" aria-label="Anteckning" />
                           <button
                             type="button"
                             disabled={updatingId === item.id}

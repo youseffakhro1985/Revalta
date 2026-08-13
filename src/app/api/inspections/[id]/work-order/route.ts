@@ -5,6 +5,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { addWorkOrderStatusEvent, allocateWorkOrderNumber, calculateWorkOrderSla, setWorkOrderEnterpriseFields } from "@/lib/work-order-enterprise-core";
 import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/inspections/[id]/work-order" });
 
 export async function POST(
   _request: Request,
@@ -114,7 +117,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, ...created }, { status: 201 });
   } catch (error) {
-    console.error("Create inspection work order error:", error);
+    logger.error("Create inspection work order error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

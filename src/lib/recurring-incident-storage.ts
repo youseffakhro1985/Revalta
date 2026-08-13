@@ -62,6 +62,60 @@ export async function createRecurringIncidentEvent(input: {
   });
 }
 
+/**
+ * Atomically create an "escalation" event, guarding against a concurrent or
+ * retried cron invocation creating a duplicate escalation (and thus a duplicate
+ * notification) for the same notificationKey/level. Takes a Postgres advisory
+ * lock scoped to (companyId, notificationKey), then re-checks the highest
+ * already-recorded escalation level for that key *inside* the lock before
+ * inserting — mirrors the pattern used by generateRecurringWorkOrder.
+ */
+export async function tryCreateRecurringIncidentEscalation(input: {
+  companyId: string;
+  notificationKey: string;
+  level: number;
+  status: string;
+  recipient?: string | null;
+  payload: Prisma.InputJsonValue;
+}) {
+  return db.$transaction(async (tx) => {
+    const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
+      SELECT pg_try_advisory_xact_lock(hashtext(${`recurring-incident-escalation:${input.companyId}:${input.notificationKey}`})) AS locked
+    `);
+    if (!lock[0]?.locked) return { created: false as const, reason: "locked" as const };
+
+    const existing = await tx.recurringIncidentEvent.findMany({
+      where: { company_id: input.companyId, notification_key: input.notificationKey, event_type: "escalation" },
+      select: { payload: true },
+    });
+    const highestExisting = existing.reduce((max, row) => {
+      const data = objectPayload(row.payload);
+      const level = typeof data?.level === "number" ? data.level : 0;
+      return Math.max(max, level);
+    }, 0);
+    if (highestExisting >= input.level) {
+      return { created: false as const, reason: "already_escalated" as const };
+    }
+
+    const payload = {
+      ...(typeof input.payload === "object" && input.payload && !Array.isArray(input.payload) ? input.payload : {}),
+      notificationKey: input.notificationKey,
+    } as Prisma.InputJsonValue;
+
+    const event = await tx.recurringIncidentEvent.create({
+      data: {
+        company_id: input.companyId,
+        notification_key: input.notificationKey,
+        event_type: "escalation",
+        status: input.status,
+        recipient: input.recipient ?? null,
+        payload,
+      },
+    });
+    return { created: true as const, event };
+  });
+}
+
 export async function listRecurringIncidentEvents(
   companyId: string,
   options: { eventTypes?: RecurringIncidentEventType[]; take?: number } = {},

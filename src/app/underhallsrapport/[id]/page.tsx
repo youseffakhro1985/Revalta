@@ -39,9 +39,9 @@ export default function MaintenanceReportPage({params}:{params:Promise<{id:strin
 
       <section className="mt-10"><h2 className="text-2xl font-semibold">Planerade åtgärder</h2><div className="mt-5 overflow-hidden rounded-xl border border-sand-200"><table className="w-full text-left text-xs"><thead className="bg-sand-50 text-ink-500"><tr><th className="px-3 py-3">År</th><th className="px-3 py-3">Åtgärd</th><th className="px-3 py-3">Omfattning</th><th className="px-3 py-3">Risk</th><th className="px-3 py-3">Status</th><th className="px-3 py-3 text-right">Kostnad</th></tr></thead><tbody>{data.actions.map(item=><tr key={item.id} className="border-t border-sand-100 align-top"><td className="px-3 py-3 font-semibold">{item.planned_year}</td><td className="px-3 py-3"><p className="font-semibold">{item.title}</p><p className="mt-1 text-ink-500">{item.category}{item.building_name?` · ${item.building_name}`:""}{item.technical_asset_name?` · ${item.technical_asset_name}`:""}</p></td><td className="max-w-xs px-3 py-3 text-ink-600">{item.scope||"–"}</td><td className="px-3 py-3">{labels[item.risk]||item.risk}</td><td className="px-3 py-3">{labels[item.status]||item.status}</td><td className="px-3 py-3 text-right font-semibold">{money.format(item.estimated_cost)}</td></tr>)}</tbody></table></div></section>
 
-      <footer className="mt-12 border-t border-sand-200 pt-5 text-xs text-ink-400">Rapport genererad i Revalta · {new Intl.DateTimeFormat("sv-SE",{dateStyle:"long"}).format(new Date())}</footer>
+      <footer className="mt-12 border-t border-sand-200 pt-5 text-xs text-ink-500">Rapport genererad i Revalta · {new Intl.DateTimeFormat("sv-SE",{dateStyle:"long"}).format(new Date())}</footer>
     </article>
   </main>;
 }
 
-function Fact({label,value}:{label:string;value:string}){return <div><p className="text-xs text-ink-400">{label}</p><p className="mt-1 font-semibold text-ink-800">{value}</p></div>}
+function Fact({label,value}:{label:string;value:string}){return <div><p className="text-xs text-ink-500">{label}</p><p className="mt-1 font-semibold text-ink-800">{value}</p></div>}

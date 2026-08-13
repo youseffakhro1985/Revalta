@@ -6,6 +6,9 @@ import {
   notDeletedFilter,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/work-orders/options" });
 
 export async function GET() {
   try {
@@ -54,7 +57,7 @@ export async function GET() {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error("Get work-order options error:", error);
+    logger.error("Get work-order options error", error);
     if (isMissingSchemaColumnError(error)) {
       return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
     }

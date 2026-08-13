@@ -9,6 +9,9 @@ import {
   findAccessibleResidentPortalTicket,
   mapResidentPortalComments,
 } from "@/lib/resident-portal-tickets";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/resident-portal/tickets/[id]" });
 
 export async function GET(
   _request: Request,
@@ -46,7 +49,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Get resident portal ticket error:", error);
+    logger.error("Get resident portal ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

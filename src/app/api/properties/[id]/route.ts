@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { OCCUPYING_LEASE_STATUSES } from "@/lib/leasing";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/properties/[id]" });
 
 function optionalText(value: unknown) {
   if (typeof value !== "string") return null;
@@ -91,7 +94,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     return NextResponse.json({ success: true, property });
   } catch (error) {
-    console.error("Update property error:", error);
+    logger.error("Update property error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -177,7 +180,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete property error:", error);
+    logger.error("Delete property error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -113,7 +113,7 @@ export function WorkOrderLockSecurityAlerts() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-950">{item.title}</h3>{!item.read ? <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800">Ny</span> : null}</div>
               <p className="mt-1 text-sm leading-6 text-ink-600">{item.description}</p>
-              <time dateTime={item.dueAt} className="mt-2 block text-xs font-semibold uppercase tracking-wide text-ink-400">{dateTime.format(new Date(item.dueAt))}</time>
+              <time dateTime={item.dueAt} className="mt-2 block text-xs font-semibold uppercase tracking-wide text-ink-500">{dateTime.format(new Date(item.dueAt))}</time>
             </div>
             <div className="flex flex-wrap gap-2 lg:justify-end">
               <button type="button" onClick={() => void markRead(item.key)} disabled={item.read || pendingKeys.has(item.key)} className="rounded-xl border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-600 disabled:opacity-40">Markera läst</button>

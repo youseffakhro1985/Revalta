@@ -132,10 +132,10 @@ export default function EscalationAdminPage() {
         {data ? (
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Motor</p><p className={`mt-2 font-semibold ${data.rules.enabled ? "text-emerald-800" : "text-amber-800"}`}>{data.rules.enabled ? "Aktiverad" : "Pausad"}</p></div>
-              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Orsaker</p><p className="mt-2 font-semibold text-ink-800">{[data.rules.escalateBlocked && "Blockerad", data.rules.escalateOverdue && "Deadline"].filter(Boolean).join(" + ") || "Inga"}</p></div>
-              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Respittid</p><p className="mt-2 font-semibold text-ink-800">{data.rules.graceDays} dagar</p></div>
-              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Upprepning</p><p className="mt-2 font-semibold text-ink-800">Var {data.rules.repeatDays}:e dag</p></div>
+              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Motor</p><p className={`mt-2 font-semibold ${data.rules.enabled ? "text-emerald-800" : "text-amber-800"}`}>{data.rules.enabled ? "Aktiverad" : "Pausad"}</p></div>
+              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Orsaker</p><p className="mt-2 font-semibold text-ink-800">{[data.rules.escalateBlocked && "Blockerad", data.rules.escalateOverdue && "Deadline"].filter(Boolean).join(" + ") || "Inga"}</p></div>
+              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Respittid</p><p className="mt-2 font-semibold text-ink-800">{data.rules.graceDays} dagar</p></div>
+              <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Upprepning</p><p className="mt-2 font-semibold text-ink-800">Var {data.rules.repeatDays}:e dag</p></div>
             </div>
             <Link href="/dashboard/installningar/eskaleringar/regler" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900"><SlidersHorizontal className="h-4 w-4" /> Hantera regler</Link>
           </div>
@@ -200,15 +200,15 @@ export default function EscalationAdminPage() {
               </summary>
               <div className="border-t border-sand-100 p-5">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Orsak</p><p className="mt-1 font-semibold text-ink-800">{reason === "blocked" ? "Blockerad" : reason === "overdue_deadline" ? "Deadline passerad" : reason}</p></div>
-                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Respittid slut</p><p className="mt-1 font-semibold text-ink-800">{graceAt ? dateTime.format(new Date(graceAt)) : "Ej tillämplig"}</p></div>
-                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Mottagare</p><p className="mt-1 font-semibold text-ink-800">{recipients.length}</p></div>
-                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Dataversion</p><p className="mt-1 font-semibold text-ink-800">{payload?.schemaVersion === 2 ? "Revisionsspår v2" : "Äldre format"}</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Orsak</p><p className="mt-1 font-semibold text-ink-800">{reason === "blocked" ? "Blockerad" : reason === "overdue_deadline" ? "Deadline passerad" : reason}</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Respittid slut</p><p className="mt-1 font-semibold text-ink-800">{graceAt ? dateTime.format(new Date(graceAt)) : "Ej tillämplig"}</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Mottagare</p><p className="mt-1 font-semibold text-ink-800">{recipients.length}</p></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Dataversion</p><p className="mt-1 font-semibold text-ink-800">{payload?.schemaVersion === 2 ? "Revisionsspår v2" : "Äldre format"}</p></div>
                 </div>
                 {snapshot ? <div className="mt-5 rounded-xl bg-sand-50 p-4"><p className="text-sm font-semibold text-ink-900">Regelögonblicksbild</p><div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-ink-700"><span className="rounded-full bg-white px-3 py-1">Respittid {snapshot.graceDays} dagar</span><span className="rounded-full bg-white px-3 py-1">Upprepning {snapshot.repeatDays} dagar</span><span className="rounded-full bg-white px-3 py-1">{snapshot.includeAssignee ? "Ansvarig inkluderad" : "Ansvarig ej inkluderad"}</span>{snapshot.recipientRoles.map((role) => <span key={role} className="rounded-full bg-white px-3 py-1">{roleLabels[role] || role}</span>)}</div>{snapshot.updatedAt ? <p className="mt-3 text-xs text-ink-500">Reglerna ändrades senast {dateTime.format(new Date(snapshot.updatedAt))} före detta försök.</p> : null}</div> : <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">Den här äldre historikposten skapades innan regelögonblicksbilder infördes.</p>}
                 {recipients.length ? <div className="mt-5"><p className="text-sm font-semibold text-ink-900">Faktiska mottagare</p><div className="mt-2 flex flex-wrap gap-2">{recipients.map((email) => <span key={email} className="rounded-full border border-sand-200 px-3 py-1 text-xs text-ink-600">{email}</span>)}</div></div> : null}
                 {errorMessage ? <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{errorMessage}</p> : null}
-                <p className="mt-5 break-all text-xs text-ink-400">Körningsnyckel: {event.recipient || "–"}</p>
+                <p className="mt-5 break-all text-xs text-ink-500">Körningsnyckel: {event.recipient || "–"}</p>
               </div>
             </details>
           );

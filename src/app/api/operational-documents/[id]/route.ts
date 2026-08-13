@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { isOperationalDocumentAccessible } from "@/lib/operational-document-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/operational-documents/[id]" });
 
 export async function DELETE(
   _request: Request,
@@ -68,7 +71,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete operational document error:", error);
+    logger.error("Delete operational document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

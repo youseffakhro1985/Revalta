@@ -239,6 +239,7 @@ model Property {
 
   @@index([company_id])
   @@index([company_id, deleted_at])
+  @@index([company_id, deleted_at, created_at])
   @@index([user_id])
   @@index([city])
 }
@@ -323,6 +324,7 @@ model Ticket {
   operations            TicketOperation[]
 
   @@index([company_id, deleted_at])
+  @@index([company_id, deleted_at, created_at])
 }
 
 model WorkOrder {
@@ -1066,6 +1068,7 @@ model Lease {
   @@unique([company_id, lease_number])
   @@index([company_id, status])
   @@index([company_id, deleted_at])
+  @@index([company_id, status, updated_at])
   @@index([property_id])
   @@index([unit_id, status])
   @@index([lease_holder_id])

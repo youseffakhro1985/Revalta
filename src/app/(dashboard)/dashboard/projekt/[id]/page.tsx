@@ -114,22 +114,22 @@ export default function ProjectDetailPage() {
           action={save}
           className="grid gap-4 sm:grid-cols-2"
         >
-          <input name="name" defaultValue={project.name} className={`${premiumFieldClass} sm:col-span-2`} />
-          <input name="contractor" defaultValue={project.contractor || ""} placeholder="Entreprenör" className={premiumFieldClass} />
+          <input name="name" defaultValue={project.name} className={`${premiumFieldClass} sm:col-span-2`} aria-label="Projektnamn" />
+          <input name="contractor" defaultValue={project.contractor || ""} placeholder="Entreprenör" className={premiumFieldClass} aria-label="Entreprenör" />
           <select name="managerId" defaultValue={project.manager?.id || ""} className={premiumFieldClass} aria-label="Projektledare">
             <option value="">Ej tilldelad</option>
             {members.map((member) => (
               <option key={member.id} value={member.id}>{member.name || member.email}</option>
             ))}
           </select>
-          <select name="status" defaultValue={project.status} className={premiumFieldClass}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select name="risk" defaultValue={project.risk} className={premiumFieldClass}>{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
-          <input name="startDate" type="date" defaultValue={project.start_date?.slice(0, 10) || ""} className={premiumFieldClass} />
-          <input name="endDate" type="date" defaultValue={project.end_date?.slice(0, 10) || ""} className={premiumFieldClass} />
-          <input name="budget" type="number" min="0" step="0.01" defaultValue={budget} className={premiumFieldClass} />
-          <input name="forecast" type="number" min="0" step="0.01" defaultValue={forecast} className={premiumFieldClass} />
-          <input name="actual" type="number" min="0" step="0.01" defaultValue={actual} className={premiumFieldClass} />
-          <textarea name="description" defaultValue={project.description || ""} placeholder="Projektbeskrivning" className={`${premiumFieldClass} min-h-28 sm:col-span-2`} />
+          <select name="status" defaultValue={project.status} className={premiumFieldClass} aria-label="Status">{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select name="risk" defaultValue={project.risk} className={premiumFieldClass} aria-label="Risk">{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
+          <input name="startDate" type="date" defaultValue={project.start_date?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Startdatum" />
+          <input name="endDate" type="date" defaultValue={project.end_date?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Slutdatum" />
+          <input name="budget" type="number" min="0" step="0.01" defaultValue={budget} className={premiumFieldClass} aria-label="Budget" />
+          <input name="forecast" type="number" min="0" step="0.01" defaultValue={forecast} className={premiumFieldClass} aria-label="Prognos" />
+          <input name="actual" type="number" min="0" step="0.01" defaultValue={actual} className={premiumFieldClass} aria-label="Utfall" />
+          <textarea name="description" defaultValue={project.description || ""} placeholder="Projektbeskrivning" className={`${premiumFieldClass} min-h-28 sm:col-span-2`} aria-label="Projektbeskrivning" />
           <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara projekt"}</button>
         </form>
         <div className="mt-5 space-y-3 border-t border-sand-100 pt-5 text-sm text-ink-500">

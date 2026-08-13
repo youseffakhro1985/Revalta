@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageWorkOrderFinance, getCurrentUser } from "@/lib/current-user";
 import { readAuditPreviousStatus, resolveRestoredProjectStatus } from "@/lib/soft-delete-restore";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/projects/[id]/restore" });
 
 export async function POST(
   _request: Request,
@@ -17,10 +20,11 @@ export async function POST(
     if (!user.company_id) {
       return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
+    const companyId = user.company_id;
 
     const { id } = await params;
     const existing = await db.project.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: { not: null } },
+      where: { id, company_id: companyId, deleted_at: { not: null } },
       select: {
         id: true,
         name: true,
@@ -40,7 +44,7 @@ export async function POST(
 
     const deleteAudit = await db.auditLog.findFirst({
       where: {
-        company_id: user.company_id,
+        company_id: companyId,
         entity_type: "project",
         entity_id: existing.id,
         action: "project.deleted",
@@ -53,29 +57,35 @@ export async function POST(
       readAuditPreviousStatus(deleteAudit?.metadata),
     );
 
-    const restoreResult = await db.project.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
-      data: { deleted_at: null, status: restoredStatus },
+    // Restore + audit log in one transaction: an audit-write failure must never
+    // leave the project un-deleted while the caller is told the request failed.
+    const restored = await db.$transaction(async (tx) => {
+      const restoreResult = await tx.project.updateMany({
+        where: { id: existing.id, company_id: companyId, deleted_at: { not: null } },
+        data: { deleted_at: null, status: restoredStatus },
+      });
+      if (restoreResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "project",
+        entityId: existing.id,
+        action: "project.restored",
+        metadata: {
+          name: existing.name,
+          previousStatus: existing.status,
+          status: restoredStatus,
+          softDelete: true,
+        },
+      }, tx);
+      return true;
     });
-    if (restoreResult.count === 0) {
+    if (!restored) {
       return NextResponse.json({ error: "Projektet hittades inte eller är redan aktivt" }, { status: 404 });
     }
 
-    await writeAuditLog(user, {
-      entityType: "project",
-      entityId: existing.id,
-      action: "project.restored",
-      metadata: {
-        name: existing.name,
-        previousStatus: existing.status,
-        status: restoredStatus,
-        softDelete: true,
-      },
-    });
-
     return NextResponse.json({ success: true, id: existing.id, status: restoredStatus });
   } catch (error) {
-    console.error("Restore project error:", error);
+    logger.error("Restore project error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

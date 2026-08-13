@@ -3,6 +3,9 @@ import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCur
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/imd-readings" });
 
 const action = "imd.reading.created";
 
@@ -115,7 +118,7 @@ export async function GET() {
       permissions: { canManage: canManageWorkOrderFinance(user.role) },
     });
   } catch (error) {
-    console.error("Get IMD readings error:", error);
+    logger.error("Get IMD readings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -235,7 +238,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, reading: created.reading, debit: created.debit }, { status: 201 });
   } catch (error) {
-    console.error("Create IMD reading error:", error);
+    logger.error("Create IMD reading error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -450,7 +453,7 @@ export async function PATCH(request: Request) {
     if (error instanceof Error && (error.message === "IMD_VOID_CONFLICT" || error.message === "IMD_UPDATE_CONFLICT")) {
       return NextResponse.json({ error: "Avläsningen kunde inte uppdateras. Ladda om och försök igen." }, { status: 409 });
     }
-    console.error("Update IMD reading error:", error);
+    logger.error("Update IMD reading error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

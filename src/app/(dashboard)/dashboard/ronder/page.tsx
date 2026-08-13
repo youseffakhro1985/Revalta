@@ -278,7 +278,7 @@ export default function RoundsPage() {
               </Field>
               <Field label="Kontrollpunkter">
                 <textarea rows={7} className={premiumTextareaClass} value={form.checklistText} onChange={(e) => setForm({ ...form, checklistText: e.target.value })} />
-                <span className="mt-1.5 block text-xs text-ink-400">En kontrollpunkt per rad.</span>
+                <span className="mt-1.5 block text-xs text-ink-500">En kontrollpunkt per rad.</span>
               </Field>
               <button disabled={busy} className={`${premiumPrimaryButtonClass} w-full`}>{busy ? "Sparar…" : "Skapa rond"}</button>
             </form>
@@ -329,11 +329,13 @@ export default function RoundsPage() {
                           value={editForm.title}
                           onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                           placeholder="Titel"
+                          aria-label="Titel"
                         />
                         <select
                           className={premiumFieldClass}
                           value={editForm.interval}
                           onChange={(e) => setEditForm({ ...editForm, interval: e.target.value })}
+                          aria-label="Intervall"
                         >
                           <option value="weekly">Varje vecka</option>
                           <option value="monthly">Varje månad</option>
@@ -345,6 +347,7 @@ export default function RoundsPage() {
                           className={premiumFieldClass}
                           value={editForm.nextDue}
                           onChange={(e) => setEditForm({ ...editForm, nextDue: e.target.value })}
+                          aria-label="Nästa datum"
                         />
                         <button
                           type="button"
@@ -396,6 +399,7 @@ export default function RoundsPage() {
                                     value={item.note}
                                     onChange={(e) => updateLocalChecklist(r.id, item.id, { note: e.target.value })}
                                     placeholder="Beskriv avvikelsen"
+                                    aria-label="Beskriv avvikelsen"
                                     className={`${premiumFieldClass} mt-3`}
                                   />
                                 ) : null}
@@ -453,5 +457,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-xs text-ink-400">{label}</p><p className="mt-1 font-semibold text-ink-800">{value}</p></div>;
+  return <div><p className="text-xs text-ink-500">{label}</p><p className="mt-1 font-semibold text-ink-800">{value}</p></div>;
 }

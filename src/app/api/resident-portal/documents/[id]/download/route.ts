@@ -10,6 +10,9 @@ import { leaseHolderEmailMatch } from "@/lib/resident-portal-scope";
 import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
 import { allowedDocumentContentTypes, safeDocumentFileName, validateDocumentFile } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/resident-portal/documents/[id]/download" });
 
 const activeLeaseStatuses = ["active", "notice"];
 const residentDocumentVisibilities = new Set([
@@ -279,7 +282,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Download resident document error:", error);
+    logger.error("Download resident document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

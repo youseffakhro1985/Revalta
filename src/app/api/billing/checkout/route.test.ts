@@ -75,4 +75,26 @@ describe("billing checkout fail-closed", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, mode: "mock" });
   });
+
+  it("still returns 503 in production even when ALLOW_INTEGRATION_MOCKS=1 is set", async () => {
+    // Regression test: a money flow must never return a fake "success" checkout
+    // to a real customer just because a mock-enabling env var leaked into a
+    // production Vercel environment group (e.g. copied from preview).
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("ALLOW_INTEGRATION_MOCKS", "1");
+    isStripeReadyMock.mockReturnValue(false);
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify({ plan: "professional" }),
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Stripe är inte konfigurerad i produktion",
+    });
+  });
 });

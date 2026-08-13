@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { isAssignedWorkAccessible } from "@/lib/assigned-work-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/work-orders/[id]/restore" });
 
 export async function POST(
   _request: Request,
@@ -17,10 +20,11 @@ export async function POST(
     if (!user.company_id) {
       return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
+    const companyId = user.company_id;
 
     const { id } = await params;
     const existing = await db.workOrder.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: { not: null } },
+      where: { id, company_id: companyId, deleted_at: { not: null } },
       select: {
         id: true,
         title: true,
@@ -63,7 +67,7 @@ export async function POST(
       }
 
       const ticket = await db.ticket.findFirst({
-        where: { id: existing.ticket_id, company_id: user.company_id },
+        where: { id: existing.ticket_id, company_id: companyId },
         select: { id: true, deleted_at: true },
       });
       if (!ticket) {
@@ -77,24 +81,30 @@ export async function POST(
       }
     }
 
-    const restoreResult = await db.workOrder.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
-      data: { deleted_at: null },
+    // Restore + audit log in one transaction: an audit-write failure must never
+    // leave the work order un-deleted while the caller is told the request failed.
+    const restored = await db.$transaction(async (tx) => {
+      const restoreResult = await tx.workOrder.updateMany({
+        where: { id: existing.id, company_id: companyId, deleted_at: { not: null } },
+        data: { deleted_at: null },
+      });
+      if (restoreResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: existing.id,
+        action: "work_order.restored",
+        metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+      }, tx);
+      return true;
     });
-    if (restoreResult.count === 0) {
+    if (!restored) {
       return NextResponse.json({ error: "Arbetsordern hittades inte eller är redan aktiv" }, { status: 404 });
     }
 
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: existing.id,
-      action: "work_order.restored",
-      metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
-    });
-
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
-    console.error("Restore work order error:", error);
+    logger.error("Restore work order error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

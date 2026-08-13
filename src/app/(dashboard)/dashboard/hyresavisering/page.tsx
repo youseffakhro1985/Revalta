@@ -174,36 +174,36 @@ export default function RentNoticesPage() {
       {canManage ? (
       <Panel title="Ny hyresavi" description="Utgå från ett aktivt kontrakt eller registrera uppgifterna manuellt.">
         <form onSubmit={submit} className="space-y-4">
-          <select className={premiumFieldClass} value={form.leaseId} onChange={(e) => selectLease(e.target.value)}>
+          <select className={premiumFieldClass} value={form.leaseId} onChange={(e) => selectLease(e.target.value)} aria-label="Avtal">
             <option value="">Välj kontrakt</option>
             {leases.filter((lease) => lease.status === "active" || lease.status === "notice").map((lease) => (
               <option key={lease.id} value={lease.id}>{lease.property_name} · {lease.unit} · {lease.tenant_name || "Ingen hyresgäst"}</option>
             ))}
           </select>
-          <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required>
+          <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Fastighet">
             <option value="">Välj fastighet</option>
             {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
           </select>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input className={premiumFieldClass} placeholder="Hyresgäst" value={form.tenantName} onChange={(e) => setForm({ ...form, tenantName: e.target.value })} />
-            <input className={premiumFieldClass} placeholder="Objekt" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+            <input className={premiumFieldClass} placeholder="Hyresgäst" value={form.tenantName} onChange={(e) => setForm({ ...form, tenantName: e.target.value })} aria-label="Hyresgäst" />
+            <input className={premiumFieldClass} placeholder="Objekt" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} aria-label="Objekt" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input className={premiumFieldClass} type="month" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} required />
-            <input className={premiumFieldClass} type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} required />
+            <input className={premiumFieldClass} type="month" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} required aria-label="Period" />
+            <input className={premiumFieldClass} type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} required aria-label="Förfallodatum" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input className={premiumFieldClass} type="number" min="0" placeholder="Grundhyra" value={form.baseRent} onChange={(e) => setForm({ ...form, baseRent: e.target.value })} />
-            <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Index %" value={form.indexPercent} onChange={(e) => setForm({ ...form, indexPercent: e.target.value })} />
+            <input className={premiumFieldClass} type="number" min="0" placeholder="Grundhyra" value={form.baseRent} onChange={(e) => setForm({ ...form, baseRent: e.target.value })} aria-label="Grundhyra" />
+            <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Index %" value={form.indexPercent} onChange={(e) => setForm({ ...form, indexPercent: e.target.value })} aria-label="Index %" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input className={premiumFieldClass} type="number" min="0" placeholder="Tillägg" value={form.additions} onChange={(e) => setForm({ ...form, additions: e.target.value })} />
-            <input className={premiumFieldClass} type="number" min="0" placeholder="Avdrag" value={form.deductions} onChange={(e) => setForm({ ...form, deductions: e.target.value })} />
+            <input className={premiumFieldClass} type="number" min="0" placeholder="Tillägg" value={form.additions} onChange={(e) => setForm({ ...form, additions: e.target.value })} aria-label="Tillägg" />
+            <input className={premiumFieldClass} type="number" min="0" placeholder="Avdrag" value={form.deductions} onChange={(e) => setForm({ ...form, deductions: e.target.value })} aria-label="Avdrag" />
           </div>
-          <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+          <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} aria-label="Status">
             {Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <textarea className={premiumTextareaClass} placeholder="Anteckning" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+          <textarea className={premiumTextareaClass} placeholder="Anteckning" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} aria-label="Anteckning" />
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Skapa hyresavi"}</button>
         </form>
       </Panel>
@@ -224,14 +224,14 @@ export default function RentNoticesPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-ink-500">{notice.property_name}{notice.unit ? ` · ${notice.unit}` : ""}</p>
-                    <p className="mt-2 text-xs text-ink-400">Period {notice.period || "–"} · Förfaller {notice.due_date || "–"}</p>
+                    <p className="mt-2 text-xs text-ink-500">Period {notice.period || "–"} · Förfaller {notice.due_date || "–"}</p>
                     {notice.source === "legacy" ? (
                       <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering.</p>
                     ) : null}
                   </div>
                   <div className="space-y-2 sm:text-right">
                     <p className="text-xl font-semibold text-ink-900">{money.format(Number(notice.total || 0))}</p>
-                    <p className="text-xs text-ink-400">Index {Number(notice.index_percent || 0).toLocaleString("sv-SE")} %</p>
+                    <p className="text-xs text-ink-500">Index {Number(notice.index_percent || 0).toLocaleString("sv-SE")} %</p>
                     {canManage && notice.source !== "legacy" ? (
                       <>
                         <select
@@ -261,18 +261,18 @@ export default function RentNoticesPage() {
                 {canManage && editingId === notice.id && notice.status === "draft" ? (
                   <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} />
-                      <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} />
+                      <input className={premiumFieldClass} type="month" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} aria-label="Period" />
+                      <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} aria-label="Förfallodatum" />
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <input className={premiumFieldClass} type="number" min="0" placeholder="Grundhyra" value={editForm.baseRent} onChange={(e) => setEditForm({ ...editForm, baseRent: e.target.value })} />
-                      <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Index %" value={editForm.indexPercent} onChange={(e) => setEditForm({ ...editForm, indexPercent: e.target.value })} />
+                      <input className={premiumFieldClass} type="number" min="0" placeholder="Grundhyra" value={editForm.baseRent} onChange={(e) => setEditForm({ ...editForm, baseRent: e.target.value })} aria-label="Grundhyra" />
+                      <input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Index %" value={editForm.indexPercent} onChange={(e) => setEditForm({ ...editForm, indexPercent: e.target.value })} aria-label="Index %" />
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <input className={premiumFieldClass} type="number" min="0" placeholder="Tillägg" value={editForm.additions} onChange={(e) => setEditForm({ ...editForm, additions: e.target.value })} />
-                      <input className={premiumFieldClass} type="number" min="0" placeholder="Avdrag" value={editForm.deductions} onChange={(e) => setEditForm({ ...editForm, deductions: e.target.value })} />
+                      <input className={premiumFieldClass} type="number" min="0" placeholder="Tillägg" value={editForm.additions} onChange={(e) => setEditForm({ ...editForm, additions: e.target.value })} aria-label="Tillägg" />
+                      <input className={premiumFieldClass} type="number" min="0" placeholder="Avdrag" value={editForm.deductions} onChange={(e) => setEditForm({ ...editForm, deductions: e.target.value })} aria-label="Avdrag" />
                     </div>
-                    <textarea className={premiumTextareaClass} placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                    <textarea className={premiumTextareaClass} placeholder="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} aria-label="Anteckning" />
                     <button
                       type="button"
                       disabled={updatingId === notice.id}

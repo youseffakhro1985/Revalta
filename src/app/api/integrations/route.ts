@@ -2,6 +2,9 @@ import db from "@/lib/db";
 import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
 import { hasStorageConfig } from "@/lib/storage";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/integrations" });
 
 const requiredEnv: Record<string, string[]> = {
   email: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM"],
@@ -30,25 +33,31 @@ export async function GET() {
 
     const companyFilter = user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" };
 
-    const [events, invoiceJobs] = await Promise.all([
+    const [events, invoiceJobCounts] = await Promise.all([
       db.integrationEvent.findMany({
         where: companyFilter,
         orderBy: { created_at: "desc" },
         take: 50,
       }),
+      // Aggregate status counts in the database instead of fetching every
+      // invoice export job row ever created for the company (unbounded growth
+      // risk over the company's lifetime) just to count them in JS.
       user.company_id
-        ? db.workOrderInvoiceExportJob.findMany({
+        ? db.workOrderInvoiceExportJob.groupBy({
+            by: ["status"],
             where: { company_id: user.company_id },
-            select: { status: true },
+            _count: { _all: true },
           })
-        : Promise.resolve([] as Array<{ status: string }>),
+        : Promise.resolve([] as Array<{ status: string; _count: { _all: number } }>),
     ]);
 
+    const countFor = (status: string) =>
+      invoiceJobCounts.find((row) => row.status === status)?._count._all ?? 0;
     const invoiceExportSummary = {
-      total: invoiceJobs.length,
-      active: invoiceJobs.filter((job) => job.status === "queued" || job.status === "processing").length,
-      failed: invoiceJobs.filter((job) => job.status === "failed").length,
-      sent: invoiceJobs.filter((job) => job.status === "sent").length,
+      total: invoiceJobCounts.reduce((sum, row) => sum + row._count._all, 0),
+      active: countFor("queued") + countFor("processing"),
+      failed: countFor("failed"),
+      sent: countFor("sent"),
     };
 
     return NextResponse.json(
@@ -56,7 +65,7 @@ export async function GET() {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error("Get integrations error:", error);
+    logger.error("Get integrations error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

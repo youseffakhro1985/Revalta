@@ -110,7 +110,7 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
         )}
 
         <div className="flex flex-col justify-between gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center">
-          <p className="text-xs text-ink-400">Registreringen kopplas till komponenten och sparas i revisionsloggen. Koppling till arbetsorder eller projekt är valfri.</p>
+          <p className="text-xs text-ink-500">Registreringen kopplas till komponenten och sparas i revisionsloggen. Koppling till arbetsorder eller projekt är valfri.</p>
           <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-900 disabled:opacity-50">
             {tab === "event" ? <CalendarPlus className="h-4 w-4" /> : <CircleDollarSign className="h-4 w-4" />}
             <Save className="hidden h-4 w-4" /> {saving ? "Sparar…" : tab === "event" ? "Registrera händelse" : "Registrera kostnad"}
@@ -128,7 +128,7 @@ function Select({ name, label, options, required }: { name: string; label: strin
   return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><select name={name} required={required} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50">{Object.entries(options).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>;
 }
 function LinkSelect({ name, label, loading, options }: { name: string; label: string; loading: boolean; options: Array<{ value: string; label: string }> }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select name={name} disabled={loading} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50 disabled:bg-sand-50 disabled:text-ink-400"><option value="">{loading ? "Laddar…" : "Ingen koppling"}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select name={name} disabled={loading} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50 disabled:bg-sand-50 disabled:text-ink-500"><option value="">{loading ? "Laddar…" : "Ingen koppling"}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 function Textarea({ name, label, maxLength }: { name: string; label: string; maxLength: number }) {
   return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><textarea name={name} rows={4} maxLength={maxLength} className="w-full resize-y rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50" /></label>;

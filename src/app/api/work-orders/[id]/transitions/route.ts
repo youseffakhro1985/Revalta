@@ -4,6 +4,9 @@ import { canAssignWorkOrders, canManageTickets, getCurrentUser, type CompanyUser
 import { getAllowedWorkOrderTransitions } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/work-orders/[id]/transitions" });
 
 export async function GET(
   _request: Request,
@@ -45,7 +48,7 @@ export async function GET(
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error("Get work order transitions error:", error);
+    logger.error("Get work order transitions error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

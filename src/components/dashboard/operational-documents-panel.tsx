@@ -154,7 +154,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
                       <span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{document.visibility === "shared" ? "Delat" : "Internt"}</span>
                     </div>
                     <p className="mt-1 text-xs text-ink-500">{formatBytes(document.size_bytes)} · Version {document.version} · {document.uploaded_by.name || document.uploaded_by.email}</p>
-                    <p className="mt-1 text-xs text-ink-400">{formatDate(document.created_at)}</p>
+                    <p className="mt-1 text-xs text-ink-500">{formatDate(document.created_at)}</p>
                   </div>
                 </a>
                 <button

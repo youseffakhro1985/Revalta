@@ -98,7 +98,7 @@ export function ServiceNotificationAlertCenter() {
             {data?.summary.open ? <ShieldAlert className="h-5 w-5" aria-hidden="true" /> : <CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
           </div>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-400">Operativ uppföljning</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-500">Operativ uppföljning</p>
             <h2 id="service-alert-center-title" className="mt-1 font-semibold text-ink-950">Driftlarm för serviceaviseringar</h2>
             <p className="mt-1 text-sm text-ink-600">Kvittera leveransproblem och följ när systemet automatiskt har återhämtat sig.</p>
           </div>
@@ -111,10 +111,10 @@ export function ServiceNotificationAlertCenter() {
       {error ? <div role="alert" className="border-b border-red-100 bg-red-50 px-5 py-3 text-sm font-semibold text-red-800">{error}</div> : null}
 
       <div className="grid gap-3 border-b border-sand-100 px-5 py-4 sm:grid-cols-4">
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Öppna</p><p className="mt-1 text-xl font-semibold text-ink-950">{data?.summary.open || 0}</p></div>
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Ej kvitterade</p><p className="mt-1 text-xl font-semibold text-ink-950">{data?.summary.unacknowledged || 0}</p></div>
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Kritiska</p><p className="mt-1 text-xl font-semibold text-red-800">{data?.summary.critical || 0}</p></div>
-        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Lösta</p><p className="mt-1 text-xl font-semibold text-emerald-800">{data?.summary.resolved || 0}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Öppna</p><p className="mt-1 text-xl font-semibold text-ink-950">{data?.summary.open || 0}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Ej kvitterade</p><p className="mt-1 text-xl font-semibold text-ink-950">{data?.summary.unacknowledged || 0}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Kritiska</p><p className="mt-1 text-xl font-semibold text-red-800">{data?.summary.critical || 0}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Lösta</p><p className="mt-1 text-xl font-semibold text-emerald-800">{data?.summary.resolved || 0}</p></div>
       </div>
 
       <div className="divide-y divide-sand-100">
@@ -125,7 +125,7 @@ export function ServiceNotificationAlertCenter() {
               <div>
                 <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-950">{item.title}</h3><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.severity === "critical" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"}`}>{item.severity === "critical" ? "Kritisk" : "Varning"}</span>{item.acknowledged ? <span className="rounded-full bg-sand-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">Kvitterad</span> : null}</div>
                 <p className="mt-1 text-sm leading-6 text-ink-600">{item.description}</p>
-                <p className="mt-2 text-xs text-ink-400">Upptäckt {dateTime.format(new Date(item.createdAt))}</p>
+                <p className="mt-2 text-xs text-ink-500">Upptäckt {dateTime.format(new Date(item.createdAt))}</p>
                 {item.source === "legacy" ? (
                   <p className="mt-2 text-xs font-medium text-amber-800">Äldre larm – kör backfill innan det kan kvitteras.</p>
                 ) : null}
@@ -140,7 +140,7 @@ export function ServiceNotificationAlertCenter() {
         {recentResolved.map((item) => (
           <article key={item.id} className="flex items-start gap-3 px-5 py-4">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /></div>
-            <div><h3 className="font-semibold text-ink-900">Leveransproblemet är löst</h3><p className="mt-1 text-sm text-ink-500">Systemet registrerade en senare lyckad körning och stängde driftlarmet automatiskt.</p><p className="mt-2 text-xs text-ink-400">Larm skapat {dateTime.format(new Date(item.createdAt))}</p></div>
+            <div><h3 className="font-semibold text-ink-900">Leveransproblemet är löst</h3><p className="mt-1 text-sm text-ink-500">Systemet registrerade en senare lyckad körning och stängde driftlarmet automatiskt.</p><p className="mt-2 text-xs text-ink-500">Larm skapat {dateTime.format(new Date(item.createdAt))}</p></div>
           </article>
         ))}
       </div>

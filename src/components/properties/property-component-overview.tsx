@@ -84,7 +84,7 @@ export function PropertyComponentOverview({ propertyId }: { propertyId: string }
         {rows.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-sand-100 text-sm">
-              <thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-400"><tr><th className="px-5 py-3">Komponent</th><th className="px-5 py-3">Risk</th><th className="px-5 py-3">Nästa service</th><th className="px-5 py-3">Skick</th><th className="px-5 py-3 text-right">Kostnad</th><th className="px-5 py-3" /></tr></thead>
+              <thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-5 py-3">Komponent</th><th className="px-5 py-3">Risk</th><th className="px-5 py-3">Nästa service</th><th className="px-5 py-3">Skick</th><th className="px-5 py-3 text-right">Kostnad</th><th className="px-5 py-3" /></tr></thead>
               <tbody className="divide-y divide-sand-100">
                 {rows.map((row) => { const state = serviceState(row.next_service_at); return (
                   <tr key={text(row, "id")} className="transition hover:bg-sand-50/70">

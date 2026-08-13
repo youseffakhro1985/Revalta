@@ -59,7 +59,7 @@ export function DashboardPreview() {
             <span className="h-2 w-2 rounded-full border border-sand-400 bg-white" />
             <span className="h-2 w-2 rounded-full border border-sand-400 bg-white" />
           </div>
-          <span className="text-[9px] font-medium tracking-[0.08em] text-ink-400">
+          <span className="text-[9px] font-medium tracking-[0.08em] text-ink-500">
             APP.REVALTA.SE
           </span>
           <span className="w-8" />
@@ -73,7 +73,7 @@ export function DashboardPreview() {
               </span>
             </div>
             <div className="px-3 py-4">
-              <p className="mb-2 px-2 text-[8px] font-semibold uppercase tracking-[0.15em] text-ink-400">
+              <p className="mb-2 px-2 text-[8px] font-semibold uppercase tracking-[0.15em] text-ink-500">
                 Förvaltning
               </p>
               <nav aria-label="Dashboardmeny" className="space-y-0.5">
@@ -107,7 +107,7 @@ export function DashboardPreview() {
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[9px] font-semibold text-ink-800">Anna Lindberg</p>
-                  <p className="truncate text-[8px] text-ink-400">Fastighetsförvaltare</p>
+                  <p className="truncate text-[8px] text-ink-500">Fastighetsförvaltare</p>
                 </div>
               </div>
             </div>
@@ -116,14 +116,14 @@ export function DashboardPreview() {
           <div className="min-w-0 flex-1 bg-[#FCFCFA]">
             <div className="flex h-[58px] items-center justify-between border-b border-sand-200 bg-white px-4 sm:px-5">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-ink-400">Portfölj</span>
+                <span className="text-[10px] text-ink-500">Portfölj</span>
                 <span className="text-[10px] text-sand-400">/</span>
                 <span className="text-[10px] font-semibold text-ink-700">Översikt</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="hidden h-7 w-32 items-center gap-2 rounded-md border border-sand-200 bg-sand-50 px-2.5 sm:flex">
-                  <Search aria-hidden="true" className="h-3 w-3 text-ink-400" strokeWidth={1.7} />
-                  <span className="text-[8px] text-ink-400">Sök i Revalta</span>
+                  <Search aria-hidden="true" className="h-3 w-3 text-ink-500" strokeWidth={1.7} />
+                  <span className="text-[8px] text-ink-500">Sök i Revalta</span>
                 </div>
                 <div className="flex h-7 w-7 items-center justify-center rounded-md border border-sand-200 bg-white">
                   <Bell aria-hidden="true" className="h-3.5 w-3.5 text-ink-500" strokeWidth={1.6} />
@@ -134,7 +134,7 @@ export function DashboardPreview() {
             <div className="p-4 sm:p-5">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[9px] font-medium text-ink-400">Tisdag 14 juli</p>
+                  <p className="text-[9px] font-medium text-ink-500">Tisdag 14 juli</p>
                   <h2 className="mt-1 font-display text-[19px] font-semibold tracking-[-0.025em] text-ink-950 sm:text-[21px]">
                     God morgon, Anna
                   </h2>
@@ -151,11 +151,11 @@ export function DashboardPreview() {
               <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {metrics.map((metric) => (
                   <div key={metric.label} className="rounded-[10px] border border-sand-200 bg-white p-3 sm:p-3.5">
-                    <p className="truncate text-[8px] font-medium text-ink-400 sm:text-[9px]">{metric.label}</p>
+                    <p className="truncate text-[8px] font-medium text-ink-500 sm:text-[9px]">{metric.label}</p>
                     <p className="mt-2 font-display text-[17px] font-semibold tracking-[-0.03em] text-ink-950 sm:text-[21px]">
                       {metric.value}
                     </p>
-                    <p className="mt-1 truncate text-[7px] text-ink-400 sm:text-[8px]">{metric.detail}</p>
+                    <p className="mt-1 truncate text-[7px] text-ink-500 sm:text-[8px]">{metric.detail}</p>
                   </div>
                 ))}
               </div>
@@ -173,7 +173,7 @@ export function DashboardPreview() {
                       <div key={ticket.title} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                         <div className="min-w-0">
                           <p className="truncate text-[9px] font-medium text-ink-800">{ticket.title}</p>
-                          <p className="mt-0.5 truncate text-[8px] text-ink-400">{ticket.property}</p>
+                          <p className="mt-0.5 truncate text-[8px] text-ink-500">{ticket.property}</p>
                         </div>
                         <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[7px] font-semibold ${ticket.statusClass}`}>
                           {ticket.status}
@@ -218,7 +218,7 @@ export function DashboardPreview() {
             <Building2 aria-hidden="true" className="h-3 w-3 text-petroleum-700" strokeWidth={1.7} />
           </span>
           <div>
-            <p className="text-[8px] text-ink-400">Uthyrningsgrad</p>
+            <p className="text-[8px] text-ink-500">Uthyrningsgrad</p>
             <p className="text-[12px] font-semibold text-ink-900">98,2 %</p>
           </div>
         </div>

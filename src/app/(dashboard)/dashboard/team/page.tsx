@@ -77,13 +77,13 @@ export default function TeamPage() {
       <Panel title="Bjud in teammedlem" description="Skapa en säker inbjudan och välj rätt roll från början.">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={!canManage} className="space-y-4 disabled:opacity-60">
-            <input placeholder="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} />
-            <input type="email" required placeholder="E-post" value={email} onChange={(event) => setEmail(event.target.value)} className={premiumFieldClass} />
-            <select value={role} onChange={(event) => setRole(event.target.value)} className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option><option value="resident">Boende</option></select>
+            <input placeholder="Namn" aria-label="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} />
+            <input type="email" required placeholder="E-post" aria-label="E-post" value={email} onChange={(event) => setEmail(event.target.value)} className={premiumFieldClass} />
+            <select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Roll" className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option><option value="resident">Boende</option></select>
             <button disabled={submitting || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skapar…" : "Skapa inbjudan"}</button>
           </fieldset>
         </form>
-        {!canManage ? <p className="mt-4 text-xs leading-5 text-ink-400">Du behöver administratörsbehörighet för att bjuda in nya användare.</p> : null}
+        {!canManage ? <p className="mt-4 text-xs leading-5 text-ink-500">Du behöver administratörsbehörighet för att bjuda in nya användare.</p> : null}
         {inviteUrl ? <div className="mt-5 rounded-xl border border-petroleum-100 bg-petroleum-50 p-4"><p className="text-xs font-semibold uppercase tracking-[0.1em] text-petroleum-700">Inbjudningslänk</p><p className="mt-2 break-all text-sm text-petroleum-800">{inviteUrl}</p></div> : null}
       </Panel>
 

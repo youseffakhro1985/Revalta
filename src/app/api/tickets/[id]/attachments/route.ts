@@ -6,6 +6,9 @@ import { recordStorageEvent } from "@/lib/integrations";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]/attachments" });
 
 export async function POST(
   request: Request,
@@ -97,7 +100,7 @@ export async function POST(
     if (error instanceof StorageConfigurationError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    console.error("Create attachment error:", error);
+    logger.error("Create attachment error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

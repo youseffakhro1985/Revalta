@@ -214,7 +214,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
         <Panel title="Boende och avtalsparter" description={`${pagination.total} registrerade kontakter på fastigheten`} bodyClassName="p-0">
           <div className="border-b border-sand-100 p-4">
             <label className="relative block">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
               <input className={`${premiumFieldClass} pl-9`} maxLength={160} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök namn, e-post, telefon eller organisationsnummer" />
             </label>
           </div>

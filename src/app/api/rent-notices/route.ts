@@ -3,6 +3,9 @@ import { auditScopedWhere, canManageLeases, canViewLeasingData, getCurrentUser, 
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/rent-notices" });
 
 const noticeAction = "rent_notice.created";
 
@@ -94,7 +97,7 @@ export async function GET() {
       permissions: { canManage: canManageLeases(user.role) },
     });
   } catch (error) {
-    console.error("Get rent notices error:", error);
+    logger.error("Get rent notices error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -197,7 +200,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, notice }, { status: 201 });
   } catch (error) {
-    console.error("Create rent notice error:", error);
+    logger.error("Create rent notice error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -354,7 +357,7 @@ export async function PATCH(request: Request) {
       indexed_rent: indexedRent,
     });
   } catch (error) {
-    console.error("Update rent notice error:", error);
+    logger.error("Update rent notice error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

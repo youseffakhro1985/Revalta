@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
-import { createRecurringIncidentEvent, listRecurringIncidentEvents } from "@/lib/recurring-incident-storage";
+import { listRecurringIncidentEvents, tryCreateRecurringIncidentEscalation } from "@/lib/recurring-incident-storage";
 import { listRecurringRuns, readRecurringSchedules } from "@/lib/recurring-work-order-engine";
 
 type IncidentPayload = {
@@ -144,10 +144,10 @@ export async function runRecurringIncidentEscalation(options: { companyId?: stri
           continue;
         }
 
-        await createRecurringIncidentEvent({
+        const result = await tryCreateRecurringIncidentEscalation({
           companyId,
           notificationKey: source.notificationKey,
-          eventType: "escalation",
+          level: desiredLevel,
           status: `level_${desiredLevel}`,
           recipient: desiredLevel === 2 ? "company:management" : "company:operations",
           payload: {
@@ -160,7 +160,13 @@ export async function runRecurringIncidentEscalation(options: { companyId?: stri
           },
         });
         highestLevel.set(source.notificationKey, desiredLevel);
-        escalated += 1;
+        if (result.created) {
+          escalated += 1;
+        } else {
+          // Another concurrent/retried run already escalated this key to this
+          // level (or higher) — don't double-count or send a duplicate notification.
+          skipped += 1;
+        }
       }
     } catch (error) {
       errors.push({

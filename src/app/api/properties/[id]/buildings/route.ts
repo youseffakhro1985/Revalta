@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/properties/[id]/buildings" });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -44,7 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ success: true, building }, { status: 201 });
   } catch (error) {
-    console.error("Create building error:", error);
+    logger.error("Create building error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

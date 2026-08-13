@@ -6,12 +6,14 @@ const {
   projectUpdateManyMock,
   auditLogFindFirstMock,
   writeAuditLogMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   projectFindFirstMock: vi.fn(),
   projectUpdateManyMock: vi.fn(),
   auditLogFindFirstMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -23,8 +25,8 @@ vi.mock("@/lib/audit", () => ({
   writeAuditLog: writeAuditLogMock,
 }));
 
-vi.mock("@/lib/db", () => ({
-  default: {
+vi.mock("@/lib/db", () => {
+  const dbMock = {
     project: {
       findFirst: projectFindFirstMock,
       updateMany: projectUpdateManyMock,
@@ -32,8 +34,11 @@ vi.mock("@/lib/db", () => ({
     auditLog: {
       findFirst: auditLogFindFirstMock,
     },
-  },
-}));
+    $transaction: transactionMock,
+  };
+  transactionMock.mockImplementation((callback: (tx: typeof dbMock) => unknown) => callback(dbMock));
+  return { default: dbMock };
+});
 
 import { POST } from "./route";
 
@@ -70,6 +75,24 @@ describe("projects/[id]/restore", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ action: "project.restored" }),
+      expect.anything(),
     );
+  });
+
+  it("does not report success when the audit log write fails inside the transaction", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    projectFindFirstMock.mockResolvedValue({
+      id: "project-1",
+      name: "Tak",
+      status: "cancelled",
+      property: { deleted_at: null },
+    });
+    auditLogFindFirstMock.mockResolvedValue(null);
+    writeAuditLogMock.mockRejectedValue(new Error("audit db unavailable"));
+
+    const response = await POST(new Request("http://localhost/api/projects/project-1/restore", { method: "POST" }), { params });
+
+    expect(response.status).toBe(500);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 });

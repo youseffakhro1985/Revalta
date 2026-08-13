@@ -151,11 +151,11 @@ export default function BudgetPage() {
       {canManage ? (
         <Panel title="Ny budgetrad" description="Registrera budget, prognos och verkligt utfall per kostnadsslag.">
           <form onSubmit={submit} className="space-y-4">
-            <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} /><select className={premiumFieldClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
-            <input className={premiumFieldClass} placeholder="Konto eller kostnadsslag" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} required />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><input className={premiumFieldClass} type="number" placeholder="Budget" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} /><input className={premiumFieldClass} type="number" placeholder="Prognos" value={form.forecast} onChange={(e) => setForm({ ...form, forecast: e.target.value })} /><input className={premiumFieldClass} type="number" placeholder="Utfall" value={form.actual} onChange={(e) => setForm({ ...form, actual: e.target.value })} /></div>
-            <textarea className={premiumTextareaClass} placeholder="Kommentar" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} aria-label="År" /><select className={premiumFieldClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} aria-label="Kategori">{Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+            <input className={premiumFieldClass} placeholder="Konto eller kostnadsslag" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} required aria-label="Konto eller kostnadsslag" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3"><input className={premiumFieldClass} type="number" placeholder="Budget" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} aria-label="Budget" /><input className={premiumFieldClass} type="number" placeholder="Prognos" value={form.forecast} onChange={(e) => setForm({ ...form, forecast: e.target.value })} aria-label="Prognos" /><input className={premiumFieldClass} type="number" placeholder="Utfall" value={form.actual} onChange={(e) => setForm({ ...form, actual: e.target.value })} aria-label="Utfall" /></div>
+            <textarea className={premiumTextareaClass} placeholder="Kommentar" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} aria-label="Kommentar" />
             <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara budgetrad"}</button>
           </form>
         </Panel>
@@ -178,7 +178,7 @@ export default function BudgetPage() {
               </div>
               <div className="space-y-2 sm:text-right">
                 <p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(itemVariance)}</p>
-                <p className="text-xs text-ink-400">Avvikelse mot budget</p>
+                <p className="text-xs text-ink-500">Avvikelse mot budget</p>
                 {canManage && item.source !== "legacy" ? (
                   <>
                     <button type="button" onClick={() => (editingId === item.id ? setEditingId("") : startEdit(item))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">
@@ -194,18 +194,18 @@ export default function BudgetPage() {
             {canManage && editingId === item.id && item.source !== "legacy" ? (
               <div className="mt-4 space-y-3 border-t border-sand-100 pt-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <input className={premiumFieldClass} type="number" value={editForm.year} onChange={(e) => setEditForm({ ...editForm, year: e.target.value })} />
-                  <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}>
+                  <input className={premiumFieldClass} type="number" value={editForm.year} onChange={(e) => setEditForm({ ...editForm, year: e.target.value })} aria-label="År" />
+                  <select className={premiumFieldClass} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} aria-label="Kategori">
                     {Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                 </div>
-                <input className={premiumFieldClass} placeholder="Konto" value={editForm.account} onChange={(e) => setEditForm({ ...editForm, account: e.target.value })} />
+                <input className={premiumFieldClass} placeholder="Konto" value={editForm.account} onChange={(e) => setEditForm({ ...editForm, account: e.target.value })} aria-label="Konto" />
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <input className={premiumFieldClass} type="number" placeholder="Budget" value={editForm.budget} onChange={(e) => setEditForm({ ...editForm, budget: e.target.value })} />
-                  <input className={premiumFieldClass} type="number" placeholder="Prognos" value={editForm.forecast} onChange={(e) => setEditForm({ ...editForm, forecast: e.target.value })} />
-                  <input className={premiumFieldClass} type="number" placeholder="Utfall" value={editForm.actual} onChange={(e) => setEditForm({ ...editForm, actual: e.target.value })} />
+                  <input className={premiumFieldClass} type="number" placeholder="Budget" value={editForm.budget} onChange={(e) => setEditForm({ ...editForm, budget: e.target.value })} aria-label="Budget" />
+                  <input className={premiumFieldClass} type="number" placeholder="Prognos" value={editForm.forecast} onChange={(e) => setEditForm({ ...editForm, forecast: e.target.value })} aria-label="Prognos" />
+                  <input className={premiumFieldClass} type="number" placeholder="Utfall" value={editForm.actual} onChange={(e) => setEditForm({ ...editForm, actual: e.target.value })} aria-label="Utfall" />
                 </div>
-                <textarea className={premiumTextareaClass} placeholder="Kommentar" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} />
+                <textarea className={premiumTextareaClass} placeholder="Kommentar" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} aria-label="Kommentar" />
                 <button type="button" disabled={updatingId === item.id} onClick={() => void saveEdit(item)} className={`${premiumPrimaryButtonClass} sm:w-auto`}>
                   {updatingId === item.id ? "Sparar…" : "Spara ändringar"}
                 </button>

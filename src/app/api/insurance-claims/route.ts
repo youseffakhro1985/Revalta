@@ -10,6 +10,9 @@ import {
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/insurance-claims" });
 
 const action = "insurance_claim.created";
 
@@ -97,7 +100,7 @@ export async function GET() {
       permissions: { canManage: canManageWorkOrderFinance(user.role) },
     });
   } catch (error) {
-    console.error("Get insurance claims error:", error);
+    logger.error("Get insurance claims error", error);
     if (isMissingSchemaColumnError(error)) {
       return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
     }
@@ -201,7 +204,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, claim }, { status: 201 });
   } catch (error) {
-    console.error("Create insurance claim error:", error);
+    logger.error("Create insurance claim error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -349,7 +352,7 @@ export async function PATCH(request: Request) {
       net_cost: Math.max(0, estimatedCost - compensation),
     });
   } catch (error) {
-    console.error("Update insurance claim error:", error);
+    logger.error("Update insurance claim error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

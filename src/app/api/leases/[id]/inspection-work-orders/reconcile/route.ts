@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
 import { InspectionRecordSyncError, reconcileInspectionRecord } from "@/lib/reconcile-inspection-record";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases/[id]/inspection-work-orders/reconcile" });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -23,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof InspectionRecordSyncError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("Reconcile inspection work orders error:", error);
+    logger.error("Reconcile inspection work orders error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

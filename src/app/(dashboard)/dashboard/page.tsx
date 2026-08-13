@@ -199,7 +199,7 @@ export default async function Dashboard() {
                 <div>
                   <p className="text-sm font-medium text-ink-500">{kpi.label}</p>
                   <p className="mt-2 text-[30px] font-semibold tracking-[-0.04em] text-ink-950">{kpi.value}</p>
-                  <p className="mt-1 text-xs text-ink-400">{kpi.hint}</p>
+                  <p className="mt-1 text-xs text-ink-500">{kpi.hint}</p>
                 </div>
                 <div className="rounded-xl border border-sand-100 bg-sand-50 p-3 text-petroleum-700 transition-colors duration-200 ease-in-out group-hover:border-petroleum-100 group-hover:bg-petroleum-50/70">
                   <Icon className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
