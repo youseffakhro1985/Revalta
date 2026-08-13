@@ -115,6 +115,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
               maxLength={5000}
               required
               placeholder="Skriv en tydlig kommentar eller ett beslut…"
+              aria-label="Skriv en kommentar"
               className="min-h-28 w-full resize-y rounded-xl border border-sand-200 bg-white px-4 py-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
             />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

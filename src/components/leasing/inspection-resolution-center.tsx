@@ -81,7 +81,7 @@ export function InspectionResolutionCenter() {
     <Panel title="Återkoppla slutförda arbetsorder" description="Synkronisera arbetsorderstatus tillbaka till rätt besiktningspunkt.">
       <div className="space-y-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <select className={premiumFieldClass} value={leaseId} onChange={(e) => setLeaseId(e.target.value)}>
+          <select className={premiumFieldClass} aria-label="Välj avtal" value={leaseId} onChange={(e) => setLeaseId(e.target.value)}>
             <option value="">Välj avtal</option>
             {leases.map((l) => (
               <option key={l.id} value={l.id}>{l.lease_number} · {l.property.name} · {l.unit.designation} · {l.lease_holder.name}</option>

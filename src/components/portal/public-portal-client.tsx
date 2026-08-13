@@ -354,6 +354,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                       onChange={(event) => setResidentComment(event.target.value)}
                       className="mt-3 w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-900 outline-none transition-all focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500"
                       placeholder="Skriv en komplettering eller fråga till förvaltningen..."
+                      aria-label="Skicka kommentar"
                     />
                     <button disabled={loading || !residentComment.trim()} className="mt-3 rounded-lg bg-petroleum-600 px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-petroleum-700 transition-colors">
                       Skicka kommentar
@@ -365,6 +366,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                     <p className="mt-1 text-xs text-ink-500">Bifoga bild eller dokument (PNG, JPG, PDF) upp till 1 MB.</p>
                     <input
                       type="file"
+                      aria-label="Lägg till bilaga"
                       accept="image/png,image/jpeg,image/webp,application/pdf,text/plain"
                       onChange={(event) => setAttachmentFile(event.target.files?.[0] || null)}
                       className="mt-3 block w-full rounded-xl border border-sand-200 bg-sand-50/30 p-2.5 text-sm text-ink-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-petroleum-50 file:text-petroleum-700 hover:file:bg-petroleum-100 transition-all cursor-pointer"

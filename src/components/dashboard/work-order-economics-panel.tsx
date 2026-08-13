@@ -377,7 +377,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
               <input name="startedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Starttid" />
               <input name="endedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Sluttid" />
             </div>
-            <input name="note" placeholder="Anteckning" className={premiumFieldClass} />
+            <input name="note" placeholder="Anteckning" aria-label="Anteckning" className={premiumFieldClass} />
             <label className="inline-flex items-center gap-2 text-sm text-ink-600">
               <input name="billable" type="checkbox" defaultChecked className="h-4 w-4 rounded border-sand-300" />
               Debiterbar
@@ -463,15 +463,15 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             }}
             className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4"
           >
-            <input name="name" required placeholder="Artikel / material" className={premiumFieldClass} />
+            <input name="name" required placeholder="Artikel / material" aria-label="Artikel / material" className={premiumFieldClass} />
             <div className="grid gap-3 sm:grid-cols-3">
               <input name="quantity" type="number" min="0.001" step="0.001" defaultValue="1" required className={premiumFieldClass} aria-label="Antal" />
               <select name="unit" defaultValue="st" className={premiumFieldClass} aria-label="Enhet">
                 {["st", "m", "m2", "m3", "kg", "l", "förp"].map((unit) => <option key={unit} value={unit}>{unit}</option>)}
               </select>
-              <input name="unitPrice" type="number" min="0" step="0.01" required placeholder="À-pris" className={premiumFieldClass} />
+              <input name="unitPrice" type="number" min="0" step="0.01" required placeholder="À-pris" aria-label="À-pris" className={premiumFieldClass} />
             </div>
-            <input name="supplier" placeholder="Leverantör" className={premiumFieldClass} />
+            <input name="supplier" placeholder="Leverantör" aria-label="Leverantör" className={premiumFieldClass} />
             <label className="inline-flex items-center gap-2 text-sm text-ink-600">
               <input name="billable" type="checkbox" defaultChecked className="h-4 w-4 rounded border-sand-300" />
               Debiterbar
@@ -590,6 +590,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 value={draft.customerName}
                 onChange={(event) => setDraft({ ...draft, customerName: event.target.value })}
                 placeholder="Kundnamn"
+                aria-label="Kundnamn"
                 disabled={!canManage}
                 className={premiumFieldClass}
               />
@@ -597,6 +598,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 value={draft.customerOrgNumber}
                 onChange={(event) => setDraft({ ...draft, customerOrgNumber: event.target.value })}
                 placeholder="Org.nr"
+                aria-label="Org.nr"
                 disabled={!canManage}
                 className={premiumFieldClass}
               />
@@ -604,6 +606,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 value={draft.customerReference}
                 onChange={(event) => setDraft({ ...draft, customerReference: event.target.value })}
                 placeholder="Kundreferens"
+                aria-label="Kundreferens"
                 disabled={!canManage}
                 className={premiumFieldClass}
               />
@@ -611,6 +614,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 type="date"
                 value={draft.invoiceDate}
                 onChange={(event) => setDraft({ ...draft, invoiceDate: event.target.value })}
+                aria-label="Fakturadatum"
                 disabled={!canManage}
                 className={premiumFieldClass}
               />

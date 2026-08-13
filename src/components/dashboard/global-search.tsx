@@ -93,9 +93,10 @@ export function GlobalSearch() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Sök fastighet, ärende, användare eller hyrespart..."
+                aria-label="Sök fastighet, ärende, användare eller hyrespart"
                 className="h-16 flex-1 bg-transparent text-[15px] text-ink-900 outline-none placeholder:text-ink-400"
               />
-              <button type="button" onClick={() => setOpen(false)} className="rounded-lg p-2 text-ink-400 hover:bg-sand-100 hover:text-ink-700">
+              <button type="button" onClick={() => setOpen(false)} aria-label="Stäng sökning" className="rounded-lg p-2 text-ink-400 hover:bg-sand-100 hover:text-ink-700">
                 <X className="h-4 w-4" />
               </button>
             </div>
