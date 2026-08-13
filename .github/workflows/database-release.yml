@@ -86,11 +86,19 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: npx prisma generate
 
-      - name: Show migration status before release
+      - name: Show migration status before release (informational)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-        run: npx prisma migrate status
+        run: |
+          set +e
+          npx prisma migrate status
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            echo "::notice::Pre-release migration status exited with code $status. Pending migrations are expected here; prisma migrate deploy remains the authoritative release gate."
+          fi
 
       - name: Apply migrations
         env:
