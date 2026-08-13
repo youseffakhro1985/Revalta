@@ -5,6 +5,9 @@ import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-use
 import { recordAiEvent } from "@/lib/integrations";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]/ai" });
 
 export async function POST(
   _request: Request,
@@ -76,7 +79,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, ticket });
   } catch (error) {
-    console.error("Analyze ticket error:", error);
+    logger.error("Analyze ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

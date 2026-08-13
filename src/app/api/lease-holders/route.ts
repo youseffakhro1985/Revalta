@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageLeases, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/lease-holders" });
 
 const partyTypes = new Set(["individual", "organization"]);
 const statuses = new Set(["active", "inactive"]);
@@ -88,7 +91,7 @@ export async function GET(request: Request) {
       pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
     });
   } catch (error) {
-    console.error("Get lease holders error:", error);
+    logger.error("Get lease holders error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -149,7 +152,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ holder }, { status: 201 });
   } catch (error) {
-    console.error("Create lease holder error:", error);
+    logger.error("Create lease holder error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

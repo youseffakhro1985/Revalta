@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/documents/[id]/lifecycle" });
 
 const allowedTransitions = new Set(["archive", "unpublish", "restore"]);
 
@@ -100,7 +103,7 @@ export async function PATCH(
 
     return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
   } catch (error) {
-    console.error("Update document lifecycle error:", error);
+    logger.error("Update document lifecycle error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

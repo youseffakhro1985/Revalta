@@ -7,6 +7,9 @@ import { validateUploadFile } from "@/lib/document-file-security";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { findAccessibleWorkOrder } from "@/lib/assigned-work-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/operational-documents" });
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const ENTITY_TYPES = new Set(["work_order", "project", "property", "technical_asset"]);
@@ -181,7 +184,7 @@ export async function POST(request: Request) {
     if (error instanceof StorageConfigurationError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
-    console.error("Create operational document error:", error);
+    logger.error("Create operational document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

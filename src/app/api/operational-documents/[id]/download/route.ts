@@ -4,6 +4,9 @@ import db from "@/lib/db";
 import { getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { isOperationalDocumentAccessible } from "@/lib/operational-document-access";
 import { getStorageToken } from "@/lib/storage";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/operational-documents/[id]/download" });
 
 function contentDisposition(fileName: string) {
   const safeAscii = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -73,7 +76,7 @@ export async function GET(
     }
     return new Response(legacyResponse.body, { headers });
   } catch (error) {
-    console.error("Download operational document error:", error);
+    logger.error("Download operational document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

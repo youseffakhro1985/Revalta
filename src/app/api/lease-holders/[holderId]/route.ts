@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/lease-holders/[holderId]" });
 
 const partyTypes = new Set(["individual", "organization"]);
 const statuses = new Set(["active", "inactive"]);
@@ -106,7 +109,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ho
 
     return NextResponse.json({ holder });
   } catch (error) {
-    console.error("Update lease holder error:", error);
+    logger.error("Update lease holder error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -142,7 +145,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete lease holder error:", error);
+    logger.error("Delete lease holder error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

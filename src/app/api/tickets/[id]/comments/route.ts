@@ -4,6 +4,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification } from "@/lib/integrations";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]/comments" });
 
 export async function POST(
   request: Request,
@@ -74,7 +77,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, comment }, { status: 201 });
   } catch (error) {
-    console.error("Create ticket comment error:", error);
+    logger.error("Create ticket comment error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
