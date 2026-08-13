@@ -162,7 +162,7 @@ export default function ResidentDocumentsPage() {
         <div className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row">
           <label className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök dokumentnamn, fil eller kategori" className={`${premiumFieldClass} pl-9`} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök dokumentnamn, fil eller kategori" aria-label="Sök dokumentnamn, fil eller kategori" className={`${premiumFieldClass} pl-9`} />
           </label>
           <button type="button" onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50">
             <RefreshCw className="h-4 w-4" /> Uppdatera

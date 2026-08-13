@@ -123,7 +123,7 @@ export default function WorkOrderEditLocksPage() {
 
     <Panel title="Driftläge" description="Vyn uppdateras automatiskt var 30:e sekund. Utgångna lås rensas innan resultatet visas.">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-xl"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök arbetsorder, fastighet eller redigerare" className={`${premiumFieldClass} pl-10`} /></div>
+        <div className="relative w-full max-w-xl"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök arbetsorder, fastighet eller redigerare" aria-label="Sök arbetsorder, fastighet eller redigerare" className={`${premiumFieldClass} pl-10`} /></div>
         <button type="button" onClick={() => void load(true)} disabled={refreshing} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-petroleum-800 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Uppdatera</button>
       </div>
       {data?.generatedAt ? <p className="mt-3 text-xs text-ink-500">Senast kontrollerad {dateTime.format(new Date(data.generatedAt))}</p> : null}

@@ -239,7 +239,7 @@ export default function ResidentPortalPage() {
           bodyClassName="p-0"
         >
           <div className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row">
-            <input placeholder="Sök referens, boende, fastighet, objekt eller ämne" value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} />
+            <input placeholder="Sök referens, boende, fastighet, objekt eller ämne" aria-label="Sök referens, boende, fastighet, objekt eller ämne" value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} />
             <button type="button" onClick={() => void load()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50">
               <RefreshCw className="h-4 w-4" /> Uppdatera
             </button>

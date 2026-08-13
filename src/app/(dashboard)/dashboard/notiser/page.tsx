@@ -149,15 +149,15 @@ export default function NotificationsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Nytt meddelande</p>
               <h2 className="mt-2 text-lg font-semibold text-ink-950">Publicera intern information</h2>
             </div>
-            <input required maxLength={120} placeholder="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
-            <textarea required maxLength={2000} rows={6} placeholder="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <input required maxLength={120} placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <textarea required maxLength={2000} rows={6} placeholder="Meddelande" aria-label="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
             <div className="grid grid-cols-2 gap-3">
-              <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
+              <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} aria-label="Prioritet" className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
                 <option value="normal">Information</option>
                 <option value="important">Viktigt</option>
                 <option value="urgent">Brådskande</option>
               </select>
-              <select value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value })} className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
+              <select value={form.audience} onChange={(event) => setForm({ ...form, audience: event.target.value })} aria-label="Målgrupp" className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
                 <option>Alla användare</option>
                 <option>Förvaltare</option>
                 <option>Fastighetsskötare</option>

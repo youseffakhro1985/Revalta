@@ -77,9 +77,9 @@ export default function TeamPage() {
       <Panel title="Bjud in teammedlem" description="Skapa en säker inbjudan och välj rätt roll från början.">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={!canManage} className="space-y-4 disabled:opacity-60">
-            <input placeholder="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} />
-            <input type="email" required placeholder="E-post" value={email} onChange={(event) => setEmail(event.target.value)} className={premiumFieldClass} />
-            <select value={role} onChange={(event) => setRole(event.target.value)} className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option><option value="resident">Boende</option></select>
+            <input placeholder="Namn" aria-label="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} />
+            <input type="email" required placeholder="E-post" aria-label="E-post" value={email} onChange={(event) => setEmail(event.target.value)} className={premiumFieldClass} />
+            <select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Roll" className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option><option value="resident">Boende</option></select>
             <button disabled={submitting || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skapar…" : "Skapa inbjudan"}</button>
           </fieldset>
         </form>
