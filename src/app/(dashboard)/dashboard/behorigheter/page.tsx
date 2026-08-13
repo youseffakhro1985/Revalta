@@ -75,7 +75,7 @@ export default async function PermissionsPage() {
         </div>
       </Panel>
 
-      <Panel title="Användare och roller" description="Rolländringar görs från Team. Individuell fastighetsbehörighet och leverantörs-/styrelseroller kommer i nästa steg." bodyClassName="p-0">
+      <Panel title="Användare och roller" description="Roll sätts när en användare bjuds in via Team. Att ändra roll för en befintlig användare stöds inte ännu. Individuell fastighetsbehörighet och leverantörs-/styrelseroller kommer i nästa steg." bodyClassName="p-0">
         <div className="divide-y divide-sand-100">
           {members.map((member) => <div key={member.id} className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-ink-900">{member.name || "Namn saknas"}</p><p className="text-sm text-ink-500">{member.email}</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{roles.find((role) => role.key === member.role)?.label || member.role}</span><span className="rounded-full border border-petroleum-100 bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-700">{member.status === "active" ? "Aktiv" : member.status}</span></div></div>)}
         </div>
