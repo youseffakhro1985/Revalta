@@ -2,6 +2,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/current-user";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/settings/profile" });
 
 export async function GET() {
   try {
@@ -10,7 +13,7 @@ export async function GET() {
 
     return NextResponse.json({ user });
   } catch (error) {
-    console.error("Get profile settings error:", error);
+    logger.error("Get profile settings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -48,7 +51,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, user: updatedUser });
   } catch (error) {
-    console.error("Update profile settings error:", error);
+    logger.error("Update profile settings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

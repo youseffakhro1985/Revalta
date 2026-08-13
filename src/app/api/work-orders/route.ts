@@ -30,6 +30,9 @@ import {
 } from "@/lib/schema-readiness";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { findAccessibleTicket } from "@/lib/assigned-work-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/work-orders" });
 
 function parseOptionalDate(value: unknown) {
   if (!value) return null;
@@ -211,7 +214,7 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error("Get work orders error:", error);
+    logger.error("Get work orders error", error);
     if (isMissingSchemaColumnError(error)) {
       return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
     }

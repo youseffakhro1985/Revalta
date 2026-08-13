@@ -2,6 +2,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/settings/company" });
 
 export async function GET() {
   try {
@@ -16,7 +19,7 @@ export async function GET() {
 
     return NextResponse.json({ company, canManage: canManageCompany(user.role) });
   } catch (error) {
-    console.error("Get company settings error:", error);
+    logger.error("Get company settings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -54,7 +57,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, company });
   } catch (error) {
-    console.error("Update company settings error:", error);
+    logger.error("Update company settings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

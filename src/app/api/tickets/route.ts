@@ -9,6 +9,9 @@ import {
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets" });
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
@@ -109,7 +112,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Get tickets error:", error);
+    logger.error("Get tickets error", error);
     if (isMissingSchemaColumnError(error)) {
       return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
     }
@@ -255,7 +258,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, ticket }, { status: 201 });
   } catch (error) {
-    console.error("Create ticket error:", error);
+    logger.error("Create ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

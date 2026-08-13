@@ -7,6 +7,9 @@ import {
   notDeletedFilter,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/properties" });
 
 /** Explicit select avoids querying soft-delete columns that may not exist yet. */
 const propertyListSelect = (ticketActive: { deleted_at: null } | Record<string, never>) => ({
@@ -48,7 +51,7 @@ export async function GET() {
       permissions: { canCreate: canCreateProperties(user.role) },
     });
   } catch (error) {
-    console.error("Get properties error:", error);
+    logger.error("Get properties error", error);
     if (isMissingSchemaColumnError(error)) {
       return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
     }
@@ -106,7 +109,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, property }, { status: 201 });
   } catch (error) {
-    console.error("Create property error:", error);
+    logger.error("Create property error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

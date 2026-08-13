@@ -2,6 +2,9 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canViewAudit, getCurrentUser } from "@/lib/current-user";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/audit" });
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -149,7 +152,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Get audit log error:", error);
+    logger.error("Get audit log error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

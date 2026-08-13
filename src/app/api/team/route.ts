@@ -10,6 +10,9 @@ import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/team" });
 
 const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer", "resident"]);
 
@@ -67,7 +70,7 @@ export async function GET() {
       permissions: { canManage: canManageTeam(user.role), canSeeEmails: true },
     });
   } catch (error) {
-    console.error("Get team error:", error);
+    logger.error("Get team error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -146,7 +149,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, member }, { status: 201 });
   } catch (error) {
-    console.error("Create team member error:", error);
+    logger.error("Create team member error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

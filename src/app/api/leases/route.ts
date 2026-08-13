@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageLeases, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
 import { generateLeaseNumber, isOccupyingLeaseStatus, parseLeaseInput } from "@/lib/leasing";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases" });
 
 const leasableUnitTypes = ["apartment", "commercial", "storage", "garage", "parking", "other"];
 
@@ -109,7 +112,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Get leases error:", error);
+    logger.error("Get leases error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -228,7 +231,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Avtalsnumret används redan eller objektet har ett annat pågående avtal" }, { status: 409 });
     }
     if (error instanceof SyntaxError) return NextResponse.json({ error: "Ogiltigt JSON-underlag" }, { status: 400 });
-    console.error("Create lease error:", error);
+    logger.error("Create lease error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

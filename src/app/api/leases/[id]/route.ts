@@ -4,6 +4,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
 import { isOccupyingLeaseStatus, parseLeaseInput } from "@/lib/leasing";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases/[id]" });
 
 const softDeletableLeaseStatuses = new Set(["draft", "cancelled", "ended"]);
 
@@ -135,7 +138,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Avtalsnumret används redan eller objektet har ett annat pågående avtal" }, { status: 409 });
     }
     if (error instanceof SyntaxError) return NextResponse.json({ error: "Ogiltigt JSON-underlag" }, { status: 400 });
-    console.error("Update lease error:", error);
+    logger.error("Update lease error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -178,7 +181,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete lease error:", error);
+    logger.error("Delete lease error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
