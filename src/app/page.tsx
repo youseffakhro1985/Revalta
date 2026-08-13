@@ -75,26 +75,23 @@ export default function Home() {
         <MarketingHeader />
 
         <section className="relative border-b border-sand-200/80">
-          <div className="pointer-events-none absolute inset-y-0 left-[7%] hidden w-px bg-sand-200/70 xl:block" />
-          <div className="pointer-events-none absolute inset-y-0 right-[7%] hidden w-px bg-sand-200/70 xl:block" />
-
-          <div className="mx-auto grid max-w-[1440px] items-center gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-20 lg:grid-cols-[0.82fr_1.18fr] lg:gap-12 lg:px-12 lg:pb-28 lg:pt-24 xl:gap-20">
-            <div className="relative z-10 max-w-[610px]">
-              <div className="mb-7 flex items-center gap-3">
+          <div className="mx-auto grid max-w-[1440px] items-center gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-20 lg:grid-cols-[0.86fr_1.14fr] lg:gap-14 lg:px-12 lg:pb-24 lg:pt-20 xl:gap-16 xl:pb-28 xl:pt-24">
+            <div className="relative z-10 max-w-[600px]">
+              <div className="mb-6 flex items-center gap-3">
                 <span className="h-px w-8 bg-petroleum-600" />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">
                   För svensk fastighetsförvaltning
                 </span>
               </div>
 
-              <h1 className="font-display text-[44px] font-semibold leading-[1.04] tracking-[-0.045em] text-ink-950 sm:text-[56px] lg:text-[62px] xl:text-[68px]">
+              <h1 className="font-display text-[44px] font-semibold leading-[1.04] tracking-[-0.045em] text-ink-950 sm:text-[56px] lg:text-[60px] xl:text-[64px]">
                 Ett lugnare sätt att förvalta fastigheter.
               </h1>
-              <p className="mt-7 max-w-[560px] text-[17px] leading-8 text-ink-600 sm:text-[18px]">
+              <p className="mt-6 max-w-[540px] text-[17px] leading-[1.75] text-ink-600 sm:text-[18px]">
                 Revalta samlar fastigheter, ärenden, avtal och ekonomi i ett genomtänkt system – byggt för svenska fastighetsägare, BRF:er och förvaltare.
               </p>
 
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/register"
                   className="inline-flex h-12 items-center justify-center gap-2.5 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
@@ -110,7 +107,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-sand-200 pt-6">
+              <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-sand-200/90 pt-5">
                 {[
                   "Fastighetsägare",
                   "BRF",
@@ -124,8 +121,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div id="plattform" className="relative scroll-mt-28 lg:translate-x-3 xl:translate-x-6">
-              <div className="absolute -left-8 -top-8 h-20 w-20 border-l border-t border-sand-300/80" aria-hidden="true" />
+            <div id="plattform" className="relative scroll-mt-28 lg:translate-x-2">
               <DashboardPreview />
             </div>
           </div>
