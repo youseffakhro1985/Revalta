@@ -17,10 +17,11 @@ export async function POST(
     if (!user.company_id) {
       return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
+    const companyId = user.company_id;
 
     const { id } = await params;
     const existing = await db.project.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: { not: null } },
+      where: { id, company_id: companyId, deleted_at: { not: null } },
       select: {
         id: true,
         name: true,
@@ -40,7 +41,7 @@ export async function POST(
 
     const deleteAudit = await db.auditLog.findFirst({
       where: {
-        company_id: user.company_id,
+        company_id: companyId,
         entity_type: "project",
         entity_id: existing.id,
         action: "project.deleted",
@@ -57,7 +58,7 @@ export async function POST(
     // leave the project un-deleted while the caller is told the request failed.
     const restored = await db.$transaction(async (tx) => {
       const restoreResult = await tx.project.updateMany({
-        where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
+        where: { id: existing.id, company_id: companyId, deleted_at: { not: null } },
         data: { deleted_at: null, status: restoredStatus },
       });
       if (restoreResult.count === 0) return false;

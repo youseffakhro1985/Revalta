@@ -17,10 +17,11 @@ export async function POST(
     if (!user.company_id) {
       return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
+    const companyId = user.company_id;
 
     const { id } = await params;
     const existing = await db.workOrder.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: { not: null } },
+      where: { id, company_id: companyId, deleted_at: { not: null } },
       select: {
         id: true,
         title: true,
@@ -63,7 +64,7 @@ export async function POST(
       }
 
       const ticket = await db.ticket.findFirst({
-        where: { id: existing.ticket_id, company_id: user.company_id },
+        where: { id: existing.ticket_id, company_id: companyId },
         select: { id: true, deleted_at: true },
       });
       if (!ticket) {
@@ -81,7 +82,7 @@ export async function POST(
     // leave the work order un-deleted while the caller is told the request failed.
     const restored = await db.$transaction(async (tx) => {
       const restoreResult = await tx.workOrder.updateMany({
-        where: { id: existing.id, company_id: user.company_id, deleted_at: { not: null } },
+        where: { id: existing.id, company_id: companyId, deleted_at: { not: null } },
         data: { deleted_at: null },
       });
       if (restoreResult.count === 0) return false;
