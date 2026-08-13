@@ -3,6 +3,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { auditScopedWhere, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { asNumber, isModernStorageMirror, loadLegacyRows, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/vendors" });
 
 const entityType = "vendor_contract";
 
@@ -64,7 +67,7 @@ export async function GET() {
 
     return NextResponse.json({ vendors: mergeByCreatedAt(modern, legacyRows, 200) });
   } catch (error) {
-    console.error("Get vendors error:", error);
+    logger.error("Get vendors error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -146,7 +149,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ vendor: { id: vendor.id, ...metadata } }, { status: 201 });
   } catch (error) {
-    console.error("Create vendor error:", error);
+    logger.error("Create vendor error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -323,7 +326,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
   } catch (error) {
-    console.error("Update vendor error:", error);
+    logger.error("Update vendor error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

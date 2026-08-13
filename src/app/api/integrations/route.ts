@@ -2,6 +2,9 @@ import db from "@/lib/db";
 import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
 import { hasStorageConfig } from "@/lib/storage";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/integrations" });
 
 const requiredEnv: Record<string, string[]> = {
   email: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM"],
@@ -62,7 +65,7 @@ export async function GET() {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error("Get integrations error:", error);
+    logger.error("Get integrations error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

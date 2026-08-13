@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { canManageWorkOrderFinance, canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/projects" });
 
 const allowedStatuses = new Set(["planned", "active", "paused", "completed", "cancelled"]);
 const allowedRisks = new Set(["low", "medium", "high"]);
@@ -98,7 +101,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error("Get projects error:", error);
+    logger.error("Get projects error", error);
     if (isMissingSchemaColumnError(error)) {
       return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
     }

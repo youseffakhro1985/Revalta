@@ -3,6 +3,9 @@ import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCur
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/quotes" });
 
 const action = "quote.created";
 const decisionAction = "quote.status_changed";
@@ -135,7 +138,7 @@ export async function GET() {
       permissions: { canManage: canManageWorkOrderFinance(user.role) },
     });
   } catch (error) {
-    console.error("Get quotes error:", error);
+    logger.error("Get quotes error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -227,7 +230,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, quote }, { status: 201 });
   } catch (error) {
-    console.error("Create quote error:", error);
+    logger.error("Create quote error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -448,7 +451,7 @@ export async function PATCH(request: Request) {
       total,
     });
   } catch (error) {
-    console.error("Update quote error:", error);
+    logger.error("Update quote error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

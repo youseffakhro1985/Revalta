@@ -10,6 +10,9 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/bookings" });
 
 const action = "booking.created";
 
@@ -86,7 +89,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Get bookings error:", error);
+    logger.error("Get bookings error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -189,7 +192,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, booking }, { status: 201 });
   } catch (error) {
-    console.error("Create booking error:", error);
+    logger.error("Create booking error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -343,7 +346,7 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Update booking error:", error);
+    logger.error("Update booking error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

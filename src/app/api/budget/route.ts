@@ -3,6 +3,9 @@ import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCur
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, isModernStorageMirror, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/budget" });
 
 const action = "budget.entry.created";
 const allowedCategories = new Set(["income", "operations", "maintenance", "energy", "administration", "finance", "investment", "other"]);
@@ -68,7 +71,7 @@ export async function GET() {
       permissions: { canManage: canManageWorkOrderFinance(user.role) },
     });
   } catch (error) {
-    console.error("Get budget error:", error);
+    logger.error("Get budget error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -136,7 +139,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ success: true, entry }, { status: 201 });
   } catch (error) {
-    console.error("Create budget error:", error);
+    logger.error("Create budget error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -261,7 +264,7 @@ export async function PATCH(request: Request) {
       actual,
     });
   } catch (error) {
-    console.error("Update budget entry error:", error);
+    logger.error("Update budget entry error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -323,7 +326,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
-    console.error("Delete budget entry error:", error);
+    logger.error("Delete budget entry error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

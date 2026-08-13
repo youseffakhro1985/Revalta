@@ -14,6 +14,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { asNumber, loadLegacyRows } from "@/lib/dual-list";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/maintenance" });
 
 const action = "maintenance.plan.item";
 const statuses = ["planned", "approved", "in_progress", "completed", "cancelled"] as const;
@@ -115,7 +118,7 @@ export async function GET() {
       },
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    console.error("Get maintenance plan error:", error);
+    logger.error("Get maintenance plan error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -186,7 +189,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, itemId: item.id }, { status: 201 });
   } catch (error) {
-    console.error("Create maintenance item error:", error);
+    logger.error("Create maintenance item error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -353,7 +356,7 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ success: true, id: modern.id, status: nextStatus });
   } catch (error) {
-    console.error("Update maintenance item error:", error);
+    logger.error("Update maintenance item error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
