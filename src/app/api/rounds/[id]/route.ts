@@ -4,6 +4,9 @@ import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { countDeviations, normalizeChecklist, parseChecklistUpdate } from "@/lib/inspection-round-checklist";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/rounds/[id]" });
 
 const ALLOWED_INTERVALS = new Set(["weekly", "monthly", "quarterly", "yearly"]);
 
@@ -157,7 +160,7 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error("Update round error:", error);
+    logger.error("Update round error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

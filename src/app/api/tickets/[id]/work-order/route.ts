@@ -10,6 +10,9 @@ import {
   setWorkOrderEnterpriseFields,
 } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
 
 export async function GET(
   _request: Request,
@@ -239,7 +242,7 @@ export async function POST(
     if (concurrent) {
       return NextResponse.json({ workOrderId: concurrent.id, created: false });
     }
-    console.error("Create work order from ticket error:", error);
+    logger.error("Create work order from ticket error", error);
     return NextResponse.json({ error: "Kunde inte skapa arbetsorder från ärendet" }, { status: 500 });
   }
 }

@@ -4,6 +4,9 @@ import { getWorkOrderEnterpriseState, getWorkOrderStatusEvents } from "@/lib/wor
 import { buildTicketWorkOrderTimeline } from "@/lib/ticket-work-order-timeline";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]/timeline" });
 
 type TimelineItem = {
   id: string;
@@ -133,7 +136,7 @@ export async function GET(
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
-    console.error("Get ticket timeline error:", error);
+    logger.error("Get ticket timeline error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

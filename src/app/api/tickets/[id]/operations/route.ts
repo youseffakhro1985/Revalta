@@ -10,6 +10,9 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, loadLegacyRows } from "@/lib/dual-list";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]/operations" });
 
 const allowedTypes = new Set(["time", "cost", "checklist", "note"]);
 
@@ -132,7 +135,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Get work order operations error:", error);
+    logger.error("Get work order operations error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -227,7 +230,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, operation: mapModernOperation(operation) }, { status: 201 });
   } catch (error) {
-    console.error("Create work order operation error:", error);
+    logger.error("Create work order operation error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -393,7 +396,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, operation: mapModernOperation(operation) });
   } catch (error) {
-    console.error("Update ticket operation error:", error);
+    logger.error("Update ticket operation error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -488,7 +491,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, id: existing.id, deleted_at: now.toISOString() });
   } catch (error) {
-    console.error("Delete ticket operation error:", error);
+    logger.error("Delete ticket operation error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

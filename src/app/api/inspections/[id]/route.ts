@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/inspections/[id]" });
 
 const allowedStatuses = new Set(["planned", "booked", "completed", "action_required", "cancelled"]);
 const allowedTypes = new Set([
@@ -167,7 +170,7 @@ export async function PATCH(
       status: data.status ?? inspection.status,
     });
   } catch (error) {
-    console.error("Patch inspection error:", error);
+    logger.error("Patch inspection error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

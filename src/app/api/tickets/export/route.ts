@@ -1,6 +1,9 @@
 import db from "@/lib/db";
 import { canExportTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { NextResponse } from "next/server";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/export" });
 
 function csvCell(value: unknown) {
   const text = value == null ? "" : String(value);
@@ -59,7 +62,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Export tickets error:", error);
+    logger.error("Export tickets error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

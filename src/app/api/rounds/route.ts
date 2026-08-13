@@ -5,6 +5,9 @@ import { writeAuditLog } from "@/lib/audit";
 import type { Prisma } from "@prisma/client";
 import { buildChecklistFromLabels, normalizeChecklist } from "@/lib/inspection-round-checklist";
 import { loadLegacyRows } from "@/lib/dual-list";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/rounds" });
 
 export async function GET() {
   try {
@@ -68,7 +71,7 @@ export async function GET() {
       permissions: { canManage: canManageTickets(user.role) },
     });
   } catch (error) {
-    console.error("Get rounds error:", error);
+    logger.error("Get rounds error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -141,7 +144,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, round }, { status: 201 });
   } catch (error) {
-    console.error("Create round error:", error);
+    logger.error("Create round error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
