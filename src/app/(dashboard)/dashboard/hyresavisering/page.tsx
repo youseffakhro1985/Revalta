@@ -224,14 +224,14 @@ export default function RentNoticesPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-ink-500">{notice.property_name}{notice.unit ? ` · ${notice.unit}` : ""}</p>
-                    <p className="mt-2 text-xs text-ink-400">Period {notice.period || "–"} · Förfaller {notice.due_date || "–"}</p>
+                    <p className="mt-2 text-xs text-ink-500">Period {notice.period || "–"} · Förfaller {notice.due_date || "–"}</p>
                     {notice.source === "legacy" ? (
                       <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering.</p>
                     ) : null}
                   </div>
                   <div className="space-y-2 sm:text-right">
                     <p className="text-xl font-semibold text-ink-900">{money.format(Number(notice.total || 0))}</p>
-                    <p className="text-xs text-ink-400">Index {Number(notice.index_percent || 0).toLocaleString("sv-SE")} %</p>
+                    <p className="text-xs text-ink-500">Index {Number(notice.index_percent || 0).toLocaleString("sv-SE")} %</p>
                     {canManage && notice.source !== "legacy" ? (
                       <>
                         <select

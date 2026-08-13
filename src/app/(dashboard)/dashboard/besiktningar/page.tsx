@@ -299,7 +299,7 @@ export default function InspectionsPage() {
                       </div>
                       <div className="sm:text-right">
                         <p className="text-sm font-semibold text-ink-900">{i.due_date ? new Date(`${i.due_date}T00:00:00`).toLocaleDateString("sv-SE") : "—"}</p>
-                        <p className={`mt-1 text-xs ${urgent ? "text-red-700" : "text-ink-400"}`}>
+                        <p className={`mt-1 text-xs ${urgent ? "text-red-700" : "text-ink-500"}`}>
                           {days < 0 ? `${Math.abs(days)} dagar försenad` : days === 0 ? "Förfaller idag" : `${days} dagar kvar`}
                         </p>
                       </div>

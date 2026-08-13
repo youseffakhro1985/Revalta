@@ -102,10 +102,10 @@ export default function IntegrationsPage() {
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {integrations.map((integration) => (
           <article key={integration.type} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-400">{labels[integration.type] || integration.type}</p>
-            <div className={`mt-4 w-fit rounded-full px-3 py-1 text-xs font-semibold ${integration.configured ? "bg-success-50 text-success-600" : "bg-warning-50 text-warning-600"}`}>{integration.configured ? "Konfigurerad" : "Konfiguration saknas"}</div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">{labels[integration.type] || integration.type}</p>
+            <div className={`mt-4 w-fit rounded-full px-3 py-1 text-xs font-semibold ${integration.configured ? "bg-success-50 text-success-700" : "bg-warning-50 text-warning-700"}`}>{integration.configured ? "Konfigurerad" : "Konfiguration saknas"}</div>
             <p className="mt-4 text-sm leading-6 text-ink-500">{descriptions[integration.type] || "Extern systemanslutning."}</p>
-            <div className="mt-5 rounded-xl bg-sand-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-ink-400">Miljövariabler</p><p className="mt-1 break-words text-xs leading-5 text-ink-600">{integration.requiredEnv.length ? integration.requiredEnv.join(", ") : "Inga externa nycklar krävs"}</p></div>
+            <div className="mt-5 rounded-xl bg-sand-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Miljövariabler</p><p className="mt-1 break-words text-xs leading-5 text-ink-600">{integration.requiredEnv.length ? integration.requiredEnv.join(", ") : "Inga externa nycklar krävs"}</p></div>
           </article>
         ))}
       </section>

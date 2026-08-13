@@ -160,7 +160,7 @@ export default function BillingPage() {
       </header>
 
       {(error || success) && (
-        <div className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-600" : "border-success-500 bg-success-50 text-success-600"}`}>
+        <div className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>
           {error || success}
         </div>
       )}
@@ -182,7 +182,7 @@ export default function BillingPage() {
             </div>
             <div className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
               <p className="text-sm font-medium text-ink-500">Stripe</p>
-              <p className={`mt-3 text-lg font-semibold ${billing.stripeConfigured ? "text-success-600" : "text-warning-600"}`}>
+              <p className={`mt-3 text-lg font-semibold ${billing.stripeConfigured ? "text-success-700" : "text-warning-700"}`}>
                 {billing.stripeConfigured ? "Live redo" : "Mockläge"}
               </p>
               {billing.subscriptionStatus && (

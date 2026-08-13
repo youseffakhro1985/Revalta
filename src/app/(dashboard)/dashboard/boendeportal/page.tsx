@@ -197,7 +197,7 @@ export default function ResidentPortalPage() {
                         {selectedLease.property.name} · {selectedLease.unit.designation}<br />
                         Avtal {selectedLease.lease_number} · {moneyFormatter.format(selectedLease.monthly_rent)}/mån
                       </p>
-                      <p className="mt-1 text-xs text-ink-400">{selectedLease.lease_holder.email || selectedLease.lease_holder.phone || "Kontaktuppgift saknas"}</p>
+                      <p className="mt-1 text-xs text-ink-500">{selectedLease.lease_holder.email || selectedLease.lease_holder.phone || "Kontaktuppgift saknas"}</p>
                     </div>
                   </div>
                 </div>
@@ -258,12 +258,12 @@ export default function ResidentPortalPage() {
                       {ticket.public_reference || "Utan referens"} · {ticket.property?.name || "Ingen fastighet"}{ticket.reporter_unit ? ` · ${ticket.reporter_unit}` : ""}
                     </p>
                     <h3 className="mt-1 font-semibold text-ink-900">{ticket.reporter_name || "Okänd boende"}</h3>
-                    <p className="mt-1 text-xs text-ink-400">{ticket.reporter_email || ticket.reporter_phone || "Kontaktuppgift saknas"}</p>
+                    <p className="mt-1 text-xs text-ink-500">{ticket.reporter_email || ticket.reporter_phone || "Kontaktuppgift saknas"}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-ink-800">{ticket.title}</p>
                     <p className="mt-1 line-clamp-2 text-sm leading-6 text-ink-500">{ticket.description}</p>
-                    <p className="mt-2 text-xs text-ink-400">
+                    <p className="mt-2 text-xs text-ink-500">
                       {categoryLabels[ticket.category] || ticket.category} · {priorityLabels[ticket.priority] || ticket.priority} · {dateFormatter.format(new Date(ticket.created_at))}
                     </p>
                   </div>

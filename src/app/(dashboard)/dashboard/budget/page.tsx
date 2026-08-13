@@ -178,7 +178,7 @@ export default function BudgetPage() {
               </div>
               <div className="space-y-2 sm:text-right">
                 <p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{money.format(itemVariance)}</p>
-                <p className="text-xs text-ink-400">Avvikelse mot budget</p>
+                <p className="text-xs text-ink-500">Avvikelse mot budget</p>
                 {canManage && item.source !== "legacy" ? (
                   <>
                     <button type="button" onClick={() => (editingId === item.id ? setEditingId("") : startEdit(item))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">

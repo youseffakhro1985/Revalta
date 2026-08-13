@@ -136,9 +136,9 @@ export default function InsuranceClaimsPage() {
   const field = "h-11 w-full rounded-lg border border-sand-200 bg-white px-3 text-sm text-ink-800 outline-none transition focus:border-petroleum-500";
 
   return <div className="space-y-8">
-    <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-400">Risk och försäkring</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-ink-900">Skador och försäkringsärenden</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Samlad uppföljning av skador, kostnader, självrisker, ersättningar och kontakt med försäkringsbolag.</p></div>
+    <div><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500">Risk och försäkring</p><h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-ink-900">Skador och försäkringsärenden</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Samlad uppföljning av skador, kostnader, självrisker, ersättningar och kontakt med försäkringsbolag.</p></div>
 
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["Öppna ärenden", openClaims], ["Beräknad kostnad", money.format(totalEstimated)], ["Försäkringsersättning", money.format(totalCompensation)], ["Nettokostnad", money.format(totalNet)]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-sand-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,34,31,0.04)]"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">{label}</p><p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink-900">{value}</p></div>)}</div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[["Öppna ärenden", openClaims], ["Beräknad kostnad", money.format(totalEstimated)], ["Försäkringsersättning", money.format(totalCompensation)], ["Nettokostnad", money.format(totalNet)]].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-sand-200 bg-white p-5 shadow-[0_1px_2px_rgba(17,34,31,0.04)]"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">{label}</p><p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-ink-900">{value}</p></div>)}</div>
 
     {error ? <InlineAlert tone="error">{error}</InlineAlert> : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra skadeärenden.</InlineAlert> : null}
@@ -182,11 +182,11 @@ export default function InsuranceClaimsPage() {
                     ) : null}
                   </div>
                   <div>
-                    <p className="text-xs text-ink-400">Försäkringsbolag</p>
+                    <p className="text-xs text-ink-500">Försäkringsbolag</p>
                     <p className="mt-1 text-sm text-ink-700">{claim.insurer || "Ej angivet"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-ink-400">Ekonomi</p>
+                    <p className="text-xs text-ink-500">Ekonomi</p>
                     <p className="mt-1 text-sm text-ink-700">Netto {money.format(Number(claim.net_cost || 0))}</p>
                   </div>
                   <div className="space-y-2">

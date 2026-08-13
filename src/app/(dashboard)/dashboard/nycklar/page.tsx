@@ -197,7 +197,7 @@ export default function KeysPage() {
   return (
     <div className="space-y-8">
       <header>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-ink-400">Säkerhet och åtkomst</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-ink-500">Säkerhet och åtkomst</p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-[-0.04em] text-ink-900">Nycklar och passage</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500">
           Samla nycklar, taggar, passerkort och utlämningar i ett spårbart register per fastighet.
@@ -386,7 +386,7 @@ export default function KeysPage() {
                     </div>
                     <div className="space-y-2 sm:text-right">
                       <p className="text-sm font-semibold text-ink-800">{item.holder || "Ingen mottagare"}</p>
-                      <p className="text-xs text-ink-400">
+                      <p className="text-xs text-ink-500">
                         {item.return_due
                           ? `Åter senast ${new Date(item.return_due).toLocaleDateString("sv-SE")}`
                           : "Ingen återlämningsdag"}

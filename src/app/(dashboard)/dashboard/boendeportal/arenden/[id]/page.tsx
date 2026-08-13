@@ -166,7 +166,7 @@ export default function ResidentTicketDetailPage() {
                   {ticket.title}
                 </h2>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-ink-600">{ticket.description}</p>
-                <p className="mt-3 text-xs text-ink-400">
+                <p className="mt-3 text-xs text-ink-500">
                   {categoryLabels[ticket.category] || ticket.category}
                   {" · "}
                   Skapad {dateFormatter.format(new Date(ticket.created_at))}
@@ -174,7 +174,7 @@ export default function ResidentTicketDetailPage() {
                   Uppdaterad {dateFormatter.format(new Date(ticket.updated_at))}
                 </p>
                 {ticket.property ? (
-                  <p className="mt-1 text-xs text-ink-400">
+                  <p className="mt-1 text-xs text-ink-500">
                     {ticket.property.address}, {ticket.property.city}
                   </p>
                 ) : null}
@@ -216,7 +216,7 @@ export default function ResidentTicketDetailPage() {
                         {comment.author.type === "resident" ? "Du / boende" : "Förvaltningen"}
                       </span>
                       <span className="text-xs font-medium text-ink-700">{comment.author.name}</span>
-                      <span className="text-xs text-ink-400">
+                      <span className="text-xs text-ink-500">
                         {dateFormatter.format(new Date(comment.created_at))}
                       </span>
                     </div>

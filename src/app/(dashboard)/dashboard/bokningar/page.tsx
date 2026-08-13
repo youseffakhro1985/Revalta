@@ -151,7 +151,7 @@ export default function BookingsPage() {
       <section className="grid gap-4 md:grid-cols-3">
         {[["Kommande", upcoming.length], ["Nästa sju dagar", week], ["Resurstyper", resourceTypes.length]].map(([label, value]) => (
           <div key={String(label)} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-            <p className="text-xs text-ink-400">{label}</p>
+            <p className="text-xs text-ink-500">{label}</p>
             <p className="mt-2 text-2xl font-semibold text-ink-950">{value}</p>
           </div>
         ))}
@@ -186,7 +186,7 @@ export default function BookingsPage() {
           <div className="border-b border-sand-200 p-5"><h2 className="font-semibold text-ink-950">Bokningsöversikt</h2></div>
           <div className="divide-y divide-sand-200">
             {bookings.length === 0 ? (
-              <p className="p-8 text-sm text-ink-400">Inga bokningar registrerade ännu.</p>
+              <p className="p-8 text-sm text-ink-500">Inga bokningar registrerade ännu.</p>
             ) : (
               bookings.map((booking) => (
                 <article key={booking.id} className="space-y-3 p-5">
@@ -201,7 +201,7 @@ export default function BookingsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-ink-800">{new Date(booking.start).toLocaleString("sv-SE")}</p>
-                      <p className="text-xs text-ink-400">Till {new Date(booking.end).toLocaleString("sv-SE")}</p>
+                      <p className="text-xs text-ink-500">Till {new Date(booking.end).toLocaleString("sv-SE")}</p>
                     </div>
                     <div className="flex flex-col items-start gap-2 md:items-end">
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${booking.status === "cancelled" ? "bg-sand-100 text-ink-600" : "bg-petroleum-50 text-petroleum-700"}`}>

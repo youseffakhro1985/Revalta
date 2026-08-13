@@ -220,7 +220,7 @@ export default function WorkOrdersPage() {
         <SlaMini label="SLA saknas" value={slaSummary?.not_configured ?? 0} />
         <SlaMini label="Totalt" value={slaSummary?.total ?? workOrders.length} />
       </div>
-      {evaluatedAt ? <p className="mt-4 text-xs text-ink-400">SLA beräknad {dateTime.format(new Date(evaluatedAt))}</p> : null}
+      {evaluatedAt ? <p className="mt-4 text-xs text-ink-500">SLA beräknad {dateTime.format(new Date(evaluatedAt))}</p> : null}
     </Panel>
 
     <Panel title="Planeringstavla" description="Sök, filtrera och hantera arbetsorderportföljen efter serverns aktuella SLA-bedömning." bodyClassName="p-4 sm:p-5">
@@ -232,15 +232,15 @@ export default function WorkOrdersPage() {
         <button type="button" onClick={clearFilters} disabled={!hasFilters} className="h-11 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40">Rensa</button>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-sand-100 pt-4">
-        <p className="text-xs font-medium text-ink-400">{visibleWorkOrders.length} arbetsordrar visas</p>
-        <p className="text-xs text-ink-400">{canManage || canAssign ? "Status och tilldelning sparas med revisionsspår." : "Öppna en arbetsorder för mer detaljer."}</p>
+        <p className="text-xs font-medium text-ink-500">{visibleWorkOrders.length} arbetsordrar visas</p>
+        <p className="text-xs text-ink-500">{canManage || canAssign ? "Status och tilldelning sparas med revisionsspår." : "Öppna en arbetsorder för mer detaljer."}</p>
       </div>
 
       {loading ? <div className="mt-5 grid gap-4 xl:grid-cols-5">{columns.map((column) => <div key={column.key} className="h-96 animate-pulse rounded-2xl bg-sand-100" />)}</div> : visibleWorkOrders.length === 0 ? <div className="mt-5"><EmptyState title="Inga arbetsordrar matchar filtreringen" description="Rensa filtren eller skapa en arbetsorder från ett ärende." /></div> : <div className="mt-5 grid gap-4 xl:grid-cols-5">
         {columns.map((column) => {
           const items = visibleWorkOrders.filter((workOrder) => column.statuses.includes(workOrder.status));
           return <section key={column.key} className="min-h-[440px] rounded-2xl border border-sand-200 bg-[#F1F1EC] p-3">
-            <div className="flex items-start justify-between gap-3 px-2 py-2"><div><h2 className="text-sm font-semibold text-ink-900">{column.label}</h2><p className="mt-0.5 text-xs leading-4 text-ink-400">{column.description}</p></div><span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500">{items.length}</span></div>
+            <div className="flex items-start justify-between gap-3 px-2 py-2"><div><h2 className="text-sm font-semibold text-ink-900">{column.label}</h2><p className="mt-0.5 text-xs leading-4 text-ink-500">{column.description}</p></div><span className="rounded-full border border-sand-200 bg-white px-2.5 py-1 text-xs font-semibold text-ink-500">{items.length}</span></div>
             <div className="mt-2 space-y-3">
               {items.map((workOrder) => (
                 <WorkOrderCard
@@ -252,7 +252,7 @@ export default function WorkOrdersPage() {
                   onUpdated={(patch) => updateWorkOrder(workOrder.id, patch)}
                 />
               ))}
-              {items.length === 0 ? <div className="rounded-xl border border-dashed border-sand-300 bg-white/60 p-6 text-center"><ClipboardList className="mx-auto h-5 w-5 text-ink-300" /><p className="mt-2 text-xs text-ink-400">Inga arbetsordrar</p></div> : null}
+              {items.length === 0 ? <div className="rounded-xl border border-dashed border-sand-300 bg-white/60 p-6 text-center"><ClipboardList className="mx-auto h-5 w-5 text-ink-300" /><p className="mt-2 text-xs text-ink-500">Inga arbetsordrar</p></div> : null}
             </div>
           </section>;
         })}
@@ -262,7 +262,7 @@ export default function WorkOrdersPage() {
 }
 
 function SlaMini({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4"><p className="text-xs font-medium text-ink-400">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-ink-950">{value}</p></div>;
+  return <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4"><p className="text-xs font-medium text-ink-500">{label}</p><p className="mt-2 text-2xl font-semibold tracking-tight text-ink-950">{value}</p></div>;
 }
 
 function WorkOrderCard({
@@ -286,10 +286,10 @@ function WorkOrderCard({
     <div className="flex items-center justify-between gap-2"><span className="font-mono text-[11px] font-semibold tracking-wide text-petroleum-700">{enterprise?.work_order_number || `AO-${workOrder.id.slice(0, 8)}`}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${riskUi.className}`}>{sla.label}</span></div>
     <Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="mt-3 block font-semibold leading-5 text-ink-900 transition hover:text-petroleum-800">{workOrder.title}</Link>
     <div className="mt-2 flex flex-wrap gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${workOrder.priority === "urgent" ? "bg-red-50 text-red-700" : workOrder.priority === "high" ? "bg-amber-50 text-amber-700" : "bg-sand-50 text-ink-500"}`}>{priorityLabels[workOrder.priority] || workOrder.priority}</span><span className="rounded-full bg-sand-50 px-2 py-0.5 text-[10px] font-semibold text-ink-500">{typeLabels[enterprise?.work_type || ""] || "Avhjälpande"}</span><span className="rounded-full bg-sand-50 px-2 py-0.5 text-[10px] font-semibold text-ink-500">{sourceLabels[enterprise?.source || ""] || "Internt"}</span></div>
-    <p className="mt-3 text-xs leading-5 text-ink-500">{workOrder.property.name}{workOrder.unit ? ` · ${workOrder.unit.designation}` : ""}</p><p className="text-xs leading-5 text-ink-400">{workOrder.assigned_to?.name || workOrder.assigned_to?.email || "Ej tilldelad"}</p>
+    <p className="mt-3 text-xs leading-5 text-ink-500">{workOrder.property.name}{workOrder.unit ? ` · ${workOrder.unit.designation}` : ""}</p><p className="text-xs leading-5 text-ink-500">{workOrder.assigned_to?.name || workOrder.assigned_to?.email || "Ej tilldelad"}</p>
     {workOrder.projects[0] ? <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-petroleum-50 px-2.5 py-2 text-[11px] font-medium text-petroleum-700"><FolderKanban className="h-3.5 w-3.5" />{workOrder.projects[0].name}</div> : null}
-    <div className="mt-4 rounded-xl border border-sand-100 bg-sand-50 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">{phaseLabels[sla.phase]}</span><Clock3 className="h-3.5 w-3.5 text-ink-300" /></div><p className={`mt-1 text-sm font-semibold ${riskUi.timeClass}`}>{timeText}</p>{sla.dueAt ? <p className="mt-1 text-[11px] text-ink-400">Deadline {dateTime.format(new Date(sla.dueAt))}</p> : null}</div>
-    <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-ink-400"><span>{statusLabels[workOrder.status] || workOrder.status}</span>{formatMoney(workOrder.estimated_cost) ? <span className="font-semibold text-ink-600">{formatMoney(workOrder.estimated_cost)}</span> : null}</div>
+    <div className="mt-4 rounded-xl border border-sand-100 bg-sand-50 p-3"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-500">{phaseLabels[sla.phase]}</span><Clock3 className="h-3.5 w-3.5 text-ink-300" /></div><p className={`mt-1 text-sm font-semibold ${riskUi.timeClass}`}>{timeText}</p>{sla.dueAt ? <p className="mt-1 text-[11px] text-ink-500">Deadline {dateTime.format(new Date(sla.dueAt))}</p> : null}</div>
+    <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-ink-500"><span>{statusLabels[workOrder.status] || workOrder.status}</span>{formatMoney(workOrder.estimated_cost) ? <span className="font-semibold text-ink-600">{formatMoney(workOrder.estimated_cost)}</span> : null}</div>
     <WorkOrderQuickActions
       workOrderId={workOrder.id}
       status={workOrder.status}

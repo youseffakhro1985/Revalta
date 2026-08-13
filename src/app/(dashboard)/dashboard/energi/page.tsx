@@ -191,7 +191,7 @@ export default function EnergyPage() {
               </div>
               <div className="space-y-2 sm:text-right">
                 <p className="text-xl font-semibold text-ink-900">{number.format(Number(row.value || 0))} {row.unit}</p>
-                <p className="text-xs text-ink-400">{money.format(Number(row.cost || 0))}</p>
+                <p className="text-xs text-ink-500">{money.format(Number(row.cost || 0))}</p>
                 {canManage && row.source !== "legacy" ? (
                   <>
                     <button type="button" onClick={() => (editingId === row.id ? setEditingId("") : startEdit(row))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">

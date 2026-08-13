@@ -83,7 +83,7 @@ export default function TeamPage() {
             <button disabled={submitting || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skapar…" : "Skapa inbjudan"}</button>
           </fieldset>
         </form>
-        {!canManage ? <p className="mt-4 text-xs leading-5 text-ink-400">Du behöver administratörsbehörighet för att bjuda in nya användare.</p> : null}
+        {!canManage ? <p className="mt-4 text-xs leading-5 text-ink-500">Du behöver administratörsbehörighet för att bjuda in nya användare.</p> : null}
         {inviteUrl ? <div className="mt-5 rounded-xl border border-petroleum-100 bg-petroleum-50 p-4"><p className="text-xs font-semibold uppercase tracking-[0.1em] text-petroleum-700">Inbjudningslänk</p><p className="mt-2 break-all text-sm text-petroleum-800">{inviteUrl}</p></div> : null}
       </Panel>
 

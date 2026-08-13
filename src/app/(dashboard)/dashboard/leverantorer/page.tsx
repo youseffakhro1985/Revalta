@@ -196,7 +196,7 @@ export default function VendorsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-ink-800">{vendor.contractTitle || "Inget avtal angivet"}</p>
-                      <p className="mt-1 text-xs text-ink-400">Uppsägning {vendor.noticeMonths || 0} mån · {vendor.endDate ? `slut ${new Date(vendor.endDate).toLocaleDateString("sv-SE")}` : "inget slutdatum"}</p>
+                      <p className="mt-1 text-xs text-ink-500">Uppsägning {vendor.noticeMonths || 0} mån · {vendor.endDate ? `slut ${new Date(vendor.endDate).toLocaleDateString("sv-SE")}` : "inget slutdatum"}</p>
                       {vendor.source !== "legacy" ? (
                         <select
                           disabled={updatingId === vendor.id}
@@ -249,7 +249,7 @@ export default function VendorsPage() {
                           <input className={premiumFieldClass} type="date" value={editForm.endDate} onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })} aria-label="Slutdatum" />
                         </>
                       ) : (
-                        <p className="text-xs text-ink-400">Avslutade avtal: endast kontaktuppgifter kan ändras.</p>
+                        <p className="text-xs text-ink-500">Avslutade avtal: endast kontaktuppgifter kan ändras.</p>
                       )}
                       <button
                         type="button"

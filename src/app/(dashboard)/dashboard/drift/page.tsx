@@ -168,7 +168,7 @@ export default function OperationsPage() {
                     Saknade schemaobjekt: {health.schema.missing.join(", ")}
                   </p>
                 ) : null}
-                <p className="text-xs text-ink-400">Kontrollerad {new Date(health.checkedAt).toLocaleString("sv-SE")}</p>
+                <p className="text-xs text-ink-500">Kontrollerad {new Date(health.checkedAt).toLocaleString("sv-SE")}</p>
               </div>
             </Panel>
 

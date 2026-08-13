@@ -173,7 +173,7 @@ export default function CalendarPage() {
       <section className="grid gap-4 md:grid-cols-3">
         {[["Kommande aktiviteter", upcoming], ["Nästa 7 dagar", nextSevenDays], ["Totalt planerat", activeEvents.length]].map(([label, value]) => (
           <div key={String(label)} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-            <p className="text-xs font-medium text-ink-400">{label}</p>
+            <p className="text-xs font-medium text-ink-500">{label}</p>
             <p className="mt-2 text-2xl font-semibold text-ink-950">{value}</p>
           </div>
         ))}
@@ -206,22 +206,22 @@ export default function CalendarPage() {
 
         <div className="rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
           <div className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div><h2 className="font-semibold text-ink-950">Planerade aktiviteter</h2><p className="mt-1 text-xs text-ink-400">Sorterade i datumordning</p></div>
+            <div><h2 className="font-semibold text-ink-950">Planerade aktiviteter</h2><p className="mt-1 text-xs text-ink-500">Sorterade i datumordning</p></div>
             <select value={filter} onChange={(e) => setFilter(e.target.value)} className="rounded-xl border border-sand-200 px-3 py-2 text-sm" aria-label="Filtrera efter typ">
               <option>Alla</option>
               {typeOptions.map((type) => <option key={type}>{type}</option>)}
             </select>
           </div>
           <div className="divide-y divide-sand-200">
-            {visible.length === 0 ? <p className="p-8 text-sm text-ink-400">Inga aktiviteter registrerade ännu.</p> : visible.map((event) => (
+            {visible.length === 0 ? <p className="p-8 text-sm text-ink-500">Inga aktiviteter registrerade ännu.</p> : visible.map((event) => (
               <article key={event.id} className="p-5">
                 <div className="grid gap-4 md:grid-cols-[150px_1fr_auto] md:items-center">
-                  <div><p className="text-sm font-semibold text-ink-950">{dateFormatter.format(new Date(`${event.date}T12:00:00`))}</p><p className="mt-1 text-xs text-ink-400">{event.time || "Heldag"}</p></div>
+                  <div><p className="text-sm font-semibold text-ink-950">{dateFormatter.format(new Date(`${event.date}T12:00:00`))}</p><p className="mt-1 text-xs text-ink-500">{event.time || "Heldag"}</p></div>
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-petroleum-700">{event.type}</p>
                     <h3 className="mt-1 font-semibold text-ink-950">{event.title}</h3>
                     <p className="mt-1 text-sm text-ink-500">{event.property_name || "Ingen fastighet"}{event.responsible ? ` · ${event.responsible}` : ""}</p>
-                    {event.note ? <p className="mt-2 text-xs text-ink-400">{event.note}</p> : null}
+                    {event.note ? <p className="mt-2 text-xs text-ink-500">{event.note}</p> : null}
                     {event.source === "legacy" ? (
                       <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering eller borttagning.</p>
                     ) : null}

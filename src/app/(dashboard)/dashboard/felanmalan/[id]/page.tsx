@@ -421,12 +421,12 @@ export default function TicketDetailPage() {
         </Panel>
 
         <Panel title="Bilagor" description="Foton, dokument och underlag kopplade till ärendet." bodyClassName="p-6 sm:p-8">
-          {ticket.attachments.length ? <div className="grid gap-3 sm:grid-cols-2">{ticket.attachments.map((attachment) => <a key={attachment.id} href={attachment.data_url} target="_blank" rel="noreferrer" className="rounded-2xl border border-sand-200 p-4 transition hover:bg-sand-50"><FileText className="h-5 w-5 text-petroleum-700" /><p className="mt-3 font-semibold text-ink-900">{attachment.file_name}</p><p className="mt-1 text-xs text-ink-400">{Math.ceil(attachment.size_bytes / 1024)} KB</p></a>)}</div> : <EmptyState title="Inga bilagor" description="Ladda upp ett underlag från panelen till höger." />}
+          {ticket.attachments.length ? <div className="grid gap-3 sm:grid-cols-2">{ticket.attachments.map((attachment) => <a key={attachment.id} href={attachment.data_url} target="_blank" rel="noreferrer" className="rounded-2xl border border-sand-200 p-4 transition hover:bg-sand-50"><FileText className="h-5 w-5 text-petroleum-700" /><p className="mt-3 font-semibold text-ink-900">{attachment.file_name}</p><p className="mt-1 text-xs text-ink-500">{Math.ceil(attachment.size_bytes / 1024)} KB</p></a>)}</div> : <EmptyState title="Inga bilagor" description="Ladda upp ett underlag från panelen till höger." />}
         </Panel>
 
         <Panel title="Kommentarer och tidslinje" description="Operativ historik för handläggningen." bodyClassName="space-y-6 p-6 sm:p-8">
-          <div className="space-y-3">{ticket.comments.map((item) => <div key={item.id} className="rounded-2xl border border-sand-200 p-4"><p className="text-sm leading-6 text-ink-700">{item.body}</p><p className="mt-3 text-xs text-ink-400">{item.user.name || item.user.email} · {dateFormatter.format(new Date(item.created_at))}</p></div>)}</div>
-          <div className="border-t border-sand-200 pt-6"><h3 className="font-semibold text-ink-900">Tidslinje</h3><div className="mt-4 space-y-3">{timeline.map((item) => <div key={`${item.type}-${item.id}`} className="flex gap-3"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-petroleum-600" /><div><p className="text-sm font-semibold text-ink-900">{item.title}</p><p className="mt-1 text-sm text-ink-500">{item.description}</p><p className="mt-1 text-xs text-ink-400">{dateFormatter.format(new Date(item.created_at))}</p></div></div>)}</div></div>
+          <div className="space-y-3">{ticket.comments.map((item) => <div key={item.id} className="rounded-2xl border border-sand-200 p-4"><p className="text-sm leading-6 text-ink-700">{item.body}</p><p className="mt-3 text-xs text-ink-500">{item.user.name || item.user.email} · {dateFormatter.format(new Date(item.created_at))}</p></div>)}</div>
+          <div className="border-t border-sand-200 pt-6"><h3 className="font-semibold text-ink-900">Tidslinje</h3><div className="mt-4 space-y-3">{timeline.map((item) => <div key={`${item.type}-${item.id}`} className="flex gap-3"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-petroleum-600" /><div><p className="text-sm font-semibold text-ink-900">{item.title}</p><p className="mt-1 text-sm text-ink-500">{item.description}</p><p className="mt-1 text-xs text-ink-500">{dateFormatter.format(new Date(item.created_at))}</p></div></div>)}</div></div>
         </Panel>
       </div>
 
@@ -493,7 +493,7 @@ export default function TicketDetailPage() {
                     <div className="min-w-0">
                       <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{operationTypeLabels[type] || type || "Registrering"}</p>
                       <p className="mt-1 text-sm text-ink-700">{detail}</p>
-                      <p className="mt-1 text-[11px] text-ink-400">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p>
+                      <p className="mt-1 text-[11px] text-ink-500">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p>
                       {item.source === "legacy" ? <p className="mt-1 text-[11px] font-medium text-amber-800">Äldre rad – kör backfill innan ändring eller borttagning.</p> : null}
                     </div>
                     {item.source === "table" ? (
@@ -583,7 +583,7 @@ export default function TicketDetailPage() {
 }
 
 function Info({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">{label}</p><p className="mt-1 text-sm font-semibold text-ink-800">{value}</p></div>;
+  return <div><p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">{label}</p><p className="mt-1 text-sm font-semibold text-ink-800">{value}</p></div>;
 }
 function Insight({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl bg-sand-50 p-4"><p className="text-[11px] font-semibold uppercase tracking-wide text-petroleum-700">{label}</p><p className="mt-2 text-sm leading-6 text-ink-700">{value}</p></div>;

@@ -59,7 +59,7 @@ export default async function PermissionsPage() {
             <h2 className="font-semibold text-ink-950">{role.label}</h2>
             <p className="mt-2 text-sm leading-6 text-ink-500">{role.description}</p>
             <p className="mt-5 text-2xl font-semibold text-petroleum-800">{members.filter((member) => member.role === role.key).length}</p>
-            <p className="text-xs uppercase tracking-wide text-ink-400">användare</p>
+            <p className="text-xs uppercase tracking-wide text-ink-500">användare</p>
           </article>
         ))}
       </section>
@@ -69,7 +69,7 @@ export default async function PermissionsPage() {
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-sand-50 text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-6 py-4">Område</th>{roles.map((role) => <th key={role.key} className="px-4 py-4 text-center">{role.label}</th>)}</tr></thead>
             <tbody className="divide-y divide-sand-100">
-              {permissions.map(([label, ...values]) => <tr key={String(label)} className="hover:bg-sand-50/60"><td className="px-6 py-4 font-medium text-ink-800">{String(label)}</td>{values.map((allowed, index) => <td key={index} className="px-4 py-4 text-center"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${allowed ? "bg-petroleum-50 text-petroleum-700" : "bg-sand-50 text-ink-400"}`}>{allowed ? "Tillåten" : "Begränsad"}</span></td>)}</tr>)}
+              {permissions.map(([label, ...values]) => <tr key={String(label)} className="hover:bg-sand-50/60"><td className="px-6 py-4 font-medium text-ink-800">{String(label)}</td>{values.map((allowed, index) => <td key={index} className="px-4 py-4 text-center"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${allowed ? "bg-petroleum-50 text-petroleum-700" : "bg-sand-50 text-ink-500"}`}>{allowed ? "Tillåten" : "Begränsad"}</span></td>)}</tr>)}
             </tbody>
           </table>
         </div>

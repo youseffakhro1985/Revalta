@@ -138,7 +138,7 @@ export default async function ReportsPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-ink-950">Rapporter och nyckeltal</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500">En samlad bild av drift, ärendeflöde, bestånd och arbetsbelastning de senaste 90 dagarna.</p>
         </div>
-        <p className="text-xs text-ink-400">Uppdaterad {new Intl.DateTimeFormat("sv-SE", { dateStyle: "long", timeStyle: "short" }).format(new Date())}</p>
+        <p className="text-xs text-ink-500">Uppdaterad {new Intl.DateTimeFormat("sv-SE", { dateStyle: "long", timeStyle: "short" }).format(new Date())}</p>
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -150,9 +150,9 @@ export default async function ReportsPage() {
           ["Genomsnittlig åtgärdstid", formatDays(averageResolution), `${percent(assignedTickets, totalTickets)} % tilldelade`],
         ].map(([label, value, detail]) => (
           <article key={String(label)} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-            <p className="text-xs font-medium text-ink-400">{label}</p>
+            <p className="text-xs font-medium text-ink-500">{label}</p>
             <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-ink-950">{value}</p>
-            <p className="mt-2 text-[11px] text-ink-400">{detail}</p>
+            <p className="mt-2 text-[11px] text-ink-500">{detail}</p>
           </article>
         ))}
       </section>
@@ -161,7 +161,7 @@ export default async function ReportsPage() {
         <article className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
           <div className="flex items-start justify-between gap-4">
             <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Utveckling</p><h2 className="mt-1 text-lg font-semibold text-ink-950">Ärenden per månad</h2></div>
-            <p className="text-xs text-ink-400">Senaste tre månaderna</p>
+            <p className="text-xs text-ink-500">Senaste tre månaderna</p>
           </div>
           <div className="mt-8 grid min-h-56 grid-cols-3 items-end gap-5 border-b border-sand-200 pb-4">
             {monthBuckets.map((bucket) => {
@@ -169,7 +169,7 @@ export default async function ReportsPage() {
               const height = Math.max(12, Math.round((bucket.total / max) * 150));
               return (
                 <div key={bucket.key} className="flex h-full flex-col justify-end">
-                  <div className="mb-3 text-center"><p className="text-lg font-semibold text-ink-900">{bucket.total}</p><p className="text-[10px] text-ink-400">{bucket.closed} avslutade</p></div>
+                  <div className="mb-3 text-center"><p className="text-lg font-semibold text-ink-900">{bucket.total}</p><p className="text-[10px] text-ink-500">{bucket.closed} avslutade</p></div>
                   <div className="mx-auto w-full max-w-24 rounded-t-xl bg-petroleum-700" style={{ height }} />
                   <p className="mt-3 text-center text-xs capitalize text-ink-500">{bucket.label}</p>
                 </div>
@@ -182,7 +182,7 @@ export default async function ReportsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Fördelning</p>
           <h2 className="mt-1 text-lg font-semibold text-ink-950">Vanligaste kategorier</h2>
           <div className="mt-6 space-y-5">
-            {categoryRows.length === 0 ? <p className="text-sm text-ink-400">Inga ärenden under perioden.</p> : categoryRows.map(([category, value]) => (
+            {categoryRows.length === 0 ? <p className="text-sm text-ink-500">Inga ärenden under perioden.</p> : categoryRows.map(([category, value]) => (
               <div key={category}>
                 <div className="mb-2 flex items-center justify-between gap-4"><p className="text-sm font-medium capitalize text-ink-700">{category.replaceAll("_", " ")}</p><p className="text-sm font-semibold text-ink-900">{value}</p></div>
                 <div className="h-2 overflow-hidden rounded-full bg-sand-100"><div className="h-full rounded-full bg-petroleum-600" style={{ width: `${Math.max(5, (value / maxCategory) * 100)}%` }} /></div>
@@ -197,8 +197,8 @@ export default async function ReportsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Bestånd</p>
           <h2 className="mt-1 text-lg font-semibold text-ink-950">Belastning per fastighet</h2>
           <div className="mt-5 divide-y divide-sand-200">
-            {busiestProperties.length === 0 ? <p className="py-5 text-sm text-ink-400">Ingen fastighetsdata ännu.</p> : busiestProperties.map((property) => (
-              <div key={property.name} className="flex items-center justify-between gap-4 py-3"><div><p className="text-sm font-medium text-ink-800">{property.name}</p><p className="text-[11px] text-ink-400">{property.open} öppna</p></div><p className="text-sm font-semibold text-ink-950">{property.total}</p></div>
+            {busiestProperties.length === 0 ? <p className="py-5 text-sm text-ink-500">Ingen fastighetsdata ännu.</p> : busiestProperties.map((property) => (
+              <div key={property.name} className="flex items-center justify-between gap-4 py-3"><div><p className="text-sm font-medium text-ink-800">{property.name}</p><p className="text-[11px] text-ink-500">{property.open} öppna</p></div><p className="text-sm font-semibold text-ink-950">{property.total}</p></div>
             ))}
           </div>
         </article>
@@ -207,8 +207,8 @@ export default async function ReportsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Organisation</p>
           <h2 className="mt-1 text-lg font-semibold text-ink-950">Arbetsbelastning</h2>
           <div className="mt-5 divide-y divide-sand-200">
-            {teamRows.length === 0 ? <p className="py-5 text-sm text-ink-400">Inga tilldelade ärenden ännu.</p> : teamRows.map((member) => (
-              <div key={member.name} className="flex items-center justify-between gap-4 py-3"><div><p className="text-sm font-medium text-ink-800">{member.name}</p><p className="text-[11px] text-ink-400">{member.open} öppna</p></div><p className="text-sm font-semibold text-ink-950">{member.total}</p></div>
+            {teamRows.length === 0 ? <p className="py-5 text-sm text-ink-500">Inga tilldelade ärenden ännu.</p> : teamRows.map((member) => (
+              <div key={member.name} className="flex items-center justify-between gap-4 py-3"><div><p className="text-sm font-medium text-ink-800">{member.name}</p><p className="text-[11px] text-ink-500">{member.open} öppna</p></div><p className="text-sm font-semibold text-ink-950">{member.total}</p></div>
             ))}
           </div>
         </article>
@@ -230,9 +230,9 @@ export default async function ReportsPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-sand-200 bg-[#F1F1EC] p-5"><p className="text-xs text-ink-400">Samlad registrerad area</p><p className="mt-2 text-xl font-semibold text-ink-950">{Math.round(portfolioArea).toLocaleString("sv-SE")} m²</p></div>
-        <div className="rounded-2xl border border-sand-200 bg-[#F1F1EC] p-5"><p className="text-xs text-ink-400">Byggnader i beståndet</p><p className="mt-2 text-xl font-semibold text-ink-950">{properties.reduce((sum, property) => sum + property._count.buildings, 0)}</p></div>
-        <div className="rounded-2xl border border-sand-200 bg-[#F1F1EC] p-5"><p className="text-xs text-ink-400">Tilldelningsgrad</p><p className="mt-2 text-xl font-semibold text-ink-950">{percent(assignedTickets, totalTickets)} %</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-[#F1F1EC] p-5"><p className="text-xs text-ink-500">Samlad registrerad area</p><p className="mt-2 text-xl font-semibold text-ink-950">{Math.round(portfolioArea).toLocaleString("sv-SE")} m²</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-[#F1F1EC] p-5"><p className="text-xs text-ink-500">Byggnader i beståndet</p><p className="mt-2 text-xl font-semibold text-ink-950">{properties.reduce((sum, property) => sum + property._count.buildings, 0)}</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-[#F1F1EC] p-5"><p className="text-xs text-ink-500">Tilldelningsgrad</p><p className="mt-2 text-xl font-semibold text-ink-950">{percent(assignedTickets, totalTickets)} %</p></div>
       </section>
     </div>
   );

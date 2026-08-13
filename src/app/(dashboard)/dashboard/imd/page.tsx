@@ -291,7 +291,7 @@ export default function ImdPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="bg-sand-50 text-xs uppercase tracking-[0.08em] text-ink-400">
+              <thead className="bg-sand-50 text-xs uppercase tracking-[0.08em] text-ink-500">
                 <tr>
                   {["Fastighet", "Objekt", "Mätare", "Typ", "Period", "Förbrukning", "Belopp", "Debitering", ""].map((head) => (
                     <th key={head || "actions"} className="px-5 py-3 font-semibold">{head}</th>
@@ -329,7 +329,7 @@ export default function ImdPage() {
                       ) : item.source === "legacy" ? (
                         <span className="text-xs font-medium text-amber-800">Äldre rad – kör backfill innan ändring</span>
                       ) : (
-                        <span className="text-xs text-ink-400">Saknas</span>
+                        <span className="text-xs text-ink-500">Saknas</span>
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
@@ -353,7 +353,7 @@ export default function ImdPage() {
                             {voidingId === item.id ? "Makulerar…" : "Makulera"}
                           </button>
                         ) : item.source === "legacy" ? (
-                          <span className="text-xs text-ink-400">—</span>
+                          <span className="text-xs text-ink-500">—</span>
                         ) : null}
                       </div>
                     </td>

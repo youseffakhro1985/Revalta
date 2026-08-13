@@ -153,7 +153,7 @@ export default function ProjectsPage() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2"><Link href={`/dashboard/projekt/${project.id}`} className="font-semibold text-ink-900 transition hover:text-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200 focus:ring-offset-2">{project.name}</Link><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{statusLabels[project.status] || project.status}</span><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${project.risk === "high" ? "bg-red-50 text-red-800" : "bg-sand-100 text-ink-600"}`}>Risk {riskLabels[project.risk] || project.risk}</span></div>
             <p className="mt-1 text-sm text-ink-500">{project.property_name}</p>
-            <p className="mt-3 text-xs text-ink-400">{formatDate(project.start_date)} – {formatDate(project.end_date)}</p>
+            <p className="mt-3 text-xs text-ink-500">{formatDate(project.start_date)} – {formatDate(project.end_date)}</p>
             {project.source_work_order ? <Link href={`/dashboard/arbetsorder/${project.source_work_order.id}`} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-sand-50 px-3 py-2 text-xs text-ink-600 transition hover:bg-sand-100 hover:text-petroleum-800"><FolderKanban className="h-4 w-4 text-petroleum-700" />Från arbetsorder: {project.source_work_order.title}</Link> : null}
           </div>
           <div className="grid grid-cols-2 gap-4 text-xs text-ink-500 sm:grid-cols-4 lg:min-w-[520px]">
@@ -165,7 +165,7 @@ export default function ProjectsPage() {
         </div>
         <div className="mt-5 flex flex-col gap-3 border-t border-sand-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            <p className="text-xs text-ink-400">Budget {money.format(Number(project.budget || 0))} · Utfall {money.format(Number(project.actual || 0))}</p>
+            <p className="text-xs text-ink-500">Budget {money.format(Number(project.budget || 0))} · Utfall {money.format(Number(project.actual || 0))}</p>
             <Link href={`/dashboard/projekt/${project.id}`} className="text-xs font-semibold text-petroleum-700 transition hover:text-petroleum-900">Öppna projektdetalj</Link>
           </div>
           <select value={project.status} disabled={updatingId === project.id} onChange={(event) => void changeStatus(project.id, event.target.value)} className={`${premiumFieldClass} sm:w-44`} aria-label={`Ändra status för ${project.name}`}><option value="planned">Planerad</option><option value="active">Pågående</option><option value="paused">Pausad</option><option value="completed">Slutförd</option><option value="cancelled">Avbruten</option></select>

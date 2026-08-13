@@ -180,7 +180,7 @@ export default function TechnicianPlanningPage() {
                     <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-petroleum-700">{order.enterprise?.work_order_number || "Arbetsorder"}</p><h3 className="mt-1 truncate font-semibold text-ink-950">{order.title}</h3><p className="mt-1 truncate text-sm text-ink-500">{order.property.name} · {order.property.address}, {order.property.city}</p></div>
                     <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${badge(order.sla.risk)}`}>{order.sla.label}</span>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-ink-600">{duration(order)}</span><span className="text-ink-400">{order.sla.dueAt ? dateTime.format(new Date(order.sla.dueAt)) : "Deadline saknas"}</span></div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="font-semibold text-ink-600">{duration(order)}</span><span className="text-ink-500">{order.sla.dueAt ? dateTime.format(new Date(order.sla.dueAt)) : "Deadline saknas"}</span></div>
                 </Link>
                 <WorkOrderQuickActions
                   workOrderId={order.id}

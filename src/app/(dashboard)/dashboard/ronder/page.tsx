@@ -278,7 +278,7 @@ export default function RoundsPage() {
               </Field>
               <Field label="Kontrollpunkter">
                 <textarea rows={7} className={premiumTextareaClass} value={form.checklistText} onChange={(e) => setForm({ ...form, checklistText: e.target.value })} />
-                <span className="mt-1.5 block text-xs text-ink-400">En kontrollpunkt per rad.</span>
+                <span className="mt-1.5 block text-xs text-ink-500">En kontrollpunkt per rad.</span>
               </Field>
               <button disabled={busy} className={`${premiumPrimaryButtonClass} w-full`}>{busy ? "Sparar…" : "Skapa rond"}</button>
             </form>
@@ -457,5 +457,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-xs text-ink-400">{label}</p><p className="mt-1 font-semibold text-ink-800">{value}</p></div>;
+  return <div><p className="text-xs text-ink-500">{label}</p><p className="mt-1 font-semibold text-ink-800">{value}</p></div>;
 }

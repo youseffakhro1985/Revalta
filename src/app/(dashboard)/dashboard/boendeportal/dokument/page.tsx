@@ -189,7 +189,7 @@ export default function ResidentDocumentsPage() {
                       {expired ? <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800">Utgånget</span> : null}
                     </div>
                     <p className="mt-2 text-sm text-ink-500">{document.fileName || "Dokumentfil"} · {formatBytes(document.sizeBytes)}</p>
-                    <p className="mt-1 text-xs text-ink-400">
+                    <p className="mt-1 text-xs text-ink-500">
                       Publicerat {dateFormatter.format(new Date(document.createdAt))} av {document.uploadedBy}
                       {document.validUntil ? ` · giltigt till ${dateFormatter.format(new Date(document.validUntil))}` : ""}
                     </p>

@@ -122,13 +122,13 @@ export default function RecurringIncidentSlaReportPage() {
           <th className="px-5 py-4">Incident</th><th className="px-4 py-4">Ansvarig</th><th className="px-4 py-4">Status</th><th className="px-4 py-4">Svarsmål</th><th className="px-4 py-4">Svarstid</th><th className="px-4 py-4">Lösningsmål</th><th className="px-4 py-4">Lösningstid</th><th className="px-4 py-4">Avvikelse</th>
         </tr></thead>
         <tbody className="divide-y divide-sand-100">{rows.map((row) => <tr key={row.notificationKey} className={row.activeBreach ? "bg-red-50/40" : "bg-white"}>
-          <td className="px-5 py-4"><p className="font-semibold text-ink-900">{row.source}</p><p className="mt-1 max-w-[280px] truncate text-xs text-ink-400" title={row.notificationKey}>{row.notificationKey}</p></td>
+          <td className="px-5 py-4"><p className="font-semibold text-ink-900">{row.source}</p><p className="mt-1 max-w-[280px] truncate text-xs text-ink-500" title={row.notificationKey}>{row.notificationKey}</p></td>
           <td className="px-4 py-4 text-ink-700">{row.assignee}</td>
           <td className="px-4 py-4"><span className="rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-700">{statusLabel(row.status)}</span></td>
-          <td className="px-4 py-4"><p className="text-ink-700">{when(row.responseDueAt)}</p><p className={`mt-1 text-xs font-semibold ${row.responseMet === false ? "text-red-700" : row.responseMet ? "text-emerald-700" : "text-ink-400"}`}>{row.responseMet === null ? "Ej mätt" : row.responseMet ? "Uppfyllt" : "Ej uppfyllt"}</p></td>
-          <td className="px-4 py-4"><p className="font-semibold text-ink-800">{hours(row.responseHours)}</p><p className="mt-1 text-xs text-ink-400">Kvitterad {when(row.acknowledgedAt)}</p></td>
-          <td className="px-4 py-4"><p className="text-ink-700">{when(row.resolutionDueAt)}</p><p className={`mt-1 text-xs font-semibold ${row.resolutionMet === false ? "text-red-700" : row.resolutionMet ? "text-emerald-700" : "text-ink-400"}`}>{row.resolutionMet === null ? "Ej mätt" : row.resolutionMet ? "Uppfyllt" : "Ej uppfyllt"}</p></td>
-          <td className="px-4 py-4"><p className="font-semibold text-ink-800">{hours(row.resolutionHours)}</p><p className="mt-1 text-xs text-ink-400">Löst {when(row.resolvedAt)}</p></td>
+          <td className="px-4 py-4"><p className="text-ink-700">{when(row.responseDueAt)}</p><p className={`mt-1 text-xs font-semibold ${row.responseMet === false ? "text-red-700" : row.responseMet ? "text-emerald-700" : "text-ink-500"}`}>{row.responseMet === null ? "Ej mätt" : row.responseMet ? "Uppfyllt" : "Ej uppfyllt"}</p></td>
+          <td className="px-4 py-4"><p className="font-semibold text-ink-800">{hours(row.responseHours)}</p><p className="mt-1 text-xs text-ink-500">Kvitterad {when(row.acknowledgedAt)}</p></td>
+          <td className="px-4 py-4"><p className="text-ink-700">{when(row.resolutionDueAt)}</p><p className={`mt-1 text-xs font-semibold ${row.resolutionMet === false ? "text-red-700" : row.resolutionMet ? "text-emerald-700" : "text-ink-500"}`}>{row.resolutionMet === null ? "Ej mätt" : row.resolutionMet ? "Uppfyllt" : "Ej uppfyllt"}</p></td>
+          <td className="px-4 py-4"><p className="font-semibold text-ink-800">{hours(row.resolutionHours)}</p><p className="mt-1 text-xs text-ink-500">Löst {when(row.resolvedAt)}</p></td>
           <td className="px-4 py-4">{row.activeBreach ? <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800">Aktivt SLA-brott</span> : <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Ingen aktiv avvikelse</span>}</td>
         </tr>)}</tbody>
       </table></div> : null}
