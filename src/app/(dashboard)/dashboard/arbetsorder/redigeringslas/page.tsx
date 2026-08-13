@@ -92,7 +92,7 @@ export default function WorkOrderEditLocksPage() {
       }
       if (event.key !== "Tab") return;
       const focusable = [reasonRef.current, cancelRef.current, confirmRef.current].filter(
-        (el): el is HTMLElement => Boolean(el) && !(el as HTMLButtonElement | HTMLTextAreaElement).disabled
+        (el): el is HTMLButtonElement | HTMLTextAreaElement => Boolean(el) && !el?.disabled
       );
       if (!focusable.length) return;
       const first = focusable[0];
