@@ -119,103 +119,75 @@
   }
 
   .landing-dashboard-stage {
-    perspective: 1600px;
-    perspective-origin: 52% 44%;
+    perspective: 1500px;
+    perspective-origin: 50% 45%;
+    transform-style: preserve-3d;
   }
 
   .landing-dashboard-float {
     backface-visibility: hidden;
     transform: translate3d(0, 0, 0);
-    transform-origin: 52% 58%;
+    transform-origin: 50% 55%;
+    transform-style: preserve-3d;
     will-change: transform;
-    animation: revalta-dashboard-float 10s ease-in-out infinite;
+    animation: revalta-dashboard-float 18s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   }
 
   .landing-dashboard-frame {
     isolation: isolate;
   }
 
-  .landing-dashboard-frame::after {
-    position: absolute;
-    inset: -40% auto -40% -34%;
-    z-index: 4;
-    width: 24%;
-    content: "";
-    pointer-events: none;
-    background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.38), transparent);
-    opacity: 0;
-    transform: translate3d(0, 0, 0) rotate(7deg);
-    will-change: transform, opacity;
-    animation: revalta-dashboard-sheen 14s ease-in-out infinite;
-  }
-
   .landing-dashboard-shadow {
     transform: translate3d(0, 0, 0) scale(0.98);
     will-change: transform, opacity;
-    animation: revalta-dashboard-shadow 10s ease-in-out infinite;
+    animation: revalta-dashboard-shadow 18s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   }
 
   .landing-dashboard-detail {
     backface-visibility: hidden;
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 24px);
+    transform-style: preserve-3d;
     will-change: transform;
-    animation: revalta-dashboard-detail 10s ease-in-out 500ms infinite;
+    animation: revalta-dashboard-detail 18s cubic-bezier(0.45, 0, 0.55, 1) 350ms infinite;
   }
 }
 
 @keyframes revalta-dashboard-float {
   0%,
   100% {
-    transform: translate3d(0, 1px, 0) rotateX(0.15deg) rotateY(-0.2deg) scale(1);
+    transform: translate3d(0, 1px, 0) rotateX(0.8deg) rotateY(-1.05deg) rotateZ(-0.06deg);
   }
   50% {
-    transform: translate3d(0, -4px, 0) rotateX(-0.25deg) rotateY(0.3deg) scale(1.008);
+    transform: translate3d(0, -7px, 10px) rotateX(-0.65deg) rotateY(1.15deg) rotateZ(0.06deg);
   }
 }
 
 @keyframes revalta-dashboard-shadow {
   0%,
   100% {
-    opacity: 0.88;
-    transform: translate3d(0, 1px, 0) scale(0.98);
+    opacity: 0.82;
+    transform: translate3d(-2px, 2px, 0) scale(0.98);
   }
   50% {
-    opacity: 0.66;
-    transform: translate3d(0, 5px, 0) scale(0.94);
+    opacity: 0.58;
+    transform: translate3d(2px, 7px, 0) scale(0.93);
   }
 }
 
 @keyframes revalta-dashboard-detail {
   0%,
   100% {
-    transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 24px) rotateY(-0.25deg);
   }
   50% {
-    transform: translate3d(0, -3px, 8px);
-  }
-}
-
-@keyframes revalta-dashboard-sheen {
-  0%,
-  30%,
-  100% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) rotate(7deg);
-  }
-  42% {
-    opacity: 0.16;
-  }
-  58% {
-    opacity: 0;
-    transform: translate3d(580%, 0, 0) rotate(7deg);
+    transform: translate3d(1px, -5px, 34px) rotateY(0.35deg);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .landing-dashboard-float,
   .landing-dashboard-shadow,
-  .landing-dashboard-detail,
-  .landing-dashboard-frame::after {
+  .landing-dashboard-detail {
     animation: none !important;
     transform: none;
     will-change: auto;
