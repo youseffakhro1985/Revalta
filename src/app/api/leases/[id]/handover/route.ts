@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageLeases, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
 import { emptyHandover, parseHandoverInput, type LeaseHandoverPayload } from "@/lib/lease-handover";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases/[id]/handover" });
 
 const EVENT_TYPE = "lease_handover_record";
 
@@ -90,7 +93,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     return NextResponse.json({ lease, handover, source, history, permissions: { canManage: canManageLeases(user.role) } });
   } catch (error) {
-    console.error("Get lease handover error:", error);
+    logger.error("Get lease handover error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -161,7 +164,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ handover });
   } catch (error) {
-    console.error("Update lease handover error:", error);
+    logger.error("Update lease handover error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

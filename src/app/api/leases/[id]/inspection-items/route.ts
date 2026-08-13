@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageLeases, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
 import { emptyInspectionRecord, parseInspectionRecord, type LeaseInspectionRecord } from "@/lib/lease-inspection-items";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases/[id]/inspection-items" });
 
 const EVENT_TYPE = "lease_inspection_items";
 
@@ -79,7 +82,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { record, source } = await loadRecordForRead(user.company_id, id, { id: user.id, name: user.name, email: user.email });
     return NextResponse.json({ lease, record, source, permissions: { canManage: canManageLeases(user.role) } });
   } catch (error) {
-    console.error("Get lease inspection items error:", error);
+    logger.error("Get lease inspection items error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
@@ -147,7 +150,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ record });
   } catch (error) {
-    console.error("Update lease inspection items error:", error);
+    logger.error("Update lease inspection items error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

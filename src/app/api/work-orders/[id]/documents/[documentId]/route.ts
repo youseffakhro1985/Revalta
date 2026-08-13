@@ -4,6 +4,9 @@ import db from "@/lib/db";
 import { getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { getStorageToken } from "@/lib/storage";
 import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/work-orders/[id]/documents/[documentId]" });
 
 function contentDisposition(fileName: string) {
   const safeAscii = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -68,7 +71,7 @@ export async function GET(
     }
     return new Response(legacyResponse.body, { headers });
   } catch (error) {
-    console.error("Download work-order document error:", error);
+    logger.error("Download work-order document error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

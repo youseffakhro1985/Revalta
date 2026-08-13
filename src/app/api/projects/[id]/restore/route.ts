@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageWorkOrderFinance, getCurrentUser } from "@/lib/current-user";
 import { readAuditPreviousStatus, resolveRestoredProjectStatus } from "@/lib/soft-delete-restore";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/projects/[id]/restore" });
 
 export async function POST(
   _request: Request,
@@ -82,7 +85,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, id: existing.id, status: restoredStatus });
   } catch (error) {
-    console.error("Restore project error:", error);
+    logger.error("Restore project error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageLeases, getCurrentUser } from "@/lib/current-user";
 import { isOccupyingLeaseStatus } from "@/lib/leasing";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/leases/[id]/restore" });
 
 export async function POST(
   _request: Request,
@@ -82,7 +85,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
-    console.error("Restore lease error:", error);
+    logger.error("Restore lease error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

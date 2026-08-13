@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { isCronRequestAuthorized } from "@/lib/request-security";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/cron/document-expiry-reminders" });
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -101,7 +104,7 @@ export async function GET(request: Request) {
       skipped,
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    console.error("Document expiry reminders error:", error);
+    logger.error("Document expiry reminders error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }

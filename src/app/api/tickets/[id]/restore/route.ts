@@ -3,6 +3,9 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/tickets/[id]/restore" });
 
 export async function POST(
   _request: Request,
@@ -64,7 +67,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
-    console.error("Restore ticket error:", error);
+    logger.error("Restore ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
 }
