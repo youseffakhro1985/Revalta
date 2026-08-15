@@ -14,6 +14,13 @@ function escapeHtml(value: unknown) { return String(value ?? "").replace(/&/g, "
 function appBaseUrl() { const value = process.env.NEXT_PUBLIC_APP_URL?.trim(); if (value) return value.replace(/\/$/, ""); const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim(); return host ? `https://${host}` : "https://www.revalta.se"; }
 function formatDate(value: Date) { return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeZone: "Europe/Stockholm" }).format(value); }
 function repeatBucket(now: Date, repeatDays: number) { return Math.floor(now.getTime() / (repeatDays * 86400000)); }
+// Exported for unit testing — a concurrent/retried run racing on the same
+// (company_id, dedupe_key) unique constraint must be skipped, not allowed to
+// throw an uncaught P2002 that aborts the rest of runServiceEscalations'
+// batch.
+export function isDedupeKeyConflict(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
 
 async function sendEscalation(candidate: Candidate, emails: string[]) {
   const apiKey = process.env.EMAIL_PROVIDER_API_KEY;
@@ -193,30 +200,46 @@ export async function runServiceEscalations(now = new Date()) {
     };
 
     if (!emails.length) {
-      await db.serviceAssignmentEscalation.create({
-        data: {
-          company_id: candidate.asset.company_id,
-          dedupe_key: dedupeKey,
-          notification_key: candidate.notificationKey,
-          status: "skipped",
-          reason: candidate.reason,
-          payload: { ...basePayload, reasonCode: "no_recipients" },
-        },
-      });
+      try {
+        await db.serviceAssignmentEscalation.create({
+          data: {
+            company_id: candidate.asset.company_id,
+            dedupe_key: dedupeKey,
+            notification_key: candidate.notificationKey,
+            status: "skipped",
+            reason: candidate.reason,
+            payload: { ...basePayload, reasonCode: "no_recipients" },
+          },
+        });
+      } catch (error) {
+        // A concurrent/retried run already claimed this dedupeKey (unique
+        // constraint on company_id+dedupe_key) — that run owns this
+        // candidate now, don't let it abort the rest of this batch.
+        if (!isDedupeKeyConflict(error)) throw error;
+      }
       result.skipped += 1;
       continue;
     }
 
-    const event = await db.serviceAssignmentEscalation.create({
-      data: {
-        company_id: candidate.asset.company_id,
-        dedupe_key: dedupeKey,
-        notification_key: candidate.notificationKey,
-        status: "processing",
-        reason: candidate.reason,
-        payload: basePayload,
-      },
-    });
+    let event: { id: string } | null = null;
+    try {
+      event = await db.serviceAssignmentEscalation.create({
+        data: {
+          company_id: candidate.asset.company_id,
+          dedupe_key: dedupeKey,
+          notification_key: candidate.notificationKey,
+          status: "processing",
+          reason: candidate.reason,
+          payload: basePayload,
+        },
+      });
+    } catch (error) {
+      if (!isDedupeKeyConflict(error)) throw error;
+      // Same race as above: another invocation already owns this dedupeKey.
+      // Skip rather than letting the whole batch fail.
+      result.skipped += 1;
+      continue;
+    }
     try {
       const providerResponse = await sendEscalation(candidate, emails);
       await db.serviceAssignmentEscalation.update({

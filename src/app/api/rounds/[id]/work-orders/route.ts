@@ -52,12 +52,14 @@ export async function POST(
       return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
     }
 
-    const checklist = normalizeChecklist(round.checklist);
-    const candidates = checklist.filter((item) => {
+    const selectCandidates = (source: ReturnType<typeof normalizeChecklist>) => source.filter((item) => {
       if (!item.hasDeviation || item.workOrderId) return false;
       if (!requestedIds.length) return true;
       return requestedIds.includes(item.id);
     });
+
+    const checklist = normalizeChecklist(round.checklist);
+    const candidates = selectCandidates(checklist);
     if (!candidates.length) {
       return NextResponse.json({ error: "Inga öppna avvikelser att skapa arbetsorder för" }, { status: 409 });
     }
@@ -65,11 +67,37 @@ export async function POST(
       return NextResponse.json({ error: "Högst 50 arbetsorder kan skapas åt gången" }, { status: 400 });
     }
 
+    // Two concurrent POSTs against the same round (even for different
+    // itemIds) can both read this stale checklist, both create real
+    // WorkOrder rows, and then race on inspectionRound.updateMany — the
+    // second write silently overwrites the first's checklist linkage
+    // (lost update), leaving an orphaned-but-real duplicate WorkOrder. Guard
+    // with an advisory lock scoped to this round, then re-read the checklist
+    // *inside* the lock and recompute candidates from that fresh state —
+    // same pattern as tryCreateRecurringIncidentEscalation in
+    // src/lib/recurring-incident-storage.ts.
     const created = await db.$transaction(async (tx) => {
-      const result: Array<{ itemId: string; workOrderId: string; workOrderNumber: string }> = [];
-      const nextChecklist = [...checklist];
+      const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
+        SELECT pg_try_advisory_xact_lock(hashtext(${`round-work-orders:${round.id}`})) AS locked
+      `);
+      if (!lock[0]?.locked) return { conflict: "locked" as const, result: [], checklist: [] };
 
-      for (const item of candidates) {
+      const freshRound = await tx.inspectionRound.findFirst({
+        where: { id: round.id, company_id: user.company_id! },
+        select: { checklist: true, status: true },
+      });
+      if (!freshRound) return { conflict: "not_found" as const, result: [], checklist: [] };
+
+      const freshChecklist = normalizeChecklist(freshRound.checklist);
+      const freshCandidates = selectCandidates(freshChecklist).filter((item) => candidates.some((c) => c.id === item.id));
+      if (!freshCandidates.length) {
+        return { conflict: "no_candidates" as const, result: [], checklist: freshChecklist };
+      }
+
+      const result: Array<{ itemId: string; workOrderId: string; workOrderNumber: string }> = [];
+      const nextChecklist = [...freshChecklist];
+
+      for (const item of freshCandidates) {
         const createdAt = new Date();
         const priority = normalizeWorkOrderPriority("normal");
         const sla = calculateWorkOrderSla(createdAt, priority);
@@ -125,12 +153,22 @@ export async function POST(
         data: {
           checklist: nextChecklist as unknown as Prisma.InputJsonValue,
           deviations: countDeviations(nextChecklist),
-          status: round.status === "planned" ? "in_progress" : round.status,
+          status: freshRound.status === "planned" ? "in_progress" : freshRound.status,
         },
       });
 
-      return { result, checklist: nextChecklist };
+      return { conflict: null as const, result, checklist: nextChecklist };
     });
+
+    if (created.conflict === "locked") {
+      return NextResponse.json({ error: "Arbetsorder skapas redan för den här ronden, försök igen om en stund" }, { status: 409 });
+    }
+    if (created.conflict === "not_found") {
+      return NextResponse.json({ error: "Ronden hittades inte" }, { status: 404 });
+    }
+    if (created.conflict === "no_candidates") {
+      return NextResponse.json({ error: "Avvikelserna hanteras redan av en annan förfrågan" }, { status: 409 });
+    }
 
     await writeAuditLog(user, {
       entityType: "round",
