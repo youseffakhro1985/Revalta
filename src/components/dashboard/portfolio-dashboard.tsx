@@ -22,17 +22,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
   const activeWorkStatuses = { notIn: ["completed", "invoiced", "cancelled"] };
   const propertyScope = { deleted_at: null, ...tenantWhere(user) };
 
-  const [
-    properties,
-    openTickets,
-    urgentTickets,
-    unassignedTickets,
-    totalUnits,
-    leasedUnits,
-    budget,
-    maintenanceDue,
-    overdueWorkOrders,
-  ] = await Promise.all([
+  const [properties, openTickets, urgentTickets, unassignedTickets, totalUnits, leasedUnits, budget, maintenanceDue, overdueWorkOrders] = await Promise.all([
     db.property.findMany({
       where: propertyScope,
       orderBy: { name: "asc" },
@@ -43,22 +33,16 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
         city: true,
         _count: {
           select: {
-            units: { where: { deleted_at: null } },
+            units: true,
             tickets: { where: { deleted_at: null, status: { not: "closed" } } },
           },
         },
       },
     }),
-    db.ticket.count({
-      where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" }, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-    }),
-    db.ticket.count({
-      where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" }, priority: "urgent", OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-    }),
-    db.ticket.count({
-      where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" }, assigned_to_id: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-    }),
-    db.unit.count({ where: { deleted_at: null, property: propertyScope } }),
+    db.ticket.count({ where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" }, OR: [{ property_id: null }, { property: { deleted_at: null } }] } }),
+    db.ticket.count({ where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" }, priority: "urgent", OR: [{ property_id: null }, { property: { deleted_at: null } }] } }),
+    db.ticket.count({ where: { deleted_at: null, ...tenantWhere(user), status: { not: "closed" }, assigned_to_id: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] } }),
+    db.unit.count({ where: { property: propertyScope } }),
     user.company_id
       ? db.lease.findMany({
           where: {
@@ -66,7 +50,6 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
             deleted_at: null,
             status: { in: ["reserved", "active", "notice"] },
             property: { deleted_at: null },
-            unit: { deleted_at: null },
           },
           distinct: ["unit_id"],
           select: { unit_id: true },
@@ -95,10 +78,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
             deleted_at: null,
             property: { deleted_at: null },
             status: activeWorkStatuses,
-            OR: [
-              { completion_due_at: { lt: now } },
-              { sla_resolution_due_at: { lt: now } },
-            ],
+            OR: [{ completion_due_at: { lt: now } }, { sla_resolution_due_at: { lt: now } }],
           },
         })
       : Promise.resolve(0),
