@@ -13,10 +13,12 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
   today.setHours(0, 0, 0, 0);
   const horizon = new Date(today.getTime() + 30 * 86400000);
   const activeWorkStatuses = { notIn: ["completed", "invoiced", "cancelled"] };
+  const propertyScope = { deleted_at: null, ...tenantWhere(user) };
 
-  const [properties, unassignedTickets, overdueWorkOrders, upcomingActivities, activeVendors, expiringVendors, ticketQueue] = await Promise.all([
+  const [totalProperties, properties, unassignedTickets, overdueWorkOrders, upcomingActivities, activeVendors, expiringVendors, ticketQueue] = await Promise.all([
+    db.property.count({ where: propertyScope }),
     db.property.findMany({
-      where: { deleted_at: null, ...tenantWhere(user) },
+      where: propertyScope,
       orderBy: { name: "asc" },
       take: 6,
       select: {
@@ -88,19 +90,19 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
       <PageHeader
         eyebrow="Förvaltarvy"
         title="Dagens förvaltning"
-        description="Mina fastigheter, otilldelade ärenden, försenade arbetsordrar, kommande aktiviteter och leverantörsläge i en operativ arbetsyta."
+        description="Fastigheter i arbetsytan, otilldelade ärenden, försenade arbetsordrar, kommande aktiviteter och leverantörsläge i en operativ vy."
         action={<Link href="/dashboard/arbetsorder/planering" className="inline-flex h-11 items-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800">Öppna planering</Link>}
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Building2} label="Mina fastigheter" value={properties.length} hint="Fastigheter inom din organisation" />
+        <MetricCard icon={Building2} label="Fastigheter i arbetsytan" value={totalProperties} hint="Tenant-scopat bestånd" />
         <MetricCard icon={ClipboardList} label="Otilldelade ärenden" value={unassignedTickets} hint="Behöver ansvarig" />
         <MetricCard icon={Wrench} label="Försenade arbetsordrar" value={overdueWorkOrders} hint="Aktiva AO efter deadline" />
         <MetricCard icon={BriefcaseBusiness} label="Aktiva leverantörer" value={activeVendors} hint={`${expiringVendors} avtal löper inom 120 dagar`} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Panel title="Mina fastigheter" description="Snabbväg till bestånd och aktuella ärenden." bodyClassName="p-0">
+        <Panel title="Fastigheter i fokus" description="Snabbväg till bestånd och aktuella ärenden." bodyClassName="p-0">
           {properties.length ? <div className="divide-y divide-sand-100">{properties.map((property) => (
             <Link key={property.id} href={`/dashboard/fastigheter/${property.id}`} className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-sand-50/70">
               <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-900">{property.name}</p><p className="mt-1 text-xs text-ink-500">{property.city}</p></div>
