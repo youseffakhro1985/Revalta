@@ -7,28 +7,45 @@ import { MetricCard, Panel } from "@/components/dashboard/premium-ui";
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 const number = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 1 });
 
-function sumByType(rows: Array<{ type: string; _sum: { value: unknown; cost: unknown } }>, type: string) {
-  const row = rows.find((entry) => entry.type === type);
-  return {
-    value: Number(row?._sum.value || 0),
-    cost: Number(row?._sum.cost || 0),
-  };
+type LatestReading = {
+  value: unknown;
+  unit: string;
+  period: string;
+} | null;
+
+function readingValue(reading: LatestReading) {
+  if (!reading) return "–";
+  return `${number.format(Number(reading.value || 0))} ${reading.unit}`;
+}
+
+function readingHint(reading: LatestReading) {
+  return reading ? `Senaste period ${reading.period}` : "Ingen avläsning registrerad";
 }
 
 export async function PropertyFinanceEnergySummary({ user, propertyId }: { user: CurrentUser; propertyId: string }) {
   if (!user.company_id || !canViewFinanceData(user.role)) return null;
 
   const year = new Date().getFullYear();
-  const [energyByType, latestEnergy, budget] = await Promise.all([
-    db.energyReading.groupBy({
-      by: ["type"],
-      where: { company_id: user.company_id, property_id: propertyId, property: { deleted_at: null } },
-      _sum: { value: true, cost: true },
+  const energyScope = { company_id: user.company_id, property_id: propertyId, property: { deleted_at: null } };
+  const [electricity, heating, water, energyCost, budget] = await Promise.all([
+    db.energyReading.findFirst({
+      where: { ...energyScope, type: "electricity" },
+      orderBy: { created_at: "desc" },
+      select: { value: true, unit: true, period: true },
     }),
     db.energyReading.findFirst({
-      where: { company_id: user.company_id, property_id: propertyId, property: { deleted_at: null } },
+      where: { ...energyScope, type: "heating" },
       orderBy: { created_at: "desc" },
-      select: { period: true, created_at: true },
+      select: { value: true, unit: true, period: true },
+    }),
+    db.energyReading.findFirst({
+      where: { ...energyScope, type: "water" },
+      orderBy: { created_at: "desc" },
+      select: { value: true, unit: true, period: true },
+    }),
+    db.energyReading.aggregate({
+      where: energyScope,
+      _sum: { cost: true },
     }),
     db.budgetEntry.aggregate({
       where: { company_id: user.company_id, property_id: propertyId, year, property: { deleted_at: null } },
@@ -36,14 +53,12 @@ export async function PropertyFinanceEnergySummary({ user, propertyId }: { user:
     }),
   ]);
 
-  const electricity = sumByType(energyByType, "electricity");
-  const heating = sumByType(energyByType, "heating");
-  const water = sumByType(energyByType, "water");
-  const totalEnergyCost = electricity.cost + heating.cost + water.cost;
+  const totalEnergyCost = Number(energyCost._sum.cost || 0);
   const budgetValue = Number(budget._sum.budget || 0);
   const forecastValue = Number(budget._sum.forecast || 0);
   const actualValue = Number(budget._sum.actual || 0);
   const variance = budgetValue - actualValue;
+  const latestPeriods = [electricity?.period, heating?.period, water?.period].filter(Boolean);
 
   return (
     <div className="space-y-8">
@@ -52,15 +67,15 @@ export async function PropertyFinanceEnergySummary({ user, propertyId }: { user:
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">Energi</p>
             <h2 id="property-energy-title" className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-ink-950">Energi och förbrukning</h2>
-            <p className="mt-1 text-sm text-ink-500">Fastighetens registrerade el, värme, vatten och kostnader från befintliga EnergyReading-poster.</p>
+            <p className="mt-1 text-sm text-ink-500">Senaste registrerade avläsning per energityp. Enheten följer den faktiska EnergyReading-posten och räknas aldrig ihop över olika enheter.</p>
           </div>
           <Link href="/dashboard/energi" className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Öppna energimodulen →</Link>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Zap} label="El" value={`${number.format(electricity.value)} kWh`} hint={money.format(electricity.cost)} />
-          <MetricCard icon={Flame} label="Värme" value={`${number.format(heating.value)} kWh`} hint={money.format(heating.cost)} />
-          <MetricCard icon={Droplets} label="Vatten" value={`${number.format(water.value)} m³`} hint={money.format(water.cost)} />
-          <MetricCard icon={Gauge} label="Energikostnad" value={money.format(totalEnergyCost)} hint={latestEnergy?.period ? `Senaste registrering ${latestEnergy.period}` : "Ingen avläsning registrerad"} />
+          <MetricCard icon={Zap} label="Senaste el" value={readingValue(electricity)} hint={readingHint(electricity)} />
+          <MetricCard icon={Flame} label="Senaste värme" value={readingValue(heating)} hint={readingHint(heating)} />
+          <MetricCard icon={Droplets} label="Senaste vatten" value={readingValue(water)} hint={readingHint(water)} />
+          <MetricCard icon={Gauge} label="Registrerad energikostnad" value={money.format(totalEnergyCost)} hint={latestPeriods.length ? `Senaste period ${latestPeriods[0]}` : "Ingen energidata registrerad"} />
         </div>
       </section>
 
