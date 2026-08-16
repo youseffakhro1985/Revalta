@@ -29,10 +29,11 @@ describe("dashboard navigation v2", () => {
     ]);
   });
 
-  it("bevarar rollstyrningen för technician", () => {
+  it("bevarar rollstyrningen för technician och kalendern som generell planeringsyta", () => {
     expect(itemLabels("technician", "drift")).toEqual([
       "Ärenden",
       "Arbetsordrar",
+      "Kalender",
       "Ronder",
       "Besiktningar",
     ]);
@@ -53,6 +54,7 @@ describe("dashboard navigation v2", () => {
 
   it("markerar arbetsorderns rot men inte dess separata underområden", () => {
     expect(isDashboardNavItemActive("/dashboard/arbetsorder/AO-2026-0142", "/dashboard/arbetsorder")).toBe(true);
+    expect(isDashboardNavItemActive("/dashboard/arbetsorder/operationsoversikt", "/dashboard/arbetsorder")).toBe(false);
     expect(isDashboardNavItemActive("/dashboard/arbetsorder/planering", "/dashboard/arbetsorder")).toBe(false);
     expect(isDashboardNavItemActive("/dashboard/arbetsorder/aterkommande", "/dashboard/arbetsorder")).toBe(false);
     expect(isDashboardNavItemActive("/dashboard/arbetsorder/redigeringslas", "/dashboard/arbetsorder")).toBe(false);
@@ -60,7 +62,9 @@ describe("dashboard navigation v2", () => {
 
   it("öppnar rätt modulområde för en aktiv underroute", () => {
     const sections = visibleDashboardSections("owner");
+    expect(activeDashboardSectionId("/dashboard/arbetsorder/operationsoversikt", sections)).toBe("drift");
     expect(activeDashboardSectionId("/dashboard/arbetsorder/planering", sections)).toBe("drift");
+    expect(activeDashboardSectionId("/dashboard/kalender", sections)).toBe("drift");
     expect(activeDashboardSectionId("/dashboard/hyresavisering", sections)).toBe("boende-uthyrning");
     expect(activeDashboardSectionId("/dashboard/energi", sections)).toBe("ekonomi-analys");
     expect(activeDashboardSectionId("/dashboard/dokument", sections)).toBe("dokument-projekt");
