@@ -10,14 +10,17 @@ Miljövariabler:
 
 - `EMAIL_PROVIDER_API_KEY`
 - `EMAIL_FROM`
+- `DEMO_REQUEST_TO` — serverbestämd mottagare för publika demoförfrågningar
 
-När dessa finns skickar Revalta e-post via Resend för:
+När `EMAIL_PROVIDER_API_KEY` och `EMAIL_FROM` finns skickar Revalta e-post via Resend för:
 
 - e-postverifiering
 - lösenordsåterställning
 - ärendekvitto
 - statusuppdateringar
 - nya kommentarer
+
+Publika demoförfrågningar via `/demo` kräver dessutom `DEMO_REQUEST_TO`. Om variabeln saknas failar `/api/demo-request` stängt och bekräftar aldrig en leverans som inte har skett. Besökaren kan inte styra mottagaradressen.
 
 ## SMS
 
