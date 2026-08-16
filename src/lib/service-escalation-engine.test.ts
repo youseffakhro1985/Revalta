@@ -1,19 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@prisma/client", () => ({
-  Prisma: {
-    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
-    PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
-      code: string;
-      constructor(message: string, code: string) {
-        super(message);
-        this.code = code;
-      }
-    },
-  },
-}));
-
 vi.mock("@/lib/db", () => ({
   default: {},
 }));
@@ -29,12 +16,12 @@ describe("isDedupeKeyConflict", () => {
   // dedupeKey" and skipped, not treated as a fatal error that aborts the
   // rest of the batch.
   it("recognizes a Prisma P2002 unique-constraint violation", () => {
-    const error = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", "P2002");
+    const error = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", { code: "P2002", clientVersion: "test" });
     expect(isDedupeKeyConflict(error)).toBe(true);
   });
 
   it("does not swallow unrelated Prisma errors", () => {
-    const error = new Prisma.PrismaClientKnownRequestError("Foreign key constraint failed", "P2003");
+    const error = new Prisma.PrismaClientKnownRequestError("Foreign key constraint failed", { code: "P2003", clientVersion: "test" });
     expect(isDedupeKeyConflict(error)).toBe(false);
   });
 
