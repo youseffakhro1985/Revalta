@@ -126,7 +126,7 @@ export async function POST(
         // linked back to the inspection).
         throw new Error("Kunde inte länka arbetsordern till kontrollen");
       }
-      return { conflict: null as const, workOrderId: workOrder.id, workOrderNumber };
+      return { conflict: null, workOrderId: workOrder.id, workOrderNumber };
     });
 
     if (created.conflict === "locked") {
