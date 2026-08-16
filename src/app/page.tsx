@@ -96,7 +96,7 @@ export default function Home() {
                   href="/register"
                   className="inline-flex h-12 items-center justify-center gap-2.5 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
                 >
-                  Boka en personlig visning
+                  Skapa konto
                   <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
                 </Link>
                 <Link
@@ -201,7 +201,7 @@ export default function Home() {
               href="/register"
               className="inline-flex h-12 w-fit items-center gap-2.5 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
             >
-              Boka personlig visning
+              Skapa konto
               <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
             </Link>
           </div>

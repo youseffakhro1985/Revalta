@@ -50,7 +50,7 @@ const tickets = [
 
 export function DashboardPreview() {
   return (
-    <div className="landing-dashboard-stage relative mx-auto w-full max-w-[760px] lg:mx-0">
+    <div aria-hidden="true" className="landing-dashboard-stage relative mx-auto w-full max-w-[760px] lg:mx-0">
       <div className="landing-dashboard-shadow absolute -bottom-6 left-14 right-14 h-16 rounded-full bg-petroleum-950/10 blur-2xl" aria-hidden="true" />
       <div className="landing-dashboard-float landing-dashboard-frame relative overflow-hidden rounded-[18px] border border-sand-300/80 bg-white shadow-[0_32px_90px_-42px_rgba(17,34,31,0.42),0_12px_30px_-20px_rgba(17,34,31,0.24)]">
         <div className="relative flex h-11 items-center justify-between border-b border-sand-200 bg-[#F8F8F5] px-4">
