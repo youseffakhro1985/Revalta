@@ -1,4 +1,5 @@
 import {
+  canCreateProperties,
   canManageTickets,
   canViewFinanceData,
   canViewLeasingData,
@@ -26,6 +27,7 @@ export type PropertyWorkspaceSection = {
 
 export type PropertyWorkspaceCapabilities = {
   canOperate: boolean;
+  canManagePropertyRecords: boolean;
   canViewMaintenance: boolean;
   canViewLeasing: boolean;
   canViewDocuments: boolean;
@@ -37,6 +39,7 @@ export function propertyWorkspaceCapabilities(role: string): PropertyWorkspaceCa
   const canViewLeasing = canViewLeasingData(role);
   return {
     canOperate,
+    canManagePropertyRecords: canCreateProperties(role) || canViewOperations(role),
     canViewMaintenance: canViewOperations(role),
     canViewLeasing,
     canViewDocuments: canOperate || canViewLeasing,
