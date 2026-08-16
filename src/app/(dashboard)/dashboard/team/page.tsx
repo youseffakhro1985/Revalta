@@ -62,7 +62,7 @@ export default function TeamPage() {
   const pending = invites.filter((invite) => !invite.accepted_at).length;
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Team och behörigheter" title={companyName} description="Hantera roller, ansvar, arbetsbelastning och säker åtkomst för hela förvaltningsorganisationen." />
+    <PageHeader eyebrow={companyName} title="Team" description="Hantera roller, ansvar, arbetsbelastning och säker åtkomst för hela förvaltningsorganisationen." />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <MetricCard icon={UsersRound} label="Aktiva teammedlemmar" value={members.length} />
@@ -93,7 +93,7 @@ export default function TeamPage() {
     </section>
 
     <Panel title="Senaste inbjudningar" description="Status för säkra inbjudningslänkar." bodyClassName="p-0">
-      {invites.length === 0 ? <EmptyState title="Inga inbjudningar" /> : <div className="divide-y divide-sand-100">{invites.map((invite) => <article key={invite.id} className="p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-900">{invite.name || invite.email}</h3><p className="mt-1 text-sm text-ink-500">{invite.email}</p></div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-800">{roleLabels[invite.role] || invite.role}</span><span className={`rounded-full px-3 py-1 text-xs font-semibold ${invite.accepted_at ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{invite.accepted_at ? "Accepterad" : "Väntar"}</span></div></div></article>)}</div>}
+      {invites.length === 0 ? <EmptyState title="Inga inbjudningar" description="Nya inbjudningar du skickar ut visas här tills de accepteras." /> : <div className="divide-y divide-sand-100">{invites.map((invite) => <article key={invite.id} className="p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-900">{invite.name || invite.email}</h3><p className="mt-1 text-sm text-ink-500">{invite.email}</p></div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-800">{roleLabels[invite.role] || invite.role}</span><span className={`rounded-full px-3 py-1 text-xs font-semibold ${invite.accepted_at ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>{invite.accepted_at ? "Accepterad" : "Väntar"}</span></div></div></article>)}</div>}
     </Panel>
   </div>;
 }

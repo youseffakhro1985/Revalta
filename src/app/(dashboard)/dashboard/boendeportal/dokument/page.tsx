@@ -128,12 +128,17 @@ export default function ResidentDocumentsPage() {
         <MetricCard icon={FileText} label="Tillgängliga dokument" value={visibleDocuments.length} hint="För valt avtal" />
         <MetricCard icon={FileCheck2} label="Giltiga dokument" value={visibleDocuments.filter((item) => !item.validUntil || new Date(item.validUntil).getTime() >= Date.now()).length} hint="Inte passerat slutdatum" />
         <MetricCard icon={RefreshCw} label="Går ut inom 30 dagar" value={expiringCount} hint="Kräver uppföljning" />
-        <MetricCard icon={ShieldCheck} label="Åtkomstmodell" value="Tenant-säker" hint="Kontrolleras vid hämtning" />
+        <MetricCard icon={ShieldCheck} label="Åtkomstkontroll" value="Aktiv" hint="Endast godkända dokument visas för valt avtal" />
       </section>
 
       <Panel title="Välj boende och avtal" description="Dokumentlistan räknas om efter det valda aktiva avtalet.">
         {loading ? <div className="h-24 animate-pulse rounded-xl bg-sand-100" /> : !data?.leases.length ? (
-          <EmptyState title="Inga aktiva avtal" description="Boendedokument blir tillgängliga när ett aktivt eller uppsagt avtal finns i uthyrningsmodulen." />
+          <EmptyState
+            title="Inga aktiva avtal"
+            description={data?.isResident
+              ? "Dokument blir tillgängliga här så snart du har ett aktivt eller nyligen avslutat hyresavtal. Kontakta förvaltningen om du tycker att något saknas."
+              : "Boendedokument blir tillgängliga när ett aktivt eller uppsagt hyresavtal finns registrerat under Uthyrning."}
+          />
         ) : (
           <div className="grid gap-4 lg:grid-cols-[1fr_1fr] lg:items-end">
             <label className="block space-y-1.5">
@@ -172,7 +177,12 @@ export default function ResidentDocumentsPage() {
         {loading ? (
           <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}</div>
         ) : visibleDocuments.length === 0 ? (
-          <EmptyState title="Inga dokument för detta avtal" description="Dokument som publiceras för organisationen, fastigheten, objektet eller det valda avtalet visas här." />
+          <EmptyState
+            title="Inga dokument för detta avtal"
+            description={data?.isResident
+              ? "Förvaltningen har inte publicerat några dokument för din lägenhet eller ditt avtal ännu. Kontakta förvaltningen om du saknar något specifikt."
+              : "Dokument som publiceras för organisationen, fastigheten, objektet eller det valda avtalet visas här."}
+          />
         ) : (
           <div className="divide-y divide-sand-100">
             {visibleDocuments.map((document) => {

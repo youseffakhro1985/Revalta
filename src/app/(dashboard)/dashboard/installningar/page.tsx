@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { readResponseJson } from "@/lib/fetch-json";
+import { premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Profile = {
   id: string;
@@ -18,6 +19,21 @@ type Company = {
   org_number: string | null;
   plan: string;
   status: string;
+};
+
+const roleLabels: Record<string, string> = {
+  owner: "Ägare",
+  admin: "Admin",
+  manager: "Förvaltare",
+  technician: "Tekniker",
+  viewer: "Läsbehörig",
+  resident: "Boende",
+};
+
+const planLabels: Record<string, string> = {
+  start: "Start",
+  professional: "Standard",
+  enterprise: "Professional",
 };
 
 export default function SettingsPage() {
@@ -149,13 +165,13 @@ export default function SettingsPage() {
           <h2 className="text-xl font-semibold text-ink-950">Profil</h2>
           <p className="mt-2 text-sm text-ink-500">Dina personliga uppgifter i Revalta.</p>
           <label className="mt-6 block text-sm font-medium text-ink-700">Namn</label>
-          <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Namn" />
+          <input value={name} onChange={(event) => setName(event.target.value)} className={`mt-1 ${premiumFieldClass}`} aria-label="Namn" />
           <div className="mt-4 rounded-lg bg-sand-50 p-4 text-sm text-ink-600">
             <p>{profile?.email}</p>
-            <p className="mt-1">Roll: {profile?.role}</p>
+            <p className="mt-1">Roll: {profile?.role ? roleLabels[profile.role] || profile.role : ""}</p>
             <p className="mt-1">{profile?.email_verified_at ? "E-post verifierad" : "E-post ej verifierad"}</p>
           </div>
-          <button disabled={loading} className="mt-6 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">Spara profil</button>
+          <button disabled={loading} className={`mt-6 w-full ${premiumPrimaryButtonClass}`}>Spara profil</button>
         </form>
 
         <form onSubmit={saveCompany} className="rounded-2xl border border-sand-200/80 bg-white p-6 shadow-premium-sm">
@@ -164,14 +180,14 @@ export default function SettingsPage() {
           <fieldset disabled={!canManageCompany || loading} className="mt-6 space-y-4 disabled:opacity-60">
             <div>
               <label className="block text-sm font-medium text-ink-700">Namn</label>
-              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Namn" />
+              <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} className={`mt-1 ${premiumFieldClass}`} aria-label="Namn" />
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Organisationsnummer</label>
-              <input value={orgNumber} onChange={(event) => setOrgNumber(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" placeholder="556000-0000" aria-label="Organisationsnummer" />
+              <input value={orgNumber} onChange={(event) => setOrgNumber(event.target.value)} className={`mt-1 ${premiumFieldClass}`} placeholder="556000-0000" aria-label="Organisationsnummer" />
             </div>
-            <div className="rounded-lg bg-sand-50 p-4 text-sm text-ink-600">Plan: {company?.plan}</div>
-            <button className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800">Spara organisation</button>
+            <div className="rounded-lg bg-sand-50 p-4 text-sm text-ink-600">Plan: {company?.plan ? planLabels[company.plan] || company.plan : ""}</div>
+            <button className={`w-full ${premiumPrimaryButtonClass}`}>Spara organisation</button>
           </fieldset>
         </form>
 
@@ -181,18 +197,18 @@ export default function SettingsPage() {
           <div className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-ink-700">Nuvarande lösenord</label>
-              <input required autoComplete="current-password" type="password" maxLength={512} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Nuvarande lösenord" />
+              <input required autoComplete="current-password" type="password" maxLength={512} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className={`mt-1 ${premiumFieldClass}`} aria-label="Nuvarande lösenord" />
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Nytt lösenord</label>
-              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Nytt lösenord" />
+              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className={`mt-1 ${premiumFieldClass}`} aria-label="Nytt lösenord" />
               <p className="mt-2 text-xs text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-700">Bekräfta nytt lösenord</label>
-              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="mt-1 w-full rounded-lg border border-sand-200 p-3" aria-label="Bekräfta nytt lösenord" />
+              <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className={`mt-1 ${premiumFieldClass}`} aria-label="Bekräfta nytt lösenord" />
             </div>
-            <button disabled={loading} className="w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white hover:bg-petroleum-800 disabled:opacity-70">{loading ? "Uppdaterar…" : "Byt lösenord säkert"}</button>
+            <button disabled={loading} className={`w-full ${premiumPrimaryButtonClass}`}>{loading ? "Uppdaterar…" : "Byt lösenord"}</button>
           </div>
         </form>
       </div>

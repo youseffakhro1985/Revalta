@@ -297,7 +297,7 @@ export default function TicketDetailPage() {
 
   function startEditOperation(operation: TicketOperation) {
     if (operation.source !== "table") {
-      setError("Registreringen finns i äldre lagring. Kör backfill till TicketOperation innan den kan ändras.");
+      setError("Den här äldre registreringen kan inte redigeras. Kontakta support om den behöver ändras.");
       return;
     }
     setEditingOperationId(operation.id);
@@ -311,7 +311,7 @@ export default function TicketDetailPage() {
 
   async function saveOperationEdit(operation: TicketOperation) {
     if (operation.source !== "table") {
-      setError("Registreringen finns i äldre lagring. Kör backfill till TicketOperation innan den kan ändras.");
+      setError("Den här äldre registreringen kan inte redigeras. Kontakta support om den behöver ändras.");
       return;
     }
     const type = String(operation.metadata?.type || "");
@@ -347,7 +347,7 @@ export default function TicketDetailPage() {
 
   async function removeOperation(operation: TicketOperation) {
     if (operation.source !== "table") {
-      setError("Registreringen finns i äldre lagring. Kör backfill till TicketOperation innan den kan tas bort.");
+      setError("Den här äldre registreringen kan inte tas bort. Kontakta support om den behöver ändras.");
       return;
     }
     if (!window.confirm("Ta bort registreringen? Den döljs från listan men behålls i historiken.")) return;
@@ -494,7 +494,7 @@ export default function TicketDetailPage() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{operationTypeLabels[type] || type || "Registrering"}</p>
                       <p className="mt-1 text-sm text-ink-700">{detail}</p>
                       <p className="mt-1 text-[11px] text-ink-500">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p>
-                      {item.source === "legacy" ? <p className="mt-1 text-[11px] font-medium text-amber-800">Äldre rad – kör backfill innan ändring eller borttagning.</p> : null}
+                      {item.source === "legacy" ? <p className="mt-1 text-[11px] font-medium text-amber-800">Äldre registrering – kan inte ändras eller tas bort här. Kontakta support vid behov.</p> : null}
                     </div>
                     {item.source === "table" ? (
                       <div className="flex shrink-0 flex-col items-end gap-2">
