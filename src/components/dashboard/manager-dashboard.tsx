@@ -9,7 +9,9 @@ const date = new Intl.DateTimeFormat("sv-SE", { weekday: "short", day: "numeric"
 
 export async function ManagerDashboard({ user }: { user: CurrentUser }) {
   const now = new Date();
-  const horizon = new Date(now.getTime() + 30 * 86400000);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const horizon = new Date(today.getTime() + 30 * 86400000);
   const activeWorkStatuses = { notIn: ["completed", "invoiced", "cancelled"] };
 
   const [properties, unassignedTickets, overdueWorkOrders, upcomingActivities, activeVendors, expiringVendors, ticketQueue] = await Promise.all([
@@ -46,7 +48,7 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
       : Promise.resolve(0),
     user.company_id
       ? db.calendarEvent.findMany({
-          where: { company_id: user.company_id, status: "planned", date: { gte: now, lte: horizon } },
+          where: { company_id: user.company_id, status: "planned", date: { gte: today, lte: horizon } },
           orderBy: [{ date: "asc" }, { time: "asc" }],
           take: 6,
           select: { id: true, title: true, date: true, time: true, type: true, property_name: true, responsible: true },
@@ -120,7 +122,7 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
       <DashboardSlaOperations />
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel title="Kommande aktiviteter" description="Planerade aktiviteter de närmaste 30 dagarna." bodyClassName="p-0">
+        <Panel title="Kommande aktiviteter" description="Planerade aktiviteter från idag och 30 dagar framåt." bodyClassName="p-0">
           {upcomingActivities.length ? <div className="divide-y divide-sand-100">{upcomingActivities.map((event) => (
             <div key={event.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[110px_minmax(0,1fr)] sm:items-center">
               <div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-petroleum-700">{date.format(event.date)}</p><p className="mt-1 text-xs text-ink-500">{event.time || "Heldag"}</p></div>
