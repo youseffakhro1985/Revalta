@@ -22,7 +22,8 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
   const activeWorkStatuses = { notIn: ["completed", "invoiced", "cancelled"] };
   const propertyScope = { deleted_at: null, ...tenantWhere(user) };
 
-  const [properties, openTickets, urgentTickets, unassignedTickets, totalUnits, leasedUnits, budget, maintenanceDue, overdueWorkOrders] = await Promise.all([
+  const [totalProperties, properties, openTickets, urgentTickets, unassignedTickets, totalUnits, leasedUnits, budget, maintenanceDue, overdueWorkOrders] = await Promise.all([
+    db.property.count({ where: propertyScope }),
     db.property.findMany({
       where: propertyScope,
       orderBy: { name: "asc" },
@@ -100,7 +101,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Building2} label="Fastigheter" value={properties.length} hint={`${totalUnits} registrerade objekt`} />
+        <MetricCard icon={Building2} label="Fastigheter" value={totalProperties} hint={`${totalUnits} registrerade objekt`} />
         <MetricCard icon={AlertTriangle} label="Kritiska avvikelser" value={criticalDeviations} hint={`${urgentTickets} akuta ärenden · ${overdueWorkOrders} försenade AO`} />
         <MetricCard icon={CircleDollarSign} label={`Budget ${year}`} value={money.format(budgetTotal)} hint={`Utfall ${money.format(actualTotal)}`} />
         <MetricCard icon={DoorOpen} label="Vakanta objekt" value={vacantUnits} hint={totalUnits ? `${Math.round((vacantUnits / totalUnits) * 100)} % av beståndet` : "Inga objekt registrerade"} />
