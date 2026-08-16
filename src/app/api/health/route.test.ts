@@ -176,10 +176,31 @@ describe("health route", () => {
     expect(response.status).toBe(500);
     expect(body).toMatchObject({ status: "error", ok: false, database: "error" });
     expect(body.env).toBeUndefined();
+    // A sustained failure retries once (Neon cold-start tolerance) and still reports unhealthy.
+    expect(queryRawMock).toHaveBeenCalledTimes(2);
     expect(loggerErrorMock).toHaveBeenCalledWith(
       "health check failed",
       expect.any(Error),
       expect.objectContaining({ audience: "public" }),
     );
+  });
+
+  it("recovers from a transient database ping failure via a single retry", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+    queryRawMock
+      .mockRejectedValueOnce(new Error("Can't reach database server"))
+      .mockResolvedValueOnce([{ "?column?": 1 }]);
+
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ status: "ok", ok: true, database: "ok" });
+    expect(queryRawMock).toHaveBeenCalledTimes(2);
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "health check database ping succeeded after retry",
+      expect.objectContaining({ audience: "public" }),
+    );
+    expect(loggerErrorMock).not.toHaveBeenCalled();
   });
 });

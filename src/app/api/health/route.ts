@@ -38,6 +38,30 @@ function buildReleaseSnapshot() {
   };
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const DB_PING_RETRY_DELAY_MS = 200;
+
+/**
+ * Serverless Postgres (Neon) can take a moment to wake a suspended compute,
+ * which surfaces as a transient PrismaClientInitializationError on the first
+ * ping after idle. One short retry avoids reporting a false "unhealthy" for
+ * what is really just a cold-start blip, while a genuine outage still fails
+ * after the retry.
+ */
+async function pingDatabaseWithRetry(): Promise<{ retried: boolean }> {
+  try {
+    await db.$queryRaw`SELECT 1`;
+    return { retried: false };
+  } catch {
+    await delay(DB_PING_RETRY_DELAY_MS);
+    await db.$queryRaw`SELECT 1`;
+    return { retried: true };
+  }
+}
+
 function healthResponse(body: unknown, status = 200, release = buildReleaseSnapshot()) {
   return NextResponse.json(body, {
     status,
@@ -67,7 +91,13 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    await db.$queryRaw`SELECT 1`;
+    const ping = await pingDatabaseWithRetry();
+    if (ping.retried) {
+      logger.warn("health check database ping succeeded after retry", {
+        latencyMs: Date.now() - startedAt,
+        audience: isPublic ? "public" : "operations",
+      });
+    }
     if (isPublic) {
       return healthResponse({
         status: "ok",
