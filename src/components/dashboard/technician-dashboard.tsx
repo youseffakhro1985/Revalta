@@ -8,14 +8,8 @@ import { MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui
 import { isMissingSchemaColumnError } from "@/lib/schema-readiness";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
-type DailyExecutionSummary = {
-  total_minutes: number;
-  material_entries: number;
-};
-
-type DailyPhotoSummary = {
-  photo_count: number;
-};
+type DailyExecutionSummary = { total_minutes: number; material_entries: number };
+type DailyPhotoSummary = { photo_count: number };
 
 const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 const time = new Intl.DateTimeFormat("sv-SE", { hour: "2-digit", minute: "2-digit" });
@@ -64,7 +58,9 @@ async function loadDailyFieldSummary(companyId: string, userId: string, start: D
 }
 
 export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
-  if (!user.company_id) return null;
+  if (!user.company_id) {
+    return <Panel title="Min dag" description="Teknikervyn kräver en aktiv organisation."><p className="text-sm text-ink-500">Kontot saknar organisationskoppling och kan därför inte läsa tilldelade arbetsordrar.</p></Panel>;
+  }
 
   const now = new Date();
   const startOfDay = new Date(now);
@@ -78,7 +74,8 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
     property: { deleted_at: null },
   };
 
-  const [activeOrders, urgentCount, completedToday, fieldSummary] = await Promise.all([
+  const [activeOrderCount, activeOrders, urgentCount, completedToday, fieldSummary] = await Promise.all([
+    db.workOrder.count({ where: { ...assignedScope, status: activeStatuses } }),
     db.workOrder.findMany({
       where: { ...assignedScope, status: activeStatuses },
       orderBy: [{ scheduled_start: "asc" }, { priority: "desc" }, { created_at: "asc" }],
@@ -97,11 +94,7 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
     }),
     db.workOrder.count({ where: { ...assignedScope, status: activeStatuses, priority: "urgent" } }),
     db.workOrder.count({
-      where: {
-        ...assignedScope,
-        status: { in: ["completed", "invoiced"] },
-        completed_at: { gte: startOfDay, lt: endOfDay },
-      },
+      where: { ...assignedScope, status: { in: ["completed", "invoiced"] }, completed_at: { gte: startOfDay, lt: endOfDay } },
     }),
     loadDailyFieldSummary(user.company_id, user.id, startOfDay, endOfDay),
   ]);
@@ -120,7 +113,7 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Wrench} label="Mina aktiva arbetsordrar" value={activeOrders.length} hint="Endast tilldelat arbete" />
+        <MetricCard icon={Wrench} label="Mina aktiva arbetsordrar" value={activeOrderCount} hint="Endast tilldelat arbete" />
         <MetricCard icon={AlertTriangle} label="Akuta" value={urgentCount} hint="Prioritet akut" />
         <MetricCard icon={Clock3} label="Tid registrerad idag" value={formattedMinutes} hint="Från arbetsorderutförande" />
         <MetricCard icon={PackageOpen} label="Materialposter idag" value={fieldSummary.materialEntries} hint={`${fieldSummary.photoCount} fältbilder registrerade`} />
