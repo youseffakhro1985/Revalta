@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Building2, ClipboardList, DoorOpen, MapPin, Ruler, UserRound } from "lucide-react";
+import { Building2, ClipboardList, DoorOpen, MapPin, Ruler, UserRound } from "lucide-react";
 import db from "@/lib/db";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { notDeletedFilter } from "@/lib/schema-readiness";
+import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
 import { PropertyRegistryManager } from "@/components/properties/property-registry-manager";
 import { PropertyComponentOverview } from "@/components/properties/property-component-overview";
 import { PropertyResidentRegister } from "@/components/properties/property-resident-register";
@@ -61,7 +62,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="animate-fade-in-soft space-y-6">
-      <Link href="/dashboard/fastigheter" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 transition hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" /> Till fastighetsregistret</Link>
+      <DashboardBreadcrumbs items={[{ label: "Fastigheter", href: "/dashboard/fastigheter" }, { label: property.name }]} />
 
       <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
         <div className="relative p-7 sm:p-8">

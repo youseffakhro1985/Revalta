@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Building2, DoorOpen, MapPin } from "lucide-react";
+import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
 
@@ -25,6 +26,7 @@ export default function PropertiesPage() {
   async function submit(e:React.FormEvent){e.preventDefault();setError("");setSuccess("");setSubmitting(true);try{const r=await fetch("/api/properties",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});const d=await readResponseJson(r);if(r.status===401){router.push("/login");return;}if(!r.ok)throw new Error(d.error||"Kunde inte skapa fastigheten");setProperties(c=>[d.property,...c]);setForm({name:"",address:"",postalCode:"",city:""});setSuccess("Fastigheten är skapad och redo för byggnader, objekt och förvaltningsdata.");}catch(e){setError(e instanceof Error?e.message:"Kunde inte kontakta servern");}finally{setSubmitting(false);}}
 
   return <div className="space-y-8">
+    <DashboardBreadcrumbs items={[{ label: "Fastigheter" }]} />
     <PageHeader eyebrow="Bestånd och struktur" title="Fastighetsregister" description="Samla fastigheter, byggnader, lägenheter, lokaler och ärenden i en tydlig och enhetlig förvaltningsstruktur." />
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={Building2} label="Fastigheter" value={properties.length} />
