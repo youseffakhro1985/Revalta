@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageBilling, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
+import { isProductionRuntime } from "@/lib/runtime-env";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -48,6 +49,10 @@ export async function GET() {
       plans,
       usage: { properties, teamMembers, openTickets },
       canManage: canManageBilling(user.role),
+      // Direct plan writes (PATCH below) are a dev/preview convenience only — in
+      // production, plan changes must go through Stripe Checkout so billing stays
+      // in sync with what the customer actually pays.
+      canDirectChangePlan: !isProductionRuntime(),
       stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
       stripeCustomerId: company?.stripe_customer_id || null,
       stripeSubscriptionId: company?.stripe_subscription_id || null,
@@ -65,6 +70,19 @@ export async function PATCH(request: Request) {
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     if (!user.company_id || !canManageBilling(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att ändra plan" }, { status: 403 });
+    }
+
+    // Plan changes are a money flow. In production this must go through a real
+    // Stripe Checkout session (the webhook is what actually updates company.plan
+    // from there) — never a free-form write straight to the plan field, which
+    // would let a customer grant themselves a higher tier without paying for it.
+    // Left enabled outside production so dev/preview environments without live
+    // Stripe keys can still exercise plan changes end to end.
+    if (isProductionRuntime()) {
+      return NextResponse.json(
+        { error: "Planbyten görs via Stripe Checkout i produktion. Använd \"Starta Stripe Checkout\"." },
+        { status: 403 },
+      );
     }
 
     const { plan } = await request.json();

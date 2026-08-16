@@ -21,6 +21,7 @@ type BillingData = {
     openTickets: number;
   };
   canManage: boolean;
+  canDirectChangePlan: boolean;
   stripeConfigured: boolean;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
@@ -223,14 +224,22 @@ export default function BillingPage() {
                   <li>Audit log och integration events</li>
                   <li>AI-analys i dev/mockläge</li>
                 </ul>
-                <button
-                  type="button"
-                  disabled={!billing.canManage || savingPlan === key || billing.currentPlan === key}
-                  onClick={() => changePlan(key)}
-                  className={`mt-7 w-full ${premiumPrimaryButtonClass}`}
-                >
-                  {billing.currentPlan === key ? "Aktiv plan" : savingPlan === key ? "Uppdaterar..." : "Byt plan"}
-                </button>
+                {billing.currentPlan === key ? (
+                  <button type="button" disabled className={`mt-7 w-full ${premiumPrimaryButtonClass}`}>
+                    Aktiv plan
+                  </button>
+                ) : billing.canDirectChangePlan ? (
+                  // Dev/preview convenience only — hidden in production, where plan
+                  // changes must go through a real Stripe Checkout session below.
+                  <button
+                    type="button"
+                    disabled={!billing.canManage || savingPlan === key}
+                    onClick={() => changePlan(key)}
+                    className={`mt-7 w-full ${premiumPrimaryButtonClass}`}
+                  >
+                    {savingPlan === key ? "Uppdaterar..." : "Byt plan"}
+                  </button>
+                ) : null}
                 {billing.currentPlan !== key && (
                   <button
                     type="button"
