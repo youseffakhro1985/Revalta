@@ -11,15 +11,15 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 - Produktionsmigrationer går endast via dokumenterat Database Release-flöde.
 - Inga secrets får skrivas i denna fil, PR-beskrivningar, screenshots eller loggar.
 - Befintlig svensk/skandinavisk premiumdesign bevaras.
-- Om en task blockeras externt kan nästa icke-överlappande task aktiveras först när filägarskapet är dokumenterat här.
+- Om en task blockeras externt får nästa icke-överlappande task aktiveras först när filägarskapet är dokumenterat här.
 
 ## Snapshot
 
 - Datum: `2026-08-17`
-- Baseline `main` för aktiv task: `b7cad49965b3c5c714cea8cc907a2f9170eafc24`
-- Commit: `docs: hand off to Command Center task`
+- Baseline `main` för aktiv task: `a93f0fd050e88ba344f96e8d0685d4d3da26153a`
+- Commit: `feat: evolve GlobalSearch into Revalta Command Center`
 - Production: `https://www.revalta.se`
-- Sprint: **S0 — IA, conversion och Command Center**
+- Sprint: **S0 — rollbaserad arbetsyta och fastighetsworkspace**
 - Historiska Claude/Cursor-branches: HOLD tills explicit task + current-main compare.
 
 > SHA-raden är task-baseline. Läs alltid GitHub `main` igen före merge.
@@ -28,7 +28,7 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 
 | Task-ID | Ägare | Branch | Status | Ägt område | Nästa grind |
 |---|---|---|---|---|---|
-| REV-SEARCH-001 | ChatGPT | `agent/command-center` | **IN PROGRESS** | `global-search.tsx`, `command-center-*` support/tests, `/api/search` + test, ledger | GlobalSearch ska bli Command Center utan parallell search; tenant/role/assigned-work scope bevaras; local state isoleras per user-id; CI/CodeQL/exact-SHA Preview krävs. |
+| REV-DASH-ROLE-001 | ChatGPT | `agent/role-dashboard` | **IN PROGRESS** | dashboard root, role router + Portfolio/Manager/Technician/Viewer components/tests, ledger | Rollspecifika arbetsytor utan ny datamodell; Resident fortsatt separat; tenant/assigned-work scope; schema readiness; full CI/CodeQL/exact-SHA Preview |
 | REV-DEMO-001 | ChatGPT | `agent/demo-conversion-flow` | **BLOCKED_ENV — CODE GATE GREEN** | `/demo`, `/api/demo-request`, demo form/mail/tests, marketing header/footer, landing CTA, sitemap, `.env.example`, `INTEGRATIONS.md` | PR #254 draft. CI #978 + CodeQL #269 + Preview `5936266435` success. Merge först när `DEMO_REQUEST_TO` kan klassas PRESENT och submission smoke kan göras. |
 | REV-244-AUDIT | ChatGPT | read-only | LOW PRIORITY | Historisk PR #244 | Endast isolerade follow-ups vid verifierad risk. |
 | REV-VERCEL-001 | ChatGPT | read-only | BLOCKED_CONNECTOR | Vercel project/env/runtime | OAuth-team syns men Revalta project/deploy lookup ger 404. Rapportera aldrig secretvärden. |
@@ -41,6 +41,7 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 | REV-NAV-001 | Navigation v2 + Settings/Admin IA | #252 | `354de1e0ba408525a4e47c2b6f16a038929e60f7` | Full CI, CodeQL, exact-SHA Preview; Production `5936152663` success |
 | REV-BREAD-001 | Gemensamma breadcrumbs + lokal modulnavigation; tenant-safe AO-label | #253 | `e24feff5f2e48c22b913b444b6c8ffd5cf82ee63` | Full CI, 135 testfiler/783 tester, CodeQL, exact-SHA Preview; Production `5936223118` success |
 | REV-COORD-003 | Handoff till Command Center och demo-blocker dokumenterad | #255 | `b7cad49965b3c5c714cea8cc907a2f9170eafc24` | Full CI, CodeQL och Vercel Preview success |
+| REV-SEARCH-001 | Befintlig GlobalSearch utvecklad till Command Center; rollstyrda kommandon, modulnav, favorites/recents, work-order search | #256 | `a93f0fd050e88ba344f96e8d0685d4d3da26153a` | Full CI #981, CodeQL #272 och exact-SHA Preview `5936357068` success |
 
 ## Filägarskap
 
@@ -57,37 +58,65 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 - `.env.example`
 - `INTEGRATIONS.md`
 
-### REV-SEARCH-001 — aktivt låst
+### REV-DASH-ROLE-001 — aktivt låst
 
-- `src/components/dashboard/global-search.tsx`
-- `src/components/dashboard/command-center-state.ts`
-- `src/components/dashboard/command-center-state.test.ts`
-- `src/components/dashboard/command-center-actions.ts`
-- `src/components/dashboard/command-center-actions.test.ts`
-- `src/app/api/search/route.ts`
-- `src/app/api/search/route.test.ts`
+- `src/app/(dashboard)/dashboard/page.tsx`
+- `src/components/dashboard/dashboard-role.ts`
+- `src/components/dashboard/dashboard-role.test.ts`
+- `src/components/dashboard/portfolio-dashboard.tsx`
+- `src/components/dashboard/manager-dashboard.tsx`
+- `src/components/dashboard/technician-dashboard.tsx`
+- `src/components/dashboard/viewer-dashboard.tsx`
 - `AI_COLLABORATION.md`
 
-Dashboard layout/shell är **inte** del av slutligt SEARCH-scope; en kortlivad branchändring i layouten återställdes till exakt main-innehåll innan PR.
+Command Center-filer är handoffade och får inte ändras i denna task.
 
-## REV-SEARCH-001 — implementerad riktning hittills
+## REV-DASH-ROLE-001 — implementerad riktning hittills
 
-- Befintlig `GlobalSearch` utvecklas till ett Command Center; ingen ny parallell search-komponent.
-- `⌘K/Ctrl+K` och mobiltrigger behålls.
-- Tomt läge visar rollstyrda snabbåtgärder (`Ny arbetsorder`, `Registrera ärende`, `Lägg till fastighet`, `Bjud in team`) via befintliga permission helpers.
-- Modulnavigation återanvänder `staffPrimaryNavigation`, `visibleDashboardSections(role)` och `staffSettingsNavigation` från Navigation v2.
-- `/api/search` söker nu även arbetsordrar på titel, beskrivning och AO-nummer.
-- Arbetsordersökning är strikt `company_id`-scopad och technicians får endast tilldelade arbetsordrar, samma princip som övrigt operativt scope.
-- Search-respons är `private, no-store`.
-- Favoriter och senaste objekt sparas endast lokalt, namespacat med autentiserat opaque user-id från befintliga `/api/settings/profile`.
-- Persisted state validerar result type, längder och att href börjar med `/dashboard/`; manipulerad extern URL ignoreras.
-- Favoriter/senaste har hårda maxgränser och dubblettskydd.
-- Servern är fortsatt sanningskälla för live-sökresultat; lokal state är endast UX-minne.
+### Owner / Admin — Portföljöversikt
+- verkligt tenant-scopat fastighets- och objektsantal
+- kritiska avvikelser från akuta ärenden + försenade aktiva arbetsordrar
+- aktuell årsbudget och utfall från befintlig `BudgetEntry`
+- vakans härledd från objekt minus unika reserverade/aktiva/notice leases
+- underhållsbehov till nästa år från befintlig `PortfolioMaintenanceItem`
+- befintlig `DashboardSlaOperations`
+- inget fabricerat health-score; läget visas endast från verkliga avvikelser
+
+### Manager — Dagens förvaltning
+- tenant-scopat bestånd i arbetsytan (ingen falsk individuell property-assignment eftersom modellen saknar manager-user FK)
+- otilldelade ärenden
+- försenade arbetsordrar
+- kommande CalendarEvent från idag + 30 dagar
+- aktiva leverantörsavtal och avtal med slutdatum inom 120 dagar
+- otilldelad ärendekö och befintlig SLA-operationsvy
+
+### Technician — Min dag
+- strikt `company_id + assigned_to_id` för alla arbetsordrar
+- verkligt totalantal aktiva egna AO + akutantal
+- nästa uppdrag från schemalagd/aktiv AO
+- dagens registrerade exekveringstid, materialposter och före/efter-bilder via befintliga execution/document-tabeller
+- dagens avslutade egna arbetsordrar
+- fältflöde länkar tillbaka till arbetsordern för tid, material, bilder och avslut
+- raw SQL använder parameterisering + befintliga soft-delete guards; schema mismatch ger endast noll i fältsummeringen, aldrig cross-tenant fallback
+
+### Viewer
+- read-only bestånd, objekt, vakans och budget/utfall
+- inga mutations-CTA:er i arbetsytan
+
+### Gemensam dashboard-router
+- Owner/Admin → portfolio
+- Manager → manager
+- Technician → technician
+- Viewer/unknown → viewer
+- Resident → befintlig boendeportal
+- schema readiness + e-postverifieringsbanner bevaras
+- om schema inte är redo körs inga nya rollqueries; en fail-closed kompatibilitetsvy visas tills Database Release är klar
 
 ## Verifierade findings
 
-- `/api/search` var redan autentiserad och tenant-scopad; leasingdirectory är rollstyrd och technician ticket-sökning assigned-scopad.
-- Prisma `WorkOrder` har `company_id`, `assigned_to_id`, `work_order_number`, `deleted_at` och relation till Property, så utökningen kräver ingen migration eller rå SQL.
+- Prisma `Unit` har inget `deleted_at`; nya rollvyer har korrigerats så de följer faktisk modell i stället för att anta soft-delete på Unit.
+- Prisma `WorkOrder` har `company_id`, `assigned_to_id`, `scheduled_start`, `completion_due_at`, `sla_resolution_due_at`, `completed_at` och `work_order_number`.
+- `WorkOrderExecutionEntry` och `OperationalDocument` är befintliga datakällor för teknikerns tid/material/bilder; ingen ny modell krävs.
 - DEMO-blockern är fortsatt extern env-verifiering, inte kodkvalitet.
 - Legacy route cleanup förblir separat REV-ROUTES-001.
 
@@ -104,15 +133,14 @@ Dashboard layout/shell är **inte** del av slutligt SEARCH-scope; en kortlivad b
 
 ## Leveransordning
 
-1. **REV-SEARCH-001 — ACTIVE**
-2. REV-DASH-ROLE-001 — Owner/Admin, Manager, Technician dashboards
-3. REV-PROPERTY-001 — fastigheten som central arbetsyta
-4. REV-ONBOARD-001 — first-run onboarding
-5. REV-ROUTES-001 — canonical route-plan + redirects/tests
-6. REV-E2E-001 — kritiska browser-E2E
-7. REV-VERCEL-001 — autentiserad Vercel-audit när connector scope fungerar
+1. **REV-DASH-ROLE-001 — ACTIVE**
+2. REV-PROPERTY-001 — fastigheten som central arbetsyta
+3. REV-ONBOARD-001 — first-run onboarding
+4. REV-ROUTES-001 — canonical route-plan + redirects/tests
+5. REV-E2E-001 — kritiska browser-E2E
+6. REV-VERCEL-001 — autentiserad Vercel-audit när connector scope fungerar
 
-REV-DEMO-001 återupptas så snart env-blockern är verifierbar; SEARCH får inte röra DEMO-filerna.
+REV-DEMO-001 återupptas så snart env-blockern är verifierbar; roll-dashboard får inte röra DEMO-filerna.
 
 ## Handoff / Definition of Done
 
