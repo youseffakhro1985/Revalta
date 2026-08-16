@@ -11,20 +11,27 @@ import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/search" });
 
+function searchResponse(body: unknown, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "private, no-store" },
+  });
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user) return searchResponse({ error: "Obehörig" }, 401);
 
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get("q") || "").trim();
-    if (query.length < 2) return NextResponse.json({ results: [] });
+    if (query.length < 2) return searchResponse({ results: [] });
 
     const contains = { contains: query, mode: "insensitive" as const };
     const includeDirectory = canViewLeasingData(user.role);
     const scopedToAssigned = shouldScopeToAssignedWork(user.role);
 
-    const [properties, tickets, users, leaseHolders] = await Promise.all([
+    const [properties, tickets, workOrders, users, leaseHolders] = await Promise.all([
       db.property.findMany({
         where: {
           deleted_at: null,
@@ -61,6 +68,30 @@ export async function GET(request: Request) {
         orderBy: { updated_at: "desc" },
         select: { id: true, title: true, status: true, public_reference: true, property: { select: { name: true } } },
       }),
+      user.company_id
+        ? db.workOrder.findMany({
+            where: {
+              company_id: user.company_id,
+              deleted_at: null,
+              property: { deleted_at: null },
+              ...(scopedToAssigned ? { assigned_to_id: user.id } : {}),
+              OR: [
+                { title: contains },
+                { description: contains },
+                { work_order_number: contains },
+              ],
+            },
+            take: 8,
+            orderBy: { updated_at: "desc" },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              work_order_number: true,
+              property: { select: { name: true } },
+            },
+          })
+        : Promise.resolve([]),
       includeDirectory
         ? db.user.findMany({
             where: {
@@ -113,6 +144,13 @@ export async function GET(request: Request) {
         subtitle: [item.public_reference, item.property?.name, item.status].filter(Boolean).join(" · "),
         href: `/dashboard/felanmalan/${item.id}`,
       })),
+      ...workOrders.map((item) => ({
+        id: item.id,
+        type: "work_order",
+        title: item.title,
+        subtitle: [item.work_order_number, item.property.name, item.status].filter(Boolean).join(" · "),
+        href: `/dashboard/arbetsorder/${item.id}`,
+      })),
       ...users.map((item) => ({
         id: item.id,
         type: "user",
@@ -131,9 +169,9 @@ export async function GET(request: Request) {
       })),
     ];
 
-    return NextResponse.json({ results });
+    return searchResponse({ results });
   } catch (error) {
     logger.error("Global search error", error);
-    return NextResponse.json({ error: "Sökningen kunde inte genomföras" }, { status: 500 });
+    return searchResponse({ error: "Sökningen kunde inte genomföras" }, 500);
   }
 }
