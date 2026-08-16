@@ -3,153 +3,66 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Activity,
-  BarChart3,
-  BellRing,
-  BriefcaseBusiness,
-  Building2,
-  CalendarCheck2,
-  CalendarDays,
-  CircleGauge,
-  ClipboardCheck,
-  ClipboardList,
-  ClipboardSignature,
-  CreditCard,
-  DoorOpen,
-  FileArchive,
-  FileClock,
-  FileText,
-  FolderKanban,
-  Gauge,
-  Hammer,
-  HandCoins,
-  KeyRound,
-  LayoutList,
-  LockKeyhole,
-  Menu,
-  MessageSquareText,
-  Plug,
-  ReceiptText,
-  Repeat2,
-  Settings,
-  ShieldAlert,
-  ShieldCheck,
-  UserRound,
-  Users,
-  UsersRound,
-  WalletCards,
-  Wrench,
-  X,
-} from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
+import {
+  activeDashboardSectionId,
+  isDashboardNavItemActive,
+  residentNavigation,
+  staffPrimaryNavigation,
+  staffSettingsNavigation,
+  visibleDashboardItems,
+  visibleDashboardSections,
+  type DashboardNavItem,
+} from "@/components/dashboard/dashboard-navigation";
 import { NotificationMenu } from "@/components/dashboard/notification-menu";
 import { WorkOrderLockIndicator } from "@/components/dashboard/work-order-lock-indicator";
-import {
-  canManageAccessCredentials,
-  canManageBilling,
-  canManageCompany,
-  canManageIntegrations,
-  canManageTeam,
-  canViewAudit,
-  canViewFinanceData,
-  canViewLeasingData,
-  canViewOperations,
-  isResident,
-} from "@/lib/permissions";
+import { isResident } from "@/lib/permissions";
 import { isStaffOnlyDashboardPath, residentHomePath } from "@/lib/resident-access";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: typeof CircleGauge;
-  visible?: (role: string) => boolean;
-};
+const settingsAreaPaths = [
+  "/dashboard/installningar",
+  "/dashboard/notiser",
+  "/dashboard/aviseringscenter",
+  "/dashboard/audit",
+  "/dashboard/drift",
+  "/dashboard/arbetsorder/redigeringslas",
+  "/dashboard/billing",
+] as const;
 
-type NavGroup = {
-  label: string;
-  items: NavItem[];
-};
+function isSettingsAreaActive(pathname: string) {
+  return settingsAreaPaths.some((href) => pathname === href || pathname.startsWith(`${href}/`));
+}
 
-const residentNavigation: NavGroup[] = [
-  {
-    label: "Min portal",
-    items: [
-      { href: "/dashboard/boendeportal", label: "Mina ärenden", icon: MessageSquareText },
-      { href: "/dashboard/boendeportal/dokument", label: "Mina dokument", icon: FileText },
-      { href: "/dashboard/boendeportal/avier", label: "Mina avier", icon: HandCoins },
-      { href: "/dashboard/boendeportal/bokningar", label: "Mina bokningar", icon: CalendarCheck2 },
-      { href: "/dashboard/boendeportal/konto", label: "Mitt konto", icon: UserRound },
-    ],
-  },
-];
+function NavigationLink({
+  item,
+  pathname,
+  onNavigate,
+  compact = false,
+  activeOverride,
+}: {
+  item: DashboardNavItem;
+  pathname: string;
+  onNavigate?: () => void;
+  compact?: boolean;
+  activeOverride?: boolean;
+}) {
+  const Icon = item.icon;
+  const active = activeOverride ?? isDashboardNavItemActive(pathname, item.href);
 
-const navigation: NavGroup[] = [
-  {
-    label: "Arbetsyta",
-    items: [
-      { href: "/dashboard", label: "Översikt", icon: CircleGauge },
-      { href: "/dashboard/fastigheter", label: "Fastigheter", icon: Building2 },
-      { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
-      { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
-      { href: "/dashboard/arbetsorder/planering", label: "Teknikerplanering", icon: UsersRound, visible: canViewOperations },
-      { href: "/dashboard/arbetsorder/operationsoversikt", label: "Arbetsorderöversikt", icon: LayoutList, visible: canViewOperations },
-      { href: "/dashboard/arbetsorder/aterkommande", label: "Återkommande", icon: Repeat2, visible: canViewOperations },
-      { href: "/dashboard/projekt", label: "Projekt", icon: FolderKanban, visible: canViewOperations },
-      { href: "/dashboard/skador", label: "Skador & försäkring", icon: ShieldAlert, visible: canViewFinanceData },
-      { href: "/dashboard/kalender", label: "Kalender", icon: CalendarDays },
-      { href: "/dashboard/bokningar", label: "Bokningar", icon: CalendarCheck2, visible: canViewLeasingData },
-      { href: "/dashboard/ronder", label: "Ronder", icon: ClipboardCheck },
-      { href: "/dashboard/besiktningar", label: "Besiktningar", icon: ClipboardSignature },
-      { href: "/dashboard/nycklar", label: "Nycklar & passage", icon: KeyRound, visible: canManageAccessCredentials },
-      { href: "/dashboard/uthyrning", label: "Uthyrning", icon: DoorOpen, visible: canViewLeasingData },
-      { href: "/dashboard/hyresavisering", label: "Hyresavisering", icon: HandCoins, visible: canViewLeasingData },
-      { href: "/dashboard/underhall", label: "Underhåll", icon: Hammer, visible: canViewOperations },
-      { href: "/dashboard/energi", label: "Energi", icon: Gauge, visible: canViewFinanceData },
-      { href: "/dashboard/imd", label: "Mätare & IMD", icon: Gauge, visible: canViewFinanceData },
-      { href: "/dashboard/dokument", label: "Dokument", icon: FileArchive, visible: (role) => canViewOperations(role) || canViewLeasingData(role) },
-      { href: "/dashboard/offerter", label: "Offerter", icon: ReceiptText, visible: canViewFinanceData },
-    ],
-  },
-  {
-    label: "Organisation",
-    items: [
-      { href: "/dashboard/boendeportal", label: "Boendeportal", icon: MessageSquareText, visible: canViewLeasingData },
-      { href: "/dashboard/aviseringscenter", label: "Aviseringscenter", icon: BellRing, visible: canViewOperations },
-      { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness, visible: canViewOperations },
-      { href: "/dashboard/team", label: "Team", icon: Users, visible: (role) => canManageTeam(role) || canViewLeasingData(role) },
-      { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck, visible: canManageCompany },
-      { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug, visible: canManageIntegrations },
-    ],
-  },
-  {
-    label: "Administration",
-    items: [
-      { href: "/dashboard/budget", label: "Budget & prognos", icon: WalletCards, visible: canViewFinanceData },
-      { href: "/dashboard/rapporter", label: "Rapporter", icon: BarChart3, visible: canViewOperations },
-      { href: "/dashboard/notiser", label: "Notiser", icon: BellRing, visible: canViewOperations },
-      { href: "/dashboard/audit", label: "Händelselogg", icon: FileClock, visible: canViewAudit },
-      { href: "/dashboard/drift", label: "Driftstatus", icon: Activity, visible: canViewOperations },
-      { href: "/dashboard/arbetsorder/redigeringslas", label: "Redigeringslås", icon: LockKeyhole, visible: canViewOperations },
-      { href: "/dashboard/billing", label: "Abonnemang", icon: CreditCard, visible: canManageBilling },
-      { href: "/dashboard/installningar", label: "Inställningar", icon: Settings },
-    ],
-  },
-];
-
-function isActive(pathname: string, href: string) {
-  if (href === "/dashboard") return pathname === href;
-  if (href === "/dashboard/arbetsorder") {
-    return pathname === href || (
-      pathname.startsWith(`${href}/`)
-      && !pathname.startsWith("/dashboard/arbetsorder/planering")
-      && !pathname.startsWith("/dashboard/arbetsorder/operationsoversikt")
-      && !pathname.startsWith("/dashboard/arbetsorder/aterkommande")
-      && !pathname.startsWith("/dashboard/arbetsorder/redigeringslas")
-    );
-  }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={`flex items-center gap-3 rounded-lg border font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-1 focus-visible:ring-offset-[#F1F1EC] ${compact ? "min-h-10 px-3 text-[12px]" : "min-h-11 px-3 text-[13px]"} ${active ? "border-sand-200/90 bg-white text-petroleum-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(17,34,31,0.04)]" : "border-transparent text-ink-500 hover:border-sand-200/60 hover:bg-white/65 hover:text-ink-900"}`}
+    >
+      <Icon className={compact ? "h-4 w-4" : "h-[17px] w-[17px]"} strokeWidth={1.65} aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {active ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-petroleum-600" aria-hidden="true" /> : null}
+    </Link>
+  );
 }
 
 function NavigationContent({
@@ -161,30 +74,85 @@ function NavigationContent({
   role: string;
   onNavigate?: () => void;
 }) {
-  const groups = useMemo(() => {
-    const source = isResident(role) ? residentNavigation : navigation;
-    return source
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => !item.visible || item.visible(role)),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [role]);
+  const resident = isResident(role);
+  const residentItems = useMemo(() => visibleDashboardItems(residentNavigation, role), [role]);
+  const primaryItems = useMemo(() => visibleDashboardItems(staffPrimaryNavigation, role), [role]);
+  const sections = useMemo(() => visibleDashboardSections(role), [role]);
+  const detectedSectionId = useMemo(() => {
+    if (pathname.startsWith("/dashboard/arbetsorder/operationsoversikt") || pathname.startsWith("/dashboard/kalender")) {
+      return "drift";
+    }
+    return activeDashboardSectionId(pathname, sections);
+  }, [pathname, sections]);
+  const [expandedSectionId, setExpandedSectionId] = useState<string | null>(detectedSectionId);
 
-  return <>
-    {groups.map((group, groupIndex) => (
-      <div key={group.label} className={groupIndex > 0 ? "mt-7" : ""}>
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">{group.label}</p>
+  useEffect(() => {
+    setExpandedSectionId(detectedSectionId);
+  }, [detectedSectionId, pathname]);
+
+  if (resident) {
+    return (
+      <div>
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">Min portal</p>
         <div className="space-y-1">
-          {group.items.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(pathname, item.href);
-            return <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-[13px] font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-1 focus-visible:ring-offset-[#F1F1EC] ${active ? "border border-sand-200/90 bg-white text-petroleum-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(17,34,31,0.04)]" : "border border-transparent text-ink-500 hover:border-sand-200/60 hover:bg-white/65 hover:text-ink-900"}`}><Icon className="h-[17px] w-[17px]" strokeWidth={1.65} aria-hidden="true" />{item.label}{active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-petroleum-600" aria-hidden="true" /> : null}</Link>;
-          })}
+          {residentItems.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />)}
         </div>
       </div>
-    ))}
-  </>;
+    );
+  }
+
+  return (
+    <>
+      <div>
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">Arbetsyta</p>
+        <div className="space-y-1">
+          {primaryItems.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />)}
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-1" aria-label="Modulområden">
+        {sections.map((section) => {
+          const Icon = section.icon;
+          const expanded = expandedSectionId === section.id;
+          const sectionActive = detectedSectionId === section.id;
+          const regionId = `dashboard-nav-${section.id}`;
+
+          return (
+            <div key={section.id}>
+              <button
+                type="button"
+                onClick={() => setExpandedSectionId((current) => current === section.id ? null : section.id)}
+                aria-expanded={expanded}
+                aria-controls={regionId}
+                className={`flex min-h-11 w-full items-center gap-3 rounded-lg border px-3 text-left text-[13px] font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-1 focus-visible:ring-offset-[#F1F1EC] ${sectionActive ? "border-sand-200/90 bg-white text-petroleum-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(17,34,31,0.04)]" : "border-transparent text-ink-500 hover:border-sand-200/60 hover:bg-white/65 hover:text-ink-900"}`}
+              >
+                <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.65} aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{section.label}</span>
+                {sectionActive ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-petroleum-600" aria-hidden="true" /> : null}
+                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} strokeWidth={1.65} aria-hidden="true" />
+              </button>
+
+              {expanded ? (
+                <div id={regionId} className="ml-[18px] mt-1 space-y-0.5 border-l border-sand-200/90 pl-2">
+                  {section.items.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} compact />)}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 border-t border-sand-200/80 pt-4">
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">Administration</p>
+        <NavigationLink
+          item={staffSettingsNavigation}
+          pathname={pathname}
+          onNavigate={onNavigate}
+          activeOverride={isSettingsAreaActive(pathname)}
+        />
+      </div>
+    </>
+  );
 }
 
 function initials(name: string | null | undefined, email: string) {
