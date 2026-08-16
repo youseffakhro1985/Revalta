@@ -14,10 +14,11 @@ const roles = [
 ];
 
 const permissions = [
-  ["Översikt och rapporter", true, true, true, true, true, false],
-  ["Fastigheter och objekt", true, true, true, false, true, false],
+  ["Översikt", true, true, true, true, true, false],
+  ["Rapporter", true, true, true, false, false, false],
+  ["Fastigheter och objekt", true, true, true, true, true, false],
   ["Ärenden och arbetsordrar", true, true, true, true, true, false],
-  ["Boendeportal (självservice)", true, true, true, false, false, true],
+  ["Boendeportal (självservice)", true, true, true, false, true, true],
   ["Team och roller", true, true, false, false, false, false],
   ["Händelselogg", true, true, false, false, false, false],
   ["Integrationer", true, true, false, false, false, false],
