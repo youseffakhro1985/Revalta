@@ -28,9 +28,11 @@ export default function TeamPage() {
   const [inviteUrl, setInviteUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [updatingMemberId, setUpdatingMemberId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const router = useRouter();
+  const manageableRoles = ["admin", "manager", "technician", "viewer", "resident"];
 
   const loadTeam = useCallback(async () => {
     setLoading(true);
@@ -56,6 +58,18 @@ export default function TeamPage() {
       setInvites((current) => [data.invite, ...current]); setInviteUrl(data.inviteUrl || ""); setName(""); setEmail(""); setRole("technician"); setSuccess("Inbjudan är skapad och redo att skickas.");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte kontakta servern"); }
     finally { setSubmitting(false); }
+  }
+
+  async function handleMemberUpdate(member: TeamMember, patch: { role?: string; status?: string }) {
+    setError(""); setSuccess(""); setUpdatingMemberId(member.id);
+    try {
+      const response = await fetch(`/api/team/${member.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte uppdatera teammedlemmen");
+      setMembers((current) => current.map((existing) => (existing.id === member.id ? data.member : existing)));
+      setSuccess(patch.status ? (patch.status === "active" ? "Medlemmen är återaktiverad." : "Medlemmen är inaktiverad.") : "Rollen är uppdaterad.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte kontakta servern"); }
+    finally { setUpdatingMemberId(""); }
   }
 
   const assigned = useMemo(() => members.reduce((sum, member) => sum + Number(member._count.assigned_tickets || 0), 0), [members]);
@@ -88,7 +102,7 @@ export default function TeamPage() {
       </Panel>
 
       <Panel title="Team" description="Roller, status och aktuell arbetsbelastning." bodyClassName="p-0">
-        {loading ? <div className="space-y-3 p-6">{[1,2,3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-sand-100" />)}</div> : members.length === 0 ? <EmptyState title="Inga teammedlemmar" description="Bjud in den första kollegan för att bygga organisationen." /> : <div className="divide-y divide-sand-100">{members.map((member) => <article key={member.id} className="p-6 transition hover:bg-sand-50/70"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-900">{member.name || member.email}</h3><p className="mt-1 text-sm text-ink-500">{member.email}</p></div><div className="flex flex-wrap gap-2"><span className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-800">{roleLabels[member.role] || member.role}</span><span className="rounded-full bg-sand-100 px-3 py-1 text-xs font-semibold text-ink-600">{member._count.assigned_tickets} tilldelade</span></div></div></article>)}</div>}
+        {loading ? <div className="space-y-3 p-6">{[1,2,3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-sand-100" />)}</div> : members.length === 0 ? <EmptyState title="Inga teammedlemmar" description="Bjud in den första kollegan för att bygga organisationen." /> : <div className="divide-y divide-sand-100">{members.map((member) => <article key={member.id} className="p-6 transition hover:bg-sand-50/70"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-900">{member.name || member.email}</h3><p className="mt-1 text-sm text-ink-500">{member.email}</p></div><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${member.status === "active" ? "bg-petroleum-50 text-petroleum-800" : "bg-sand-100 text-ink-500"}`}>{roleLabels[member.role] || member.role}</span><span className="rounded-full bg-sand-100 px-3 py-1 text-xs font-semibold text-ink-600">{member._count.assigned_tickets} tilldelade</span>{member.status !== "active" ? <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Inaktiv</span> : null}</div></div>{canManage ? <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-sand-100 pt-4"><select aria-label={`Roll för ${member.name || member.email}`} value={member.role === "owner" ? "owner" : member.role} disabled={updatingMemberId === member.id || member.role === "owner"} onChange={(event) => void handleMemberUpdate(member, { role: event.target.value })} className="h-9 rounded-lg border border-sand-200 bg-white px-2 text-xs text-ink-700 outline-none focus:border-petroleum-500 disabled:cursor-not-allowed disabled:opacity-50">{member.role === "owner" ? <option value="owner">Ägare</option> : null}{manageableRoles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleLabels[roleOption]}</option>)}</select><button type="button" disabled={updatingMemberId === member.id} onClick={() => void handleMemberUpdate(member, { status: member.status === "active" ? "inactive" : "active" })} className="inline-flex h-9 items-center rounded-lg border border-sand-200 px-3 text-xs font-semibold text-ink-700 hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">{updatingMemberId === member.id ? "Uppdaterar…" : member.status === "active" ? "Inaktivera" : "Återaktivera"}</button></div> : null}</article>)}</div>}
       </Panel>
     </section>
 
