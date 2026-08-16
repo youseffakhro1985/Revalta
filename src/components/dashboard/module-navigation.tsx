@@ -9,10 +9,14 @@ import {
   CreditCard,
   FileClock,
   Inbox,
+  LayoutList,
   LockKeyhole,
+  Repeat2,
   Siren,
   SlidersHorizontal,
   UserRoundCog,
+  UsersRound,
+  Wrench,
 } from "lucide-react";
 
 const icons = {
@@ -22,10 +26,14 @@ const icons = {
   billing: CreditCard,
   audit: FileClock,
   inbox: Inbox,
+  layout: LayoutList,
   lock: LockKeyhole,
+  repeat: Repeat2,
   siren: Siren,
   sliders: SlidersHorizontal,
   userSettings: UserRoundCog,
+  users: UsersRound,
+  wrench: Wrench,
 } as const;
 
 export type ModuleNavigationIcon = keyof typeof icons;
