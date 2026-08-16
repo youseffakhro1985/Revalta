@@ -19,10 +19,10 @@ export async function ViewerDashboard({ user }: { user: CurrentUser }) {
         name: true,
         address: true,
         city: true,
-        _count: { select: { units: { where: { deleted_at: null } } } },
+        _count: { select: { units: true } },
       },
     }),
-    db.unit.count({ where: { deleted_at: null, property: propertyScope } }),
+    db.unit.count({ where: { property: propertyScope } }),
     user.company_id
       ? db.lease.findMany({
           where: {
@@ -30,7 +30,6 @@ export async function ViewerDashboard({ user }: { user: CurrentUser }) {
             deleted_at: null,
             status: { in: ["reserved", "active", "notice"] },
             property: { deleted_at: null },
-            unit: { deleted_at: null },
           },
           distinct: ["unit_id"],
           select: { unit_id: true },
