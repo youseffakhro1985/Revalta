@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
@@ -51,7 +52,25 @@ export async function POST(
       return NextResponse.json({ error: "Kontrollen har redan en arbetsorder", workOrderId: inspection.work_order_id }, { status: 409 });
     }
 
+    // Two concurrent requests (double-click, client retry) can both pass the
+    // work_order_id check above before either transaction commits. Guard with
+    // an advisory lock scoped to this inspection, then re-check work_order_id
+    // *inside* the lock — same pattern as tryCreateRecurringIncidentEscalation
+    // in src/lib/recurring-incident-storage.ts.
     const created = await db.$transaction(async (tx) => {
+      const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
+        SELECT pg_try_advisory_xact_lock(hashtext(${`inspection-work-order:${inspection.id}`})) AS locked
+      `);
+      if (!lock[0]?.locked) return { conflict: "locked" as const, workOrderId: null, workOrderNumber: null };
+
+      const fresh = await tx.complianceInspection.findFirst({
+        where: { id: inspection.id, company_id: user.company_id! },
+        select: { work_order_id: true },
+      });
+      if (!fresh || fresh.work_order_id) {
+        return { conflict: "already_linked" as const, workOrderId: fresh?.work_order_id ?? null, workOrderNumber: null };
+      }
+
       const createdAt = new Date();
       const priority = normalizeWorkOrderPriority("high");
       const sla = calculateWorkOrderSla(createdAt, priority);
@@ -97,12 +116,25 @@ export async function POST(
         reason: "Skapad från besiktningskontroll",
         metadata: { inspectionId: inspection.id, type: inspection.type },
       });
-      await tx.complianceInspection.updateMany({
+      const linked = await tx.complianceInspection.updateMany({
         where: { id: inspection.id, company_id: user.company_id!, work_order_id: null },
         data: { work_order_id: workOrder.id },
       });
-      return { workOrderId: workOrder.id, workOrderNumber };
+      if (linked.count === 0) {
+        // Lost the race after all (should be unreachable given the lock, but
+        // never report success for a work order that didn't actually get
+        // linked back to the inspection).
+        throw new Error("Kunde inte länka arbetsordern till kontrollen");
+      }
+      return { conflict: null, workOrderId: workOrder.id, workOrderNumber };
     });
+
+    if (created.conflict === "locked") {
+      return NextResponse.json({ error: "Arbetsorder skapas redan för den här kontrollen, försök igen om en stund" }, { status: 409 });
+    }
+    if (created.conflict === "already_linked") {
+      return NextResponse.json({ error: "Kontrollen har redan en arbetsorder", workOrderId: created.workOrderId }, { status: 409 });
+    }
 
     await writeAuditLog(user, {
       entityType: "compliance_inspection",
@@ -115,7 +147,7 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ success: true, ...created }, { status: 201 });
+    return NextResponse.json({ success: true, workOrderId: created.workOrderId, workOrderNumber: created.workOrderNumber }, { status: 201 });
   } catch (error) {
     logger.error("Create inspection work order error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });

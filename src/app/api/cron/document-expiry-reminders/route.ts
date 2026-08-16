@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { isCronRequestAuthorized } from "@/lib/request-security";
@@ -45,17 +46,6 @@ export async function GET(request: Request) {
       if (!validUntil) { skipped += 1; continue; }
       const days = daysUntil(validUntil);
       const dedupeKey = `document-expiry:${document.id}:${validUntil.toISOString().slice(0, 10)}`;
-      const existing = await db.appNotification.findFirst({
-        where: {
-          company_id: document.company_id,
-          deleted_at: null,
-          title: { startsWith: "Dokument går ut" },
-          message: { contains: document.id },
-          created_at: { gte: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) },
-        },
-        select: { id: true },
-      });
-      if (existing) { skipped += 1; continue; }
 
       const urgency = days <= 0 ? "hög" : days <= 7 ? "hög" : "normal";
       const title = days <= 0
@@ -67,7 +57,30 @@ export async function GET(request: Request) {
         `Öppna dokumentarkivet och förnya eller arkivera. Ref: ${document.id}`,
       ].join(" ");
 
-      await db.$transaction(async (tx) => {
+      // Overlapping/retried cron invocations must not send duplicate
+      // reminders for the same document. Guard the dedupe check + create
+      // with an advisory lock keyed on dedupeKey, checked *inside* the
+      // transaction — same pattern as tryCreateRecurringIncidentEscalation
+      // in src/lib/recurring-incident-storage.ts (this route previously did
+      // the dedupe findFirst outside any lock/transaction).
+      const outcome = await db.$transaction(async (tx) => {
+        const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
+          SELECT pg_try_advisory_xact_lock(hashtext(${dedupeKey})) AS locked
+        `);
+        if (!lock[0]?.locked) return "locked" as const;
+
+        const existing = await tx.appNotification.findFirst({
+          where: {
+            company_id: document.company_id,
+            deleted_at: null,
+            title: { startsWith: "Dokument går ut" },
+            message: { contains: document.id },
+            created_at: { gte: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) },
+          },
+          select: { id: true },
+        });
+        if (existing) return "already_notified" as const;
+
         await tx.appNotification.create({
           data: {
             company_id: document.company_id,
@@ -93,8 +106,14 @@ export async function GET(request: Request) {
             },
           },
         });
+        return "created" as const;
       });
-      created += 1;
+
+      if (outcome === "created") {
+        created += 1;
+      } else {
+        skipped += 1;
+      }
     }
 
     return NextResponse.json({
