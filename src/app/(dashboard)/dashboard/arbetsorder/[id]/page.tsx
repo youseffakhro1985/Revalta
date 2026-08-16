@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Banknote, Building2, CalendarClock, CheckCircle2, Clock3, FolderKanban, History, LockKeyhole, MapPin, PauseCircle, RefreshCw, ShieldAlert, UserRound, Wrench } from "lucide-react";
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { WORK_ORDER_STATUS_LABELS } from "@/lib/domain-labels";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 import { OperationalActivityPanel } from "@/components/dashboard/operational-activity-panel";
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
@@ -47,7 +48,7 @@ type TransitionData = {
 type BuildingOption = { id: string; name: string; address: string | null };
 type AssetOption = { id: string; name: string; category: string; component_class: string | null; location: string | null; status: string; criticality: string; building_id: string | null; building_name: string | null };
 
-const statusLabels: Record<string, string> = { new: "Ny", planned: "Planerad", in_progress: "Pågående", waiting_material: "Väntar material", blocked: "Blockerad", completed: "Slutförd", invoiced: "Fakturerad", cancelled: "Avbruten" };
+const statusLabels = WORK_ORDER_STATUS_LABELS;
 const priorityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
 const typeLabels: Record<string, string> = { corrective: "Avhjälpande", preventive: "Förebyggande", inspection: "Besiktning", emergency: "Akut", project: "Projekt", warranty: "Garanti" };
 const sourceLabels: Record<string, string> = { internal: "Internt", ticket: "Ärende", maintenance_plan: "Underhållsplan", inspection: "Besiktning", component: "Komponent", resident: "Boende", supplier: "Leverantör" };
@@ -217,7 +218,7 @@ export default function WorkOrderDetailPage() {
       <MetricCard icon={Banknote} label="Kostnadsutfall" value={money.format(actual)} hint={`Beräknat ${money.format(estimated)}`} />
     </section>
 
-    <Panel title="Work Orders 2.0" description="Operativ identifiering, SLA och oföränderligt revisionsspår för arbetsordern.">
+    <Panel title="Identifiering och spårning" description="Operativ identifiering, SLA och oföränderligt revisionsspår för arbetsordern.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Arbetsordernummer</p><p className="mt-2 font-semibold text-ink-950">{enterprise?.work_order_number || "Äldre arbetsorder"}</p></div>
         <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Arbetstyp</p><p className="mt-2 font-semibold text-ink-950">{typeLabels[enterprise?.work_type || ""] || enterprise?.work_type || "Ej angiven"}</p></div>
@@ -294,7 +295,7 @@ export default function WorkOrderDetailPage() {
     <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>
-        <p className="mt-1 text-sm text-ink-500">Kanonisk väg för attesterad tid, material, lönsamhet och exportbart fakturaunderlag (Fortnox/Visma). Fältregistreringen ovan är driftunderlag, inte fakturarader.</p>
+        <p className="mt-1 text-sm text-ink-500">Här samlas attesterad tid, material, lönsamhet och exportbart fakturaunderlag (Fortnox/Visma). Fältregistreringen ovan är driftunderlag, inte fakturarader.</p>
       </div>
       <WorkOrderEconomicsPanel workOrderId={workOrder.id} />
     </section>

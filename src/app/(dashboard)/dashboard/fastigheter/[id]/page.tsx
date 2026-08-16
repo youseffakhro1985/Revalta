@@ -22,6 +22,11 @@ function unitTypeLabel(type: string) {
   return labels[type] || type;
 }
 
+function propertyTypeLabel(type: string) {
+  const labels: Record<string, string> = { residential: "Bostäder", commercial: "Kommersiell", mixed: "Blandfastighet", community: "Samhällsfastighet", industrial: "Industri", other: "Övrig" };
+  return labels[type] || type;
+}
+
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -93,7 +98,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           <h2 className="text-xl font-semibold text-ink-950">Förvaltningsöversikt</h2><p className="mt-1 text-sm text-ink-500">Samlad basinformation för beståndet.</p>
           <dl className="mt-6 grid grid-cols-1 gap-x-6 gap-y-5 text-sm sm:grid-cols-2">
             {[
-              ["Fastighetstyp", property.property_type], ["Byggår", property.construction_year?.toString() || "Ej angivet"], ["Total area", property.total_area ? `${property.total_area} m²` : "Ej angivet"], ["BOA / LOA", `${property.boa ? `${property.boa} m²` : "–"} / ${property.loa ? `${property.loa} m²` : "–"}`], ["Ansvarig förvaltare", property.manager_name || "Ej angivet"], ["Kontaktperson", property.contact_name || "Ej angivet"], ["E-post", property.contact_email || "Ej angivet"], ["Registrerad", formatDate(property.created_at)],
+              ["Fastighetstyp", propertyTypeLabel(property.property_type)], ["Byggår", property.construction_year?.toString() || "Ej angivet"], ["Total area", property.total_area ? `${property.total_area} m²` : "Ej angivet"], ["BOA / LOA", `${property.boa ? `${property.boa} m²` : "–"} / ${property.loa ? `${property.loa} m²` : "–"}`], ["Ansvarig förvaltare", property.manager_name || "Ej angivet"], ["Kontaktperson", property.contact_name || "Ej angivet"], ["E-post", property.contact_email || "Ej angivet"], ["Registrerad", formatDate(property.created_at)],
             ].map(([label, value]) => <div key={label} className="border-b border-sand-100 pb-4"><dt className="text-ink-500">{label}</dt><dd className="mt-1 font-semibold text-ink-900">{value}</dd></div>)}
           </dl>
         </section>

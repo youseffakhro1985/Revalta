@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, BadgeCheck, ClipboardList, Clock3, FolderKanban, Gauge, Search, UserRound } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
+import { WORK_ORDER_STATUS_LABELS } from "@/lib/domain-labels";
 import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
 import { WorkOrderQuickActions, type QuickActionUser } from "@/components/dashboard/work-order-quick-actions";
 import { readResponseJson } from "@/lib/fetch-json";
@@ -64,7 +65,7 @@ const columns: readonly BoardColumn[] = [
 const priorityLabels: Record<string, string> = { low: "Låg", normal: "Normal", high: "Hög", urgent: "Akut" };
 const typeLabels: Record<string, string> = { corrective: "Avhjälpande", preventive: "Förebyggande", inspection: "Besiktning", emergency: "Akut", project: "Projekt", warranty: "Garanti" };
 const sourceLabels: Record<string, string> = { internal: "Internt", ticket: "Ärende", maintenance_plan: "Underhållsplan", inspection: "Besiktning", component: "Komponent", resident: "Boende", supplier: "Leverantör" };
-const statusLabels: Record<string, string> = { new: "Ny", planned: "Planerad", in_progress: "Pågående", waiting_material: "Väntar material", blocked: "Blockerad", completed: "Slutförd", invoiced: "Fakturerad", cancelled: "Avbruten" };
+const statusLabels = WORK_ORDER_STATUS_LABELS;
 const phaseLabels: Record<SlaPhase, string> = { response: "Svarstid", resolution: "Lösningstid", fulfilled: "Hanterad", paused: "Pausad", not_configured: "Saknas" };
 
 const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
@@ -195,7 +196,7 @@ export default function WorkOrdersPage() {
       description={scopedToAssigned
         ? "Dina tilldelade arbetsordrar med serverberäknad SLA-risk. Ändra status direkt i tavlan."
         : "Prioritera efter serverberäknad svarstid, lösningstid, ansvar och verklig SLA-risk. Tilldela och flytta status direkt i tavlan."}
-      action={canManage ? <div className="flex flex-wrap gap-2"><Link href="/dashboard/arbetsorder/ny" className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200">Ny arbetsorder</Link><Link href="/dashboard/felanmalan" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-5 text-sm font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800">Skapa från ärende</Link></div> : undefined}
+      action={canManage ? <div className="flex flex-wrap gap-2"><Link href="/dashboard/arbetsorder/ny" className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200">Ny arbetsorder</Link><Link href="/dashboard/felanmalan" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-5 text-sm font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800">Öppna ärendelistan</Link></div> : undefined}
     />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     <SoftDeleteUndoBanner

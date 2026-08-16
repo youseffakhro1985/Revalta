@@ -114,7 +114,7 @@ export default function ResidentNoticesPage() {
                   {notice.note ? <p className="mt-1 text-sm text-ink-500">{notice.note}</p> : null}
                 </div>
                 <div className="text-sm text-ink-600">
-                  <p>Baskälla: {money.format(notice.baseRent)}</p>
+                  <p>Grundhyra: {money.format(notice.baseRent)}</p>
                   <p className="mt-1">Tillägg/avdrag: {money.format(notice.additions - notice.deductions)}</p>
                 </div>
                 <div className="flex flex-col items-start gap-2 sm:items-end">

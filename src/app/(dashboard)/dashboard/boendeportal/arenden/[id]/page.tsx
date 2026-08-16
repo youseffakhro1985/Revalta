@@ -40,10 +40,10 @@ type Ticket = {
 
 const categoryLabels: Record<string, string> = {
   maintenance: "Underhåll",
-  plumbing: "VVS",
+  plumbing: "Vatten och avlopp",
   electrical: "El",
-  heating: "Värme",
-  access: "Passage",
+  heating: "Värme och ventilation",
+  access: "Nyckel och passage",
   noise: "Störning",
   other: "Övrigt",
 };

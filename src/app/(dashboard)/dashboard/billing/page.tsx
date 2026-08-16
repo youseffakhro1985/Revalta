@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { readResponseJson } from "@/lib/fetch-json";
+import { premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Plan = {
   label: string;
@@ -24,6 +25,17 @@ type BillingData = {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   subscriptionStatus: string | null;
+};
+
+const subscriptionStatusLabels: Record<string, string> = {
+  active: "Aktivt",
+  trialing: "Testperiod",
+  past_due: "Betalning försenad",
+  unpaid: "Obetalt",
+  canceled: "Uppsagt",
+  incomplete: "Ofullständigt",
+  incomplete_expired: "Utgånget",
+  paused: "Pausat",
 };
 
 export default function BillingPage() {
@@ -48,7 +60,7 @@ export default function BillingPage() {
         const data = await readResponseJson(response);
         if (!isMounted) return;
         if (!response.ok) {
-          setError(data.error || "Kunde inte hämta billing");
+          setError(data.error || "Kunde inte hämta abonnemangsuppgifter");
           return;
         }
         setBilling(data);
@@ -186,13 +198,13 @@ export default function BillingPage() {
                 {billing.stripeConfigured ? "Live redo" : "Mockläge"}
               </p>
               {billing.subscriptionStatus && (
-                <p className="mt-2 text-xs font-medium text-ink-500">Status: {billing.subscriptionStatus}</p>
+                <p className="mt-2 text-xs font-medium text-ink-500">Status: {subscriptionStatusLabels[billing.subscriptionStatus] || billing.subscriptionStatus}</p>
               )}
               <button
                 type="button"
                 onClick={openCustomerPortal}
                 disabled={openingPortal || !billing.canManage}
-                className="mt-4 rounded-lg border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-60"
+                className={`mt-4 ${premiumSecondaryButtonClass}`}
               >
                 {openingPortal ? "Öppnar..." : "Kundportal"}
               </button>
@@ -215,7 +227,7 @@ export default function BillingPage() {
                   type="button"
                   disabled={!billing.canManage || savingPlan === key || billing.currentPlan === key}
                   onClick={() => changePlan(key)}
-                  className="mt-7 w-full rounded-lg bg-petroleum-700 px-5 py-3 font-semibold text-white transition-colors hover:bg-petroleum-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`mt-7 w-full ${premiumPrimaryButtonClass}`}
                 >
                   {billing.currentPlan === key ? "Aktiv plan" : savingPlan === key ? "Uppdaterar..." : "Byt plan"}
                 </button>
@@ -224,7 +236,7 @@ export default function BillingPage() {
                     type="button"
                     disabled={!billing.canManage || checkoutPlan === key}
                     onClick={() => startCheckout(key)}
-                    className="mt-3 w-full rounded-lg border border-sand-200 bg-white px-5 py-3 font-semibold text-ink-800 transition-colors hover:bg-sand-50 disabled:opacity-60"
+                    className={`mt-3 w-full ${premiumSecondaryButtonClass}`}
                   >
                     {checkoutPlan === key ? "Startar..." : "Starta Stripe Checkout"}
                   </button>
