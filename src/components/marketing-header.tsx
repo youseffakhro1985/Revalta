@@ -8,6 +8,7 @@ const navigation = [
   { href: "/#plattform", label: "Plattform" },
   { href: "/#funktioner", label: "Funktioner" },
   { href: "/portal", label: "Boendeportal" },
+  { href: "/demo", label: "Boka demo" },
 ];
 
 export function MarketingHeader() {
