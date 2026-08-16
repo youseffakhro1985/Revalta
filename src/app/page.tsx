@@ -93,26 +93,25 @@ export default function Home() {
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href="/register"
+                  href="/demo"
                   className="inline-flex h-12 items-center justify-center gap-2.5 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
                 >
-                  Skapa konto
+                  Boka demo
                   <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
                 </Link>
                 <Link
-                  href="#plattform"
+                  href="/register"
                   className="inline-flex h-12 items-center justify-center rounded-lg border border-sand-300 bg-white px-5 text-[14px] font-semibold text-ink-700 shadow-[0_1px_2px_rgba(17,34,31,0.03)] transition-[background-color,border-color,color,box-shadow] duration-200 ease-in-out hover:border-sand-400 hover:bg-sand-50/60 hover:text-petroleum-800 hover:shadow-premium-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/20 focus-visible:ring-offset-2"
                 >
-                  Se plattformen
+                  Skapa konto
                 </Link>
               </div>
+              <Link href="#plattform" className="mt-4 inline-flex text-[12px] font-semibold text-ink-500 underline-offset-4 transition hover:text-petroleum-700 hover:underline">
+                Se plattformen
+              </Link>
 
               <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-sand-200/90 pt-5">
-                {[
-                  "Fastighetsägare",
-                  "BRF",
-                  "Förvaltare",
-                ].map((audience) => (
+                {["Fastighetsägare", "BRF", "Förvaltare"].map((audience) => (
                   <span key={audience} className="flex items-center gap-2 text-[12px] font-medium text-ink-500">
                     <span className="h-1.5 w-1.5 rounded-full bg-petroleum-500" />
                     {audience}
@@ -198,10 +197,10 @@ export default function Home() {
               </h2>
             </div>
             <Link
-              href="/register"
+              href="/demo"
               className="inline-flex h-12 w-fit items-center gap-2.5 rounded-lg border border-petroleum-800/15 bg-petroleum-700 px-5 text-[14px] font-semibold text-white shadow-premium-sm transition-[background-color,box-shadow] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-600/30 focus-visible:ring-offset-2"
             >
-              Skapa konto
+              Boka demo
               <ArrowRight aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
             </Link>
           </div>
