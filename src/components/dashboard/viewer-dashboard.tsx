@@ -9,7 +9,8 @@ const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK
 export async function ViewerDashboard({ user }: { user: CurrentUser }) {
   const year = new Date().getFullYear();
   const propertyScope = { deleted_at: null, ...tenantWhere(user) };
-  const [properties, unitCount, leasedUnits, budget] = await Promise.all([
+  const [propertyCount, properties, unitCount, leasedUnits, budget] = await Promise.all([
+    db.property.count({ where: propertyScope }),
     db.property.findMany({
       where: propertyScope,
       orderBy: { name: "asc" },
@@ -56,7 +57,7 @@ export async function ViewerDashboard({ user }: { user: CurrentUser }) {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Building2} label="Fastigheter" value={properties.length} />
+        <MetricCard icon={Building2} label="Fastigheter" value={propertyCount} />
         <MetricCard icon={DoorOpen} label="Objekt" value={unitCount} hint={`${vacant} utan aktivt eller pågående hyresavtal`} />
         <MetricCard icon={CircleDollarSign} label={`Budget ${year}`} value={money.format(budgetTotal)} hint={`Utfall ${money.format(actualTotal)}`} />
         <MetricCard icon={FileText} label="Åtkomst" value="Läs" hint="Inga mutationer från denna arbetsyta" />
