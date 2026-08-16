@@ -1,26 +1,23 @@
-import bcrypt from "bcryptjs";
-import { describe, expect, it } from "vitest";
-import { comparePassword, hashPassword } from "@/lib/auth";
+import bcrypt from 'bcryptjs';
+import { createHash, randomBytes } from "crypto";
+export { signToken, verifyToken } from './session';
 
-describe("password hashing", () => {
-  it("hashes with a cost factor of 12", async () => {
-    const hash = await hashPassword("StarktLosen123");
-    // bcrypt hash format: $<algorithm>$<cost>$<salt+digest>
-    expect(hash).toMatch(/^\$2[aby]\$12\$/);
-  });
+// 12 rounds balances resistance to offline cracking against bcryptjs's (pure-JS,
+// slower than native bcrypt) per-hash latency on serverless CPUs.
+const BCRYPT_COST_FACTOR = 12;
 
-  it("round-trips through comparePassword", async () => {
-    const hash = await hashPassword("StarktLosen123");
-    await expect(comparePassword("StarktLosen123", hash)).resolves.toBe(true);
-    await expect(comparePassword("FelLosenord", hash)).resolves.toBe(false);
-  });
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_COST_FACTOR);
+}
 
-  it("still verifies hashes generated at the older cost factor of 10", async () => {
-    // Locks in bcrypt's backward compatibility: existing user rows hashed
-    // before the cost factor was raised from 10 to 12 must keep working —
-    // the cost is embedded in the hash itself, not read from BCRYPT_COST_FACTOR.
-    const legacyHash = await bcrypt.hash("ÄldreLosenord123", 10);
-    expect(legacyHash).toMatch(/^\$2[aby]\$10\$/);
-    await expect(comparePassword("ÄldreLosenord123", legacyHash)).resolves.toBe(true);
-  });
-});
+export async function comparePassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
+
+export function createResetToken() {
+  return randomBytes(32).toString("hex");
+}
+
+export function hashResetToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
