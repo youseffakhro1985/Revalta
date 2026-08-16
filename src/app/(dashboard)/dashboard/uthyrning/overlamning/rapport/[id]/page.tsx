@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { PrintHandoverReportButton } from "@/components/leasing/print-handover-report-button";
-import { getCurrentUser } from "@/lib/current-user";
+import { canViewLeasingData, getCurrentUser } from "@/lib/current-user";
 import { getLeaseHandoverReport } from "@/lib/lease-handover-report";
 import { handoverChecklistKeys } from "@/lib/lease-handover";
 
@@ -21,6 +21,7 @@ export default async function HandoverReportPage({ params }: { params: Promise<{
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!user.company_id) notFound();
+  if (!canViewLeasingData(user.role)) redirect("/dashboard");
   const { id } = await params;
   const report = await getLeaseHandoverReport(user.company_id, id);
   if (!report) notFound();
