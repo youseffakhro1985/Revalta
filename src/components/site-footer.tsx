@@ -15,6 +15,7 @@ export function SiteFooter() {
           <div>
             <h4 className="text-sm font-semibold text-ink-950 mb-4">Plattformen</h4>
             <nav className="flex flex-col gap-3 text-sm text-ink-500">
+              <Link href="/demo" className="hover:text-petroleum-600 transition-colors">Boka demo</Link>
               <Link href="/portal" className="hover:text-petroleum-600 transition-colors">Boendeportal</Link>
               <Link href="/register" className="hover:text-petroleum-600 transition-colors">Skapa konto</Link>
               <Link href="/login" className="hover:text-petroleum-600 transition-colors">Logga in</Link>
