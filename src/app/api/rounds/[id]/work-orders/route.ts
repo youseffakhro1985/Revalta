@@ -157,7 +157,7 @@ export async function POST(
         },
       });
 
-      return { conflict: null as const, result, checklist: nextChecklist };
+      return { conflict: null, result, checklist: nextChecklist };
     });
 
     if (created.conflict === "locked") {
