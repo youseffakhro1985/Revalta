@@ -14,12 +14,20 @@ const PASSTHROUGH_ACTIONS = new Set([
   "runCommandRaw",
 ]);
 
+/**
+ * RateLimitAttempt has no soft-delete column or relations. Running its queries
+ * through compatibility inspection can force a second root-client query while
+ * an interactive rate-limit transaction is holding a connection.
+ */
+const SOFT_DELETE_COMPAT_BYPASS_MODELS = new Set(["RateLimitAttempt"]);
+
 export function shouldSanitizeSoftDeleteParams(params: {
   model?: string;
   action: string;
 }): boolean {
   if (!params.model) return false;
   if (PASSTHROUGH_ACTIONS.has(params.action)) return false;
+  if (SOFT_DELETE_COMPAT_BYPASS_MODELS.has(params.model)) return false;
   return true;
 }
 
