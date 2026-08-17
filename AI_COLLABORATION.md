@@ -13,36 +13,28 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 - Tenant isolation är högsta säkerhetsinvarianten.
 - Produktionsmigrationer går endast via dokumenterat Database Release-flöde.
 - Inga secrets får skrivas i denna fil, PR-beskrivningar, screenshots eller loggar.
-- Befintlig svensk/skandinavisk premiumdesign bevaras; koordinationsarbete får inte glida över i UI-redesign.
+- Befintlig svensk/skandinavisk premiumdesign bevaras.
 - Maskinläsbar task-status speglas i `docs/AI_TASKS.yml`.
 
-## Verifierad snapshot
+## Verifierad snapshot för REV-COORD-004
 
 - Datum: `2026-08-17`
-- Verifierad aktuell `main`: `ed4b4d1e38f354eb054f1233de12571312d1d290`
-- Commit: `test: add exact-SHA Preview browser E2E`
+- Baseline `main`: `ed4b4d1e38f354eb054f1233de12571312d1d290`
+- Baseline commit: `test: add exact-SHA Preview browser E2E`
 - Production: `https://www.revalta.se`
-- GitHub/Vercel Production deployment: `5941808630` — **SUCCESS**
-- Vercel connector: **BLOCKED_CONNECTOR** — teamet är synligt men projektlistningen returnerar inga projekt. Full project/env/runtime-audit får därför inte påstås vara verifierad.
-- Sprint: **P0 — koordinering, Vercel access, auth-reset, observability och demo**
+- Baseline Production deployment: `5941808630` — **SUCCESS**
+- Vercel connector: **BLOCKED_CONNECTOR** — teamet är synligt men projektlistningen returnerar inga projekt. Full project/env/runtime-audit får inte påstås vara verifierad.
+- Sprint: **P0 — Vercel access, auth-reset, observability och demo**
 
-> Snapshot-SHA är verifierad vid koordinationsstart. Läs alltid GitHub `main` igen före merge.
+> Snapshot-SHA är task-baseline. Läs alltid GitHub `main` igen före nästa task och före merge.
 
-## Aktiv task
+## Senast slutförd koordinering
 
-| Task-ID | Ägare | Branch | Status | Ägt område | Acceptance |
-|---|---|---|---|---|---|
-| REV-COORD-004 | ChatGPT Work | `agent/coord-004-task-registry` | **ACTIVE** | `AI_COLLABORATION.md`, `docs/AI_TASKS.yml` | Synka verklig status mot current main, ta bort gamla aktiva markeringar, skapa maskinläsbart register, inga runtime/UI/DB/dependencyändringar |
+| Task-ID | Resultat | PR | Kandidat | Verifiering |
+|---|---|---|---|---|
+| REV-COORD-004 | Synkad multi-agent truth + maskinläsbart task-register | #266 | `aa8be09becabd133a17f3d9ca3d54a2da1c0bef9` | Revalta CI #1001 SUCCESS, CodeQL #293 SUCCESS, exact-SHA Vercel Preview `5943297957` SUCCESS, Preview Browser E2E #8 SUCCESS; merge/Production verifieras som sista release-steg |
 
-### REV-COORD-004 — förbjudna områden
-
-- `src/**`
-- `prisma/**`
-- `.github/workflows/**`
-- `package.json`
-- `package-lock.json`
-- demo-implementationens låsta filer
-- all annan produktkod
+REV-COORD-004 ändrar endast `AI_COLLABORATION.md` och `docs/AI_TASKS.yml`. Ingen runtime-, UI-, API-, auth-, databas-, migration-, workflow- eller dependencyändring ingår.
 
 ## Blockerade / nästa P0-tasks
 
@@ -53,7 +45,7 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 | REV-OBS-002 | **QUEUED** | Issue #217 | Färdigställ korrelerad observability för auth/cron/Stripe/kritiska API:er med requestId, latency och säkra eventkoder |
 | REV-DEMO-001 | **BLOCKED_ENV — CODE GATE GREEN** | Draft PR #254 | Verifiera Vercel/env-status för `DEMO_REQUEST_TO`, smoke-testa submission på Preview, full gate, merge, Production smoke |
 
-Ingen av de tre planerade P0-tasks ovan äger produktfiler förrän egen branch har skapats från då aktuell `main`. `REV-DEMO-001` behåller däremot sitt redan etablerade filägarskap eftersom PR #254 fortfarande är öppen och blockerad.
+Ingen planerad P0-task ovan får ta produktfiler förrän en egen branch har skapats från då aktuell `main`. `REV-DEMO-001` behåller sitt redan etablerade filägarskap eftersom PR #254 fortfarande är öppen och blockerad.
 
 ## Slutförda produkt- och plattformstasks
 
@@ -67,15 +59,10 @@ Ingen av de tre planerade P0-tasks ovan äger produktfiler förrän egen branch 
 | REV-DASH-ROLE-001 | Rollbaserade dashboards | #257 | `9147f3e88156d1eb1e6a59c1f70856cc4dba8183` | Merged; full gate verifierad |
 | REV-PROPERTY-001 | Digital fastighetspärm/workspace | #258 | `d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d` | Merged; full gate verifierad |
 | REV-ONBOARD-001 | Tenant-scopad 5-stegs first-run onboarding | #262 | `b9253cda99a79780477ef3b09150ba03c56338cd` | CI #990, CodeQL #282, exact-SHA Preview och Production success |
-| REV-ROUTES-001 | Canonical dashboard route tree + legacy redirects | #263 | `a839728684984f8e5233093153972ec69e7e3f4d` | Merged; CI #992, CodeQL #284, exact-SHA Preview och Production success |
-| REV-E2E-AUTH-001 | Exact-SHA Preview browser-E2E för register/login/navigation/Command Center/mobile/logout/protected route | #264 | `ed4b4d1e38f354eb054f1233de12571312d1d290` | CI #998, CodeQL #290, exact-SHA Preview + Browser E2E #5 success, Production success; password reset avsiktligt separerad som #265 |
+| REV-ROUTES-001 | Canonical dashboard route tree + legacy redirects | #263 | `a839728684984f8e5233093153972ec69e7e3f4d` | CI #992, CodeQL #284, exact-SHA Preview och Production success |
+| REV-E2E-AUTH-001 | Exact-SHA browser-E2E foundation | #264 | `ed4b4d1e38f354eb054f1233de12571312d1d290` | CI #998, CodeQL #290, exact-SHA Preview + Browser E2E #5 + Production success; password reset separerad som #265 |
 
 ## Aktiva fil-lås
-
-### REV-COORD-004
-
-- `AI_COLLABORATION.md`
-- `docs/AI_TASKS.yml`
 
 ### REV-DEMO-001 — blockerad men fortfarande låst
 
@@ -108,24 +95,17 @@ Ingen av de tre planerade P0-tasks ovan äger produktfiler förrän egen branch 
 
 ## Branch quarantine
 
-Det finns många äldre `agent/*`, `cursor/*` och `claude/*` branches kvar. De är **inte aktiva bara för att de existerar**. Innan eventuell återanvändning krävs:
-
-1. verifiera då aktuell `main`,
-2. compare branch → current `main`,
-3. kontrollera om motsvarande PR/task redan är merged/superseded,
-4. isolera unik diff,
-5. skapa explicit handoff innan någon fil skrivs.
+Det finns många äldre `agent/*`, `cursor/*` och `claude/*` branches kvar. De är **inte aktiva bara för att de existerar**. Innan eventuell återanvändning krävs current-main-verifiering, compare, kontroll av merged/superseded status, isolering av unik diff och explicit handoff.
 
 `noop` är en inaktiv, oavsiktlig branch utan avsett unikt arbete och kan städas bort separat när branch-delete görs säkert.
 
-## Leveransordning
+## Leveransordning efter REV-COORD-004
 
-1. **REV-COORD-004 — ACTIVE**
-2. **REV-VERCEL-002 — verifierbar Vercel project access**
-3. **REV-AUTH-RESET-001 — issue #265**
-4. **REV-OBS-002 — issue #217**
-5. **REV-DEMO-001 — återuppta befintlig PR #254 när env är verifierbar**
-6. Därefter P1-produktarbete enligt aktuell roadmap, men endast efter ny current-main-reconciliation.
+1. **REV-VERCEL-002 — verifierbar Vercel project access**
+2. **REV-AUTH-RESET-001 — issue #265**
+3. **REV-OBS-002 — issue #217**
+4. **REV-DEMO-001 — återuppta befintlig PR #254 när env är verifierbar**
+5. Därefter P1-produktarbete enligt aktuell roadmap, men endast efter ny current-main-reconciliation.
 
 ## Handoff / Definition of Done
 
