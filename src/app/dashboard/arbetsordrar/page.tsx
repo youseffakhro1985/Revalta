@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { legacyDashboardRedirects } from "@/lib/dashboard-route-compat";
 
 export default function LegacyWorkOrdersIndexPage() {
-  redirect("/dashboard/arbetsorder");
+  redirect(legacyDashboardRedirects.workOrders);
 }
