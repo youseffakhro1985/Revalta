@@ -11,16 +11,14 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 - Produktionsmigrationer går endast via dokumenterat Database Release-flöde.
 - Inga secrets får skrivas i denna fil, PR-beskrivningar, screenshots eller loggar.
 - Befintlig svensk/skandinavisk premiumdesign bevaras.
-- Om en task blockeras externt får nästa icke-överlappande task aktiveras först när filägarskapet är dokumenterat här.
 
 ## Snapshot
 
 - Datum: `2026-08-17`
-- Baseline `main` för aktiv task: `d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d`
-- Commit: `feat: make property detail a digital property workspace`
+- Baseline `main` för aktiv task: `b9253cda99a79780477ef3b09150ba03c56338cd`
+- Commit: `feat: add first-run organisation onboarding`
 - Production: `https://www.revalta.se`
-- Sprint: **S0 — first-run onboarding och därefter canonical routes/E2E**
-- Historiska Claude/Cursor-branches: HOLD tills explicit task + current-main compare.
+- Sprint: **S0 — canonical routes och därefter kritisk E2E**
 
 > SHA-raden är task-baseline. Läs alltid GitHub `main` igen före merge.
 
@@ -28,7 +26,7 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 
 | Task-ID | Ägare | Branch | Status | Ägt område | Nästa grind |
 |---|---|---|---|---|---|
-| REV-ONBOARD-001 | ChatGPT | `agent/first-run-onboarding` | **IN PROGRESS** | onboarding progress helper/tests, `/api/onboarding`, dashboard first-run panel, dashboard root integration, ledger | 5-stegs owner/admin-onboarding med verkliga company/property/team/notifieringssignaler, audit-verifierad felanmälan, ingen ny datamodell; full CI/CodeQL/exact-SHA Preview |
+| REV-ROUTES-001 | ChatGPT | `agent/canonical-dashboard-routes` | **IN PROGRESS** | dashboard route trees, legacy work-order redirects, route compatibility helper/tests, canonical route doc, ledger | Canonical implementation tree under `(dashboard)`; legacy tree endast redirectadapters; full CI/CodeQL/exact-SHA Preview |
 | REV-DEMO-001 | ChatGPT | `agent/demo-conversion-flow` | **BLOCKED_ENV — CODE GATE GREEN** | `/demo`, `/api/demo-request`, demo form/mail/tests, marketing header/footer, landing CTA, sitemap, `.env.example`, `INTEGRATIONS.md` | PR #254 draft. Merge först när `DEMO_REQUEST_TO` kan klassas PRESENT och submission smoke kan göras. |
 | REV-244-AUDIT | ChatGPT | read-only | LOW PRIORITY | Historisk PR #244 | Endast isolerade follow-ups vid verifierad risk. |
 | REV-VERCEL-001 | ChatGPT | read-only | BLOCKED_CONNECTOR | Vercel project/env/runtime | OAuth-team syns men Revalta project/deploy lookup ger 404. Rapportera aldrig secretvärden. |
@@ -42,8 +40,9 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 | REV-BREAD-001 | Gemensamma breadcrumbs + lokal modulnavigation | #253 | `e24feff5f2e48c22b913b444b6c8ffd5cf82ee63` | Full CI, tester, CodeQL, exact-SHA Preview; Production success |
 | REV-COORD-003 | Handoff till Command Center och demo-blocker | #255 | `b7cad49965b3c5c714cea8cc907a2f9170eafc24` | Full CI, CodeQL och Preview success |
 | REV-SEARCH-001 | GlobalSearch → Revalta Command Center | #256 | `a93f0fd050e88ba344f96e8d0685d4d3da26153a` | Full CI, CodeQL och exact-SHA Preview success |
-| REV-DASH-ROLE-001 | Rollbaserade Owner/Admin, Manager, Technician och Viewer dashboards; Resident separat | #257 | `9147f3e88156d1eb1e6a59c1f70856cc4dba8183` | Full CI, CodeQL och exact-SHA Preview success |
-| REV-PROPERTY-001 | Fastigheten som rollstyrd digital fastighetspärm med befintlig data | #258 | `d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d` | Full CI, CodeQL och exact-SHA Preview success |
+| REV-DASH-ROLE-001 | Rollbaserade Owner/Admin, Manager, Technician och Viewer dashboards | #257 | `9147f3e88156d1eb1e6a59c1f70856cc4dba8183` | Full CI, CodeQL och exact-SHA Preview success |
+| REV-PROPERTY-001 | Fastigheten som digital fastighetspärm | #258 | `d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d` | Full CI, CodeQL och exact-SHA Preview success |
+| REV-ONBOARD-001 | Tenant-scopad 5-stegs first-run onboarding för Owner/Admin | #262 | `b9253cda99a79780477ef3b09150ba03c56338cd` | Full CI #990, CodeQL #282, exact-SHA Preview och Production success |
 
 ## Filägarskap
 
@@ -60,36 +59,24 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 - `.env.example`
 - `INTEGRATIONS.md`
 
-### REV-ONBOARD-001 — aktivt låst
+### REV-ROUTES-001 — aktivt låst
 
-- `src/lib/onboarding.ts`
-- `src/lib/onboarding.test.ts`
-- `src/app/api/onboarding/**`
-- `src/components/dashboard/first-run-onboarding.tsx`
-- `src/app/(dashboard)/dashboard/page.tsx`
+- `src/app/(dashboard)/dashboard/installningar/eskaleringar/**`
+- `src/app/dashboard/installningar/eskaleringar/**`
+- `src/app/dashboard/arbetsordrar/**`
+- `src/lib/dashboard-route-compat.ts`
+- `src/lib/dashboard-route-compat.test.ts`
+- `docs/CANONICAL_DASHBOARD_ROUTES.md`
 - `AI_COLLABORATION.md`
 
-Ingen annan agent får ändra ovanstående filer innan explicit handoff.
+## REV-ROUTES-001 — canonical kontrakt
 
-## REV-ONBOARD-001 — beslutad implementation
-
-1. **Företagsuppgifter** är klar först när organisationen har namn + organisationsnummer.
-2. **Första fastigheten** är klar först när minst en icke-raderad Property finns för aktuell company.
-3. **Bjud in team** är klar när organisationen har fler än en aktiv icke-resident-medlem eller en giltig väntande TeamInvite.
-4. **Konfigurera felanmälan** använder ingen påhittad configmodell. Owner/Admin verifierar befintligt felanmälan/boendeportal-flöde efter att minst en fastighet finns; verifieringen lagras som immutable AuditLog-event `onboarding.ticket_intake_verified`.
-5. **Notifieringsinställningar** är klar först när befintliga `ServiceNotificationSettings` faktiskt har sparats (`updatedAt` finns).
-
-Progress räknas server-side från tenant-scopade signaler. Ingen localStorage används som affärssanning. Manager/Technician/Viewer/Resident får inte organisationens onboardingpanel.
-
-## Säkerhet / data
-
-- Ingen ny Prisma-modell, migration eller dependency.
-- Onboarding-API använder aktuell `company_id` på samtliga queries.
-- Endast owner/admin kan verifiera organisations-onboarding.
-- Felanmälan kan inte markeras verifierad utan minst en verklig fastighet.
-- AuditLog används för explicit verifieringsmilestone; ingen duplicerad affärsdata skapas.
-- Dashboard visar onboarding endast när schema-readiness är grön.
-- DEMO-filer rörs inte i onboarding-tasken.
+- Alla riktiga dashboardimplementationer ska bo i `src/app/(dashboard)/dashboard/**`.
+- `src/app/dashboard/**` får endast innehålla legacy-kompatibilitetsredirects.
+- `/dashboard/installningar/eskaleringar` och `/regler` behåller oförändrad URL men deras befintliga Git-blobs flyttas byte-identiskt till canonical route group.
+- Legacy `/dashboard/arbetsordrar`, `/dashboard/arbetsordrar/[id]` och `/dashboard/arbetsordrar/operationsoversikt` behålls som redirects till singulara `/dashboard/arbetsorder...`.
+- Redirect targets centraliseras i `src/lib/dashboard-route-compat.ts` och regressionstestas.
+- Ingen UI-, API-, auth-, databas- eller dependencyändring ingår i route-migreringen.
 
 ## PR-triage / HOLD
 
@@ -101,19 +88,15 @@ Progress räknas server-side från tenant-scopade signaler. Ingen localStorage a
 - #191: HOLD — actions/checkout major.
 - #222: HOLD — CodeQL major.
 - #194: HOLD — separat react-dom dependency-task.
-- #248/#249/#250: stängda som empty/superseded/duplicate.
 
 ## Leveransordning
 
-1. **REV-ONBOARD-001 — ACTIVE**
-2. REV-ROUTES-001 — canonical route-plan + redirects/tests
-3. REV-E2E-001 — kritiska browser-E2E
-4. REV-VERCEL-001 — autentiserad Vercel-audit när connector scope fungerar
+1. **REV-ROUTES-001 — ACTIVE**
+2. REV-E2E-001 — kritiska browser-E2E
+3. REV-VERCEL-001 — autentiserad Vercel-audit när connector scope fungerar
 
 REV-DEMO-001 återupptas så snart env-blockern är verifierbar och får inte blandas med ovanstående tasks.
 
 ## Handoff / Definition of Done
-
-Handoff ska dokumentera Task-ID, branch/HEAD SHA, exakt filscope, implementerat/återstående, tester, accessibility, security impact, database impact, PR och kända risker.
 
 En task är DONE först när relevant lint, typecheck, tester, full quality gate, CI, CodeQL, exact-SHA Preview, browser smoke när åtkomst finns, accessibility/security/database impact, commit/PR/review/merge, Production deploy/smoke, runtime-loggkontroll och kvarvarande risker är redovisade.
