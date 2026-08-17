@@ -97,7 +97,15 @@ try {
   const registerResponse = await registerResponsePromise;
   const registerLatencyMs = Date.now() - registerStartedAt;
   if (registerResponse.status() !== 201) {
-    fail(`register request returned HTTP ${registerResponse.status()} after ${registerLatencyMs}ms`);
+    let publicError = {};
+    try {
+      publicError = await registerResponse.json();
+    } catch {
+      publicError = {};
+    }
+    const errorCode = typeof publicError?.errorCode === "string" ? publicError.errorCode : "UNKNOWN";
+    const errorMessage = typeof publicError?.error === "string" ? publicError.error : "unknown public error";
+    fail(`register request returned HTTP ${registerResponse.status()} after ${registerLatencyMs}ms (${errorCode}: ${errorMessage})`);
   }
   console.log(`register API: HTTP 201 in ${registerLatencyMs}ms`);
   await expectPath(page, "/login");
