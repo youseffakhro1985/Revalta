@@ -18,8 +18,8 @@ function fail(message) {
   throw new Error(message);
 }
 
-async function expectVisible(locator, label) {
-  await locator.waitFor({ state: "visible", timeout: 15_000 }).catch(() => fail(`${label} was not visible`));
+async function expectVisible(locator, label, timeout = 15_000) {
+  await locator.waitFor({ state: "visible", timeout }).catch(() => fail(`${label} was not visible`));
 }
 
 async function expectPath(page, pathname) {
@@ -64,8 +64,18 @@ try {
   // Password-reset request must stay enumeration-safe while completing in UI.
   await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
   await page.getByLabel("E-post").fill(email);
+  const resetResponsePromise = page.waitForResponse(
+    (response) => response.url().includes("/api/auth/password-reset/request") && response.request().method() === "POST",
+    { timeout: 25_000 },
+  );
   await page.getByRole("button", { name: "Skicka återställningslänk" }).click();
-  await expectVisible(page.getByText(/Om kontot finns skickar vi en återställningslänk/i), "password-reset neutral confirmation");
+  const resetResponse = await resetResponsePromise;
+  if (resetResponse.status() !== 200) fail(`password-reset request returned ${resetResponse.status()}`);
+  await expectVisible(
+    page.getByText(/Om kontot finns skickar vi en återställningslänk/i),
+    "password-reset neutral confirmation",
+    5_000,
+  );
   console.log("password-reset request: browser flow passed");
 
   // Login through the real form.
