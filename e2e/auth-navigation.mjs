@@ -5,6 +5,7 @@ const baseUrl = String(process.env.E2E_BASE_URL || "").replace(/\/$/, "");
 const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
 const RESET_MAX_LATENCY_MS = 8_000;
 const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
+const REGISTER_RESPONSE_TIMEOUT_MS = 20_000;
 
 if (!baseUrl || !/^https:\/\//.test(baseUrl)) {
   console.error("E2E_BASE_URL must be an https Preview origin");
@@ -24,8 +25,12 @@ async function expectVisible(locator, label, timeout = 15_000) {
   await locator.waitFor({ state: "visible", timeout }).catch(() => fail(`${label} was not visible`));
 }
 
-async function expectPath(page, pathname) {
-  await page.waitForURL((url) => url.pathname === pathname || url.pathname.startsWith(`${pathname}/`), { timeout: 20_000 });
+async function expectPath(page, pathname, timeout = 20_000) {
+  await page.waitForFunction(
+    (expectedPath) => window.location.pathname === expectedPath || window.location.pathname.startsWith(`${expectedPath}/`),
+    pathname,
+    { timeout },
+  );
 }
 
 const extraHTTPHeaders = bypass
@@ -52,18 +57,8 @@ page.on("pageerror", (error) => {
 try {
   console.log(`E2E auth/navigation against ${baseUrl}`);
 
-  // Register through the real browser form.
-  await page.goto("/register", { waitUntil: "domcontentloaded" });
-  await expectVisible(page.getByRole("heading", { name: "Skapa ditt Revalta-konto" }), "register heading");
-  await page.getByLabel("Namn").fill("Revalta E2E Owner");
-  await page.getByLabel("Organisation").fill(companyName);
-  await page.getByLabel("E-post").fill(email);
-  await page.getByLabel("Lösenord").fill(password);
-  await page.getByRole("button", { name: "Skapa konto" }).click();
-  await expectPath(page, "/login");
-  console.log("register: browser flow passed");
-
-  // Password reset must remain enumeration-safe and bounded for an unknown account.
+  // Password reset does not depend on registration. Prove the issue #265 path first
+  // so a separate registration-navigation flake cannot hide reset latency evidence.
   await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
   await expectVisible(page.getByRole("heading", { name: "Återställ ditt lösenord" }), "forgot-password heading");
   await page.getByLabel("E-post").fill(`missing-reset-${runId}@example.com`);
@@ -85,8 +80,31 @@ try {
   await expectVisible(page.getByText(RESET_NEUTRAL_MESSAGE, { exact: true }), "neutral password-reset confirmation");
   console.log(`password reset: neutral browser flow passed in ${resetLatencyMs}ms (limit ${RESET_MAX_LATENCY_MS}ms)`);
 
+  // Register through the real browser form. Measure the API response separately
+  // from the client-side router transition so Preview latency is diagnosable.
+  await page.goto("/register", { waitUntil: "domcontentloaded" });
+  await expectVisible(page.getByRole("heading", { name: "Skapa ditt Revalta-konto" }), "register heading");
+  await page.getByLabel("Namn").fill("Revalta E2E Owner");
+  await page.getByLabel("Organisation").fill(companyName);
+  await page.getByLabel("E-post").fill(email);
+  await page.getByLabel("Lösenord").fill(password);
+  const registerStartedAt = Date.now();
+  const registerResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/auth/register") && response.request().method() === "POST",
+    { timeout: REGISTER_RESPONSE_TIMEOUT_MS },
+  );
+  await page.getByRole("button", { name: "Skapa konto" }).click();
+  const registerResponse = await registerResponsePromise;
+  const registerLatencyMs = Date.now() - registerStartedAt;
+  if (registerResponse.status() !== 201) {
+    fail(`register request returned HTTP ${registerResponse.status()} after ${registerLatencyMs}ms`);
+  }
+  console.log(`register API: HTTP 201 in ${registerLatencyMs}ms`);
+  await expectPath(page, "/login");
+  await expectVisible(page.getByRole("heading", { name: "Logga in" }), "login heading after registration");
+  console.log("register: browser flow passed");
+
   // Login through the real form.
-  await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Lösenord").fill(password);
   await page.getByRole("button", { name: "Logga in" }).click();
@@ -132,8 +150,10 @@ try {
   await expectVisible(logout, "logout button");
   await logout.click();
   await expectPath(page, "/login");
+  await expectVisible(page.getByRole("heading", { name: "Logga in" }), "login heading after logout");
   await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
   await expectPath(page, "/login");
+  await expectVisible(page.getByRole("heading", { name: "Logga in" }), "login heading after protected redirect");
   console.log("logout + protected dashboard redirect: passed");
 
   if (pageErrors.length > 0) {
