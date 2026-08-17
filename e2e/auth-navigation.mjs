@@ -3,6 +3,8 @@ import { chromium } from "playwright";
 
 const baseUrl = String(process.env.E2E_BASE_URL || "").replace(/\/$/, "");
 const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
+const RESET_MAX_LATENCY_MS = 8_000;
+const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
 
 if (!baseUrl || !/^https:\/\//.test(baseUrl)) {
   console.error("E2E_BASE_URL must be an https Preview origin");
@@ -61,8 +63,27 @@ try {
   await expectPath(page, "/login");
   console.log("register: browser flow passed");
 
-  // Password-reset browser coverage is intentionally isolated in issue #265
-  // until Preview request latency is bounded and deterministic.
+  // Password reset must remain enumeration-safe and bounded for an unknown account.
+  await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
+  await expectVisible(page.getByRole("heading", { name: "Återställ ditt lösenord" }), "forgot-password heading");
+  await page.getByLabel("E-post").fill(`missing-reset-${runId}@example.com`);
+  const resetStartedAt = Date.now();
+  const resetResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/auth/password-reset/request") && response.request().method() === "POST",
+    { timeout: RESET_MAX_LATENCY_MS },
+  );
+  await page.getByRole("button", { name: "Skicka återställningslänk" }).click();
+  const resetResponse = await resetResponsePromise;
+  const resetLatencyMs = Date.now() - resetStartedAt;
+  if (resetResponse.status() !== 200) {
+    fail(`password-reset request returned HTTP ${resetResponse.status()}`);
+  }
+  const resetBody = await resetResponse.json();
+  if (resetBody?.message !== RESET_NEUTRAL_MESSAGE) {
+    fail("password-reset request did not preserve the neutral anti-enumeration response");
+  }
+  await expectVisible(page.getByText(RESET_NEUTRAL_MESSAGE, { exact: true }), "neutral password-reset confirmation");
+  console.log(`password reset: neutral browser flow passed in ${resetLatencyMs}ms (limit ${RESET_MAX_LATENCY_MS}ms)`);
 
   // Login through the real form.
   await page.goto("/login", { waitUntil: "domcontentloaded" });
