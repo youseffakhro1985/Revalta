@@ -17,7 +17,7 @@ tasks:
   - task_id: "REV-AUTH-RESET-001"
     title: "Fix password-reset request latency"
     owner: "ChatGPT Work"
-    status: "IN_PROGRESS"
+    status: "FINAL_GATE"
     baseline_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
     branch: "agent/auth-reset-bounded-latency"
     owned_paths:
@@ -50,19 +50,21 @@ tasks:
     dependencies:
       - "issue #265"
       - "exact-SHA Vercel Preview evidence through GitHub Deployments"
-      - "password-reset E2E restored only after Preview latency proof"
+      - "final candidate must rerun all gates without code or documentation changes"
     acceptance:
-      - "unknown email receives identical neutral 200 response within bounded latency"
+      - "unknown email receives identical neutral HTTP 200 response and message within 8000ms in exact-SHA browser E2E"
       - "real account remains enumeration-safe when email provider is slow or unavailable"
-      - "RateLimitAttempt no longer triggers unrelated soft-delete schema inspection inside its transaction"
-      - "persistent rate-limit transaction has explicit maxWait and timeout"
-      - "existing database limiter remains primary; bounded memory fallback behavior remains intact"
+      - "persistent rate-limit transaction has maxWait 1500ms and timeout 2500ms"
+      - "database limiter remains primary and existing memory fallback remains deterministic"
+      - "soft-delete compatibility inspection runs only when root model, deleted_at args or selected/included relations can touch a soft-delete model"
+      - "simple User-to-Company, RateLimitAttempt and token infrastructure queries bypass unnecessary information_schema inspection"
+      - "soft-delete protection remains for Property, Ticket, WorkOrder and nested soft-delete relations"
       - "safe phase latency instrumentation covers rate limit, lookup, token, delivery and total request"
-      - "no email, IP, reset token, request body or secrets are logged"
-      - "regression tests cover the middleware bypass and bounded transaction/fallback"
-      - "password-reset browser E2E restored after exact-SHA Preview proof"
-      - "CI, CodeQL, exact-SHA Preview, browser E2E and Production smoke pass before DONE"
-    pull_request: null
+      - "email, IP, reset token, request body, secrets and raw DB errors are not logged by new/fallback paths"
+      - "regression tests cover query-shape routing and bounded transaction/fallback"
+      - "cold Preview evidence before final candidate: neutral reset 736ms and register HTTP 201 in 1071ms"
+      - "final CI, CodeQL, exact-SHA Preview, browser E2E and Production smoke pass before DONE"
+    pull_request: 267
     updated_at: "2026-08-17"
 
   - task_id: "REV-VERCEL-002"
@@ -246,7 +248,7 @@ tasks:
     branch: "agent/e2e-auth-navigation"
     owned_paths: []
     forbidden_paths: []
-    dependencies: ["password-reset browser coverage remains issue #265 / REV-AUTH-RESET-001"]
+    dependencies: ["password-reset browser coverage is being restored by issue #265 / REV-AUTH-RESET-001"]
     acceptance:
       - "register/login/navigation/Command Center/mobile/logout/protected redirect passed"
       - "CI #998, CodeQL #290, exact-SHA Preview, Browser E2E #5 and Production succeeded"
