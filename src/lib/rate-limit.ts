@@ -17,6 +17,11 @@ export type RateLimitResult = {
 const fallbackBuckets = new Map<string, Bucket>();
 let cleanupCounter = 0;
 
+export const RATE_LIMIT_TRANSACTION_OPTIONS = {
+  maxWait: 1_500,
+  timeout: 2_500,
+} as const;
+
 function hashKey(key: string) {
   return createHash("sha256").update(key).digest("hex");
 }
@@ -81,7 +86,7 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
 
       await tx.rateLimitAttempt.create({ data: { key_hash: keyHash } });
       return { allowed: true, remaining: Math.max(0, limit - count - 1), resetAt };
-    });
+    }, RATE_LIMIT_TRANSACTION_OPTIONS);
 
     cleanupCounter += 1;
     if (cleanupCounter % 100 === 0) {
@@ -92,7 +97,10 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
 
     return { ...result, source: "database" };
   } catch (error) {
-    console.error("Persistent rate limiter unavailable; using bounded in-memory fallback", error);
+    console.error(
+      "Persistent rate limiter unavailable; using bounded in-memory fallback",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return checkMemoryFallback(keyHash, limit, windowMs);
   }
 }

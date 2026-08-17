@@ -4,49 +4,67 @@ source_of_truth: "GitHub main"
 
 snapshot:
   verified_at: "2026-08-17"
-  baseline_main_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
+  baseline_main_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
   production:
     url: "https://www.revalta.se"
-    baseline_deployment_id: 5941808630
+    baseline_deployment_id: 5943445598
     status: "SUCCESS"
   vercel_connector:
     status: "BLOCKED_CONNECTOR"
     note: "Team visible; project listing returned no projects. Do not infer env/runtime state."
 
 tasks:
-  - task_id: "REV-COORD-004"
-    title: "Synchronize multi-agent truth and task registry"
+  - task_id: "REV-AUTH-RESET-001"
+    title: "Fix password-reset request latency"
     owner: "ChatGPT Work"
-    status: "DONE"
-    baseline_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
-    branch: "agent/coord-004-task-registry"
+    status: "FINAL_GATE"
+    baseline_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
+    branch: "agent/auth-reset-bounded-latency"
     owned_paths:
+      - "src/app/api/auth/password-reset/request/route.ts"
+      - "src/app/api/auth/password-reset/request/route.test.ts"
+      - "src/lib/rate-limit.ts"
+      - "src/lib/rate-limit.test.ts"
+      - "src/lib/db.ts"
+      - "src/lib/db.test.ts"
+      - "e2e/auth-navigation.mjs"
       - "AI_COLLABORATION.md"
       - "docs/AI_TASKS.yml"
     forbidden_paths:
-      - "src/**"
-      - "prisma/**"
-      - ".github/workflows/**"
+      - "src/app/demo/**"
+      - "src/app/api/demo-request/**"
+      - "src/lib/demo-request-email*"
+      - "src/components/demo-request-form.tsx"
+      - "src/app/page.tsx"
+      - "src/components/marketing-header.tsx"
+      - "src/components/site-footer.tsx"
+      - "src/app/sitemap.ts"
+      - ".env.example"
+      - "INTEGRATIONS.md"
+      - "prisma/schema.prisma"
+      - "prisma/migrations/**"
       - "package.json"
       - "package-lock.json"
-      - "REV-DEMO-001 locked implementation paths"
+      - ".github/workflows/**"
+      - "other auth/session/login code"
     dependencies:
-      - "current GitHub main"
-      - "open PR and issue status"
-      - "GitHub deployment evidence"
-      - "Vercel connector visibility check"
+      - "issue #265"
+      - "exact-SHA Vercel Preview evidence through GitHub Deployments"
+      - "final candidate must rerun all gates without code or documentation changes"
     acceptance:
-      - "coordination truth reconciled to baseline main"
-      - "machine-readable task register created"
-      - "only two documentation files changed"
-      - "no runtime, UI, database, workflow or dependency changes"
-      - "no secrets or secret values recorded"
-      - "Revalta CI #1001 succeeded on pre-finalization candidate"
-      - "CodeQL #293 succeeded on pre-finalization candidate"
-      - "exact-SHA Preview deployment 5943297957 succeeded on pre-finalization candidate"
-      - "Preview Browser E2E #8 succeeded on pre-finalization candidate"
-      - "final candidate must rerun exact-SHA gates before merge"
-    pull_request: 266
+      - "unknown email receives identical neutral HTTP 200 response and message within 8000ms in exact-SHA browser E2E"
+      - "real account remains enumeration-safe when email provider is slow or unavailable"
+      - "persistent rate-limit transaction has maxWait 1500ms and timeout 2500ms"
+      - "database limiter remains primary and existing memory fallback remains deterministic"
+      - "soft-delete compatibility inspection runs only when root model, deleted_at args or selected/included relations can touch a soft-delete model"
+      - "simple User-to-Company, RateLimitAttempt and token infrastructure queries bypass unnecessary information_schema inspection"
+      - "soft-delete protection remains for Property, Ticket, WorkOrder and nested soft-delete relations"
+      - "safe phase latency instrumentation covers rate limit, lookup, token, delivery and total request"
+      - "email, IP, reset token, request body, secrets and raw DB errors are not logged by new/fallback paths"
+      - "regression tests cover query-shape routing and bounded transaction/fallback"
+      - "cold Preview evidence before final candidate: neutral reset 736ms and register HTTP 201 in 1071ms"
+      - "final CI, CodeQL, exact-SHA Preview, browser E2E and Production smoke pass before DONE"
+    pull_request: 267
     updated_at: "2026-08-17"
 
   - task_id: "REV-VERCEL-002"
@@ -57,33 +75,11 @@ tasks:
     branch: null
     owned_paths: []
     forbidden_paths: []
-    dependencies:
-      - "Vercel connector must expose the Revalta project"
+    dependencies: ["Vercel connector must expose the Revalta project"]
     acceptance:
       - "Revalta project is discoverable through connected Vercel access"
       - "project, deployment and env status can be read without exposing secret values"
       - "runtime/log verification is possible where permissions allow"
-    pull_request: null
-    updated_at: "2026-08-17"
-
-  - task_id: "REV-AUTH-RESET-001"
-    title: "Fix password-reset request latency"
-    owner: "ChatGPT Work"
-    status: "READY_NEXT"
-    baseline_sha: null
-    branch: null
-    owned_paths: []
-    forbidden_paths:
-      - "REV-DEMO-001 locked implementation paths"
-    dependencies:
-      - "issue #265"
-      - "fresh current-main read before branch creation"
-    acceptance:
-      - "unknown email receives deterministic neutral response within bounded latency"
-      - "real account remains enumeration-safe when email provider is slow or unavailable"
-      - "blocking operation is identified instead of hidden by a longer timeout"
-      - "timing regression coverage added where practical"
-      - "password-reset browser E2E restored after fix"
     pull_request: null
     updated_at: "2026-08-17"
 
@@ -94,18 +90,16 @@ tasks:
     baseline_sha: null
     branch: null
     owned_paths: []
-    forbidden_paths:
-      - "REV-DEMO-001 locked implementation paths"
+    forbidden_paths: ["REV-DEMO-001 locked implementation paths"]
     dependencies:
       - "issue #217"
-      - "REV-AUTH-RESET-001 reconciliation"
+      - "REV-AUTH-RESET-001 completion/reconciliation"
       - "fresh current-main read before branch creation"
     acceptance:
       - "critical requests correlate requestId, route, method, release, environment and latency"
       - "stable event/error codes used"
       - "secrets, sessions, reset tokens, Stripe signatures and DB URLs never logged"
       - "Production responses do not expose stack traces"
-      - "CI, CodeQL and exact-SHA Preview pass before merge"
     pull_request: null
     updated_at: "2026-08-17"
 
@@ -132,14 +126,27 @@ tasks:
       - "navigation and dashboard runtime code"
     dependencies:
       - "verifiable Vercel project access"
-      - "DEMO_REQUEST_TO presence/status verification without revealing its value"
+      - "DEMO_REQUEST_TO status verification without value disclosure"
       - "Preview submission smoke"
     acceptance:
       - "DEMO_REQUEST_TO classified PRESENT/MISSING/MISCONFIGURED without value disclosure"
       - "demo submission succeeds on exact-SHA Preview"
-      - "full release gate passes"
-      - "Production smoke passes after merge"
+      - "full release gate and Production smoke pass"
     pull_request: 254
+    updated_at: "2026-08-17"
+
+  - task_id: "REV-COORD-004"
+    title: "Synchronize multi-agent truth and task registry"
+    owner: "ChatGPT Work"
+    status: "DONE"
+    baseline_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
+    branch: "agent/coord-004-task-registry"
+    owned_paths: []
+    forbidden_paths: []
+    dependencies: []
+    acceptance: ["merged and Production verified"]
+    pull_request: 266
+    merge_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
     updated_at: "2026-08-17"
 
   - task_id: "REV-NAV-001"
@@ -241,8 +248,7 @@ tasks:
     branch: "agent/e2e-auth-navigation"
     owned_paths: []
     forbidden_paths: []
-    dependencies:
-      - "password-reset browser coverage remains issue #265"
+    dependencies: ["password-reset browser coverage is being restored by issue #265 / REV-AUTH-RESET-001"]
     acceptance:
       - "register/login/navigation/Command Center/mobile/logout/protected redirect passed"
       - "CI #998, CodeQL #290, exact-SHA Preview, Browser E2E #5 and Production succeeded"
