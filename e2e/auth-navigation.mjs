@@ -6,6 +6,7 @@ const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
 const RESET_MAX_LATENCY_MS = 8_000;
 const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
 const REGISTER_MAX_LATENCY_MS = 8_000;
+const REGISTER_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 
 if (!baseUrl || !/^https:\/\//.test(baseUrl)) {
   console.error("E2E_BASE_URL must be an https Preview origin");
@@ -80,8 +81,8 @@ try {
   await expectVisible(page.getByText(RESET_NEUTRAL_MESSAGE, { exact: true }), "neutral password-reset confirmation");
   console.log(`password reset: neutral browser flow passed in ${resetLatencyMs}ms (limit ${RESET_MAX_LATENCY_MS}ms)`);
 
-  // Register through the real browser form. Measure the API response separately
-  // from the client-side router transition so Preview latency is diagnosable.
+  // Register through the real browser form. Observe long responses for diagnostics,
+  // but keep the actual release SLO at REGISTER_MAX_LATENCY_MS.
   await page.goto("/register", { waitUntil: "domcontentloaded" });
   await expectVisible(page.getByRole("heading", { name: "Skapa ditt Revalta-konto" }), "register heading");
   await page.getByLabel("Namn").fill("Revalta E2E Owner");
@@ -95,7 +96,7 @@ try {
   const registerStartedAt = Date.now();
   const registerResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith("/api/auth/register") && response.request().method() === "POST",
-    { timeout: REGISTER_MAX_LATENCY_MS },
+    { timeout: REGISTER_DIAGNOSTIC_TIMEOUT_MS },
   );
   await page.getByRole("button", { name: "Skapa konto" }).click();
   const registerResponse = await registerResponsePromise;
@@ -110,6 +111,9 @@ try {
     const errorCode = typeof publicError?.errorCode === "string" ? publicError.errorCode : "UNKNOWN";
     const errorMessage = typeof publicError?.error === "string" ? publicError.error : "unknown public error";
     fail(`register request returned HTTP ${registerResponse.status()} after ${registerLatencyMs}ms (${errorCode}: ${errorMessage})`);
+  }
+  if (registerLatencyMs > REGISTER_MAX_LATENCY_MS) {
+    fail(`register request exceeded latency SLO: HTTP 201 after ${registerLatencyMs}ms (limit ${REGISTER_MAX_LATENCY_MS}ms)`);
   }
   console.log(`register API: HTTP 201 in ${registerLatencyMs}ms (limit ${REGISTER_MAX_LATENCY_MS}ms)`);
   await expectPath(page, "/login");
