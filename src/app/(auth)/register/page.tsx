@@ -15,15 +15,23 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      name: String(formData.get("name") ?? ""),
+      companyName: String(formData.get("companyName") ?? ""),
+      email: String(formData.get("email") ?? ""),
+      password: String(formData.get("password") ?? ""),
+    };
+
     setError("");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, companyName, email, password }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         router.push("/login");
@@ -58,6 +66,7 @@ export default function RegisterPage() {
           <label htmlFor="register-name" className="block text-sm font-medium text-ink-700">Namn</label>
           <input
             id="register-name"
+            name="name"
             type="text"
             autoComplete="name"
             maxLength={120}
@@ -71,6 +80,7 @@ export default function RegisterPage() {
           <label htmlFor="register-company" className="block text-sm font-medium text-ink-700">Organisation</label>
           <input
             id="register-company"
+            name="companyName"
             type="text"
             required
             minLength={2}
@@ -86,6 +96,7 @@ export default function RegisterPage() {
           <label htmlFor="register-email" className="block text-sm font-medium text-ink-700">E-post</label>
           <input
             id="register-email"
+            name="email"
             type="email"
             required
             maxLength={254}
@@ -100,6 +111,7 @@ export default function RegisterPage() {
           <label htmlFor="register-password" className="block text-sm font-medium text-ink-700">Lösenord</label>
           <input
             id="register-password"
+            name="password"
             type="password"
             required
             minLength={10}
