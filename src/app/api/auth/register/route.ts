@@ -9,7 +9,7 @@ import { queueEmailVerification } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 
-export const REGISTER_TRANSACTION_OPTIONS = {
+const REGISTER_TRANSACTION_OPTIONS = {
   maxWait: 1_500,
   timeout: 5_000,
 } as const;
