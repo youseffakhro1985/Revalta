@@ -12,7 +12,6 @@ const {
   loggerWarnMock,
   queueEmailVerificationMock,
   scheduledAfterCallbacks,
-  userFindUniqueMock,
   writeAuditLogMock,
   transactionMock,
 } = vi.hoisted(() => ({
@@ -27,7 +26,6 @@ const {
   loggerWarnMock: vi.fn(),
   queueEmailVerificationMock: vi.fn(),
   scheduledAfterCallbacks: [] as Array<() => void | Promise<void>>,
-  userFindUniqueMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
   transactionMock: vi.fn(),
 }));
@@ -40,7 +38,6 @@ vi.mock("@/lib/db", () => ({
   default: {
     company: { create: companyCreateMock },
     emailVerificationToken: { create: emailVerificationTokenCreateMock },
-    user: { findUnique: userFindUniqueMock },
     $transaction: transactionMock,
   },
 }));
@@ -97,7 +94,6 @@ describe("POST /api/auth/register", () => {
       warn: loggerWarnMock,
       error: loggerErrorMock,
     });
-    userFindUniqueMock.mockResolvedValue(null);
     hashPasswordMock.mockResolvedValue("password-hash");
     companyCreateMock.mockResolvedValue({
       id: "company-1",
@@ -148,15 +144,18 @@ describe("POST /api/auth/register", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("retry-after")).toBeTruthy();
     expect(response.headers.get("x-request-id")).toBe(requestId);
-    expect(userFindUniqueMock).not.toHaveBeenCalled();
+    expect(companyCreateMock).not.toHaveBeenCalled();
     expect(loggerWarnMock).toHaveBeenCalledWith(
       "auth registration rate limited",
       expect.objectContaining({ event: "auth.registration.rate_limited" }),
     );
   });
 
-  it("uses the conflict contract for an existing account", async () => {
-    userFindUniqueMock.mockResolvedValue({ id: "existing-user" });
+  it("uses the conflict contract when the unique email constraint rejects account creation", async () => {
+    companyCreateMock.mockRejectedValueOnce({
+      code: "P2002",
+      meta: { target: ["email"] },
+    });
 
     const response = await POST(registrationRequest({
       companyName: "Exempel AB",
@@ -166,9 +165,37 @@ describe("POST /api/auth/register", () => {
     const body = await response.json();
 
     expect(response.status).toBe(409);
-    expect(body.errorCode).toBe("CONFLICT");
-    expect(companyCreateMock).not.toHaveBeenCalled();
+    expect(body).toEqual({
+      error: "E-postadressen används redan",
+      errorCode: "CONFLICT",
+      requestId,
+    });
     expect(afterMock).not.toHaveBeenCalled();
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "auth registration email conflict",
+      expect.objectContaining({ event: "auth.registration.email_conflict" }),
+    );
+  });
+
+  it("does not misclassify another unique-constraint failure as an email conflict", async () => {
+    companyCreateMock.mockRejectedValueOnce({
+      code: "P2002",
+      meta: { target: ["token_hash"] },
+    });
+
+    const response = await POST(registrationRequest({
+      companyName: "Exempel AB",
+      email: "owner@example.se",
+      password: "securepass1",
+    }));
+
+    expect(response.status).toBe(500);
+    expect(afterMock).not.toHaveBeenCalled();
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "auth registration failed",
+      expect.anything(),
+      expect.objectContaining({ event: "auth.registration.failed" }),
+    );
   });
 
   it("commits owner/token/audit before returning 201 and schedules canonical verification delivery", async () => {
