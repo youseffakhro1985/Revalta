@@ -4,10 +4,10 @@ source_of_truth: "GitHub main"
 
 snapshot:
   verified_at: "2026-08-17"
-  main_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
+  baseline_main_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
   production:
     url: "https://www.revalta.se"
-    deployment_id: 5941808630
+    baseline_deployment_id: 5941808630
     status: "SUCCESS"
   vercel_connector:
     status: "BLOCKED_CONNECTOR"
@@ -17,7 +17,7 @@ tasks:
   - task_id: "REV-COORD-004"
     title: "Synchronize multi-agent truth and task registry"
     owner: "ChatGPT Work"
-    status: "ACTIVE"
+    status: "DONE"
     baseline_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
     branch: "agent/coord-004-task-registry"
     owned_paths:
@@ -29,26 +29,23 @@ tasks:
       - ".github/workflows/**"
       - "package.json"
       - "package-lock.json"
-      - "src/app/demo/**"
-      - "src/app/api/demo-request/**"
-      - "src/lib/demo-request-email*"
-      - "src/components/demo-request-form.tsx"
-      - "src/app/page.tsx"
-      - "src/components/marketing-header.tsx"
-      - "src/components/site-footer.tsx"
-      - "src/app/sitemap.ts"
-      - ".env.example"
-      - "INTEGRATIONS.md"
+      - "REV-DEMO-001 locked implementation paths"
     dependencies:
       - "current GitHub main"
       - "open PR and issue status"
       - "GitHub deployment evidence"
       - "Vercel connector visibility check"
     acceptance:
-      - "AI_COLLABORATION.md reflects current merged, blocked and planned task state"
-      - "docs/AI_TASKS.yml is machine-readable and contains required task fields"
+      - "coordination truth reconciled to baseline main"
+      - "machine-readable task register created"
+      - "only two documentation files changed"
       - "no runtime, UI, database, workflow or dependency changes"
-      - "no secrets or secret values are recorded"
+      - "no secrets or secret values recorded"
+      - "Revalta CI #1001 succeeded on pre-finalization candidate"
+      - "CodeQL #293 succeeded on pre-finalization candidate"
+      - "exact-SHA Preview deployment 5943297957 succeeded on pre-finalization candidate"
+      - "Preview Browser E2E #8 succeeded on pre-finalization candidate"
+      - "final candidate must rerun exact-SHA gates before merge"
     pull_request: 266
     updated_at: "2026-08-17"
 
@@ -64,7 +61,7 @@ tasks:
       - "Vercel connector must expose the Revalta project"
     acceptance:
       - "Revalta project is discoverable through connected Vercel access"
-      - "project, deployment and environment status can be read without exposing secret values"
+      - "project, deployment and env status can be read without exposing secret values"
       - "runtime/log verification is possible where permissions allow"
     pull_request: null
     updated_at: "2026-08-17"
@@ -77,20 +74,16 @@ tasks:
     branch: null
     owned_paths: []
     forbidden_paths:
-      - "src/app/demo/**"
-      - "src/app/api/demo-request/**"
-      - "src/lib/demo-request-email*"
-      - "src/components/demo-request-form.tsx"
+      - "REV-DEMO-001 locked implementation paths"
     dependencies:
       - "issue #265"
       - "fresh current-main read before branch creation"
     acceptance:
       - "unknown email receives deterministic neutral response within bounded latency"
       - "real account remains enumeration-safe when email provider is slow or unavailable"
-      - "blocking operation is identified rather than hidden by a longer timeout"
-      - "timing regression coverage is added where practical"
-      - "password-reset browser E2E is restored after the fix"
-    issue: 265
+      - "blocking operation is identified instead of hidden by a longer timeout"
+      - "timing regression coverage added where practical"
+      - "password-reset browser E2E restored after fix"
     pull_request: null
     updated_at: "2026-08-17"
 
@@ -102,21 +95,17 @@ tasks:
     branch: null
     owned_paths: []
     forbidden_paths:
-      - "src/app/demo/**"
-      - "src/app/api/demo-request/**"
-      - "src/lib/demo-request-email*"
-      - "src/components/demo-request-form.tsx"
+      - "REV-DEMO-001 locked implementation paths"
     dependencies:
       - "issue #217"
-      - "REV-AUTH-RESET-001 should be reconciled first"
+      - "REV-AUTH-RESET-001 reconciliation"
       - "fresh current-main read before branch creation"
     acceptance:
-      - "critical errors correlate requestId, route, method, release, environment and latency"
-      - "stable event/error codes are used"
-      - "passwords, sessions, reset tokens, Stripe signatures, database URLs and secrets are never logged"
+      - "critical requests correlate requestId, route, method, release, environment and latency"
+      - "stable event/error codes used"
+      - "secrets, sessions, reset tokens, Stripe signatures and DB URLs never logged"
       - "Production responses do not expose stack traces"
-      - "CI, CodeQL and exact-SHA Preview are green before merge"
-    issue: 217
+      - "CI, CodeQL and exact-SHA Preview pass before merge"
     pull_request: null
     updated_at: "2026-08-17"
 
@@ -143,10 +132,10 @@ tasks:
       - "navigation and dashboard runtime code"
     dependencies:
       - "verifiable Vercel project access"
-      - "DEMO_REQUEST_TO presence/status must be verifiable without exposing its value"
+      - "DEMO_REQUEST_TO presence/status verification without revealing its value"
       - "Preview submission smoke"
     acceptance:
-      - "DEMO_REQUEST_TO is classified PRESENT/MISSING/MISCONFIGURED without revealing its value"
+      - "DEMO_REQUEST_TO classified PRESENT/MISSING/MISCONFIGURED without value disclosure"
       - "demo submission succeeds on exact-SHA Preview"
       - "full release gate passes"
       - "Production smoke passes after merge"
@@ -162,14 +151,12 @@ tasks:
     owned_paths: []
     forbidden_paths: []
     dependencies: []
-    acceptance:
-      - "merged and release-gated"
+    acceptance: ["merged and release-gated"]
     pull_request: 252
-    merge_sha: "354de1e0ba408525a4e47c2b6f16a038929e60f7"
     updated_at: "2026-08-16"
 
   - task_id: "REV-BREAD-001"
-    title: "Shared dashboard breadcrumbs and local module navigation"
+    title: "Shared dashboard breadcrumbs and module navigation"
     owner: "ChatGPT Work"
     status: "DONE"
     baseline_sha: "354de1e0ba408525a4e47c2b6f16a038929e60f7"
@@ -177,10 +164,8 @@ tasks:
     owned_paths: []
     forbidden_paths: []
     dependencies: []
-    acceptance:
-      - "merged and release-gated"
+    acceptance: ["merged and release-gated"]
     pull_request: 253
-    merge_sha: "e24feff5f2e48c22b913b444b6c8ffd5cf82ee63"
     updated_at: "2026-08-16"
 
   - task_id: "REV-SEARCH-001"
@@ -192,10 +177,8 @@ tasks:
     owned_paths: []
     forbidden_paths: []
     dependencies: []
-    acceptance:
-      - "merged and release-gated"
+    acceptance: ["merged and release-gated"]
     pull_request: 256
-    merge_sha: "a93f0fd050e88ba344f96e8d0685d4d3da26153a"
     updated_at: "2026-08-16"
 
   - task_id: "REV-DASH-ROLE-001"
@@ -207,10 +190,8 @@ tasks:
     owned_paths: []
     forbidden_paths: []
     dependencies: []
-    acceptance:
-      - "merged and release-gated"
+    acceptance: ["merged and release-gated"]
     pull_request: 257
-    merge_sha: "9147f3e88156d1eb1e6a59c1f70856cc4dba8183"
     updated_at: "2026-08-16"
 
   - task_id: "REV-PROPERTY-001"
@@ -222,10 +203,8 @@ tasks:
     owned_paths: []
     forbidden_paths: []
     dependencies: []
-    acceptance:
-      - "merged and release-gated"
+    acceptance: ["merged and release-gated"]
     pull_request: 258
-    merge_sha: "d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d"
     updated_at: "2026-08-16"
 
   - task_id: "REV-ONBOARD-001"
@@ -237,10 +216,8 @@ tasks:
     owned_paths: []
     forbidden_paths: []
     dependencies: []
-    acceptance:
-      - "merged; CI #990, CodeQL #282, exact-SHA Preview and Production succeeded"
+    acceptance: ["CI #990, CodeQL #282, exact-SHA Preview and Production succeeded"]
     pull_request: 262
-    merge_sha: "b9253cda99a79780477ef3b09150ba03c56338cd"
     updated_at: "2026-08-17"
 
   - task_id: "REV-ROUTES-001"
@@ -252,10 +229,8 @@ tasks:
     owned_paths: []
     forbidden_paths: []
     dependencies: []
-    acceptance:
-      - "merged; CI #992, CodeQL #284, exact-SHA Preview and Production succeeded"
+    acceptance: ["CI #992, CodeQL #284, exact-SHA Preview and Production succeeded"]
     pull_request: 263
-    merge_sha: "a839728684984f8e5233093153972ec69e7e3f4d"
     updated_at: "2026-08-17"
 
   - task_id: "REV-E2E-AUTH-001"
@@ -269,48 +244,22 @@ tasks:
     dependencies:
       - "password-reset browser coverage remains issue #265"
     acceptance:
-      - "register browser flow passed"
-      - "login browser flow passed"
-      - "critical desktop navigation passed"
-      - "Command Center passed"
-      - "mobile menu passed"
-      - "logout and protected dashboard redirect passed"
+      - "register/login/navigation/Command Center/mobile/logout/protected redirect passed"
       - "CI #998, CodeQL #290, exact-SHA Preview, Browser E2E #5 and Production succeeded"
     pull_request: 264
-    merge_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
-    followup_issue: 265
     updated_at: "2026-08-17"
 
 holds:
-  - pull_request: 239
-    status: "HOLD"
-    reason: "Document archive pagination/filter work must be reconciled against current main."
-  - pull_request: 218
-    status: "FROZEN_HISTORICAL_STACK"
-    reason: "Do not reuse directly."
-  - pull_request: 223
-    status: "HOLD"
-    reason: "Prisma client major upgrade; coordinate with PR #260 in a separate dependency task."
-  - pull_request: 260
-    status: "HOLD"
-    reason: "Prisma CLI major upgrade; coordinate with PR #223 in a separate dependency task."
-  - pull_request: 191
-    status: "HOLD"
-    reason: "actions/checkout major upgrade."
-  - pull_request: 222
-    status: "HOLD"
-    reason: "CodeQL major upgrade."
-  - pull_request: 194
-    status: "HOLD"
-    reason: "react-dom dependency task."
-  - pull_request: 259
-    status: "HOLD"
-    reason: "tailwind-merge breaking upgrade; coordinate with Tailwind strategy."
-  - pull_request: 261
-    status: "HOLD"
-    reason: "Tailwind 4 breaking upgrade; do not mix with P0 product work."
+  - {pull_request: 239, status: "HOLD", reason: "Reconcile document archive work against current main."}
+  - {pull_request: 218, status: "FROZEN_HISTORICAL_STACK", reason: "Do not reuse directly."}
+  - {pull_request: 223, status: "HOLD", reason: "Coordinate Prisma client major with PR #260."}
+  - {pull_request: 260, status: "HOLD", reason: "Coordinate Prisma CLI major with PR #223."}
+  - {pull_request: 191, status: "HOLD", reason: "actions/checkout major."}
+  - {pull_request: 222, status: "HOLD", reason: "CodeQL major."}
+  - {pull_request: 194, status: "HOLD", reason: "react-dom dependency task."}
+  - {pull_request: 259, status: "HOLD", reason: "tailwind-merge breaking upgrade."}
+  - {pull_request: 261, status: "HOLD", reason: "Tailwind 4 breaking upgrade."}
 
 branch_quarantine:
-  policy: "Old ChatGPT/Cursor/Claude branches must be compared with current main before reuse. Branch existence does not imply active ownership."
-  known_cleanup_candidates:
-    - "noop"
+  policy: "Old ChatGPT/Cursor/Claude branches require compare against current main and explicit handoff before reuse. Branch existence does not imply active ownership."
+  known_cleanup_candidates: ["noop"]
