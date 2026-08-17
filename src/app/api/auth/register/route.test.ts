@@ -57,7 +57,7 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/integrations", () => ({ queueEmailVerification: queueEmailVerificationMock }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
-import { POST, REGISTER_TRANSACTION_OPTIONS } from "./route";
+import { POST } from "./route";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -197,8 +197,7 @@ describe("POST /api/auth/register", () => {
       expect.anything(),
     );
     expect(transactionMock).toHaveBeenCalledTimes(1);
-    expect(transactionMock.mock.calls[0]?.[1]).toEqual(REGISTER_TRANSACTION_OPTIONS);
-    expect(REGISTER_TRANSACTION_OPTIONS).toEqual({ maxWait: 1_500, timeout: 5_000 });
+    expect(transactionMock.mock.calls[0]?.[1]).toEqual({ maxWait: 1_500, timeout: 5_000 });
     expect(afterMock).toHaveBeenCalledTimes(1);
     expect(queueEmailVerificationMock).not.toHaveBeenCalled();
     expect(JSON.stringify(body)).not.toContain("token");
