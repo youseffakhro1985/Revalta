@@ -4,49 +4,80 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 
 ## Grundregler
 
-- En task = ett tydligt problemområde = en branch = en PR.
-- Kontrollera aktuell `main` SHA direkt före branch-skapande och direkt före merge.
-- Gamla Claude/Cursor-branches får inte återanvändas utan compare mot aktuell `main`.
+- En task = ett tydligt problemområde = en ägare = en branch = en PR.
+- Läs aktuell `main` och notera exakt SHA före varje ny task och direkt före merge.
+- Läs `AI_COLLABORATION.md`, `AGENTS.md`, `CLAUDE.md`, `DESIGN_SYSTEM.md`, `INTEGRATIONS.md` och relevanta docs innan produktkod ändras.
+- Kontrollera öppna PR:er, issues, Preview/Production-status och Vercel där åtkomst finns.
+- Gamla ChatGPT/Cursor/Claude-branches är **quarantine** tills de har jämförts mot aktuell `main`.
+- En kvarvarande branch betyder inte att tasken fortfarande är aktiv.
 - Tenant isolation är högsta säkerhetsinvarianten.
 - Produktionsmigrationer går endast via dokumenterat Database Release-flöde.
 - Inga secrets får skrivas i denna fil, PR-beskrivningar, screenshots eller loggar.
-- Befintlig svensk/skandinavisk premiumdesign bevaras.
+- Befintlig svensk/skandinavisk premiumdesign bevaras; koordinationsarbete får inte glida över i UI-redesign.
+- Maskinläsbar task-status speglas i `docs/AI_TASKS.yml`.
 
-## Snapshot
+## Verifierad snapshot
 
 - Datum: `2026-08-17`
-- Baseline `main` för aktiv task: `b9253cda99a79780477ef3b09150ba03c56338cd`
-- Commit: `feat: add first-run organisation onboarding`
+- Verifierad aktuell `main`: `ed4b4d1e38f354eb054f1233de12571312d1d290`
+- Commit: `test: add exact-SHA Preview browser E2E`
 - Production: `https://www.revalta.se`
-- Sprint: **S0 — canonical routes och därefter kritisk E2E**
+- GitHub/Vercel Production deployment: `5941808630` — **SUCCESS**
+- Vercel connector: **BLOCKED_CONNECTOR** — teamet är synligt men projektlistningen returnerar inga projekt. Full project/env/runtime-audit får därför inte påstås vara verifierad.
+- Sprint: **P0 — koordinering, Vercel access, auth-reset, observability och demo**
 
-> SHA-raden är task-baseline. Läs alltid GitHub `main` igen före merge.
+> Snapshot-SHA är verifierad vid koordinationsstart. Läs alltid GitHub `main` igen före merge.
 
-## Aktiva / blockerade tasks
+## Aktiv task
 
-| Task-ID | Ägare | Branch | Status | Ägt område | Nästa grind |
+| Task-ID | Ägare | Branch | Status | Ägt område | Acceptance |
 |---|---|---|---|---|---|
-| REV-ROUTES-001 | ChatGPT | `agent/canonical-dashboard-routes` | **IN PROGRESS** | dashboard route trees, legacy work-order redirects, route compatibility helper/tests, canonical route doc, ledger | Canonical implementation tree under `(dashboard)`; legacy tree endast redirectadapters; full CI/CodeQL/exact-SHA Preview |
-| REV-DEMO-001 | ChatGPT | `agent/demo-conversion-flow` | **BLOCKED_ENV — CODE GATE GREEN** | `/demo`, `/api/demo-request`, demo form/mail/tests, marketing header/footer, landing CTA, sitemap, `.env.example`, `INTEGRATIONS.md` | PR #254 draft. Merge först när `DEMO_REQUEST_TO` kan klassas PRESENT och submission smoke kan göras. |
-| REV-244-AUDIT | ChatGPT | read-only | LOW PRIORITY | Historisk PR #244 | Endast isolerade follow-ups vid verifierad risk. |
-| REV-VERCEL-001 | ChatGPT | read-only | BLOCKED_CONNECTOR | Vercel project/env/runtime | OAuth-team syns men Revalta project/deploy lookup ger 404. Rapportera aldrig secretvärden. |
+| REV-COORD-004 | ChatGPT Work | `agent/coord-004-task-registry` | **ACTIVE** | `AI_COLLABORATION.md`, `docs/AI_TASKS.yml` | Synka verklig status mot current main, ta bort gamla aktiva markeringar, skapa maskinläsbart register, inga runtime/UI/DB/dependencyändringar |
 
-## Slutförda tasks
+### REV-COORD-004 — förbjudna områden
 
-| Task-ID | Resultat | PR | Merge SHA | Verifiering |
+- `src/**`
+- `prisma/**`
+- `.github/workflows/**`
+- `package.json`
+- `package-lock.json`
+- demo-implementationens låsta filer
+- all annan produktkod
+
+## Blockerade / nästa P0-tasks
+
+| Task-ID | Status | Källa | Nästa säkra steg |
+|---|---|---|---|
+| REV-VERCEL-002 | **BLOCKED_CONNECTOR** | Vercel team syns, `list_projects` returnerar inga projekt | Återställ verifierbar project access; därefter läs project/env/deploy/runtime utan att exponera secretvärden |
+| REV-AUTH-RESET-001 | **READY_NEXT** | Issue #265 | Isolera latency i password-reset request, bevara anti-enumeration, lägg bounded regressionstest och återställ reset browser-E2E efter fix |
+| REV-OBS-002 | **QUEUED** | Issue #217 | Färdigställ korrelerad observability för auth/cron/Stripe/kritiska API:er med requestId, latency och säkra eventkoder |
+| REV-DEMO-001 | **BLOCKED_ENV — CODE GATE GREEN** | Draft PR #254 | Verifiera Vercel/env-status för `DEMO_REQUEST_TO`, smoke-testa submission på Preview, full gate, merge, Production smoke |
+
+Ingen av de tre planerade P0-tasks ovan äger produktfiler förrän egen branch har skapats från då aktuell `main`. `REV-DEMO-001` behåller däremot sitt redan etablerade filägarskap eftersom PR #254 fortfarande är öppen och blockerad.
+
+## Slutförda produkt- och plattformstasks
+
+| Task-ID | Resultat | PR | Merge SHA | Verifierad status |
 |---|---|---|---|---|
 | REV-COORD-002 | Collaboration ledger + PR-triage | #251 | `b8138046087a7a93c6d346a58658f7bf006097dc` | CI/CodeQL/Preview/Production success |
-| REV-NAV-001 | Navigation v2 + Settings/Admin IA | #252 | `354de1e0ba408525a4e47c2b6f16a038929e60f7` | Full CI, CodeQL, exact-SHA Preview; Production success |
-| REV-BREAD-001 | Gemensamma breadcrumbs + lokal modulnavigation | #253 | `e24feff5f2e48c22b913b444b6c8ffd5cf82ee63` | Full CI, tester, CodeQL, exact-SHA Preview; Production success |
-| REV-COORD-003 | Handoff till Command Center och demo-blocker | #255 | `b7cad49965b3c5c714cea8cc907a2f9170eafc24` | Full CI, CodeQL och Preview success |
-| REV-SEARCH-001 | GlobalSearch → Revalta Command Center | #256 | `a93f0fd050e88ba344f96e8d0685d4d3da26153a` | Full CI, CodeQL och exact-SHA Preview success |
-| REV-DASH-ROLE-001 | Rollbaserade Owner/Admin, Manager, Technician och Viewer dashboards | #257 | `9147f3e88156d1eb1e6a59c1f70856cc4dba8183` | Full CI, CodeQL och exact-SHA Preview success |
-| REV-PROPERTY-001 | Fastigheten som digital fastighetspärm | #258 | `d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d` | Full CI, CodeQL och exact-SHA Preview success |
-| REV-ONBOARD-001 | Tenant-scopad 5-stegs first-run onboarding för Owner/Admin | #262 | `b9253cda99a79780477ef3b09150ba03c56338cd` | Full CI #990, CodeQL #282, exact-SHA Preview och Production success |
+| REV-NAV-001 | Navigation v2 + Settings/Admin IA | #252 | `354de1e0ba408525a4e47c2b6f16a038929e60f7` | Merged; full gate och Production verifierad |
+| REV-BREAD-001 | Gemensamma breadcrumbs + lokal modulnavigation | #253 | `e24feff5f2e48c22b913b444b6c8ffd5cf82ee63` | Merged; full gate och Production verifierad |
+| REV-COORD-003 | Handoff till Command Center och demo-blocker | #255 | `b7cad49965b3c5c714cea8cc907a2f9170eafc24` | Merged; CI/CodeQL/Preview success |
+| REV-SEARCH-001 | GlobalSearch → Revalta Command Center | #256 | `a93f0fd050e88ba344f96e8d0685d4d3da26153a` | Merged; full gate verifierad |
+| REV-DASH-ROLE-001 | Rollbaserade dashboards | #257 | `9147f3e88156d1eb1e6a59c1f70856cc4dba8183` | Merged; full gate verifierad |
+| REV-PROPERTY-001 | Digital fastighetspärm/workspace | #258 | `d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d` | Merged; full gate verifierad |
+| REV-ONBOARD-001 | Tenant-scopad 5-stegs first-run onboarding | #262 | `b9253cda99a79780477ef3b09150ba03c56338cd` | CI #990, CodeQL #282, exact-SHA Preview och Production success |
+| REV-ROUTES-001 | Canonical dashboard route tree + legacy redirects | #263 | `a839728684984f8e5233093153972ec69e7e3f4d` | Merged; CI #992, CodeQL #284, exact-SHA Preview och Production success |
+| REV-E2E-AUTH-001 | Exact-SHA Preview browser-E2E för register/login/navigation/Command Center/mobile/logout/protected route | #264 | `ed4b4d1e38f354eb054f1233de12571312d1d290` | CI #998, CodeQL #290, exact-SHA Preview + Browser E2E #5 success, Production success; password reset avsiktligt separerad som #265 |
 
-## Filägarskap
+## Aktiva fil-lås
 
-### REV-DEMO-001 — låst/blockerat
+### REV-COORD-004
+
+- `AI_COLLABORATION.md`
+- `docs/AI_TASKS.yml`
+
+### REV-DEMO-001 — blockerad men fortfarande låst
 
 - `src/app/demo/**`
 - `src/app/api/demo-request/**`
@@ -59,44 +90,45 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 - `.env.example`
 - `INTEGRATIONS.md`
 
-### REV-ROUTES-001 — aktivt låst
+## Öppna issues som påverkar releaseordningen
 
-- `src/app/(dashboard)/dashboard/installningar/eskaleringar/**`
-- `src/app/dashboard/installningar/eskaleringar/**`
-- `src/app/dashboard/arbetsordrar/**`
-- `src/lib/dashboard-route-compat.ts`
-- `src/lib/dashboard-route-compat.test.ts`
-- `docs/CANONICAL_DASHBOARD_ROUTES.md`
-- `AI_COLLABORATION.md`
-
-## REV-ROUTES-001 — canonical kontrakt
-
-- Alla riktiga dashboardimplementationer ska bo i `src/app/(dashboard)/dashboard/**`.
-- `src/app/dashboard/**` får endast innehålla legacy-kompatibilitetsredirects.
-- `/dashboard/installningar/eskaleringar` och `/regler` behåller oförändrad URL men deras befintliga Git-blobs flyttas byte-identiskt till canonical route group.
-- Legacy `/dashboard/arbetsordrar`, `/dashboard/arbetsordrar/[id]` och `/dashboard/arbetsordrar/operationsoversikt` behålls som redirects till singulara `/dashboard/arbetsorder...`.
-- Redirect targets centraliseras i `src/lib/dashboard-route-compat.ts` och regressionstestas.
-- Ingen UI-, API-, auth-, databas- eller dependencyändring ingår i route-migreringen.
+- **#265 — password-reset request stalls on Vercel Preview.** P0. Höj inte bara timeout; identifiera blockerande operation och bevara neutral anti-enumeration-respons.
+- **#217 — Observability phase 2.** P0 efter auth-reset. Korrelera kritiska serverfel med requestId, route, method, release, environment, latency och stabil event/error code utan secrets/PII.
 
 ## PR-triage / HOLD
 
-- #254: DEMO — draft / BLOCKED_ENV, kodgate grön.
-- #244: MERGED / historisk stor Claude-branch — återanvänd inte direkt.
-- #239: HOLD — dokumentarkiv paginering/filter måste reconcileras mot current main.
-- #218: FROZEN HISTORICAL STACK.
-- #223: HOLD — Prisma major.
-- #191: HOLD — actions/checkout major.
-- #222: HOLD — CodeQL major.
-- #194: HOLD — separat react-dom dependency-task.
+- #254 — DEMO: **draft / BLOCKED_ENV**, kodgate grön; merge förbjuden tills env + submission smoke är verifierbar.
+- #239 — HOLD: dokumentarkiv paginering/filter måste reconcileras mot current main innan återanvändning.
+- #218 — FROZEN HISTORICAL STACK: återanvänd inte direkt.
+- #223 + #260 — HOLD: Prisma client/CLI major-upgrade måste hanteras som en koordinerad separat dependency-task.
+- #191 — HOLD: actions/checkout major.
+- #222 — HOLD: CodeQL major.
+- #194 — HOLD: separat react-dom dependency-task.
+- #259 + #261 — HOLD: tailwind-merge/Tailwind 4 är breaking dependency-spår och ska inte blandas med P0-produktarbete.
+
+## Branch quarantine
+
+Det finns många äldre `agent/*`, `cursor/*` och `claude/*` branches kvar. De är **inte aktiva bara för att de existerar**. Innan eventuell återanvändning krävs:
+
+1. verifiera då aktuell `main`,
+2. compare branch → current `main`,
+3. kontrollera om motsvarande PR/task redan är merged/superseded,
+4. isolera unik diff,
+5. skapa explicit handoff innan någon fil skrivs.
+
+`noop` är en inaktiv, oavsiktlig branch utan avsett unikt arbete och kan städas bort separat när branch-delete görs säkert.
 
 ## Leveransordning
 
-1. **REV-ROUTES-001 — ACTIVE**
-2. REV-E2E-001 — kritiska browser-E2E
-3. REV-VERCEL-001 — autentiserad Vercel-audit när connector scope fungerar
-
-REV-DEMO-001 återupptas så snart env-blockern är verifierbar och får inte blandas med ovanstående tasks.
+1. **REV-COORD-004 — ACTIVE**
+2. **REV-VERCEL-002 — verifierbar Vercel project access**
+3. **REV-AUTH-RESET-001 — issue #265**
+4. **REV-OBS-002 — issue #217**
+5. **REV-DEMO-001 — återuppta befintlig PR #254 när env är verifierbar**
+6. Därefter P1-produktarbete enligt aktuell roadmap, men endast efter ny current-main-reconciliation.
 
 ## Handoff / Definition of Done
 
-En task är DONE först när relevant lint, typecheck, tester, full quality gate, CI, CodeQL, exact-SHA Preview, browser smoke när åtkomst finns, accessibility/security/database impact, commit/PR/review/merge, Production deploy/smoke, runtime-loggkontroll och kvarvarande risker är redovisade.
+En task är inte DONE bara för att kod eller dokument är skrivna. Relevant task ska redovisa baseline SHA, branch, changed files, implementation, tester/validering, lint/typecheck/full quality gate där relevant, security/tenant/accessibility/database impact, CI, CodeQL, exact-SHA Preview, relevant browser E2E/smoke, PR/review, compare mot current main, merge med förväntad HEAD, Production deploy/smoke, runtime-loggkontroll där åtkomst finns, kvarvarande risker och uppdaterat ledger/task-register.
+
+Om en kontroll inte kan utföras ska status vara **BLOCKED**. Gissa aldrig att den är grön.
