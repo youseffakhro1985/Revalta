@@ -3,8 +3,9 @@ import { PortfolioDashboard } from "@/components/dashboard/portfolio-dashboard";
 import { ManagerDashboard } from "@/components/dashboard/manager-dashboard";
 import { TechnicianDashboard } from "@/components/dashboard/technician-dashboard";
 import { ViewerDashboard } from "@/components/dashboard/viewer-dashboard";
+import { FirstRunOnboarding } from "@/components/dashboard/first-run-onboarding";
 import { dashboardModeForRole } from "@/components/dashboard/dashboard-role";
-import { getCurrentUser } from "@/lib/current-user";
+import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 import { residentHomePath } from "@/lib/resident-access";
 import { getCachedSchemaReadiness, schemaCompatibilityBannerMessage } from "@/lib/schema-readiness";
 
@@ -37,6 +38,8 @@ export default async function Dashboard() {
           <p className="mt-1 text-sm">Verifiera adressen för säkrare kontoåterställning och framtida systemnotiser.</p>
         </div>
       ) : null}
+
+      {schema.ready && canManageCompany(user.role) ? <FirstRunOnboarding /> : null}
 
       {schema.ready ? (
         mode === "portfolio" ? <PortfolioDashboard user={user} />
