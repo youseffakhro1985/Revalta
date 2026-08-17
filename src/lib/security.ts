@@ -1,6 +1,8 @@
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const BCRYPT_MAX_PASSWORD_BYTES = 72;
 
-export const passwordPolicyMessage = "Lösenordet ska ha minst 10 tecken samt innehålla både bokstav och siffra";
+export const passwordPolicyMessage =
+  "Lösenordet ska ha minst 10 tecken, innehålla både bokstav och siffra och får inte vara för långt";
 
 export function normalizeEmail(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -11,10 +13,12 @@ export function isValidEmail(value: string) {
 }
 
 export function isStrongPassword(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const utf8Length = new TextEncoder().encode(value).length;
   return (
-    typeof value === "string" &&
     value.length >= 10 &&
     value.length <= 128 &&
+    utf8Length <= BCRYPT_MAX_PASSWORD_BYTES &&
     /[A-Za-zÅÄÖåäö]/.test(value) &&
     /\d/.test(value)
   );
