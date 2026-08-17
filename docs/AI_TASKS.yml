@@ -49,7 +49,7 @@ tasks:
       - "docs/AI_TASKS.yml is machine-readable and contains required task fields"
       - "no runtime, UI, database, workflow or dependency changes"
       - "no secrets or secret values are recorded"
-    pull_request: null
+    pull_request: 266
     updated_at: "2026-08-17"
 
   - task_id: "REV-VERCEL-002"
