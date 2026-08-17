@@ -109,7 +109,7 @@ try {
   }
   console.log(`register API: HTTP 201 in ${registerLatencyMs}ms`);
   await expectPath(page, "/login");
-  await expectVisible(page.getByRole("heading", { name: "Logga in" }), "login heading after registration");
+  await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after registration");
   console.log("register: browser flow passed");
 
   // Login through the real form.
@@ -158,10 +158,10 @@ try {
   await expectVisible(logout, "logout button");
   await logout.click();
   await expectPath(page, "/login");
-  await expectVisible(page.getByRole("heading", { name: "Logga in" }), "login heading after logout");
+  await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after logout");
   await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
   await expectPath(page, "/login");
-  await expectVisible(page.getByRole("heading", { name: "Logga in" }), "login heading after protected redirect");
+  await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after protected redirect");
   console.log("logout + protected dashboard redirect: passed");
 
   if (pageErrors.length > 0) {
