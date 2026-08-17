@@ -113,7 +113,7 @@ describe("POST /api/auth/password-reset/request", () => {
     passwordResetTokenUpdateManyMock.mockResolvedValue({ count: 0 });
     passwordResetTokenCreateMock.mockResolvedValue({ id: "reset-token-1" });
     sendPasswordResetEmailMock.mockResolvedValue(undefined);
-    transactionMock.mockImplementation(async (callback, _options) => callback({
+    transactionMock.mockImplementation(async (callback) => callback({
       user: { findUnique: userFindUniqueMock },
       passwordResetToken: {
         create: passwordResetTokenCreateMock,
