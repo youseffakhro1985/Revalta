@@ -97,7 +97,10 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
 
     return { ...result, source: "database" };
   } catch (error) {
-    console.error("Persistent rate limiter unavailable; using bounded in-memory fallback", error);
+    console.error(
+      "Persistent rate limiter unavailable; using bounded in-memory fallback",
+      error instanceof Error ? error.name : "UnknownError",
+    );
     return checkMemoryFallback(keyHash, limit, windowMs);
   }
 }
