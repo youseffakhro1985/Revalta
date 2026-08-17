@@ -2,11 +2,9 @@ import bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from "crypto";
 export { signToken, verifyToken } from './session';
 
-// bcryptjs is pure JavaScript, so cost 12 can exceed Revalta's registration
-// latency budget on constrained serverless CPUs. OWASP's legacy-bcrypt
-// guidance requires a work factor of 10 or greater; cost 10 keeps new hashes
-// within that floor while existing higher-cost hashes remain fully verifiable.
-const BCRYPT_COST_FACTOR = 10;
+// 12 rounds balances resistance to offline cracking against bcryptjs's (pure-JS,
+// slower than native bcrypt) per-hash latency on serverless CPUs.
+const BCRYPT_COST_FACTOR = 12;
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, BCRYPT_COST_FACTOR);
