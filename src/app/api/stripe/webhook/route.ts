@@ -1,8 +1,9 @@
 import { Prisma } from "@prisma/client";
-import db from "@/lib/db";
-import { verifyStripeSignature } from "@/lib/stripe";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import db from "@/lib/db";
 import { createRouteObservability } from "@/lib/route-observability";
+import { verifyStripeSignature } from "@/lib/stripe";
 
 type StripeObject = {
   id?: string;
@@ -26,6 +27,13 @@ const supportedEvents = new Set([
   "invoice.payment_succeeded",
   "invoice.payment_failed",
 ]);
+
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 function getPlanFromMetadata(object: StripeObject) {
   const plan = object.metadata?.plan;
@@ -108,72 +116,121 @@ async function updateCompanyFromStripeObject(client: Prisma.TransactionClient, o
 
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, "/api/stripe/webhook");
+  const acknowledge = (body: { received: true; duplicate?: true }) =>
+    observability.correlate(NextResponse.json(body, { headers: SUCCESS_HEADERS }));
+
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature");
 
   if (!verifyStripeSignature(payload, signature)) {
-    return NextResponse.json({ error: "Ogiltig Stripe-signatur" }, { status: 400 });
+    observability.logger.warn("stripe webhook signature rejected", observability.elapsed({
+      event: "stripe.webhook.signature_invalid",
+    }));
+    return apiErrorResponse({
+      status: 400,
+      code: API_ERROR_CODES.validationFailed,
+      message: "Ogiltig Stripe-signatur",
+      requestId: observability.requestId,
+    });
   }
 
+  let event: StripeEvent;
   try {
-    const event = JSON.parse(payload) as StripeEvent;
-    if (typeof event.id !== "string" || !event.id.startsWith("evt_") || typeof event.type !== "string") {
-      return NextResponse.json({ error: "Ogiltig Stripe-payload" }, { status: 400 });
-    }
-    const object = event.data?.object;
+    event = JSON.parse(payload) as StripeEvent;
+  } catch {
+    observability.logger.warn("stripe webhook payload rejected", observability.elapsed({
+      event: "stripe.webhook.payload_invalid",
+    }));
+    return apiErrorResponse({
+      status: 400,
+      code: API_ERROR_CODES.validationFailed,
+      message: "Ogiltig Stripe-payload",
+      requestId: observability.requestId,
+    });
+  }
 
-    if (object && supportedEvents.has(event.type)) {
+  if (typeof event.id !== "string" || !event.id.startsWith("evt_") || typeof event.type !== "string") {
+    observability.logger.warn("stripe webhook payload rejected", observability.elapsed({
+      event: "stripe.webhook.payload_invalid",
+    }));
+    return apiErrorResponse({
+      status: 400,
+      code: API_ERROR_CODES.validationFailed,
+      message: "Ogiltig Stripe-payload",
+      requestId: observability.requestId,
+    });
+  }
+
+  const object = event.data?.object;
+  const supported = supportedEvents.has(event.type);
+  observability.logger.info("stripe webhook received", observability.elapsed({
+    event: "stripe.webhook.received",
+    stripeEventId: event.id,
+    stripeEventType: event.type,
+    supported,
+  }));
+
+  try {
+    if (object && supported) {
       const duplicate = await db.$transaction(async (tx) => {
-          // Serialize deliveries of the same Stripe event without requiring a new
-          // database table to exist before this application version is deployed.
-          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe:${event.id}`}))`;
-          const existingEvent = await tx.integrationEvent.findFirst({
-            where: { type: "stripe", recipient: event.id },
-            select: { id: true },
-          });
-          if (existingEvent) return true;
-
-          const company = await updateCompanyFromStripeObject(tx, object);
-          await tx.integrationEvent.create({
-            data: {
-              company_id: company?.id,
-              type: "stripe",
-              status: company ? "received" : "ignored",
-              recipient: event.id,
-              payload: {
-                eventType: event.type,
-                objectId: object.id,
-                customer: object.customer,
-                subscription: object.subscription,
-                status: object.status,
-                matchedCompany: Boolean(company),
-                metadataCompanyId: object.metadata?.companyId || null,
-              },
-            },
-          });
-          return false;
+        // Serialize deliveries of the same Stripe event without requiring a new
+        // database table to exist before this application version is deployed.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe:${event.id}`}))`;
+        const existingEvent = await tx.integrationEvent.findFirst({
+          where: { type: "stripe", recipient: event.id },
+          select: { id: true },
         });
+        if (existingEvent) return true;
+
+        const company = await updateCompanyFromStripeObject(tx, object);
+        await tx.integrationEvent.create({
+          data: {
+            company_id: company?.id,
+            type: "stripe",
+            status: company ? "received" : "ignored",
+            recipient: event.id,
+            payload: {
+              eventType: event.type,
+              objectId: object.id,
+              customer: object.customer,
+              subscription: object.subscription,
+              status: object.status,
+              matchedCompany: Boolean(company),
+              metadataCompanyId: object.metadata?.companyId || null,
+            },
+          },
+        });
+        return false;
+      });
+
       if (duplicate) {
         observability.logger.info("stripe webhook duplicate acknowledged", observability.elapsed({
           event: "stripe.webhook.duplicate",
           stripeEventId: event.id,
           stripeEventType: event.type,
         }));
-        return NextResponse.json({ received: true, duplicate: true });
+        return acknowledge({ received: true, duplicate: true });
       }
     }
 
-    observability.logger.info("stripe webhook received", observability.elapsed({
-      event: "stripe.webhook.received",
+    observability.logger.info("stripe webhook processed", observability.elapsed({
+      event: "stripe.webhook.processed",
       stripeEventId: event.id,
       stripeEventType: event.type,
-      supported: supportedEvents.has(event.type),
+      supported,
     }));
-    return NextResponse.json({ received: true });
+    return acknowledge({ received: true });
   } catch (error) {
     observability.logger.error("stripe webhook failed", error, observability.elapsed({
       event: "stripe.webhook.failed",
+      stripeEventId: event.id,
+      stripeEventType: event.type,
     }));
-    return NextResponse.json({ error: "Ogiltig Stripe-payload" }, { status: 400 });
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
