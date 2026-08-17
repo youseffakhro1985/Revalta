@@ -11,6 +11,7 @@ if (!baseUrl || !/^https:\/\//.test(baseUrl)) {
 
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const email = `e2e-owner-${runId}@example.com`;
+const resetEmail = `e2e-reset-missing-${runId}@example.com`;
 const password = `RevaltaE2E!${runId.slice(-8)}9`;
 const companyName = `E2E Organisation ${runId.slice(-6)}`;
 
@@ -61,9 +62,9 @@ try {
   await expectPath(page, "/login");
   console.log("register: browser flow passed");
 
-  // Password-reset request must stay enumeration-safe while completing in UI.
+  // Password-reset request must stay enumeration-safe without depending on external e-mail delivery.
   await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
-  await page.getByLabel("E-post").fill(email);
+  await page.getByLabel("E-post").fill(resetEmail);
   const resetResponsePromise = page.waitForResponse(
     (response) => response.url().includes("/api/auth/password-reset/request") && response.request().method() === "POST",
     { timeout: 25_000 },
@@ -76,7 +77,7 @@ try {
     "password-reset neutral confirmation",
     5_000,
   );
-  console.log("password-reset request: browser flow passed");
+  console.log("password-reset enumeration-safe browser flow: passed");
 
   // Login through the real form.
   await page.goto("/login", { waitUntil: "domcontentloaded" });
