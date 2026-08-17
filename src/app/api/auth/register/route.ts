@@ -18,6 +18,18 @@ function phaseLatency(startedAt: number) {
   return Math.max(0, Date.now() - startedAt);
 }
 
+function isEmailUniqueConstraintError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; meta?: { target?: unknown } };
+  if (candidate.code !== "P2002") return false;
+
+  const target = candidate.meta?.target;
+  if (Array.isArray(target)) {
+    return target.some((value) => typeof value === "string" && value.toLowerCase().includes("email"));
+  }
+  return typeof target === "string" && target.toLowerCase().includes("email");
+}
+
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, "/api/auth/register");
   try {
@@ -76,21 +88,6 @@ export async function POST(request: Request) {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
         message: passwordPolicyMessage,
-        requestId: observability.requestId,
-      });
-    }
-
-    const lookupStartedAt = Date.now();
-    const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });
-    observability.logger.info("auth registration account lookup completed", {
-      event: "auth.registration.lookup_completed",
-      phaseLatencyMs: phaseLatency(lookupStartedAt),
-    });
-    if (existingUser) {
-      return apiErrorResponse({
-        status: 409,
-        code: API_ERROR_CODES.conflict,
-        message: "E-postadressen används redan",
         requestId: observability.requestId,
       });
     }
@@ -190,6 +187,18 @@ export async function POST(request: Request) {
     }));
     return observability.correlate(response);
   } catch (error) {
+    if (isEmailUniqueConstraintError(error)) {
+      observability.logger.info("auth registration email conflict", observability.elapsed({
+        event: "auth.registration.email_conflict",
+      }));
+      return apiErrorResponse({
+        status: 409,
+        code: API_ERROR_CODES.conflict,
+        message: "E-postadressen används redan",
+        requestId: observability.requestId,
+      });
+    }
+
     observability.logger.error("auth registration failed", error, observability.elapsed({
       event: "auth.registration.failed",
     }));
