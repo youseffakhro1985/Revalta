@@ -16,36 +16,79 @@ GitHub `main` är alltid den enda tekniska sanningskällan. Ingen agent får skr
 - Befintlig svensk/skandinavisk premiumdesign bevaras.
 - Maskinläsbar task-status speglas i `docs/AI_TASKS.yml`.
 
-## Verifierad snapshot för REV-COORD-004
+## Verifierad snapshot
 
 - Datum: `2026-08-17`
-- Baseline `main`: `ed4b4d1e38f354eb054f1233de12571312d1d290`
-- Baseline commit: `test: add exact-SHA Preview browser E2E`
+- Aktuell task-baseline `main`: `5537f6a49d168cb3ed9b683668c6dbddad81b16d`
+- Baseline commit: `docs: synchronize AI collaboration truth and task registry`
 - Production: `https://www.revalta.se`
-- Baseline Production deployment: `5941808630` — **SUCCESS**
+- Baseline Production deployment: `5943445598` — **SUCCESS**
 - Vercel connector: **BLOCKED_CONNECTOR** — teamet är synligt men projektlistningen returnerar inga projekt. Full project/env/runtime-audit får inte påstås vara verifierad.
-- Sprint: **P0 — Vercel access, auth-reset, observability och demo**
+- Sprint: **P0 — auth-reset, observability och demo; Vercel access fortsatt blockerad**
 
-> Snapshot-SHA är task-baseline. Läs alltid GitHub `main` igen före nästa task och före merge.
+> Snapshot-SHA är task-baseline. Läs alltid GitHub `main` igen före nästa task och direkt före merge.
 
-## Senast slutförd koordinering
+## Aktiv task
 
-| Task-ID | Resultat | PR | Kandidat | Verifiering |
-|---|---|---|---|---|
-| REV-COORD-004 | Synkad multi-agent truth + maskinläsbart task-register | #266 | `aa8be09becabd133a17f3d9ca3d54a2da1c0bef9` | Revalta CI #1001 SUCCESS, CodeQL #293 SUCCESS, exact-SHA Vercel Preview `5943297957` SUCCESS, Preview Browser E2E #8 SUCCESS; merge/Production verifieras som sista release-steg |
+| Task-ID | Ägare | Branch | Status | Ägt område | Nästa grind |
+|---|---|---|---|---|---|
+| REV-AUTH-RESET-001 | ChatGPT Work | `agent/auth-reset-bounded-latency` | **IN PROGRESS** | password-reset request route/test, persistent rate limiter + tests, Prisma soft-delete routing only for RateLimitAttempt, E2E reset coverage after Preview proof, ledger/register | Unit/CI/CodeQL → exact-SHA Preview → direct/browser reset latency proof → restore reset E2E → final gate |
 
-REV-COORD-004 ändrar endast `AI_COLLABORATION.md` och `docs/AI_TASKS.yml`. Ingen runtime-, UI-, API-, auth-, databas-, migration-, workflow- eller dependencyändring ingår.
+### REV-AUTH-RESET-001 — mål
+
+Issue #265 visade att `POST /api/auth/password-reset/request` kunde sakna browser-observerbart svar efter 25 sekunder även för en okänd e-postadress. Fixen ska:
+
+- bevara exakt neutral anti-enumeration-respons,
+- identifiera och ta bort den verifierade pre-mail-latencyfällan,
+- hålla persistent DB-rate-limit som primär källa,
+- använda befintlig bounded memory fallback när persistent limiter inte kan slutföras inom satt transaktionsgräns,
+- lägga säkra faslatencies för rate limit, lookup, token, delivery och total request,
+- inte logga e-post, IP, reset-token, request body eller secrets,
+- lägga regressionstester,
+- återställa password-reset browser-E2E först efter Preview-bevis.
+
+### REV-AUTH-RESET-001 — owned paths
+
+- `src/app/api/auth/password-reset/request/route.ts`
+- `src/app/api/auth/password-reset/request/route.test.ts`
+- `src/lib/rate-limit.ts`
+- `src/lib/rate-limit.test.ts`
+- `src/lib/db.ts` — endast bypass av soft-delete compatibility för relation-free `RateLimitAttempt`
+- `src/lib/db.test.ts`
+- `e2e/auth-navigation.mjs` — endast efter verifierad Preview-fix
+- `AI_COLLABORATION.md`
+- `docs/AI_TASKS.yml`
+
+### REV-AUTH-RESET-001 — forbidden paths
+
+- `src/app/demo/**`
+- `src/app/api/demo-request/**`
+- `src/lib/demo-request-email*`
+- `src/components/demo-request-form.tsx`
+- `src/app/page.tsx`
+- `src/components/marketing-header.tsx`
+- `src/components/site-footer.tsx`
+- `src/app/sitemap.ts`
+- `.env.example`
+- `INTEGRATIONS.md`
+- `prisma/schema.prisma`
+- `prisma/migrations/**`
+- `package.json`
+- `package-lock.json`
+- `.github/workflows/**`
+- övrig auth/session/login-kod
+
+Databasimpact: **ingen schema/migration**. Säkerhetsimpact: anti-enumeration oförändrad; rate-limit-kontrakt och limittal oförändrade; DB-limiter fortsatt primär.
 
 ## Blockerade / nästa P0-tasks
 
 | Task-ID | Status | Källa | Nästa säkra steg |
 |---|---|---|---|
 | REV-VERCEL-002 | **BLOCKED_CONNECTOR** | Vercel team syns, `list_projects` returnerar inga projekt | Återställ verifierbar project access; därefter läs project/env/deploy/runtime utan att exponera secretvärden |
-| REV-AUTH-RESET-001 | **READY_NEXT** | Issue #265 | Isolera latency i password-reset request, bevara anti-enumeration, lägg bounded regressionstest och återställ reset browser-E2E efter fix |
-| REV-OBS-002 | **QUEUED** | Issue #217 | Färdigställ korrelerad observability för auth/cron/Stripe/kritiska API:er med requestId, latency och säkra eventkoder |
+| REV-OBS-002 | **QUEUED** | Issue #217 | Färdigställ korrelerad observability efter auth-reset; återanvänd nya säkra latency-event där relevant |
 | REV-DEMO-001 | **BLOCKED_ENV — CODE GATE GREEN** | Draft PR #254 | Verifiera Vercel/env-status för `DEMO_REQUEST_TO`, smoke-testa submission på Preview, full gate, merge, Production smoke |
 
-Ingen planerad P0-task ovan får ta produktfiler förrän en egen branch har skapats från då aktuell `main`. `REV-DEMO-001` behåller sitt redan etablerade filägarskap eftersom PR #254 fortfarande är öppen och blockerad.
+`REV-DEMO-001` behåller sitt etablerade filägarskap. Inget auth-reset-arbete får röra demo-scope.
 
 ## Slutförda produkt- och plattformstasks
 
@@ -61,8 +104,13 @@ Ingen planerad P0-task ovan får ta produktfiler förrän en egen branch har ska
 | REV-ONBOARD-001 | Tenant-scopad 5-stegs first-run onboarding | #262 | `b9253cda99a79780477ef3b09150ba03c56338cd` | CI #990, CodeQL #282, exact-SHA Preview och Production success |
 | REV-ROUTES-001 | Canonical dashboard route tree + legacy redirects | #263 | `a839728684984f8e5233093153972ec69e7e3f4d` | CI #992, CodeQL #284, exact-SHA Preview och Production success |
 | REV-E2E-AUTH-001 | Exact-SHA browser-E2E foundation | #264 | `ed4b4d1e38f354eb054f1233de12571312d1d290` | CI #998, CodeQL #290, exact-SHA Preview + Browser E2E #5 + Production success; password reset separerad som #265 |
+| REV-COORD-004 | Synkad multi-agent truth + `docs/AI_TASKS.yml` | #266 | `5537f6a49d168cb3ed9b683668c6dbddad81b16d` | CI #1003, CodeQL #295, exact-SHA Preview + Browser E2E retry success, Production `5943445598` success |
 
 ## Aktiva fil-lås
+
+### REV-AUTH-RESET-001
+
+Se owned/forbidden paths ovan.
 
 ### REV-DEMO-001 — blockerad men fortfarande låst
 
@@ -79,36 +127,36 @@ Ingen planerad P0-task ovan får ta produktfiler förrän en egen branch har ska
 
 ## Öppna issues som påverkar releaseordningen
 
-- **#265 — password-reset request stalls on Vercel Preview.** P0. Höj inte bara timeout; identifiera blockerande operation och bevara neutral anti-enumeration-respons.
-- **#217 — Observability phase 2.** P0 efter auth-reset. Korrelera kritiska serverfel med requestId, route, method, release, environment, latency och stabil event/error code utan secrets/PII.
+- **#265 — password-reset request stalls on Vercel Preview.** **ACTIVE via REV-AUTH-RESET-001.**
+- **#217 — Observability phase 2.** P0 efter auth-reset.
 
 ## PR-triage / HOLD
 
 - #254 — DEMO: **draft / BLOCKED_ENV**, kodgate grön; merge förbjuden tills env + submission smoke är verifierbar.
 - #239 — HOLD: dokumentarkiv paginering/filter måste reconcileras mot current main innan återanvändning.
 - #218 — FROZEN HISTORICAL STACK: återanvänd inte direkt.
-- #223 + #260 — HOLD: Prisma client/CLI major-upgrade måste hanteras som en koordinerad separat dependency-task.
+- #223 + #260 — HOLD: Prisma client/CLI major-upgrade måste hanteras som koordinerad separat dependency-task.
 - #191 — HOLD: actions/checkout major.
 - #222 — HOLD: CodeQL major.
 - #194 — HOLD: separat react-dom dependency-task.
-- #259 + #261 — HOLD: tailwind-merge/Tailwind 4 är breaking dependency-spår och ska inte blandas med P0-produktarbete.
+- #259 + #261 — HOLD: tailwind-merge/Tailwind 4 är breaking dependency-spår och ska inte blandas med P0-arbete.
 
 ## Branch quarantine
 
-Det finns många äldre `agent/*`, `cursor/*` och `claude/*` branches kvar. De är **inte aktiva bara för att de existerar**. Innan eventuell återanvändning krävs current-main-verifiering, compare, kontroll av merged/superseded status, isolering av unik diff och explicit handoff.
+Äldre `agent/*`, `cursor/*` och `claude/*` branches är **inte aktiva bara för att de existerar**. Innan eventuell återanvändning krävs current-main-verifiering, compare, kontroll av merged/superseded status, isolering av unik diff och explicit handoff.
 
-`noop` är en inaktiv, oavsiktlig branch utan avsett unikt arbete och kan städas bort separat när branch-delete görs säkert.
+`noop` är en inaktiv, oavsiktlig branch utan avsett unikt arbete och kan städas separat när branch-delete görs säkert.
 
-## Leveransordning efter REV-COORD-004
+## Leveransordning
 
-1. **REV-VERCEL-002 — verifierbar Vercel project access**
-2. **REV-AUTH-RESET-001 — issue #265**
-3. **REV-OBS-002 — issue #217**
-4. **REV-DEMO-001 — återuppta befintlig PR #254 när env är verifierbar**
-5. Därefter P1-produktarbete enligt aktuell roadmap, men endast efter ny current-main-reconciliation.
+1. **REV-AUTH-RESET-001 — ACTIVE**
+2. **REV-OBS-002 — issue #217**
+3. **REV-DEMO-001 — när Vercel/env är verifierbar**
+4. **REV-VERCEL-002** förblir blockerad tills connector scope faktiskt ändras; försök får göras utan att blockera säker koddiagnostik som kan verifieras via GitHub Deployments.
+5. Därefter P1-produktarbete först efter ny current-main-reconciliation.
 
 ## Handoff / Definition of Done
 
-En task är inte DONE bara för att kod eller dokument är skrivna. Relevant task ska redovisa baseline SHA, branch, changed files, implementation, tester/validering, lint/typecheck/full quality gate där relevant, security/tenant/accessibility/database impact, CI, CodeQL, exact-SHA Preview, relevant browser E2E/smoke, PR/review, compare mot current main, merge med förväntad HEAD, Production deploy/smoke, runtime-loggkontroll där åtkomst finns, kvarvarande risker och uppdaterat ledger/task-register.
+En task är inte DONE bara för att kod eller dokument är skrivna. Relevant task ska redovisa baseline SHA, branch, changed files, implementation, tester/validering, lint/typecheck/full quality gate, security/tenant/accessibility/database impact, CI, CodeQL, exact-SHA Preview, relevant browser E2E/smoke, PR/review, compare mot current main, merge med förväntad HEAD, Production deploy/smoke, runtime-loggkontroll där åtkomst finns, kvarvarande risker och uppdaterat ledger/task-register.
 
 Om en kontroll inte kan utföras ska status vara **BLOCKED**. Gissa aldrig att den är grön.
