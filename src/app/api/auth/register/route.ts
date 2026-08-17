@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { getPublicAppUrl } from "@/lib/app-url";
 import db from "@/lib/db";
@@ -9,11 +9,26 @@ import { queueEmailVerification } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 
+export const REGISTER_TRANSACTION_OPTIONS = {
+  maxWait: 1_500,
+  timeout: 5_000,
+} as const;
+
+function phaseLatency(startedAt: number) {
+  return Math.max(0, Date.now() - startedAt);
+}
+
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, "/api/auth/register");
   try {
     const ip = getClientIp(request);
+    const rateLimitStartedAt = Date.now();
     const rateLimit = await checkRateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
+    observability.logger.info("auth registration rate limit completed", {
+      event: "auth.registration.rate_limit_completed",
+      phaseLatencyMs: phaseLatency(rateLimitStartedAt),
+      source: rateLimit.source,
+    });
     if (!rateLimit.allowed) {
       observability.logger.warn("auth registration rate limited", observability.elapsed({
         event: "auth.registration.rate_limited",
@@ -65,7 +80,12 @@ export async function POST(request: Request) {
       });
     }
 
+    const lookupStartedAt = Date.now();
     const existingUser = await db.user.findUnique({ where: { email: normalizedEmail } });
+    observability.logger.info("auth registration account lookup completed", {
+      event: "auth.registration.lookup_completed",
+      phaseLatencyMs: phaseLatency(lookupStartedAt),
+    });
     if (existingUser) {
       return apiErrorResponse({
         status: 409,
@@ -75,9 +95,15 @@ export async function POST(request: Request) {
       });
     }
 
+    const passwordStartedAt = Date.now();
     const hashedPassword = await hashPassword(password);
+    observability.logger.info("auth registration password hash completed", {
+      event: "auth.registration.password_hash_completed",
+      phaseLatencyMs: phaseLatency(passwordStartedAt),
+    });
 
     const verifyToken = createResetToken();
+    const persistenceStartedAt = Date.now();
     const { company, owner } = await db.$transaction(async (tx) => {
       const createdCompany = await tx.company.create({
         data: {
@@ -115,11 +141,40 @@ export async function POST(request: Request) {
         metadata: { companyName: normalizedCompanyName },
       }, tx);
       return { company: createdCompany, owner: createdOwner };
+    }, REGISTER_TRANSACTION_OPTIONS);
+    observability.logger.info("auth registration persistence completed", {
+      event: "auth.registration.persistence_completed",
+      companyId: company.id,
+      userId: owner.id,
+      phaseLatencyMs: phaseLatency(persistenceStartedAt),
     });
+
     const verifyUrl = `${getPublicAppUrl(request.url)}/verify-email?token=${encodeURIComponent(verifyToken)}`;
-    await queueEmailVerification(owner, {
-      recipient: owner.email,
-      verificationUrl: verifyUrl,
+    after(async () => {
+      const deliveryStartedAt = Date.now();
+      try {
+        await queueEmailVerification(owner, {
+          recipient: owner.email,
+          verificationUrl: verifyUrl,
+        });
+        observability.logger.info("auth registration verification delivery completed", {
+          event: "auth.registration.verification_delivery_completed",
+          companyId: company.id,
+          userId: owner.id,
+          phaseLatencyMs: phaseLatency(deliveryStartedAt),
+        });
+      } catch (error) {
+        observability.logger.error(
+          "auth registration verification delivery failed",
+          error,
+          {
+            event: "auth.registration.verification_delivery_failed",
+            companyId: company.id,
+            userId: owner.id,
+            phaseLatencyMs: phaseLatency(deliveryStartedAt),
+          },
+        );
+      }
     });
 
     const canExposeVerifyUrl = !process.env.EMAIL_PROVIDER_API_KEY && process.env.NODE_ENV !== "production";
@@ -131,6 +186,7 @@ export async function POST(request: Request) {
       event: "auth.registration.succeeded",
       userId: owner.id,
       companyId: company.id,
+      verificationDelivery: "scheduled",
     }));
     return observability.correlate(response);
   } catch (error) {
