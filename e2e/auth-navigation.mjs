@@ -40,8 +40,10 @@ const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
 });
 const page = await context.newPage();
+const pageErrors = [];
 
 page.on("pageerror", (error) => {
+  pageErrors.push(error.message);
   console.error(`PAGE_ERROR: ${error.message}`);
 });
 
@@ -103,7 +105,8 @@ try {
   await expectVisible(mobileMenu, "mobile dashboard menu");
   await expectVisible(mobileMenu.getByRole("link", { name: "Fastigheter", exact: true }), "mobile Fastigheter navigation");
   await expectVisible(mobileMenu.getByRole("button", { name: "Drift" }), "mobile Drift navigation group");
-  await mobileMenu.getByRole("button", { name: "Stäng meny" }).click();
+  const mobilePanel = mobileMenu.getByRole("complementary");
+  await mobilePanel.getByRole("button", { name: "Stäng meny" }).click();
   console.log("mobile menu: passed");
 
   // Logout and verify the protected dashboard is no longer the active surface.
@@ -115,6 +118,10 @@ try {
   await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
   await expectPath(page, "/login");
   console.log("logout + protected dashboard redirect: passed");
+
+  if (pageErrors.length > 0) {
+    fail(`browser emitted page errors: ${pageErrors.join(" | ")}`);
+  }
 
   console.log("OK: browser auth/navigation E2E passed");
 } finally {
