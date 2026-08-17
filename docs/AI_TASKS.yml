@@ -4,82 +4,72 @@ source_of_truth: "GitHub main"
 
 snapshot:
   verified_at: "2026-08-17"
-  baseline_main_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
+  main_sha: "68670b9378c49b4806eb33acc737da0719ae9ed1"
   production:
     url: "https://www.revalta.se"
-    baseline_deployment_id: 5943445598
+    deployment_id: 5944102557
     status: "SUCCESS"
+    direct_password_reset_post_smoke: "BLOCKED"
   vercel_connector:
     status: "BLOCKED_CONNECTOR"
-    note: "Team visible; project listing returned no projects. Do not infer env/runtime state."
+    note: "Team visible; project listing empty. Do not infer env/runtime/log state."
 
 tasks:
-  - task_id: "REV-AUTH-RESET-001"
-    title: "Fix password-reset request latency"
+  - task_id: "REV-COORD-005"
+    title: "Post-auth release handoff and task truth sync"
     owner: "ChatGPT Work"
-    status: "FINAL_GATE"
-    baseline_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
-    branch: "agent/auth-reset-bounded-latency"
+    status: "ACTIVE"
+    baseline_sha: "68670b9378c49b4806eb33acc737da0719ae9ed1"
+    branch: "agent/coord-005-auth-handoff"
     owned_paths:
-      - "src/app/api/auth/password-reset/request/route.ts"
-      - "src/app/api/auth/password-reset/request/route.test.ts"
-      - "src/lib/rate-limit.ts"
-      - "src/lib/rate-limit.test.ts"
-      - "src/lib/db.ts"
-      - "src/lib/db.test.ts"
-      - "e2e/auth-navigation.mjs"
       - "AI_COLLABORATION.md"
       - "docs/AI_TASKS.yml"
     forbidden_paths:
-      - "src/app/demo/**"
-      - "src/app/api/demo-request/**"
-      - "src/lib/demo-request-email*"
-      - "src/components/demo-request-form.tsx"
-      - "src/app/page.tsx"
-      - "src/components/marketing-header.tsx"
-      - "src/components/site-footer.tsx"
-      - "src/app/sitemap.ts"
-      - ".env.example"
-      - "INTEGRATIONS.md"
-      - "prisma/schema.prisma"
-      - "prisma/migrations/**"
+      - "src/**"
+      - "prisma/**"
+      - ".github/workflows/**"
       - "package.json"
       - "package-lock.json"
-      - ".github/workflows/**"
-      - "other auth/session/login code"
+      - "REV-DEMO-001 locked paths"
     dependencies:
-      - "issue #265"
-      - "exact-SHA Vercel Preview evidence through GitHub Deployments"
-      - "final candidate must rerun all gates without code or documentation changes"
+      - "PR #267 merged"
+      - "issue #265 closed"
+      - "issue #268 open"
+      - "current main and Production deployment evidence"
     acceptance:
-      - "unknown email receives identical neutral HTTP 200 response and message within 8000ms in exact-SHA browser E2E"
-      - "real account remains enumeration-safe when email provider is slow or unavailable"
-      - "persistent rate-limit transaction has maxWait 1500ms and timeout 2500ms"
-      - "database limiter remains primary and existing memory fallback remains deterministic"
-      - "soft-delete compatibility inspection runs only when root model, deleted_at args or selected/included relations can touch a soft-delete model"
-      - "simple User-to-Company, RateLimitAttempt and token infrastructure queries bypass unnecessary information_schema inspection"
-      - "soft-delete protection remains for Property, Ticket, WorkOrder and nested soft-delete relations"
-      - "safe phase latency instrumentation covers rate limit, lookup, token, delivery and total request"
-      - "email, IP, reset token, request body, secrets and raw DB errors are not logged by new/fallback paths"
-      - "regression tests cover query-shape routing and bounded transaction/fallback"
-      - "cold Preview evidence before final candidate: neutral reset 736ms and register HTTP 201 in 1071ms"
-      - "final CI, CodeQL, exact-SHA Preview, browser E2E and Production smoke pass before DONE"
-    pull_request: 267
+      - "REV-AUTH-RESET-001 marked DONE with exact merge and release evidence"
+      - "issue #265 recorded CLOSED"
+      - "REV-AUTH-REGISTER-001 / issue #268 recorded as next P0"
+      - "REV-OBS-002 remains queued after registration latency"
+      - "Vercel/runtime limitations remain explicitly BLOCKED"
+      - "only coordination files changed"
+    pull_request: null
     updated_at: "2026-08-17"
 
-  - task_id: "REV-VERCEL-002"
-    title: "Restore verifiable Vercel project access"
+  - task_id: "REV-AUTH-REGISTER-001"
+    title: "Bound registration response latency without false verification delivery"
     owner: "ChatGPT Work"
-    status: "BLOCKED_CONNECTOR"
+    status: "READY_NEXT"
     baseline_sha: null
     branch: null
     owned_paths: []
-    forbidden_paths: []
-    dependencies: ["Vercel connector must expose the Revalta project"]
+    forbidden_paths:
+      - "REV-DEMO-001 locked paths"
+      - "password-reset implementation unless a verified shared primitive requires isolated change"
+      - "unrelated dashboard/navigation/product UI"
+    dependencies:
+      - "issue #268"
+      - "fresh current-main read before branch creation"
     acceptance:
-      - "Revalta project is discoverable through connected Vercel access"
-      - "project, deployment and env status can be read without exposing secret values"
-      - "runtime/log verification is possible where permissions allow"
+      - "new account receives deterministic HTTP 201 within a bounded latency target even when email provider is slow/unavailable"
+      - "email verification requirement remains intact"
+      - "delivery status remains truthful; no false provider success"
+      - "no duplicate verification emails or IntegrationEvents on retries"
+      - "safe phase latency instrumentation covers registration DB, verification delivery and event persistence"
+      - "regression coverage includes slow/unavailable provider"
+      - "registration browser E2E passes reliably on exact-SHA Preview"
+      - "full CI, CodeQL, exact-SHA Preview, browser E2E and Production release evidence before DONE"
+    issue: 268
     pull_request: null
     updated_at: "2026-08-17"
 
@@ -90,16 +80,19 @@ tasks:
     baseline_sha: null
     branch: null
     owned_paths: []
-    forbidden_paths: ["REV-DEMO-001 locked implementation paths"]
+    forbidden_paths:
+      - "REV-DEMO-001 locked paths"
     dependencies:
       - "issue #217"
-      - "REV-AUTH-RESET-001 completion/reconciliation"
+      - "REV-AUTH-REGISTER-001 completion/reconciliation"
       - "fresh current-main read before branch creation"
     acceptance:
       - "critical requests correlate requestId, route, method, release, environment and latency"
       - "stable event/error codes used"
-      - "secrets, sessions, reset tokens, Stripe signatures and DB URLs never logged"
+      - "passwords, sessions, reset tokens, Stripe signatures, DB URLs and secrets never logged"
       - "Production responses do not expose stack traces"
+      - "CI, CodeQL and exact-SHA Preview pass before merge"
+    issue: 217
     pull_request: null
     updated_at: "2026-08-17"
 
@@ -121,18 +114,64 @@ tasks:
       - ".env.example"
       - "INTEGRATIONS.md"
     forbidden_paths:
-      - "password-reset implementation"
-      - "observability implementation outside demo scope"
-      - "navigation and dashboard runtime code"
+      - "auth registration/password-reset implementation"
+      - "observability outside demo scope"
+      - "unrelated navigation/dashboard runtime code"
     dependencies:
       - "verifiable Vercel project access"
       - "DEMO_REQUEST_TO status verification without value disclosure"
       - "Preview submission smoke"
     acceptance:
-      - "DEMO_REQUEST_TO classified PRESENT/MISSING/MISCONFIGURED without value disclosure"
+      - "DEMO_REQUEST_TO classified PRESENT/MISSING/MISCONFIGURED without exposing value"
       - "demo submission succeeds on exact-SHA Preview"
       - "full release gate and Production smoke pass"
     pull_request: 254
+    updated_at: "2026-08-17"
+
+  - task_id: "REV-VERCEL-002"
+    title: "Restore verifiable Vercel project access"
+    owner: "ChatGPT Work"
+    status: "BLOCKED_CONNECTOR"
+    baseline_sha: null
+    branch: null
+    owned_paths: []
+    forbidden_paths: []
+    dependencies:
+      - "connected Vercel access must expose Revalta project"
+    acceptance:
+      - "Revalta project is discoverable"
+      - "project/deployment/env state readable without secret disclosure"
+      - "runtime/log verification possible where permissions allow"
+    pull_request: null
+    updated_at: "2026-08-17"
+
+  - task_id: "REV-AUTH-RESET-001"
+    title: "Fix password-reset request latency"
+    owner: "ChatGPT Work"
+    status: "DONE_WITH_BLOCKED_PRODUCTION_POST_SMOKE"
+    baseline_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
+    branch: "agent/auth-reset-bounded-latency"
+    owned_paths: []
+    forbidden_paths: []
+    dependencies: []
+    acceptance:
+      - "issue #265 closed completed"
+      - "neutral reset response retained"
+      - "final candidate reset browser E2E hard gate 8000ms"
+      - "final identical-SHA retry reset measured 157ms"
+      - "cold candidate reset measured 736ms"
+      - "first final attempt reset measured 2600ms"
+      - "CI #1014 SUCCESS"
+      - "CodeQL #306 SUCCESS"
+      - "exact-SHA Preview 5944001258 SUCCESS"
+      - "Browser E2E #21 SUCCESS on controlled identical-SHA retry"
+      - "merge SHA 68670b9378c49b4806eb33acc737da0719ae9ed1"
+      - "Production deployment 5944102557 SUCCESS"
+      - "push CodeQL #307 SUCCESS"
+      - "direct Production reset POST and runtime logs BLOCKED by current execution/connector access"
+    issue: 265
+    pull_request: 267
+    merge_sha: "68670b9378c49b4806eb33acc737da0719ae9ed1"
     updated_at: "2026-08-17"
 
   - task_id: "REV-COORD-004"
@@ -160,6 +199,7 @@ tasks:
     dependencies: []
     acceptance: ["merged and release-gated"]
     pull_request: 252
+    merge_sha: "354de1e0ba408525a4e47c2b6f16a038929e60f7"
     updated_at: "2026-08-16"
 
   - task_id: "REV-BREAD-001"
@@ -173,6 +213,7 @@ tasks:
     dependencies: []
     acceptance: ["merged and release-gated"]
     pull_request: 253
+    merge_sha: "e24feff5f2e48c22b913b444b6c8ffd5cf82ee63"
     updated_at: "2026-08-16"
 
   - task_id: "REV-SEARCH-001"
@@ -186,6 +227,7 @@ tasks:
     dependencies: []
     acceptance: ["merged and release-gated"]
     pull_request: 256
+    merge_sha: "a93f0fd050e88ba344f96e8d0685d4d3da26153a"
     updated_at: "2026-08-16"
 
   - task_id: "REV-DASH-ROLE-001"
@@ -199,6 +241,7 @@ tasks:
     dependencies: []
     acceptance: ["merged and release-gated"]
     pull_request: 257
+    merge_sha: "9147f3e88156d1eb1e6a59c1f70856cc4dba8183"
     updated_at: "2026-08-16"
 
   - task_id: "REV-PROPERTY-001"
@@ -212,6 +255,7 @@ tasks:
     dependencies: []
     acceptance: ["merged and release-gated"]
     pull_request: 258
+    merge_sha: "d7d4d5624a16e4b6baf47b82b97fc4777d4d4d0d"
     updated_at: "2026-08-16"
 
   - task_id: "REV-ONBOARD-001"
@@ -225,6 +269,7 @@ tasks:
     dependencies: []
     acceptance: ["CI #990, CodeQL #282, exact-SHA Preview and Production succeeded"]
     pull_request: 262
+    merge_sha: "b9253cda99a79780477ef3b09150ba03c56338cd"
     updated_at: "2026-08-17"
 
   - task_id: "REV-ROUTES-001"
@@ -238,21 +283,23 @@ tasks:
     dependencies: []
     acceptance: ["CI #992, CodeQL #284, exact-SHA Preview and Production succeeded"]
     pull_request: 263
+    merge_sha: "a839728684984f8e5233093153972ec69e7e3f4d"
     updated_at: "2026-08-17"
 
   - task_id: "REV-E2E-AUTH-001"
     title: "Exact-SHA Preview browser E2E foundation"
     owner: "ChatGPT Work"
-    status: "DONE_WITH_FOLLOWUP_ISSUE"
+    status: "DONE"
     baseline_sha: "a839728684984f8e5233093153972ec69e7e3f4d"
     branch: "agent/e2e-auth-navigation"
     owned_paths: []
     forbidden_paths: []
-    dependencies: ["password-reset browser coverage is being restored by issue #265 / REV-AUTH-RESET-001"]
+    dependencies: []
     acceptance:
-      - "register/login/navigation/Command Center/mobile/logout/protected redirect passed"
-      - "CI #998, CodeQL #290, exact-SHA Preview, Browser E2E #5 and Production succeeded"
+      - "register/login/navigation/Command Center/mobile/logout/protected redirect covered"
+      - "password reset coverage restored later by REV-AUTH-RESET-001"
     pull_request: 264
+    merge_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
     updated_at: "2026-08-17"
 
 holds:
