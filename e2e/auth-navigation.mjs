@@ -5,7 +5,7 @@ const baseUrl = String(process.env.E2E_BASE_URL || "").replace(/\/$/, "");
 const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
 const RESET_MAX_LATENCY_MS = 8_000;
 const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
-const REGISTER_RESPONSE_TIMEOUT_MS = 20_000;
+const REGISTER_MAX_LATENCY_MS = 8_000;
 
 if (!baseUrl || !/^https:\/\//.test(baseUrl)) {
   console.error("E2E_BASE_URL must be an https Preview origin");
@@ -86,12 +86,16 @@ try {
   await expectVisible(page.getByRole("heading", { name: "Skapa ditt Revalta-konto" }), "register heading");
   await page.getByLabel("Namn").fill("Revalta E2E Owner");
   await page.getByLabel("Organisation").fill(companyName);
-  await page.getByLabel("E-post").fill(email);
+  const registerEmailInput = page.getByLabel("E-post");
+  await registerEmailInput.fill(email);
+  if ((await registerEmailInput.inputValue()) !== email) {
+    fail("register email input did not retain the generated test address");
+  }
   await page.getByLabel("Lösenord").fill(password);
   const registerStartedAt = Date.now();
   const registerResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith("/api/auth/register") && response.request().method() === "POST",
-    { timeout: REGISTER_RESPONSE_TIMEOUT_MS },
+    { timeout: REGISTER_MAX_LATENCY_MS },
   );
   await page.getByRole("button", { name: "Skapa konto" }).click();
   const registerResponse = await registerResponsePromise;
@@ -107,7 +111,7 @@ try {
     const errorMessage = typeof publicError?.error === "string" ? publicError.error : "unknown public error";
     fail(`register request returned HTTP ${registerResponse.status()} after ${registerLatencyMs}ms (${errorCode}: ${errorMessage})`);
   }
-  console.log(`register API: HTTP 201 in ${registerLatencyMs}ms`);
+  console.log(`register API: HTTP 201 in ${registerLatencyMs}ms (limit ${REGISTER_MAX_LATENCY_MS}ms)`);
   await expectPath(page, "/login");
   await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after registration");
   console.log("register: browser flow passed");
