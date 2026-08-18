@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  createLoggerMock,
   getCurrentUserMock,
+  loggerErrorMock,
+  loggerInfoMock,
+  loggerWarnMock,
   managedFindManyMock,
   auditFindManyMock,
   propertyFindManyMock,
   leaseFindManyMock,
   lifecycleMapMock,
 } = vi.hoisted(() => ({
+  createLoggerMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
+  loggerInfoMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
   managedFindManyMock: vi.fn(),
   auditFindManyMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
@@ -22,6 +30,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 }));
 vi.mock("@/lib/document-lifecycle", () => ({ getDocumentLifecycleMap: lifecycleMapMock }));
 vi.mock("@/lib/document-file-security", () => ({ validateDocumentFile: vi.fn() }));
+vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/db", () => ({
   default: {
     managedDocument: { findMany: managedFindManyMock },
@@ -31,11 +40,30 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
+import { GET, PATCH, POST } from "./route";
+
+const requestId = "550e8400-e29b-41d4-a716-446655440000";
+
+function request(method = "GET") {
+  return new Request("https://www.revalta.se/api/documents", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-request-id": requestId,
+    },
+    ...(method === "PATCH" ? { body: JSON.stringify({}) } : {}),
+  });
+}
 
 describe("documents route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
     managedFindManyMock.mockResolvedValue([]);
     auditFindManyMock.mockResolvedValue([
       {
@@ -99,10 +127,13 @@ describe("documents route", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(request());
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("private");
+    expect(response.headers.get("cache-control")).toContain("no-store");
     expect(managedFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         company_id: "company-1",
@@ -118,11 +149,20 @@ describe("documents route", () => {
     expect(body.documents[0].dataUrl).toBeUndefined();
     expect(body.documents[1].id).toBe("doc-1");
     expect(body.documents[1].dataUrl).toBeUndefined();
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "document list completed",
+      expect.objectContaining({
+        event: "documents.list.completed",
+        userId: "user-1",
+        companyId: "company-1",
+        returned: 2,
+      }),
+    );
   });
 
   it("scopes document audit logs by actor for solo users and never returns dataUrl", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
-    const response = await GET();
+    const response = await GET(request());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -136,11 +176,52 @@ describe("documents route", () => {
 
   it("omits company lease dump for technicians", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
-    const response = await GET();
+    const response = await GET(request());
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(leaseFindManyMock).not.toHaveBeenCalled();
     expect(body.leases).toEqual([]);
+  });
+
+  it("returns correlated stable 401s for GET, POST and PATCH before touching document data", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    const getResponse = await GET(request());
+    const postResponse = await POST(request("POST"));
+    const patchResponse = await PATCH(request("PATCH"));
+
+    for (const response of [getResponse, postResponse, patchResponse]) {
+      expect(response.status).toBe(401);
+      expect(response.headers.get("x-request-id")).toBe(requestId);
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      await expect(response.json()).resolves.toEqual({
+        error: "Obehörig",
+        errorCode: "UNAUTHORIZED",
+        requestId,
+      });
+    }
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a safe correlated 500 when authentication fails unexpectedly", async () => {
+    getCurrentUserMock.mockRejectedValue(new Error("postgres://user:secret@db.internal/revalta"));
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Internt serverfel",
+      errorCode: "INTERNAL_ERROR",
+      requestId,
+    });
+    expect(JSON.stringify(body)).not.toContain("postgres://");
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "document list failed",
+      expect.any(Error),
+      expect.objectContaining({ event: "documents.list.failed" }),
+    );
   });
 });
