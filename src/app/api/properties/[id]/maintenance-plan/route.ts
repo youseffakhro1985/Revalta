@@ -51,6 +51,18 @@ const PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
 const RISKS = new Set(["low", "medium", "high", "critical"]);
 const ACTION_STATUSES = new Set(["planned", "approved", "in_progress", "completed", "deferred", "cancelled"]);
 const HORIZONS = new Set([5, 10, 20, 30]);
+const ROOT_WRITE_ACTIONS = new Set(["plan.create", "action.create", "plan.activate"]);
+
+class MaintenanceWriteError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 404,
+    readonly code: Parameters<typeof apiErrorResponse>[0]["code"],
+    readonly reason: string,
+  ) {
+    super(message);
+  }
+}
 
 function text(value: unknown, max = 500) {
   const normalized = String(value ?? "").trim();
@@ -108,7 +120,7 @@ function calculateForecast(plan: PlanRow, actions: ActionRow[]) {
   };
 }
 
-function rejectRead(
+function rejectRequest(
   observability: ReturnType<typeof createRouteObservability>,
   options: {
     status: number;
@@ -118,13 +130,13 @@ function rejectRead(
     context?: Record<string, unknown>;
   },
 ) {
-  observability.logger.warn("maintenance plan read rejected", observability.elapsed({ event: options.event, ...options.context }));
+  observability.logger.warn("maintenance plan request rejected", observability.elapsed({ event: options.event, ...options.context }));
   return apiErrorResponse({ status: options.status, code: options.code, message: options.message, requestId: observability.requestId });
 }
 
-async function loadProperty(companyId: string, id: string, user: Awaited<ReturnType<typeof getCurrentUser>>) {
+async function loadProperty(id: string, user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
   return db.property.findFirst({
-    where: { id, deleted_at: null, ...tenantWhere(user!) },
+    where: { id, deleted_at: null, ...tenantWhere(user) },
     select: {
       id: true,
       name: true,
@@ -139,16 +151,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return rejectRead(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "maintenance_plan.read.unauthorized" });
+      return rejectRequest(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "maintenance_plan.read.unauthorized" });
     }
     if (!user.company_id) {
-      return rejectRead(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "maintenance_plan.read.missing_company", context: { userId: user.id } });
+      return rejectRequest(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "maintenance_plan.read.missing_company", context: { userId: user.id } });
     }
 
     const { id } = await params;
-    const property = await loadProperty(user.company_id, id, user);
+    const property = await loadProperty(id, user);
     if (!property) {
-      return rejectRead(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "maintenance_plan.read.property_not_found", context: { userId: user.id, companyId: user.company_id } });
+      return rejectRequest(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "maintenance_plan.read.property_not_found", context: { userId: user.id, companyId: user.company_id } });
     }
 
     const plans = await db.$queryRaw<PlanRow[]>(Prisma.sql`
@@ -215,125 +227,198 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const observability = createRouteObservability(request, ROUTE);
 
-  const { id } = await params;
-  const property = await loadProperty(user.company_id, id, user);
-  if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
-
-  const body = await request.json();
-  const action = String(body.action || "");
-
-  if (action === "plan.create") {
-    const name = text(body.name, 150);
-    const baseYear = integer(body.baseYear);
-    const horizonYears = integer(body.horizonYears);
-    const annualIndexRate = decimal(body.annualIndexRate);
-    if (!name || !baseYear || !horizonYears || !HORIZONS.has(horizonYears) || annualIndexRate == null || annualIndexRate < 0 || annualIndexRate > 25) {
-      return NextResponse.json({ error: "Kontrollera namn, basår, tidshorisont och indexering" }, { status: 400 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return rejectRequest(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "maintenance_plan.write.unauthorized" });
+    }
+    if (!canViewOperations(user.role)) {
+      return rejectRequest(observability, { status: 403, code: API_ERROR_CODES.forbidden, message: "Du saknar behörighet", event: "maintenance_plan.write.forbidden", context: { userId: user.id, companyId: user.company_id } });
+    }
+    if (!user.company_id) {
+      return rejectRequest(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "maintenance_plan.write.missing_company", context: { userId: user.id } });
     }
 
-    const [{ next_version }] = await db.$queryRaw<{ next_version: number }[]>(Prisma.sql`
-      SELECT COALESCE(MAX("version"), 0) + 1 AS "next_version"
-      FROM "MaintenancePlan" WHERE "property_id" = ${id}
-    `);
-    const planId = crypto.randomUUID();
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "MaintenancePlan" (
-        "id", "company_id", "property_id", "created_by_id", "name", "version", "status",
-        "base_year", "horizon_years", "annual_index_rate", "summary", "assumptions"
-      ) VALUES (
-        ${planId}, ${user.company_id}, ${id}, ${user.id}, ${name}, ${next_version}, 'draft',
-        ${baseYear}, ${horizonYears}, ${annualIndexRate}, ${text(body.summary, 2000)}, ${text(body.assumptions, 4000)}
-      )
-    `);
-    await writeAuditLog(user, { entityType: "maintenance_plan", entityId: planId, action: "maintenance_plan.created", metadata: { propertyId: id, name, baseYear, horizonYears } });
-    return NextResponse.json({ id: planId }, { status: 201 });
+    const { id } = await params;
+    const property = await loadProperty(id, user);
+    if (!property) {
+      return rejectRequest(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "maintenance_plan.write.property_not_found", context: { userId: user.id, companyId: user.company_id } });
+    }
+
+    const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+    if (!body) {
+      return rejectRequest(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Ogiltig förfrågan", event: "maintenance_plan.write.validation_failed", context: { reason: "invalid_body", userId: user.id, companyId: user.company_id, propertyId: property.id } });
+    }
+
+    const action = String(body.action || "");
+    if (!ROOT_WRITE_ACTIONS.has(action)) {
+      return rejectRequest(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Okänd åtgärd", event: "maintenance_plan.write.validation_failed", context: { reason: "unknown_action", userId: user.id, companyId: user.company_id, propertyId: property.id } });
+    }
+
+    try {
+      if (action === "plan.create") {
+        const name = text(body.name, 150);
+        const baseYear = integer(body.baseYear);
+        const horizonYears = integer(body.horizonYears);
+        const annualIndexRate = decimal(body.annualIndexRate);
+        if (!name || !baseYear || !horizonYears || !HORIZONS.has(horizonYears) || annualIndexRate == null || annualIndexRate < 0 || annualIndexRate > 25) {
+          throw new MaintenanceWriteError("Kontrollera namn, basår, tidshorisont och indexering", 400, API_ERROR_CODES.validationFailed, "invalid_plan");
+        }
+
+        const planId = crypto.randomUUID();
+        await db.$transaction(async (tx) => {
+          const versions = await tx.$queryRaw<{ next_version: number | bigint }[]>(Prisma.sql`
+            SELECT COALESCE(MAX("version"), 0) + 1 AS "next_version"
+            FROM "MaintenancePlan"
+            WHERE "company_id" = ${user.company_id} AND "property_id" = ${property.id}
+          `);
+          const nextVersion = Number(versions[0]?.next_version ?? 1);
+          const affected = await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "MaintenancePlan" (
+              "id", "company_id", "property_id", "created_by_id", "name", "version", "status",
+              "base_year", "horizon_years", "annual_index_rate", "summary", "assumptions"
+            ) VALUES (
+              ${planId}, ${user.company_id}, ${property.id}, ${user.id}, ${name}, ${nextVersion}, 'draft',
+              ${baseYear}, ${horizonYears}, ${annualIndexRate}, ${text(body.summary, 2000)}, ${text(body.assumptions, 4000)}
+            )
+          `);
+          if (affected !== 1) throw new Error("maintenance plan insert did not affect exactly one row");
+          await writeAuditLog(user, {
+            entityType: "maintenance_plan",
+            entityId: planId,
+            action: "maintenance_plan.created",
+            metadata: { propertyId: property.id, baseYear, horizonYears, indexRateConfigured: true },
+          }, tx);
+        });
+
+        observability.logger.info("maintenance plan created", observability.elapsed({ event: "maintenance_plan.write.plan_created", userId: user.id, companyId: user.company_id, propertyId: property.id, planId }));
+        return observability.correlate(NextResponse.json({ id: planId }, { status: 201, headers: SUCCESS_HEADERS }));
+      }
+
+      if (action === "action.create") {
+        const planId = text(body.planId, 80);
+        const title = text(body.title, 180);
+        const category = text(body.category, 80);
+        const plannedYear = integer(body.plannedYear);
+        const estimatedCost = decimal(body.estimatedCost);
+        const priority = String(body.priority || "normal");
+        const risk = String(body.risk || "low");
+        const status = String(body.status || "planned");
+        if (!planId || !title || !category || !plannedYear || estimatedCost == null || estimatedCost < 0 || !PRIORITIES.has(priority) || !RISKS.has(risk) || !ACTION_STATUSES.has(status)) {
+          throw new MaintenanceWriteError("Kontrollera åtgärdens obligatoriska uppgifter", 400, API_ERROR_CODES.validationFailed, "invalid_action");
+        }
+
+        const buildingId = text(body.buildingId, 80);
+        if (buildingId && !property.buildings.some((building) => building.id === buildingId)) {
+          throw new MaintenanceWriteError("Byggnaden tillhör inte fastigheten", 400, API_ERROR_CODES.validationFailed, "invalid_building");
+        }
+
+        const recurrenceYears = integer(body.recurrenceYears);
+        const lifetimeYears = integer(body.technicalLifetimeYears);
+        const annualIndexRate = body.annualIndexRate === "" || body.annualIndexRate == null ? null : decimal(body.annualIndexRate);
+        if ((recurrenceYears != null && recurrenceYears <= 0) || (lifetimeYears != null && lifetimeYears <= 0) || (annualIndexRate != null && (annualIndexRate < 0 || annualIndexRate > 25))) {
+          throw new MaintenanceWriteError("Intervall, livslängd eller indexering är ogiltig", 400, API_ERROR_CODES.validationFailed, "invalid_interval_or_index");
+        }
+
+        const technicalAssetId = text(body.technicalAssetId, 80);
+        const actionId = crypto.randomUUID();
+        await db.$transaction(async (tx) => {
+          const plans = await tx.$queryRaw<PlanRow[]>(Prisma.sql`
+            SELECT "id", "name", "version", "status", "base_year", "horizon_years",
+                   "annual_index_rate"::double precision AS "annual_index_rate", "summary", "assumptions", "approved_at", "created_at"
+            FROM "MaintenancePlan"
+            WHERE "id" = ${planId} AND "company_id" = ${user.company_id} AND "property_id" = ${property.id}
+            LIMIT 1
+          `);
+          const plan = plans[0];
+          if (!plan) throw new MaintenanceWriteError("Underhållsplanen hittades inte", 404, API_ERROR_CODES.notFound, "plan_not_found");
+          if (plannedYear < plan.base_year || plannedYear >= plan.base_year + plan.horizon_years) {
+            throw new MaintenanceWriteError("Åtgärdens år måste ligga inom planens tidshorisont", 400, API_ERROR_CODES.validationFailed, "year_outside_horizon");
+          }
+
+          if (technicalAssetId) {
+            const assets = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+              SELECT "id" FROM "PropertyTechnicalAsset"
+              WHERE "id" = ${technicalAssetId} AND "company_id" = ${user.company_id} AND "property_id" = ${property.id}
+              LIMIT 1
+            `);
+            if (!assets[0]) throw new MaintenanceWriteError("Installationen tillhör inte fastigheten", 400, API_ERROR_CODES.validationFailed, "invalid_asset");
+          }
+
+          const affected = await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "MaintenanceAction" (
+              "id", "company_id", "maintenance_plan_id", "property_id", "building_id", "technical_asset_id",
+              "created_by_id", "category", "title", "description", "scope", "planned_year", "recurrence_years",
+              "technical_lifetime_years", "estimated_cost", "annual_index_rate", "priority", "risk", "status", "contractor"
+            ) VALUES (
+              ${actionId}, ${user.company_id}, ${planId}, ${property.id}, ${buildingId}, ${technicalAssetId},
+              ${user.id}, ${category}, ${title}, ${text(body.description, 3000)}, ${text(body.scope, 1000)}, ${plannedYear},
+              ${recurrenceYears}, ${lifetimeYears}, ${estimatedCost}, ${annualIndexRate}, ${priority}, ${risk}, ${status}, ${text(body.contractor, 180)}
+            )
+          `);
+          if (affected !== 1) throw new Error("maintenance action insert did not affect exactly one row");
+          await writeAuditLog(user, {
+            entityType: "maintenance_action",
+            entityId: actionId,
+            action: "maintenance_action.created",
+            metadata: {
+              propertyId: property.id,
+              planId,
+              plannedYear,
+              priority,
+              risk,
+              financeFieldRecorded: true,
+              indexed: annualIndexRate != null,
+            },
+          }, tx);
+        });
+
+        observability.logger.info("maintenance action created", observability.elapsed({ event: "maintenance_plan.write.action_created", userId: user.id, companyId: user.company_id, propertyId: property.id, planId, actionId }));
+        return observability.correlate(NextResponse.json({ id: actionId }, { status: 201, headers: SUCCESS_HEADERS }));
+      }
+
+      const planId = text(body.planId, 80);
+      if (!planId) {
+        throw new MaintenanceWriteError("Plan saknas", 400, API_ERROR_CODES.validationFailed, "missing_plan");
+      }
+
+      await db.$transaction(async (tx) => {
+        await tx.$executeRaw(Prisma.sql`
+          UPDATE "MaintenancePlan" SET "status" = 'archived', "updated_at" = CURRENT_TIMESTAMP
+          WHERE "company_id" = ${user.company_id} AND "property_id" = ${property.id} AND "status" = 'active'
+        `);
+        const updated = await tx.$executeRaw(Prisma.sql`
+          UPDATE "MaintenancePlan" SET "status" = 'active', "approved_by_id" = ${user.id},
+            "approved_at" = CURRENT_TIMESTAMP, "updated_at" = CURRENT_TIMESTAMP
+          WHERE "id" = ${planId} AND "company_id" = ${user.company_id} AND "property_id" = ${property.id}
+        `);
+        if (updated !== 1) throw new MaintenanceWriteError("Planen hittades inte", 404, API_ERROR_CODES.notFound, "plan_not_found");
+        await writeAuditLog(user, {
+          entityType: "maintenance_plan",
+          entityId: planId,
+          action: "maintenance_plan.activated",
+          metadata: { propertyId: property.id },
+        }, tx);
+      });
+
+      observability.logger.info("maintenance plan activated", observability.elapsed({ event: "maintenance_plan.write.plan_activated", userId: user.id, companyId: user.company_id, propertyId: property.id, planId }));
+      return observability.correlate(NextResponse.json({ success: true }, { headers: SUCCESS_HEADERS }));
+    } catch (error) {
+      if (error instanceof MaintenanceWriteError) {
+        return rejectRequest(observability, {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+          event: "maintenance_plan.write.rejected",
+          context: { reason: error.reason, userId: user.id, companyId: user.company_id, propertyId: property.id, action },
+        });
+      }
+      throw error;
+    }
+  } catch (error) {
+    observability.logger.error("maintenance plan write failed", error, observability.elapsed({ event: "maintenance_plan.write.failed" }));
+    return apiErrorResponse({ status: 500, code: API_ERROR_CODES.internalError, message: "Internt serverfel", requestId: observability.requestId });
   }
-
-  if (action === "action.create") {
-    const planId = text(body.planId, 80);
-    const title = text(body.title, 180);
-    const category = text(body.category, 80);
-    const plannedYear = integer(body.plannedYear);
-    const estimatedCost = decimal(body.estimatedCost);
-    const priority = String(body.priority || "normal");
-    const risk = String(body.risk || "low");
-    const status = String(body.status || "planned");
-    if (!planId || !title || !category || !plannedYear || estimatedCost == null || estimatedCost < 0 || !PRIORITIES.has(priority) || !RISKS.has(risk) || !ACTION_STATUSES.has(status)) {
-      return NextResponse.json({ error: "Kontrollera åtgärdens obligatoriska uppgifter" }, { status: 400 });
-    }
-
-    const [plan] = await db.$queryRaw<PlanRow[]>(Prisma.sql`
-      SELECT "id", "name", "version", "status", "base_year", "horizon_years",
-             "annual_index_rate"::double precision AS "annual_index_rate", "summary", "assumptions", "approved_at", "created_at"
-      FROM "MaintenancePlan"
-      WHERE "id" = ${planId} AND "company_id" = ${user.company_id} AND "property_id" = ${id}
-      LIMIT 1
-    `);
-    if (!plan) return NextResponse.json({ error: "Underhållsplanen hittades inte" }, { status: 404 });
-    if (plannedYear < plan.base_year || plannedYear >= plan.base_year + plan.horizon_years) {
-      return NextResponse.json({ error: "Åtgärdens år måste ligga inom planens tidshorisont" }, { status: 400 });
-    }
-
-    const buildingId = text(body.buildingId, 80);
-    if (buildingId && !property.buildings.some((building) => building.id === buildingId)) {
-      return NextResponse.json({ error: "Byggnaden tillhör inte fastigheten" }, { status: 400 });
-    }
-
-    const technicalAssetId = text(body.technicalAssetId, 80);
-    if (technicalAssetId) {
-      const [asset] = await db.$queryRaw<{ id: string }[]>(Prisma.sql`
-        SELECT "id" FROM "PropertyTechnicalAsset"
-        WHERE "id" = ${technicalAssetId} AND "company_id" = ${user.company_id} AND "property_id" = ${id}
-      `);
-      if (!asset) return NextResponse.json({ error: "Installationen tillhör inte fastigheten" }, { status: 400 });
-    }
-
-    const recurrenceYears = integer(body.recurrenceYears);
-    const lifetimeYears = integer(body.technicalLifetimeYears);
-    const annualIndexRate = body.annualIndexRate === "" || body.annualIndexRate == null ? null : decimal(body.annualIndexRate);
-    if ((recurrenceYears != null && recurrenceYears <= 0) || (lifetimeYears != null && lifetimeYears <= 0) || (annualIndexRate != null && (annualIndexRate < 0 || annualIndexRate > 25))) {
-      return NextResponse.json({ error: "Intervall, livslängd eller indexering är ogiltig" }, { status: 400 });
-    }
-
-    const actionId = crypto.randomUUID();
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "MaintenanceAction" (
-        "id", "company_id", "maintenance_plan_id", "property_id", "building_id", "technical_asset_id",
-        "created_by_id", "category", "title", "description", "scope", "planned_year", "recurrence_years",
-        "technical_lifetime_years", "estimated_cost", "annual_index_rate", "priority", "risk", "status", "contractor"
-      ) VALUES (
-        ${actionId}, ${user.company_id}, ${planId}, ${id}, ${buildingId}, ${technicalAssetId},
-        ${user.id}, ${category}, ${title}, ${text(body.description, 3000)}, ${text(body.scope, 1000)}, ${plannedYear},
-        ${recurrenceYears}, ${lifetimeYears}, ${estimatedCost}, ${annualIndexRate}, ${priority}, ${risk}, ${status}, ${text(body.contractor, 180)}
-      )
-    `);
-    await writeAuditLog(user, { entityType: "maintenance_action", entityId: actionId, action: "maintenance_action.created", metadata: { propertyId: id, planId, title, plannedYear, estimatedCost, priority, risk } });
-    return NextResponse.json({ id: actionId }, { status: 201 });
-  }
-
-  if (action === "plan.activate") {
-    const planId = text(body.planId, 80);
-    if (!planId) return NextResponse.json({ error: "Plan saknas" }, { status: 400 });
-    const updated = await db.$transaction(async (tx) => {
-      await tx.$executeRaw(Prisma.sql`
-        UPDATE "MaintenancePlan" SET "status" = 'archived', "updated_at" = CURRENT_TIMESTAMP
-        WHERE "company_id" = ${user.company_id} AND "property_id" = ${id} AND "status" = 'active'
-      `);
-      return tx.$executeRaw(Prisma.sql`
-        UPDATE "MaintenancePlan" SET "status" = 'active', "approved_by_id" = ${user.id},
-          "approved_at" = CURRENT_TIMESTAMP, "updated_at" = CURRENT_TIMESTAMP
-        WHERE "id" = ${planId} AND "company_id" = ${user.company_id} AND "property_id" = ${id}
-      `);
-    });
-    if (!updated) return NextResponse.json({ error: "Planen hittades inte" }, { status: 404 });
-    await writeAuditLog(user, { entityType: "maintenance_plan", entityId: planId, action: "maintenance_plan.activated", metadata: { propertyId: id } });
-    return NextResponse.json({ success: true });
-  }
-
-  return NextResponse.json({ error: "Okänd åtgärd" }, { status: 400 });
 }
