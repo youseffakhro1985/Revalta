@@ -6,7 +6,6 @@ import { writeAuditLog } from "@/lib/audit";
 import {
   canCreateProperties,
   canViewFinanceData,
-  canViewOperations,
   getCurrentUser,
   tenantWhere,
 } from "@/lib/current-user";
@@ -24,6 +23,12 @@ const criticalities = new Set(["low", "normal", "high", "critical"]);
 const assetStatuses = new Set(["active", "service_due", "out_of_service", "decommissioned"]);
 const inspectionStatuses = new Set(["planned", "completed", "approved", "remark", "overdue"]);
 const agreementStatuses = new Set(["active", "expired", "cancelled"]);
+const cardActions = new Set(["entrance.save", "asset.save", "warranty.save", "inspection.save", "agreement.save"]);
+
+type CardScopeClient = Pick<Prisma.TransactionClient, "building" | "$queryRaw">;
+
+class CardWriteValidationError extends Error {}
+class CardWriteScopeError extends Error {}
 
 function text(value: unknown, max = 500) {
   const result = value == null ? "" : String(value).trim();
@@ -47,7 +52,7 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function rejectCardRead(
+function rejectCard(
   observability: ReturnType<typeof createRouteObservability>,
   options: {
     status: number;
@@ -57,7 +62,7 @@ function rejectCardRead(
     context?: Record<string, unknown>;
   },
 ) {
-  observability.logger.warn("property card read rejected", observability.elapsed({ event: options.event, ...options.context }));
+  observability.logger.warn("property card request rejected", observability.elapsed({ event: options.event, ...options.context }));
   return apiErrorResponse({ status: options.status, code: options.code, message: options.message, requestId: observability.requestId });
 }
 
@@ -66,15 +71,15 @@ async function resolveProperty(id: string, user: Awaited<ReturnType<typeof getCu
   return db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
 }
 
-async function validateBuilding(buildingId: string | null, propertyId: string) {
+async function validateBuilding(client: CardScopeClient, buildingId: string | null, propertyId: string) {
   if (!buildingId) return true;
-  const building = await db.building.findFirst({ where: { id: buildingId, property_id: propertyId }, select: { id: true } });
+  const building = await client.building.findFirst({ where: { id: buildingId, property_id: propertyId }, select: { id: true } });
   return Boolean(building);
 }
 
-async function validateAsset(assetId: string | null, propertyId: string, companyId: string) {
+async function validateAsset(client: CardScopeClient, assetId: string | null, propertyId: string, companyId: string) {
   if (!assetId) return true;
-  const rows = await db.$queryRaw<{ id: string }[]>(Prisma.sql`
+  const rows = await client.$queryRaw<{ id: string }[]>(Prisma.sql`
     SELECT "id" FROM "PropertyTechnicalAsset"
     WHERE "id" = ${assetId} AND "property_id" = ${propertyId} AND "company_id" = ${companyId}
     LIMIT 1
@@ -88,10 +93,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return rejectCardRead(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "property.card.read.unauthorized" });
+      return rejectCard(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "property.card.read.unauthorized" });
     }
     if (!user.company_id) {
-      return rejectCardRead(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "property.card.read.missing_company", context: { userId: user.id } });
+      return rejectCard(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "property.card.read.missing_company", context: { userId: user.id } });
     }
 
     const { id } = await params;
@@ -123,7 +128,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     });
 
     if (!property) {
-      return rejectCardRead(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "property.card.read.property_not_found", context: { userId: user.id, companyId: user.company_id } });
+      return rejectCard(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "property.card.read.property_not_found", context: { userId: user.id, companyId: user.company_id } });
     }
 
     const companyId = user.company_id;
@@ -216,87 +221,126 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canCreateProperties(user.role) && !canViewOperations(user.role)) {
-    return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  const observability = createRouteObservability(request, CARD_ROUTE);
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return rejectCard(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "property.card.write.unauthorized" });
+    }
+    if (!canCreateProperties(user.role)) {
+      return rejectCard(observability, { status: 403, code: API_ERROR_CODES.forbidden, message: "Du saknar behörighet", event: "property.card.write.forbidden", context: { userId: user.id, companyId: user.company_id } });
+    }
+    if (!user.company_id) {
+      return rejectCard(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "property.card.write.missing_company", context: { userId: user.id } });
+    }
+
+    const { id: propertyId } = await params;
+    const property = await resolveProperty(propertyId, user);
+    if (!property) {
+      return rejectCard(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "property.card.write.property_not_found", context: { userId: user.id, companyId: user.company_id } });
+    }
+
+    const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+    if (!body) {
+      return rejectCard(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Ogiltig förfrågan", event: "property.card.write.validation_failed", context: { reason: "invalid_body", userId: user.id, companyId: user.company_id, propertyId: property.id } });
+    }
+
+    const action = text(body.action, 80);
+    if (!cardActions.has(action)) {
+      return rejectCard(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Åtgärden stöds inte", event: "property.card.write.validation_failed", context: { reason: "unsupported_action", userId: user.id, companyId: user.company_id, propertyId: property.id } });
+    }
+
+    const recordId = nullableText(body.recordId, 80) || crypto.randomUUID();
+    const companyId = user.company_id;
+    const buildingId = nullableText(body.buildingId, 80);
+    const technicalAssetId = nullableText(body.technicalAssetId, 80);
+
+    try {
+      await db.$transaction(async (tx) => {
+        if (!(await validateBuilding(tx, buildingId, property.id))) throw new CardWriteValidationError("Byggnaden tillhör inte fastigheten");
+        if (!(await validateAsset(tx, technicalAssetId, property.id, companyId))) throw new CardWriteValidationError("Installationen tillhör inte fastigheten");
+
+        let affected = 0;
+        if (action === "entrance.save") {
+          const name = text(body.name, 160);
+          if (!name) throw new CardWriteValidationError("Namn på entré eller trapphus krävs");
+          affected = await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "PropertyEntrance" ("id", "company_id", "property_id", "building_id", "name", "address", "floors", "accessibility", "status", "notes")
+            VALUES (${recordId}, ${companyId}, ${property.id}, ${buildingId}, ${name}, ${nullableText(body.address, 200)}, ${nullableNumber(body.floors)}, ${nullableText(body.accessibility, 300)}, ${text(body.status, 40) || "active"}, ${nullableText(body.notes, 2000)})
+            ON CONFLICT ("id") DO UPDATE SET "building_id" = EXCLUDED."building_id", "name" = EXCLUDED."name", "address" = EXCLUDED."address", "floors" = EXCLUDED."floors", "accessibility" = EXCLUDED."accessibility", "status" = EXCLUDED."status", "notes" = EXCLUDED."notes", "updated_at" = CURRENT_TIMESTAMP
+            WHERE "PropertyEntrance"."company_id" = ${companyId} AND "PropertyEntrance"."property_id" = ${property.id}
+          `);
+        } else if (action === "asset.save") {
+          const name = text(body.name, 160);
+          const category = text(body.category, 40);
+          const criticality = text(body.criticality, 40) || "normal";
+          const status = text(body.status, 40) || "active";
+          if (!name || !assetCategories.has(category) || !criticalities.has(criticality) || !assetStatuses.has(status)) throw new CardWriteValidationError("Kontrollera installationens namn, kategori, kritikalitet och status");
+          affected = await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "PropertyTechnicalAsset" ("id", "company_id", "property_id", "building_id", "category", "name", "manufacturer", "model", "serial_number", "location", "installed_at", "last_service_at", "next_service_at", "service_provider", "criticality", "status", "notes")
+            VALUES (${recordId}, ${companyId}, ${property.id}, ${buildingId}, ${category}, ${name}, ${nullableText(body.manufacturer, 160)}, ${nullableText(body.model, 160)}, ${nullableText(body.serialNumber, 160)}, ${nullableText(body.location, 200)}, ${nullableDate(body.installedAt)}, ${nullableDate(body.lastServiceAt)}, ${nullableDate(body.nextServiceAt)}, ${nullableText(body.serviceProvider, 200)}, ${criticality}, ${status}, ${nullableText(body.notes, 2000)})
+            ON CONFLICT ("id") DO UPDATE SET "building_id" = EXCLUDED."building_id", "category" = EXCLUDED."category", "name" = EXCLUDED."name", "manufacturer" = EXCLUDED."manufacturer", "model" = EXCLUDED."model", "serial_number" = EXCLUDED."serial_number", "location" = EXCLUDED."location", "installed_at" = EXCLUDED."installed_at", "last_service_at" = EXCLUDED."last_service_at", "next_service_at" = EXCLUDED."next_service_at", "service_provider" = EXCLUDED."service_provider", "criticality" = EXCLUDED."criticality", "status" = EXCLUDED."status", "notes" = EXCLUDED."notes", "updated_at" = CURRENT_TIMESTAMP
+            WHERE "PropertyTechnicalAsset"."company_id" = ${companyId} AND "PropertyTechnicalAsset"."property_id" = ${property.id}
+          `);
+        } else if (action === "warranty.save") {
+          const title = text(body.title, 180);
+          if (!title) throw new CardWriteValidationError("Garantins titel krävs");
+          const startsAt = nullableDate(body.startsAt);
+          const expiresAt = nullableDate(body.expiresAt);
+          if (startsAt && expiresAt && expiresAt < startsAt) throw new CardWriteValidationError("Garantins slutdatum kan inte vara före startdatum");
+          affected = await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "PropertyWarranty" ("id", "company_id", "property_id", "technical_asset_id", "title", "supplier", "scope", "starts_at", "expires_at", "contact_name", "contact_email", "contact_phone", "document_url", "status")
+            VALUES (${recordId}, ${companyId}, ${property.id}, ${technicalAssetId}, ${title}, ${nullableText(body.supplier, 200)}, ${nullableText(body.scope, 1000)}, ${startsAt}, ${expiresAt}, ${nullableText(body.contactName, 160)}, ${nullableText(body.contactEmail, 200)}, ${nullableText(body.contactPhone, 80)}, ${nullableText(body.documentUrl, 1000)}, ${text(body.status, 40) || "active"})
+            ON CONFLICT ("id") DO UPDATE SET "technical_asset_id" = EXCLUDED."technical_asset_id", "title" = EXCLUDED."title", "supplier" = EXCLUDED."supplier", "scope" = EXCLUDED."scope", "starts_at" = EXCLUDED."starts_at", "expires_at" = EXCLUDED."expires_at", "contact_name" = EXCLUDED."contact_name", "contact_email" = EXCLUDED."contact_email", "contact_phone" = EXCLUDED."contact_phone", "document_url" = EXCLUDED."document_url", "status" = EXCLUDED."status", "updated_at" = CURRENT_TIMESTAMP
+            WHERE "PropertyWarranty"."company_id" = ${companyId} AND "PropertyWarranty"."property_id" = ${property.id}
+          `);
+        } else if (action === "inspection.save") {
+          const title = text(body.title, 180);
+          const inspectionType = text(body.inspectionType, 100);
+          const status = text(body.status, 40) || "planned";
+          if (!title || !inspectionType || !inspectionStatuses.has(status)) throw new CardWriteValidationError("Besiktningens typ, titel och status krävs");
+          affected = await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "PropertyInspection" ("id", "company_id", "property_id", "technical_asset_id", "inspection_type", "title", "scheduled_at", "performed_at", "next_due_at", "provider", "contact_name", "result", "summary", "document_url", "status")
+            VALUES (${recordId}, ${companyId}, ${property.id}, ${technicalAssetId}, ${inspectionType}, ${title}, ${nullableDate(body.scheduledAt)}, ${nullableDate(body.performedAt)}, ${nullableDate(body.nextDueAt)}, ${nullableText(body.provider, 200)}, ${nullableText(body.contactName, 160)}, ${nullableText(body.result, 300)}, ${nullableText(body.summary, 2000)}, ${nullableText(body.documentUrl, 1000)}, ${status})
+            ON CONFLICT ("id") DO UPDATE SET "technical_asset_id" = EXCLUDED."technical_asset_id", "inspection_type" = EXCLUDED."inspection_type", "title" = EXCLUDED."title", "scheduled_at" = EXCLUDED."scheduled_at", "performed_at" = EXCLUDED."performed_at", "next_due_at" = EXCLUDED."next_due_at", "provider" = EXCLUDED."provider", "contact_name" = EXCLUDED."contact_name", "result" = EXCLUDED."result", "summary" = EXCLUDED."summary", "document_url" = EXCLUDED."document_url", "status" = EXCLUDED."status", "updated_at" = CURRENT_TIMESTAMP
+            WHERE "PropertyInspection"."company_id" = ${companyId} AND "PropertyInspection"."property_id" = ${property.id}
+          `);
+        } else {
+          const supplier = text(body.supplier, 200);
+          const serviceArea = text(body.serviceArea, 180);
+          const status = text(body.status, 40) || "active";
+          const startsAt = nullableDate(body.startsAt);
+          const endsAt = nullableDate(body.endsAt);
+          if (!supplier || !serviceArea || !agreementStatuses.has(status)) throw new CardWriteValidationError("Leverantör, tjänsteområde och status krävs");
+          if (startsAt && endsAt && endsAt < startsAt) throw new CardWriteValidationError("Avtalets slutdatum kan inte vara före startdatum");
+          const costAmount = nullableNumber(body.costAmount);
+          if (costAmount != null && costAmount < 0) throw new CardWriteValidationError("Avtalskostnaden kan inte vara negativ");
+          affected = await tx.$executeRaw(Prisma.sql`
+            INSERT INTO "PropertyServiceAgreement" ("id", "company_id", "property_id", "technical_asset_id", "supplier", "agreement_number", "service_area", "starts_at", "ends_at", "notice_period_months", "cost_amount", "cost_interval", "contact_name", "contact_email", "contact_phone", "document_url", "status")
+            VALUES (${recordId}, ${companyId}, ${property.id}, ${technicalAssetId}, ${supplier}, ${nullableText(body.agreementNumber, 120)}, ${serviceArea}, ${startsAt}, ${endsAt}, ${nullableNumber(body.noticePeriodMonths)}, ${costAmount}, ${nullableText(body.costInterval, 40)}, ${nullableText(body.contactName, 160)}, ${nullableText(body.contactEmail, 200)}, ${nullableText(body.contactPhone, 80)}, ${nullableText(body.documentUrl, 1000)}, ${status})
+            ON CONFLICT ("id") DO UPDATE SET "technical_asset_id" = EXCLUDED."technical_asset_id", "supplier" = EXCLUDED."supplier", "agreement_number" = EXCLUDED."agreement_number", "service_area" = EXCLUDED."service_area", "starts_at" = EXCLUDED."starts_at", "ends_at" = EXCLUDED."ends_at", "notice_period_months" = EXCLUDED."notice_period_months", "cost_amount" = EXCLUDED."cost_amount", "cost_interval" = EXCLUDED."cost_interval", "contact_name" = EXCLUDED."contact_name", "contact_email" = EXCLUDED."contact_email", "contact_phone" = EXCLUDED."contact_phone", "document_url" = EXCLUDED."document_url", "status" = EXCLUDED."status", "updated_at" = CURRENT_TIMESTAMP
+            WHERE "PropertyServiceAgreement"."company_id" = ${companyId} AND "PropertyServiceAgreement"."property_id" = ${property.id}
+          `);
+        }
+
+        if (affected !== 1) throw new CardWriteScopeError("Posten kunde inte sparas i fastigheten");
+        await writeAuditLog(user, { entityType: "property", entityId: property.id, action: `property_card.${action}`, metadata: { recordId } }, tx);
+      });
+    } catch (error) {
+      if (error instanceof CardWriteValidationError) {
+        return rejectCard(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: error.message, event: "property.card.write.validation_failed", context: { reason: "field_or_scope_validation", userId: user.id, companyId, propertyId: property.id, action } });
+      }
+      if (error instanceof CardWriteScopeError) {
+        return rejectCard(observability, { status: 404, code: API_ERROR_CODES.notFound, message: error.message, event: "property.card.write.record_not_saved", context: { userId: user.id, companyId, propertyId: property.id, action } });
+      }
+      throw error;
+    }
+
+    observability.logger.info("property card write completed", observability.elapsed({ event: "property.card.write.completed", userId: user.id, companyId, propertyId: property.id, recordId, action }));
+    return observability.correlate(NextResponse.json({ success: true, id: recordId }, { headers: SUCCESS_HEADERS }));
+  } catch (error) {
+    observability.logger.error("property card write failed", error, observability.elapsed({ event: "property.card.write.failed" }));
+    return apiErrorResponse({ status: 500, code: API_ERROR_CODES.internalError, message: "Internt serverfel", requestId: observability.requestId });
   }
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-
-  const { id: propertyId } = await params;
-  const property = await resolveProperty(propertyId, user);
-  if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
-
-  const body = await request.json();
-  const action = text(body.action, 80);
-  const recordId = nullableText(body.recordId, 80) || crypto.randomUUID();
-  const companyId = user.company_id;
-  const buildingId = nullableText(body.buildingId, 80);
-  const technicalAssetId = nullableText(body.technicalAssetId, 80);
-
-  if (!(await validateBuilding(buildingId, propertyId))) return NextResponse.json({ error: "Byggnaden tillhör inte fastigheten" }, { status: 400 });
-  if (!(await validateAsset(technicalAssetId, propertyId, companyId))) return NextResponse.json({ error: "Installationen tillhör inte fastigheten" }, { status: 400 });
-
-  if (action === "entrance.save") {
-    const name = text(body.name, 160);
-    if (!name) return NextResponse.json({ error: "Namn på entré eller trapphus krävs" }, { status: 400 });
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "PropertyEntrance" ("id", "company_id", "property_id", "building_id", "name", "address", "floors", "accessibility", "status", "notes")
-      VALUES (${recordId}, ${companyId}, ${propertyId}, ${buildingId}, ${name}, ${nullableText(body.address, 200)}, ${nullableNumber(body.floors)}, ${nullableText(body.accessibility, 300)}, ${text(body.status, 40) || "active"}, ${nullableText(body.notes, 2000)})
-      ON CONFLICT ("id") DO UPDATE SET "building_id" = EXCLUDED."building_id", "name" = EXCLUDED."name", "address" = EXCLUDED."address", "floors" = EXCLUDED."floors", "accessibility" = EXCLUDED."accessibility", "status" = EXCLUDED."status", "notes" = EXCLUDED."notes", "updated_at" = CURRENT_TIMESTAMP
-      WHERE "PropertyEntrance"."company_id" = ${companyId} AND "PropertyEntrance"."property_id" = ${propertyId}
-    `);
-  } else if (action === "asset.save") {
-    const name = text(body.name, 160);
-    const category = text(body.category, 40);
-    const criticality = text(body.criticality, 40) || "normal";
-    const status = text(body.status, 40) || "active";
-    if (!name || !assetCategories.has(category) || !criticalities.has(criticality) || !assetStatuses.has(status)) return NextResponse.json({ error: "Kontrollera installationens namn, kategori, kritikalitet och status" }, { status: 400 });
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "PropertyTechnicalAsset" ("id", "company_id", "property_id", "building_id", "category", "name", "manufacturer", "model", "serial_number", "location", "installed_at", "last_service_at", "next_service_at", "service_provider", "criticality", "status", "notes")
-      VALUES (${recordId}, ${companyId}, ${propertyId}, ${buildingId}, ${category}, ${name}, ${nullableText(body.manufacturer, 160)}, ${nullableText(body.model, 160)}, ${nullableText(body.serialNumber, 160)}, ${nullableText(body.location, 200)}, ${nullableDate(body.installedAt)}, ${nullableDate(body.lastServiceAt)}, ${nullableDate(body.nextServiceAt)}, ${nullableText(body.serviceProvider, 200)}, ${criticality}, ${status}, ${nullableText(body.notes, 2000)})
-      ON CONFLICT ("id") DO UPDATE SET "building_id" = EXCLUDED."building_id", "category" = EXCLUDED."category", "name" = EXCLUDED."name", "manufacturer" = EXCLUDED."manufacturer", "model" = EXCLUDED."model", "serial_number" = EXCLUDED."serial_number", "location" = EXCLUDED."location", "installed_at" = EXCLUDED."installed_at", "last_service_at" = EXCLUDED."last_service_at", "next_service_at" = EXCLUDED."next_service_at", "service_provider" = EXCLUDED."service_provider", "criticality" = EXCLUDED."criticality", "status" = EXCLUDED."status", "notes" = EXCLUDED."notes", "updated_at" = CURRENT_TIMESTAMP
-      WHERE "PropertyTechnicalAsset"."company_id" = ${companyId} AND "PropertyTechnicalAsset"."property_id" = ${propertyId}
-    `);
-  } else if (action === "warranty.save") {
-    const title = text(body.title, 180);
-    if (!title) return NextResponse.json({ error: "Garantins titel krävs" }, { status: 400 });
-    const startsAt = nullableDate(body.startsAt); const expiresAt = nullableDate(body.expiresAt);
-    if (startsAt && expiresAt && expiresAt < startsAt) return NextResponse.json({ error: "Garantins slutdatum kan inte vara före startdatum" }, { status: 400 });
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "PropertyWarranty" ("id", "company_id", "property_id", "technical_asset_id", "title", "supplier", "scope", "starts_at", "expires_at", "contact_name", "contact_email", "contact_phone", "document_url", "status")
-      VALUES (${recordId}, ${companyId}, ${propertyId}, ${technicalAssetId}, ${title}, ${nullableText(body.supplier, 200)}, ${nullableText(body.scope, 1000)}, ${startsAt}, ${expiresAt}, ${nullableText(body.contactName, 160)}, ${nullableText(body.contactEmail, 200)}, ${nullableText(body.contactPhone, 80)}, ${nullableText(body.documentUrl, 1000)}, ${text(body.status, 40) || "active"})
-      ON CONFLICT ("id") DO UPDATE SET "technical_asset_id" = EXCLUDED."technical_asset_id", "title" = EXCLUDED."title", "supplier" = EXCLUDED."supplier", "scope" = EXCLUDED."scope", "starts_at" = EXCLUDED."starts_at", "expires_at" = EXCLUDED."expires_at", "contact_name" = EXCLUDED."contact_name", "contact_email" = EXCLUDED."contact_email", "contact_phone" = EXCLUDED."contact_phone", "document_url" = EXCLUDED."document_url", "status" = EXCLUDED."status", "updated_at" = CURRENT_TIMESTAMP
-      WHERE "PropertyWarranty"."company_id" = ${companyId} AND "PropertyWarranty"."property_id" = ${propertyId}
-    `);
-  } else if (action === "inspection.save") {
-    const title = text(body.title, 180); const inspectionType = text(body.inspectionType, 100);
-    const status = text(body.status, 40) || "planned";
-    if (!title || !inspectionType || !inspectionStatuses.has(status)) return NextResponse.json({ error: "Besiktningens typ, titel och status krävs" }, { status: 400 });
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "PropertyInspection" ("id", "company_id", "property_id", "technical_asset_id", "inspection_type", "title", "scheduled_at", "performed_at", "next_due_at", "provider", "contact_name", "result", "summary", "document_url", "status")
-      VALUES (${recordId}, ${companyId}, ${propertyId}, ${technicalAssetId}, ${inspectionType}, ${title}, ${nullableDate(body.scheduledAt)}, ${nullableDate(body.performedAt)}, ${nullableDate(body.nextDueAt)}, ${nullableText(body.provider, 200)}, ${nullableText(body.contactName, 160)}, ${nullableText(body.result, 300)}, ${nullableText(body.summary, 2000)}, ${nullableText(body.documentUrl, 1000)}, ${status})
-      ON CONFLICT ("id") DO UPDATE SET "technical_asset_id" = EXCLUDED."technical_asset_id", "inspection_type" = EXCLUDED."inspection_type", "title" = EXCLUDED."title", "scheduled_at" = EXCLUDED."scheduled_at", "performed_at" = EXCLUDED."performed_at", "next_due_at" = EXCLUDED."next_due_at", "provider" = EXCLUDED."provider", "contact_name" = EXCLUDED."contact_name", "result" = EXCLUDED."result", "summary" = EXCLUDED."summary", "document_url" = EXCLUDED."document_url", "status" = EXCLUDED."status", "updated_at" = CURRENT_TIMESTAMP
-      WHERE "PropertyInspection"."company_id" = ${companyId} AND "PropertyInspection"."property_id" = ${propertyId}
-    `);
-  } else if (action === "agreement.save") {
-    const supplier = text(body.supplier, 200); const serviceArea = text(body.serviceArea, 180);
-    const status = text(body.status, 40) || "active";
-    const startsAt = nullableDate(body.startsAt); const endsAt = nullableDate(body.endsAt);
-    if (!supplier || !serviceArea || !agreementStatuses.has(status)) return NextResponse.json({ error: "Leverantör, tjänsteområde och status krävs" }, { status: 400 });
-    if (startsAt && endsAt && endsAt < startsAt) return NextResponse.json({ error: "Avtalets slutdatum kan inte vara före startdatum" }, { status: 400 });
-    const costAmount = nullableNumber(body.costAmount);
-    if (costAmount != null && costAmount < 0) return NextResponse.json({ error: "Avtalskostnaden kan inte vara negativ" }, { status: 400 });
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "PropertyServiceAgreement" ("id", "company_id", "property_id", "technical_asset_id", "supplier", "agreement_number", "service_area", "starts_at", "ends_at", "notice_period_months", "cost_amount", "cost_interval", "contact_name", "contact_email", "contact_phone", "document_url", "status")
-      VALUES (${recordId}, ${companyId}, ${propertyId}, ${technicalAssetId}, ${supplier}, ${nullableText(body.agreementNumber, 120)}, ${serviceArea}, ${startsAt}, ${endsAt}, ${nullableNumber(body.noticePeriodMonths)}, ${costAmount}, ${nullableText(body.costInterval, 40)}, ${nullableText(body.contactName, 160)}, ${nullableText(body.contactEmail, 200)}, ${nullableText(body.contactPhone, 80)}, ${nullableText(body.documentUrl, 1000)}, ${status})
-      ON CONFLICT ("id") DO UPDATE SET "technical_asset_id" = EXCLUDED."technical_asset_id", "supplier" = EXCLUDED."supplier", "agreement_number" = EXCLUDED."agreement_number", "service_area" = EXCLUDED."service_area", "starts_at" = EXCLUDED."starts_at", "ends_at" = EXCLUDED."ends_at", "notice_period_months" = EXCLUDED."notice_period_months", "cost_amount" = EXCLUDED."cost_amount", "cost_interval" = EXCLUDED."cost_interval", "contact_name" = EXCLUDED."contact_name", "contact_email" = EXCLUDED."contact_email", "contact_phone" = EXCLUDED."contact_phone", "document_url" = EXCLUDED."document_url", "status" = EXCLUDED."status", "updated_at" = CURRENT_TIMESTAMP
-      WHERE "PropertyServiceAgreement"."company_id" = ${companyId} AND "PropertyServiceAgreement"."property_id" = ${propertyId}
-    `);
-  } else {
-    return NextResponse.json({ error: "Åtgärden stöds inte" }, { status: 400 });
-  }
-
-  await writeAuditLog(user, { entityType: "property", entityId: propertyId, action: `property_card.${action}`, metadata: { recordId } });
-  return NextResponse.json({ success: true, id: recordId });
 }
