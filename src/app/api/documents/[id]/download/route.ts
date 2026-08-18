@@ -1,12 +1,13 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { auditScopedWhere, getCurrentUser } from "@/lib/current-user";
 import { safeDocumentFileName } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/documents/[id]/download" });
+const ROUTE = "/api/documents/[id]/download";
 
 function contentDisposition(fileName: string) {
   const safeAscii = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -22,37 +23,100 @@ function isTrustedLegacyBlobUrl(value: string) {
   }
 }
 
-async function streamFromStorage(storageUrl: string, headers: Record<string, string>) {
+function notFound(
+  observability: ReturnType<typeof createRouteObservability>,
+  message: string,
+  event: string,
+  context: Record<string, unknown> = {},
+) {
+  observability.logger.warn("document download unavailable", observability.elapsed({ event, ...context }));
+  return apiErrorResponse({
+    status: 404,
+    code: API_ERROR_CODES.notFound,
+    message,
+    requestId: observability.requestId,
+  });
+}
+
+async function streamFromStorage(
+  storageUrl: string,
+  headers: Record<string, string>,
+  observability: ReturnType<typeof createRouteObservability>,
+  context: { userId: string; companyId: string | null; documentId: string; source: string },
+) {
   const token = getStorageToken();
-  if (!token) return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
+  if (!token) {
+    observability.logger.warn("document storage unavailable", observability.elapsed({
+      event: "documents.download.storage_unavailable",
+      ...context,
+    }));
+    return apiErrorResponse({
+      status: 503,
+      code: API_ERROR_CODES.serviceUnavailable,
+      message: "Fillagringen är inte konfigurerad",
+      requestId: observability.requestId,
+    });
+  }
 
   try {
     const blob = await get(storageUrl, { access: "private", token });
-    if (blob) return new Response(blob.stream, { headers });
+    if (blob) {
+      observability.logger.info("document download completed", observability.elapsed({
+        event: "documents.download.completed",
+        ...context,
+        storage: "private_blob",
+      }));
+      return observability.correlate(new Response(blob.stream, { headers }));
+    }
   } catch (error) {
     if (!isTrustedLegacyBlobUrl(storageUrl)) throw error;
   }
 
   if (!isTrustedLegacyBlobUrl(storageUrl)) {
-    return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+    return notFound(observability, "Dokumentfilen saknas", "documents.download.file_missing", context);
   }
 
   const legacyResponse = await fetch(storageUrl, { cache: "no-store" });
   if (!legacyResponse.ok || !legacyResponse.body) {
-    return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+    return notFound(observability, "Dokumentfilen saknas", "documents.download.legacy_file_missing", context);
   }
-  return new Response(legacyResponse.body, { headers });
+
+  observability.logger.info("document download completed", observability.elapsed({
+    event: "documents.download.completed",
+    ...context,
+    storage: "legacy_blob_url",
+  }));
+  return observability.correlate(new Response(legacyResponse.body, { headers }));
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user) {
+      observability.logger.warn("document download rejected", observability.elapsed({
+        event: "documents.download.unauthorized",
+      }));
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        requestId: observability.requestId,
+      });
+    }
 
     const { id } = await params;
+    const context = {
+      userId: user.id,
+      companyId: user.company_id,
+      documentId: id,
+      source: "modern",
+    };
+
     if (user.company_id) {
       const modern = await db.managedDocument.findFirst({
         where: { id, company_id: user.company_id },
@@ -68,18 +132,25 @@ export async function GET(
           "Content-Type": modern.content_type,
           "Content-Disposition": contentDisposition(safeDocumentFileName(modern.file_name)),
           "Cache-Control": "private, no-store, max-age=0",
+          "CDN-Cache-Control": "no-store",
+          "Vercel-CDN-Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
         };
-        if (modern.storage_url) return streamFromStorage(modern.storage_url, headers);
+        if (modern.storage_url) return streamFromStorage(modern.storage_url, headers, observability, context);
         if (modern.data_url?.startsWith("data:")) {
           const match = /^data:([^;]+);base64,([\s\S]+)$/.exec(modern.data_url);
-          if (!match) return NextResponse.json({ error: "Dokumentfilen är ogiltig" }, { status: 404 });
+          if (!match) return notFound(observability, "Dokumentfilen är ogiltig", "documents.download.invalid_data", context);
           const bytes = Buffer.from(match[2], "base64");
-          return new Response(bytes, {
+          observability.logger.info("document download completed", observability.elapsed({
+            event: "documents.download.completed",
+            ...context,
+            storage: "inline_data",
+          }));
+          return observability.correlate(new Response(bytes, {
             headers: { ...headers, "Content-Length": String(bytes.length) },
-          });
+          }));
         }
-        return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+        return notFound(observability, "Dokumentfilen saknas", "documents.download.file_missing", context);
       }
     }
 
@@ -92,8 +163,20 @@ export async function GET(
       },
       select: { metadata: true },
     });
-    if (!log) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    if (!log) {
+      return notFound(observability, "Dokumentet hittades inte", "documents.download.not_found", {
+        userId: user.id,
+        companyId: user.company_id,
+        documentId: id,
+      });
+    }
 
+    const legacyContext = {
+      userId: user.id,
+      companyId: user.company_id,
+      documentId: id,
+      source: "legacy",
+    };
     const metadata = (log.metadata || {}) as Record<string, unknown>;
     const contentType = typeof metadata.contentType === "string" ? metadata.contentType : "application/octet-stream";
     const fileName = safeDocumentFileName(
@@ -103,30 +186,44 @@ export async function GET(
       "Content-Type": contentType,
       "Content-Disposition": contentDisposition(fileName),
       "Cache-Control": "private, no-store, max-age=0",
+      "CDN-Cache-Control": "no-store",
+      "Vercel-CDN-Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     };
 
     const storageUrl = typeof metadata.storageUrl === "string" ? metadata.storageUrl : null;
-    if (storageUrl) return streamFromStorage(storageUrl, headers);
+    if (storageUrl) return streamFromStorage(storageUrl, headers, observability, legacyContext);
 
     const dataUrl = typeof metadata.dataUrl === "string" ? metadata.dataUrl : null;
     if (!dataUrl?.startsWith("data:")) {
-      return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+      return notFound(observability, "Dokumentfilen saknas", "documents.download.file_missing", legacyContext);
     }
 
     const match = /^data:([^;]+);base64,([\s\S]+)$/.exec(dataUrl);
-    if (!match) return NextResponse.json({ error: "Dokumentfilen är ogiltig" }, { status: 404 });
+    if (!match) return notFound(observability, "Dokumentfilen är ogiltig", "documents.download.invalid_data", legacyContext);
 
     const bytes = Buffer.from(match[2], "base64");
-    return new Response(bytes, {
+    observability.logger.info("document download completed", observability.elapsed({
+      event: "documents.download.completed",
+      ...legacyContext,
+      storage: "inline_data",
+    }));
+    return observability.correlate(new Response(bytes, {
       headers: {
         ...headers,
         "Content-Type": typeof metadata.contentType === "string" ? metadata.contentType : match[1],
         "Content-Length": String(bytes.length),
       },
-    });
+    }));
   } catch (error) {
-    logger.error("Download document error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("document download failed", error, observability.elapsed({
+      event: "documents.download.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
