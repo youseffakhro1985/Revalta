@@ -49,6 +49,7 @@ import { GET as getReport } from "./[componentId]/report/route";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const owner = { id: "owner-1", company_id: "company-1", role: "owner" };
+const manager = { id: "manager-1", company_id: "company-1", role: "manager" };
 const technician = { id: "tech-1", company_id: "company-1", role: "technician" };
 const property = {
   id: "property-1",
@@ -104,7 +105,7 @@ function entryRequest(body: Record<string, unknown>) {
   });
 }
 
-function reportParams() {
+function componentParams() {
   return { params: Promise.resolve({ id: "property-1", componentId: "asset-1" }) };
 }
 
@@ -137,11 +138,11 @@ describe("component support security contracts", () => {
     writeAuditLogMock.mockResolvedValue(undefined);
   });
 
-  it("masks component finance and historical audit metadata in JSON reports for technicians", async () => {
+  it("masks component finance and withholds audit data in JSON reports for technicians", async () => {
     getCurrentUserMock.mockResolvedValue(technician);
     seedReportQueries();
 
-    const response = await getReport(reportRequest(), reportParams());
+    const response = await getReport(reportRequest(), componentParams());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -150,19 +151,21 @@ describe("component support security contracts", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(body.component.replacement_value).toBeNull();
     expect(body.costs[0].amount_ex_vat).toBeNull();
-    expect(body.audits[0].metadata).toBeNull();
+    expect(body.audits).toEqual([]);
     expect(body.summary.totalCostExVat).toBeNull();
+    expect(body.summary.auditCount).toBe(0);
+    expect(auditFindManyMock).not.toHaveBeenCalled();
     expect(JSON.stringify(body)).not.toContain("historical-audit-secret");
     expect(loggerInfoMock).toHaveBeenCalledWith(
       "component report generated",
-      expect.objectContaining({ event: "components.report.completed", includeFinance: false, propertyId: "property-1", componentId: "asset-1" }),
+      expect.objectContaining({ event: "components.report.completed", includeFinance: false, includeAudit: false, propertyId: "property-1", componentId: "asset-1" }),
     );
   });
 
-  it("preserves report finance data for authorized roles", async () => {
+  it("preserves report finance and audit data for owner roles", async () => {
     seedReportQueries();
 
-    const response = await getReport(reportRequest(), reportParams());
+    const response = await getReport(reportRequest(), componentParams());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -170,13 +173,29 @@ describe("component support security contracts", () => {
     expect(body.costs[0].amount_ex_vat).toBe(5000);
     expect(body.audits[0].metadata.secret).toBe("historical-audit-secret");
     expect(body.summary.totalCostExVat).toBe(5000);
+    expect(auditFindManyMock).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps finance out of technician CSV exports and neutralizes spreadsheet formulas", async () => {
+  it("keeps manager finance access while enforcing the stricter audit permission", async () => {
+    getCurrentUserMock.mockResolvedValue(manager);
+    seedReportQueries();
+
+    const response = await getReport(reportRequest(), componentParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.component.replacement_value).toBe(250000);
+    expect(body.costs[0].amount_ex_vat).toBe(5000);
+    expect(body.summary.totalCostExVat).toBe(5000);
+    expect(body.audits).toEqual([]);
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps finance and audit data out of technician CSV exports and neutralizes spreadsheet formulas", async () => {
     getCurrentUserMock.mockResolvedValue(technician);
     seedReportQueries([{ event_date: new Date("2026-08-18T00:00:00.000Z"), event_type: "service", title: "=2+2", description: null, provider: "Tekniker" }]);
 
-    const response = await getReport(reportRequest("csv"), reportParams());
+    const response = await getReport(reportRequest("csv"), componentParams());
     const csv = await response.text();
 
     expect(response.status).toBe(200);
@@ -185,13 +204,15 @@ describe("component support security contracts", () => {
     expect(csv).not.toContain("250000");
     expect(csv).not.toContain("5000");
     expect(csv).not.toContain("historical-audit-secret");
+    expect(csv).not.toContain("Revision");
     expect(csv).toContain("\"'=2+2\"");
+    expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 
   it("returns a safe correlated 500 if report data loading fails", async () => {
     queryRawMock.mockRejectedValueOnce(new Error("postgres://user:secret@db.internal/revalta"));
 
-    const response = await getReport(reportRequest(), reportParams());
+    const response = await getReport(reportRequest(), componentParams());
     const body = await response.json();
 
     expect(response.status).toBe(500);
@@ -202,6 +223,18 @@ describe("component support security contracts", () => {
       expect.any(Error),
       expect.objectContaining({ event: "components.report.failed" }),
     );
+  });
+
+  it("rejects technicians before link-option property or component enumeration", async () => {
+    getCurrentUserMock.mockResolvedValue(technician);
+
+    const response = await getLinkOptions(linkRequest(), componentParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({ error: "Du saknar behörighet att länka komponenthistorik", errorCode: "FORBIDDEN", requestId });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 
   it("does not log unverified cross-tenant identifiers in link options", async () => {
@@ -226,7 +259,7 @@ describe("component support security contracts", () => {
       .mockResolvedValueOnce([{ id: "wo-1", title: "Service", status: "open", priority: "normal" }])
       .mockResolvedValueOnce([{ id: "project-1", name: "Byte", status: "active", risk: "low" }]);
 
-    const response = await getLinkOptions(linkRequest(), reportParams());
+    const response = await getLinkOptions(linkRequest(), componentParams());
     const body = await response.json();
 
     expect(response.status).toBe(200);
