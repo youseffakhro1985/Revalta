@@ -1,5 +1,4 @@
 import { get } from "@vercel/blob";
-import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { auditScopedWhere, getCurrentUser } from "@/lib/current-user";
