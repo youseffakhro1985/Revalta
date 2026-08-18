@@ -1,9 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { deliverServiceEmail, type ServiceEmailDelivery } from "@/lib/component-service-email";
-import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { isCronRequestAuthorized } from "@/lib/request-security";
+import { createRouteObservability } from "@/lib/route-observability";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,13 +16,20 @@ type Preferences = { enabled: boolean; daysAhead: number; roles: string[]; addit
 type UserPreferences = { enabled: boolean; overdueOnly: boolean };
 type DeliveryStatus = "sent" | "partial" | "failed";
 
+const ROUTE = "/api/cron/component-service-reminders";
+const JOB = "component_service_reminders";
 const allowedRoles = ["owner", "admin", "manager", "property_manager"];
 const defaults: Preferences = { enabled: true, daysAhead: 30, roles: [...allowedRoles], additionalEmails: [] };
 const userDefaults: UserPreferences = { enabled: true, overdueOnly: false };
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROCESSING_LEASE_MS = 15 * 60_000;
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
-function noStore(body: unknown, init?: ResponseInit) { return NextResponse.json(body, { ...init, headers: { "Cache-Control": "private, no-store", ...(init?.headers || {}) } }); }
 function dateKey(date = new Date()) { return date.toISOString().slice(0, 10); }
 function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 function toJson(value: unknown): Prisma.InputJsonValue { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
@@ -166,113 +175,198 @@ async function finalizeRun(input: {
 }
 
 export async function GET(request: Request) {
-  if (!isCronRequestAuthorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
-  const now = new Date();
-  const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
-  const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
-  const [components, modernSettings, modernUserPreferences] = await Promise.all([
-    db.$queryRaw<DueComponent[]>(Prisma.sql`
-      SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."criticality", a."next_service_at",
-        p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
-      FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
-      WHERE a."next_service_at" IS NOT NULL
-        ${propertyGuard}
-        AND a."next_service_at" <= ${maxDueBefore}
-        AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
-      ORDER BY a."company_id", a."next_service_at" ASC, a."criticality" DESC
-    `),
-    db.serviceNotificationSettings.findMany({
-      select: { company_id: true, enabled: true, days_ahead: true, roles: true, additional_emails: true },
-    }),
-    db.userServiceNotificationPreference.findMany({
-      select: { company_id: true, user_id: true, enabled: true, overdue_only: true },
-    }),
-  ]);
+  const observability = createRouteObservability(request, ROUTE);
 
-  const settings = new Map<string, Preferences>();
-  for (const row of modernSettings) {
-    settings.set(row.company_id, {
-      enabled: row.enabled,
-      daysAhead: row.days_ahead,
-      roles: Array.isArray(row.roles) ? row.roles.map(String).filter((role) => allowedRoles.includes(role)) : defaults.roles,
-      additionalEmails: Array.isArray(row.additional_emails) ? row.additional_emails.map(String) : [],
+  if (!isCronRequestAuthorized(request)) {
+    observability.logger.warn("component service reminder cron rejected", observability.elapsed({
+      event: "cron.authorization.denied",
+      job: JOB,
+    }));
+    return apiErrorResponse({
+      status: 401,
+      code: API_ERROR_CODES.unauthorized,
+      message: "Obehörig",
+      requestId: observability.requestId,
     });
   }
-  const userSettings = new Map<string, UserPreferences>();
-  for (const row of modernUserPreferences) {
-    userSettings.set(`${row.company_id}:${row.user_id}`, { enabled: row.enabled, overdueOnly: row.overdue_only });
-  }
 
-  const grouped = new Map<string, DueComponent[]>();
-  for (const component of components) {
-    const preference = settings.get(component.company_id) || defaults;
-    if (!preference.enabled || component.next_service_at > new Date(now.getTime() + preference.daysAhead * 86400000)) continue;
-    const list = grouped.get(component.company_id) || [];
-    list.push(component);
-    grouped.set(component.company_id, list);
-  }
+  observability.logger.info("component service reminder cron started", observability.elapsed({
+    event: "cron.started",
+    job: JOB,
+  }));
 
-  const result = { companies: grouped.size, sent: 0, partial: 0, skipped: 0, failed: 0, components: Array.from(grouped.values()).reduce((sum, list) => sum + list.length, 0) };
-  const runDate = dateKey(now);
+  try {
+    const now = new Date();
+    const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
+    const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
+    const [components, modernSettings, modernUserPreferences] = await Promise.all([
+      db.$queryRaw<DueComponent[]>(Prisma.sql`
+        SELECT a."id", a."company_id", a."property_id", a."name" AS "component_name", a."criticality", a."next_service_at",
+          p."name" AS "property_name", p."address" AS "property_address", p."city" AS "property_city"
+        FROM "PropertyTechnicalAsset" a INNER JOIN "Property" p ON p."id" = a."property_id" AND p."company_id" = a."company_id"
+        WHERE a."next_service_at" IS NOT NULL
+          ${propertyGuard}
+          AND a."next_service_at" <= ${maxDueBefore}
+          AND COALESCE(a."status", 'active') NOT IN ('retired', 'removed')
+        ORDER BY a."company_id", a."next_service_at" ASC, a."criticality" DESC
+      `),
+      db.serviceNotificationSettings.findMany({
+        select: { company_id: true, enabled: true, days_ahead: true, roles: true, additional_emails: true },
+      }),
+      db.userServiceNotificationPreference.findMany({
+        select: { company_id: true, user_id: true, enabled: true, overdue_only: true },
+      }),
+    ]);
 
-  for (const [companyId, companyComponents] of grouped) {
-    const preference = settings.get(companyId) || defaults;
-    const dedupeKey = `component-service-digest:${companyId}:${runDate}`;
-    const recipients = await db.user.findMany({ where: { company_id: companyId, status: "active", role: { in: preference.roles } }, select: { id: true, email: true, name: true, role: true }, orderBy: { created_at: "asc" } }) as Recipient[];
-    const allEmails = new Set(preference.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)));
-    const overdueOnlyEmails = new Set<string>();
-    for (const recipient of recipients) {
-      const personal = userSettings.get(`${companyId}:${recipient.id}`) || userDefaults;
-      if (!personal.enabled) continue;
-      const email = normalizeEmail(recipient.email);
-      if (!emailPattern.test(email)) continue;
-      if (personal.overdueOnly) overdueOnlyEmails.add(email); else allEmails.add(email);
+    const settings = new Map<string, Preferences>();
+    for (const row of modernSettings) {
+      settings.set(row.company_id, {
+        enabled: row.enabled,
+        daysAhead: row.days_ahead,
+        roles: Array.isArray(row.roles) ? row.roles.map(String).filter((role) => allowedRoles.includes(role)) : defaults.roles,
+        additionalEmails: Array.isArray(row.additional_emails) ? row.additional_emails.map(String) : [],
+      });
     }
-    for (const email of allEmails) overdueOnlyEmails.delete(email);
+    const userSettings = new Map<string, UserPreferences>();
+    for (const row of modernUserPreferences) {
+      userSettings.set(`${row.company_id}:${row.user_id}`, { enabled: row.enabled, overdueOnly: row.overdue_only });
+    }
 
-    const overdueComponents = companyComponents.filter((item) => item.next_service_at < now);
-    const basePayload = { allRecipients: Array.from(allEmails), overdueOnlyRecipients: Array.from(overdueOnlyEmails), componentCount: companyComponents.length, overdueCount: overdueComponents.length, runDate, settings: preference };
-    if (!allEmails.size && (!overdueOnlyEmails.size || !overdueComponents.length)) {
-      await db.componentServiceDigestRun.upsert({
-        where: { company_id_dedupe_key: { company_id: companyId, dedupe_key: dedupeKey } },
-        create: {
-          company_id: companyId,
-          dedupe_key: dedupeKey,
-          status: "skipped",
-          payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
-        },
-        update: {
-          status: "skipped",
-          payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
+    const grouped = new Map<string, DueComponent[]>();
+    for (const component of components) {
+      const preference = settings.get(component.company_id) || defaults;
+      if (!preference.enabled || component.next_service_at > new Date(now.getTime() + preference.daysAhead * 86400000)) continue;
+      const list = grouped.get(component.company_id) || [];
+      list.push(component);
+      grouped.set(component.company_id, list);
+    }
+
+    const result = {
+      companies: grouped.size,
+      sent: 0,
+      partial: 0,
+      skipped: 0,
+      failed: 0,
+      components: Array.from(grouped.values()).reduce((sum, list) => sum + list.length, 0),
+    };
+    const runDate = dateKey(now);
+
+    for (const [companyId, companyComponents] of grouped) {
+      const preference = settings.get(companyId) || defaults;
+      const dedupeKey = `component-service-digest:${companyId}:${runDate}`;
+      const recipients = await db.user.findMany({
+        where: { company_id: companyId, status: "active", role: { in: preference.roles } },
+        select: { id: true, email: true, name: true, role: true },
+        orderBy: { created_at: "asc" },
+      }) as Recipient[];
+      const allEmails = new Set(preference.additionalEmails.map(normalizeEmail).filter((email) => emailPattern.test(email)));
+      const overdueOnlyEmails = new Set<string>();
+      for (const recipient of recipients) {
+        const personal = userSettings.get(`${companyId}:${recipient.id}`) || userDefaults;
+        if (!personal.enabled) continue;
+        const email = normalizeEmail(recipient.email);
+        if (!emailPattern.test(email)) continue;
+        if (personal.overdueOnly) overdueOnlyEmails.add(email);
+        else allEmails.add(email);
+      }
+      for (const email of allEmails) overdueOnlyEmails.delete(email);
+
+      const overdueComponents = companyComponents.filter((item) => item.next_service_at < now);
+      const basePayload = {
+        allRecipients: Array.from(allEmails),
+        overdueOnlyRecipients: Array.from(overdueOnlyEmails),
+        componentCount: companyComponents.length,
+        overdueCount: overdueComponents.length,
+        runDate,
+        settings: preference,
+      };
+      if (!allEmails.size && (!overdueOnlyEmails.size || !overdueComponents.length)) {
+        await db.componentServiceDigestRun.upsert({
+          where: { company_id_dedupe_key: { company_id: companyId, dedupe_key: dedupeKey } },
+          create: {
+            company_id: companyId,
+            dedupe_key: dedupeKey,
+            status: "skipped",
+            payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
+          },
+          update: {
+            status: "skipped",
+            payload: toJson({ ...basePayload, reason: "no_recipients_or_matching_components" }),
+          },
+        });
+        result.skipped += 1;
+        continue;
+      }
+
+      const claim = await claimRun(companyId, dedupeKey, basePayload);
+      if (!claim.claimed) {
+        result.skipped += 1;
+        continue;
+      }
+
+      const deliveries: ServiceEmailDelivery[] = [];
+      for (const email of allEmails) {
+        deliveries.push(await deliverServiceEmail(email, companyComponents, preference.daysAhead, "all"));
+      }
+      if (overdueComponents.length) {
+        for (const email of overdueOnlyEmails) {
+          deliveries.push(await deliverServiceEmail(email, overdueComponents, preference.daysAhead, "overdue_only"));
+        }
+      }
+
+      const sentCount = deliveries.filter((item) => item.status === "sent").length;
+      const failedCount = deliveries.length - sentCount;
+      const status: DeliveryStatus = sentCount === 0 ? "failed" : failedCount > 0 ? "partial" : "sent";
+      await finalizeRun({
+        companyId,
+        eventId: claim.eventId,
+        dedupeKey,
+        status,
+        sentCount,
+        failedCount,
+        payload: {
+          ...basePayload,
+          deliverySummary: { total: deliveries.length, sent: sentCount, failed: failedCount },
+          deliveries,
         },
       });
-      result.skipped += 1;
-      continue;
+      if (status === "sent") result.sent += 1;
+      else if (status === "partial") result.partial += 1;
+      else result.failed += 1;
     }
 
-    const claim = await claimRun(companyId, dedupeKey, basePayload);
-    if (!claim.claimed) { result.skipped += 1; continue; }
-
-    const deliveries: ServiceEmailDelivery[] = [];
-    for (const email of allEmails) deliveries.push(await deliverServiceEmail(email, companyComponents, preference.daysAhead, "all"));
-    if (overdueComponents.length) for (const email of overdueOnlyEmails) deliveries.push(await deliverServiceEmail(email, overdueComponents, preference.daysAhead, "overdue_only"));
-
-    const sentCount = deliveries.filter((item) => item.status === "sent").length;
-    const failedCount = deliveries.length - sentCount;
-    const status: DeliveryStatus = sentCount === 0 ? "failed" : failedCount > 0 ? "partial" : "sent";
-    await finalizeRun({
-      companyId,
-      eventId: claim.eventId,
-      dedupeKey,
-      status,
-      sentCount,
-      failedCount,
-      payload: { ...basePayload, deliverySummary: { total: deliveries.length, sent: sentCount, failed: failedCount }, deliveries },
+    const context = observability.elapsed({
+      job: JOB,
+      companies: result.companies,
+      components: result.components,
+      sent: result.sent,
+      partial: result.partial,
+      skipped: result.skipped,
+      failed: result.failed,
     });
-    if (status === "sent") result.sent += 1;
-    else if (status === "partial") result.partial += 1;
-    else result.failed += 1;
-  }
+    if (result.partial > 0 || result.failed > 0) {
+      observability.logger.warn("component service reminder cron partially failed", {
+        event: "cron.partial_failure",
+        ...context,
+      });
+    } else {
+      observability.logger.info("component service reminder cron completed", {
+        event: "cron.completed",
+        ...context,
+      });
+    }
 
-  return noStore(result);
+    return observability.correlate(NextResponse.json(result, { headers: SUCCESS_HEADERS }));
+  } catch (error) {
+    observability.logger.error("component service reminder cron failed", error, observability.elapsed({
+      event: "cron.failed",
+      job: JOB,
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Cron-körningen misslyckades",
+      requestId: observability.requestId,
+    });
+  }
 }
