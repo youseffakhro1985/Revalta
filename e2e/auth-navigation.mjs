@@ -35,6 +35,16 @@ async function expectPath(page, pathname, timeout = 20_000) {
   );
 }
 
+async function waitForValue(read, timeout, label) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const value = read();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  fail(`${label} within ${timeout}ms`);
+}
+
 const extraHTTPHeaders = bypass
   ? {
       "x-vercel-protection-bypass": bypass,
@@ -50,11 +60,26 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 const pageErrors = [];
+let registerRequest = null;
+let registerResponse = null;
 let registerRequestFailure = null;
 
 page.on("pageerror", (error) => {
   pageErrors.push(error.message);
   console.error(`PAGE_ERROR: ${error.message}`);
+});
+
+page.on("request", (request) => {
+  if (request.url().endsWith("/api/auth/register") && request.method() === "POST") {
+    registerRequest = request;
+    console.log("register request: POST emitted by browser");
+  }
+});
+
+page.on("response", (response) => {
+  if (response.url().endsWith("/api/auth/register") && response.request().method() === "POST") {
+    registerResponse = response;
+  }
 });
 
 page.on("requestfailed", (request) => {
@@ -90,9 +115,9 @@ try {
   await expectVisible(page.getByText(RESET_NEUTRAL_MESSAGE, { exact: true }), "neutral password-reset confirmation");
   console.log(`password reset: neutral browser flow passed in ${resetLatencyMs}ms (limit ${RESET_MAX_LATENCY_MS}ms)`);
 
-  // Register through the real browser form. Separate browser submit emission from
-  // server response latency so a native validation/UI failure cannot be mistaken
-  // for a slow API and vice versa.
+  // Register through the real browser form. Passive network listeners separate
+  // browser submit emission from server response latency without leaving pending
+  // Playwright promises that can mask the real diagnostic failure.
   await page.goto("/register", { waitUntil: "domcontentloaded" });
   await expectVisible(page.getByRole("heading", { name: "Skapa ditt Revalta-konto" }), "register heading");
   await page.getByLabel("Namn").fill("Revalta E2E Owner");
@@ -110,37 +135,32 @@ try {
     fail("register form failed native browser validation before submit");
   }
 
+  registerRequest = null;
+  registerResponse = null;
+  registerRequestFailure = null;
   const registerStartedAt = Date.now();
-  const registerRequestPromise = page.waitForRequest(
-    (request) => request.url().endsWith("/api/auth/register") && request.method() === "POST",
-    { timeout: REGISTER_REQUEST_EMIT_TIMEOUT_MS },
-  );
-  const registerResponsePromise = page.waitForResponse(
-    (response) => response.url().endsWith("/api/auth/register") && response.request().method() === "POST",
-    { timeout: REGISTER_DIAGNOSTIC_TIMEOUT_MS },
-  );
   await page.getByRole("button", { name: "Skapa konto" }).click();
-  await registerRequestPromise.catch(() =>
-    fail(`register submit did not emit POST /api/auth/register within ${REGISTER_REQUEST_EMIT_TIMEOUT_MS}ms`),
+  await waitForValue(
+    () => registerRequest,
+    REGISTER_REQUEST_EMIT_TIMEOUT_MS,
+    "register submit did not emit POST /api/auth/register",
   );
-  console.log("register request: POST emitted by browser");
-  const registerResponse = await registerResponsePromise.catch(() =>
-    fail(
-      `register POST was emitted but produced no response within ${REGISTER_DIAGNOSTIC_TIMEOUT_MS}ms` +
-        (registerRequestFailure ? ` (network failure: ${registerRequestFailure})` : ""),
-    ),
+  const observedRegisterResponse = await waitForValue(
+    () => registerResponse,
+    REGISTER_DIAGNOSTIC_TIMEOUT_MS,
+    `register POST was emitted but produced no response${registerRequestFailure ? ` (network failure: ${registerRequestFailure})` : ""}`,
   );
   const registerLatencyMs = Date.now() - registerStartedAt;
-  if (registerResponse.status() !== 201) {
+  if (observedRegisterResponse.status() !== 201) {
     let publicError = {};
     try {
-      publicError = await registerResponse.json();
+      publicError = await observedRegisterResponse.json();
     } catch {
       publicError = {};
     }
     const errorCode = typeof publicError?.errorCode === "string" ? publicError.errorCode : "UNKNOWN";
     const errorMessage = typeof publicError?.error === "string" ? publicError.error : "unknown public error";
-    fail(`register request returned HTTP ${registerResponse.status()} after ${registerLatencyMs}ms (${errorCode}: ${errorMessage})`);
+    fail(`register request returned HTTP ${observedRegisterResponse.status()} after ${registerLatencyMs}ms (${errorCode}: ${errorMessage})`);
   }
   if (registerLatencyMs > REGISTER_MAX_LATENCY_MS) {
     fail(`register request exceeded latency SLO: HTTP 201 after ${registerLatencyMs}ms (limit ${REGISTER_MAX_LATENCY_MS}ms)`);
