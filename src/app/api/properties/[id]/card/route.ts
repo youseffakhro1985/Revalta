@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import {
@@ -9,7 +10,15 @@ import {
   getCurrentUser,
   tenantWhere,
 } from "@/lib/current-user";
+import { createRouteObservability } from "@/lib/route-observability";
 
+const CARD_ROUTE = "/api/properties/[id]/card";
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 const assetCategories = new Set(["elevator", "ventilation", "heating", "electricity", "water", "fire", "access", "other"]);
 const criticalities = new Set(["low", "normal", "high", "critical"]);
 const assetStatuses = new Set(["active", "service_due", "out_of_service", "decommissioned"]);
@@ -38,6 +47,20 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function rejectCardRead(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("property card read rejected", observability.elapsed({ event: options.event, ...options.context }));
+  return apiErrorResponse({ status: options.status, code: options.code, message: options.message, requestId: observability.requestId });
+}
+
 async function resolveProperty(id: string, user: Awaited<ReturnType<typeof getCurrentUser>>) {
   if (!user) return null;
   return db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) }, select: { id: true } });
@@ -59,125 +82,137 @@ async function validateAsset(assetId: string | null, propertyId: string, company
   return rows.length === 1;
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const observability = createRouteObservability(request, CARD_ROUTE);
 
-  const { id } = await params;
-  const property = await db.property.findFirst({
-    where: { id, deleted_at: null, ...tenantWhere(user) },
-    include: {
-      buildings: { orderBy: { name: "asc" }, include: { _count: { select: { units: true } } } },
-      units: { orderBy: [{ unit_type: "asc" }, { designation: "asc" }], include: { building: { select: { id: true, name: true } } } },
-      work_orders: {
-        where: { deleted_at: null },
-        orderBy: { updated_at: "desc" }, take: 12,
-        select: { id: true, title: true, status: true, priority: true, scheduled_end: true, actual_cost: true, updated_at: true },
-      },
-      projects: {
-        where: { deleted_at: null },
-        orderBy: { updated_at: "desc" }, take: 12,
-        select: { id: true, name: true, status: true, risk: true, budget: true, forecast: true, actual: true, end_date: true, updated_at: true },
-      },
-      _count: {
-        select: {
-          tickets: { where: { deleted_at: null } },
-          buildings: true,
-          units: true,
-          work_orders: { where: { deleted_at: null } },
-          projects: { where: { deleted_at: null } },
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return rejectCardRead(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "property.card.read.unauthorized" });
+    }
+    if (!user.company_id) {
+      return rejectCardRead(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "property.card.read.missing_company", context: { userId: user.id } });
+    }
+
+    const { id } = await params;
+    const property = await db.property.findFirst({
+      where: { id, deleted_at: null, ...tenantWhere(user) },
+      include: {
+        buildings: { orderBy: { name: "asc" }, include: { _count: { select: { units: true } } } },
+        units: { orderBy: [{ unit_type: "asc" }, { designation: "asc" }], include: { building: { select: { id: true, name: true } } } },
+        work_orders: {
+          where: { deleted_at: null },
+          orderBy: { updated_at: "desc" }, take: 12,
+          select: { id: true, title: true, status: true, priority: true, scheduled_end: true, actual_cost: true, updated_at: true },
+        },
+        projects: {
+          where: { deleted_at: null },
+          orderBy: { updated_at: "desc" }, take: 12,
+          select: { id: true, name: true, status: true, risk: true, budget: true, forecast: true, actual: true, end_date: true, updated_at: true },
+        },
+        _count: {
+          select: {
+            tickets: { where: { deleted_at: null } },
+            buildings: true,
+            units: true,
+            work_orders: { where: { deleted_at: null } },
+            projects: { where: { deleted_at: null } },
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
+    if (!property) {
+      return rejectCardRead(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "property.card.read.property_not_found", context: { userId: user.id, companyId: user.company_id } });
+    }
 
-  const companyId = user.company_id;
-  const [entrances, assets, warranties, inspections, agreements] = await Promise.all([
-    db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
-      SELECT e.*, b."name" AS "building_name"
-      FROM "PropertyEntrance" e
-      LEFT JOIN "Building" b ON b."id" = e."building_id"
-      WHERE e."company_id" = ${companyId} AND e."property_id" = ${id}
-      ORDER BY e."name" ASC
-    `),
-    db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
-      SELECT a.*, b."name" AS "building_name"
-      FROM "PropertyTechnicalAsset" a
-      LEFT JOIN "Building" b ON b."id" = a."building_id"
-      WHERE a."company_id" = ${companyId} AND a."property_id" = ${id}
-      ORDER BY CASE a."criticality" WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
-               a."next_service_at" ASC NULLS LAST, a."name" ASC
-    `),
-    db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
-      SELECT w.*, a."name" AS "technical_asset_name"
-      FROM "PropertyWarranty" w
-      LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
-      WHERE w."company_id" = ${companyId} AND w."property_id" = ${id}
-      ORDER BY w."expires_at" ASC NULLS LAST, w."title" ASC
-    `),
-    db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
-      SELECT i.*, a."name" AS "technical_asset_name"
-      FROM "PropertyInspection" i
-      LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = i."technical_asset_id"
-      WHERE i."company_id" = ${companyId} AND i."property_id" = ${id}
-      ORDER BY COALESCE(i."next_due_at", i."scheduled_at") ASC NULLS LAST, i."title" ASC
-    `),
-    db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
-      SELECT s.*, a."name" AS "technical_asset_name",
-             s."cost_amount"::double precision AS "cost_amount"
-      FROM "PropertyServiceAgreement" s
-      LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = s."technical_asset_id"
-      WHERE s."company_id" = ${companyId} AND s."property_id" = ${id}
-      ORDER BY s."ends_at" ASC NULLS LAST, s."supplier" ASC
-    `),
-  ]);
+    const companyId = user.company_id;
+    const [entrances, assets, warranties, inspections, agreements] = await Promise.all([
+      db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        SELECT e.*, b."name" AS "building_name"
+        FROM "PropertyEntrance" e
+        LEFT JOIN "Building" b ON b."id" = e."building_id"
+        WHERE e."company_id" = ${companyId} AND e."property_id" = ${property.id}
+        ORDER BY e."name" ASC
+      `),
+      db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        SELECT a.*, b."name" AS "building_name"
+        FROM "PropertyTechnicalAsset" a
+        LEFT JOIN "Building" b ON b."id" = a."building_id"
+        WHERE a."company_id" = ${companyId} AND a."property_id" = ${property.id}
+        ORDER BY CASE a."criticality" WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
+                 a."next_service_at" ASC NULLS LAST, a."name" ASC
+      `),
+      db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        SELECT w.*, a."name" AS "technical_asset_name"
+        FROM "PropertyWarranty" w
+        LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = w."technical_asset_id"
+        WHERE w."company_id" = ${companyId} AND w."property_id" = ${property.id}
+        ORDER BY w."expires_at" ASC NULLS LAST, w."title" ASC
+      `),
+      db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        SELECT i.*, a."name" AS "technical_asset_name"
+        FROM "PropertyInspection" i
+        LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = i."technical_asset_id"
+        WHERE i."company_id" = ${companyId} AND i."property_id" = ${property.id}
+        ORDER BY COALESCE(i."next_due_at", i."scheduled_at") ASC NULLS LAST, i."title" ASC
+      `),
+      db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        SELECT s.*, a."name" AS "technical_asset_name",
+               s."cost_amount"::double precision AS "cost_amount"
+        FROM "PropertyServiceAgreement" s
+        LEFT JOIN "PropertyTechnicalAsset" a ON a."id" = s."technical_asset_id"
+        WHERE s."company_id" = ${companyId} AND s."property_id" = ${property.id}
+        ORDER BY s."ends_at" ASC NULLS LAST, s."supplier" ASC
+      `),
+    ]);
 
-  const now = Date.now();
-  const inDays = (value: unknown, days: number) => {
-    if (!value) return false;
-    const time = new Date(String(value)).getTime();
-    return Number.isFinite(time) && time >= now && time <= now + days * 86_400_000;
-  };
+    const now = Date.now();
+    const inDays = (value: unknown, days: number) => {
+      if (!value) return false;
+      const time = new Date(String(value)).getTime();
+      return Number.isFinite(time) && time >= now && time <= now + days * 86_400_000;
+    };
 
-  const metrics = {
-    entrances: entrances.length,
-    technicalAssets: assets.length,
-    criticalAssets: assets.filter((item) => item.criticality === "critical" || item.status === "out_of_service").length,
-    serviceDue90Days: assets.filter((item) => inDays(item.next_service_at, 90) || item.status === "service_due").length,
-    warrantiesExpiring180Days: warranties.filter((item) => inDays(item.expires_at, 180)).length,
-    inspectionsDue90Days: inspections.filter((item) => inDays(item.next_due_at || item.scheduled_at, 90) || item.status === "overdue").length,
-    agreementsEnding180Days: agreements.filter((item) => inDays(item.ends_at, 180)).length,
-  };
+    const metrics = {
+      entrances: entrances.length,
+      technicalAssets: assets.length,
+      criticalAssets: assets.filter((item) => item.criticality === "critical" || item.status === "out_of_service").length,
+      serviceDue90Days: assets.filter((item) => inDays(item.next_service_at, 90) || item.status === "service_due").length,
+      warrantiesExpiring180Days: warranties.filter((item) => inDays(item.expires_at, 180)).length,
+      inspectionsDue90Days: inspections.filter((item) => inDays(item.next_due_at || item.scheduled_at, 90) || item.status === "overdue").length,
+      agreementsEnding180Days: agreements.filter((item) => inDays(item.ends_at, 180)).length,
+    };
 
-  const includeFinance = canViewFinanceData(user.role);
-  const safeProperty = includeFinance
-    ? property
-    : {
-        ...property,
-        work_orders: property.work_orders.map((order) => ({ ...order, actual_cost: null })),
-        projects: property.projects.map((project) => ({
-          ...project,
-          budget: null,
-          forecast: null,
-          actual: null,
-        })),
-      };
-  const safeAgreements = includeFinance
-    ? agreements
-    : agreements.map((item) => ({ ...item, cost_amount: null }));
+    const includeFinance = canViewFinanceData(user.role);
+    const safeProperty = includeFinance
+      ? property
+      : {
+          ...property,
+          work_orders: property.work_orders.map((order) => ({ ...order, actual_cost: null })),
+          projects: property.projects.map((project) => ({ ...project, budget: null, forecast: null, actual: null })),
+        };
+    const safeAssets: Array<Record<string, unknown>> = includeFinance
+      ? assets
+      : assets.map((item): Record<string, unknown> => ({ ...item, replacement_value: null }));
+    const safeAgreements: Array<Record<string, unknown>> = includeFinance
+      ? agreements
+      : agreements.map((item): Record<string, unknown> => ({ ...item, cost_amount: null }));
 
-  return NextResponse.json({
-    property: safeProperty,
-    entrances,
-    assets,
-    warranties,
-    inspections,
-    agreements: safeAgreements,
-    metrics,
-  });
+    observability.logger.info("property card read completed", observability.elapsed({ event: "property.card.read.completed", userId: user.id, companyId, propertyId: property.id, includeFinance }));
+    return observability.correlate(NextResponse.json({
+      property: safeProperty,
+      entrances,
+      assets: safeAssets,
+      warranties,
+      inspections,
+      agreements: safeAgreements,
+      metrics,
+    }, { headers: SUCCESS_HEADERS }));
+  } catch (error) {
+    observability.logger.error("property card read failed", error, observability.elapsed({ event: "property.card.read.failed" }));
+    return apiErrorResponse({ status: 500, code: API_ERROR_CODES.internalError, message: "Internt serverfel", requestId: observability.requestId });
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
