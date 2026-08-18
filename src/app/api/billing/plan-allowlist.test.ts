@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   createLoggerMock,
@@ -46,6 +46,10 @@ describe("billing plan allowlist", () => {
     vi.stubEnv("VERCEL_ENV", "preview");
     createLoggerMock.mockReturnValue({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() });
     getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   for (const prototypeKey of ["toString", "constructor", "__proto__"]) {
