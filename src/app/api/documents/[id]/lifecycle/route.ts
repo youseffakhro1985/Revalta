@@ -1,23 +1,81 @@
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/documents/[id]/lifecycle" });
-
+const ROUTE = "/api/documents/[id]/lifecycle";
 const allowedTransitions = new Set(["archive", "unpublish", "restore"]);
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
+
+function successResponse(
+  observability: ReturnType<typeof createRouteObservability>,
+  body: unknown,
+) {
+  return observability.correlate(NextResponse.json(body, { headers: SUCCESS_HEADERS }));
+}
+
+function reject(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("document lifecycle request rejected", observability.elapsed({
+    event: options.event,
+    ...options.context,
+  }));
+  return apiErrorResponse({
+    status: options.status,
+    code: options.code,
+    message: options.message,
+    requestId: observability.requestId,
+  });
+}
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "documents.lifecycle.unauthorized",
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Användaren saknar organisation",
+        event: "documents.lifecycle.missing_company",
+        context: { userId: user.id },
+      });
+    }
     if (!["owner", "admin", "manager"].includes(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att ändra dokument" }, { status: 403 });
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att ändra dokument",
+        event: "documents.lifecycle.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
     const { id } = await params;
@@ -25,7 +83,13 @@ export async function PATCH(
     const transition = typeof body?.transition === "string" ? body.transition.trim() : "";
     const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 500) : "";
     if (!allowedTransitions.has(transition)) {
-      return NextResponse.json({ error: "Ogiltig dokumentåtgärd" }, { status: 400 });
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Ogiltig dokumentåtgärd",
+        event: "documents.lifecycle.validation_failed",
+        context: { reason: "invalid_transition", userId: user.id, companyId: user.company_id },
+      });
     }
 
     const modern = await db.managedDocument.findFirst({
@@ -42,7 +106,13 @@ export async function PATCH(
         select: { id: true },
       });
       if (orphaned) {
-        return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet hittades inte",
+          event: "documents.lifecycle.orphaned",
+          context: { userId: user.id, companyId: user.company_id },
+        });
       }
     }
 
@@ -55,17 +125,37 @@ export async function PATCH(
 
     if (modern) {
       if (modern.lifecycle_state === nextState) {
-        return NextResponse.json({ success: true, state: modern.lifecycle_state, unchanged: true });
+        observability.logger.info("document lifecycle unchanged", observability.elapsed({
+          event: "documents.lifecycle.unchanged",
+          userId: user.id,
+          companyId: user.company_id,
+          documentId: modern.id,
+        }));
+        return successResponse(observability, { success: true, state: modern.lifecycle_state, unchanged: true });
       }
       if (transition === "unpublish" && modern.lifecycle_state === "archived") {
-        return NextResponse.json({ error: "Återställ det arkiverade dokumentet innan det avpubliceras" }, { status: 409 });
+        return reject(observability, {
+          status: 409,
+          code: API_ERROR_CODES.conflict,
+          message: "Återställ det arkiverade dokumentet innan det avpubliceras",
+          event: "documents.lifecycle.transition_conflict",
+          context: { userId: user.id, companyId: user.company_id, documentId: modern.id },
+        });
       }
 
       const updateResult = await db.managedDocument.updateMany({
         where: { id: modern.id, company_id: user.company_id },
         data: { lifecycle_state: nextState },
       });
-      if (updateResult.count === 0) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+      if (updateResult.count === 0) {
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet hittades inte",
+          event: "documents.lifecycle.not_found_after_write",
+          context: { userId: user.id, companyId: user.company_id },
+        });
+      }
 
       await writeAuditLog(user, {
         entityType: "document",
@@ -82,7 +172,14 @@ export async function PATCH(
         },
       });
 
-      return NextResponse.json({ success: true, state: nextState });
+      observability.logger.info("document lifecycle completed", observability.elapsed({
+        event: "documents.lifecycle.completed",
+        userId: user.id,
+        companyId: user.company_id,
+        documentId: modern.id,
+        transition,
+      }));
+      return successResponse(observability, { success: true, state: nextState });
     }
 
     // Legacy AuditLog documents are no longer mutable — migrate via backfill first.
@@ -96,14 +193,31 @@ export async function PATCH(
       select: { id: true },
     });
     if (legacy) {
-      return NextResponse.json({
-        error: "Dokumentet finns kvar i äldre lagring. Kör backfill till ManagedDocument innan livscykel ändras.",
-      }, { status: 409 });
+      return reject(observability, {
+        status: 409,
+        code: API_ERROR_CODES.conflict,
+        message: "Dokumentet finns kvar i äldre lagring. Kör backfill till ManagedDocument innan livscykel ändras.",
+        event: "documents.lifecycle.legacy_conflict",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
-    return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    return reject(observability, {
+      status: 404,
+      code: API_ERROR_CODES.notFound,
+      message: "Dokumentet hittades inte",
+      event: "documents.lifecycle.not_found",
+      context: { userId: user.id, companyId: user.company_id },
+    });
   } catch (error) {
-    logger.error("Update document lifecycle error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("document lifecycle failed", error, observability.elapsed({
+      event: "documents.lifecycle.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
