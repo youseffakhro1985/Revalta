@@ -1,5 +1,6 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import {
   canDownloadResidentDocuments,
@@ -10,10 +11,9 @@ import { leaseHolderEmailMatch } from "@/lib/resident-portal-scope";
 import { getDocumentLifecycleState } from "@/lib/document-lifecycle";
 import { allowedDocumentContentTypes, safeDocumentFileName, validateDocumentFile } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/resident-portal/documents/[id]/download" });
-
+const ROUTE = "/api/resident-portal/documents/[id]/download";
 const activeLeaseStatuses = ["active", "notice"];
 const residentDocumentVisibilities = new Set([
   "resident_all",
@@ -85,21 +85,74 @@ function bytesFromDataUrl(dataUrl: string, contentType: string) {
   return Buffer.from(match[2], "base64");
 }
 
+function reject(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("resident document download unavailable", observability.elapsed({
+    event: options.event,
+    ...options.context,
+  }));
+  return apiErrorResponse({
+    status: options.status,
+    code: options.code,
+    message: options.message,
+    requestId: observability.requestId,
+  });
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "resident_documents.download.unauthorized",
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Användaren saknar organisation",
+        event: "resident_documents.download.missing_company",
+        context: { userId: user.id },
+      });
+    }
     if (!canDownloadResidentDocuments(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet till boendedokument" }, { status: 403 });
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet till boendedokument",
+        event: "resident_documents.download.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
     const { id } = await params;
     const leaseId = new URL(request.url).searchParams.get("leaseId")?.trim() || "";
-    if (!leaseId) return NextResponse.json({ error: "Hyresavtal krävs" }, { status: 400 });
+    if (!leaseId) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Hyresavtal krävs",
+        event: "resident_documents.download.validation_failed",
+        context: { reason: "missing_lease", userId: user.id, companyId: user.company_id },
+      });
+    }
     const residentView = isResident(user.role);
 
     const lease = await db.lease.findFirst({
@@ -113,7 +166,15 @@ export async function GET(
       },
       select: { id: true, property_id: true, unit_id: true, lease_number: true },
     });
-    if (!lease) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+    if (!lease) {
+      return reject(observability, {
+        status: 404,
+        code: API_ERROR_CODES.notFound,
+        message: "Dokumentet hittades inte",
+        event: "resident_documents.download.lease_not_found",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
 
     const modern = await db.managedDocument.findFirst({
       where: { id, company_id: user.company_id },
@@ -142,7 +203,13 @@ export async function GET(
 
     if (modern) {
       if (modern.lifecycle_state !== "active") {
-        return NextResponse.json({ error: "Dokumentet är inte längre publicerat" }, { status: 410 });
+        return reject(observability, {
+          status: 410,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet är inte längre publicerat",
+          event: "resident_documents.download.inactive",
+          context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
+        });
       }
       visibility = modern.visibility;
       if (
@@ -153,7 +220,13 @@ export async function GET(
           leaseId: modern.lease_id,
         }, lease)
       ) {
-        return NextResponse.json({ error: "Du saknar behörighet till dokumentet" }, { status: 403 });
+        return reject(observability, {
+          status: 403,
+          code: API_ERROR_CODES.forbidden,
+          message: "Du saknar behörighet till dokumentet",
+          event: "resident_documents.download.scope_forbidden",
+          context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
+        });
       }
 
       documentId = modern.id;
@@ -165,7 +238,13 @@ export async function GET(
           bytes = await bytesFromStorage(modern.storage_url);
         } catch (error) {
           if (error instanceof Error && error.message === "storage_unconfigured") {
-            return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
+            return reject(observability, {
+              status: 503,
+              code: API_ERROR_CODES.serviceUnavailable,
+              message: "Fillagringen är inte konfigurerad",
+              event: "resident_documents.download.storage_unavailable",
+              context: { userId: user.id, companyId: user.company_id, leaseId: lease.id, documentId },
+            });
           }
           throw error;
         }
@@ -182,16 +261,36 @@ export async function GET(
         },
         select: { id: true, metadata: true },
       });
-      if (!documentLog) return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+      if (!documentLog) {
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet hittades inte",
+          event: "resident_documents.download.not_found",
+          context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
+        });
+      }
 
       const lifecycle = await getDocumentLifecycleState(user.company_id, documentLog.id);
       if (lifecycle.state !== "active") {
-        return NextResponse.json({ error: "Dokumentet är inte längre publicerat" }, { status: 410 });
+        return reject(observability, {
+          status: 410,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet är inte längre publicerat",
+          event: "resident_documents.download.inactive",
+          context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
+        });
       }
 
       const metadata = (documentLog.metadata || {}) as DocumentMetadata;
       if (metadata.storage === "ManagedDocument") {
-        return NextResponse.json({ error: "Dokumentet hittades inte" }, { status: 404 });
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet hittades inte",
+          event: "resident_documents.download.managed_marker_missing",
+          context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
+        });
       }
 
       visibility = typeof metadata.visibility === "string" ? metadata.visibility : "internal";
@@ -201,7 +300,13 @@ export async function GET(
         leaseId: typeof metadata.leaseId === "string" ? metadata.leaseId : null,
       };
       if (!residentDocumentVisibilities.has(visibility) || !documentAccessibleToLease(visibility, scope, lease)) {
-        return NextResponse.json({ error: "Du saknar behörighet till dokumentet" }, { status: 403 });
+        return reject(observability, {
+          status: 403,
+          code: API_ERROR_CODES.forbidden,
+          message: "Du saknar behörighet till dokumentet",
+          event: "resident_documents.download.scope_forbidden",
+          context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
+        });
       }
 
       documentId = documentLog.id;
@@ -220,7 +325,13 @@ export async function GET(
           bytes = await bytesFromStorage(storageUrl);
         } catch (error) {
           if (error instanceof Error && error.message === "storage_unconfigured") {
-            return NextResponse.json({ error: "Fillagringen är inte konfigurerad" }, { status: 503 });
+            return reject(observability, {
+              status: 503,
+              code: API_ERROR_CODES.serviceUnavailable,
+              message: "Fillagringen är inte konfigurerad",
+              event: "resident_documents.download.storage_unavailable",
+              context: { userId: user.id, companyId: user.company_id, leaseId: lease.id, documentId },
+            });
           }
           throw error;
         }
@@ -230,13 +341,31 @@ export async function GET(
     }
 
     if (!allowedDocumentContentTypes.has(contentType)) {
-      return NextResponse.json({ error: "Dokumentets filformat stöds inte" }, { status: 415 });
+      return reject(observability, {
+        status: 415,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Dokumentets filformat stöds inte",
+        event: "resident_documents.download.unsupported_type",
+        context: { userId: user.id, companyId: user.company_id, leaseId: lease.id, documentId },
+      });
     }
     if (!bytes?.length) {
-      return NextResponse.json({ error: "Dokumentfilen saknas" }, { status: 404 });
+      return reject(observability, {
+        status: 404,
+        code: API_ERROR_CODES.notFound,
+        message: "Dokumentfilen saknas",
+        event: "resident_documents.download.file_missing",
+        context: { userId: user.id, companyId: user.company_id, leaseId: lease.id, documentId },
+      });
     }
     if (expectedSize !== null && bytes.length !== expectedSize) {
-      return NextResponse.json({ error: "Dokumentfilens storlek kunde inte verifieras" }, { status: 422 });
+      return reject(observability, {
+        status: 422,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Dokumentfilens storlek kunde inte verifieras",
+        event: "resident_documents.download.size_mismatch",
+        context: { userId: user.id, companyId: user.company_id, leaseId: lease.id, documentId },
+      });
     }
 
     const safeName = safeDocumentFileName(fileName);
@@ -247,7 +376,13 @@ export async function GET(
       maxBytes: 2_000_000,
     });
     if (!validation.ok) {
-      return NextResponse.json({ error: "Dokumentfilens innehåll kunde inte verifieras" }, { status: 422 });
+      return reject(observability, {
+        status: 422,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Dokumentfilens innehåll kunde inte verifieras",
+        event: "resident_documents.download.content_invalid",
+        context: { userId: user.id, companyId: user.company_id, leaseId: lease.id, documentId },
+      });
     }
 
     await db.auditLog.create({
@@ -270,19 +405,39 @@ export async function GET(
       },
     });
 
-    return new NextResponse(new Uint8Array(bytes), {
+    observability.logger.info("resident document download completed", observability.elapsed({
+      event: "resident_documents.download.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      documentId,
+      leaseId: lease.id,
+      residentView,
+      sizeBytes: bytes.length,
+    }));
+
+    const response = new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {
         "Content-Type": contentType,
         "Content-Length": String(bytes.length),
         "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(validation.fileName)}`,
-        "Cache-Control": "private, no-store, max-age=0",
+        "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'; sandbox",
       },
     });
+    return observability.correlate(response);
   } catch (error) {
-    logger.error("Download resident document error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("resident document download failed", error, observability.elapsed({
+      event: "resident_documents.download.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
