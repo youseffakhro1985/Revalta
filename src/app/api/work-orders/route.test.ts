@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  createLoggerMock,
   getCurrentUserMock,
+  loggerErrorMock,
+  loggerInfoMock,
+  loggerWarnMock,
   workOrderFindManyMock,
   queryRawMock,
   userFindManyMock,
   notDeletedFilterMock,
   sqlSoftDeleteGuardMock,
 } = vi.hoisted(() => ({
+  createLoggerMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
+  loggerInfoMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
   workOrderFindManyMock: vi.fn(),
   queryRawMock: vi.fn(),
   userFindManyMock: vi.fn(),
@@ -38,6 +46,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
+
 vi.mock("@/lib/work-order-sla", () => ({
   evaluateWorkOrderSla: () => ({
     phase: "resolution",
@@ -54,9 +64,23 @@ vi.mock("@/lib/work-order-sla", () => ({
 
 import { GET, POST } from "./route";
 
+const requestId = "550e8400-e29b-41d4-a716-446655440000";
+
+function request(url = "https://www.revalta.se/api/work-orders", init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+  headers.set("x-request-id", requestId);
+  return new Request(url, { ...init, headers });
+}
+
 describe("work-orders GET role scoping", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
     notDeletedFilterMock.mockResolvedValue({ deleted_at: null });
     sqlSoftDeleteGuardMock.mockResolvedValue("");
     workOrderFindManyMock.mockResolvedValue([]);
@@ -67,10 +91,13 @@ describe("work-orders GET role scoping", () => {
   it("scopes technicians to assigned work and omits assignees", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
 
-    const response = await GET(new Request("https://www.revalta.se/api/work-orders"));
+    const response = await GET(request());
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("private");
+    expect(response.headers.get("cache-control")).toContain("no-store");
     expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         company_id: "company-1",
@@ -86,12 +113,21 @@ describe("work-orders GET role scoping", () => {
       scopedToAssigned: true,
     });
     expect(body.assignees).toEqual([]);
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "work-order list completed",
+      expect.objectContaining({
+        event: "work_orders.list.completed",
+        userId: "tech-1",
+        companyId: "company-1",
+        scopedToAssigned: true,
+      }),
+    );
   });
 
   it("lets managers see all work orders and assignable users", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
 
-    const response = await GET(new Request("https://www.revalta.se/api/work-orders"));
+    const response = await GET(request());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -130,7 +166,7 @@ describe("work-orders GET role scoping", () => {
       projects: [],
     }]);
 
-    const response = await GET(new Request("https://www.revalta.se/api/work-orders"));
+    const response = await GET(request());
 
     expect(response.status).toBe(200);
     expect(queryRawMock).toHaveBeenCalledTimes(1);
@@ -140,7 +176,7 @@ describe("work-orders GET role scoping", () => {
   it("excludes terminal work orders from planning reads", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
 
-    const response = await GET(new Request("https://www.revalta.se/api/work-orders?view=planning"));
+    const response = await GET(request("https://www.revalta.se/api/work-orders?view=planning"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -151,14 +187,63 @@ describe("work-orders GET role scoping", () => {
     }));
     expect(body.resultScope).toBe("active");
   });
+
+  it("returns a correlated safe 401 without querying work orders", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toEqual({
+      error: "Obehörig",
+      errorCode: "UNAUTHORIZED",
+      requestId,
+    });
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(workOrderFindManyMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "work-order request rejected",
+      expect.objectContaining({ event: "work_orders.list.unauthorized" }),
+    );
+  });
+
+  it("returns a safe correlated 500 when the authenticated lookup fails", async () => {
+    getCurrentUserMock.mockRejectedValue(new Error("postgres://user:super-secret@db.internal/revalta"));
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Internt serverfel",
+      errorCode: "INTERNAL_ERROR",
+      requestId,
+    });
+    expect(JSON.stringify(body)).not.toContain("postgres://");
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "work-order list failed",
+      expect.any(Error),
+      expect.objectContaining({ event: "work_orders.list.failed" }),
+    );
+  });
 });
 
 describe("work-orders POST assignment authorization", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+  });
 
-  it("prevents a technician from assigning newly created work to another user", async () => {
+  it("prevents a technician from assigning newly created work to another user with a stable error contract", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
-    const response = await POST(new Request("https://www.revalta.se/api/work-orders", {
+    const response = await POST(request("https://www.revalta.se/api/work-orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -172,6 +257,42 @@ describe("work-orders POST assignment authorization", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "Du saknar behörighet att tilldela arbetsorder till andra",
+      errorCode: "FORBIDDEN",
+      requestId,
     });
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "work-order request rejected",
+      expect.objectContaining({
+        event: "work_orders.create.assignment_forbidden",
+        userId: "tech-1",
+        companyId: "company-1",
+      }),
+    );
+  });
+
+  it("returns a correlated safe 500 when authentication fails unexpectedly", async () => {
+    getCurrentUserMock.mockRejectedValue(new Error("session-secret-that-must-not-leak"));
+
+    const response = await POST(request("https://www.revalta.se/api/work-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Internt serverfel",
+      errorCode: "INTERNAL_ERROR",
+      requestId,
+    });
+    expect(JSON.stringify(body)).not.toContain("session-secret");
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "work-order create failed",
+      expect.any(Error),
+      expect.objectContaining({ event: "work_orders.create.failed" }),
+    );
   });
 });

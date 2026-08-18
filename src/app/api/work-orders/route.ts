@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import {
   canAssignWorkOrders,
@@ -30,9 +31,22 @@ import {
 } from "@/lib/schema-readiness";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { findAccessibleTicket } from "@/lib/assigned-work-access";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/work-orders" });
+const ROUTE = "/api/work-orders";
+const ACTIVE_WORK_ORDER_STATUSES = ["completed", "invoiced", "cancelled"] as const;
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
+const SAFE_ASSET_LINK_MESSAGES = new Set([
+  "Fastigheten hittades inte",
+  "Byggnaden tillhör inte vald fastighet",
+  "Komponenten tillhör inte vald fastighet",
+  "Komponenten tillhör inte vald byggnad",
+]);
 
 function parseOptionalDate(value: unknown) {
   if (!value) return null;
@@ -44,6 +58,46 @@ function parseOptionalMoney(value: unknown) {
   if (value === "" || value === null || value === undefined) return null;
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function safeAssetLinkMessage(error: unknown) {
+  return error instanceof Error && SAFE_ASSET_LINK_MESSAGES.has(error.message)
+    ? error.message
+    : "Ogiltig komponentkoppling";
+}
+
+function successResponse(
+  observability: ReturnType<typeof createRouteObservability>,
+  body: unknown,
+  init?: ResponseInit,
+) {
+  const headers = new Headers(init?.headers);
+  for (const [name, value] of Object.entries(SUCCESS_HEADERS)) {
+    headers.set(name, value);
+  }
+  return observability.correlate(NextResponse.json(body, { ...init, headers }));
+}
+
+function reject(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("work-order request rejected", observability.elapsed({
+    event: options.event,
+    ...options.context,
+  }));
+  return apiErrorResponse({
+    status: options.status,
+    code: options.code,
+    message: options.message,
+    requestId: observability.requestId,
+  });
 }
 
 type EnterpriseListRow = {
@@ -65,13 +119,28 @@ type EnterpriseListRow = {
   technical_asset_location: string | null;
 };
 
-const ACTIVE_WORK_ORDER_STATUSES = ["completed", "invoiced", "cancelled"] as const;
-
 export async function GET(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "work_orders.list.unauthorized",
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Användaren saknar organisation",
+        event: "work_orders.list.missing_company",
+        context: { userId: user.id },
+      });
+    }
 
     const [workOrderActive, projectActive, workOrderGuard, propertyGuard] = await Promise.all([
       notDeletedFilter("WorkOrder"),
@@ -90,35 +159,35 @@ export async function GET(request: Request) {
     const activeOnly = view === "planning" || view === "priority";
 
     const workOrders = await db.workOrder.findMany({
-        where: {
-          company_id: user.company_id,
-          ...workOrderActive,
-          property: { deleted_at: null },
-          ...assignedScope,
-          ...(activeOnly ? { status: { notIn: [...ACTIVE_WORK_ORDER_STATUSES] } } : {}),
+      where: {
+        company_id: user.company_id,
+        ...workOrderActive,
+        property: { deleted_at: null },
+        ...assignedScope,
+        ...(activeOnly ? { status: { notIn: [...ACTIVE_WORK_ORDER_STATUSES] } } : {}),
+      },
+      orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
+      take: 500,
+      // Explicit select omits deleted_at so preview works before soft-delete migrate.
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        estimated_cost: true,
+        completed_at: true,
+        scheduled_start: true,
+        created_at: true,
+        property: { select: { id: true, name: true, address: true, city: true } },
+        unit: { select: { id: true, designation: true, unit_type: true } },
+        ticket: { select: { id: true, public_reference: true, title: true } },
+        assigned_to: { select: { id: true, name: true, email: true } },
+        projects: {
+          ...(Object.keys(projectActive).length > 0 ? { where: projectActive } : {}),
+          select: { id: true, name: true, status: true },
         },
-        orderBy: [{ status: "asc" }, { scheduled_start: "asc" }, { created_at: "desc" }],
-        take: 500,
-        // Explicit select omits deleted_at so preview works before soft-delete migrate.
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          estimated_cost: true,
-          completed_at: true,
-          scheduled_start: true,
-          created_at: true,
-          property: { select: { id: true, name: true, address: true, city: true } },
-          unit: { select: { id: true, designation: true, unit_type: true } },
-          ticket: { select: { id: true, public_reference: true, title: true } },
-          assigned_to: { select: { id: true, name: true, email: true } },
-          projects: {
-            ...(Object.keys(projectActive).length > 0 ? { where: projectActive } : {}),
-            select: { id: true, name: true, status: true },
-          },
-        },
-      });
+      },
+    });
 
     // Only enrich the rows that can actually be returned. Previously this query
     // scanned every work order in the tenant even though the list is capped.
@@ -195,116 +264,245 @@ export async function GET(request: Request) {
       awaitingResolution: 0,
     });
 
-    return NextResponse.json(
-      {
-        workOrders: enriched,
-        slaSummary,
-        evaluatedAt: now.toISOString(),
-        assignees,
-        permissions: {
-          canManage,
-          canAssign,
-          canManageFinance,
-          canViewFinance: includeFinance,
-          scopedToAssigned,
-        },
-        currentUserId: user.id,
-        resultScope: activeOnly ? "active" : "default",
+    observability.logger.info("work-order list completed", observability.elapsed({
+      event: "work_orders.list.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      returned: enriched.length,
+      resultScope: activeOnly ? "active" : "default",
+      scopedToAssigned,
+    }));
+
+    return successResponse(observability, {
+      workOrders: enriched,
+      slaSummary,
+      evaluatedAt: now.toISOString(),
+      assignees,
+      permissions: {
+        canManage,
+        canAssign,
+        canManageFinance,
+        canViewFinance: includeFinance,
+        scopedToAssigned,
       },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
+      currentUserId: user.id,
+      resultScope: activeOnly ? "active" : "default",
+    });
   } catch (error) {
-    logger.error("Get work orders error", error);
     if (isMissingSchemaColumnError(error)) {
-      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+      observability.logger.error("work-order list schema unavailable", error, observability.elapsed({
+        event: "work_orders.list.schema_unavailable",
+      }));
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        requestId: observability.requestId,
+      });
     }
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+
+    observability.logger.error("work-order list failed", error, observability.elapsed({
+      event: "work_orders.list.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const observability = createRouteObservability(request, ROUTE);
 
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
-
-  const propertyId = String(body.propertyId || "").trim();
-  const buildingId = body.buildingId ? String(body.buildingId).trim() : null;
-  const technicalAssetId = body.technicalAssetId ? String(body.technicalAssetId).trim() : null;
-  const unitId = body.unitId ? String(body.unitId).trim() : null;
-  const requestedAssigneeId = body.assignedToId ? String(body.assignedToId).trim() : null;
-  const ticketId = body.ticketId ? String(body.ticketId).trim() : null;
-  const title = String(body.title || "").trim();
-  const description = String(body.description || "").trim();
-  const rawStatus = String(body.status || "planned").trim();
-  const rawPriority = String(body.priority || "normal").trim();
-  const rawWorkType = String(body.workType || "corrective").trim();
-  const rawSource = String(body.source || (technicalAssetId ? "component" : ticketId ? "ticket" : "internal")).trim();
-  const status = normalizeWorkOrderStatus(rawStatus);
-  const priority = normalizeWorkOrderPriority(rawPriority);
-  const workType = normalizeWorkOrderType(rawWorkType);
-  const source = normalizeWorkOrderSource(rawSource);
-  const scheduledStart = parseOptionalDate(body.scheduledStart);
-  const scheduledEnd = parseOptionalDate(body.scheduledEnd);
-  const estimatedCost = parseOptionalMoney(body.estimatedCost);
-  const canAssign = canAssignWorkOrders(user.role);
-  if (!canAssign && requestedAssigneeId && requestedAssigneeId !== user.id) {
-    return NextResponse.json({ error: "Du saknar behörighet att tilldela arbetsorder till andra" }, { status: 403 });
-  }
-  const assignedToId = canAssign ? requestedAssigneeId : user.id;
-
-  if (!propertyId || !title || !description) return NextResponse.json({ error: "Fastighet, rubrik och beskrivning krävs" }, { status: 400 });
-  if (title.length > 180) return NextResponse.json({ error: "Rubriken får vara högst 180 tecken" }, { status: 400 });
-  if (description.length > 10000) return NextResponse.json({ error: "Beskrivningen får vara högst 10 000 tecken" }, { status: 400 });
-  if (!WORK_ORDER_STATUSES.includes(rawStatus as (typeof WORK_ORDER_STATUSES)[number])) return NextResponse.json({ error: "Ogiltig arbetsorderstatus" }, { status: 400 });
-  if (!WORK_ORDER_PRIORITIES.includes(rawPriority as (typeof WORK_ORDER_PRIORITIES)[number])) return NextResponse.json({ error: "Ogiltig prioritet" }, { status: 400 });
-  if (!WORK_ORDER_TYPES.includes(rawWorkType as (typeof WORK_ORDER_TYPES)[number])) return NextResponse.json({ error: "Ogiltig arbetstyp" }, { status: 400 });
-  if (!WORK_ORDER_SOURCES.includes(rawSource as (typeof WORK_ORDER_SOURCES)[number])) return NextResponse.json({ error: "Ogiltigt ursprung" }, { status: 400 });
-  if (body.scheduledStart && !scheduledStart) return NextResponse.json({ error: "Ogiltigt startdatum" }, { status: 400 });
-  if (body.scheduledEnd && !scheduledEnd) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 });
-  if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) return NextResponse.json({ error: "Sluttiden måste ligga efter starttiden" }, { status: 400 });
-  if (body.estimatedCost !== undefined && body.estimatedCost !== "" && estimatedCost === null) return NextResponse.json({ error: "Beräknad kostnad måste vara ett positivt belopp" }, { status: 400 });
-  if (body.estimatedCost !== undefined && body.estimatedCost !== null && body.estimatedCost !== "" && !canManageWorkOrderFinance(user.role)) {
-    return NextResponse.json({ error: "Du saknar behörighet att sätta arbetsorderkostnader" }, { status: 403 });
-  }
-
-  const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
-  if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
-
-  if (unitId) {
-    const unit = await db.unit.findFirst({ where: { id: unitId, property_id: propertyId }, select: { id: true } });
-    if (!unit) return NextResponse.json({ error: "Enheten tillhör inte fastigheten" }, { status: 400 });
-  }
-  if (assignedToId) {
-    const assignee = await db.user.findFirst({ where: { id: assignedToId, company_id: user.company_id, status: "active" }, select: { id: true } });
-    if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
-  }
-  if (ticketId) {
-    const ticket = await findAccessibleTicket(user, ticketId);
-    if (!ticket) return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
-  }
   try {
-    await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId, buildingId, technicalAssetId });
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Ogiltig komponentkoppling" }, { status: 400 });
-  }
+    const user = await getCurrentUser();
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "work_orders.create.unauthorized",
+      });
+    }
+    if (!canManageTickets(user.role)) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet",
+        event: "work_orders.create.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Användaren saknar organisation",
+        event: "work_orders.create.missing_company",
+        context: { userId: user.id },
+      });
+    }
 
-  const createdAt = new Date();
-  const sla = calculateWorkOrderSla(createdAt, priority);
-  const workOrder = await db.$transaction(async (tx) => {
-    const workOrderNumber = await allocateWorkOrderNumber(tx, user.company_id!, createdAt);
-    const created = await tx.workOrder.create({
-      data: { company_id: user.company_id!, property_id: propertyId, unit_id: unitId, assigned_to_id: assignedToId, ticket_id: ticketId, created_by_id: user.id, title, description, status, priority, scheduled_start: scheduledStart, scheduled_end: scheduledEnd, estimated_cost: estimatedCost, created_at: createdAt },
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Ogiltigt innehåll",
+        event: "work_orders.create.validation_failed",
+        context: { reason: "invalid_body", userId: user.id, companyId: user.company_id },
+      });
+    }
+
+    const propertyId = String(body.propertyId || "").trim();
+    const buildingId = body.buildingId ? String(body.buildingId).trim() : null;
+    const technicalAssetId = body.technicalAssetId ? String(body.technicalAssetId).trim() : null;
+    const unitId = body.unitId ? String(body.unitId).trim() : null;
+    const requestedAssigneeId = body.assignedToId ? String(body.assignedToId).trim() : null;
+    const ticketId = body.ticketId ? String(body.ticketId).trim() : null;
+    const title = String(body.title || "").trim();
+    const description = String(body.description || "").trim();
+    const rawStatus = String(body.status || "planned").trim();
+    const rawPriority = String(body.priority || "normal").trim();
+    const rawWorkType = String(body.workType || "corrective").trim();
+    const rawSource = String(body.source || (technicalAssetId ? "component" : ticketId ? "ticket" : "internal")).trim();
+    const status = normalizeWorkOrderStatus(rawStatus);
+    const priority = normalizeWorkOrderPriority(rawPriority);
+    const workType = normalizeWorkOrderType(rawWorkType);
+    const source = normalizeWorkOrderSource(rawSource);
+    const scheduledStart = parseOptionalDate(body.scheduledStart);
+    const scheduledEnd = parseOptionalDate(body.scheduledEnd);
+    const estimatedCost = parseOptionalMoney(body.estimatedCost);
+    const canAssign = canAssignWorkOrders(user.role);
+
+    if (!canAssign && requestedAssigneeId && requestedAssigneeId !== user.id) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att tilldela arbetsorder till andra",
+        event: "work_orders.create.assignment_forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
+    const assignedToId = canAssign ? requestedAssigneeId : user.id;
+
+    const validationFailure = (message: string, reason: string) => reject(observability, {
+      status: 400,
+      code: API_ERROR_CODES.validationFailed,
+      message,
+      event: "work_orders.create.validation_failed",
+      context: { reason, userId: user.id, companyId: user.company_id },
     });
-    await setWorkOrderEnterpriseFields(tx, { workOrderId: created.id, companyId: user.company_id!, workOrderNumber, workType, source, responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt });
-    await setWorkOrderAssetLinks(tx, { workOrderId: created.id, companyId: user.company_id!, buildingId, technicalAssetId });
-    await addWorkOrderStatusEvent(tx, { companyId: user.company_id!, workOrderId: created.id, actorUserId: user.id, fromStatus: null, toStatus: status, reason: "Arbetsorder skapad", metadata: { workOrderNumber, priority, workType, source, buildingId, technicalAssetId } });
-    return { ...created, enterprise: { work_order_number: workOrderNumber, work_type: workType, source, sla_response_due_at: sla.responseDueAt, sla_resolution_due_at: sla.resolutionDueAt, responded_at: null, paused_at: null, pause_reason: null, closed_at: null, building_id: buildingId, technical_asset_id: technicalAssetId } };
-  });
 
-  await writeAuditLog(user, { entityType: "work_order", entityId: workOrder.id, action: "work_order.created", metadata: { workOrderNumber: workOrder.enterprise.work_order_number, propertyId, buildingId, technicalAssetId, unitId, assignedToId, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } });
-  return NextResponse.json({ workOrder }, { status: 201 });
+    if (!propertyId || !title || !description) return validationFailure("Fastighet, rubrik och beskrivning krävs", "missing_required_fields");
+    if (title.length > 180) return validationFailure("Rubriken får vara högst 180 tecken", "title_too_long");
+    if (description.length > 10000) return validationFailure("Beskrivningen får vara högst 10 000 tecken", "description_too_long");
+    if (!WORK_ORDER_STATUSES.includes(rawStatus as (typeof WORK_ORDER_STATUSES)[number])) return validationFailure("Ogiltig arbetsorderstatus", "invalid_status");
+    if (!WORK_ORDER_PRIORITIES.includes(rawPriority as (typeof WORK_ORDER_PRIORITIES)[number])) return validationFailure("Ogiltig prioritet", "invalid_priority");
+    if (!WORK_ORDER_TYPES.includes(rawWorkType as (typeof WORK_ORDER_TYPES)[number])) return validationFailure("Ogiltig arbetstyp", "invalid_work_type");
+    if (!WORK_ORDER_SOURCES.includes(rawSource as (typeof WORK_ORDER_SOURCES)[number])) return validationFailure("Ogiltigt ursprung", "invalid_source");
+    if (body.scheduledStart && !scheduledStart) return validationFailure("Ogiltigt startdatum", "invalid_start_date");
+    if (body.scheduledEnd && !scheduledEnd) return validationFailure("Ogiltigt slutdatum", "invalid_end_date");
+    if (scheduledStart && scheduledEnd && scheduledEnd <= scheduledStart) return validationFailure("Sluttiden måste ligga efter starttiden", "invalid_date_range");
+    if (body.estimatedCost !== undefined && body.estimatedCost !== "" && estimatedCost === null) return validationFailure("Beräknad kostnad måste vara ett positivt belopp", "invalid_estimated_cost");
+    if (body.estimatedCost !== undefined && body.estimatedCost !== null && body.estimatedCost !== "" && !canManageWorkOrderFinance(user.role)) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att sätta arbetsorderkostnader",
+        event: "work_orders.create.finance_forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
+
+    const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
+    if (!property) {
+      return reject(observability, {
+        status: 404,
+        code: API_ERROR_CODES.notFound,
+        message: "Fastigheten hittades inte",
+        event: "work_orders.create.property_not_found",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
+
+    if (unitId) {
+      const unit = await db.unit.findFirst({ where: { id: unitId, property_id: propertyId }, select: { id: true } });
+      if (!unit) return validationFailure("Enheten tillhör inte fastigheten", "unit_property_mismatch");
+    }
+    if (assignedToId) {
+      const assignee = await db.user.findFirst({ where: { id: assignedToId, company_id: user.company_id, status: "active" }, select: { id: true } });
+      if (!assignee) return validationFailure("Ansvarig användare hittades inte", "assignee_not_found");
+    }
+    if (ticketId) {
+      const ticket = await findAccessibleTicket(user, ticketId);
+      if (!ticket) {
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Ärendet hittades inte",
+          event: "work_orders.create.ticket_not_found",
+          context: { userId: user.id, companyId: user.company_id },
+        });
+      }
+    }
+    try {
+      await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId, buildingId, technicalAssetId });
+    } catch (error) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: safeAssetLinkMessage(error),
+        event: "work_orders.create.asset_link_invalid",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
+
+    const createdAt = new Date();
+    const sla = calculateWorkOrderSla(createdAt, priority);
+    const workOrder = await db.$transaction(async (tx) => {
+      const workOrderNumber = await allocateWorkOrderNumber(tx, user.company_id!, createdAt);
+      const created = await tx.workOrder.create({
+        data: { company_id: user.company_id!, property_id: propertyId, unit_id: unitId, assigned_to_id: assignedToId, ticket_id: ticketId, created_by_id: user.id, title, description, status, priority, scheduled_start: scheduledStart, scheduled_end: scheduledEnd, estimated_cost: estimatedCost, created_at: createdAt },
+      });
+      await setWorkOrderEnterpriseFields(tx, { workOrderId: created.id, companyId: user.company_id!, workOrderNumber, workType, source, responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt });
+      await setWorkOrderAssetLinks(tx, { workOrderId: created.id, companyId: user.company_id!, buildingId, technicalAssetId });
+      await addWorkOrderStatusEvent(tx, { companyId: user.company_id!, workOrderId: created.id, actorUserId: user.id, fromStatus: null, toStatus: status, reason: "Arbetsorder skapad", metadata: { workOrderNumber, priority, workType, source, buildingId, technicalAssetId } });
+      return { ...created, enterprise: { work_order_number: workOrderNumber, work_type: workType, source, sla_response_due_at: sla.responseDueAt, sla_resolution_due_at: sla.resolutionDueAt, responded_at: null, paused_at: null, pause_reason: null, closed_at: null, building_id: buildingId, technical_asset_id: technicalAssetId } };
+    });
+
+    await writeAuditLog(user, { entityType: "work_order", entityId: workOrder.id, action: "work_order.created", metadata: { workOrderNumber: workOrder.enterprise.work_order_number, propertyId, buildingId, technicalAssetId, unitId, assignedToId, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } });
+
+    observability.logger.info("work-order create completed", observability.elapsed({
+      event: "work_orders.create.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      workOrderId: workOrder.id,
+    }));
+    return successResponse(observability, { workOrder }, { status: 201 });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error)) {
+      observability.logger.error("work-order create schema unavailable", error, observability.elapsed({
+        event: "work_orders.create.schema_unavailable",
+      }));
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        requestId: observability.requestId,
+      });
+    }
+
+    observability.logger.error("work-order create failed", error, observability.elapsed({
+      event: "work_orders.create.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
+  }
 }
