@@ -1,13 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  createLoggerMock,
   getCurrentUserMock,
+  loggerErrorMock,
+  loggerInfoMock,
+  loggerWarnMock,
   managedDocumentFindFirstMock,
   auditLogFindFirstMock,
   blobGetMock,
   getStorageTokenMock,
 } = vi.hoisted(() => ({
+  createLoggerMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
+  loggerInfoMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
   managedDocumentFindFirstMock: vi.fn(),
   auditLogFindFirstMock: vi.fn(),
   blobGetMock: vi.fn(),
@@ -34,6 +42,8 @@ vi.mock("@/lib/storage", () => ({
   getStorageToken: getStorageTokenMock,
 }));
 
+vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
+
 import { GET } from "./route";
 
 function streamFromString(value: string) {
@@ -45,24 +55,45 @@ function streamFromString(value: string) {
   });
 }
 
+const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const params = Promise.resolve({ id: "doc-1" });
+
+function request(path = "doc-1") {
+  return new Request(`http://localhost/api/documents/${path}/download`, {
+    headers: { "x-request-id": requestId },
+  });
+}
 
 describe("documents/[id]/download", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
     getStorageTokenMock.mockReturnValue("blob-token");
   });
 
-  it("401s when there is no authenticated user", async () => {
+  it("returns a correlated stable 401 when there is no authenticated user", async () => {
     getCurrentUserMock.mockResolvedValue(null);
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
+    const body = await response.json();
 
     expect(response.status).toBe(401);
+    expect(body).toEqual({
+      error: "Obehörig",
+      errorCode: "UNAUTHORIZED",
+      requestId,
+    });
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("no-store");
     expect(managedDocumentFindFirstMock).not.toHaveBeenCalled();
   });
 
-  it("streams a document owned by the requesting user's company (happy path)", async () => {
+  it("streams a document owned by the requesting user's company with correlation", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "owner" });
     managedDocumentFindFirstMock.mockResolvedValue({
       file_name: "avtal.pdf",
@@ -72,11 +103,14 @@ describe("documents/[id]/download", () => {
     });
     blobGetMock.mockResolvedValue({ stream: streamFromString("pdf-bytes") });
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("application/pdf");
     expect(response.headers.get("Content-Disposition")).toContain("avtal.pdf");
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("private");
+    expect(response.headers.get("cache-control")).toContain("no-store");
     expect(managedDocumentFindFirstMock).toHaveBeenCalledWith({
       where: { id: "doc-1", company_id: "company-a" },
       select: {
@@ -90,6 +124,16 @@ describe("documents/[id]/download", () => {
       access: "private",
       token: "blob-token",
     });
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "document download completed",
+      expect.objectContaining({
+        event: "documents.download.completed",
+        userId: "user-1",
+        companyId: "company-a",
+        documentId: "doc-1",
+        storage: "private_blob",
+      }),
+    );
   });
 
   it("never returns another company's document: scopes the lookup by the caller's company_id and 404s when it belongs to a different tenant", async () => {
@@ -98,7 +142,7 @@ describe("documents/[id]/download", () => {
     managedDocumentFindFirstMock.mockResolvedValue(null);
     auditLogFindFirstMock.mockResolvedValue(null);
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
     const body = await response.json();
 
     expect(managedDocumentFindFirstMock).toHaveBeenCalledWith(
@@ -110,7 +154,11 @@ describe("documents/[id]/download", () => {
       }),
     );
     expect(response.status).toBe(404);
-    expect(body.error).toBe("Dokumentet hittades inte");
+    expect(body).toEqual({
+      error: "Dokumentet hittades inte",
+      errorCode: "NOT_FOUND",
+      requestId,
+    });
     expect(blobGetMock).not.toHaveBeenCalled();
   });
 
@@ -119,7 +167,7 @@ describe("documents/[id]/download", () => {
     managedDocumentFindFirstMock.mockResolvedValue(null);
     auditLogFindFirstMock.mockResolvedValue(null);
 
-    const response = await GET(new Request("http://localhost/api/documents/missing/download"), {
+    const response = await GET(request("missing"), {
       params: Promise.resolve({ id: "missing" }),
     });
 
@@ -130,7 +178,7 @@ describe("documents/[id]/download", () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
     auditLogFindFirstMock.mockResolvedValue(null);
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
 
     expect(managedDocumentFindFirstMock).not.toHaveBeenCalled();
     expect(auditLogFindFirstMock).toHaveBeenCalledWith(
@@ -153,15 +201,16 @@ describe("documents/[id]/download", () => {
       },
     });
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
     const bytes = Buffer.from(await response.arrayBuffer());
 
     expect(response.status).toBe(200);
     expect(bytes.toString()).toBe("hello world");
     expect(response.headers.get("Content-Disposition")).toContain("legacy.txt");
+    expect(response.headers.get("x-request-id")).toBe(requestId);
   });
 
-  it("returns 503 when blob storage is not configured for a storage_url document", async () => {
+  it("returns a correlated 503 when blob storage is not configured for a storage_url document", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "owner" });
     managedDocumentFindFirstMock.mockResolvedValue({
       file_name: "avtal.pdf",
@@ -171,11 +220,15 @@ describe("documents/[id]/download", () => {
     });
     getStorageTokenMock.mockReturnValue(null);
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
     const body = await response.json();
 
     expect(response.status).toBe(503);
-    expect(body.error).toBe("Fillagringen är inte konfigurerad");
+    expect(body).toEqual({
+      error: "Fillagringen är inte konfigurerad",
+      errorCode: "SERVICE_UNAVAILABLE",
+      requestId,
+    });
     expect(blobGetMock).not.toHaveBeenCalled();
   });
 
@@ -188,19 +241,29 @@ describe("documents/[id]/download", () => {
       data_url: null,
     });
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
 
     expect(response.status).toBe(404);
   });
 
-  it("returns 500 and logs when an unexpected error is thrown", async () => {
+  it("returns a correlated safe 500 and never exposes an unexpected error", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "owner" });
-    managedDocumentFindFirstMock.mockRejectedValue(new Error("db unavailable"));
+    managedDocumentFindFirstMock.mockRejectedValue(new Error("postgres://secret@db.internal/revalta"));
 
-    const response = await GET(new Request("http://localhost/api/documents/doc-1/download"), { params });
+    const response = await GET(request(), { params });
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body.error).toBe("Internt serverfel");
+    expect(body).toEqual({
+      error: "Internt serverfel",
+      errorCode: "INTERNAL_ERROR",
+      requestId,
+    });
+    expect(JSON.stringify(body)).not.toContain("postgres://");
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "document download failed",
+      expect.any(Error),
+      expect.objectContaining({ event: "documents.download.failed" }),
+    );
   });
 });
