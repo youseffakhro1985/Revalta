@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canViewAudit, canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
@@ -91,34 +91,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       WHERE c."technical_asset_id" = ${componentId} AND c."property_id" = ${property.id} AND c."company_id" = ${user.company_id}
       ORDER BY c."cost_date" DESC, c."created_at" DESC
     `);
-    const audits = await db.auditLog.findMany({
-      where: {
-        company_id: user.company_id,
-        OR: [
-          { entity_type: "technical_asset", entity_id: componentId },
-          { entity_type: { in: ["component_lifecycle_event", "component_cost_entry"] }, metadata: { path: ["componentId"], equals: componentId } },
-        ],
-      },
-      include: { actor: { select: { name: true, email: true } } },
-      orderBy: { created_at: "desc" },
-      take: 500,
-    });
 
     const includeFinance = canViewFinanceData(user.role);
+    const includeAudit = canViewAudit(user.role);
+    const audits = includeAudit
+      ? await db.auditLog.findMany({
+          where: {
+            company_id: user.company_id,
+            OR: [
+              { entity_type: "technical_asset", entity_id: componentId },
+              { entity_type: { in: ["component_lifecycle_event", "component_cost_entry"] }, metadata: { path: ["componentId"], equals: componentId } },
+            ],
+          },
+          include: { actor: { select: { name: true, email: true } } },
+          orderBy: { created_at: "desc" },
+          take: 500,
+        })
+      : [];
     const safeComponent = includeFinance ? component : { ...component, replacement_value: null };
     const safeCosts = includeFinance ? costs : costs.map((item) => ({ ...item, amount_ex_vat: null }));
-    const safeAudits = includeFinance ? audits : audits.map((item) => ({ ...item, metadata: null }));
     const totalCostExVat = includeFinance ? costs.reduce((sum, row) => sum + Number(row.amount_ex_vat || 0), 0) : null;
 
     const format = new URL(request.url).searchParams.get("format") || "json";
-    observability.logger.info("component report generated", observability.elapsed({ event: "components.report.completed", userId: user.id, companyId: user.company_id, propertyId: property.id, componentId, format, includeFinance }));
+    observability.logger.info("component report generated", observability.elapsed({ event: "components.report.completed", userId: user.id, companyId: user.company_id, propertyId: property.id, componentId, format, includeFinance, includeAudit }));
 
     if (format === "csv") {
       const rows: string[][] = [["Sektion", "Datum", "Typ", "Rubrik/Beskrivning", "Leverantör/Användare", "Belopp exkl. moms", "Moms %", "Arbetsorder", "Projekt", "Övrigt"]];
       rows.push(["Komponent", "", String(component.category || component.component_class || ""), String(component.name || ""), String(component.responsible_supplier || ""), includeFinance ? String(component.replacement_value || "") : "", "", "", "", JSON.stringify(safeComponent)]);
       for (const event of events) rows.push(["Händelse", String(event.event_date || ""), String(event.event_type || ""), `${event.title || ""}${event.description ? ` – ${event.description}` : ""}`, String(event.provider || event.created_by_name || event.created_by_email || ""), "", "", String(event.work_order_title || ""), String(event.project_name || ""), String(event.result || "")]);
       for (const cost of safeCosts) rows.push(["Kostnad", String(cost.cost_date || ""), String(cost.cost_type || ""), String(cost.description || ""), String(cost.supplier || cost.created_by_name || cost.created_by_email || ""), includeFinance ? String(cost.amount_ex_vat || "0") : "", String(cost.vat_rate || "0"), String(cost.work_order_title || ""), String(cost.project_name || ""), ""]);
-      for (const audit of safeAudits) rows.push(["Revision", audit.created_at.toISOString(), audit.action, audit.entity_type, audit.actor?.name || audit.actor?.email || "System", "", "", "", "", includeFinance ? JSON.stringify(audit.metadata || {}) : ""]);
+      for (const audit of audits) rows.push(["Revision", audit.created_at.toISOString(), audit.action, audit.entity_type, audit.actor?.name || audit.actor?.email || "System", "", "", "", "", JSON.stringify(audit.metadata || {})]);
       const csv = "\uFEFF" + rows.map((row) => row.map(csvCell).join(";")).join("\r\n");
       const safeName = String(component.name || "komponent").replace(/[^a-zA-Z0-9åäöÅÄÖ_-]+/g, "-").slice(0, 80);
       return observability.correlate(new Response(csv, { headers: { ...SUCCESS_HEADERS, "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="revalta-livscykel-${safeName}.csv"` } }));
@@ -129,7 +131,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       component: safeComponent,
       events,
       costs: safeCosts,
-      audits: safeAudits,
+      audits,
       summary: { eventCount: events.length, costCount: costs.length, auditCount: audits.length, totalCostExVat },
     }, { headers: SUCCESS_HEADERS }));
   } catch (error) {
