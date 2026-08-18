@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import {
   canAccessResidentPortal,
   getCurrentUser,
@@ -9,28 +10,86 @@ import {
   findAccessibleResidentPortalTicket,
   mapResidentPortalComments,
 } from "@/lib/resident-portal-tickets";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/resident-portal/tickets/[id]" });
+const ROUTE = "/api/resident-portal/tickets/[id]";
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
+
+function reject(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("resident ticket detail request rejected", observability.elapsed({
+    event: options.event,
+    ...options.context,
+  }));
+  return apiErrorResponse({
+    status: options.status,
+    code: options.code,
+    message: options.message,
+    requestId: observability.requestId,
+  });
+}
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = requireCompanyMember(await getCurrentUser());
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "resident_tickets.detail.unauthorized",
+      });
+    }
     if (!canAccessResidentPortal(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet till boendeportalen" }, { status: 403 });
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet till boendeportalen",
+        event: "resident_tickets.detail.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
     const { id } = await params;
     const ticket = await findAccessibleResidentPortalTicket(user, id);
     if (!ticket) {
-      return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
+      return reject(observability, {
+        status: 404,
+        code: API_ERROR_CODES.notFound,
+        message: "Ärendet hittades inte",
+        event: "resident_tickets.detail.not_found",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
-    return NextResponse.json({
+    const comments = mapResidentPortalComments(ticket.comments, ticket.reporter_name);
+    observability.logger.info("resident ticket detail completed", observability.elapsed({
+      event: "resident_tickets.detail.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      ticketId: ticket.id,
+      commentCount: comments.length,
+    }));
+
+    return observability.correlate(NextResponse.json({
       canComment: canCommentOnResidentPortalTicket(user.role),
       ticket: {
         id: ticket.id,
@@ -45,11 +104,18 @@ export async function GET(
         created_at: ticket.created_at,
         updated_at: ticket.updated_at,
         property: ticket.property,
-        comments: mapResidentPortalComments(ticket.comments, ticket.reporter_name),
+        comments,
       },
-    });
+    }, { headers: SUCCESS_HEADERS }));
   } catch (error) {
-    logger.error("Get resident portal ticket error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("resident ticket detail failed", error, observability.elapsed({
+      event: "resident_tickets.detail.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
