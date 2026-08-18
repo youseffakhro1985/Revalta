@@ -471,13 +471,14 @@ export async function PATCH(request: Request) {
         context: { userId: user.id },
       });
     }
+    const companyId = user.company_id;
     if (!["owner", "admin", "manager"].includes(user.role)) {
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
         message: "Du saknar behörighet att ändra dokument",
         event: "documents.update.forbidden",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     }
 
@@ -488,14 +489,14 @@ export async function PATCH(request: Request) {
       code: API_ERROR_CODES.validationFailed,
       message,
       event: "documents.update.validation_failed",
-      context: { reason, userId: user.id, companyId: user.company_id },
+      context: { reason, userId: user.id, companyId },
     });
     if (!documentId) return validationFailure("Dokument-id krävs", "missing_document_id");
 
     const existing = await db.managedDocument.findFirst({
       where: {
         id: documentId,
-        company_id: user.company_id,
+        company_id: companyId,
         OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
       select: {
@@ -524,7 +525,7 @@ export async function PATCH(request: Request) {
           code: API_ERROR_CODES.conflict,
           message: "Dokumentet finns kvar i äldre lagring. Kör backfill till ManagedDocument innan det kan ändras.",
           event: "documents.update.legacy_conflict",
-          context: { userId: user.id, companyId: user.company_id },
+          context: { userId: user.id, companyId },
         });
       }
       return reject(observability, {
@@ -532,7 +533,7 @@ export async function PATCH(request: Request) {
         code: API_ERROR_CODES.notFound,
         message: "Dokumentet hittades inte",
         event: "documents.update.not_found",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     }
 
@@ -542,7 +543,7 @@ export async function PATCH(request: Request) {
         code: API_ERROR_CODES.conflict,
         message: "Arkiverade dokument kan inte redigeras. Återställ först.",
         event: "documents.update.archived_conflict",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     }
 
@@ -582,9 +583,29 @@ export async function PATCH(request: Request) {
 
     if (Object.keys(data).length === 0) return validationFailure("Inga fält att uppdatera", "no_fields");
 
-    const updated = await db.managedDocument.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
-      data,
+    const updated = await db.$transaction(async (tx) => {
+      const result = await tx.managedDocument.updateMany({
+        where: { id: existing.id, company_id: companyId },
+        data,
+      });
+      if (result.count === 0) return result;
+
+      await writeAuditLog(user, {
+        entityType: "document",
+        entityId: existing.id,
+        action: "document.updated",
+        metadata: {
+          schemaVersion: 6,
+          storage: "ManagedDocument",
+          changedName: data.name !== undefined,
+          changedCategory: data.category !== undefined,
+          changedVisibility: data.visibility !== undefined,
+          changedValidUntil: data.valid_until !== undefined,
+          visibility: data.visibility ?? existing.visibility,
+        },
+      }, tx);
+
+      return result;
     });
     if (updated.count === 0) {
       return reject(observability, {
@@ -592,27 +613,14 @@ export async function PATCH(request: Request) {
         code: API_ERROR_CODES.notFound,
         message: "Dokumentet hittades inte",
         event: "documents.update.not_found_after_write",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     }
-
-    await writeAuditLog(user, {
-      entityType: "document",
-      entityId: existing.id,
-      action: "document.updated",
-      metadata: {
-        previousName: existing.name,
-        name: data.name ?? existing.name,
-        category: data.category ?? existing.category,
-        visibility: data.visibility ?? existing.visibility,
-        storage: "ManagedDocument",
-      },
-    });
 
     observability.logger.info("document update completed", observability.elapsed({
       event: "documents.update.completed",
       userId: user.id,
-      companyId: user.company_id,
+      companyId,
       documentId: existing.id,
     }));
     return successResponse(observability, { success: true, id: existing.id });
