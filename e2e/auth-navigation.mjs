@@ -6,6 +6,7 @@ const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
 const RESET_MAX_LATENCY_MS = 8_000;
 const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
 const REGISTER_MAX_LATENCY_MS = 8_000;
+const REGISTER_REQUEST_EMIT_TIMEOUT_MS = 5_000;
 const REGISTER_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 
 if (!baseUrl || !/^https:\/\//.test(baseUrl)) {
@@ -49,10 +50,18 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 const pageErrors = [];
+let registerRequestFailure = null;
 
 page.on("pageerror", (error) => {
   pageErrors.push(error.message);
   console.error(`PAGE_ERROR: ${error.message}`);
+});
+
+page.on("requestfailed", (request) => {
+  if (request.url().endsWith("/api/auth/register") && request.method() === "POST") {
+    registerRequestFailure = request.failure()?.errorText || "unknown network failure";
+    console.error(`register request failed at browser network layer: ${registerRequestFailure}`);
+  }
 });
 
 try {
@@ -81,8 +90,9 @@ try {
   await expectVisible(page.getByText(RESET_NEUTRAL_MESSAGE, { exact: true }), "neutral password-reset confirmation");
   console.log(`password reset: neutral browser flow passed in ${resetLatencyMs}ms (limit ${RESET_MAX_LATENCY_MS}ms)`);
 
-  // Register through the real browser form. Observe long responses for diagnostics,
-  // but keep the actual release SLO at REGISTER_MAX_LATENCY_MS.
+  // Register through the real browser form. Separate browser submit emission from
+  // server response latency so a native validation/UI failure cannot be mistaken
+  // for a slow API and vice versa.
   await page.goto("/register", { waitUntil: "domcontentloaded" });
   await expectVisible(page.getByRole("heading", { name: "Skapa ditt Revalta-konto" }), "register heading");
   await page.getByLabel("Namn").fill("Revalta E2E Owner");
@@ -93,13 +103,33 @@ try {
     fail("register email input did not retain the generated test address");
   }
   await page.getByLabel("Lösenord").fill(password);
+
+  const registerForm = page.locator("form");
+  const registerFormValid = await registerForm.evaluate((form) => form.checkValidity());
+  if (!registerFormValid) {
+    fail("register form failed native browser validation before submit");
+  }
+
   const registerStartedAt = Date.now();
+  const registerRequestPromise = page.waitForRequest(
+    (request) => request.url().endsWith("/api/auth/register") && request.method() === "POST",
+    { timeout: REGISTER_REQUEST_EMIT_TIMEOUT_MS },
+  );
   const registerResponsePromise = page.waitForResponse(
     (response) => response.url().endsWith("/api/auth/register") && response.request().method() === "POST",
     { timeout: REGISTER_DIAGNOSTIC_TIMEOUT_MS },
   );
   await page.getByRole("button", { name: "Skapa konto" }).click();
-  const registerResponse = await registerResponsePromise;
+  await registerRequestPromise.catch(() =>
+    fail(`register submit did not emit POST /api/auth/register within ${REGISTER_REQUEST_EMIT_TIMEOUT_MS}ms`),
+  );
+  console.log("register request: POST emitted by browser");
+  const registerResponse = await registerResponsePromise.catch(() =>
+    fail(
+      `register POST was emitted but produced no response within ${REGISTER_DIAGNOSTIC_TIMEOUT_MS}ms` +
+        (registerRequestFailure ? ` (network failure: ${registerRequestFailure})` : ""),
+    ),
+  );
   const registerLatencyMs = Date.now() - registerStartedAt;
   if (registerResponse.status() !== 201) {
     let publicError = {};
