@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - agent/e2e-pr295-manual-preview
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
