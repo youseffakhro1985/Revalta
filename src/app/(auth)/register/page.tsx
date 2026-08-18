@@ -1,7 +1,7 @@
 "use client";
 
 import { readResponseJson } from "@/lib/fetch-json";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
@@ -13,10 +13,17 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!hydrated || loading) return;
+
     const formData = new FormData(e.currentTarget);
     const payload = {
       name: String(formData.get("name") ?? ""),
@@ -124,7 +131,7 @@ export default function RegisterPage() {
           />
           <p className="mt-2 text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
         </div>
-        <button type="submit" disabled={loading} className={authButtonClass}>
+        <button type="submit" disabled={!hydrated || loading} className={authButtonClass}>
           {loading ? "Skapar konto..." : "Skapa konto"}
         </button>
       </form>
