@@ -1,7 +1,7 @@
 "use client";
 
 import { readResponseJson } from "@/lib/fetch-json";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
@@ -13,10 +13,19 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  const controlsDisabled = !hydrated || loading;
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (controlsDisabled) return;
+
     const formData = new FormData(e.currentTarget);
     const payload = {
       name: String(formData.get("name") ?? ""),
@@ -61,7 +70,7 @@ export default function RegisterPage() {
       }
     >
       {error ? <AuthAlert>{error}</AuthAlert> : null}
-      <form onSubmit={handleRegister} className="mt-7 space-y-5">
+      <form onSubmit={handleRegister} aria-busy={loading} className="mt-7 space-y-5">
         <div>
           <label htmlFor="register-name" className="block text-sm font-medium text-ink-700">Namn</label>
           <input
@@ -70,6 +79,7 @@ export default function RegisterPage() {
             type="text"
             autoComplete="name"
             maxLength={120}
+            disabled={controlsDisabled}
             className={authInputClass}
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -86,6 +96,7 @@ export default function RegisterPage() {
             minLength={2}
             maxLength={160}
             autoComplete="organization"
+            disabled={controlsDisabled}
             className={authInputClass}
             value={companyName}
             onChange={(event) => setCompanyName(event.target.value)}
@@ -101,6 +112,7 @@ export default function RegisterPage() {
             required
             maxLength={254}
             autoComplete="email"
+            disabled={controlsDisabled}
             className={authInputClass}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -117,6 +129,7 @@ export default function RegisterPage() {
             minLength={10}
             maxLength={128}
             autoComplete="new-password"
+            disabled={controlsDisabled}
             className={authInputClass}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -124,7 +137,7 @@ export default function RegisterPage() {
           />
           <p className="mt-2 text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
         </div>
-        <button type="submit" disabled={loading} className={authButtonClass}>
+        <button type="submit" disabled={controlsDisabled} className={authButtonClass}>
           {loading ? "Skapar konto..." : "Skapa konto"}
         </button>
       </form>
