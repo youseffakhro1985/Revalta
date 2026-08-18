@@ -1,20 +1,46 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { isCronRequestAuthorized } from "@/lib/request-security";
-import { createLogger } from "@/lib/structured-logger";
-
-const logger = createLogger({ route: "/api/cron/document-expiry-reminders" });
+import { createRouteObservability } from "@/lib/route-observability";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const ROUTE = "/api/cron/document-expiry-reminders";
+const JOB = "document_expiry_reminders";
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 function daysUntil(date: Date) {
   return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
 export async function GET(request: Request) {
-  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const observability = createRouteObservability(request, ROUTE);
+
+  if (!isCronRequestAuthorized(request)) {
+    observability.logger.warn("document expiry cron rejected", observability.elapsed({
+      event: "cron.authorization.denied",
+      job: JOB,
+    }));
+    return apiErrorResponse({
+      status: 401,
+      code: API_ERROR_CODES.unauthorized,
+      message: "Obehörig",
+      requestId: observability.requestId,
+    });
+  }
+
+  observability.logger.info("document expiry cron started", observability.elapsed({
+    event: "cron.started",
+    job: JOB,
+  }));
 
   try {
     const horizon = new Date();
@@ -43,7 +69,10 @@ export async function GET(request: Request) {
 
     for (const document of documents) {
       const validUntil = document.valid_until;
-      if (!validUntil) { skipped += 1; continue; }
+      if (!validUntil) {
+        skipped += 1;
+        continue;
+      }
       const days = daysUntil(validUntil);
       const dedupeKey = `document-expiry:${document.id}:${validUntil.toISOString().slice(0, 10)}`;
 
@@ -57,12 +86,6 @@ export async function GET(request: Request) {
         `Öppna dokumentarkivet och förnya eller arkivera. Ref: ${document.id}`,
       ].join(" ");
 
-      // Overlapping/retried cron invocations must not send duplicate
-      // reminders for the same document. Guard the dedupe check + create
-      // with an advisory lock keyed on dedupeKey, checked *inside* the
-      // transaction — same pattern as tryCreateRecurringIncidentEscalation
-      // in src/lib/recurring-incident-storage.ts (this route previously did
-      // the dedupe findFirst outside any lock/transaction).
       const outcome = await db.$transaction(async (tx) => {
         const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
           SELECT pg_try_advisory_xact_lock(hashtext(${dedupeKey})) AS locked
@@ -109,21 +132,29 @@ export async function GET(request: Request) {
         return "created" as const;
       });
 
-      if (outcome === "created") {
-        created += 1;
-      } else {
-        skipped += 1;
-      }
+      if (outcome === "created") created += 1;
+      else skipped += 1;
     }
 
-    return NextResponse.json({
-      ok: true,
-      scanned: documents.length,
-      created,
-      skipped,
-    }, { headers: { "Cache-Control": "private, no-store" } });
+    const result = { ok: true, scanned: documents.length, created, skipped };
+    observability.logger.info("document expiry cron completed", observability.elapsed({
+      event: "cron.completed",
+      job: JOB,
+      scanned: result.scanned,
+      created: result.created,
+      skipped: result.skipped,
+    }));
+    return observability.correlate(NextResponse.json(result, { headers: SUCCESS_HEADERS }));
   } catch (error) {
-    logger.error("Document expiry reminders error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("document expiry cron failed", error, observability.elapsed({
+      event: "cron.failed",
+      job: JOB,
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Cron-körningen misslyckades",
+      requestId: observability.requestId,
+    });
   }
 }
