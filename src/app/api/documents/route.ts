@@ -263,13 +263,14 @@ export async function POST(request: Request) {
         context: { userId: user.id },
       });
     }
+    const companyId = user.company_id;
     if (!["owner", "admin", "manager"].includes(user.role)) {
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
         message: "Du saknar behörighet att ladda upp dokument",
         event: "documents.create.forbidden",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     }
 
@@ -288,7 +289,7 @@ export async function POST(request: Request) {
       code: API_ERROR_CODES.validationFailed,
       message,
       event: "documents.create.validation_failed",
-      context: { reason, userId: user.id, companyId: user.company_id },
+      context: { reason, userId: user.id, companyId },
     });
 
     if (!(file instanceof File) || !name) return validationFailure("Dokumentnamn och fil krävs", "missing_file_or_name");
@@ -308,42 +309,42 @@ export async function POST(request: Request) {
     if (visibility === "resident_lease" && !leaseId) return validationFailure("Hyresavtal krävs för denna synlighet", "missing_lease");
 
     if (leaseId) {
-      const lease = await db.lease.findFirst({ where: { id: leaseId, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } }, select: { id: true, property_id: true, unit_id: true } });
+      const lease = await db.lease.findFirst({ where: { id: leaseId, company_id: companyId, deleted_at: null, property: { deleted_at: null } }, select: { id: true, property_id: true, unit_id: true } });
       if (!lease) {
         return reject(observability, {
           status: 404,
           code: API_ERROR_CODES.notFound,
           message: "Hyresavtalet hittades inte",
           event: "documents.create.lease_not_found",
-          context: { userId: user.id, companyId: user.company_id },
+          context: { userId: user.id, companyId },
         });
       }
       resolvedLeaseId = lease.id;
       resolvedPropertyId = lease.property_id;
       resolvedUnitId = lease.unit_id;
     } else if (unitId) {
-      const unit = await db.unit.findFirst({ where: { id: unitId, property: { company_id: user.company_id, deleted_at: null } }, select: { id: true, property_id: true } });
+      const unit = await db.unit.findFirst({ where: { id: unitId, property: { company_id: companyId, deleted_at: null } }, select: { id: true, property_id: true } });
       if (!unit) {
         return reject(observability, {
           status: 404,
           code: API_ERROR_CODES.notFound,
           message: "Objektet hittades inte",
           event: "documents.create.unit_not_found",
-          context: { userId: user.id, companyId: user.company_id },
+          context: { userId: user.id, companyId },
         });
       }
       if (propertyId && propertyId !== unit.property_id) return validationFailure("Objektet tillhör inte den valda fastigheten", "unit_property_mismatch");
       resolvedUnitId = unit.id;
       resolvedPropertyId = unit.property_id;
     } else if (propertyId) {
-      const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
+      const property = await db.property.findFirst({ where: { id: propertyId, company_id: companyId, deleted_at: null }, select: { id: true } });
       if (!property) {
         return reject(observability, {
           status: 404,
           code: API_ERROR_CODES.notFound,
           message: "Fastigheten hittades inte",
           event: "documents.create.property_not_found",
-          context: { userId: user.id, companyId: user.company_id },
+          context: { userId: user.id, companyId },
         });
       }
       resolvedPropertyId = property.id;
@@ -363,7 +364,7 @@ export async function POST(request: Request) {
         fileName: validation.fileName,
         contentType: validation.contentType,
         buffer: bytes,
-        prefix: `documents/${user.company_id}`,
+        prefix: `documents/${companyId}`,
       });
       storageUrl = stored.url;
     } else if (isProductionRuntime()) {
@@ -372,7 +373,7 @@ export async function POST(request: Request) {
         code: API_ERROR_CODES.serviceUnavailable,
         message: "Fillagringen är inte konfigurerad",
         event: "documents.create.storage_unavailable",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     } else {
       dataUrl = `data:${validation.contentType};base64,${bytes.toString("base64")}`;
@@ -381,7 +382,7 @@ export async function POST(request: Request) {
     const document = await db.$transaction(async (tx) => {
       const created = await tx.managedDocument.create({
         data: {
-          company_id: user.company_id,
+          company_id: companyId,
           property_id: resolvedPropertyId,
           unit_id: resolvedUnitId,
           lease_id: resolvedLeaseId,
@@ -420,7 +421,7 @@ export async function POST(request: Request) {
     observability.logger.info("document create completed", observability.elapsed({
       event: "documents.create.completed",
       userId: user.id,
-      companyId: user.company_id,
+      companyId,
       documentId: document.id,
     }));
     return successResponse(observability, { success: true, document }, { status: 201 });
@@ -565,8 +566,6 @@ export async function PATCH(request: Request) {
     if (body.visibility !== undefined) {
       const visibility = String(body.visibility || "").trim();
       if (!allowedVisibilities.has(visibility)) return validationFailure("Ogiltig synlighet", "invalid_visibility");
-      // Keep existing property/unit/lease targeting; only allow visibility flips that do not
-      // require new parent resolution in this field PATCH.
       if (
         (visibility === "resident_property" || visibility === "resident_unit" || visibility === "resident_lease") &&
         existing.visibility === "internal"
