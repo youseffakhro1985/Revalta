@@ -1,0 +1,40 @@
+name: PR295 Manual Preview Browser E2E
+
+on:
+  push:
+    branches:
+      - agent/e2e-pr295-manual-preview
+
+permissions:
+  contents: read
+
+jobs:
+  browser-e2e:
+    name: Auth, navigation, mobile and Command Center
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      E2E_BASE_URL: https://revalta-git-agent-rev-obs-002-989ba0-youseffakhro1985s-projects.vercel.app
+    steps:
+      - name: Check out candidate app code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 7389234289e4d33df6f08e69f5149729762a3567
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install application dependencies
+        run: npm ci
+
+      - name: Install pinned browser runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.60.0
+          npx playwright install --with-deps chromium
+
+      - name: Run browser E2E against PR295 Ready Preview
+        run: node e2e/auth-navigation.mjs
