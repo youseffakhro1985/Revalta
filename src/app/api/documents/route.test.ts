@@ -205,6 +205,32 @@ describe("documents route", () => {
     expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 
+  it("blocks technicians from editing documents before reading document data", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await PATCH(request("PATCH"));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "Du saknar behörighet att ändra dokument",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "document request rejected",
+      expect.objectContaining({
+        event: "documents.update.forbidden",
+        userId: "tech-1",
+        companyId: "company-1",
+      }),
+    );
+  });
+
   it("returns a safe correlated 500 when authentication fails unexpectedly", async () => {
     getCurrentUserMock.mockRejectedValue(new Error("postgres://user:secret@db.internal/revalta"));
 
