@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
@@ -41,6 +41,9 @@ export async function GET(
     }
     if (!user.company_id) {
       return reject(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "components.link_options.missing_company", context: { userId: user.id } });
+    }
+    if (!canCreateProperties(user.role)) {
+      return reject(observability, { status: 403, code: API_ERROR_CODES.forbidden, message: "Du saknar behörighet att länka komponenthistorik", event: "components.link_options.forbidden", context: { userId: user.id, companyId: user.company_id } });
     }
 
     const { id: propertyId, componentId } = await params;
