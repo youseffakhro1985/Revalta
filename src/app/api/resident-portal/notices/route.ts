@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import {
   canAccessResidentPortal,
@@ -7,9 +8,15 @@ import {
   requireCompanyMember,
 } from "@/lib/current-user";
 import { listResidentMatchedLeases } from "@/lib/resident-portal-leases";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/resident-portal/notices" });
+const ROUTE = "/api/resident-portal/notices";
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 const publishedStatuses = new Set(["sent", "paid", "overdue", "cancelled", "issued", "published"]);
 
@@ -17,12 +24,56 @@ function asNumber(value: { toString(): string } | number | null | undefined) {
   return Number(value ?? 0);
 }
 
-export async function GET() {
+function successResponse(
+  observability: ReturnType<typeof createRouteObservability>,
+  body: unknown,
+) {
+  return observability.correlate(NextResponse.json(body, { headers: SUCCESS_HEADERS }));
+}
+
+function reject(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("resident notice request rejected", observability.elapsed({
+    event: options.event,
+    ...options.context,
+  }));
+  return apiErrorResponse({
+    status: options.status,
+    code: options.code,
+    message: options.message,
+    requestId: observability.requestId,
+  });
+}
+
+export async function GET(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = requireCompanyMember(await getCurrentUser());
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "resident_notices.list.unauthorized",
+      });
+    }
     if (!canAccessResidentPortal(user.role) || !isResident(user.role)) {
-      return NextResponse.json({ error: "Endast boende kan använda denna yta" }, { status: 403 });
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Endast boende kan använda denna yta",
+        event: "resident_notices.list.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
     const leases = await listResidentMatchedLeases(user.company_id, user.email);
@@ -54,7 +105,15 @@ export async function GET() {
       publishedStatuses.has(notice.status) || notice.status !== "draft"
     ));
 
-    return NextResponse.json({
+    observability.logger.info("resident notice list completed", observability.elapsed({
+      event: "resident_notices.list.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      leaseCount: leases.length,
+      noticeCount: visible.length,
+    }));
+
+    return successResponse(observability, {
       leases: leases.map((lease) => ({
         id: lease.id,
         leaseNumber: lease.lease_number,
@@ -81,7 +140,14 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    logger.error("Get resident notices error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("resident notice list failed", error, observability.elapsed({
+      event: "resident_notices.list.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
