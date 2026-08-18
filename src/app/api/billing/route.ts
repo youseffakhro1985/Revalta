@@ -1,12 +1,19 @@
-import db from "@/lib/db";
+import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageBilling, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import db from "@/lib/db";
 import { recordPaymentEvent } from "@/lib/integrations";
+import { createRouteObservability } from "@/lib/route-observability";
 import { isProductionRuntime } from "@/lib/runtime-env";
-import { NextResponse } from "next/server";
-import { createLogger } from "@/lib/structured-logger";
 
-const logger = createLogger({ route: "/api/billing" });
+const ROUTE = "/api/billing";
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 const plans = {
   start: { label: "Start", price: 495, propertyLimit: 10, teamLimit: 3 },
@@ -14,18 +21,74 @@ const plans = {
   enterprise: { label: "Professional", price: 1995, propertyLimit: 999, teamLimit: 100 },
 };
 
-export async function GET() {
+function successResponse(
+  observability: ReturnType<typeof createRouteObservability>,
+  body: unknown,
+  init?: ResponseInit,
+) {
+  const headers = new Headers(init?.headers);
+  for (const [name, value] of Object.entries(SUCCESS_HEADERS)) headers.set(name, value);
+  return observability.correlate(NextResponse.json(body, { ...init, headers }));
+}
+
+function reject(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("billing request rejected", observability.elapsed({
+    event: options.event,
+    ...options.context,
+  }));
+  return apiErrorResponse({
+    status: options.status,
+    code: options.code,
+    message: options.message,
+    requestId: observability.requestId,
+  });
+}
+
+export async function GET(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Företag saknas" }, { status: 400 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "billing.read.unauthorized",
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Företag saknas",
+        event: "billing.read.missing_company",
+        context: { userId: user.id },
+      });
+    }
+    const companyId = user.company_id;
     if (!canManageBilling(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att visa abonnemang" }, { status: 403 });
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att visa abonnemang",
+        event: "billing.read.forbidden",
+        context: { userId: user.id, companyId },
+      });
     }
 
-    const [properties, teamMembers, openTickets] = await Promise.all([
+    const [properties, teamMembers, openTickets, company] = await Promise.all([
       db.property.count({ where: { deleted_at: null, ...tenantWhere(user) } }),
-      db.user.count({ where: { company_id: user.company_id } }),
+      db.user.count({ where: { company_id: companyId } }),
       db.ticket.count({
         where: {
           deleted_at: null,
@@ -34,17 +97,26 @@ export async function GET() {
           OR: [{ property_id: null }, { property: { deleted_at: null } }],
         },
       }),
+      db.company.findUnique({
+        where: { id: companyId },
+        select: {
+          stripe_customer_id: true,
+          stripe_subscription_id: true,
+          subscription_status: true,
+        },
+      }),
     ]);
-    const company = await db.company.findUnique({
-      where: { id: user.company_id },
-      select: {
-        stripe_customer_id: true,
-        stripe_subscription_id: true,
-        subscription_status: true,
-      },
-    });
 
-    return NextResponse.json({
+    observability.logger.info("billing summary completed", observability.elapsed({
+      event: "billing.read.completed",
+      userId: user.id,
+      companyId,
+      properties,
+      teamMembers,
+      openTickets,
+    }));
+
+    return successResponse(observability, {
       currentPlan: user.company?.plan || "professional",
       plans,
       usage: { properties, teamMembers, openTickets },
@@ -59,54 +131,123 @@ export async function GET() {
       subscriptionStatus: company?.subscription_status || null,
     });
   } catch (error) {
-    logger.error("Get billing error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("billing summary failed", error, observability.elapsed({
+      event: "billing.read.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
 
 export async function PATCH(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id || !canManageBilling(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att ändra plan" }, { status: 403 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "billing.plan_change.unauthorized",
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att ändra plan",
+        event: "billing.plan_change.missing_company",
+        context: { userId: user.id },
+      });
+    }
+    const companyId = user.company_id;
+    if (!canManageBilling(user.role)) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att ändra plan",
+        event: "billing.plan_change.forbidden",
+        context: { userId: user.id, companyId },
+      });
     }
 
     // Plan changes are a money flow. In production this must go through a real
-    // Stripe Checkout session (the webhook is what actually updates company.plan
-    // from there) — never a free-form write straight to the plan field, which
-    // would let a customer grant themselves a higher tier without paying for it.
-    // Left enabled outside production so dev/preview environments without live
-    // Stripe keys can still exercise plan changes end to end.
+    // Stripe Checkout session; the webhook is the only production writer of the
+    // paid plan so a customer can never self-grant a higher tier.
     if (isProductionRuntime()) {
-      return NextResponse.json(
-        { error: "Planbyten görs via Stripe Checkout i produktion. Använd \"Starta Stripe Checkout\"." },
-        { status: 403 },
-      );
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Planbyten görs via Stripe Checkout i produktion. Använd \"Starta Stripe Checkout\".",
+        event: "billing.plan_change.production_blocked",
+        context: { userId: user.id, companyId },
+      });
     }
 
-    const { plan } = await request.json();
-    if (typeof plan !== "string" || !(plan in plans)) {
-      return NextResponse.json({ error: "Ogiltig plan" }, { status: 400 });
+    const body = await request.json().catch(() => ({}));
+    const plan = typeof body?.plan === "string" ? body.plan : "";
+    if (!(plan in plans)) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Ogiltig plan",
+        event: "billing.plan_change.validation_failed",
+        context: { reason: "invalid_plan", userId: user.id, companyId },
+      });
     }
 
-    const company = await db.company.update({
-      where: { id: user.company_id },
-      data: { plan },
-      select: { id: true, name: true, plan: true },
+    const company = await db.$transaction(async (tx) => {
+      const updated = await tx.company.update({
+        where: { id: companyId },
+        data: { plan },
+        select: { id: true, name: true, plan: true },
+      });
+
+      await writeAuditLog(user, {
+        entityType: "company",
+        entityId: updated.id,
+        action: "billing.plan_changed",
+        metadata: { schemaVersion: 2, plan },
+      }, tx);
+
+      return updated;
     });
 
-    await writeAuditLog(user, {
-      entityType: "company",
-      entityId: company.id,
-      action: "billing.plan_changed",
-      metadata: { plan },
-    });
-    await recordPaymentEvent(user, { companyId: company.id, plan, mode: "plan_change" });
+    try {
+      await recordPaymentEvent(user, { companyId, plan, mode: "plan_change" });
+    } catch {
+      // IntegrationEvent is operational telemetry, not the source of truth for
+      // this non-production plan change. Do not report a false failed mutation
+      // after the atomic company+audit transaction has committed.
+      observability.logger.warn("billing payment event recording failed", observability.elapsed({
+        event: "billing.plan_change.telemetry_failed",
+        userId: user.id,
+        companyId,
+        plan,
+      }));
+    }
 
-    return NextResponse.json({ success: true, company });
+    observability.logger.info("billing plan change completed", observability.elapsed({
+      event: "billing.plan_change.completed",
+      userId: user.id,
+      companyId,
+      plan,
+    }));
+    return successResponse(observability, { success: true, company });
   } catch (error) {
-    logger.error("Update billing error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("billing plan change failed", error, observability.elapsed({
+      event: "billing.plan_change.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
