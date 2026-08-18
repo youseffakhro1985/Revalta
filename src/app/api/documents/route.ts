@@ -472,6 +472,15 @@ export async function PATCH(request: Request) {
         context: { userId: user.id },
       });
     }
+    if (!["owner", "admin", "manager"].includes(user.role)) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att ändra dokument",
+        event: "documents.update.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
 
     const body = await request.json().catch(() => ({}));
     const documentId = String(body.documentId || body.id || "").trim();
