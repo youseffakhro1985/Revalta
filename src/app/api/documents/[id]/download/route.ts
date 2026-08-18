@@ -167,7 +167,6 @@ export async function GET(
       return notFound(observability, "Dokumentet hittades inte", "documents.download.not_found", {
         userId: user.id,
         companyId: user.company_id,
-        documentId: id,
       });
     }
 
