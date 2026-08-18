@@ -1,4 +1,5 @@
 import db from "@/lib/db";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { canAssignWorkOrders, canExportTickets, canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
@@ -9,12 +10,17 @@ import {
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/tickets" });
-
+const ROUTE = "/api/tickets";
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 function positiveInteger(value: string | null, fallback: number, max?: number) {
   const parsed = Number.parseInt(value || "", 10);
@@ -22,10 +28,35 @@ function positiveInteger(value: string | null, fallback: number, max?: number) {
   return max ? Math.min(parsed, max) : parsed;
 }
 
+function successResponse(
+  observability: ReturnType<typeof createRouteObservability>,
+  body: unknown,
+  init?: ResponseInit,
+) {
+  const headers = new Headers(init?.headers);
+  for (const [name, value] of Object.entries(SUCCESS_HEADERS)) {
+    headers.set(name, value);
+  }
+  return observability.correlate(NextResponse.json(body, { ...init, headers }));
+}
+
 export async function GET(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user) {
+      observability.logger.warn("ticket list rejected", observability.elapsed({
+        event: "tickets.list.unauthorized",
+      }));
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        requestId: observability.requestId,
+      });
+    }
+
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim();
     const status = searchParams.get("status")?.trim();
@@ -98,7 +129,18 @@ export async function GET(request: Request) {
       }),
       db.ticket.count({ where }),
     ]);
-    return NextResponse.json({
+
+    observability.logger.info("ticket list completed", observability.elapsed({
+      event: "tickets.list.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      returned: tickets.length,
+      total,
+      page,
+      pageSize,
+    }));
+
+    return successResponse(observability, {
       tickets,
       pagination: {
         page,
@@ -112,20 +154,58 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    logger.error("Get tickets error", error);
     if (isMissingSchemaColumnError(error)) {
-      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+      observability.logger.error("ticket list schema unavailable", error, observability.elapsed({
+        event: "tickets.list.schema_unavailable",
+      }));
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        requestId: observability.requestId,
+      });
     }
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+
+    observability.logger.error("ticket list failed", error, observability.elapsed({
+      event: "tickets.list.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
 
 export async function POST(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    if (!user) {
+      observability.logger.warn("ticket create rejected", observability.elapsed({
+        event: "tickets.create.unauthorized",
+      }));
+      return apiErrorResponse({
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        requestId: observability.requestId,
+      });
+    }
     if (!canManageTickets(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att skapa ärenden" }, { status: 403 });
+      observability.logger.warn("ticket create forbidden", observability.elapsed({
+        event: "tickets.create.forbidden",
+        userId: user.id,
+        companyId: user.company_id,
+      }));
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att skapa ärenden",
+        requestId: observability.requestId,
+      });
     }
 
     const { title, description, propertyId, category, priority, assignedToId } = await request.json();
@@ -137,21 +217,75 @@ export async function POST(request: Request) {
     const requestedAssigneeId = typeof assignedToId === "string" && assignedToId.trim() ? assignedToId.trim() : null;
     const canAssign = canAssignWorkOrders(user.role);
     if (!canAssign && requestedAssigneeId && requestedAssigneeId !== user.id) {
-      return NextResponse.json({ error: "Du saknar behörighet att tilldela ärenden till andra" }, { status: 403 });
+      observability.logger.warn("ticket assignment forbidden", observability.elapsed({
+        event: "tickets.create.assignment_forbidden",
+        userId: user.id,
+        companyId: user.company_id,
+      }));
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att tilldela ärenden till andra",
+        requestId: observability.requestId,
+      });
     }
     const normalizedAssignedToId = canAssign ? requestedAssigneeId : user.id;
 
     if (!normalizedTitle || !normalizedDescription) {
-      return NextResponse.json({ error: "Titel och beskrivning krävs" }, { status: 400 });
+      observability.logger.warn("ticket create validation failed", observability.elapsed({
+        event: "tickets.create.validation_failed",
+        reason: "missing_required_fields",
+        userId: user.id,
+        companyId: user.company_id,
+      }));
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Titel och beskrivning krävs",
+        requestId: observability.requestId,
+      });
     }
     if (normalizedTitle.length > 180 || normalizedDescription.length > 10_000) {
-      return NextResponse.json({ error: "Titel eller beskrivning är för lång" }, { status: 400 });
+      observability.logger.warn("ticket create validation failed", observability.elapsed({
+        event: "tickets.create.validation_failed",
+        reason: "field_too_long",
+        userId: user.id,
+        companyId: user.company_id,
+      }));
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Titel eller beskrivning är för lång",
+        requestId: observability.requestId,
+      });
     }
     if (!new Set(["other", "vvs", "electricity", "elevator", "security", "cleaning"]).has(normalizedCategory)) {
-      return NextResponse.json({ error: "Ogiltig ärendekategori" }, { status: 400 });
+      observability.logger.warn("ticket create validation failed", observability.elapsed({
+        event: "tickets.create.validation_failed",
+        reason: "invalid_category",
+        userId: user.id,
+        companyId: user.company_id,
+      }));
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Ogiltig ärendekategori",
+        requestId: observability.requestId,
+      });
     }
     if (!new Set(["low", "normal", "high", "urgent"]).has(normalizedPriority)) {
-      return NextResponse.json({ error: "Ogiltig prioritet" }, { status: 400 });
+      observability.logger.warn("ticket create validation failed", observability.elapsed({
+        event: "tickets.create.validation_failed",
+        reason: "invalid_priority",
+        userId: user.id,
+        companyId: user.company_id,
+      }));
+      return apiErrorResponse({
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Ogiltig prioritet",
+        requestId: observability.requestId,
+      });
     }
 
     if (normalizedPropertyId) {
@@ -166,7 +300,17 @@ export async function POST(request: Request) {
       });
 
       if (!property) {
-        return NextResponse.json({ error: "Vald fastighet hittades inte" }, { status: 400 });
+        observability.logger.warn("ticket create property rejected", observability.elapsed({
+          event: "tickets.create.property_not_found",
+          userId: user.id,
+          companyId: user.company_id,
+        }));
+        return apiErrorResponse({
+          status: 400,
+          code: API_ERROR_CODES.validationFailed,
+          message: "Vald fastighet hittades inte",
+          requestId: observability.requestId,
+        });
       }
     }
 
@@ -179,7 +323,17 @@ export async function POST(request: Request) {
       });
 
       if (!assignee || assignee.id !== normalizedAssignedToId) {
-        return NextResponse.json({ error: "Vald ansvarig hittades inte" }, { status: 400 });
+        observability.logger.warn("ticket create assignee rejected", observability.elapsed({
+          event: "tickets.create.assignee_not_found",
+          userId: user.id,
+          companyId: user.company_id,
+        }));
+        return apiErrorResponse({
+          status: 400,
+          code: API_ERROR_CODES.validationFailed,
+          message: "Vald ansvarig hittades inte",
+          requestId: observability.requestId,
+        });
       }
     }
 
@@ -256,9 +410,22 @@ export async function POST(request: Request) {
       priority: ticket.priority,
     });
 
-    return NextResponse.json({ success: true, ticket }, { status: 201 });
+    observability.logger.info("ticket create completed", observability.elapsed({
+      event: "tickets.create.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      ticketId: ticket.id,
+    }));
+    return successResponse(observability, { success: true, ticket }, { status: 201 });
   } catch (error) {
-    logger.error("Create ticket error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("ticket create failed", error, observability.elapsed({
+      event: "tickets.create.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
