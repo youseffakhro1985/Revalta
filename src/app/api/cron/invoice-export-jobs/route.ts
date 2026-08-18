@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { isCronRequestAuthorized } from "@/lib/request-security";
+import { createRouteObservability } from "@/lib/route-observability";
 import {
   getInvoiceDraftByVersion,
   getModernInvoiceDraftByVersion,
@@ -13,8 +15,16 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const ROUTE = "/api/cron/invoice-export-jobs";
+const JOB_NAME = "invoice_export_jobs";
 const MAX_JOBS_PER_RUN = 20;
 const REQUEST_TIMEOUT_MS = 20_000;
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 type Obj = Record<string, unknown>;
 type Job = InvoiceExportJobPayload & {
@@ -193,7 +203,9 @@ async function send(job: Job, payload: ReturnType<typeof exportPayload>) {
       response: responseText.slice(0, 2000),
     };
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") throw new Error(`${job.provider} svarade inte inom ${REQUEST_TIMEOUT_MS / 1000} sekunder`);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`${job.provider} svarade inte inom ${REQUEST_TIMEOUT_MS / 1000} sekunder`);
+    }
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -210,94 +222,142 @@ async function saveJob(companyId: string, job: Job, status: string, extra: Parti
 }
 
 export async function GET(request: Request) {
-  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const observability = createRouteObservability(request, ROUTE);
 
-  const queuedRaw = await listQueuedInvoiceExportJobs(MAX_JOBS_PER_RUN);
-  const queued = queuedRaw
-    .map((item) => {
-      const job = asJob(item.job);
-      return job ? { ...item, job } : null;
-    })
-    .filter((item): item is { companyId: string; workOrderId: string; job: Job; createdAt: Date } => Boolean(item));
-
-  const result = { queued: queued.length, sent: 0, failed: 0, skipped: 0 };
-
-  for (const item of queued) {
-    const { companyId, workOrderId, job } = item;
-    if (job.status !== "queued") {
-      result.skipped += 1;
-      continue;
-    }
-
-    // Fail-closed: never rematerialize IE-only jobs into WorkOrderInvoiceExportJob.
-    const modernRaw = await getModernInvoiceExportJob(companyId, workOrderId, job.jobId);
-    const modernJob = modernRaw ? asJob(modernRaw) : null;
-    if (!modernJob) {
-      result.skipped += 1;
-      continue;
-    }
-
-    // Atomic claim: guards against a concurrent/retried cron invocation processing
-    // the same job twice (which would submit the same invoice to Fortnox/Visma/the
-    // webhook provider more than once). The WHERE clause only matches a row that is
-    // still "queued", so at most one concurrent request can flip it to "processing";
-    // a losing request sees count 0 and skips instead of re-sending.
-    const claim = await db.workOrderInvoiceExportJob.updateMany({
-      where: { id: modernJob.jobId, company_id: companyId, status: "queued" },
-      data: { status: "processing", processing_started_at: new Date() },
+  if (!isCronRequestAuthorized(request)) {
+    observability.logger.warn("invoice export cron rejected", observability.elapsed({
+      event: "cron.authorization.denied",
+      job: JOB_NAME,
+    }));
+    return apiErrorResponse({
+      status: 401,
+      code: API_ERROR_CODES.unauthorized,
+      message: "Obehörig",
+      requestId: observability.requestId,
     });
-    if (claim.count === 0) {
-      result.skipped += 1;
-      continue;
-    }
-
-    try {
-      const workOrder = await db.workOrder.findFirst({
-        where: { deleted_at: null, id: workOrderId, company_id: companyId, property: { deleted_at: null } },
-        select: {
-          id: true,
-          title: true,
-          property: { select: { name: true, address: true, postal_code: true, city: true } },
-          unit: { select: { designation: true } },
-          company: { select: { name: true, org_number: true } },
-        },
-      });
-
-      if (!workOrder) throw new Error("Arbetsordern hittades inte längre");
-      if (!modernJob.invoiceVersionId) throw new Error("Exportjobbet saknar fakturaversion");
-      const modernInvoice = await getModernInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
-      if (!modernInvoice) {
-        const legacyInvoice = await getInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
-        throw new Error(
-          legacyInvoice
-            ? "Faktureringsunderlaget finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceDraft innan export."
-            : "Den kopplade fakturaversionen hittades inte",
-        );
-      }
-      const invoice = asInvoice(modernInvoice);
-      if (!invoice) throw new Error("Den kopplade fakturaversionen hittades inte");
-      if (!["ready", "exported"].includes(invoice.status)) throw new Error("Faktureringsunderlaget måste vara markerat som redo före export");
-
-      const payload = exportPayload({ job: modernJob, invoice, workOrder });
-      const providerResult = await send(modernJob, payload);
-      // Receipt fields live on WorkOrderInvoiceExportJob (sent_at/external_id/provider_response).
-      await saveJob(companyId, modernJob, "sent", {
-        sentAt: new Date().toISOString(),
-        providerStatus: providerResult.status,
-        externalId: providerResult.externalId,
-        providerResponse: providerResult.response,
-        error: null,
-      });
-      result.sent += 1;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Okänt integrationsfel";
-      await saveJob(companyId, modernJob, "failed", {
-        failedAt: new Date().toISOString(),
-        error: message.slice(0, 2000),
-      });
-      result.failed += 1;
-    }
   }
 
-  return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+  observability.logger.info("invoice export cron started", observability.elapsed({
+    event: "cron.started",
+    job: JOB_NAME,
+  }));
+
+  try {
+    const queuedRaw = await listQueuedInvoiceExportJobs(MAX_JOBS_PER_RUN);
+    const queued = queuedRaw
+      .map((item) => {
+        const job = asJob(item.job);
+        return job ? { ...item, job } : null;
+      })
+      .filter((item): item is { companyId: string; workOrderId: string; job: Job; createdAt: Date } => Boolean(item));
+
+    const result = { queued: queued.length, sent: 0, failed: 0, skipped: 0 };
+
+    for (const item of queued) {
+      const { companyId, workOrderId, job } = item;
+      if (job.status !== "queued") {
+        result.skipped += 1;
+        continue;
+      }
+
+      // Fail-closed: never rematerialize IE-only jobs into WorkOrderInvoiceExportJob.
+      const modernRaw = await getModernInvoiceExportJob(companyId, workOrderId, job.jobId);
+      const modernJob = modernRaw ? asJob(modernRaw) : null;
+      if (!modernJob) {
+        result.skipped += 1;
+        continue;
+      }
+
+      // Atomic claim prevents overlapping/retried cron invocations from submitting
+      // the same invoice more than once.
+      const claim = await db.workOrderInvoiceExportJob.updateMany({
+        where: { id: modernJob.jobId, company_id: companyId, status: "queued" },
+        data: { status: "processing", processing_started_at: new Date() },
+      });
+      if (claim.count === 0) {
+        result.skipped += 1;
+        continue;
+      }
+
+      try {
+        const workOrder = await db.workOrder.findFirst({
+          where: { deleted_at: null, id: workOrderId, company_id: companyId, property: { deleted_at: null } },
+          select: {
+            id: true,
+            title: true,
+            property: { select: { name: true, address: true, postal_code: true, city: true } },
+            unit: { select: { designation: true } },
+            company: { select: { name: true, org_number: true } },
+          },
+        });
+
+        if (!workOrder) throw new Error("Arbetsordern hittades inte längre");
+        if (!modernJob.invoiceVersionId) throw new Error("Exportjobbet saknar fakturaversion");
+        const modernInvoice = await getModernInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
+        if (!modernInvoice) {
+          const legacyInvoice = await getInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
+          throw new Error(
+            legacyInvoice
+              ? "Faktureringsunderlaget finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceDraft innan export."
+              : "Den kopplade fakturaversionen hittades inte",
+          );
+        }
+        const invoice = asInvoice(modernInvoice);
+        if (!invoice) throw new Error("Den kopplade fakturaversionen hittades inte");
+        if (!["ready", "exported"].includes(invoice.status)) {
+          throw new Error("Faktureringsunderlaget måste vara markerat som redo före export");
+        }
+
+        const payload = exportPayload({ job: modernJob, invoice, workOrder });
+        const providerResult = await send(modernJob, payload);
+        await saveJob(companyId, modernJob, "sent", {
+          sentAt: new Date().toISOString(),
+          providerStatus: providerResult.status,
+          externalId: providerResult.externalId,
+          providerResponse: providerResult.response,
+          error: null,
+        });
+        result.sent += 1;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Okänt integrationsfel";
+        await saveJob(companyId, modernJob, "failed", {
+          failedAt: new Date().toISOString(),
+          error: message.slice(0, 2000),
+        });
+        result.failed += 1;
+      }
+    }
+
+    const context = observability.elapsed({
+      job: JOB_NAME,
+      queued: result.queued,
+      sent: result.sent,
+      failed: result.failed,
+      skipped: result.skipped,
+    });
+    if (result.failed > 0) {
+      observability.logger.warn("invoice export cron partially failed", {
+        event: "cron.partial_failure",
+        ...context,
+      });
+    } else {
+      observability.logger.info("invoice export cron completed", {
+        event: "cron.completed",
+        ...context,
+      });
+    }
+
+    return observability.correlate(NextResponse.json(result, { headers: SUCCESS_HEADERS }));
+  } catch (error) {
+    observability.logger.error("invoice export cron failed", error, observability.elapsed({
+      event: "cron.failed",
+      job: JOB_NAME,
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Cron-körningen misslyckades",
+      requestId: observability.requestId,
+    });
+  }
 }
