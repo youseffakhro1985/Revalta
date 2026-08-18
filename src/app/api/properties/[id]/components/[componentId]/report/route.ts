@@ -109,7 +109,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         })
       : [];
     const safeComponent = includeFinance ? component : { ...component, replacement_value: null };
-    const safeCosts = includeFinance ? costs : costs.map((item) => ({ ...item, amount_ex_vat: null }));
+    const safeCosts: Array<Record<string, unknown>> = includeFinance
+      ? costs
+      : costs.map((item): Record<string, unknown> => ({ ...item, amount_ex_vat: null }));
     const totalCostExVat = includeFinance ? costs.reduce((sum, row) => sum + Number(row.amount_ex_vat || 0), 0) : null;
 
     const format = new URL(request.url).searchParams.get("format") || "json";
