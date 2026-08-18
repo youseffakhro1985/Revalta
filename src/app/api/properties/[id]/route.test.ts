@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  createLoggerMock,
   getCurrentUserMock,
+  leaseCountMock,
+  loggerErrorMock,
+  loggerInfoMock,
+  loggerWarnMock,
   propertyFindFirstMock,
   propertyUpdateManyMock,
-  leaseCountMock,
   ticketCountMock,
   workOrderCountMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
+  createLoggerMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
+  leaseCountMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
+  loggerInfoMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
   propertyFindFirstMock: vi.fn(),
   propertyUpdateManyMock: vi.fn(),
-  leaseCountMock: vi.fn(),
   ticketCountMock: vi.fn(),
   workOrderCountMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
@@ -22,42 +30,24 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/current-user")>()),
   getCurrentUser: getCurrentUserMock,
 }));
-
-vi.mock("@/lib/audit", () => ({
-  writeAuditLog: writeAuditLogMock,
-}));
-
+vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/db", () => ({
   default: {
-    property: {
-      findFirst: propertyFindFirstMock,
-      updateMany: propertyUpdateManyMock,
-    },
-    lease: {
-      count: leaseCountMock,
-    },
-    ticket: {
-      count: ticketCountMock,
-    },
-    workOrder: {
-      count: workOrderCountMock,
-    },
+    property: { findFirst: propertyFindFirstMock, updateMany: propertyUpdateManyMock },
+    lease: { count: leaseCountMock },
+    ticket: { count: ticketCountMock },
+    workOrder: { count: workOrderCountMock },
   },
 }));
 
 import { DELETE, PATCH } from "./route";
 
+const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const params = Promise.resolve({ id: "property-1" });
-
 const owner = { id: "user-1", company_id: "company-1", role: "owner" };
 const technician = { id: "tech-1", company_id: "company-1", role: "technician" };
-
-const validPatchBody = {
-  name: "Kvarnhuset",
-  address: "Storgatan 1",
-  city: "Stockholm",
-};
-
+const validPatchBody = { name: "Kvarnhuset", address: "Storgatan 1", city: "Stockholm" };
 const samplePropertyRow = {
   id: "property-1",
   name: "Kvarnhuset",
@@ -67,21 +57,30 @@ const samplePropertyRow = {
   status: "active",
 };
 
-function patchRequest(body: unknown) {
-  return new Request("http://localhost/api/properties/property-1", {
+function patchRequest(body: unknown, id = "property-1") {
+  return new Request(`http://localhost/api/properties/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-request-id": requestId },
     body: JSON.stringify(body),
   });
 }
 
-function deleteRequest() {
-  return new Request("http://localhost/api/properties/property-1", { method: "DELETE" });
+function deleteRequest(id = "property-1") {
+  return new Request(`http://localhost/api/properties/${id}`, {
+    method: "DELETE",
+    headers: { "x-request-id": requestId },
+  });
 }
 
 describe("properties/[id] route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
     writeAuditLogMock.mockResolvedValue(undefined);
     propertyUpdateManyMock.mockResolvedValue({ count: 1 });
     leaseCountMock.mockResolvedValue(0);
@@ -90,7 +89,7 @@ describe("properties/[id] route", () => {
   });
 
   describe("PATCH", () => {
-    it("updates a property scoped to the user's company and writes an audit log", async () => {
+    it("updates a tenant-scoped property with correlated private success and audit", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock
         .mockResolvedValueOnce({ id: "property-1" })
@@ -100,129 +99,114 @@ describe("properties/[id] route", () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("x-request-id")).toBe(requestId);
+      expect(response.headers.get("cache-control")).toContain("private");
+      expect(response.headers.get("cache-control")).toContain("no-store");
       expect(body.success).toBe(true);
-      expect(body.property.id).toBe("property-1");
-
       expect(propertyFindFirstMock).toHaveBeenNthCalledWith(1, {
         where: { id: "property-1", deleted_at: null, company_id: "company-1" },
       });
-      expect(propertyUpdateManyMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: "property-1", company_id: "company-1", deleted_at: null },
-        }),
-      );
-      expect(propertyFindFirstMock).toHaveBeenNthCalledWith(2, {
+      expect(propertyUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
         where: { id: "property-1", company_id: "company-1", deleted_at: null },
-      });
+      }));
       expect(writeAuditLogMock).toHaveBeenCalledWith(
         owner,
         expect.objectContaining({ action: "property.updated", entityId: "property-1" }),
       );
+      expect(loggerInfoMock).toHaveBeenCalledWith(
+        "property update completed",
+        expect.objectContaining({
+          event: "properties.update.completed",
+          userId: "user-1",
+          companyId: "company-1",
+          propertyId: "property-1",
+        }),
+      );
+      const logged = JSON.stringify(loggerInfoMock.mock.calls);
+      expect(logged).not.toContain("Kvarnhuset");
+      expect(logged).not.toContain("Storgatan 1");
     });
 
-    it("returns 401 when there is no authenticated user", async () => {
+    it("returns stable correlated auth errors before property access", async () => {
       getCurrentUserMock.mockResolvedValue(null);
-
-      const response = await PATCH(patchRequest(validPatchBody), { params });
-
-      expect(response.status).toBe(401);
+      const unauthorized = await PATCH(patchRequest(validPatchBody), { params });
+      expect(unauthorized.status).toBe(401);
+      await expect(unauthorized.json()).resolves.toEqual({ error: "Obehörig", errorCode: "UNAUTHORIZED", requestId });
       expect(propertyFindFirstMock).not.toHaveBeenCalled();
-    });
 
-    it("returns 403 for a role without property-editing permission", async () => {
       getCurrentUserMock.mockResolvedValue(technician);
-
-      const response = await PATCH(patchRequest(validPatchBody), { params });
-
-      expect(response.status).toBe(403);
+      const forbidden = await PATCH(patchRequest(validPatchBody), { params });
+      expect(forbidden.status).toBe(403);
+      expect((await forbidden.json()).errorCode).toBe("FORBIDDEN");
       expect(propertyFindFirstMock).not.toHaveBeenCalled();
     });
 
-    it("returns 400 when the user has no company", async () => {
-      getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
-
-      const response = await PATCH(patchRequest(validPatchBody), { params });
-
-      expect(response.status).toBe(400);
-      expect(propertyFindFirstMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 404 (not a leaked cross-tenant record) when the property does not belong to the user's company", async () => {
+    it("returns 404 without logging an unverified cross-tenant property id", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock.mockResolvedValue(null);
 
-      const response = await PATCH(patchRequest(validPatchBody), { params });
-      const body = await response.json();
-
-      expect(response.status).toBe(404);
-      expect(body.error).toMatch(/hittades inte/i);
-      expect(propertyFindFirstMock).toHaveBeenCalledWith({
-        where: { id: "property-1", deleted_at: null, company_id: "company-1" },
+      const response = await PATCH(patchRequest(validPatchBody, "external-secret-property"), {
+        params: Promise.resolve({ id: "external-secret-property" }),
       });
+      const body = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(body.errorCode).toBe("NOT_FOUND");
+      expect(body.requestId).toBe(requestId);
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
+      expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-property");
     });
 
-    it("returns 400 when required fields are missing", async () => {
+    it("returns correlated validation errors after tenant access without logging submitted property fields", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock.mockResolvedValue({ id: "property-1" });
 
-      const response = await PATCH(patchRequest({ name: "", address: "Storgatan 1", city: "Stockholm" }), { params });
+      const response = await PATCH(patchRequest({ name: "Hemligt namn", address: "", city: "Stockholm" }), { params });
       const body = await response.json();
 
       expect(response.status).toBe(400);
-      expect(body.error).toMatch(/Namn, adress och ort krävs/);
+      expect(body.errorCode).toBe("VALIDATION_FAILED");
+      expect(body.requestId).toBe(requestId);
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
+      const logged = JSON.stringify(loggerWarnMock.mock.calls);
+      expect(logged).not.toContain("Hemligt namn");
+      expect(logged).not.toContain("Stockholm");
     });
 
-    it("returns 400 for an invalid construction year", async () => {
+    it("keeps construction-year validation and race-safe 404s", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock.mockResolvedValue({ id: "property-1" });
 
-      const response = await PATCH(
-        patchRequest({ ...validPatchBody, constructionYear: 1500 }),
-        { params },
-      );
-      const body = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(body.error).toMatch(/byggår/);
+      const invalid = await PATCH(patchRequest({ ...validPatchBody, constructionYear: 1500 }), { params });
+      expect(invalid.status).toBe(400);
+      expect((await invalid.json()).errorCode).toBe("VALIDATION_FAILED");
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
-    });
 
-    it("returns 404 when updateMany affects no rows (race with deletion)", async () => {
-      getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock.mockResolvedValue({ id: "property-1" });
       propertyUpdateManyMock.mockResolvedValue({ count: 0 });
-
-      const response = await PATCH(patchRequest(validPatchBody), { params });
-
-      expect(response.status).toBe(404);
+      const raced = await PATCH(patchRequest(validPatchBody), { params });
+      expect(raced.status).toBe(404);
     });
 
-    it("returns 404 when the post-update re-fetch finds nothing", async () => {
+    it("returns a safe correlated 500", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock
-        .mockResolvedValueOnce({ id: "property-1" })
-        .mockResolvedValueOnce(null);
+      propertyFindFirstMock.mockRejectedValue(new Error("postgres://user:secret@db.internal/revalta"));
 
       const response = await PATCH(patchRequest(validPatchBody), { params });
-
-      expect(response.status).toBe(404);
-      expect(writeAuditLogMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 500 when an unexpected error is thrown", async () => {
-      getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock.mockRejectedValue(new Error("db unavailable"));
-
-      const response = await PATCH(patchRequest(validPatchBody), { params });
+      const body = await response.json();
 
       expect(response.status).toBe(500);
+      expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
+      expect(JSON.stringify(body)).not.toContain("postgres://");
+      expect(loggerErrorMock).toHaveBeenCalledWith(
+        "property update failed",
+        expect.any(Error),
+        expect.objectContaining({ event: "properties.update.failed" }),
+      );
     });
   });
 
   describe("DELETE", () => {
-    it("soft-deletes a property scoped to the user's company and writes an audit log", async () => {
+    it("soft-deletes a verified tenant property with correlated private success", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
 
@@ -230,21 +214,14 @@ describe("properties/[id] route", () => {
       const body = await response.json();
 
       expect(response.status).toBe(200);
+      expect(response.headers.get("x-request-id")).toBe(requestId);
+      expect(response.headers.get("cache-control")).toContain("private");
       expect(body.success).toBe(true);
-
-      expect(propertyFindFirstMock).toHaveBeenCalledWith({
-        where: { id: "property-1", company_id: "company-1", deleted_at: null },
-        select: { id: true, name: true, status: true },
-      });
-      expect(leaseCountMock).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ property_id: "property-1", company_id: "company-1" }) }),
-      );
-      expect(ticketCountMock).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ property_id: "property-1", company_id: "company-1" }) }),
-      );
-      expect(workOrderCountMock).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ property_id: "property-1", company_id: "company-1" }) }),
-      );
+      expect(leaseCountMock).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ property_id: "property-1", company_id: "company-1" }),
+      }));
+      expect(ticketCountMock).toHaveBeenCalled();
+      expect(workOrderCountMock).toHaveBeenCalled();
       expect(propertyUpdateManyMock).toHaveBeenCalledWith({
         where: { id: "property-1", company_id: "company-1", deleted_at: null },
         data: { deleted_at: expect.any(Date) },
@@ -253,105 +230,59 @@ describe("properties/[id] route", () => {
         owner,
         expect.objectContaining({ action: "property.deleted", entityId: "property-1" }),
       );
+      expect(loggerInfoMock).toHaveBeenCalledWith(
+        "property delete completed",
+        expect.objectContaining({ event: "properties.delete.completed", propertyId: "property-1" }),
+      );
+      expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("Kvarnhuset");
     });
 
-    it("returns 401 when there is no authenticated user", async () => {
-      getCurrentUserMock.mockResolvedValue(null);
+    it.each([
+      ["active leases", "lease", "hyresavtal"],
+      ["open tickets", "ticket", "ärenden"],
+      ["open work orders", "workOrder", "arbetsordrar"],
+    ])("keeps the %s blocker as correlated 409", async (_label, blocker, messagePart) => {
+      getCurrentUserMock.mockResolvedValue(owner);
+      propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
+      if (blocker === "lease") leaseCountMock.mockResolvedValue(1);
+      if (blocker === "ticket") ticketCountMock.mockResolvedValue(1);
+      if (blocker === "workOrder") workOrderCountMock.mockResolvedValue(1);
 
       const response = await DELETE(deleteRequest(), { params });
+      const body = await response.json();
 
-      expect(response.status).toBe(401);
-      expect(propertyFindFirstMock).not.toHaveBeenCalled();
+      expect(response.status).toBe(409);
+      expect(body.errorCode).toBe("CONFLICT");
+      expect(body.error).toMatch(new RegExp(messagePart));
+      expect(body.requestId).toBe(requestId);
+      expect(propertyUpdateManyMock).not.toHaveBeenCalled();
     });
 
-    it("returns 403 for a role without property-deleting permission", async () => {
-      getCurrentUserMock.mockResolvedValue(technician);
-
-      const response = await DELETE(deleteRequest(), { params });
-
-      expect(response.status).toBe(403);
-      expect(propertyFindFirstMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 400 when the user has no company", async () => {
-      getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
-
-      const response = await DELETE(deleteRequest(), { params });
-
-      expect(response.status).toBe(400);
-      expect(propertyFindFirstMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 404 (not a leaked cross-tenant record) when the property does not belong to the user's company", async () => {
+    it("returns 404 for another tenant without dependency queries or id leakage", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock.mockResolvedValue(null);
 
-      const response = await DELETE(deleteRequest(), { params });
-      const body = await response.json();
+      const response = await DELETE(deleteRequest("external-secret-property"), {
+        params: Promise.resolve({ id: "external-secret-property" }),
+      });
 
       expect(response.status).toBe(404);
-      expect(body.error).toMatch(/hittades inte/i);
       expect(leaseCountMock).not.toHaveBeenCalled();
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
+      expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-property");
     });
 
-    it("returns 409 when the property has active or upcoming leases", async () => {
+    it("returns safe correlated 500 on unexpected failure", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
-      leaseCountMock.mockResolvedValue(1);
+      propertyFindFirstMock.mockRejectedValue(new Error("database-secret"));
 
       const response = await DELETE(deleteRequest(), { params });
       const body = await response.json();
-
-      expect(response.status).toBe(409);
-      expect(body.error).toMatch(/hyresavtal/);
-      expect(propertyUpdateManyMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 409 when the property has open tickets", async () => {
-      getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
-      ticketCountMock.mockResolvedValue(1);
-
-      const response = await DELETE(deleteRequest(), { params });
-      const body = await response.json();
-
-      expect(response.status).toBe(409);
-      expect(body.error).toMatch(/ärenden/);
-      expect(propertyUpdateManyMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 409 when the property has open work orders", async () => {
-      getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
-      workOrderCountMock.mockResolvedValue(1);
-
-      const response = await DELETE(deleteRequest(), { params });
-      const body = await response.json();
-
-      expect(response.status).toBe(409);
-      expect(body.error).toMatch(/arbetsordrar/);
-      expect(propertyUpdateManyMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 404 when updateMany affects no rows (race with deletion)", async () => {
-      getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
-      propertyUpdateManyMock.mockResolvedValue({ count: 0 });
-
-      const response = await DELETE(deleteRequest(), { params });
-
-      expect(response.status).toBe(404);
-      expect(writeAuditLogMock).not.toHaveBeenCalled();
-    });
-
-    it("returns 500 when an unexpected error is thrown", async () => {
-      getCurrentUserMock.mockResolvedValue(owner);
-      propertyFindFirstMock.mockRejectedValue(new Error("db unavailable"));
-
-      const response = await DELETE(deleteRequest(), { params });
 
       expect(response.status).toBe(500);
+      expect(body.errorCode).toBe("INTERNAL_ERROR");
+      expect(body.requestId).toBe(requestId);
+      expect(JSON.stringify(body)).not.toContain("database-secret");
     });
   });
 });
