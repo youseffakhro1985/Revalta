@@ -53,9 +53,9 @@ import { POST as postComponentManage } from "./manage/route";
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const owner = { id: "owner-1", company_id: "company-1", role: "owner" };
 
-function jsonRequest(url: string, body: Record<string, unknown>) {
+function jsonRequest(url: string, body: Record<string, unknown>, method: "POST" | "PATCH" = "POST") {
   return new Request(url, {
-    method: "POST",
+    method,
     headers: { "content-type": "application/json", "x-request-id": requestId },
     body: JSON.stringify(body),
   });
@@ -67,6 +67,12 @@ function componentParams(propertyId = "property-1", componentId = "asset-1") {
 
 function propertyParams(propertyId = "property-1") {
   return { params: Promise.resolve({ id: propertyId }) };
+}
+
+function requireResponse(response: Response | undefined): Response {
+  expect(response).toBeDefined();
+  if (!response) throw new Error("Route handler returned no response");
+  return response;
 }
 
 describe("secure component write contracts", () => {
@@ -89,16 +95,16 @@ describe("secure component write contracts", () => {
   });
 
   it("correlates component detail updates and excludes financial values from audit metadata", async () => {
-    const response = await patchComponent(
+    const response = requireResponse(await patchComponent(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1", {
         name: "Ventilationsaggregat",
         status: "active",
         criticality: "high",
         replacement_value: 987654,
         responsible_supplier: "Leverantör Hemlig AB",
-      }),
+      }, "PATCH"),
       componentParams(),
-    );
+    ));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-request-id")).toBe(requestId);
@@ -110,45 +116,45 @@ describe("secure component write contracts", () => {
     expect(JSON.stringify(metadata)).not.toContain("Leverantör Hemlig AB");
   });
 
-  it("returns a known validation error as correlated 400 but never turns an internal detail failure into raw 400 text", async () => {
-    const invalid = await patchComponent(
+  it("keeps known detail validation public but masks unexpected database failures", async () => {
+    const invalid = requireResponse(await patchComponent(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1", {
         name: "Ventilation",
         status: "active",
         criticality: "normal",
         installation_year: 1200,
-      }),
+      }, "PATCH"),
       componentParams(),
-    );
+    ));
     expect(invalid.status).toBe(400);
     await expect(invalid.json()).resolves.toEqual({ error: "Ogiltigt heltal", errorCode: "VALIDATION_FAILED", requestId });
 
     queryRawMock.mockRejectedValueOnce(new Error("postgres://user:secret@db.internal/revalta"));
-    const failed = await patchComponent(
+    const failed = requireResponse(await patchComponent(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1", {
         name: "Ventilation",
         status: "active",
         criticality: "normal",
-      }),
+      }, "PATCH"),
       componentParams(),
-    );
-    const failedBody = await failed.json();
+    ));
+    const body = await failed.json();
     expect(failed.status).toBe(500);
-    expect(failedBody).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
-    expect(JSON.stringify(failedBody)).not.toContain("postgres://");
+    expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
+    expect(JSON.stringify(body)).not.toContain("postgres://");
     expect(loggerErrorMock).toHaveBeenCalled();
   });
 
-  it("does not log an unverified cross-tenant property id for detail mutations", async () => {
+  it("does not log unverified cross-tenant identifiers for detail mutations", async () => {
     propertyFindFirstMock.mockResolvedValueOnce(null);
-    const response = await patchComponent(
+    const response = requireResponse(await patchComponent(
       jsonRequest("https://www.revalta.se/api/properties/external-secret-property/components/external-component", {
         name: "Ventilation",
         status: "active",
         criticality: "normal",
-      }),
+      }, "PATCH"),
       componentParams("external-secret-property", "external-component"),
-    );
+    ));
 
     expect(response.status).toBe(404);
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-property");
@@ -205,7 +211,7 @@ describe("secure component write contracts", () => {
     expect(JSON.stringify(body)).not.toContain("internal-secret");
   });
 
-  it("returns correlated validation errors for component actions and safe 500 for unexpected insert failures", async () => {
+  it("returns correlated action validation errors and safe 500 for unexpected insert failures", async () => {
     const invalid = await postComponentAction(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
         action: "event",
@@ -216,9 +222,7 @@ describe("secure component write contracts", () => {
     expect(invalid.status).toBe(400);
     await expect(invalid.json()).resolves.toEqual({ error: "Ogiltig händelsetyp", errorCode: "VALIDATION_FAILED", requestId });
 
-    queryRawMock
-      .mockResolvedValueOnce([{ id: "asset-1" }])
-      .mockRejectedValueOnce(new Error("postgres internal stack secret"));
+    queryRawMock.mockResolvedValueOnce([{ id: "asset-1" }]).mockRejectedValueOnce(new Error("postgres internal stack secret"));
     const failed = await postComponentAction(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
         action: "event",
@@ -234,28 +238,28 @@ describe("secure component write contracts", () => {
     expect(JSON.stringify(body)).not.toContain("stack secret");
   });
 
-  it("correlates maintenance settings validation and masks raw-query failures", async () => {
-    const invalid = await patchMaintenance(
+  it("correlates maintenance validation and masks raw-query failures", async () => {
+    const invalid = requireResponse(await patchMaintenance(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/maintenance-settings", {
         serviceIntervalMonths: 0,
         serviceLeadDays: 30,
         autoCreateServiceWorkOrders: true,
-      }),
+      }, "PATCH"),
       componentParams(),
-    );
+    ));
     expect(invalid.status).toBe(400);
     expect((await invalid.json()).errorCode).toBe("VALIDATION_FAILED");
 
     queryRawMock.mockRejectedValueOnce(new Error("db.internal:5432 secret"));
-    const failed = await patchMaintenance(
+    const failed = requireResponse(await patchMaintenance(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/maintenance-settings", {
         serviceIntervalMonths: 12,
         serviceLeadDays: 30,
         autoCreateServiceWorkOrders: true,
         nextServiceAt: "2026-12-01",
-      }),
+      }, "PATCH"),
       componentParams(),
-    );
+    ));
     const body = await failed.json();
     expect(failed.status).toBe(500);
     expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
