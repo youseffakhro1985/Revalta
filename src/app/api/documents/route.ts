@@ -378,45 +378,43 @@ export async function POST(request: Request) {
       dataUrl = `data:${validation.contentType};base64,${bytes.toString("base64")}`;
     }
 
-    const document = await db.managedDocument.create({
-      data: {
-        company_id: user.company_id,
-        property_id: resolvedPropertyId,
-        unit_id: resolvedUnitId,
-        lease_id: resolvedLeaseId,
-        name,
-        category,
-        visibility,
-        valid_until: parseOptionalDate(validUntil),
-        file_name: validation.fileName,
-        content_type: validation.contentType,
-        size_bytes: validation.sizeBytes,
-        storage_url: storageUrl,
-        data_url: dataUrl,
-        lifecycle_state: "active",
-        created_by_id: user.id,
-      },
-      select: { id: true, created_at: true },
-    });
+    const document = await db.$transaction(async (tx) => {
+      const created = await tx.managedDocument.create({
+        data: {
+          company_id: user.company_id,
+          property_id: resolvedPropertyId,
+          unit_id: resolvedUnitId,
+          lease_id: resolvedLeaseId,
+          name,
+          category,
+          visibility,
+          valid_until: parseOptionalDate(validUntil),
+          file_name: validation.fileName,
+          content_type: validation.contentType,
+          size_bytes: validation.sizeBytes,
+          storage_url: storageUrl,
+          data_url: dataUrl,
+          lifecycle_state: "active",
+          created_by_id: user.id,
+        },
+        select: { id: true, created_at: true },
+      });
 
-    await writeAuditLog(user, {
-      entityType: "document",
-      entityId: document.id,
-      action: "document.created",
-      metadata: {
-        schemaVersion: 5,
-        name,
-        category,
-        visibility,
-        propertyId: resolvedPropertyId,
-        unitId: resolvedUnitId,
-        leaseId: resolvedLeaseId,
-        validUntil: validUntil || null,
-        fileName: validation.fileName,
-        contentType: validation.contentType,
-        sizeBytes: validation.sizeBytes,
-        storage: "ManagedDocument",
-      },
+      await writeAuditLog(user, {
+        entityType: "document",
+        entityId: created.id,
+        action: "document.created",
+        metadata: {
+          schemaVersion: 6,
+          storage: "ManagedDocument",
+          visibility,
+          hasPropertyScope: Boolean(resolvedPropertyId),
+          hasUnitScope: Boolean(resolvedUnitId),
+          hasLeaseScope: Boolean(resolvedLeaseId),
+        },
+      }, tx);
+
+      return created;
     });
 
     observability.logger.info("document create completed", observability.elapsed({
