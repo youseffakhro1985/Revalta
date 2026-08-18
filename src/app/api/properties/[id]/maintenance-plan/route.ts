@@ -1,8 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { canViewFinanceData, canViewOperations, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
+import { createRouteObservability } from "@/lib/route-observability";
 
 type PlanRow = {
   id: string;
@@ -38,6 +40,13 @@ type ActionRow = {
   technical_asset_name: string | null;
 };
 
+const ROUTE = "/api/properties/[id]/maintenance-plan";
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 const PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
 const RISKS = new Set(["low", "medium", "high", "critical"]);
 const ACTION_STATUSES = new Set(["planned", "approved", "in_progress", "completed", "deferred", "cancelled"]);
@@ -99,6 +108,20 @@ function calculateForecast(plan: PlanRow, actions: ActionRow[]) {
   };
 }
 
+function rejectRead(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("maintenance plan read rejected", observability.elapsed({ event: options.event, ...options.context }));
+  return apiErrorResponse({ status: options.status, code: options.code, message: options.message, requestId: observability.requestId });
+}
+
 async function loadProperty(companyId: string, id: string, user: Awaited<ReturnType<typeof getCurrentUser>>) {
   return db.property.findFirst({
     where: { id, deleted_at: null, ...tenantWhere(user!) },
@@ -110,62 +133,85 @@ async function loadProperty(companyId: string, id: string, user: Awaited<ReturnT
   });
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const observability = createRouteObservability(request, ROUTE);
 
-  const { id } = await params;
-  const property = await loadProperty(user.company_id, id, user);
-  if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return rejectRead(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "maintenance_plan.read.unauthorized" });
+    }
+    if (!user.company_id) {
+      return rejectRead(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "maintenance_plan.read.missing_company", context: { userId: user.id } });
+    }
 
-  const plans = await db.$queryRaw<PlanRow[]>(Prisma.sql`
-    SELECT p."id", p."name", p."version", p."status", p."base_year", p."horizon_years",
-           p."annual_index_rate"::double precision AS "annual_index_rate", p."summary", p."assumptions",
-           p."approved_at", p."created_at"
-    FROM "MaintenancePlan" p
-    WHERE p."company_id" = ${user.company_id} AND p."property_id" = ${id}
-    ORDER BY CASE p."status" WHEN 'active' THEN 1 WHEN 'draft' THEN 2 ELSE 3 END, p."version" DESC
-  `);
+    const { id } = await params;
+    const property = await loadProperty(user.company_id, id, user);
+    if (!property) {
+      return rejectRead(observability, { status: 404, code: API_ERROR_CODES.notFound, message: "Fastigheten hittades inte", event: "maintenance_plan.read.property_not_found", context: { userId: user.id, companyId: user.company_id } });
+    }
 
-  const activePlan = plans.find((plan) => plan.status === "active") || plans[0] || null;
-  let actions: ActionRow[] = [];
-  if (activePlan) {
-    actions = await db.$queryRaw<ActionRow[]>(Prisma.sql`
-      SELECT a."id", a."maintenance_plan_id", a."category", a."title", a."description", a."scope",
-             a."planned_year", a."recurrence_years", a."technical_lifetime_years",
-             a."estimated_cost"::double precision AS "estimated_cost",
-             a."annual_index_rate"::double precision AS "annual_index_rate", a."priority", a."risk",
-             a."status", a."contractor", b."name" AS "building_name", t."name" AS "technical_asset_name"
-      FROM "MaintenanceAction" a
-      LEFT JOIN "Building" b ON b."id" = a."building_id"
-      LEFT JOIN "PropertyTechnicalAsset" t ON t."id" = a."technical_asset_id"
-      WHERE a."company_id" = ${user.company_id} AND a."property_id" = ${id}
-        AND a."maintenance_plan_id" = ${activePlan.id}
-      ORDER BY a."planned_year" ASC,
-               CASE a."priority" WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
-               a."title" ASC
+    const plans = await db.$queryRaw<PlanRow[]>(Prisma.sql`
+      SELECT p."id", p."name", p."version", p."status", p."base_year", p."horizon_years",
+             p."annual_index_rate"::double precision AS "annual_index_rate", p."summary", p."assumptions",
+             p."approved_at", p."created_at"
+      FROM "MaintenancePlan" p
+      WHERE p."company_id" = ${user.company_id} AND p."property_id" = ${property.id}
+      ORDER BY CASE p."status" WHEN 'active' THEN 1 WHEN 'draft' THEN 2 ELSE 3 END, p."version" DESC
     `);
-  }
 
-  const assets = await db.$queryRaw<{ id: string; name: string }[]>(Prisma.sql`
-    SELECT "id", "name" FROM "PropertyTechnicalAsset"
-    WHERE "company_id" = ${user.company_id} AND "property_id" = ${id}
-    ORDER BY "name" ASC
-  `);
+    const activePlan = plans.find((plan) => plan.status === "active") || plans[0] || null;
+    let actions: ActionRow[] = [];
+    if (activePlan) {
+      actions = await db.$queryRaw<ActionRow[]>(Prisma.sql`
+        SELECT a."id", a."maintenance_plan_id", a."category", a."title", a."description", a."scope",
+               a."planned_year", a."recurrence_years", a."technical_lifetime_years",
+               a."estimated_cost"::double precision AS "estimated_cost",
+               a."annual_index_rate"::double precision AS "annual_index_rate", a."priority", a."risk",
+               a."status", a."contractor", b."name" AS "building_name", t."name" AS "technical_asset_name"
+        FROM "MaintenanceAction" a
+        LEFT JOIN "Building" b ON b."id" = a."building_id"
+        LEFT JOIN "PropertyTechnicalAsset" t ON t."id" = a."technical_asset_id"
+        WHERE a."company_id" = ${user.company_id} AND a."property_id" = ${property.id}
+          AND a."maintenance_plan_id" = ${activePlan.id}
+        ORDER BY a."planned_year" ASC,
+                 CASE a."priority" WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 ELSE 4 END,
+                 a."title" ASC
+      `);
+    }
 
-  const includeFinance = canViewFinanceData(user.role);
+    const assets = await db.$queryRaw<{ id: string; name: string }[]>(Prisma.sql`
+      SELECT "id", "name" FROM "PropertyTechnicalAsset"
+      WHERE "company_id" = ${user.company_id} AND "property_id" = ${property.id}
+      ORDER BY "name" ASC
+    `);
 
-  return NextResponse.json({
-    property,
-    plans,
-    activePlan,
-    actions: includeFinance
+    const includeFinance = canViewFinanceData(user.role);
+    const safePlans = includeFinance
+      ? plans
+      : plans.map((plan) => ({ ...plan, annual_index_rate: null }));
+    const safeActivePlan = !activePlan
+      ? null
+      : includeFinance
+        ? activePlan
+        : { ...activePlan, annual_index_rate: null };
+    const safeActions = includeFinance
       ? actions
-      : actions.map((action) => ({ ...action, estimated_cost: null })),
-    assets,
-    forecast: includeFinance ? (activePlan ? calculateForecast(activePlan, actions) : null) : null,
-  });
+      : actions.map((action) => ({ ...action, estimated_cost: null, annual_index_rate: null }));
+
+    observability.logger.info("maintenance plan read completed", observability.elapsed({ event: "maintenance_plan.read.completed", userId: user.id, companyId: user.company_id, propertyId: property.id, includeFinance }));
+    return observability.correlate(NextResponse.json({
+      property,
+      plans: safePlans,
+      activePlan: safeActivePlan,
+      actions: safeActions,
+      assets,
+      forecast: includeFinance ? (activePlan ? calculateForecast(activePlan, actions) : null) : null,
+    }, { headers: SUCCESS_HEADERS }));
+  } catch (error) {
+    observability.logger.error("maintenance plan read failed", error, observability.elapsed({ event: "maintenance_plan.read.failed" }));
+    return apiErrorResponse({ status: 500, code: API_ERROR_CODES.internalError, message: "Internt serverfel", requestId: observability.requestId });
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
