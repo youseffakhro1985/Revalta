@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-  getCurrentUserMock,
+  createLoggerMock,
   findAccessibleResidentPortalTicketMock,
+  getCurrentUserMock,
+  loggerErrorMock,
+  loggerInfoMock,
+  loggerWarnMock,
 } = vi.hoisted(() => ({
-  getCurrentUserMock: vi.fn(),
+  createLoggerMock: vi.fn(),
   findAccessibleResidentPortalTicketMock: vi.fn(),
+  getCurrentUserMock: vi.fn(),
+  loggerErrorMock: vi.fn(),
+  loggerInfoMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -18,8 +26,11 @@ vi.mock("@/lib/resident-portal-tickets", async (importOriginal) => ({
   findAccessibleResidentPortalTicket: findAccessibleResidentPortalTicketMock,
 }));
 
+vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
+
 import { GET } from "./route";
 
+const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const residentUser = {
   id: "user-resident",
   company_id: "company-1",
@@ -28,12 +39,24 @@ const residentUser = {
   name: "Boende Test",
 };
 
+function request(ticketId = "ticket-1") {
+  return new Request(`https://www.revalta.se/api/resident-portal/tickets/${ticketId}`, {
+    headers: { "x-request-id": requestId },
+  });
+}
+
 describe("resident-portal ticket detail route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
   });
 
-  it("returns a scoped ticket with public comments only", async () => {
+  it("returns a scoped ticket with public comments, request correlation and private caching", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
     findAccessibleResidentPortalTicketMock.mockResolvedValue({
       id: "ticket-1",
@@ -64,12 +87,15 @@ describe("resident-portal ticket detail route", () => {
       ],
     });
 
-    const response = await GET(new Request("https://www.revalta.se/api/resident-portal/tickets/ticket-1"), {
-      params: Promise.resolve({ id: "ticket-1" }),
-    });
+    const response = await GET(request(), { params: Promise.resolve({ id: "ticket-1" }) });
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("private");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+    expect(response.headers.get("vercel-cdn-cache-control")).toBe("no-store");
     expect(body.canComment).toBe(true);
     expect(body.ticket).toMatchObject({
       id: "ticket-1",
@@ -86,27 +112,74 @@ describe("resident-portal ticket detail route", () => {
       },
     ]);
     expect(findAccessibleResidentPortalTicketMock).toHaveBeenCalledWith(residentUser, "ticket-1");
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "resident ticket detail completed",
+      expect.objectContaining({
+        event: "resident_tickets.detail.completed",
+        userId: "user-resident",
+        companyId: "company-1",
+        ticketId: "ticket-1",
+        commentCount: 1,
+      }),
+    );
+    const logged = JSON.stringify(loggerInfoMock.mock.calls);
+    expect(logged).not.toContain("Trasig port");
+    expect(logged).not.toContain("Porten fastnar");
+    expect(logged).not.toContain("boende@exempel.se");
+    expect(logged).not.toContain("Vi tittar på det imorgon");
   });
 
-  it("returns 404 when the ticket is outside resident scope", async () => {
+  it("returns a correlated 404 without logging an unverified ticket id", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
     findAccessibleResidentPortalTicketMock.mockResolvedValue(null);
 
-    const response = await GET(new Request("https://www.revalta.se/api/resident-portal/tickets/ticket-x"), {
-      params: Promise.resolve({ id: "ticket-x" }),
+    const response = await GET(request("external-secret-ticket"), {
+      params: Promise.resolve({ id: "external-secret-ticket" }),
     });
+    const body = await response.json();
 
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({ error: "Ärendet hittades inte" });
+    expect(body).toEqual({
+      error: "Ärendet hittades inte",
+      errorCode: "NOT_FOUND",
+      requestId,
+    });
+    expect(response.headers.get("x-request-id")).toBe(requestId);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-ticket");
   });
 
-  it("rejects users without a company", async () => {
+  it("returns a stable correlated 401 for users without company membership", async () => {
     getCurrentUserMock.mockResolvedValue({ ...residentUser, company_id: null });
 
-    const response = await GET(new Request("https://www.revalta.se/api/resident-portal/tickets/ticket-1"), {
-      params: Promise.resolve({ id: "ticket-1" }),
-    });
+    const response = await GET(request(), { params: Promise.resolve({ id: "ticket-1" }) });
 
     expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "Obehörig",
+      errorCode: "UNAUTHORIZED",
+      requestId,
+    });
+    expect(findAccessibleResidentPortalTicketMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a safe correlated 500 without leaking internal dependency details", async () => {
+    getCurrentUserMock.mockRejectedValue(new Error("postgres://user:secret@db.internal/revalta"));
+
+    const response = await GET(request(), { params: Promise.resolve({ id: "ticket-1" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Internt serverfel",
+      errorCode: "INTERNAL_ERROR",
+      requestId,
+    });
+    expect(JSON.stringify(body)).not.toContain("postgres://");
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "resident ticket detail failed",
+      expect.any(Error),
+      expect.objectContaining({ event: "resident_tickets.detail.failed" }),
+    );
   });
 });
