@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import {
@@ -13,9 +14,15 @@ import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { loadLegacyRows } from "@/lib/dual-list";
 import { leaseHolderEmailMatch, reporterEmailMatch } from "@/lib/resident-portal-scope";
 import { normalizeEmail } from "@/lib/security";
-import { createLogger } from "@/lib/structured-logger";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/resident-portal" });
+const ROUTE = "/api/resident-portal";
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "heating", "access", "noise", "other"]);
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
@@ -54,13 +61,68 @@ function accessibleLeaseIdsForDocument(
   }).map((lease) => lease.id);
 }
 
-export async function GET() {
+function successResponse(
+  observability: ReturnType<typeof createRouteObservability>,
+  body: unknown,
+  init?: ResponseInit,
+) {
+  const headers = new Headers(init?.headers);
+  for (const [name, value] of Object.entries(SUCCESS_HEADERS)) headers.set(name, value);
+  return observability.correlate(NextResponse.json(body, { ...init, headers }));
+}
+
+function reject(
+  observability: ReturnType<typeof createRouteObservability>,
+  options: {
+    status: number;
+    code: Parameters<typeof apiErrorResponse>[0]["code"];
+    message: string;
+    event: string;
+    context?: Record<string, unknown>;
+  },
+) {
+  observability.logger.warn("resident portal request rejected", observability.elapsed({
+    event: options.event,
+    ...options.context,
+  }));
+  return apiErrorResponse({
+    status: options.status,
+    code: options.code,
+    message: options.message,
+    requestId: observability.requestId,
+  });
+}
+
+export async function GET(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "resident_portal.workspace.unauthorized",
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Användaren saknar organisation",
+        event: "resident_portal.workspace.missing_company",
+        context: { userId: user.id },
+      });
+    }
     if (!canAccessResidentPortal(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet till boendeportalen" }, { status: 403 });
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet till boendeportalen",
+        event: "resident_portal.workspace.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
     const residentView = isResident(user.role);
@@ -144,7 +206,7 @@ export async function GET() {
     ]);
 
     const modernIds = new Set(managedDocuments.map((row) => row.id));
-    const lifecycleMap = user.company_id && documentLogs.length > 0
+    const lifecycleMap = documentLogs.length > 0
       ? await getDocumentLifecycleMap(
           user.company_id,
           documentLogs.map((log) => log.id).filter((id) => !modernIds.has(id)),
@@ -226,34 +288,78 @@ export async function GET() {
       .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
       .slice(0, 500);
 
-    return NextResponse.json(
-      {
-        leases: leases.map((lease) => ({ ...lease, monthly_rent: Number(lease.monthly_rent) })),
-        tickets,
-        documents,
-        canManage: canManageResidentPortal(user.role),
-        canCreate: canCreateResidentPortalTicket(user.role),
-        isResident: residentView,
-      },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
+    observability.logger.info("resident portal workspace completed", observability.elapsed({
+      event: "resident_portal.workspace.completed",
+      userId: user.id,
+      companyId: user.company_id,
+      residentView,
+      leaseCount: leases.length,
+      ticketCount: tickets.length,
+      documentCount: documents.length,
+    }));
+
+    return successResponse(observability, {
+      leases: leases.map((lease) => ({ ...lease, monthly_rent: Number(lease.monthly_rent) })),
+      tickets,
+      documents,
+      canManage: canManageResidentPortal(user.role),
+      canCreate: canCreateResidentPortalTicket(user.role),
+      isResident: residentView,
+    });
   } catch (error) {
-    logger.error("Get resident portal workspace error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("resident portal workspace failed", error, observability.elapsed({
+      event: "resident_portal.workspace.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
 
 export async function POST(request: Request) {
+  const observability = createRouteObservability(request, ROUTE);
+
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    if (!user) {
+      return reject(observability, {
+        status: 401,
+        code: API_ERROR_CODES.unauthorized,
+        message: "Obehörig",
+        event: "resident_portal.ticket.unauthorized",
+      });
+    }
+    if (!user.company_id) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Användaren saknar organisation",
+        event: "resident_portal.ticket.missing_company",
+        context: { userId: user.id },
+      });
+    }
     if (!canCreateResidentPortalTicket(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet",
+        event: "resident_portal.ticket.forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
     }
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-    if (!body) return NextResponse.json({ error: "Ogiltig förfrågan" }, { status: 400 });
+    const validationFailure = (message: string, reason: string) => reject(observability, {
+      status: 400,
+      code: API_ERROR_CODES.validationFailed,
+      message,
+      event: "resident_portal.ticket.validation_failed",
+      context: { reason, userId: user.id, companyId: user.company_id },
+    });
+    if (!body) return validationFailure("Ogiltig förfrågan", "invalid_body");
 
     const leaseId = String(body.leaseId || "").trim();
     const subject = String(body.subject || "").trim();
@@ -262,9 +368,9 @@ export async function POST(request: Request) {
     const priority = String(body.priority || "normal").trim();
     const residentView = isResident(user.role);
 
-    if (!leaseId || !subject || message.length < 10) return NextResponse.json({ error: "Hyresavtal, ämne och en tydlig beskrivning krävs" }, { status: 400 });
-    if (subject.length > 200 || message.length > 5000) return NextResponse.json({ error: "Ämnet eller beskrivningen är för lång" }, { status: 400 });
-    if (!allowedCategories.has(category) || !allowedPriorities.has(priority)) return NextResponse.json({ error: "Ogiltig kategori eller prioritet" }, { status: 400 });
+    if (!leaseId || !subject || message.length < 10) return validationFailure("Hyresavtal, ämne och en tydlig beskrivning krävs", "missing_required_fields");
+    if (subject.length > 200 || message.length > 5000) return validationFailure("Ämnet eller beskrivningen är för lång", "field_too_long");
+    if (!allowedCategories.has(category) || !allowedPriorities.has(priority)) return validationFailure("Ogiltig kategori eller prioritet", "invalid_category_or_priority");
 
     const lease = await db.lease.findFirst({
       where: {
@@ -283,7 +389,15 @@ export async function POST(request: Request) {
         lease_holder: { select: { id: true, name: true, contact_name: true, email: true, phone: true } },
       },
     });
-    if (!lease) return NextResponse.json({ error: "Det aktiva hyresavtalet hittades inte" }, { status: 404 });
+    if (!lease) {
+      return reject(observability, {
+        status: 404,
+        code: API_ERROR_CODES.notFound,
+        message: "Det aktiva hyresavtalet hittades inte",
+        event: "resident_portal.ticket.lease_not_found",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
 
     const reporterName = lease.lease_holder.contact_name || lease.lease_holder.name;
     const reporterEmail = residentView
@@ -345,9 +459,23 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ ticket }, { status: 201 });
+    observability.logger.info("resident portal ticket created", observability.elapsed({
+      event: "resident_portal.ticket.created",
+      userId: user.id,
+      companyId: user.company_id,
+      ticketId: ticket.id,
+      residentView,
+    }));
+    return successResponse(observability, { ticket }, { status: 201 });
   } catch (error) {
-    logger.error("Create resident portal ticket error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("resident portal ticket create failed", error, observability.elapsed({
+      event: "resident_portal.ticket.failed",
+    }));
+    return apiErrorResponse({
+      status: 500,
+      code: API_ERROR_CODES.internalError,
+      message: "Internt serverfel",
+      requestId: observability.requestId,
+    });
   }
 }
