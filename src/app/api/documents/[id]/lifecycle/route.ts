@@ -68,41 +68,42 @@ export async function PATCH(
         context: { userId: user.id },
       });
     }
+    const companyId = user.company_id;
     if (!["owner", "admin", "manager"].includes(user.role)) {
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
         message: "Du saknar behörighet att ändra dokument",
         event: "documents.lifecycle.forbidden",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     }
 
     const { id } = await params;
     const body = (await request.json().catch(() => null)) as { transition?: unknown; reason?: unknown } | null;
     const transition = typeof body?.transition === "string" ? body.transition.trim() : "";
-    const reason = typeof body?.reason === "string" ? body.reason.trim().slice(0, 500) : "";
+    const reasonProvided = typeof body?.reason === "string" && body.reason.trim().length > 0;
     if (!allowedTransitions.has(transition)) {
       return reject(observability, {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
         message: "Ogiltig dokumentåtgärd",
         event: "documents.lifecycle.validation_failed",
-        context: { reason: "invalid_transition", userId: user.id, companyId: user.company_id },
+        context: { reason: "invalid_transition", userId: user.id, companyId },
       });
     }
 
     const modern = await db.managedDocument.findFirst({
       where: {
         id,
-        company_id: user.company_id,
+        company_id: companyId,
         OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
-      select: { id: true, name: true, visibility: true, lifecycle_state: true },
+      select: { id: true, visibility: true, lifecycle_state: true },
     });
     if (!modern) {
       const orphaned = await db.managedDocument.findFirst({
-        where: { id, company_id: user.company_id },
+        where: { id, company_id: companyId },
         select: { id: true },
       });
       if (orphaned) {
@@ -111,7 +112,7 @@ export async function PATCH(
           code: API_ERROR_CODES.notFound,
           message: "Dokumentet hittades inte",
           event: "documents.lifecycle.orphaned",
-          context: { userId: user.id, companyId: user.company_id },
+          context: { userId: user.id, companyId },
         });
       }
     }
@@ -128,7 +129,7 @@ export async function PATCH(
         observability.logger.info("document lifecycle unchanged", observability.elapsed({
           event: "documents.lifecycle.unchanged",
           userId: user.id,
-          companyId: user.company_id,
+          companyId,
           documentId: modern.id,
         }));
         return successResponse(observability, { success: true, state: modern.lifecycle_state, unchanged: true });
@@ -139,13 +140,32 @@ export async function PATCH(
           code: API_ERROR_CODES.conflict,
           message: "Återställ det arkiverade dokumentet innan det avpubliceras",
           event: "documents.lifecycle.transition_conflict",
-          context: { userId: user.id, companyId: user.company_id, documentId: modern.id },
+          context: { userId: user.id, companyId, documentId: modern.id },
         });
       }
 
-      const updateResult = await db.managedDocument.updateMany({
-        where: { id: modern.id, company_id: user.company_id },
-        data: { lifecycle_state: nextState },
+      const updateResult = await db.$transaction(async (tx) => {
+        const result = await tx.managedDocument.updateMany({
+          where: { id: modern.id, company_id: companyId },
+          data: { lifecycle_state: nextState },
+        });
+        if (result.count === 0) return result;
+
+        await writeAuditLog(user, {
+          entityType: "document",
+          entityId: modern.id,
+          action,
+          metadata: {
+            schemaVersion: 6,
+            storage: "ManagedDocument",
+            previousState: modern.lifecycle_state,
+            nextState,
+            previousVisibility: modern.visibility,
+            reasonProvided,
+          },
+        }, tx);
+
+        return result;
       });
       if (updateResult.count === 0) {
         return reject(observability, {
@@ -153,40 +173,24 @@ export async function PATCH(
           code: API_ERROR_CODES.notFound,
           message: "Dokumentet hittades inte",
           event: "documents.lifecycle.not_found_after_write",
-          context: { userId: user.id, companyId: user.company_id },
+          context: { userId: user.id, companyId },
         });
       }
-
-      await writeAuditLog(user, {
-        entityType: "document",
-        entityId: modern.id,
-        action,
-        metadata: {
-          documentId: modern.id,
-          previousState: modern.lifecycle_state,
-          nextState,
-          reason: reason || null,
-          documentName: modern.name,
-          previousVisibility: modern.visibility,
-          storage: "ManagedDocument",
-        },
-      });
 
       observability.logger.info("document lifecycle completed", observability.elapsed({
         event: "documents.lifecycle.completed",
         userId: user.id,
-        companyId: user.company_id,
+        companyId,
         documentId: modern.id,
         transition,
       }));
       return successResponse(observability, { success: true, state: nextState });
     }
 
-    // Legacy AuditLog documents are no longer mutable — migrate via backfill first.
     const legacy = await db.auditLog.findFirst({
       where: {
         id,
-        company_id: user.company_id,
+        company_id: companyId,
         entity_type: "document",
         action: "document.created",
       },
@@ -198,7 +202,7 @@ export async function PATCH(
         code: API_ERROR_CODES.conflict,
         message: "Dokumentet finns kvar i äldre lagring. Kör backfill till ManagedDocument innan livscykel ändras.",
         event: "documents.lifecycle.legacy_conflict",
-        context: { userId: user.id, companyId: user.company_id },
+        context: { userId: user.id, companyId },
       });
     }
 
@@ -207,7 +211,7 @@ export async function PATCH(
       code: API_ERROR_CODES.notFound,
       message: "Dokumentet hittades inte",
       event: "documents.lifecycle.not_found",
-      context: { userId: user.id, companyId: user.company_id },
+      context: { userId: user.id, companyId },
     });
   } catch (error) {
     observability.logger.error("document lifecycle failed", error, observability.elapsed({
