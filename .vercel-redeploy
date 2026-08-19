@@ -1,2 +1,12 @@
 Redeploy marker for the latest main build.
-Triggered 2026-07-15T03:58:00Z.
+Triggered 2026-08-19T23:33:44Z by Claude.ai.
+
+Production (www.revalta.se) was confirmed still serving #305 (0dbb58d) while
+GitHub main was already at #306 (a8354f3) and beyond -- the GitHub->Vercel
+auto-deploy did not fire for a8354f3 (no deployment record at all in Vercel,
+not even ERROR/CANCELED). This commit is a content-only nudge to main to
+force a fresh push event and a real target:production deployment, the same
+pattern used for the 2026-07-15 redeploy. No application code changed.
+
+See AI_COLLABORATION.md ("Verifierad snapshot") and docs/AI_TASKS.yml
+(snapshot.production) for the full finding.
