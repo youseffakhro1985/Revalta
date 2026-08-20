@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 import { ModuleNavigation, type ModuleNavigationSection } from "@/components/dashboard/module-navigation";
 import { getCurrentUser } from "@/lib/current-user";
-import { canManageBilling, canViewAudit, canViewOperations } from "@/lib/permissions";
+import {
+  canManageBilling,
+  canManageCompany,
+  canManageIntegrations,
+  canManageTeam,
+  canViewAudit,
+  canViewLeasingData,
+  canViewOperations,
+} from "@/lib/permissions";
 
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser();
@@ -9,11 +17,15 @@ export default async function SettingsLayout({ children }: { children: ReactNode
   const showOperationsAdmin = canViewOperations(role);
   const showAudit = canViewAudit(role);
   const showBilling = canManageBilling(role);
+  const showCompany = canManageCompany(role);
+  const showIntegrations = canManageIntegrations(role);
+  const showTeam = canManageTeam(role) || canViewLeasingData(role);
 
   const sections: ModuleNavigationSection[] = [
     {
+      label: "Konto & aviseringar",
       items: [
-        { href: "/dashboard/installningar", label: "Konto och organisation", icon: "building", exact: true },
+        { href: "/dashboard/installningar", label: "Översikt", icon: "building", exact: true },
         { href: "/dashboard/installningar/aviseringar", label: "Serviceaviseringar", icon: "bell" },
         { href: "/dashboard/installningar/mina-aviseringar", label: "Mina aviseringar", icon: "userSettings" },
         { href: "/dashboard/installningar/eskaleringar", label: "Eskaleringar", icon: "siren", exact: true },
@@ -24,7 +36,21 @@ export default async function SettingsLayout({ children }: { children: ReactNode
       ],
     },
     {
-      label: "Administration",
+      label: "Organisation & åtkomst",
+      items: [
+        ...(showTeam
+          ? [{ href: "/dashboard/team", label: "Team", icon: "users" as const }]
+          : []),
+        ...(showCompany
+          ? [{ href: "/dashboard/behorigheter", label: "Behörigheter", icon: "shield" as const }]
+          : []),
+        ...(showIntegrations
+          ? [{ href: "/dashboard/integrationer", label: "Integrationer", icon: "plug" as const }]
+          : []),
+      ],
+    },
+    {
+      label: "System & säkerhet",
       items: [
         ...(showOperationsAdmin
           ? [{ href: "/dashboard/notiser", label: "Notisinställningar", icon: "bell" as const }]
@@ -43,7 +69,7 @@ export default async function SettingsLayout({ children }: { children: ReactNode
           : []),
       ],
     },
-  ];
+  ].filter((section) => section.items.length > 0);
 
   return (
     <div className="space-y-5">
