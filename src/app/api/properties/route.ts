@@ -28,6 +28,7 @@ const propertyListSelect = (ticketActive: { deleted_at: null } | Record<string, 
   property_identifier: true,
   property_type: true,
   status: true,
+  manager_name: true,
   created_at: true,
   updated_at: true,
   _count: {
