@@ -14,7 +14,6 @@ import {
   ClipboardList,
   Download,
   ExternalLink,
-  MapPin,
   Search,
   X,
 } from "lucide-react";
@@ -314,7 +313,7 @@ export default function FelanmalanPage() {
         <p className="mt-1 text-sm text-ink-500">Översikt och hantering av kund- och driftärenden.</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {permissions.canExport ? <button type="button" onClick={() => window.location.assign("/api/tickets/export")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-[11px] font-semibold text-ink-650 transition hover:bg-sand-50"><Download className="h-4 w-4" />Exportera</button> : null}
+        {permissions.canExport ? <a href="/api/tickets/export" className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-[11px] font-semibold text-ink-650 transition hover:bg-sand-50"><Download className="h-4 w-4" />Exportera</a> : null}
         {permissions.canManage ? <button type="button" onClick={() => setCreateOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-[11px] font-semibold text-white shadow-sm transition hover:bg-petroleum-800"><span className="text-base leading-none">＋</span>Nytt ärende</button> : null}
       </div>
     </div>
