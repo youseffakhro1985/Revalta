@@ -183,6 +183,11 @@ export function DashboardShell({
   const displayName = userName?.trim() || userEmail;
   const roleLabel = roleLabelFor(role);
   const canCreateWorkOrder = !resident && (role === "owner" || role === "admin" || role === "manager");
+  const isPropertiesArea = pathname === "/dashboard/fastigheter" || pathname.startsWith("/dashboard/fastigheter/");
+  const primaryCreateAction = isPropertiesArea
+    ? { href: "/dashboard/fastigheter/ny", label: "Ny fastighet" }
+    : { href: "/dashboard/arbetsorder/ny", label: "Ny arbetsorder" };
+  const showPrimaryCreateAction = canCreateWorkOrder && pathname !== "/dashboard/fastigheter/ny";
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
   useEffect(() => {
@@ -250,10 +255,10 @@ export function DashboardShell({
             <div className="ml-auto flex items-center gap-2 sm:gap-2.5">
               {resident ? null : <WorkOrderLockIndicator />}
               {resident ? null : <NotificationMenu />}
-              {canCreateWorkOrder ? (
-                <Link href="/dashboard/arbetsorder/ny" className="hidden h-11 items-center gap-2 rounded-xl border border-petroleum-900/15 bg-petroleum-950 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2 sm:inline-flex">
+              {showPrimaryCreateAction ? (
+                <Link href={primaryCreateAction.href} className="hidden h-11 items-center gap-2 rounded-xl border border-petroleum-900/15 bg-petroleum-950 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2 sm:inline-flex">
                   <Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-                  Ny arbetsorder
+                  {primaryCreateAction.label}
                 </Link>
               ) : null}
               <div className="hidden sm:block lg:hidden"><LogoutButton /></div>
