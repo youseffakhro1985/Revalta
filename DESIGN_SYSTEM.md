@@ -40,7 +40,8 @@ Petroleum-, sand- och ink-skalorna är medvetet något varmare och mer dämpade 
 - Cards ska ha vit eller mycket varmvit bakgrund, sandfärgade tunna borders och mjuk skugga.
 - Inputs ska vara rena, ljusa och fokusera med petroleum-ring.
 - Badges ska använda lågmälda statusfärger.
-- Dashboardens vänsterspalt ska normalt använda `petroleum-900`: mörk nog för tydlig navigationskontrast, men något mjukare och ljusare än `petroleum-950` för en lugn svensk premiumkänsla.
+- Dashboardens vänsterspalt ska normalt använda `petroleum-900`: mörk nog för tydlig navigationskontrast men lite ljusare, mjukare och lugnare än `petroleum-950`.
+- Vänsterspalten ska vara en ren, solid petroleumton utan dekorativ gradient; premiumkänslan ska komma från ton, typografi, spacing och kontrast.
 - `petroleum-950` reserveras för mindre, tydliga primära handlingar och extra mörka detaljer där hög kontrast behövs.
 - Diagram ska i första hand använda petroleum, sand/beige och neutrala ink-toner. Fler färger används bara när datan kräver det.
 - Animationer ska vara diskreta och får inte kännas startup/gaming.
