@@ -102,6 +102,7 @@ export const staffNavigationSections: DashboardNavSection[] = [
     label: "Ekonomi & analys",
     icon: BarChart3,
     items: [
+      { href: "/dashboard/ekonomi", label: "Ekonomi", icon: WalletCards, visible: canViewFinanceData },
       { href: "/dashboard/budget", label: "Budget & prognos", icon: WalletCards, visible: canViewFinanceData },
       { href: "/dashboard/offerter", label: "Offerter", icon: ReceiptText, visible: canViewFinanceData },
       { href: "/dashboard/energi", label: "Energi", icon: Gauge, visible: canViewFinanceData },
