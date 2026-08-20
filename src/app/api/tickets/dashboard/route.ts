@@ -55,11 +55,17 @@ export async function GET(request: Request) {
 
     const ticketActive = await notDeletedFilter("Ticket");
     const scopedToAssigned = shouldScopeToAssignedWork(user.role);
-    const baseWhere: Prisma.TicketWhereInput = {
+    const tenantScope: Prisma.TicketWhereInput = {
       ...ticketActive,
       ...tenantWhere(user),
       ...(scopedToAssigned ? { assigned_to_id: user.id } : {}),
+    };
+    const propertyScope: Prisma.TicketWhereInput = {
       OR: [{ property_id: null }, { property: { deleted_at: null } }],
+    };
+    const baseWhere: Prisma.TicketWhereInput = {
+      ...tenantScope,
+      AND: [propertyScope],
     };
 
     const monthStart = startOfMonth();
@@ -98,10 +104,15 @@ export async function GET(request: Request) {
       }),
       db.ticket.findMany({
         where: {
-          ...baseWhere,
-          OR: [
-            { created_at: { gte: trendStart } },
-            { updated_at: { gte: trendStart } },
+          ...tenantScope,
+          AND: [
+            propertyScope,
+            {
+              OR: [
+                { created_at: { gte: trendStart } },
+                { updated_at: { gte: trendStart } },
+              ],
+            },
           ],
         },
         orderBy: { created_at: "desc" },
