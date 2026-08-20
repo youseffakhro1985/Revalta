@@ -69,7 +69,7 @@ export default async function SettingsLayout({ children }: { children: ReactNode
           : []),
       ],
     },
-  ].filter((section) => section.items.length > 0);
+  ];
 
   return (
     <div className="space-y-5">
