@@ -232,7 +232,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portföljöversikt</p>
-          <h1 className="mt-1 font-display text-[28px] font-semibold tracking-[-0.04em] text-ink-950 sm:text-[32px]">God morgon</h1>
+          <h1 className="mt-1 font-display text-[28px] font-semibold tracking-[-0.04em] text-ink-950 sm:text-[32px]">Översikt</h1>
           <p className="mt-1 text-sm text-ink-500">Samlad realtidsbild av bestånd, ärenden, uthyrning och ekonomi.</p>
         </div>
         <div className="inline-flex h-10 w-fit items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[12px] font-semibold text-ink-600 shadow-premium-sm">
@@ -406,7 +406,7 @@ function PerformanceRow({ icon: Icon, label, value, href, tone }: { icon: typeof
   return (
     <Link href={href} className="group flex items-center gap-3 py-4 first:pt-1 last:pb-1">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sand-100 bg-sand-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" /></div>
-      <div className="min-w-0 flex-1"><p className="truncate text-[11px] font-medium text-ink-600">{label}</p><div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-sand-100"><div className={`h-full w-2/3 rounded-full ${dot}`} /></div></div>
+      <div className="min-w-0 flex flex-1 items-center gap-2"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" /><p className="truncate text-[11px] font-medium text-ink-600">{label}</p></div>
       <span className="text-[13px] font-semibold text-ink-900 transition group-hover:text-petroleum-800">{value}</span>
     </Link>
   );
