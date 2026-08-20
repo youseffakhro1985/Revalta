@@ -56,7 +56,7 @@ function NavigationLink({
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      className={`group flex items-center gap-3 rounded-xl border font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-petroleum-950 ${compact ? "min-h-9 px-3 text-[12px]" : "min-h-11 px-3.5 text-[13px]"} ${active ? "border-white/10 bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(4,22,18,0.12)]" : "border-transparent text-white/68 hover:border-white/[0.08] hover:bg-white/[0.07] hover:text-white"}`}
+      className={`group flex items-center gap-3 rounded-xl border font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-petroleum-900 ${compact ? "min-h-9 px-3 text-[12px]" : "min-h-11 px-3.5 text-[13px]"} ${active ? "border-white/10 bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(4,22,18,0.12)]" : "border-transparent text-white/68 hover:border-white/[0.08] hover:bg-white/[0.07] hover:text-white"}`}
     >
       <Icon className={`${compact ? "h-4 w-4" : "h-[18px] w-[18px]"} shrink-0 ${active ? "text-white" : "text-white/62 transition-colors group-hover:text-white"}`} strokeWidth={1.7} aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
@@ -122,7 +122,7 @@ function NavigationContent({
                 onClick={() => setExpandedSectionId((current) => current === section.id ? null : section.id)}
                 aria-expanded={expanded}
                 aria-controls={regionId}
-                className={`group flex min-h-11 w-full items-center gap-3 rounded-xl border px-3.5 text-left text-[13px] font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-petroleum-950 ${sectionActive ? "border-white/10 bg-white/[0.12] text-white" : "border-transparent text-white/68 hover:border-white/[0.08] hover:bg-white/[0.07] hover:text-white"}`}
+                className={`group flex min-h-11 w-full items-center gap-3 rounded-xl border px-3.5 text-left text-[13px] font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-petroleum-900 ${sectionActive ? "border-white/10 bg-white/[0.12] text-white" : "border-transparent text-white/68 hover:border-white/[0.08] hover:bg-white/[0.07] hover:text-white"}`}
               >
                 <Icon className={`h-[18px] w-[18px] shrink-0 ${sectionActive ? "text-white" : "text-white/62 group-hover:text-white"}`} strokeWidth={1.7} aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate">{section.label}</span>
@@ -205,8 +205,7 @@ export function DashboardShell({
     <div className="dashboard-surface min-h-screen bg-[#F8F7F2] text-ink-900">
       <a href="#dashboard-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-petroleum-800 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Hoppa till innehåll</a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] overflow-hidden border-r border-petroleum-950/40 bg-petroleum-950 text-white lg:flex lg:flex-col">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_0%,rgba(75,135,123,0.16),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_38%)]" aria-hidden="true" />
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] overflow-hidden border-r border-petroleum-900/35 bg-petroleum-900 text-white lg:flex lg:flex-col">
         <div className="relative flex h-[88px] items-center border-b border-white/10 px-7">
           <Link href={homeHref} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Revalta dashboard">
             <span className="font-display text-[26px] font-semibold tracking-[-0.045em] text-white">REVALTA</span>
@@ -229,7 +228,7 @@ export function DashboardShell({
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny">
           <button className="absolute inset-0 bg-ink-950/40 backdrop-blur-[2px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} />
-          <aside className="relative flex h-full w-[min(88vw,340px)] flex-col overflow-hidden border-r border-petroleum-950/50 bg-petroleum-950 text-white shadow-2xl">
+          <aside className="relative flex h-full w-[min(88vw,340px)] flex-col overflow-hidden border-r border-petroleum-900/40 bg-petroleum-900 text-white shadow-2xl">
             <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
               <Link href={homeHref} className="font-display text-xl font-semibold tracking-[-0.04em] text-white">REVALTA</Link>
               <button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-white outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Stäng meny"><X className="h-5 w-5" /></button>
