@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Menu, X } from "lucide-react";
+import { ChevronDown, Menu, Plus, X } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
 import {
@@ -56,11 +56,11 @@ function NavigationLink({
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-3 rounded-lg border font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-1 focus-visible:ring-offset-[#F1F1EC] ${compact ? "min-h-10 px-3 text-[12px]" : "min-h-11 px-3 text-[13px]"} ${active ? "border-sand-200/90 bg-white text-petroleum-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(17,34,31,0.04)]" : "border-transparent text-ink-500 hover:border-sand-200/60 hover:bg-white/65 hover:text-ink-900"}`}
+      className={`group flex items-center gap-3 rounded-xl border font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-petroleum-950 ${compact ? "min-h-9 px-3 text-[12px]" : "min-h-11 px-3.5 text-[13px]"} ${active ? "border-white/10 bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(4,22,18,0.12)]" : "border-transparent text-white/68 hover:border-white/[0.08] hover:bg-white/[0.07] hover:text-white"}`}
     >
-      <Icon className={compact ? "h-4 w-4" : "h-[17px] w-[17px]"} strokeWidth={1.65} aria-hidden="true" />
+      <Icon className={`${compact ? "h-4 w-4" : "h-[18px] w-[18px]"} shrink-0 ${active ? "text-white" : "text-white/62 transition-colors group-hover:text-white"}`} strokeWidth={1.7} aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-      {active ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-petroleum-600" aria-hidden="true" /> : null}
+      {active ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sand-200 shadow-[0_0_0_3px_rgba(255,255,255,0.06)]" aria-hidden="true" /> : null}
     </Link>
   );
 }
@@ -79,9 +79,7 @@ function NavigationContent({
   const primaryItems = useMemo(() => visibleDashboardItems(staffPrimaryNavigation, role), [role]);
   const sections = useMemo(() => visibleDashboardSections(role), [role]);
   const detectedSectionId = useMemo(() => {
-    if (pathname.startsWith("/dashboard/arbetsorder/operationsoversikt") || pathname.startsWith("/dashboard/kalender")) {
-      return "drift";
-    }
+    if (pathname.startsWith("/dashboard/arbetsorder/operationsoversikt") || pathname.startsWith("/dashboard/kalender")) return "drift";
     return activeDashboardSectionId(pathname, sections);
   }, [pathname, sections]);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(detectedSectionId);
@@ -93,7 +91,7 @@ function NavigationContent({
   if (resident) {
     return (
       <div>
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">Min portal</p>
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Min portal</p>
         <div className="space-y-1">
           {residentItems.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />)}
         </div>
@@ -104,7 +102,7 @@ function NavigationContent({
   return (
     <>
       <div>
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">Arbetsyta</p>
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Arbetsyta</p>
         <div className="space-y-1">
           {primaryItems.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />)}
         </div>
@@ -124,16 +122,15 @@ function NavigationContent({
                 onClick={() => setExpandedSectionId((current) => current === section.id ? null : section.id)}
                 aria-expanded={expanded}
                 aria-controls={regionId}
-                className={`flex min-h-11 w-full items-center gap-3 rounded-lg border px-3 text-left text-[13px] font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-1 focus-visible:ring-offset-[#F1F1EC] ${sectionActive ? "border-sand-200/90 bg-white text-petroleum-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_1px_2px_rgba(17,34,31,0.04)]" : "border-transparent text-ink-500 hover:border-sand-200/60 hover:bg-white/65 hover:text-ink-900"}`}
+                className={`group flex min-h-11 w-full items-center gap-3 rounded-xl border px-3.5 text-left text-[13px] font-medium outline-none transition-[background-color,border-color,color,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-petroleum-950 ${sectionActive ? "border-white/10 bg-white/[0.12] text-white" : "border-transparent text-white/68 hover:border-white/[0.08] hover:bg-white/[0.07] hover:text-white"}`}
               >
-                <Icon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.65} aria-hidden="true" />
+                <Icon className={`h-[18px] w-[18px] shrink-0 ${sectionActive ? "text-white" : "text-white/62 group-hover:text-white"}`} strokeWidth={1.7} aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate">{section.label}</span>
-                {sectionActive ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-petroleum-600" aria-hidden="true" /> : null}
-                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} strokeWidth={1.65} aria-hidden="true" />
+                <ChevronDown className={`h-4 w-4 shrink-0 text-white/42 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} strokeWidth={1.7} aria-hidden="true" />
               </button>
 
               {expanded ? (
-                <div id={regionId} className="ml-[18px] mt-1 space-y-0.5 border-l border-sand-200/90 pl-2">
+                <div id={regionId} className="ml-[21px] mt-1 space-y-0.5 border-l border-white/10 pl-2">
                   {section.items.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} compact />)}
                 </div>
               ) : null}
@@ -142,14 +139,9 @@ function NavigationContent({
         })}
       </div>
 
-      <div className="mt-5 border-t border-sand-200/80 pt-4">
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">Administration</p>
-        <NavigationLink
-          item={staffSettingsNavigation}
-          pathname={pathname}
-          onNavigate={onNavigate}
-          activeOverride={isSettingsAreaActive(pathname)}
-        />
+      <div className="mt-5 border-t border-white/10 pt-4">
+        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Administration</p>
+        <NavigationLink item={staffSettingsNavigation} pathname={pathname} onNavigate={onNavigate} activeOverride={isSettingsAreaActive(pathname)} />
       </div>
     </>
   );
@@ -190,13 +182,12 @@ export function DashboardShell({
   const homeHref = resident ? residentHomePath() : "/dashboard";
   const displayName = userName?.trim() || userEmail;
   const roleLabel = roleLabelFor(role);
+  const canCreateWorkOrder = !resident && (role === "owner" || role === "admin" || role === "manager");
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
   useEffect(() => {
     if (!resident) return;
-    if (isStaffOnlyDashboardPath(pathname)) {
-      router.replace(residentHomePath());
-    }
+    if (isStaffOnlyDashboardPath(pathname)) router.replace(residentHomePath());
   }, [pathname, resident, router]);
   useEffect(() => {
     if (!mobileOpen) return;
@@ -204,48 +195,73 @@ export function DashboardShell({
     document.body.style.overflow = "hidden";
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") setMobileOpen(false); };
     window.addEventListener("keydown", close);
-    return () => { document.body.style.overflow = previous; window.removeEventListener("keydown", close); };
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", close);
+    };
   }, [mobileOpen]);
 
   return (
-    <div className="dashboard-surface min-h-screen bg-[#F7F7F3] text-ink-900">
+    <div className="dashboard-surface min-h-screen bg-[#F8F7F2] text-ink-900">
       <a href="#dashboard-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-petroleum-800 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Hoppa till innehåll</a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] border-r border-sand-200/90 bg-[#F1F1EC] lg:flex lg:flex-col">
-        <div className="flex h-[72px] items-center border-b border-sand-200 px-6">
-          <Link href={homeHref} className="flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Revalta dashboard">
-            <span className="font-display text-[21px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</span><span className="h-5 w-px bg-sand-300" aria-hidden="true" /><span className="text-[8px] font-semibold uppercase leading-[1.2] tracking-[0.13em] text-ink-500">Förvaltning<br />Sverige</span>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] overflow-hidden border-r border-petroleum-950/40 bg-petroleum-950 text-white lg:flex lg:flex-col">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_0%,rgba(75,135,123,0.16),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_38%)]" aria-hidden="true" />
+        <div className="relative flex h-[88px] items-center border-b border-white/10 px-7">
+          <Link href={homeHref} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Revalta dashboard">
+            <span className="font-display text-[26px] font-semibold tracking-[-0.045em] text-white">REVALTA</span>
+            <span className="mt-1 block text-[8px] font-semibold uppercase tracking-[0.22em] text-white/42">Fastighetsförvaltning</span>
           </Link>
         </div>
-        <nav aria-label="Dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} /></nav>
-        <div className="border-t border-sand-200 p-3">
-          <div className="mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-100 text-[10px] font-semibold text-petroleum-800">{initials(userName, userEmail)}</div>
-            <div className="min-w-0">
-              <p className="truncate text-[12px] font-semibold text-ink-800">{displayName}</p>
-              <p className="truncate text-[10px] text-ink-500">{roleLabel}</p>
+        <nav aria-label="Dashboardmeny" className="relative flex-1 overflow-y-auto px-3.5 py-6"><NavigationContent pathname={pathname} role={role} /></nav>
+        <div className="relative border-t border-white/10 p-4">
+          <div className="mb-2 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.045] px-3 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/90 text-[10px] font-bold text-petroleum-950">{initials(userName, userEmail)}</div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[12px] font-semibold text-white">{displayName}</p>
+              <p className="mt-0.5 truncate text-[10px] text-white/48">{roleLabel}</p>
             </div>
           </div>
-          <LogoutButton className="w-full justify-start" />
+          <LogoutButton className="w-full justify-start !border-white/10 !bg-transparent !text-white/66 hover:!bg-white/[0.07] hover:!text-white" />
         </div>
       </aside>
 
-      {mobileOpen ? <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny"><button className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} /><aside className="relative flex h-full w-[min(88vw,340px)] flex-col border-r border-sand-200 bg-[#F7F7F3] shadow-2xl"><div className="flex h-16 items-center justify-between border-b border-sand-200 px-5"><Link href={homeHref} className="font-display text-xl font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link><button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Stäng meny"><X className="h-5 w-5" /></button></div><nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} onNavigate={() => setMobileOpen(false)} /></nav><div className="border-t border-sand-200 p-4"><LogoutButton className="w-full justify-start" /></div></aside></div> : null}
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboardmeny">
+          <button className="absolute inset-0 bg-ink-950/40 backdrop-blur-[2px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} />
+          <aside className="relative flex h-full w-[min(88vw,340px)] flex-col overflow-hidden border-r border-petroleum-950/50 bg-petroleum-950 text-white shadow-2xl">
+            <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
+              <Link href={homeHref} className="font-display text-xl font-semibold tracking-[-0.04em] text-white">REVALTA</Link>
+              <button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-white outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Stäng meny"><X className="h-5 w-5" /></button>
+            </div>
+            <nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} onNavigate={() => setMobileOpen(false)} /></nav>
+            <div className="border-t border-white/10 p-4"><LogoutButton className="w-full justify-start !border-white/10 !bg-transparent !text-white/70" /></div>
+          </aside>
+        </div>
+      ) : null}
 
-      <div className="lg:pl-[248px]">
-        <header className="sticky top-0 z-30 border-b border-sand-200/90 bg-[#FAFAF8]/95 shadow-[0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-md">
-          <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-8 lg:h-[72px] lg:px-10 xl:px-12">
-            <div className="flex items-center gap-3 lg:hidden"><button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button><Link href={homeHref} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-800">Revalta</Link></div>
-            <div className="hidden min-w-[180px] lg:block"><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ink-500">{resident ? "Boendeportal" : "Fastighetsförvaltning"}</p><p className="mt-1 text-[12px] font-medium text-ink-600">{resident ? "Självservice" : "Samlad arbetsyta"}</p></div>
-            <div className="ml-auto flex items-center gap-2 sm:gap-3">
+      <div className="lg:pl-[264px]">
+        <header className="sticky top-0 z-30 border-b border-sand-200/90 bg-[#FCFBF8]/95 backdrop-blur-xl">
+          <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-3 px-4 sm:px-7 lg:h-[88px] lg:px-8 xl:px-10">
+            <div className="flex items-center gap-3 lg:hidden">
+              <button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button>
+              <Link href={homeHref} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-950">REVALTA</Link>
+            </div>
+            <div className="hidden flex-1 lg:block">{resident ? null : <GlobalSearch />}</div>
+            <div className="ml-auto flex items-center gap-2 sm:gap-2.5">
               {resident ? null : <WorkOrderLockIndicator />}
-              {resident ? null : <GlobalSearch />}
               {resident ? null : <NotificationMenu />}
+              {canCreateWorkOrder ? (
+                <Link href="/dashboard/arbetsorder/ny" className="hidden h-11 items-center gap-2 rounded-xl border border-petroleum-900/15 bg-petroleum-950 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2 sm:inline-flex">
+                  <Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+                  Ny arbetsorder
+                </Link>
+              ) : null}
               <div className="hidden sm:block lg:hidden"><LogoutButton /></div>
             </div>
           </div>
         </header>
-        <main id="dashboard-content" tabIndex={-1} className="mx-auto w-full max-w-[1440px] px-4 py-6 outline-none sm:px-8 sm:py-10 lg:px-10 xl:px-12">{children}</main>
+        <main id="dashboard-content" tabIndex={-1} className="mx-auto w-full max-w-[1500px] px-4 py-6 outline-none sm:px-7 sm:py-8 lg:px-8 lg:py-9 xl:px-10">{children}</main>
       </div>
     </div>
   );
