@@ -14,6 +14,15 @@ const eslintConfig = defineConfig([
       "react-hooks/purity": "off",
     },
   },
+  {
+    files: ["src/app/(dashboard)/dashboard/felanmalan/page.tsx"],
+    rules: {
+      // CSV export is an API download endpoint, not a Next.js page. A normal
+      // anchor intentionally triggers a full document request so the browser
+      // honors Content-Disposition instead of performing client navigation.
+      "@next/next/no-html-link-for-pages": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
