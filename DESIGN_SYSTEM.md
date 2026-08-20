@@ -5,11 +5,22 @@ Revalta ska kännas som en svensk premium B2B SaaS-/proptech-plattform för fast
 ## Visuell riktning
 
 - Skandinavisk premiumkänsla.
-- Vit, sand och beige som bas.
+- Varmvit, sand och lågmäld beige som bas.
 - Petroleum/djup grön som primär färg.
-- Mörk text med hög läsbarhet.
+- Varm mörkgrå/kolsvart text med hög läsbarhet.
 - Tunna borders, mjuka skuggor och generöst med spacing.
 - Seriös känsla inspirerad av svensk bank, Hemnet, Fortnox, Vitec, Notion och Linear.
+- Färgerna ska kännas dämpade, naturliga och arkitektoniska snarare än starka eller tekniska.
+
+## Färgbalans
+
+Revaltas UI ska huvudsakligen bestå av neutrala premiumytor. Petroleum används för identitet, primära handlingar, fokus och navigationsmarkeringar — inte som dekor överallt.
+
+- Cirka 70–80 % av en normal dashboardvy: varmvit/sand/ljus neutral yta.
+- Cirka 15–20 %: mörk text, borders och sekundära neutrala toner.
+- Cirka 5–10 %: petroleum/djup grön och nödvändiga statusfärger.
+- Sand/beige får användas som varm accent i små detaljer, diagram och aktiva markeringar.
+- Statusfärger används bara när de bär betydelse: framgång, varning eller fel.
 
 ## Tokens
 
@@ -21,21 +32,27 @@ Använd tokens från `tailwind.config.ts`:
 - Skuggor: `shadow-premium-sm`, `shadow-premium-md`, `shadow-premium-lg`
 - Status: `success-*`, `warning-*`, `danger-*`
 
+Petroleum-, sand- och ink-skalorna är medvetet något varmare och mer dämpade för att ge en svensk premiumkänsla och bättre samspel med fastighetsfotografi, tabeller och ekonomidata.
+
 ## Komponentprinciper
 
 - Knappar ska vara tydliga men inte högljudda.
-- Cards ska ha vit bakgrund, sandfärgade tunna borders och mjuk skugga.
+- Cards ska ha vit eller mycket varmvit bakgrund, sandfärgade tunna borders och mjuk skugga.
 - Inputs ska vara rena, ljusa och fokusera med petroleum-ring.
 - Badges ska använda lågmälda statusfärger.
+- Navigation får använda djup petroleum som stabil mörk yta, men utan neon, starka gradients eller färgbrus.
+- Diagram ska i första hand använda petroleum, sand/beige och neutrala ink-toner. Fler färger används bara när datan kräver det.
 - Animationer ska vara diskreta och får inte kännas startup/gaming.
 
 ## Undvik
 
 - Neonfärger.
+- Klarblå standard-SaaS som primär identitetsfärg.
 - Dark mode som standard.
 - Glassmorphism eller kraftig blur på cards.
 - Stora gradients som bär hela layouten.
 - För många färger i samma vy.
+- Färg för dekoration när typografi, spacing eller hierarki räcker.
 - Nya designspråk vid sidan av Antigravity-layouten.
 
 ## Vid ny utveckling
@@ -45,3 +62,4 @@ Använd tokens från `tailwind.config.ts`:
 3. Skriv svensk, tydlig UI-copy.
 4. Bygg luftigt och konsekvent.
 5. Säkerställ att ny UI passar bredvid startsidan och boendeportalen.
+6. Kontrollera att en ny vy fortfarande känns premium även om all statusfärg tas bort — färg ska stödja hierarkin, inte skapa den.
