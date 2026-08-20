@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Building2,
   CalendarDays,
+  CheckCircle2,
   CircleDollarSign,
   DoorOpen,
   Gauge,
@@ -55,14 +56,15 @@ function priorityLabel(priority: string) {
 }
 
 function priorityClass(priority: string) {
-  if (priority === "urgent" || priority === "high") return "border-red-100 bg-red-50 text-red-700";
-  if (priority === "low") return "border-emerald-100 bg-emerald-50 text-emerald-700";
-  return "border-amber-100 bg-amber-50 text-amber-700";
+  if (priority === "urgent") return "border-red-100 bg-red-50 text-red-700";
+  if (priority === "high") return "border-orange-100 bg-orange-50 text-orange-700";
+  if (priority === "low") return "border-sand-200 bg-sand-50 text-ink-550";
+  return "border-emerald-100 bg-emerald-50 text-emerald-700";
 }
 
 function statusClass(status: string) {
   if (status === "completed" || status === "invoiced") return "border-emerald-100 bg-emerald-50 text-emerald-700";
-  if (status === "in_progress" || status === "accepted" || status === "assigned") return "border-sky-100 bg-sky-50 text-sky-700";
+  if (status === "in_progress" || status === "accepted" || status === "assigned") return "border-petroleum-100 bg-petroleum-50 text-petroleum-700";
   if (status === "cancelled") return "border-red-100 bg-red-50 text-red-700";
   return "border-sand-200 bg-sand-50 text-ink-600";
 }
@@ -97,7 +99,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
       where: {
         deleted_at: null,
         ...tenantWhere(user),
-        status: { not: "closed" },
+        status: { notIn: ["completed", "closed"] },
         OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
     }),
@@ -105,7 +107,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
       where: {
         deleted_at: null,
         ...tenantWhere(user),
-        status: { not: "closed" },
+        status: { notIn: ["completed", "closed"] },
         priority: "urgent",
         OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
@@ -216,6 +218,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
     acc[unit.unit_type] = (acc[unit.unit_type] || 0) + 1;
     return acc;
   }, {});
+
   const occupancySegments = unitTypeTotals
     .map((segment) => ({
       type: segment.unit_type,
@@ -227,59 +230,110 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
     .sort((a, b) => b.total - a.total)
     .slice(0, 4);
 
+  const attentionCount = urgentTickets + overdueWorkOrders;
+
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portföljöversikt</p>
-          <h1 className="mt-1 font-display text-[28px] font-semibold tracking-[-0.04em] text-ink-950 sm:text-[32px]">Översikt</h1>
-          <p className="mt-1 text-sm text-ink-500">Samlad realtidsbild av bestånd, ärenden, uthyrning och ekonomi.</p>
+    <div className="space-y-4 sm:space-y-5">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portföljöversikt</p>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1 text-[9px] font-semibold text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />Live-data
+            </span>
+          </div>
+          <h1 className="mt-1.5 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Översikt</h1>
+          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-ink-500">En lugn realtidsbild av bestånd, drift, uthyrning och ekonomi — med snabbvägar till det som kräver åtgärd.</p>
         </div>
-        <div className="inline-flex h-10 w-fit items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[12px] font-semibold text-ink-600 shadow-premium-sm">
-          <CalendarDays className="h-4 w-4 text-petroleum-700" strokeWidth={1.7} aria-hidden="true" />
-          Senaste 30 dagar
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-[#FFFEFB] px-3.5 text-[11px] font-semibold text-ink-600 shadow-premium-sm">
+            <CalendarDays className="h-4 w-4 text-petroleum-700" strokeWidth={1.7} aria-hidden="true" />
+            Senaste 30 dagar
+          </span>
+          <Link href="/dashboard/arbetsorder/ny" className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-[11px] font-semibold text-white shadow-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
+            <span className="text-base leading-none">＋</span>Ny arbetsorder
+          </Link>
         </div>
-      </div>
+      </header>
+
+      <nav aria-label="Snabbvägar" className="grid gap-2 rounded-2xl border border-sand-200/90 bg-[#FFFEFB] p-2 shadow-premium-sm sm:grid-cols-2 xl:grid-cols-4">
+        <QuickLink href="/dashboard/fastigheter" label="Fastigheter" description="Bestånd, karta och objekt" icon={Building2} />
+        <QuickLink href="/dashboard/felanmalan" label="Ärenden" description="Prioritera och följ upp" icon={MessageSquareText} />
+        <QuickLink href="/dashboard/arbetsorder" label="Arbetsorder" description="Planering och utförande" icon={Wrench} />
+        <QuickLink href="/dashboard/ekonomi" label="Ekonomi" description="Utfall, budget och rapport" icon={CircleDollarSign} />
+      </nav>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Nyckeltal">
-        <DashboardMetric icon={Building2} label="Fastigheter" value={integer.format(totalProperties)} hint={`${integer.format(totalUnits)} registrerade objekt`} href="/dashboard/fastigheter" linkLabel="Visa alla" />
-        <DashboardMetric icon={MessageSquareText} label="Öppna ärenden" value={integer.format(openTickets)} hint={urgentTickets ? `${urgentTickets} akuta kräver uppmärksamhet` : "Inga akuta ärenden"} href="/dashboard/felanmalan" linkLabel="Visa alla" />
-        <DashboardMetric icon={DoorOpen} label="Uthyrningsgrad" value={`${occupancy.toLocaleString("sv-SE")} %`} hint={`${occupiedUnitIds.length} av ${totalUnits} objekt uthyrda`} href="/dashboard/uthyrning" linkLabel="Visa detaljer" />
-        <DashboardMetric icon={CircleDollarSign} label="Hyresintäkter" value={compactMoney.format(annualContractedRent)} hint="Årlig kontrakterad hyra" href="/dashboard/hyresavisering" linkLabel="Visa ekonomi" />
+        <DashboardMetric icon={Building2} label="Fastigheter" value={integer.format(totalProperties)} hint={`${integer.format(totalUnits)} registrerade objekt`} href="/dashboard/fastigheter" />
+        <DashboardMetric icon={MessageSquareText} label="Öppna ärenden" value={integer.format(openTickets)} hint={urgentTickets ? `${urgentTickets} akuta kräver uppmärksamhet` : "Inga akuta ärenden"} href="/dashboard/felanmalan" tone={urgentTickets ? "warning" : "default"} />
+        <DashboardMetric icon={DoorOpen} label="Uthyrningsgrad" value={`${occupancy.toLocaleString("sv-SE")} %`} hint={`${occupiedUnitIds.length} av ${totalUnits} objekt uthyrda`} href="/dashboard/uthyrning" />
+        <DashboardMetric icon={CircleDollarSign} label="Hyresintäkter" value={compactMoney.format(annualContractedRent)} hint="Årlig kontrakterad hyra" href="/dashboard/ekonomi" />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(310px,0.85fr)]">
-        <DashboardPanel title="Driftnetto" description={`Utfall per fastighet, ${year}`} action={<Link href="/dashboard/budget" className="text-[12px] font-semibold text-petroleum-700 hover:text-petroleum-900">Budget & prognos →</Link>}>
+      <section className={`flex flex-col gap-3 rounded-2xl border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between ${attentionCount ? "border-amber-200 bg-amber-50/65" : "border-emerald-100 bg-emerald-50/55"}`} aria-label="Driftstatus">
+        <div className="flex items-start gap-3">
+          <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${attentionCount ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+            {attentionCount ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          </span>
+          <div>
+            <p className="text-[11px] font-semibold text-ink-800">{attentionCount ? `${attentionCount} signaler behöver uppmärksamhet` : "Driften ser stabil ut"}</p>
+            <p className="mt-0.5 text-[10px] leading-4 text-ink-500">{attentionCount ? `${urgentTickets} akuta ärenden och ${overdueWorkOrders} försenade arbetsordrar.` : "Inga akuta ärenden eller försenade arbetsordrar är registrerade just nu."}</p>
+          </div>
+        </div>
+        {attentionCount ? <div className="flex flex-wrap gap-2 pl-11 sm:pl-0"><Link href="/dashboard/felanmalan" className="text-[10px] font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna ärenden →</Link><Link href="/dashboard/arbetsorder" className="text-[10px] font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna arbetsorder →</Link></div> : null}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.58fr)_minmax(310px,0.82fr)]">
+        <DashboardPanel
+          title="Driftnetto"
+          description={`Registrerat ekonomiskt utfall per fastighet, ${year}`}
+          action={<Link href="/dashboard/budget" className="inline-flex items-center gap-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Budget & prognos <ArrowRight className="h-3 w-3" /></Link>}
+        >
+          <div className="mb-4 flex flex-wrap gap-2">
+            <MiniStat label="Utfall" value={compactMoney.format(actualTotal)} />
+            <MiniStat label="Budget" value={compactMoney.format(budgetTotal)} />
+            <MiniStat label="Budgetutnyttjande" value={budgetTotal ? `${budgetProgress.toLocaleString("sv-SE")} %` : "—"} />
+          </div>
           <PortfolioLineChart points={chartPoints} />
         </DashboardPanel>
 
         <DashboardPanel title="Uthyrningsgrad per segment" description="Aktuellt bestånd">
-          <div className="flex min-h-[260px] flex-col items-center justify-center gap-7 py-2 sm:flex-row xl:flex-col 2xl:flex-row">
-            <div className="relative h-40 w-40 shrink-0 rounded-full" style={{ background: `conic-gradient(#174a40 ${Math.max(0, Math.min(100, occupancy))}%, #e9e5db 0)` }} aria-label={`Uthyrningsgrad ${occupancy} procent`}>
-              <div className="absolute inset-[18px] flex items-center justify-center rounded-full border border-sand-100 bg-white shadow-[inset_0_1px_3px_rgba(17,34,31,0.04)]">
-                <span className="font-display text-[29px] font-semibold tracking-[-0.04em] text-ink-950">{occupancy.toLocaleString("sv-SE")} %</span>
+          <div className="flex min-h-[270px] flex-col items-center justify-center gap-7 py-2 sm:flex-row xl:flex-col 2xl:flex-row">
+            <div className="relative h-40 w-40 shrink-0 rounded-full" style={{ background: `conic-gradient(#315f55 ${Math.max(0, Math.min(100, occupancy))}%, #ece8df 0)` }} aria-label={`Uthyrningsgrad ${occupancy} procent`}>
+              <div className="absolute inset-[19px] flex flex-col items-center justify-center rounded-full border border-sand-100 bg-[#FFFEFB] shadow-[inset_0_1px_3px_rgba(17,34,31,0.04)]">
+                <span className="font-display text-[28px] font-semibold tracking-[-0.04em] text-ink-950">{occupancy.toLocaleString("sv-SE")} %</span>
+                <span className="mt-1 text-[9px] font-medium text-ink-400">Totalt uthyrt</span>
               </div>
             </div>
-            <div className="w-full max-w-[260px] space-y-3">
+            <div className="w-full max-w-[270px] space-y-3.5">
               {occupancySegments.length ? occupancySegments.map((segment, index) => (
-                <div key={segment.type} className="flex items-center gap-3 text-[12px]">
-                  <span className={`h-2.5 w-2.5 rounded-full ${index === 0 ? "bg-petroleum-800" : index === 1 ? "bg-petroleum-400" : index === 2 ? "bg-[#c9b98d]" : "bg-ink-300"}`} aria-hidden="true" />
-                  <span className="flex-1 text-ink-600">{segment.label}</span>
-                  <span className="font-semibold text-ink-900">{segment.percent.toLocaleString("sv-SE")} %</span>
+                <div key={segment.type}>
+                  <div className="flex items-center gap-2.5 text-[11px]">
+                    <span className={`h-2 w-2 rounded-full ${index === 0 ? "bg-petroleum-700" : index === 1 ? "bg-petroleum-400" : index === 2 ? "bg-[#b7a778]" : "bg-ink-300"}`} aria-hidden="true" />
+                    <span className="flex-1 text-ink-600">{segment.label}</span>
+                    <span className="font-semibold text-ink-900">{segment.percent.toLocaleString("sv-SE")} %</span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sand-100"><div className="h-full rounded-full bg-petroleum-600" style={{ width: `${Math.max(0, Math.min(100, segment.percent))}%` }} /></div>
                 </div>
               )) : <p className="text-center text-sm text-ink-500">Segmentdata visas när objekt finns registrerade.</p>}
+              <Link href="/dashboard/uthyrning" className="inline-flex items-center gap-1 pt-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa uthyrning <ArrowRight className="h-3 w-3" /></Link>
             </div>
           </div>
         </DashboardPanel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(310px,0.85fr)]">
-        <DashboardPanel title="Senaste arbetsorder" description="De senast skapade arbetsordrarna" action={<Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa alla <ArrowRight className="h-3.5 w-3.5" /></Link>} bodyClassName="p-0">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.58fr)_minmax(310px,0.82fr)]">
+        <DashboardPanel
+          title="Senaste arbetsorder"
+          description="Senast registrerade i organisationen"
+          action={<Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa alla <ArrowRight className="h-3 w-3" /></Link>}
+          bodyClassName="p-0"
+        >
           {recentWorkOrders.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[690px] text-left">
+              <table className="w-full min-w-[700px] text-left">
                 <thead>
-                  <tr className="border-b border-sand-200 bg-sand-50/55 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">
+                  <tr className="border-b border-sand-100 bg-[#FBFAF6] text-[9px] font-semibold uppercase tracking-[0.08em] text-ink-400">
                     <th className="px-5 py-3">ID</th>
                     <th className="px-3 py-3">Rubrik</th>
                     <th className="px-3 py-3">Fastighet</th>
@@ -290,23 +344,24 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
                 </thead>
                 <tbody className="divide-y divide-sand-100">
                   {recentWorkOrders.map((workOrder) => (
-                    <tr key={workOrder.id} className="group transition hover:bg-sand-50/65">
-                      <td className="px-5 py-3.5 text-[11px] font-medium text-ink-500"><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="hover:text-petroleum-800">{workOrder.work_order_number || "AO"}</Link></td>
-                      <td className="max-w-[240px] px-3 py-3.5"><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="block truncate text-[12px] font-semibold text-ink-800 transition group-hover:text-petroleum-800">{workOrder.title}</Link></td>
-                      <td className="px-3 py-3.5 text-[11px] text-ink-500">{workOrder.property.name}</td>
-                      <td className="px-3 py-3.5"><span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold ${priorityClass(workOrder.priority)}`}>{priorityLabel(workOrder.priority)}</span></td>
-                      <td className="px-3 py-3.5"><span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold ${statusClass(workOrder.status)}`}>{statusLabel(workOrder.status)}</span></td>
-                      <td className="px-5 py-3.5 text-right text-[11px] text-ink-500">{shortDate.format(workOrder.created_at)}</td>
+                    <tr key={workOrder.id} className="group transition hover:bg-sand-50/55">
+                      <td className="px-5 py-3.5 text-[10px] font-medium text-ink-450"><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="hover:text-petroleum-800">{workOrder.work_order_number || "AO"}</Link></td>
+                      <td className="max-w-[240px] px-3 py-3.5"><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="block truncate text-[11px] font-semibold text-ink-800 transition group-hover:text-petroleum-800">{workOrder.title}</Link></td>
+                      <td className="px-3 py-3.5 text-[10px] text-ink-500">{workOrder.property.name}</td>
+                      <td className="px-3 py-3.5"><span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold ${priorityClass(workOrder.priority)}`}>{priorityLabel(workOrder.priority)}</span></td>
+                      <td className="px-3 py-3.5"><span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold ${statusClass(workOrder.status)}`}>{statusLabel(workOrder.status)}</span></td>
+                      <td className="px-5 py-3.5 text-right text-[10px] text-ink-450">{shortDate.format(workOrder.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-petroleum-50 text-petroleum-700"><Wrench className="h-5 w-5" strokeWidth={1.6} /></div>
-              <p className="mt-4 text-sm font-semibold text-ink-700">Inga arbetsordrar ännu</p>
-              <Link href="/dashboard/arbetsorder/ny" className="mt-2 text-xs font-semibold text-petroleum-700">Skapa första arbetsordern →</Link>
+            <div className="flex min-h-[245px] flex-col items-center justify-center px-6 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-petroleum-50 text-petroleum-700"><Wrench className="h-4.5 w-4.5" strokeWidth={1.6} /></div>
+              <p className="mt-3 text-[12px] font-semibold text-ink-700">Inga arbetsordrar ännu</p>
+              <p className="mt-1 max-w-xs text-[10px] leading-4 text-ink-450">Skapa den första arbetsordern för att börja följa drift och utförande här.</p>
+              <Link href="/dashboard/arbetsorder/ny" className="mt-3 text-[10px] font-semibold text-petroleum-700">Skapa arbetsorder →</Link>
             </div>
           )}
         </DashboardPanel>
@@ -316,35 +371,45 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
             <PerformanceRow icon={AlertTriangle} label="Akuta ärenden" value={integer.format(urgentTickets)} href="/dashboard/felanmalan" tone={urgentTickets ? "warning" : "good"} />
             <PerformanceRow icon={Wrench} label="Försenade arbetsordrar" value={integer.format(overdueWorkOrders)} href="/dashboard/arbetsorder" tone={overdueWorkOrders ? "warning" : "good"} />
             <PerformanceRow icon={Gauge} label="Underhåll till nästa år" value={integer.format(maintenanceDue)} href="/dashboard/underhall" tone="neutral" />
-            <PerformanceRow icon={CircleDollarSign} label="Budgetutfall" value={budgetTotal ? `${budgetProgress.toLocaleString("sv-SE")} %` : "–"} href="/dashboard/budget" tone={budgetTotal && budgetProgress > 105 ? "warning" : "good"} />
+            <PerformanceRow icon={CircleDollarSign} label="Budgetutfall" value={budgetTotal ? `${budgetProgress.toLocaleString("sv-SE")} %` : "—"} href="/dashboard/budget" tone={budgetTotal && budgetProgress > 105 ? "warning" : "good"} />
           </div>
-          <Link href="/dashboard/rapporter" className="mt-5 inline-flex items-center gap-2 text-[12px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa hela prestandarapporten <ArrowRight className="h-3.5 w-3.5" /></Link>
+          <Link href="/dashboard/rapporter" className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa hela prestandarapporten <ArrowRight className="h-3 w-3" /></Link>
         </DashboardPanel>
       </section>
     </div>
   );
 }
 
-function DashboardMetric({ icon: Icon, label, value, hint, href, linkLabel }: { icon: typeof Building2; label: string; value: string; hint: string; href: string; linkLabel: string }) {
+function QuickLink({ href, label, description, icon: Icon }: { href: string; label: string; description: string; icon: typeof Building2 }) {
   return (
-    <article className="group flex min-h-[175px] flex-col rounded-2xl border border-sand-200/90 bg-white p-5 shadow-premium-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-sand-300 hover:shadow-premium-md">
+    <Link href={href} className="group flex items-center gap-3 rounded-xl px-3.5 py-3 transition hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sand-100 bg-[#F3F2EA] text-petroleum-800 transition group-hover:bg-petroleum-50"><Icon className="h-4 w-4" strokeWidth={1.65} aria-hidden="true" /></span>
+      <span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold text-ink-800">{label}</span><span className="mt-0.5 block truncate text-[9px] text-ink-400">{description}</span></span>
+      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
+    </Link>
+  );
+}
+
+function DashboardMetric({ icon: Icon, label, value, hint, href, tone = "default" }: { icon: typeof Building2; label: string; value: string; hint: string; href: string; tone?: "default" | "warning" }) {
+  return (
+    <Link href={href} className="group flex min-h-[160px] flex-col rounded-2xl border border-sand-200/90 bg-[#FFFEFB] p-5 shadow-premium-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-sand-300 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-sand-100 bg-[#F3F2EA] text-petroleum-900"><Icon className="h-[18px] w-[18px]" strokeWidth={1.65} aria-hidden="true" /></div>
-        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-petroleum-300 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${tone === "warning" ? "border-amber-100 bg-amber-50 text-amber-700" : "border-sand-100 bg-[#F3F2EA] text-petroleum-800"}`}><Icon className="h-[17px] w-[17px]" strokeWidth={1.65} aria-hidden="true" /></span>
+        <ArrowRight className="h-3.5 w-3.5 text-ink-250 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
       </div>
-      <p className="mt-4 text-[12px] font-medium text-ink-600">{label}</p>
-      <p className="mt-0.5 font-display text-[29px] font-semibold tracking-[-0.04em] text-ink-950">{value}</p>
-      <p className="mt-1 text-[10px] leading-4 text-ink-400">{hint}</p>
-      <Link href={href} className="mt-auto inline-flex items-center gap-1.5 pt-3 text-[11px] font-semibold text-petroleum-700 transition hover:text-petroleum-950">{linkLabel} <ArrowRight className="h-3 w-3" /></Link>
-    </article>
+      <p className="mt-3.5 text-[11px] font-medium text-ink-550">{label}</p>
+      <p className="mt-0.5 font-display text-[29px] font-semibold tracking-[-0.045em] text-ink-950">{value}</p>
+      <p className={`mt-1 text-[9px] leading-4 ${tone === "warning" ? "font-semibold text-amber-700" : "text-ink-400"}`}>{hint}</p>
+      <span className="mt-auto pt-2 text-[9px] font-semibold text-petroleum-700 opacity-0 transition group-hover:opacity-100">Öppna →</span>
+    </Link>
   );
 }
 
 function DashboardPanel({ title, description, action, children, bodyClassName = "p-5 sm:p-6" }: { title: string; description?: string; action?: React.ReactNode; children: React.ReactNode; bodyClassName?: string }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-sand-200/90 bg-white shadow-premium-sm">
-      <div className="flex min-h-[70px] items-center justify-between gap-4 border-b border-sand-100 px-5 py-4 sm:px-6">
-        <div><h2 className="font-display text-[18px] font-semibold tracking-[-0.025em] text-ink-900">{title}</h2>{description ? <p className="mt-0.5 text-[10px] text-ink-400">{description}</p> : null}</div>
+    <section className="overflow-hidden rounded-2xl border border-sand-200/90 bg-[#FFFEFB] shadow-premium-sm">
+      <div className="flex min-h-[66px] items-center justify-between gap-4 border-b border-sand-100 px-5 py-4 sm:px-6">
+        <div className="min-w-0"><h2 className="font-display text-[17px] font-semibold tracking-[-0.025em] text-ink-900">{title}</h2>{description ? <p className="mt-0.5 truncate text-[9px] text-ink-400">{description}</p> : null}</div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
       <div className={bodyClassName}>{children}</div>
@@ -352,18 +417,22 @@ function DashboardPanel({ title, description, action, children, bodyClassName = 
   );
 }
 
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl border border-sand-100 bg-[#FBFAF6] px-3 py-2"><p className="text-[8px] font-semibold uppercase tracking-[0.08em] text-ink-350">{label}</p><p className="mt-0.5 text-[11px] font-semibold text-ink-750">{value}</p></div>;
+}
+
 function PortfolioLineChart({ points }: { points: Array<{ label: string; value: number }> }) {
   const values = points.map((point) => point.value);
   const hasData = values.some((value) => value !== 0);
   if (!points.length || !hasData) {
-    return <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-sand-200 bg-sand-50/45 px-6 text-center text-sm text-ink-500">Driftnetto per fastighet visas när budgetutfall finns registrerat för {new Date().getFullYear()}.</div>;
+    return <div className="flex min-h-[235px] items-center justify-center rounded-xl border border-dashed border-sand-200 bg-[#FBFAF6] px-6 text-center text-[11px] leading-5 text-ink-450">Driftnetto per fastighet visas när ekonomiskt utfall finns registrerat för {new Date().getFullYear()}.</div>;
   }
 
   const width = 720;
-  const height = 245;
+  const height = 225;
   const padX = 26;
-  const padTop = 20;
-  const padBottom = 42;
+  const padTop = 18;
+  const padBottom = 38;
   const min = Math.min(0, ...values);
   const max = Math.max(0, ...values);
   const range = max - min || 1;
@@ -376,27 +445,19 @@ function PortfolioLineChart({ points }: { points: Array<{ label: string; value: 
   const area = `${path} L${x(points.length - 1).toFixed(1)},${baseline.toFixed(1)} L${x(0).toFixed(1)},${baseline.toFixed(1)} Z`;
 
   return (
-    <div className="min-h-[260px]">
+    <div className="min-h-[235px]">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label="Driftnetto per fastighet">
-        <defs>
-          <linearGradient id="revaltaPortfolioArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#386b61" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="#386b61" stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
         {[0, 1, 2, 3, 4].map((line) => {
           const lineY = padTop + (line / 4) * usableHeight;
-          return <line key={line} x1={padX} x2={width - padX} y1={lineY} y2={lineY} stroke="#ebe8e0" strokeWidth="1" />;
+          return <line key={line} x1={padX} x2={width - padX} y1={lineY} y2={lineY} stroke="#ece8df" strokeWidth="1" />;
         })}
-        <line x1={padX} x2={width - padX} y1={baseline} y2={baseline} stroke="#d8d4c9" strokeWidth="1" />
-        <path d={area} fill="url(#revaltaPortfolioArea)" />
-        <path d={path} fill="none" stroke="#174a40" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((point, index) => <circle key={point.label} cx={x(index)} cy={y(point.value)} r="3.5" fill="#174a40" stroke="#ffffff" strokeWidth="2" />)}
-        {points.map((point, index) => (
-          <text key={`${point.label}-label`} x={x(index)} y={height - 12} textAnchor="middle" fontSize="10" fill="#6d6d6d">{point.label.length > 14 ? `${point.label.slice(0, 12)}…` : point.label}</text>
-        ))}
+        <line x1={padX} x2={width - padX} y1={baseline} y2={baseline} stroke="#d8d3c7" strokeWidth="1" />
+        <path d={area} fill="#edf3f0" />
+        <path d={path} fill="none" stroke="#315f55" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point, index) => <circle key={point.label} cx={x(index)} cy={y(point.value)} r="3.5" fill="#315f55" stroke="#FFFEFB" strokeWidth="2" />)}
+        {points.map((point, index) => <text key={`${point.label}-label`} x={x(index)} y={height - 10} textAnchor="middle" fontSize="9" fill="#77736b">{point.label.length > 14 ? `${point.label.slice(0, 12)}…` : point.label}</text>)}
       </svg>
-      <div className="mt-1 flex items-center justify-between border-t border-sand-100 pt-3 text-[10px] text-ink-400"><span>Lägst {compactMoney.format(min)}</span><span>Högst {compactMoney.format(max)}</span></div>
+      <div className="mt-1 flex items-center justify-between border-t border-sand-100 pt-3 text-[9px] text-ink-400"><span>Lägst {compactMoney.format(min)}</span><span>Högst {compactMoney.format(max)}</span></div>
     </div>
   );
 }
@@ -404,10 +465,11 @@ function PortfolioLineChart({ points }: { points: Array<{ label: string; value: 
 function PerformanceRow({ icon: Icon, label, value, href, tone }: { icon: typeof AlertTriangle; label: string; value: string; href: string; tone: "good" | "warning" | "neutral" }) {
   const dot = tone === "warning" ? "bg-amber-400" : tone === "good" ? "bg-emerald-500" : "bg-petroleum-300";
   return (
-    <Link href={href} className="group flex items-center gap-3 py-4 first:pt-1 last:pb-1">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sand-100 bg-sand-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" /></div>
-      <div className="min-w-0 flex flex-1 items-center gap-2"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" /><p className="truncate text-[11px] font-medium text-ink-600">{label}</p></div>
-      <span className="text-[13px] font-semibold text-ink-900 transition group-hover:text-petroleum-800">{value}</span>
+    <Link href={href} className="group flex items-center gap-3 py-3.5 first:pt-1 last:pb-1">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-sand-100 bg-[#F7F5EF] text-petroleum-700"><Icon className="h-3.5 w-3.5" strokeWidth={1.6} aria-hidden="true" /></span>
+      <span className="min-w-0 flex flex-1 items-center gap-2"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" /><span className="truncate text-[10px] font-medium text-ink-600">{label}</span></span>
+      <span className="text-[12px] font-semibold text-ink-900 transition group-hover:text-petroleum-800">{value}</span>
+      <ArrowRight className="h-3 w-3 text-ink-250 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
     </Link>
   );
 }
