@@ -16,17 +16,14 @@ import {
   Hammer,
   HandCoins,
   KeyRound,
-  LayoutList,
   MessageSquareText,
   Plug,
   ReceiptText,
-  Repeat2,
   Settings,
   ShieldAlert,
   ShieldCheck,
   UserRound,
   Users,
-  UsersRound,
   WalletCards,
   Wrench,
 } from "lucide-react";
@@ -75,10 +72,7 @@ export const staffNavigationSections: DashboardNavSection[] = [
     items: [
       { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
       { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
-      { href: "/dashboard/arbetsorder/operationsoversikt", label: "Arbetsorderöversikt", icon: LayoutList, visible: canViewOperations },
-      { href: "/dashboard/arbetsorder/planering", label: "Planering", icon: UsersRound, visible: canViewOperations },
       { href: "/dashboard/kalender", label: "Kalender", icon: CalendarDays },
-      { href: "/dashboard/arbetsorder/aterkommande", label: "Återkommande", icon: Repeat2, visible: canViewOperations },
       { href: "/dashboard/ronder", label: "Ronder", icon: ClipboardCheck },
       { href: "/dashboard/besiktningar", label: "Besiktningar", icon: ClipboardSignature },
       { href: "/dashboard/underhall", label: "Underhåll", icon: Hammer, visible: canViewOperations },
@@ -131,8 +125,6 @@ export const staffNavigationSections: DashboardNavSection[] = [
     items: [
       { href: "/dashboard/team", label: "Team", icon: Users, visible: (role) => canManageTeam(role) || canViewLeasingData(role) },
       { href: "/dashboard/leverantorer", label: "Leverantörer", icon: BriefcaseBusiness, visible: canViewOperations },
-      { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck, visible: canManageCompany },
-      { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug, visible: canManageIntegrations },
     ],
   },
 ];
@@ -143,14 +135,17 @@ export const staffSettingsNavigation: DashboardNavItem = {
   icon: Settings,
 };
 
+export const staffAdministrationNavigation: DashboardNavItem[] = [
+  staffSettingsNavigation,
+  { href: "/dashboard/behorigheter", label: "Behörigheter", icon: ShieldCheck, visible: canManageCompany },
+  { href: "/dashboard/integrationer", label: "Integrationer", icon: Plug, visible: canManageIntegrations },
+];
+
 export function isDashboardNavItemActive(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === href;
   if (href === "/dashboard/arbetsorder") {
     return pathname === href || (
       pathname.startsWith(`${href}/`)
-      && !pathname.startsWith("/dashboard/arbetsorder/planering")
-      && !pathname.startsWith("/dashboard/arbetsorder/operationsoversikt")
-      && !pathname.startsWith("/dashboard/arbetsorder/aterkommande")
       && !pathname.startsWith("/dashboard/arbetsorder/redigeringslas")
     );
   }
