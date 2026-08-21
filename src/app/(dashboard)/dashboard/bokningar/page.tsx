@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Ban, Building2, CalendarDays, Clock3, Search } from "lucide-react";
 import {
   EmptyState,
@@ -37,10 +37,10 @@ const resourceTypes = ["Tvättstuga", "Föreningslokal", "Gästlägenhet", "Park
 const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 
 function toLocalInput(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 }
 
 function sameDay(left: Date, right: Date) {
@@ -68,18 +68,13 @@ export default function BookingsPage() {
     setError("");
     try {
       const response = await fetch("/api/bookings", { cache: "no-store" });
-      const data = await readResponseJson<{
-        bookings?: Booking[];
-        properties?: Property[];
-        permissions?: { canManage?: boolean };
-        error?: string;
-      }>(response);
+      const data = await readResponseJson<{ bookings?: Booking[]; properties?: Property[]; permissions?: { canManage?: boolean }; error?: string }>(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte hämta bokningar");
       setBookings(data.bookings || []);
       setProperties(data.properties || []);
       setCanManage(Boolean(data.permissions?.canManage));
       if (data.properties?.[0]?.id) {
-        setForm((value) => (value.propertyId ? value : { ...value, propertyId: data.properties![0].id }));
+        setForm((current) => current.propertyId ? current : { ...current, propertyId: data.properties![0].id });
       }
     } catch (value) {
       setError(value instanceof Error ? value.message : "Kunde inte hämta bokningar");
@@ -100,15 +95,11 @@ export default function BookingsPage() {
     }
     setSaving(true);
     try {
-      const response = await fetch("/api/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const response = await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       const data = await readResponseJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(data.error || "Bokningen kunde inte sparas");
       setSuccess("Bokningen är registrerad.");
-      setForm((value) => ({ ...value, residentName: "", unit: "", start: "", end: "", note: "" }));
+      setForm((current) => ({ ...current, residentName: "", unit: "", start: "", end: "", note: "" }));
       await load();
     } catch (value) {
       setError(value instanceof Error ? value.message : "Bokningen kunde inte sparas");
@@ -145,11 +136,7 @@ export default function BookingsPage() {
     setError("");
     setSuccess("");
     try {
-      const response = await fetch("/api/bookings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id, ...editForm }),
-      });
+      const response = await fetch("/api/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: booking.id, ...editForm }) });
       const data = await readResponseJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(data.error || "Bokningen kunde inte uppdateras");
       setSuccess("Bokningen är uppdaterad.");
@@ -172,11 +159,7 @@ export default function BookingsPage() {
     setError("");
     setSuccess("");
     try {
-      const response = await fetch("/api/bookings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id, status: "cancelled" }),
-      });
+      const response = await fetch("/api/bookings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingId: booking.id, status: "cancelled" }) });
       const data = await readResponseJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(data.error || "Bokningen kunde inte avbokas");
       setSuccess("Bokningen är avbokad.");
@@ -189,22 +172,20 @@ export default function BookingsPage() {
   }
 
   const now = new Date();
-  const activeBookings = useMemo(() => bookings.filter((booking) => booking.status !== "cancelled"), [bookings]);
-  const upcoming = useMemo(() => activeBookings.filter((booking) => new Date(booking.end).getTime() >= now.getTime()), [activeBookings, now]);
-  const today = useMemo(() => upcoming.filter((booking) => sameDay(new Date(booking.start), now)).length, [now, upcoming]);
-  const week = useMemo(() => upcoming.filter((booking) => new Date(booking.start).getTime() <= now.getTime() + 604800000).length, [now, upcoming]);
+  const nowMs = now.getTime();
+  const activeBookings = bookings.filter((booking) => booking.status !== "cancelled");
+  const upcoming = activeBookings.filter((booking) => new Date(booking.end).getTime() >= nowMs);
+  const today = upcoming.filter((booking) => sameDay(new Date(booking.start), now)).length;
+  const week = upcoming.filter((booking) => new Date(booking.start).getTime() <= nowMs + 604800000).length;
   const cancelled = bookings.filter((booking) => booking.status === "cancelled").length;
-
-  const filteredBookings = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return bookings.filter((booking) => {
-      if (resourceFilter && booking.resource !== resourceFilter) return false;
-      if (statusFilter === "active" && booking.status === "cancelled") return false;
-      if (statusFilter === "cancelled" && booking.status !== "cancelled") return false;
-      if (!needle) return true;
-      return [booking.resource, booking.resident_name, booking.property_name, booking.unit, booking.note].some((value) => String(value || "").toLowerCase().includes(needle));
-    });
-  }, [bookings, query, resourceFilter, statusFilter]);
+  const needle = query.trim().toLowerCase();
+  const filteredBookings = bookings.filter((booking) => {
+    if (resourceFilter && booking.resource !== resourceFilter) return false;
+    if (statusFilter === "active" && booking.status === "cancelled") return false;
+    if (statusFilter === "cancelled" && booking.status !== "cancelled") return false;
+    if (!needle) return true;
+    return [booking.resource, booking.resident_name, booking.property_name, booking.unit, booking.note].some((value) => String(value || "").toLowerCase().includes(needle));
+  });
 
   return (
     <div className="space-y-8">
@@ -260,11 +241,8 @@ export default function BookingsPage() {
                       {booking.note ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-ink-500">{booking.note}</p> : null}
                       {booking.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan bokningen kan ändras eller avbokas.</p> : null}
                     </div>
-                    <div className="rounded-xl bg-sand-50 px-4 py-3">
-                      <p className="text-sm font-semibold text-ink-800">{dateTime.format(new Date(booking.start))}</p>
-                      <p className="mt-1 text-xs text-ink-500">Till {dateTime.format(new Date(booking.end))}</p>
-                    </div>
-                    {canManage && booking.status !== "cancelled" && booking.source !== "legacy" ? <div className="flex flex-wrap gap-2 lg:justify-end"><button type="button" onClick={() => (editingId === booking.id ? setEditingId("") : startEdit(booking))} className={premiumCompactButtonClass}>{editingId === booking.id ? "Stäng" : "Ändra"}</button><button type="button" disabled={cancellingId === booking.id} onClick={() => void cancelBooking(booking)} className={premiumDangerButtonClass}>{cancellingId === booking.id ? "Avbokar…" : "Avboka"}</button></div> : null}
+                    <div className="rounded-xl bg-sand-50 px-4 py-3"><p className="text-sm font-semibold text-ink-800">{dateTime.format(new Date(booking.start))}</p><p className="mt-1 text-xs text-ink-500">Till {dateTime.format(new Date(booking.end))}</p></div>
+                    {canManage && booking.status !== "cancelled" && booking.source !== "legacy" ? <div className="flex flex-wrap gap-2 lg:justify-end"><button type="button" onClick={() => editingId === booking.id ? setEditingId("") : startEdit(booking)} className={premiumCompactButtonClass}>{editingId === booking.id ? "Stäng" : "Ändra"}</button><button type="button" disabled={cancellingId === booking.id} onClick={() => void cancelBooking(booking)} className={premiumDangerButtonClass}>{cancellingId === booking.id ? "Avbokar…" : "Avboka"}</button></div> : null}
                   </div>
 
                   {canManage && editingId === booking.id ? (
