@@ -182,8 +182,15 @@ try {
   await expectVisible(page.getByRole("link", { name: "Översikt", exact: true }), "Översikt navigation");
   await expectVisible(page.getByRole("button", { name: "Drift" }), "Drift navigation group");
   await page.getByRole("button", { name: "Drift" }).click();
-  await expectVisible(page.getByRole("link", { name: "Ärenden", exact: true }), "Ärenden navigation");
-  await expectVisible(page.getByRole("link", { name: "Arbetsordrar", exact: true }), "Arbetsordrar navigation");
+  const desktopNavigation = page.getByRole("navigation", { name: "Dashboardmeny" });
+  await expectVisible(desktopNavigation.getByRole("link", { name: "Ärenden", exact: true }), "Ärenden navigation");
+  await expectVisible(desktopNavigation.getByRole("link", { name: "Arbetsordrar", exact: true }), "Arbetsordrar navigation");
+  await expectVisible(desktopNavigation.getByRole("link", { name: "Kalender", exact: true }), "Kalender navigation");
+  for (const nestedLabel of ["Arbetsorderöversikt", "Planering", "Återkommande"]) {
+    if (await desktopNavigation.getByRole("link", { name: nestedLabel, exact: true }).count()) {
+      fail(`${nestedLabel} leaked into the global Drift navigation`);
+    }
+  }
   console.log("critical desktop navigation: passed");
 
   // Command Center must be the single global search surface.
@@ -197,7 +204,7 @@ try {
   await page.getByRole("button", { name: "Stäng Command Center" }).click();
   console.log("global search / Command Center: passed");
 
-  // Mobile menu must expose the same navigation model.
+  // Mobile menu and mobile Command Center must both remain reachable.
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileMenuButton = page.getByRole("button", { name: "Öppna meny" });
   await expectVisible(mobileMenuButton, "mobile menu button");
@@ -208,7 +215,14 @@ try {
   await expectVisible(mobileMenu.getByRole("button", { name: "Drift" }), "mobile Drift navigation group");
   const mobilePanel = mobileMenu.getByRole("complementary");
   await mobilePanel.getByRole("button", { name: "Stäng meny" }).click();
-  console.log("mobile menu: passed");
+
+  const mobileCommandButton = page.getByRole("button", { name: "Öppna Revalta Command Center" });
+  await expectVisible(mobileCommandButton, "mobile Command Center trigger");
+  await mobileCommandButton.click();
+  const mobileCommandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
+  await expectVisible(mobileCommandCenter, "mobile Command Center dialog");
+  await mobileCommandCenter.getByRole("button", { name: "Stäng Command Center" }).click();
+  console.log("mobile navigation + Command Center: passed");
 
   // Logout and verify the protected dashboard is no longer the active surface.
   await page.setViewportSize({ width: 1440, height: 1000 });
