@@ -11,6 +11,12 @@ describe("command center quick actions", () => {
     ]);
   });
 
+  it("leder fastighetsåtgärden direkt till registreringsflödet", () => {
+    expect(commandCenterQuickActions("owner").find((item) => item.id === "new-property")?.href).toBe(
+      "/dashboard/fastigheter/ny",
+    );
+  });
+
   it("ger technician endast operativa skapande åtgärder", () => {
     expect(commandCenterQuickActions("technician").map((item) => item.id)).toEqual([
       "new-work-order",
