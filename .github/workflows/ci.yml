@@ -81,6 +81,9 @@ jobs:
       - name: Audit UI interactions
         run: npm run audit:ui-interactions
 
+      - name: Audit dashboard integrity
+        run: npm run audit:dashboard-integrity
+
       - name: Unit tests
         run: npm run test:ci
 

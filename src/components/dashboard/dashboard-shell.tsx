@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Menu, Plus, X } from "lucide-react";
 import { LogoutButton } from "@/components/logout-button";
 import { GlobalSearch } from "@/components/dashboard/global-search";
+import { dashboardPrimaryCreateAction } from "@/components/dashboard/dashboard-primary-action";
 import {
   activeDashboardSectionId,
   isDashboardNavItemActive,
@@ -28,6 +29,8 @@ const settingsAreaPaths = [
   "/dashboard/audit",
   "/dashboard/drift",
   "/dashboard/arbetsorder/redigeringslas",
+  "/dashboard/behorigheter",
+  "/dashboard/integrationer",
   "/dashboard/billing",
 ] as const;
 
@@ -78,10 +81,7 @@ function NavigationContent({
   const residentItems = useMemo(() => visibleDashboardItems(residentNavigation, role), [role]);
   const primaryItems = useMemo(() => visibleDashboardItems(staffPrimaryNavigation, role), [role]);
   const sections = useMemo(() => visibleDashboardSections(role), [role]);
-  const detectedSectionId = useMemo(() => {
-    if (pathname.startsWith("/dashboard/arbetsorder/operationsoversikt") || pathname.startsWith("/dashboard/kalender")) return "drift";
-    return activeDashboardSectionId(pathname, sections);
-  }, [pathname, sections]);
+  const detectedSectionId = useMemo(() => activeDashboardSectionId(pathname, sections), [pathname, sections]);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(detectedSectionId);
 
   useEffect(() => {
@@ -182,12 +182,7 @@ export function DashboardShell({
   const homeHref = resident ? residentHomePath() : "/dashboard";
   const displayName = userName?.trim() || userEmail;
   const roleLabel = roleLabelFor(role);
-  const canCreateWorkOrder = !resident && (role === "owner" || role === "admin" || role === "manager");
-  const isPropertiesArea = pathname === "/dashboard/fastigheter" || pathname.startsWith("/dashboard/fastigheter/");
-  const primaryCreateAction = isPropertiesArea
-    ? { href: "/dashboard/fastigheter/ny", label: "Ny fastighet" }
-    : { href: "/dashboard/arbetsorder/ny", label: "Ny arbetsorder" };
-  const showPrimaryCreateAction = canCreateWorkOrder && pathname !== "/dashboard/fastigheter/ny";
+  const primaryCreateAction = resident ? null : dashboardPrimaryCreateAction(pathname, role);
 
   useEffect(() => { setMobileOpen(false); }, [pathname]);
   useEffect(() => {
@@ -251,11 +246,11 @@ export function DashboardShell({
               <button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button>
               <Link href={homeHref} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-950">REVALTA</Link>
             </div>
-            <div className="hidden flex-1 lg:block">{resident ? null : <GlobalSearch />}</div>
-            <div className="ml-auto flex items-center gap-2 sm:gap-2.5">
+            <div className="flex min-w-0 flex-1 justify-end lg:justify-start">{resident ? null : <GlobalSearch />}</div>
+            <div className="flex items-center gap-2 sm:gap-2.5">
               {resident ? null : <WorkOrderLockIndicator />}
               {resident ? null : <NotificationMenu />}
-              {showPrimaryCreateAction ? (
+              {primaryCreateAction ? (
                 <Link href={primaryCreateAction.href} className="hidden h-11 items-center gap-2 rounded-xl border border-petroleum-900/15 bg-petroleum-950 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2 sm:inline-flex">
                   <Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                   {primaryCreateAction.label}
