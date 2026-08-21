@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardSignature } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardSignature, Pencil, Plus } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
@@ -11,6 +11,7 @@ import {
   Panel,
   premiumFieldClass,
   premiumPrimaryButtonClass,
+  premiumSecondaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
@@ -47,6 +48,14 @@ function daysUntil(value?: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.ceil((due.getTime() - today.getTime()) / 86400000);
+}
+
+function statusClass(status?: string, urgent = false) {
+  if (status === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "action_required" || urgent) return "border-red-200 bg-red-50 text-red-700";
+  if (status === "booked") return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
+  if (status === "cancelled") return "border-sand-200 bg-sand-100 text-ink-500";
+  return "border-sand-200 bg-sand-50 text-ink-600";
 }
 
 export default function InspectionsPage() {
@@ -215,25 +224,34 @@ export default function InspectionsPage() {
   const sorted = [...inspections].sort((a, b) => String(a.due_date || "").localeCompare(String(b.due_date || "")));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-in-soft">
       <PageHeader
-        eyebrow="Efterlevnad och kontroll"
+        eyebrow="Drift · Efterlevnad"
         title="Besiktningar och myndighetskrav"
-        description="Samla OVK, SBA, hisskontroller, energideklarationer, radon och andra återkommande krav i en trygg och tydlig bevakning."
+        description="Samla OVK, SBA, hisskontroller, energideklarationer, radon och andra återkommande krav i en trygg och tydlig kontrollplan."
+        action={canManage ? (
+          <a href="#ny-kontroll" className={premiumPrimaryButtonClass}>
+            <Plus className="mr-2 h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+            Ny kontroll
+          </a>
+        ) : undefined}
       />
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={AlertTriangle} label="Försenade" value={summary.overdue} />
-        <MetricCard icon={CalendarClock} label="Inom 60 dagar" value={summary.upcoming} />
-        <MetricCard icon={ClipboardSignature} label="Åtgärd krävs" value={summary.action} />
-        <MetricCard icon={CheckCircle2} label="Genomförda" value={summary.completed} />
+        <MetricCard icon={AlertTriangle} label="Försenade" value={summary.overdue} hint="Kontroller med passerat förfallodatum" />
+        <MetricCard icon={CalendarClock} label="Inom 60 dagar" value={summary.upcoming} hint="Kommande krav som behöver planeras" />
+        <MetricCard icon={ClipboardSignature} label="Åtgärd krävs" value={summary.action} hint="Kontroller som kräver operativ åtgärd" />
+        <MetricCard icon={CheckCircle2} label="Genomförda" value={summary.completed} hint="Kontroller markerade som genomförda" />
       </section>
+
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra besiktningar.</InlineAlert> : null}
-      <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+
+      <section className={`grid items-start gap-6 ${canManage ? "xl:grid-cols-[390px_minmax(0,1fr)]" : "grid-cols-1"}`}>
         {canManage ? (
-          <Panel title="Ny kontroll" description="Lägg in förfallodatum, ansvarig och återkommande intervall.">
-            <form onSubmit={submit} className="space-y-4">
+          <Panel title="Ny kontroll" description="Lägg in förfallodatum, ansvarig och återkommande intervall." className="xl:sticky xl:top-[118px]">
+            <form id="ny-kontroll" onSubmit={submit} className="space-y-4">
               <Field label="Fastighet">
                 <select required className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
                   <option value="">Välj fastighet</option>
@@ -249,34 +267,25 @@ export default function InspectionsPage() {
                 <input required className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Förfallodatum">
-                  <input required type="date" className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
-                </Field>
-                <Field label="Intervall, månader">
-                  <input type="number" min="0" max="240" className={premiumFieldClass} value={form.intervalMonths} onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })} />
-                </Field>
+                <Field label="Förfallodatum"><input required type="date" className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></Field>
+                <Field label="Intervall, månader"><input type="number" min="0" max="240" className={premiumFieldClass} value={form.intervalMonths} onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })} /></Field>
               </div>
-              <Field label="Ansvarig internt">
-                <input className={premiumFieldClass} value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} placeholder="Namn eller funktion" />
-              </Field>
-              <Field label="Besiktningsföretag">
-                <input className={premiumFieldClass} value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Leverantör eller företag" />
-              </Field>
+              <Field label="Ansvarig internt"><input className={premiumFieldClass} value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} placeholder="Namn eller funktion" /></Field>
+              <Field label="Besiktningsföretag"><input className={premiumFieldClass} value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Leverantör eller företag" /></Field>
               <Field label="Status">
                 <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                   {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
-              <Field label="Anteckning">
-                <textarea className={premiumTextareaClass} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Anteckning eller krav" />
-              </Field>
+              <Field label="Anteckning"><textarea className={premiumTextareaClass} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Anteckning eller krav" /></Field>
               <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara kontroll"}</button>
             </form>
           </Panel>
         ) : null}
-        <Panel title="Kontrollplan" description="Kommande krav sorterade efter förfallodatum." bodyClassName="p-0">
+
+        <Panel title="Kontrollplan" description="Kommande myndighetskrav och kontroller sorterade efter förfallodatum." bodyClassName="p-0">
           {loading ? (
-            <div className="p-8 text-sm text-ink-500">Hämtar kontroller…</div>
+            <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div>
           ) : sorted.length === 0 ? (
             <EmptyState title="Inga besiktningar registrerade" description="Lägg till den första kontrollen för att börja bevaka myndighetskrav." />
           ) : (
@@ -284,92 +293,68 @@ export default function InspectionsPage() {
               {sorted.map((i) => {
                 const days = daysUntil(i.due_date);
                 const urgent = i.status !== "completed" && days <= 60;
+                const overdue = i.status !== "completed" && days < 0;
                 return (
-                  <article key={i.id} className="p-6 transition hover:bg-sand-50/60">
+                  <article key={i.id} className={`relative p-5 transition hover:bg-sand-50/45 sm:p-6 ${overdue ? "before:absolute before:inset-y-5 before:left-0 before:w-1 before:rounded-r-full before:bg-red-500" : ""}`}>
                     <div className="flex flex-col justify-between gap-4 sm:flex-row">
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-ink-900">{i.title}</h3>
-                          <span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{typeLabels[i.type || "other"]}</span>
-                          <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${urgent ? "bg-red-50 text-red-700" : "bg-petroleum-50 text-petroleum-700"}`}>
-                            {statusLabels[i.status || "planned"]}
-                          </span>
+                          <h3 className="font-display text-lg font-semibold tracking-[-0.02em] text-ink-900">{i.title}</h3>
+                          <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{typeLabels[i.type || "other"]}</span>
+                          <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${statusClass(i.status, urgent)}`}>{statusLabels[i.status || "planned"]}</span>
                         </div>
                         <p className="mt-1 text-sm text-ink-500">{i.property_name}{i.supplier ? ` · ${i.supplier}` : ""}</p>
                       </div>
-                      <div className="sm:text-right">
+                      <div className="shrink-0 sm:text-right">
                         <p className="text-sm font-semibold text-ink-900">{i.due_date ? new Date(`${i.due_date}T00:00:00`).toLocaleDateString("sv-SE") : "—"}</p>
-                        <p className={`mt-1 text-xs ${urgent ? "text-red-700" : "text-ink-500"}`}>
-                          {days < 0 ? `${Math.abs(days)} dagar försenad` : days === 0 ? "Förfaller idag" : `${days} dagar kvar`}
-                        </p>
+                        <p className={`mt-1 text-xs font-medium ${urgent ? "text-red-700" : "text-ink-500"}`}>{days < 0 ? `${Math.abs(days)} dagar försenad` : days === 0 ? "Förfaller idag" : Number.isFinite(days) ? `${days} dagar kvar` : "Datum saknas"}</p>
                       </div>
                     </div>
-                    <div className="mt-5 grid grid-cols-2 gap-3 text-xs text-ink-500 md:grid-cols-3">
+
+                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
                       <Mini label="Ansvarig" value={i.responsible || "Ej utsedd"} />
                       <Mini label="Intervall" value={Number(i.interval_months || 0) ? `${i.interval_months} månader` : "Engångskontroll"} />
                       <Mini label="Anteckning" value={i.note || "Ingen anteckning"} />
                     </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-3">
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
                       {i.source === "legacy" ? (
-                        <p className="text-xs font-medium text-amber-700">Äldre rad – kör backfill innan status eller arbetsorder kan ändras.</p>
+                        <InlineAlert tone="warning">Äldre rad – kör backfill innan status eller arbetsorder kan ändras.</InlineAlert>
                       ) : canManage ? (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => (editingId === i.id ? setEditingId("") : startEdit(i))}
-                            className="rounded-xl border border-sand-300 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-sand-50"
-                          >
-                            {editingId === i.id ? "Stäng" : "Ändra"}
+                          <button type="button" onClick={() => (editingId === i.id ? setEditingId("") : startEdit(i))} className={`${premiumSecondaryButtonClass} h-9 px-3 text-xs`}>
+                            <Pencil className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />{editingId === i.id ? "Stäng" : "Ändra"}
                           </button>
-                          <label className="flex items-center gap-2 text-xs text-ink-600">
-                            <span className="font-semibold">Status</span>
-                            <select
-                              disabled={updatingId === i.id}
-                              value={i.status || "planned"}
-                              onChange={(event) => void updateStatus(i, event.target.value)}
-                              className="rounded-lg border border-sand-200 bg-white px-2 py-1.5 text-xs font-semibold text-ink-800"
-                            >
-                              {Object.entries(statusLabels).map(([value, label]) => (
-                                <option key={value} value={value}>{label}</option>
-                              ))}
-                            </select>
-                          </label>
+                          <select
+                            disabled={updatingId === i.id}
+                            value={i.status || "planned"}
+                            onChange={(event) => void updateStatus(i, event.target.value)}
+                            className="h-9 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 outline-none focus:border-petroleum-500 focus:ring-2 focus:ring-petroleum-100"
+                            aria-label={`Status för ${i.title}`}
+                          >
+                            {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                          </select>
                         </>
                       ) : null}
                       {i.work_order_id ? (
-                        <Link href={`/dashboard/arbetsorder/${i.work_order_id}`} className="text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">
-                          Öppna kopplad arbetsorder
-                        </Link>
+                        <Link href={`/dashboard/arbetsorder/${i.work_order_id}`} className={`${premiumSecondaryButtonClass} h-9 px-3 text-xs`}>Öppna arbetsorder</Link>
                       ) : canManage && i.status === "action_required" && i.source !== "legacy" ? (
-                        <button
-                          type="button"
-                          disabled={creatingId === i.id}
-                          onClick={() => void createWorkOrder(i)}
-                          className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900"
-                        >
+                        <button type="button" disabled={creatingId === i.id} onClick={() => void createWorkOrder(i)} className={`${premiumPrimaryButtonClass} h-9 px-3 text-xs`}>
                           {creatingId === i.id ? "Skapar…" : "Skapa arbetsorder"}
                         </button>
                       ) : null}
                     </div>
+
                     {canManage && editingId === i.id ? (
-                      <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-4 sm:grid-cols-2">
+                      <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-[#FCFBF8] p-4 sm:grid-cols-2">
                         <input className={premiumFieldClass} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} placeholder="Titel" aria-label="Titel" />
-                        <select className={premiumFieldClass} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} aria-label="Kontrolltyp">
-                          {Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                        </select>
+                        <select className={premiumFieldClass} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} aria-label="Kontrolltyp">{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
                         <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} aria-label="Förfallodatum" />
                         <input className={premiumFieldClass} value={editForm.intervalMonths} onChange={(e) => setEditForm({ ...editForm, intervalMonths: e.target.value })} placeholder="Intervall (månader)" aria-label="Intervall (månader)" />
                         <input className={premiumFieldClass} value={editForm.responsible} onChange={(e) => setEditForm({ ...editForm, responsible: e.target.value })} placeholder="Ansvarig" aria-label="Ansvarig" />
                         <input className={premiumFieldClass} value={editForm.supplier} onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })} placeholder="Leverantör" aria-label="Leverantör" />
                         <textarea className={`${premiumTextareaClass} sm:col-span-2`} value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} placeholder="Anteckning" aria-label="Anteckning" />
-                        <button
-                          type="button"
-                          disabled={updatingId === i.id}
-                          onClick={() => void saveEdit(i)}
-                          className="rounded-xl bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white hover:bg-petroleum-900 sm:col-span-2"
-                        >
-                          {updatingId === i.id ? "Sparar…" : "Spara ändringar"}
-                        </button>
+                        <button type="button" disabled={updatingId === i.id} onClick={() => void saveEdit(i)} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{updatingId === i.id ? "Sparar…" : "Spara ändringar"}</button>
                       </div>
                     ) : null}
                   </article>
@@ -388,5 +373,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
-  return <span>{label}<strong className="mt-1 block text-ink-800">{value}</strong></span>;
+  return <div className="rounded-xl border border-sand-200 bg-[#FCFBF8] px-3.5 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-500">{label}</p><p className="mt-1.5 line-clamp-2 text-sm font-semibold text-ink-800">{value}</p></div>;
 }
