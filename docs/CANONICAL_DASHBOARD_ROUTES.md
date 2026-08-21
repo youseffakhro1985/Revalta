@@ -43,6 +43,17 @@ Redirect-targets för denna familj definieras i `src/lib/dashboard-route-compat.
 
 Detta gör att de använder samma canonical dashboard- och Settings-layoutkedja som övriga inställningssidor, samtidigt som bokmärken och interna länkar fortsätter fungera oförändrat.
 
+## Automatisk integritetskontroll
+
+`scripts/audit-dashboard-integrity.mjs` körs i Revalta CI och är en releasegrind. Kontrollen:
+
+- bygger en routekatalog från alla canonical `page.tsx` under `(dashboard)`,
+- verifierar statiska interna `/dashboard/**`-länkar mot verkliga routes,
+- stoppar nya interna länkar som använder ett känt legacy-alias,
+- verifierar att varje `page.tsx` i legacy-trädet använder `redirect(...)` och inte återinför parallell dashboard-UI.
+
+Det gör canonical-principen maskinellt verifierbar i varje PR i stället för att vara enbart dokumentation.
+
 ## Regel för framtida routes
 
 - Ny dashboardfunktion: skapa endast under `src/app/(dashboard)/dashboard/**`.
