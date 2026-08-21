@@ -32,8 +32,8 @@ export function commandCenterQuickActions(role: string): CommandCenterQuickActio
       ? [{
           id: "new-property",
           label: "Lägg till fastighet",
-          description: "Öppna fastighetsregistret",
-          href: "/dashboard/fastigheter",
+          description: "Registrera en ny fastighet",
+          href: "/dashboard/fastigheter/ny",
           kind: "property" as const,
         }]
       : []),
