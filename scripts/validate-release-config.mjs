@@ -84,12 +84,14 @@ for (const [fragment, message] of [
   ["run: npm run validate:release-config", "CI must validate release configuration"],
   ["run: npx prisma migrate deploy", "CI must apply migrations to a clean database"],
   ["run: npm run audit:ui-interactions", "CI must reject inert buttons and invalid navigation links"],
+  ["run: npm run audit:dashboard-integrity", "CI must reject broken dashboard routes and legacy UI duplication"],
   ["run: npm run test:ci", "CI must run the complete test suite"],
   ["run: npm run typecheck", "CI must run TypeScript validation"],
   ["run: npm run audit:prod", "CI must audit production dependencies"],
   ["run: npm run build:ci", "CI must build the production application"],
 ]) requireText(ci, fragment, message);
 requireOrder(ci, "run: npm run validate:release-config", "run: npx prisma generate", "Release configuration validation must run before Prisma and build work");
+requireOrder(ci, "run: npm run audit:ui-interactions", "run: npm run audit:dashboard-integrity", "Dashboard integrity audit must follow the UI interaction audit");
 validatePinnedActions(ci, "Revalta CI");
 
 for (const [fragment, message] of [
@@ -109,7 +111,9 @@ validatePinnedActions(codeql, "CodeQL");
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");
 if (scripts["audit:ui-interactions"] !== "node scripts/audit-ui-interactions.mjs") fail("package.json must expose audit:ui-interactions");
+if (scripts["audit:dashboard-integrity"] !== "node scripts/audit-dashboard-integrity.mjs") fail("package.json must expose audit:dashboard-integrity");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must validate release configuration first");
 if (!scripts.quality.includes("npm run audit:ui-interactions")) fail("The quality command must audit UI interactions");
+if (!scripts.quality.includes("npm run audit:dashboard-integrity")) fail("The quality command must audit dashboard route integrity");
 
-console.log("Release configuration is valid: Vercel commands and cron contracts, main/release-preview CI coverage, immutable GitHub Action pins, digest-pinned PostgreSQL, least-privilege checkout, database migration checks, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
+console.log("Release configuration is valid: Vercel commands and cron contracts, main/release-preview CI coverage, immutable GitHub Action pins, digest-pinned PostgreSQL, least-privilege checkout, database migration checks, UI and dashboard integrity audits, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
