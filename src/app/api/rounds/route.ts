@@ -80,8 +80,10 @@ export async function GET() {
     return NextResponse.json({
       rounds: [...modern, ...legacy]
         .sort((a, b) => {
-          const aDue = typeof a.nextDue === "string" ? new Date(a.nextDue).getTime() : Number.MAX_SAFE_INTEGER;
-          const bDue = typeof b.nextDue === "string" ? new Date(b.nextDue).getTime() : Number.MAX_SAFE_INTEGER;
+          const aNextDue = "nextDue" in a && typeof a.nextDue === "string" ? a.nextDue : null;
+          const bNextDue = "nextDue" in b && typeof b.nextDue === "string" ? b.nextDue : null;
+          const aDue = aNextDue ? new Date(aNextDue).getTime() : Number.MAX_SAFE_INTEGER;
+          const bDue = bNextDue ? new Date(bNextDue).getTime() : Number.MAX_SAFE_INTEGER;
           return aDue - bDue;
         })
         .slice(0, 300),
