@@ -28,9 +28,9 @@ export function MetricCard({ icon: Icon, label, value, hint, className = "" }: {
   </div>;
 }
 
-export function Panel({ title, description, action, children, className = "", bodyClassName = "p-6" }: { title?: string; description?: string; action?: ReactNode; children: ReactNode; className?: string; bodyClassName?: string }) {
+export function Panel({ title, description, action, icon: Icon, children, className = "", bodyClassName = "p-6" }: { title?: string; description?: string; action?: ReactNode; icon?: LucideIcon; children: ReactNode; className?: string; bodyClassName?: string }) {
   return <section className={`overflow-hidden rounded-2xl border border-sand-200/90 bg-white shadow-premium-sm ${className}`}>
-    {title ? <div className="flex flex-col gap-4 border-b border-sand-200 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6"><div className="min-w-0"><h2 className="font-display text-xl font-semibold tracking-[-0.02em] text-ink-900">{title}</h2>{description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-500">{description}</p> : null}</div>{action ? <div className="shrink-0">{action}</div> : null}</div> : null}
+    {title ? <div className="flex flex-col gap-4 border-b border-sand-200 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6"><div className="min-w-0"><div className="flex items-center gap-2.5">{Icon ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-petroleum-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /></span> : null}<h2 className="font-display text-xl font-semibold tracking-[-0.02em] text-ink-900">{title}</h2></div>{description ? <p className={`mt-1 max-w-3xl text-sm leading-6 text-ink-500 ${Icon ? "sm:ml-[42px]" : ""}`}>{description}</p> : null}</div>{action ? <div className="shrink-0">{action}</div> : null}</div> : null}
     <div className={bodyClassName}>{children}</div>
   </section>;
 }
