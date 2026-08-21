@@ -156,9 +156,9 @@ function openDeviationCount(round: Round) {
 
 function statusPill(round: Round, nowMs: number) {
   if (isOverdue(round, nowMs)) return { label: "Försenad", className: "border-red-100 bg-red-50 text-red-700" };
-  if (round.status === "completed") return { label: "Genomförd", className: "border-emerald-100 bg-emerald-50 text-emerald-700" };
-  if (round.status === "in_progress") return { label: "Pågående", className: "border-amber-100 bg-amber-50 text-amber-800" };
-  return { label: "Planerad", className: "border-petroleum-100 bg-petroleum-50 text-petroleum-800" };
+  if (round.status === "completed") return { label: statusLabels.completed, className: "border-emerald-100 bg-emerald-50 text-emerald-700" };
+  if (round.status === "in_progress") return { label: statusLabels.in_progress, className: "border-amber-100 bg-amber-50 text-amber-800" };
+  return { label: statusLabels.planned, className: "border-petroleum-100 bg-petroleum-50 text-petroleum-800" };
 }
 
 function daysOverdue(round: Round, nowMs: number) {
@@ -595,7 +595,7 @@ export default function RoundsPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={CalendarDays} label="Planerade ronder" value={nextThirty} hint="Nästa 30 dagar" />
-        <MetricCard icon={CheckCircle2} label="Genomförandegrad" value={`${completionRate}%`} hint="Slutförda av registrerade ronder" />
+        <MetricCard icon={Building2} label="Genomförandegrad" value={`${completionRate}%`} hint="Slutförda av registrerade ronder" />
         <MetricCard icon={AlertTriangle} label="Försenade ronder" value={overdueRounds.length} hint="Kräver uppföljning" />
         <MetricCard icon={ClipboardCheck} label="Öppna avvikelser" value={openDeviations} hint="Saknar kopplad arbetsorder" />
         <MetricCard icon={TrendingUp} label="Genomsnittligt resultat" value={averageResult === null ? "—" : `${averageResult}%`} hint="Genomförda ronder" />
@@ -682,7 +682,7 @@ export default function RoundsPage() {
                         </td>
                         <td className="px-4 py-4 text-xs text-ink-700">{intervalLabels[round.interval || "monthly"] || round.interval}</td>
                         <td className="px-4 py-4">
-                          <p className={`text-xs font-semibold ${isOverdue(round, nowMs) ? "text-red-700" : "text-ink-800"}`}>{round.nextDue ? dateFormat.format(new Date(round.nextDue)) : "Ej satt"}</p>
+                          <p className={`text-xs font-semibold ${isOverdue(round, nowMs) ? "text-red-700" : "text-ink-800"}`}>{round.nextDue ? dateTimeFormat.format(new Date(round.nextDue)) : "Ej satt"}</p>
                           <p className="mt-1 text-[11px] text-ink-500">{intervalLongLabels[round.interval || "monthly"]}</p>
                         </td>
                         <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${pill.className}`}>{pill.label}</span></td>
