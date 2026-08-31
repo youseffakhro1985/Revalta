@@ -372,7 +372,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!canAssignWorkOrders(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ta bort arbetsordrar" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
@@ -384,6 +383,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (shouldScopeToAssignedWork(user.role) && existing.assigned_to_id !== user.id) {
     return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
   }
+  if (!canAssignWorkOrders(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ta bort arbetsordrar" }, { status: 403 });
 
   const deleteResult = await db.workOrder.updateMany({
     where: { id: existing.id, company_id: user.company_id, deleted_at: null },
