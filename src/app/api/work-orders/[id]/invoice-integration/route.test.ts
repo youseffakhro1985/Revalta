@@ -110,6 +110,21 @@ describe("work-order invoice integration — logical export idempotency", () => 
     expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
   });
 
+  it("blocks a historically exported invoice version even when no modern export job is present", async () => {
+    const exportedInvoice = { ...invoice, status: "exported" };
+    getModernLatestInvoiceDraftMock.mockResolvedValue(exportedInvoice);
+    getLatestInvoiceDraftMock.mockResolvedValue(exportedInvoice);
+    listInvoiceExportJobsMock.mockResolvedValue([]);
+
+    const response = await POST(request({ action: "queue", provider: "webhook" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("markerad som exporterad");
+    expect(listInvoiceExportJobsMock).not.toHaveBeenCalled();
+    expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
+  });
+
   it("requires retrying the existing failed job instead of creating a new idempotency identity", async () => {
     listInvoiceExportJobsMock.mockResolvedValue([existingJob("failed")]);
 
