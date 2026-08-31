@@ -7,6 +7,7 @@ const paths = {
   vercelBuild: new URL("scripts/vercel-build.mjs", root),
   ci: new URL(".github/workflows/ci.yml", root),
   codeql: new URL(".github/workflows/codeql.yml", root),
+  databaseStatus: new URL(".github/workflows/database-status.yml", root),
 };
 
 const CHECKOUT_SHA = "11d5960a326750d5838078e36cf38b85af677262";
@@ -53,12 +54,13 @@ function validatePinnedActions(source, label) {
   }
 }
 
-const [vercel, packageJson, vercelBuild, ci, codeql] = await Promise.all([
+const [vercel, packageJson, vercelBuild, ci, codeql, databaseStatus] = await Promise.all([
   readJson(paths.vercel, "vercel.json"),
   readJson(paths.package, "package.json"),
   readFile(paths.vercelBuild, "utf8"),
   readFile(paths.ci, "utf8"),
   readFile(paths.codeql, "utf8"),
+  readFile(paths.databaseStatus, "utf8"),
 ]);
 
 if (vercel.framework !== "nextjs") fail("vercel.json framework must remain nextjs");
@@ -130,6 +132,28 @@ for (const [fragment, message] of [
 ]) requireText(codeql, fragment, message);
 validatePinnedActions(codeql, "CodeQL");
 
+for (const [fragment, message] of [
+  ["name: Database Status", "Database Status workflow name changed unexpectedly"],
+  ["workflow_dispatch:", "Database Status must be manual-only"],
+  ["commit_sha:", "Database Status must require an exact commit SHA"],
+  ["contents: read", "Database Status permissions must remain read-only"],
+  ["group: revalta-production-database-release", "Database Status must share the production migration concurrency lock"],
+  ["environment: Production", "Database Status must use the Production environment"],
+  ["persist-credentials: false", "Database Status checkout must not persist credentials"],
+  [`uses: actions/checkout@${CHECKOUT_SHA} # v4`, "Database Status checkout action must use the verified commit"],
+  [`uses: actions/setup-node@${SETUP_NODE_SHA} # v4`, "Database Status setup-node action must use the verified commit"],
+  ["git merge-base --is-ancestor", "Database Status must reject commits not contained in main"],
+  ["run: npm ci", "Database Status must use reproducible dependency installation"],
+  ["run: npx prisma generate", "Database Status must generate the Prisma client before inspection"],
+  ["npx prisma migrate status", "Database Status must inspect migration status"],
+  ["Read-only production schema inspection. This workflow must never apply migrations.", "Database Status must declare its read-only invariant"],
+]) requireText(databaseStatus, fragment, message);
+if (databaseStatus.includes("prisma migrate deploy") || databaseStatus.includes("prisma db push")) {
+  fail("Database Status must never contain a mutating Prisma migration command");
+}
+requireOrder(databaseStatus, "git merge-base --is-ancestor", "npx prisma migrate status", "Database Status must verify the approved main commit before inspecting Production");
+validatePinnedActions(databaseStatus, "Database Status");
+
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");
 if (scripts["audit:ui-interactions"] !== "node scripts/audit-ui-interactions.mjs") fail("package.json must expose audit:ui-interactions");
@@ -138,4 +162,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
 if (!scripts.quality.includes("npm run audit:ui-interactions")) fail("The quality command must audit UI interactions");
 if (!scripts.quality.includes("npm run audit:dashboard-integrity")) fail("The quality command must audit dashboard route integrity");
 
-console.log("Release configuration is valid: Vercel builds cannot run database migrations; Vercel commands and cron contracts, main/release-preview CI coverage, immutable GitHub Action pins, digest-pinned PostgreSQL, least-privilege checkout, clean-database migration checks, UI and dashboard integrity audits, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
+console.log("Release configuration is valid: Vercel builds cannot run database migrations; Database Status is read-only and shares the production migration lock; Vercel commands and cron contracts, main/release-preview CI coverage, immutable GitHub Action pins, digest-pinned PostgreSQL, least-privilege checkout, clean-database migration checks, UI and dashboard integrity audits, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
