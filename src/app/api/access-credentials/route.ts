@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { auditScopedWhere, canManageAccessCredentials, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { loadLegacyRows } from "@/lib/dual-list";
+import { isModernStorageMirror, loadLegacyRows } from "@/lib/dual-list";
 import { createLogger } from "@/lib/structured-logger";
 import { NextResponse } from "next/server";
 
@@ -76,16 +76,13 @@ export async function GET() {
       source: "table" as const,
     }));
 
-    const modernKeys = new Set(
-      modern.map((row) => `${row.property_id}|${row.identifier}|${row.credential_type}|${row.created_at.toISOString()}`),
-    );
-
+    const modernIds = new Set(modern.map((row) => row.id));
     const legacy = legacyLogs
+      .filter((log) => !isModernStorageMirror(log.metadata, "AccessCredential", modernIds, log.entity_id))
       .map((log) => {
         const metadata = (log.metadata || {}) as Record<string, unknown>;
         const identifier = typeof metadata.identifier === "string" ? metadata.identifier : "";
         const credentialType = typeof metadata.credential_type === "string" ? metadata.credential_type : "key";
-        const key = `${log.entity_id || ""}|${identifier}|${credentialType}|${log.created_at.toISOString()}`;
         return {
           id: log.id,
           property_id: log.entity_id,
@@ -102,15 +99,9 @@ export async function GET() {
           registered_by: typeof metadata.registered_by === "string" ? metadata.registered_by : "Okänd",
           created_at: log.created_at,
           source: "legacy" as const,
-          _dedupeKey: key,
         };
       })
-      .filter((row) => row.identifier && !modernKeys.has(row._dedupeKey))
-      .map((row) => {
-        const { _dedupeKey, ...rest } = row;
-        void _dedupeKey;
-        return rest;
-      });
+      .filter((row) => row.identifier);
 
     const credentials = [...modern, ...legacy]
       .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
@@ -186,17 +177,8 @@ export async function POST(request: Request) {
       action: legacyAction,
       metadata: {
         property_id: property.id,
-        property_name: property.name,
-        identifier,
         credential_type: credentialType,
-        holder,
-        unit,
-        access_area: accessArea,
         status,
-        issued_at: issuedAt || null,
-        return_due: returnDue || null,
-        note,
-        registered_by: user.name || user.email,
         storage: "AccessCredential",
       },
     });
@@ -367,9 +349,8 @@ export async function PATCH(request: Request) {
       metadata: {
         previousStatus: existing.status,
         status: nextStatus,
-        holder: nextHolder,
-        identifier: identifier ?? existing.identifier,
         credential_type: credentialType ?? existing.credential_type,
+        changed_fields: fieldKeys.filter((key) => body[key] !== undefined),
         storage: "AccessCredential",
       },
     });
