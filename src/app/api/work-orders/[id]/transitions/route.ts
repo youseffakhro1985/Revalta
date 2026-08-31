@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canAssignWorkOrders, canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canAssignWorkOrders, canManageTickets, canManageWorkOrderFinance, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { getAllowedWorkOrderTransitions } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
@@ -34,10 +34,14 @@ export async function GET(
     if (!isAssignedWorkAccessible(user as CompanyUser, workOrder.assigned_to_id)) return notFoundWorkOrder();
 
     const currentStatus = normalizeWorkOrderStatus(workOrder.status);
+    const canManageFinance = canManageWorkOrderFinance(user.role);
+    const allowedStatuses = getAllowedWorkOrderTransitions(currentStatus).filter((status) =>
+      canManageFinance || status === currentStatus || (currentStatus !== "invoiced" && status !== "invoiced")
+    );
     return NextResponse.json(
       {
         currentStatus,
-        allowedStatuses: getAllowedWorkOrderTransitions(currentStatus),
+        allowedStatuses,
         assignedToId: workOrder.assigned_to_id,
         users: canAssignWorkOrders(user.role)
           ? users.filter((member) => ["owner", "admin", "manager", "technician"].includes(member.role))
