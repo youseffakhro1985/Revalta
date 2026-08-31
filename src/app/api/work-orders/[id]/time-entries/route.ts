@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getModernTimeEntry,
@@ -50,16 +50,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const body = await request.json();
   const action = String(body.action || "manual");
-  const kind = String(body.kind || "work");
+  let kind = String(body.kind || "work");
   if (!allowedActions.has(action) || !allowedKinds.has(kind)) return NextResponse.json({ error: "Ogiltig åtgärd eller tidstyp" }, { status: 400 });
-  if (["approve", "reject"].includes(action) && !canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att attestera tid" }, { status: 403 });
+  if (["approve", "reject"].includes(action) && !canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet att attestera tid" }, { status: 403 });
 
   const isCreateAction = action === "manual" || action === "start";
   const entryId = isCreateAction ? crypto.randomUUID() : String(body.entryId || "").trim();
   if (!isCreateAction && !entryId) return NextResponse.json({ error: "Tidsrad-id krävs" }, { status: 400 });
 
-  const note = body.note ? String(body.note).trim().slice(0, 1000) : null;
-  const billable = kind !== "break" && body.billable !== false;
+  let note = body.note ? String(body.note).trim().slice(0, 1000) : null;
+  let billable = kind !== "break" && body.billable !== false;
   let startedAt: string | null = null;
   let endedAt: string | null = null;
   let minutes: number | null = null;
@@ -89,6 +89,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     userId = latest.userId;
     userName = latest.userName ?? null;
     userEmail = latest.userEmail;
+    kind = latest.kind;
+    billable = latest.billable !== false;
+    note = latest.note ?? null;
     if (action === "stop") {
       if (latest.userId !== user.id && !canManageTickets(user.role)) return NextResponse.json({ error: "Du kan bara stoppa din egen timer" }, { status: 403 });
       if (!latest.startedAt || latest.status !== "running") return NextResponse.json({ error: "Tidsraden är inte aktiv" }, { status: 400 });
