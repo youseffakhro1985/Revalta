@@ -166,6 +166,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     nextStatus = normalizeWorkOrderStatus(raw);
     const currentStatus = normalizeWorkOrderStatus(existing.status);
     if (!canTransitionWorkOrder(currentStatus, nextStatus)) return NextResponse.json({ error: `Status kan inte ändras från ${currentStatus} till ${nextStatus}` }, { status: 409 });
+    if (nextStatus !== currentStatus && (currentStatus === "invoiced" || nextStatus === "invoiced") && !canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att ändra faktureringsstatus" }, { status: 403 });
+    }
     if (["blocked", "cancelled"].includes(nextStatus) && !statusReason) return NextResponse.json({ error: "Ange en orsak till statusändringen" }, { status: 400 });
     if (statusReason && statusReason.length > 1000) return NextResponse.json({ error: "Statusorsaken får vara högst 1 000 tecken" }, { status: 400 });
     data.status = nextStatus;
