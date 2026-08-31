@@ -108,6 +108,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if ((action === "approve" || action === "reject") && existing.status !== "submitted") {
       return NextResponse.json({ error: "Materialraden kan bara attesteras när den är inskickad" }, { status: 409 });
     }
+    if (action === "delete" && existing.status !== "submitted") {
+      return NextResponse.json({ error: "Materialraden kan bara tas bort innan den har attesterats" }, { status: 409 });
+    }
     if (action === "delete" && existing.createdById !== user.id && !canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du kan bara ta bort dina egna rader" }, { status: 403 });
     }
