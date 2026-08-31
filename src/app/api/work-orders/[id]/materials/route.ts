@@ -59,7 +59,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json();
   const action = String(body.action || "create");
   if (!["create", "approve", "reject", "delete"].includes(action)) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
-  const entryId = String(body.entryId || crypto.randomUUID());
+  const entryId = action === "create" ? crypto.randomUUID() : String(body.entryId || "").trim();
+  if (action !== "create" && !entryId) return NextResponse.json({ error: "Materialrad-id krävs" }, { status: 400 });
   let row: MaterialEntryPayload;
 
   if (action === "create") {

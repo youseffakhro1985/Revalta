@@ -54,7 +54,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!allowedActions.has(action) || !allowedKinds.has(kind)) return NextResponse.json({ error: "Ogiltig åtgärd eller tidstyp" }, { status: 400 });
   if (["approve", "reject"].includes(action) && !canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att attestera tid" }, { status: 403 });
 
-  const entryId = String(body.entryId || crypto.randomUUID());
+  const isCreateAction = action === "manual" || action === "start";
+  const entryId = isCreateAction ? crypto.randomUUID() : String(body.entryId || "").trim();
+  if (!isCreateAction && !entryId) return NextResponse.json({ error: "Tidsrad-id krävs" }, { status: 400 });
+
   const note = body.note ? String(body.note).trim().slice(0, 1000) : null;
   const billable = kind !== "break" && body.billable !== false;
   let startedAt: string | null = null;
