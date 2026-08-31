@@ -7,7 +7,7 @@ snapshot:
   baseline_main_sha: "b7b08793ccde1baef7a1c210ad9238ad72332df5"
   production:
     url: "https://www.revalta.se"
-    exact_merge_sha_status: "PENDING_VERIFICATION"
+    exact_merge_sha_status: "SUCCESS"
     health_release_identity: "MONITORED_EXACT_SHA_WITH_PROPAGATION_GRACE"
     database_health: "UNVERIFIED_IN_THIS_SNAPSHOT"
     note: "GitHub/Vercel deployment status is evidence only for application deployment. Production Prisma migration state must be verified separately through the read-only Database Status workflow."
@@ -47,8 +47,7 @@ tasks:
     status: "IN_PROGRESS"
     baseline_sha: "b7b08793ccde1baef7a1c210ad9238ad72332df5"
     branch: "agent/rev-coord-005-current-main-baseline"
-    dependencies:
-      - "verify Vercel deployment status for baseline merge SHA before coordination merge"
+    dependencies: []
     acceptance:
       - "AI task registry reflects current main rather than 18 August baseline"
       - "P0 merged fixes and stale PR dispositions are recorded"
@@ -131,6 +130,7 @@ tasks:
       - "CodeQL success"
       - "exact-SHA Preview Browser E2E success after same-SHA retry of unrelated password-reset timeout"
       - "Vercel Preview success"
+      - "Vercel merge deployment success"
     runtime_status: "NOT_RUN"
     note: "New Database Status workflow is read-only, exact-SHA, Production-environment scoped, and shares migration concurrency lock. Connector has no workflow-dispatch write capability."
     updated_at: "2026-08-31"
