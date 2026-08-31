@@ -1,193 +1,304 @@
-version: 1
+version: 2
 repository: "youseffakhro1985/Revalta"
 source_of_truth: "GitHub main"
 
 snapshot:
-  verified_at: "2026-08-18"
-  baseline_main_sha: "dd593d62c9cfa374ae00eff21ecffd8bab172df1"
+  verified_at: "2026-08-31"
+  baseline_main_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+  baseline_main_commit: "Ronder: premium rond- och checklistsystem"
+  repository:
+    visibility: "public"
+    commercial_ip_decision: "BLOCKED_OWNER_DECISION"
   production:
     url: "https://www.revalta.se"
-    exact_merge_sha_status: "SUCCESS"
-    note: "Vercel status verified through GitHub commit status. Direct mutating Production registration smoke intentionally not run."
+    health_monitor_status: "SUCCESS_ON_CURRENT_MAIN_WORKFLOW"
+    exact_release_identity_status: "UNVERIFIED_UNTIL_REV_STAB_002"
+    database_health_status: "HEALTH_ENDPOINT_MONITOR_GREEN"
+    schema_migration_status: "UNVERIFIED"
+    note: "The current Production Release Monitor proves health/database/production-branch shape but does not yet prove that production commitSha equals current GitHub main. PR #332 addresses this gap."
+  database_release:
+    last_known_success_before_reset: "2026-08-13"
+    migration_after_last_known_success: "20260822010000_inspection_checklist_templates"
+    status: "VERIFY_PRODUCTION_MIGRATION_STATUS_BEFORE_ANY_SCHEMA_WRITE"
   vercel_connector:
+    team_id: "team_4GYkeSBTtXApHmGlIycnqnci"
+    team_plan: "hobby"
+    project_list_count: 0
     status: "BLOCKED_CONNECTOR"
-    note: "Team visible; Revalta project listing unavailable. Do not infer env/runtime/log state."
+    commercial_status: "BLOCKED_HOBBY_FOR_COMMERCIAL_SAAS"
+    note: "Do not infer project env/runtime/log/domain/deployment settings until Revalta project access is restored."
+
+active_program:
+  program_id: "REV-STABILIZATION-2026-08"
+  rule: "No new major feature breadth until P0 stabilization gates are resolved."
+  order:
+    - "REV-COORD-005"
+    - "REV-DB-001"
+    - "REV-STAB-001"
+    - "REV-STAB-002"
+    - "REV-STAB-003"
+    - "REV-VERCEL-002"
+    - "REV-PR-RECON-001"
+    - "REV-TENANT-AUDIT-001"
+    - "REV-BILLING-CONTRACT-001"
+    - "REV-FEATURE-READINESS-001"
+    - "REV-GOLDEN-PATH-001"
+    - "REV-UX-MOBILE-001"
+    - "REV-PERF-001"
+    - "REV-OBS-002"
+    - "REV-LEGAL-001"
+    - "REV-MARKETING-TRUTH-001"
 
 tasks:
-  - task_id: "REV-OBS-002"
-    title: "Observability phase 2: correlated API, auth, cron and Stripe errors"
-    owner: "ChatGPT Work"
-    status: "READY_NEXT"
-    issue: 217
-    baseline_sha: null
-    branch: null
-    owned_paths: []
-    forbidden_paths:
-      - "src/app/demo/**"
-      - "src/app/api/demo-request/**"
-      - "src/lib/demo-request-email*"
-      - "src/components/demo-request-form.tsx"
-      - "src/app/page.tsx"
-      - "src/components/marketing-header.tsx"
-      - "src/components/site-footer.tsx"
-      - "src/app/sitemap.ts"
-      - ".env.example"
-      - "INTEGRATIONS.md"
-      - "prisma/schema.prisma"
-      - "prisma/migrations/**"
-    dependencies:
-      - "fresh current-main read after coordination merge"
-      - "issue #217"
-      - "existing route-observability and structured logger architecture"
-    acceptance:
-      - "requestId is correlated across internal log, response header and error payload"
-      - "logs include safe route, method, release, environment, latency and stable event/error code"
-      - "public errors are safe, stable, private no-store and never expose Production stack traces"
-      - "passwords, verification/reset tokens, cookies, sessions, JWT, CRON_SECRET, Stripe signatures, raw webhook bodies, DB URLs, email, names and free text are not logged by migrated paths"
-      - "verified internal company/user/Stripe IDs only"
-      - "auth, cron, Stripe and prioritized business API routes receive contract tests"
-      - "no new external logging provider and no technical-request DB table"
-      - "no business-rule, authorization-model, schema or migration changes"
-      - "CI, CodeQL, exact-SHA Preview and relevant browser/smoke gates pass"
+  - task_id: "REV-COORD-005"
+    title: "Current-main reconciliation and stabilization baseline"
+    owner: "ChatGPT"
+    status: "IN_REVIEW"
+    baseline_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+    branch: "agent/rev-coord-005-stabilization-baseline"
     pull_request: null
-    updated_at: "2026-08-18"
-
-  - task_id: "REV-AUTH-RESET-001"
-    title: "Fix password-reset request latency"
-    owner: "ChatGPT Work"
-    status: "DONE"
-    issue: 265
-    issue_status: "CLOSED_COMPLETED"
-    baseline_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
-    branch: "agent/auth-reset-bounded-latency"
-    owned_paths: []
-    forbidden_paths: []
-    dependencies: []
+    owned_paths:
+      - "AI_COLLABORATION.md"
+      - "docs/AI_TASKS.yml"
+      - "docs/FEATURE_READINESS.md"
+      - "docs/TECHNICAL_STABILIZATION.md"
     acceptance:
-      - "CI #1014, CodeQL #306, exact-SHA Preview and Browser E2E passed"
-      - "unknown reset email preserved neutral 200 contract under 8000ms gate"
-      - "Production exact merge SHA deployment succeeded"
-      - "direct Production reset POST/runtime logs were tooling-blocked and were not claimed green"
-    pull_request: 267
-    merge_sha: "68670b9378c49b4806eb33acc737da0719ae9ed1"
-    updated_at: "2026-08-18"
+      - "current main and repo visibility recorded"
+      - "Vercel connector state recorded without guessing project state"
+      - "current open PR inventory reconciled"
+      - "feature readiness starts fail-closed: no READY without evidence"
+      - "P0 blockers and execution order are explicit"
+    updated_at: "2026-08-31"
 
-  - task_id: "REV-AUTH-REGISTER-001"
-    title: "Bound registration response latency"
-    owner: "ChatGPT Work"
-    status: "DONE"
-    issue: 268
-    issue_status: "CLOSED_COMPLETED"
-    baseline_sha: "68670b9378c49b4806eb33acc737da0719ae9ed1"
-    branch: "agent/auth-register-bounded-latency-clean"
-    owned_paths: []
-    forbidden_paths: []
-    dependencies: []
+  - task_id: "REV-DB-001"
+    title: "Production database migration reconciliation"
+    owner: "Release Engineer"
+    status: "BLOCKED_VERIFICATION"
+    baseline_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+    dependencies:
+      - "verified production DATABASE_URL/DIRECT_URL access through protected workflow"
+      - "verified backup or restore point"
     acceptance:
-      - "CI #1028 and CodeQL #320 succeeded"
-      - "exact-SHA Preview Browser E2E #35 succeeded"
-      - "password reset neutral 200 observed at 351ms"
-      - "registration HTTP 201 observed at 857ms under 8000ms gate"
-      - "account, verification token and audit commit before response"
-      - "verification delivery remains required and truthfully recorded sent/failed after response"
-      - "Production exact merge SHA Vercel status succeeded"
-      - "direct mutating Production registration smoke intentionally not run"
-    pull_request: 272
-    merge_sha: "dd593d62c9cfa374ae00eff21ecffd8bab172df1"
-    updated_at: "2026-08-18"
+      - "production prisma migrate status captured"
+      - "20260822010000_inspection_checklist_templates confirmed APPLIED or PENDING"
+      - "if pending, migration applied only through protected Database Release workflow"
+      - "post-release migrate status green"
+      - "rond/checklist smoke and tenant isolation verified"
+    note: "Never infer that the migration is missing solely from workflow history, and never run prisma db push or laptop migrate deploy against production."
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-STAB-001"
+    title: "Forbid database migrations from application builds"
+    owner: "ChatGPT"
+    status: "IN_REVIEW"
+    baseline_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+    branch: "agent/rev-stab-001-vercel-build-db-invariant"
+    pull_request: 331
+    migrations: false
+    acceptance:
+      - "application build contains no executable prisma migrate deploy path"
+      - "RUN_DB_MIGRATIONS=true fails closed"
+      - "release config validator prevents regression"
+      - "CI and CodeQL pass on exact PR SHA"
+      - "Preview gate reviewed before merge"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-STAB-002"
+    title: "Verify production release identity against current main"
+    owner: "ChatGPT"
+    status: "IN_REVIEW"
+    baseline_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+    branch: "agent/rev-stab-002-production-release-identity"
+    pull_request: 332
+    migrations: false
+    acceptance:
+      - "health and release identity are distinct checks"
+      - "production commitSha compared with actual current main"
+      - "bounded deployment propagation grace"
+      - "stale healthy production emits PRODUCTION_RELEASE_STALE"
+      - "workflow permissions remain read-only"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-STAB-003"
+    title: "Billing plan allowlist from fresh current main"
+    owner: "ChatGPT"
+    status: "IN_REVIEW"
+    baseline_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+    branch: "agent/rev-stab-003-billing-plan-allowlist"
+    pull_request: 333
+    migrations: false
+    acceptance:
+      - "prototype-chain plan names rejected"
+      - "malformed non-string plan payloads rejected"
+      - "valid current plan IDs unchanged"
+      - "production Stripe-only gate unchanged"
+      - "CI CodeQL and exact-SHA relevant gates pass"
+    supersedes_when_verified: 314
+    updated_at: "2026-08-31"
 
   - task_id: "REV-VERCEL-002"
-    title: "Restore verifiable Vercel project access"
-    owner: "ChatGPT Work"
-    status: "BLOCKED_CONNECTOR"
+    title: "Restore verifiable Vercel project access and commercial plan readiness"
+    owner: "Release Engineer"
+    status: "BLOCKED_CONNECTOR_AND_PLAN"
     baseline_sha: null
     branch: null
-    owned_paths: []
-    forbidden_paths: []
-    dependencies: ["Vercel connector must expose the Revalta project"]
-    acceptance:
-      - "Revalta project is discoverable through connected Vercel access"
-      - "project/deploy/env status can be read without secret values"
-      - "runtime/log verification works where permissions allow"
     pull_request: null
-    updated_at: "2026-08-18"
+    dependencies:
+      - "connected Vercel scope must expose the Revalta project"
+      - "owner must move commercial SaaS off Hobby before commercial production"
+    acceptance:
+      - "Revalta project discoverable"
+      - "project/deploy/domain/env presence/runtime/log state readable without secret values"
+      - "production branch/build/install/framework settings verified"
+      - "cron and deployment protection verified"
+      - "commercially appropriate Vercel plan verified"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-IP-001"
+    title: "Repository visibility and proprietary/open-source decision"
+    owner: "Product Owner"
+    status: "BLOCKED_OWNER_DECISION"
+    baseline_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+    acceptance:
+      - "explicit decision: intentionally public/open-source or proprietary/private"
+      - "if private, Actions/Vercel/CodeQL/environments/collaborators/deploy access verified before visibility change"
+      - "license intent explicitly documented"
+    note: "Do not change repository visibility automatically."
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-PR-RECON-001"
+    title: "Reconcile stale open pull requests against current main"
+    owner: "Release Engineer"
+    status: "READY_AFTER_P0"
+    baseline_sha: "9217470c171e0dd905cac7f83aa6530b2ca53865"
+    acceptance:
+      - "every stale open PR classified"
+      - "still-required fixes reimplemented from fresh main"
+      - "superseded PRs closed only after replacement evidence exists"
+      - "no historical branch merged solely on old CI evidence"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-TENANT-AUDIT-001"
+    title: "Full multi-tenant endpoint and data model audit"
+    owner: "Security Engineer"
+    status: "READY_AFTER_P0"
+    baseline_sha: null
+    acceptance:
+      - "endpoint matrix covers auth role company ownership nested relations exports blobs search mutations"
+      - "cross-company negative tests exist for high-risk paths"
+      - "nullable company_id semantics documented before schema hardening"
+      - "no client-provided company_id is trusted"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-BILLING-CONTRACT-001"
+    title: "Canonical billing and Stripe plan contract"
+    owner: "Staff Product Engineer"
+    status: "READY_AFTER_P0"
+    acceptance:
+      - "single canonical plan registry"
+      - "internal ID display name limits entitlements Stripe env mapping and interval aligned"
+      - "checkout webhook billing UI and feature gating cannot drift"
+      - "no DB plan migration bundled without separate review"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-FEATURE-READINESS-001"
+    title: "Evidence-backed module readiness audit"
+    owner: "Product/QA"
+    status: "IN_PROGRESS_BASELINE"
+    artifact: "docs/FEATURE_READINESS.md"
+    acceptance:
+      - "all navigation-exposed modules inventoried"
+      - "READY requires UI API DB permissions tenant tests UX and production evidence"
+      - "unfinished visible modules completed or intentionally gated"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-GOLDEN-PATH-001"
+    title: "Harden ticket-to-work-order-to-close core workflow"
+    owner: "Product Engineering"
+    status: "READY_AFTER_READINESS_AUDIT"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-UX-MOBILE-001"
+    title: "Cross-module UX consistency and mobile operations"
+    owner: "UX/Product Engineering"
+    status: "READY_AFTER_READINESS_AUDIT"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-PERF-001"
+    title: "Pagination query and index audit"
+    owner: "Staff Product Engineer"
+    status: "READY_AFTER_READINESS_AUDIT"
+    updated_at: "2026-08-31"
+
+  - task_id: "REV-OBS-002"
+    title: "Observability phase 2: correlated API auth cron and Stripe errors"
+    owner: "ChatGPT Work"
+    status: "HOLD_RECONCILE_STALE_PRS"
+    issue: 217
+    baseline_sha: null
+    dependencies:
+      - "P0 stabilization complete"
+      - "stale observability PRs #307-#313 reconciled against fresh main"
+    acceptance:
+      - "requestId correlated across internal log response header and error payload"
+      - "safe route method release environment latency event/error code"
+      - "no secrets PII free text raw webhooks or DB URLs logged"
+      - "no business-rule authorization schema or migration changes"
+    updated_at: "2026-08-31"
 
   - task_id: "REV-DEMO-001"
     title: "Secure demo conversion flow"
     owner: "ChatGPT Work"
-    status: "BLOCKED_ENV_CODE_GATE_GREEN"
-    baseline_sha: "e24feff5f2e48c22b913b444b6c8ffd5cf82ee63"
-    branch: "agent/demo-conversion-flow"
-    owned_paths:
-      - "src/app/demo/**"
-      - "src/app/api/demo-request/**"
-      - "src/lib/demo-request-email*"
-      - "src/components/demo-request-form.tsx"
-      - "src/app/page.tsx"
-      - "src/components/marketing-header.tsx"
-      - "src/components/site-footer.tsx"
-      - "src/app/sitemap.ts"
-      - ".env.example"
-      - "INTEGRATIONS.md"
-    forbidden_paths:
-      - "observability implementation outside demo scope"
-      - "auth runtime outside demo dependencies"
+    status: "BLOCKED_ENV_AND_CONNECTOR"
+    pull_request: 254
     dependencies:
       - "verifiable Vercel project access"
-      - "DEMO_REQUEST_TO status verification without value disclosure"
-      - "Preview submission smoke"
-    acceptance:
-      - "DEMO_REQUEST_TO classified PRESENT/MISSING/MISCONFIGURED without value disclosure"
-      - "demo submission succeeds on exact-SHA Preview"
-      - "full release gate and Production smoke pass"
-    pull_request: 254
-    updated_at: "2026-08-18"
+      - "DEMO_REQUEST_TO presence verification without value disclosure"
+      - "fresh current-main reconciliation"
+    updated_at: "2026-08-31"
 
-  - task_id: "REV-COORD-004"
-    title: "Synchronize multi-agent truth and task registry"
-    owner: "ChatGPT Work"
-    status: "DONE"
-    baseline_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
-    branch: "agent/coord-004-task-registry"
-    owned_paths: []
-    forbidden_paths: []
-    dependencies: []
-    acceptance: ["merged and Production verified"]
-    pull_request: 266
-    merge_sha: "5537f6a49d168cb3ed9b683668c6dbddad81b16d"
-    updated_at: "2026-08-17"
+  - task_id: "REV-LEGAL-001"
+    title: "Legal and commercial readiness"
+    owner: "Product Owner"
+    status: "READY_AFTER_P1"
+    note: "Do not invent legal identity, DPA, subprocessors, SLA or corporate data."
+    updated_at: "2026-08-31"
 
-  - task_id: "REV-E2E-AUTH-001"
-    title: "Exact-SHA Preview browser E2E foundation"
-    owner: "ChatGPT Work"
-    status: "DONE"
-    baseline_sha: "a839728684984f8e5233093153972ec69e7e3f4d"
-    branch: "agent/e2e-auth-navigation"
-    owned_paths: []
-    forbidden_paths: []
-    dependencies: []
-    acceptance:
-      - "register/login/navigation/Command Center/mobile/logout/protected redirect covered"
-      - "password reset and registration latency regressions later restored/fixed by #267 and #272"
-    pull_request: 264
-    merge_sha: "ed4b4d1e38f354eb054f1233de12571312d1d290"
-    updated_at: "2026-08-18"
+  - task_id: "REV-MARKETING-TRUTH-001"
+    title: "Align public claims with verified feature readiness"
+    owner: "Product/Marketing"
+    status: "READY_AFTER_P1"
+    updated_at: "2026-08-31"
 
-holds:
-  - {pull_request: 254, status: "BLOCKED_ENV_CODE_GATE_GREEN", reason: "Demo env and Preview submission smoke still unverified."}
-  - {pull_request: 239, status: "HOLD", reason: "Reconcile document archive work against current main."}
-  - {pull_request: 218, status: "FROZEN_HISTORICAL_STACK", reason: "Do not reuse directly."}
-  - {pull_request: 223, status: "HOLD", reason: "Coordinate Prisma client major with PR #260."}
-  - {pull_request: 260, status: "HOLD", reason: "Coordinate Prisma CLI major with PR #223."}
-  - {pull_request: 191, status: "HOLD", reason: "actions/checkout major."}
-  - {pull_request: 222, status: "HOLD", reason: "CodeQL major."}
-  - {pull_request: 194, status: "HOLD", reason: "react-dom dependency task."}
-  - {pull_request: 259, status: "HOLD", reason: "tailwind-merge breaking upgrade."}
-  - {pull_request: 261, status: "HOLD", reason: "Tailwind 4 breaking upgrade."}
-  - {pull_request: 269, status: "SUPERSEDED_CLOSED", reason: "Docs-only handoff was based on pre-registration-fix main; replaced by fresh coordination from current main."}
+open_pr_reconciliation:
+  current_open_before_new_stabilization_prs:
+    - {pull_request: 314, classification: "STILL_REQUIRED_REIMPLEMENT", replacement: 333, note: "Close only after #333 exact-SHA gates pass."}
+    - {pull_request: 313, classification: "STALE_REVIEW_REQUIRED", note: "Email verification atomicity fix must be rechecked against current auth main before any reuse."}
+    - {pull_request: 312, classification: "STALE_REVIEW_REQUIRED", note: "Component reminder observability branch predates current main."}
+    - {pull_request: 311, classification: "STALE_REVIEW_REQUIRED", note: "Invoice export observability branch predates current main."}
+    - {pull_request: 310, classification: "STALE_REVIEW_REQUIRED", note: "Document expiry observability branch predates current main."}
+    - {pull_request: 309, classification: "STALE_REVIEW_REQUIRED", note: "Maintenance/incident cron observability branch predates current main."}
+    - {pull_request: 308, classification: "STALE_REVIEW_REQUIRED", note: "Service assignment cron observability branch predates current main."}
+    - {pull_request: 307, classification: "STALE_REVIEW_REQUIRED", note: "Stripe checkout/portal hardening is security-relevant but must be freshly reconciled."}
+    - {pull_request: 270, classification: "SUPERSEDED_CLOSE_CANDIDATE", note: "Auth reset/register fixes were subsequently delivered by later clean PRs; verify compare before closing."}
+    - {pull_request: 254, classification: "BLOCKED", note: "Demo env/project verification unavailable."}
+    - {pull_request: 239, classification: "HOLD_REIMPLEMENT_REVIEW", note: "Document pagination concept remains valuable but branch is stale."}
+    - {pull_request: 218, classification: "FROZEN_HISTORICAL_STACK", note: "Do not merge/reuse directly."}
+  new_stabilization_prs:
+    - {pull_request: 331, classification: "CURRENT_MAIN_P0_CANDIDATE"}
+    - {pull_request: 332, classification: "CURRENT_MAIN_P0_CANDIDATE"}
+    - {pull_request: 333, classification: "CURRENT_MAIN_P0_CANDIDATE"}
 
 branch_quarantine:
-  policy: "Old ChatGPT/Cursor/Claude branches require compare against current main and explicit handoff before reuse. Branch existence does not imply active ownership."
-  known_cleanup_candidates:
-    - "noop"
+  policy: "Old ChatGPT/Cursor/Claude/agent branches require compare against current main and explicit handoff before reuse. Branch existence does not imply active ownership."
+  explicit_no_reuse:
     - "agent/auth-register-bounded-latency"
+    - "historical heads of PRs #218 #239 #254 #270 #307-#314 unless freshly reconciled"
+
+release_rules:
+  - "Never push directly to main."
+  - "Never run prisma db push against production."
+  - "Never run production migrate deploy from an application/Vercel build."
+  - "Never claim exact Production SHA until it is compared with current main."
+  - "Never claim Vercel env/runtime/log state while project connector access is blocked."
+  - "Never mark a module READY solely because a page renders."
