@@ -20,9 +20,9 @@ const {
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
-  canManageTickets: () => true,
-  canManageWorkOrderFinance: () => false,
-  canViewFinanceData: () => false,
+  canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
+  canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
+  canViewFinanceData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -51,7 +51,42 @@ function request(body: Record<string, unknown>) {
 
 const params = { params: Promise.resolve({ id: "work-order-1" }) };
 
-describe("material-entry id isolation", () => {
+function managerUser() {
+  return {
+    id: "manager-1",
+    email: "manager@example.com",
+    name: "Manager",
+    role: "manager",
+    company_id: "company-1",
+  };
+}
+
+function materialEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    entryId: "material-1",
+    workOrderId: "work-order-1",
+    articleNumber: null,
+    name: "Filter",
+    quantity: 2,
+    unit: "st",
+    unitPrice: 125,
+    total: 250,
+    supplier: null,
+    stockStatus: "used",
+    billable: true,
+    note: null,
+    status: "submitted",
+    createdById: "tech-1",
+    createdByName: "Tekniker",
+    createdByEmail: "tech@example.com",
+    actorId: "tech-1",
+    createdAt: "2026-08-31T08:00:00.000Z",
+    source: "table",
+    ...overrides,
+  };
+}
+
+describe("material-entry id isolation and attestation state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCurrentUserMock.mockResolvedValue({
@@ -98,5 +133,42 @@ describe("material-entry id isolation", () => {
     expect(getModernMaterialEntryMock).not.toHaveBeenCalled();
     expect(getMaterialEntryMock).not.toHaveBeenCalled();
     expect(upsertMaterialEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("allows a manager to approve submitted material", async () => {
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    getModernMaterialEntryMock.mockResolvedValue(materialEntry());
+
+    const response = await POST(request({ action: "approve", entryId: "material-1" }), params);
+
+    expect(response.status).toBe(201);
+    const payload = upsertMaterialEntryMock.mock.calls[0][1];
+    expect(payload.status).toBe("approved");
+    expect(payload.total).toBe(250);
+    expect(payload.actorId).toBe("manager-1");
+  });
+
+  it.each(["approved", "rejected", "deleted"] as const)("rejects approval from %s material state", async (status) => {
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    getModernMaterialEntryMock.mockResolvedValue(materialEntry({ status }));
+
+    const response = await POST(request({ action: "approve", entryId: "material-1" }), params);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "Materialraden kan bara attesteras när den är inskickad" });
+    expect(upsertMaterialEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["approved", "rejected", "deleted"] as const)("rejects rejection from %s material state", async (status) => {
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    getModernMaterialEntryMock.mockResolvedValue(materialEntry({ status }));
+
+    const response = await POST(request({ action: "reject", entryId: "material-1" }), params);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "Materialraden kan bara attesteras när den är inskickad" });
+    expect(upsertMaterialEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

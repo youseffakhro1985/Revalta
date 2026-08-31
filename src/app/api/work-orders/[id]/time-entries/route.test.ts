@@ -72,6 +72,16 @@ function timeEntry(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function managerUser() {
+  return {
+    id: "manager-1",
+    email: "manager@example.com",
+    name: "Manager",
+    role: "manager",
+    company_id: "company-1",
+  };
+}
+
 describe("time-entry id isolation and transition authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -152,13 +162,7 @@ describe("time-entry id isolation and transition authorization", () => {
   });
 
   it("lets a manager approve time without changing the submitted row semantics", async () => {
-    getCurrentUserMock.mockResolvedValue({
-      id: "manager-1",
-      email: "manager@example.com",
-      name: "Manager",
-      role: "manager",
-      company_id: "company-1",
-    });
+    getCurrentUserMock.mockResolvedValue(managerUser());
     findAccessibleWorkOrderMock.mockResolvedValue({ id: "work-order-1", assigned_to_id: "tech-1", title: "Test" });
     const latest = timeEntry({
       status: "submitted",
@@ -187,5 +191,39 @@ describe("time-entry id isolation and transition authorization", () => {
     expect(payload.note).toBe("Godkänn utan att ändra");
     expect(payload.minutes).toBe(60);
     expect(payload.actorId).toBe("manager-1");
+  });
+
+  it.each(["running", "approved", "rejected"] as const)("rejects approval from %s time state", async (status) => {
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    getModernTimeEntryMock.mockResolvedValue(timeEntry({
+      status,
+      action: status === "running" ? "start" : "approve",
+      endedAt: status === "running" ? null : "2026-08-31T09:00:00.000Z",
+      minutes: status === "running" ? null : 60,
+    }));
+
+    const response = await POST(request({ action: "approve", entryId: "time-1" }), params);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "Tidsraden kan bara attesteras när den är inskickad" });
+    expect(upsertTimeEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["running", "approved", "rejected"] as const)("rejects rejection from %s time state", async (status) => {
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    getModernTimeEntryMock.mockResolvedValue(timeEntry({
+      status,
+      action: status === "running" ? "start" : "reject",
+      endedAt: status === "running" ? null : "2026-08-31T09:00:00.000Z",
+      minutes: status === "running" ? null : 60,
+    }));
+
+    const response = await POST(request({ action: "reject", entryId: "time-1" }), params);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "Tidsraden kan bara attesteras när den är inskickad" });
+    expect(upsertTimeEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

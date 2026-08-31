@@ -92,6 +92,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     kind = latest.kind;
     billable = latest.billable !== false;
     note = latest.note ?? null;
+    if ((action === "approve" || action === "reject") && latest.status !== "submitted") {
+      return NextResponse.json({ error: "Tidsraden kan bara attesteras när den är inskickad" }, { status: 409 });
+    }
     if (action === "stop") {
       if (latest.userId !== user.id && !canManageTickets(user.role)) return NextResponse.json({ error: "Du kan bara stoppa din egen timer" }, { status: 403 });
       if (!latest.startedAt || latest.status !== "running") return NextResponse.json({ error: "Tidsraden är inte aktiv" }, { status: 400 });

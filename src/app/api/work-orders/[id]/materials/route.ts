@@ -105,6 +105,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if ((action === "approve" || action === "reject") && !canManageWorkOrderFinance(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att attestera material" }, { status: 403 });
     }
+    if ((action === "approve" || action === "reject") && existing.status !== "submitted") {
+      return NextResponse.json({ error: "Materialraden kan bara attesteras när den är inskickad" }, { status: 409 });
+    }
     if (action === "delete" && existing.createdById !== user.id && !canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du kan bara ta bort dina egna rader" }, { status: 403 });
     }
