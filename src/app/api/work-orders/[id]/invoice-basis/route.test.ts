@@ -41,9 +41,35 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
+
+function postRequest(status: string) {
+  return new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      status,
+      customerName: "Kund AB",
+      customerOrgNumber: "556000-0000",
+      customerReference: "Ref",
+      invoiceDate: "2026-08-31",
+      dueDays: 30,
+      discountPercent: 0,
+      vatPercent: 25,
+      note: "",
+      lines: [{
+        id: "line-1",
+        type: "labor",
+        description: "Arbete",
+        quantity: 1,
+        unit: "tim",
+        unitPrice: 650,
+      }],
+    }),
+  });
+}
 
 describe("work-order invoice basis material approval", () => {
   beforeEach(() => {
@@ -64,6 +90,7 @@ describe("work-order invoice basis material approval", () => {
       company: { name: "Bolaget AB", org_number: "556000-0000" },
     });
     listTimeEntriesMock.mockResolvedValue([]);
+    listMaterialEntriesMock.mockResolvedValue([]);
     getProfitabilitySettingsMock.mockResolvedValue({
       customerHourlyRate: 650,
       materialMarkupPercent: 15,
@@ -111,5 +138,30 @@ describe("work-order invoice basis material approval", () => {
     expect(response.status).toBe(200);
     expect(body.source.billableMaterial).toBe(0);
     expect(body.draft.lines.some((line: { type: string }) => line.type === "material")).toBe(false);
+  });
+
+  it("does not let a finance client fabricate exported state on an invoice version", async () => {
+    const response = await POST(postRequest("exported"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("kan inte sättas via fakturaunderlaget");
+    expect(body.error).toContain("exportjobbet");
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("still allows the canonical ready transition", async () => {
+    createInvoiceDraftMock.mockImplementation(async (_companyId, payload) => payload);
+
+    const response = await POST(postRequest("ready"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(createInvoiceDraftMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({ workOrderId: "wo-1", status: "ready" }),
+    );
+    expect(body.draft.status).toBe("ready");
   });
 });
