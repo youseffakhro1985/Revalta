@@ -4,23 +4,27 @@ const {
   getCurrentUserMock,
   quoteFindManyMock,
   quoteFindFirstMock,
+  quoteCreateMock,
   quoteUpdateManyMock,
   quoteDecisionFindManyMock,
   quoteDecisionCreateMock,
   auditFindManyMock,
   auditFindFirstMock,
   propertyFindManyMock,
+  propertyFindFirstMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   quoteFindManyMock: vi.fn(),
   quoteFindFirstMock: vi.fn(),
+  quoteCreateMock: vi.fn(),
   quoteUpdateManyMock: vi.fn(),
   quoteDecisionFindManyMock: vi.fn(),
   quoteDecisionCreateMock: vi.fn(),
   auditFindManyMock: vi.fn(),
   auditFindFirstMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -39,18 +43,18 @@ vi.mock("@/lib/db", () => ({
       findMany: quoteFindManyMock,
       findFirst: quoteFindFirstMock,
       updateMany: quoteUpdateManyMock,
-      create: vi.fn(),
+      create: quoteCreateMock,
     },
     quoteDecision: {
       findMany: quoteDecisionFindManyMock,
       create: quoteDecisionCreateMock,
     },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
-    property: { findMany: propertyFindManyMock, findFirst: vi.fn() },
+    property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
   },
 }));
 
-import { PATCH } from "./route";
+import { PATCH, POST } from "./route";
 
 describe("quotes route", () => {
   beforeEach(() => {
@@ -61,6 +65,88 @@ describe("quotes route", () => {
     propertyFindManyMock.mockResolvedValue([]);
     quoteUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it.each(["approved", "rejected", "invoiced", "cancelled"])(
+    "rejects terminal initial quote status %s before writes",
+    async (status) => {
+      getCurrentUserMock.mockResolvedValue({
+        id: "user-1",
+        company_id: "company-1",
+        role: "owner",
+        name: "Anna",
+        email: "anna@example.se",
+      });
+
+      const response = await POST(new Request("http://localhost/api/quotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          propertyId: "property-1",
+          title: "Takrenovering",
+          status,
+          labor: 1000,
+          vatRate: 25,
+        }),
+      }));
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error).toMatch(/utkast|skickade|beslutsstatus/i);
+      expect(propertyFindFirstMock).not.toHaveBeenCalled();
+      expect(quoteCreateMock).not.toHaveBeenCalled();
+      expect(quoteDecisionCreateMock).not.toHaveBeenCalled();
+      expect(writeAuditLogMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("allows sent as an initial quote status without fabricating decision history", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user-1",
+      company_id: "company-1",
+      role: "owner",
+      name: "Anna",
+      email: "anna@example.se",
+    });
+    propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Fastighet 1" });
+    quoteCreateMock.mockResolvedValue({
+      id: "quote-1",
+      created_at: new Date("2026-08-31T10:00:00.000Z"),
+    });
+
+    const response = await POST(new Request("http://localhost/api/quotes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-1",
+        title: "Takrenovering",
+        status: "sent",
+        labor: 1000,
+        material: 500,
+        vatRate: 25,
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "property-1", deleted_at: null, company_id: "company-1" },
+    }));
+    expect(quoteCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        company_id: "company-1",
+        property_id: "property-1",
+        status: "sent",
+        subtotal: 1500,
+        vat: 375,
+        total: 1875,
+      }),
+    }));
+    expect(quoteDecisionCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: "quote.created",
+      entityId: "quote-1",
+      metadata: expect.objectContaining({ status: "sent", storage: "Quote" }),
+    }));
   });
 
   it("updates modern draft quote fields and scopes active properties", async () => {
