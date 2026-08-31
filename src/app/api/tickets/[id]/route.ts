@@ -344,7 +344,7 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageTickets(user.role)) {
+    if (!canAssignWorkOrders(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att ta bort ärenden" }, { status: 403 });
     }
     if (!user.company_id) {
