@@ -103,7 +103,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         error: "Faktureringsunderlaget finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceDraft innan det kan exporteras.",
       }, { status: 409 });
     }
-    if (!["ready", "exported"].includes(String(invoice.status ?? ""))) {
+    const invoiceStatus = String(invoice.status ?? "");
+    if (invoiceStatus === "exported") {
+      return NextResponse.json({
+        error: "Fakturaversionen är markerad som exporterad och kan inte köas på nytt. Stäm av befintlig export innan ny version skapas.",
+      }, { status: 409 });
+    }
+    if (invoiceStatus !== "ready") {
       return NextResponse.json({ error: "Faktureringsunderlaget måste markeras som redo före export" }, { status: 400 });
     }
     if (typeof invoice.versionId !== "string") return NextResponse.json({ error: "Faktureringsunderlaget saknar versions-ID" }, { status: 400 });
