@@ -37,6 +37,7 @@ function logicalExportJobId(args: {
 function duplicateExportError(status: string) {
   if (status === "sent") return "Samma fakturaversion har redan exporterats till leverantören";
   if (status === "failed") return "Samma fakturaversion har ett misslyckat exportjobb. Återförsök det befintliga jobbet i stället.";
+  if (status === "cancelled") return "Ett äldre avbrutet exportjobb har oklar leverantörsstatus. Stäm av exporten innan ett nytt jobb skapas.";
   if (activeStatuses.has(status)) return "Samma fakturaversion har redan ett aktivt exportjobb för leverantören";
   return "Samma fakturaversion har redan ett exportjobb för leverantören";
 }
@@ -107,34 +108,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (typeof invoice.versionId !== "string") return NextResponse.json({ error: "Faktureringsunderlaget saknar versions-ID" }, { status: 400 });
 
+    const stableJobId = logicalExportJobId({
+      companyId: user.company_id,
+      workOrderId: id,
+      provider,
+      invoiceVersionId: invoice.versionId,
+    });
     const jobs = await listInvoiceExportJobs(user.company_id, id);
-    const duplicate = jobs.find((job) =>
-      job.provider === provider &&
-      job.invoiceVersionId === invoice.versionId &&
-      String(job.status ?? "") !== "cancelled",
-    );
-    if (duplicate) {
-      return NextResponse.json({ error: duplicateExportError(String(duplicate.status ?? "")) }, { status: 409 });
+    const matchingJobs = jobs.filter((job) => job.provider === provider && job.invoiceVersionId === invoice.versionId);
+    const nonCancelled = matchingJobs.find((job) => String(job.status ?? "") !== "cancelled");
+    if (nonCancelled) {
+      return NextResponse.json({ error: duplicateExportError(String(nonCancelled.status ?? "")) }, { status: 409 });
     }
+
+    // Before this hardening, a processing export could be marked cancelled. Its
+    // provider outcome is therefore ambiguous and its random legacy job ID cannot be
+    // replaced with a fresh idempotency identity safely. Only a cancelled job that
+    // already has the deterministic ID below is known to have been created under the
+    // safe queued-only cancellation rule and may be restarted.
+    const ambiguousCancelled = matchingJobs.find((job) => String(job.status ?? "") === "cancelled" && job.jobId !== stableJobId);
+    if (ambiguousCancelled) {
+      return NextResponse.json({ error: duplicateExportError("cancelled") }, { status: 409 });
+    }
+    const safeCancelled = matchingJobs.find((job) => String(job.status ?? "") === "cancelled" && job.jobId === stableJobId);
 
     payload = {
       // A logical export keeps the same identity even when two queue requests race.
       // upsertInvoiceExportJob is keyed by jobId, and the cron forwards jobId as the
       // provider idempotency key. This prevents concurrent queue requests from
       // materializing two separately sendable jobs for the same invoice/provider.
-      jobId: logicalExportJobId({
-        companyId: user.company_id,
-        workOrderId: id,
-        provider,
-        invoiceVersionId: invoice.versionId,
-      }),
+      jobId: stableJobId,
       workOrderId: id,
       provider,
       status: "queued",
-      attempt: 1,
+      attempt: safeCancelled ? Number(safeCancelled.attempt ?? 0) + 1 : 1,
       invoiceVersionId: invoice.versionId,
-      createdById: user.id,
-      createdAt: now,
+      createdById: safeCancelled?.createdById ?? user.id,
+      createdAt: safeCancelled?.createdAt ?? now,
       updatedAt: now,
       error: null,
     };
