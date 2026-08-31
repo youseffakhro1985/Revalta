@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   getCurrentUserMock,
@@ -95,6 +95,10 @@ describe("work-order invoice integration — logical export idempotency", () => 
     writeAuditLogMock.mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("blocks a new queue when the same invoice version was already sent to the provider", async () => {
     listInvoiceExportJobsMock.mockResolvedValue([existingJob("sent")]);
 
@@ -133,6 +137,37 @@ describe("work-order invoice integration — logical export idempotency", () => 
     expect(firstPayload.jobId).toMatch(/^iex_[0-9a-f]{40}$/);
     expect(secondPayload.jobId).toBe(firstPayload.jobId);
     expect(firstPayload.invoiceVersionId).toBe("invoice-v1");
+  });
+
+  it("blocks a legacy cancelled export whose provider outcome may be ambiguous", async () => {
+    listInvoiceExportJobsMock.mockResolvedValue([existingJob("cancelled")]);
+
+    const response = await POST(request({ action: "queue", provider: "webhook" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("oklar leverantörsstatus");
+    expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
+  });
+
+  it("requeues a safely cancelled hardened export with the same idempotency identity", async () => {
+    listInvoiceExportJobsMock.mockResolvedValue([]);
+    const first = await POST(request({ action: "queue", provider: "webhook" }), params);
+    expect(first.status).toBe(201);
+    const firstPayload = upsertInvoiceExportJobMock.mock.calls[0]?.[1];
+    const stableJobId = firstPayload.jobId;
+
+    listInvoiceExportJobsMock.mockResolvedValue([{
+      ...existingJob("cancelled"),
+      jobId: stableJobId,
+      attempt: 1,
+    }]);
+    const second = await POST(request({ action: "queue", provider: "webhook" }), params);
+
+    expect(second.status).toBe(201);
+    const secondPayload = upsertInvoiceExportJobMock.mock.calls[1]?.[1];
+    expect(secondPayload.jobId).toBe(stableJobId);
+    expect(secondPayload.attempt).toBe(2);
   });
 
   it("does not claim that an already-processing provider request can be cancelled", async () => {
