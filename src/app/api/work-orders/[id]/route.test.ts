@@ -4,6 +4,7 @@ const {
   getCurrentUserMock,
   workOrderFindFirstMock,
   userFindManyMock,
+  transactionMock,
   getWorkOrderEnterpriseStateMock,
   getWorkOrderStatusEventsMock,
   getWorkOrderAssetLinkMock,
@@ -11,6 +12,7 @@ const {
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
   userFindManyMock: vi.fn(),
+  transactionMock: vi.fn(),
   getWorkOrderEnterpriseStateMock: vi.fn(),
   getWorkOrderStatusEventsMock: vi.fn(),
   getWorkOrderAssetLinkMock: vi.fn(),
@@ -36,13 +38,30 @@ vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock, updateMany: vi.fn() },
     user: { findMany: userFindManyMock, findFirst: vi.fn() },
-    $transaction: vi.fn(),
+    $transaction: transactionMock,
   },
 }));
 
 import { GET, PATCH } from "./route";
 
 const params = Promise.resolve({ id: "wo-1" });
+
+function workOrderForPatch(status: string) {
+  return {
+    id: "wo-1",
+    assigned_to_id: "tech-1",
+    ticket_id: null,
+    status,
+    priority: "normal",
+    scheduled_start: null,
+    scheduled_end: null,
+    property_id: "property-1",
+    estimated_cost: null,
+    actual_cost: null,
+    completed_at: status === "completed" || status === "invoiced" ? new Date("2026-08-31T12:00:00Z") : null,
+    created_at: new Date("2026-08-30T12:00:00Z"),
+  };
+}
 
 describe("work-orders/[id] finance gates", () => {
   beforeEach(() => {
@@ -82,18 +101,7 @@ describe("work-orders/[id] finance gates", () => {
       company_id: "company-1",
       role: "technician",
     });
-    workOrderFindFirstMock.mockResolvedValue({
-      id: "wo-1",
-      assigned_to_id: "tech-1",
-      ticket_id: null,
-      status: "planned",
-      priority: "normal",
-      scheduled_start: null,
-      scheduled_end: null,
-      property_id: "property-1",
-      estimated_cost: null,
-      actual_cost: null,
-    });
+    workOrderFindFirstMock.mockResolvedValue(workOrderForPatch("planned"));
 
     const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
       method: "PATCH",
@@ -102,5 +110,45 @@ describe("work-orders/[id] finance gates", () => {
     }), { params });
 
     expect(response.status).toBe(403);
+  });
+
+  it("denies an assigned technician from marking a completed work order as invoiced", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+    });
+    workOrderFindFirstMock.mockResolvedValue(workOrderForPatch("completed"));
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "invoiced" }),
+    }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/faktureringsstatus/i);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies an assigned technician from reverting an invoiced work order to completed", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+    });
+    workOrderFindFirstMock.mockResolvedValue(workOrderForPatch("invoiced"));
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/faktureringsstatus/i);
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });
