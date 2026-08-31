@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import {
+  canAssignWorkOrders,
+  canManageTickets,
+  canManageWorkOrderFinance,
+  getCurrentUser,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import {
@@ -79,6 +84,7 @@ export async function POST(
   const unitId = body.unitId ? String(body.unitId).trim() : null;
   const scheduledStart = body.scheduledStart ? new Date(String(body.scheduledStart)) : null;
   const scheduledEnd = body.scheduledEnd ? new Date(String(body.scheduledEnd)) : null;
+  const estimatedCostSupplied = body.estimatedCost !== undefined && body.estimatedCost !== null && body.estimatedCost !== "";
   const estimatedCost = body.estimatedCost === "" || body.estimatedCost === undefined
     ? null
     : Number(body.estimatedCost);
@@ -122,6 +128,19 @@ export async function POST(
   });
   if (activeWorkOrder) {
     return NextResponse.json({ workOrderId: activeWorkOrder.id, created: false });
+  }
+
+  if (assignedToId && assignedToId !== ticket.assigned_to_id && !canAssignWorkOrders(user.role)) {
+    return NextResponse.json(
+      { error: "Du saknar behörighet att tilldela arbetsorder till andra" },
+      { status: 403 },
+    );
+  }
+  if (estimatedCostSupplied && !canManageWorkOrderFinance(user.role)) {
+    return NextResponse.json(
+      { error: "Du saknar behörighet att sätta arbetsorderkostnader" },
+      { status: 403 },
+    );
   }
 
   if (unitId) {
