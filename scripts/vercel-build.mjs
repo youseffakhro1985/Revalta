@@ -30,15 +30,13 @@ if (!process.env.DIRECT_URL) {
   process.env.DIRECT_URL = process.env.DATABASE_URL;
 }
 
-run("npx", ["prisma", "generate"]);
-
 if (process.env.RUN_DB_MIGRATIONS === "true") {
-  console.warn(
-    "RUN_DB_MIGRATIONS=true: applying migrations before build. Prefer the protected Database Release workflow for production.",
+  console.error(
+    "RUN_DB_MIGRATIONS=true is forbidden for application builds. Apply production migrations only through the protected Database Release workflow.",
   );
-  run("npx", ["prisma", "migrate", "deploy"]);
-} else {
-  console.log("Database migrations are intentionally separated from the application build.");
+  process.exit(1);
 }
 
+run("npx", ["prisma", "generate"]);
+console.log("Database migrations are intentionally separated from the application build.");
 run("npx", ["next", "build", "--webpack"]);
