@@ -1,0 +1,82 @@
+name: Database Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact verified commit SHA from main to inspect
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Share the production database release lock so a read-only status inspection
+# cannot race an active migration release.
+concurrency:
+  group: revalta-production-database-release
+  cancel-in-progress: false
+
+jobs:
+  status:
+    name: Inspect production migration status
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: Production
+
+    steps:
+      - name: Check out approved revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify approved main commit
+        env:
+          EXPECTED_SHA: ${{ inputs.commit_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA" || (echo "Checked out commit does not match commit_sha" && exit 1)
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$EXPECTED_SHA" origin/main || (echo "commit_sha is not contained in main" && exit 1)
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate required secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          missing=0
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL saknas i GitHub Environment 'Production'."
+            missing=1
+          fi
+          if [ -z "$DIRECT_URL" ]; then
+            echo "::error::DIRECT_URL saknas i GitHub Environment 'Production'."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma generate
+
+      - name: Inspect migration status (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: |
+          echo "::notice::Read-only production schema inspection. This workflow must never apply migrations."
+          npx prisma migrate status
