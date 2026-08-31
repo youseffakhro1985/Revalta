@@ -11,6 +11,7 @@ const action = "quote.created";
 const decisionAction = "quote.status_changed";
 const updateAction = "quote.updated";
 const allowedStatuses = new Set(["draft", "sent", "approved", "rejected", "invoiced", "cancelled"]);
+const initialStatuses = new Set(["draft", "sent"]);
 const fieldEditableStatuses = new Set(["draft", "sent"]);
 
 function money(value: { toString(): string } | number) {
@@ -163,8 +164,13 @@ export async function POST(request: Request) {
     const other = Number(body.other || 0);
     const vatRate = Number(body.vatRate ?? 25);
 
-    if (!propertyId || !title || !allowedStatuses.has(status)) {
-      return NextResponse.json({ error: "Fastighet, offertnamn och giltig status krävs" }, { status: 400 });
+    if (!propertyId || !title) {
+      return NextResponse.json({ error: "Fastighet och offertnamn krävs" }, { status: 400 });
+    }
+    if (!initialStatuses.has(status)) {
+      return NextResponse.json({
+        error: "Nya offerter måste skapas som utkast eller skickade. Beslutsstatus sätts efter skapandet.",
+      }, { status: 400 });
     }
 
     const amounts = [labor, material, supplierCost, other, vatRate];
