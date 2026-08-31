@@ -42,7 +42,7 @@ export function redactTicketReporterPii<
   };
 }
 
-type TicketAccessRow = { id: string; assigned_to_id: string | null };
+type TicketAccessRow = { id: string; assigned_to_id: string | null; property_id: string | null };
 
 export async function findAccessibleTicket(
   user: CurrentUser,
@@ -55,7 +55,7 @@ export async function findAccessibleTicket(
       ...tenantWhere(user),
       OR: [{ property_id: null }, { property: { deleted_at: null } }],
     },
-    select: { id: true, assigned_to_id: true },
+    select: { id: true, assigned_to_id: true, property_id: true },
   });
   if (!ticket) return null;
   if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return null;
