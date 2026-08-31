@@ -97,7 +97,7 @@ describe("projects/[id] route", () => {
   it("PATCH requires active property filter on findFirst", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     projectFindFirstMock
-      .mockResolvedValueOnce({ id: "project-1", status: "active" })
+      .mockResolvedValueOnce({ id: "project-1", status: "active", start_date: null, end_date: null })
       .mockResolvedValueOnce(sampleProject);
 
     const response = await PATCH(new Request("http://localhost/api/projects/project-1", {
@@ -109,8 +109,53 @@ describe("projects/[id] route", () => {
     expect(response.status).toBe(200);
     expect(projectFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
       where: { id: "project-1", company_id: "company-1", deleted_at: null, property: { deleted_at: null } },
+      select: { id: true, status: true, start_date: true, end_date: true },
     }));
     expect(projectUpdateManyMock).toHaveBeenCalled();
+  });
+
+  it("PATCH rejects a partial end-date update before the stored start date", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    projectFindFirstMock.mockResolvedValueOnce({
+      id: "project-1",
+      status: "active",
+      start_date: new Date("2026-09-10T00:00:00.000Z"),
+      end_date: new Date("2026-09-30T00:00:00.000Z"),
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/projects/project-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endDate: "2026-09-05" }),
+    }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/slutdatum.*före startdatum/i);
+    expect(projectUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects a partial start-date update after the stored end date", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    projectFindFirstMock.mockResolvedValueOnce({
+      id: "project-1",
+      status: "active",
+      start_date: new Date("2026-09-10T00:00:00.000Z"),
+      end_date: new Date("2026-09-30T00:00:00.000Z"),
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/projects/project-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startDate: "2026-10-05" }),
+    }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatch(/slutdatum.*före startdatum/i);
+    expect(projectUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
   it("PATCH returns 404 when project is missing or on a soft-deleted property", async () => {
