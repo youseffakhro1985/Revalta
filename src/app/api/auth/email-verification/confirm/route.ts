@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
-import db from "@/lib/db";
-import { hashResetToken } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
+import { hashResetToken } from "@/lib/auth";
+import db from "@/lib/db";
 import { createRouteObservability } from "@/lib/route-observability";
 
 export async function POST(request: Request) {
@@ -13,12 +13,11 @@ export async function POST(request: Request) {
     message: "Verifieringslänken är ogiltig eller har gått ut",
     requestId: observability.requestId,
   });
+
   try {
     const body = await request.json().catch(() => ({})) as { token?: unknown };
     const token = typeof body.token === "string" ? body.token : "";
-    if (token.length !== 64) {
-      return invalidTokenResponse();
-    }
+    if (token.length !== 64) return invalidTokenResponse();
 
     const tokenHash = hashResetToken(token);
     const verifiedUser = await db.$transaction(async (tx) => {
@@ -64,17 +63,17 @@ export async function POST(request: Request) {
         where: { id: verification.user_id },
         data: { email_verified_at: now },
       });
+      await writeAuditLog(verification.user, {
+        entityType: "user",
+        entityId: verification.user.id,
+        action: "auth.email_verified",
+        metadata: { method: "one_time_token" },
+      }, tx);
+
       return verification.user;
     });
 
     if (!verifiedUser) return invalidTokenResponse();
-
-    await writeAuditLog(verifiedUser, {
-      entityType: "user",
-      entityId: verifiedUser.id,
-      action: "auth.email_verified",
-      metadata: { method: "one_time_token" },
-    });
 
     const response = NextResponse.json(
       { success: true },
