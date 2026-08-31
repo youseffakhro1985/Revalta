@@ -384,6 +384,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (shouldScopeToAssignedWork(user.role) && existing.assigned_to_id !== user.id) {
     return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
   }
+  if (!canAssignWorkOrders(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ta bort arbetsordrar" }, { status: 403 });
 
   const deleteResult = await db.workOrder.updateMany({
     where: { id: existing.id, company_id: user.company_id, deleted_at: null },
