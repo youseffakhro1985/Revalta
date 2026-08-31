@@ -80,7 +80,7 @@ async function sourceData(id: string, companyId: string) {
   }
   let billableMaterial = 0;
   for (const row of materials) {
-    if (row.status !== "deleted" && row.status !== "rejected" && row.billable === true) billableMaterial += num(row.total);
+    if (row.status === "approved" && row.billable === true) billableMaterial += num(row.total);
   }
 
   return {
