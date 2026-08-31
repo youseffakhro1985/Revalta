@@ -120,6 +120,29 @@ describe("time-entry id isolation and transition authorization", () => {
     expect(getTimeEntryMock).not.toHaveBeenCalled();
   });
 
+  it("rejects a second start while a modern timer is already running", async () => {
+    listTimeEntriesMock.mockResolvedValue([timeEntry({ source: "table", status: "running" })]);
+
+    const response = await POST(request({ action: "start", kind: "work" }), params);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "Det finns redan en aktiv timer på arbetsordern" });
+    expect(upsertTimeEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("allows a new modern timer when the only running row is legacy", async () => {
+    listTimeEntriesMock.mockResolvedValue([timeEntry({ source: "legacy", status: "running" })]);
+
+    const response = await POST(request({ action: "start", kind: "work" }), params);
+
+    expect(response.status).toBe(201);
+    const payload = upsertTimeEntryMock.mock.calls[0][1];
+    expect(payload.status).toBe("running");
+    expect(payload.source).toBeUndefined();
+    expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+  });
+
   it("requires an explicit id for transition actions", async () => {
     const response = await POST(request({ action: "stop", kind: "work" }), params);
 
