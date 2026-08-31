@@ -19,16 +19,19 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Probe production health
+      - name: Probe production health and release identity
         shell: bash
         env:
           HEALTH_URL: https://www.revalta.se/api/health
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
 
           headers_file="$(mktemp)"
           body_file="$(mktemp)"
-          trap 'rm -f "$headers_file" "$body_file"' EXIT
+          main_file="$(mktemp)"
+          trap 'rm -f "$headers_file" "$body_file" "$main_file"' EXIT
 
           http_status="$(curl \
             --silent \
@@ -56,13 +59,31 @@ jobs:
           jq -e '.release.shortCommitSha | test("^[0-9a-f]{7}$")' "$body_file" >/dev/null
           jq -e '.release.branch == "main"' "$body_file" >/dev/null
 
+          curl \
+            --silent \
+            --show-error \
+            --fail \
+            --retry 3 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            --connect-timeout 10 \
+            --max-time 30 \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$REPOSITORY/commits/main" \
+            > "$main_file"
+
+          expected_sha="$(jq -er '.sha | select(test("^[0-9a-f]{40}$"))' "$main_file")"
+          main_committed_at="$(jq -er '.commit.committer.date' "$main_file")"
+          production_sha="$(jq -r '.release.commitSha' "$body_file")"
+          short_sha="$(jq -r '.release.shortCommitSha' "$body_file")"
+
           release_header="$(awk 'BEGIN{IGNORECASE=1} /^x-revalta-release:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
           environment_header="$(awk 'BEGIN{IGNORECASE=1} /^x-revalta-environment:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
           cache_control="$(awk 'BEGIN{IGNORECASE=1} /^cache-control:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
           cdn_cache_control="$(awk 'BEGIN{IGNORECASE=1} /^cdn-cache-control:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
           vercel_cdn_cache_control="$(awk 'BEGIN{IGNORECASE=1} /^vercel-cdn-cache-control:/ {gsub("\r", ""); sub(/^[^:]+:[[:space:]]*/, ""); value=$0} END{print value}' "$headers_file")"
-
-          short_sha="$(jq -r '.release.shortCommitSha' "$body_file")"
 
           [[ "$release_header" == "$short_sha" ]]
           [[ "$environment_header" == "production" ]]
@@ -72,4 +93,21 @@ jobs:
             [[ "$vercel_cdn_cache_control" == *"no-store"* ]]
           fi
 
-          echo "Production release verified: $short_sha"
+          if [[ "$production_sha" != "$expected_sha" ]]; then
+            now_epoch="$(date -u +%s)"
+            main_epoch="$(date -u -d "$main_committed_at" +%s)"
+            main_age_seconds="$((now_epoch - main_epoch))"
+
+            # A fresh merge can briefly precede Vercel alias propagation. Keep the
+            # monitor quiet only during a bounded ten-minute grace window; the next
+            # scheduled run must then observe the exact current main SHA or fail.
+            if (( main_age_seconds >= 0 && main_age_seconds < 600 )); then
+              echo "::notice title=Production deployment propagation::Production is healthy but has not reached current main yet. main=$expected_sha production=$production_sha age=${main_age_seconds}s"
+              exit 0
+            fi
+
+            echo "::error title=PRODUCTION_RELEASE_STALE::Production is healthy but does not run current main. expected=$expected_sha production=$production_sha"
+            exit 1
+          fi
+
+          echo "Production release verified: $short_sha matches current main"
