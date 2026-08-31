@@ -35,26 +35,15 @@ describe("DELETE /api/tickets/[id] authorization", () => {
     writeAuditLogMock.mockResolvedValue(undefined);
   });
 
-  it("denies an assigned technician before looking up or deleting the ticket", async () => {
+  it("denies an assigned technician after scoped lookup but before deletion", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician", email: "tech@example.se" });
+    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", title: "Läckande kran", status: "planned", assigned_to_id: "tech-1" });
 
     const response = await DELETE(new Request("http://localhost/api/tickets/ticket-1", { method: "DELETE" }), { params });
     const body = await response.json();
 
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/ta bort ärenden/i);
-    expect(ticketFindFirstMock).not.toHaveBeenCalled();
-    expect(ticketUpdateManyMock).not.toHaveBeenCalled();
-    expect(writeAuditLogMock).not.toHaveBeenCalled();
-  });
-
-  it("allows a manager to soft-delete a company-scoped ticket", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager", email: "manager@example.se" });
-    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", title: "Läckande kran", status: "planned", assigned_to_id: "tech-1" });
-
-    const response = await DELETE(new Request("http://localhost/api/tickets/ticket-1", { method: "DELETE" }), { params });
-
-    expect(response.status).toBe(200);
     expect(ticketFindFirstMock).toHaveBeenCalledWith({
       where: {
         id: "ticket-1",
@@ -64,6 +53,27 @@ describe("DELETE /api/tickets/[id] authorization", () => {
       },
       select: { id: true, title: true, status: true, assigned_to_id: true },
     });
+    expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("conceals an unassigned ticket from a technician", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician", email: "tech@example.se" });
+    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", title: "Läckande kran", status: "planned", assigned_to_id: "tech-2" });
+
+    const response = await DELETE(new Request("http://localhost/api/tickets/ticket-1", { method: "DELETE" }), { params });
+
+    expect(response.status).toBe(404);
+    expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("allows a manager to soft-delete a company-scoped ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager", email: "manager@example.se" });
+    ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", title: "Läckande kran", status: "planned", assigned_to_id: "tech-1" });
+
+    const response = await DELETE(new Request("http://localhost/api/tickets/ticket-1", { method: "DELETE" }), { params });
+
+    expect(response.status).toBe(200);
     expect(ticketUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "ticket-1", company_id: "company-1", deleted_at: null },
       data: { deleted_at: expect.any(Date) },
