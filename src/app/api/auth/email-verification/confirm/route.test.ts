@@ -46,6 +46,22 @@ function verificationRequest(value: unknown) {
   });
 }
 
+function validVerification() {
+  return {
+    id: "verification-1",
+    user_id: "user-1",
+    expires_at: new Date(Date.now() + 60_000),
+    used_at: null,
+    user: {
+      id: "user-1",
+      email: "owner@example.se",
+      company_id: "company-1",
+      status: "active",
+      company: { status: "active" },
+    },
+  };
+}
+
 describe("POST /api/auth/email-verification/confirm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,20 +90,8 @@ describe("POST /api/auth/email-verification/confirm", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("claims the one-time token atomically before activating verification", async () => {
-    tokenFindUniqueMock.mockResolvedValue({
-      id: "verification-1",
-      user_id: "user-1",
-      expires_at: new Date(Date.now() + 60_000),
-      used_at: null,
-      user: {
-        id: "user-1",
-        email: "owner@example.se",
-        company_id: "company-1",
-        status: "active",
-        company: { status: "active" },
-      },
-    });
+  it("claims the one-time token, verifies the user and writes audit in the same transaction", async () => {
+    tokenFindUniqueMock.mockResolvedValue(validVerification());
 
     const response = await POST(verificationRequest(token));
 
@@ -100,7 +104,11 @@ describe("POST /api/auth/email-verification/confirm", () => {
     }));
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "user-1" }),
-      expect.objectContaining({ metadata: { method: "one_time_token" } }),
+      expect.objectContaining({
+        action: "auth.email_verified",
+        metadata: { method: "one_time_token" },
+      }),
+      tx,
     );
     expect(response.headers.get("x-request-id")).toBe(requestId);
     expect(loggerInfoMock).toHaveBeenCalledWith(
@@ -110,19 +118,7 @@ describe("POST /api/auth/email-verification/confirm", () => {
   });
 
   it("rejects a token already claimed by a concurrent request", async () => {
-    tokenFindUniqueMock.mockResolvedValue({
-      id: "verification-1",
-      user_id: "user-1",
-      expires_at: new Date(Date.now() + 60_000),
-      used_at: null,
-      user: {
-        id: "user-1",
-        email: "owner@example.se",
-        company_id: "company-1",
-        status: "active",
-        company: { status: "active" },
-      },
-    });
+    tokenFindUniqueMock.mockResolvedValue(validVerification());
     tokenUpdateManyMock.mockResolvedValue({ count: 0 });
 
     const response = await POST(verificationRequest(token));
@@ -130,6 +126,28 @@ describe("POST /api/auth/email-verification/confirm", () => {
     expect(response.status).toBe(400);
     expect(userUpdateMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("fail-closes the verification when audit fails inside the transaction", async () => {
+    tokenFindUniqueMock.mockResolvedValue(validVerification());
+    writeAuditLogMock.mockRejectedValue(new Error("audit-db-secret"));
+
+    const response = await POST(verificationRequest(token));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Internt serverfel",
+      errorCode: "INTERNAL_ERROR",
+      requestId,
+    });
+    expect(JSON.stringify(body)).not.toContain("audit-db-secret");
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1" }),
+      expect.anything(),
+      tx,
+    );
   });
 
   it("returns a safe correlated failure when persistence fails", async () => {
