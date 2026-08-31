@@ -20,7 +20,8 @@ const {
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
-  canManageTickets: () => true,
+  canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
+  canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -49,7 +50,29 @@ function request(body: Record<string, unknown>) {
 
 const params = { params: Promise.resolve({ id: "work-order-1" }) };
 
-describe("time-entry id isolation", () => {
+function timeEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    entryId: "time-1",
+    workOrderId: "work-order-1",
+    userId: "tech-1",
+    userName: "Tekniker",
+    userEmail: "tech@example.com",
+    kind: "travel",
+    action: "start",
+    startedAt: new Date(Date.now() - 15 * 60_000).toISOString(),
+    endedAt: null,
+    minutes: null,
+    billable: false,
+    note: "Behåll originalanteckningen",
+    status: "running",
+    actorId: "tech-1",
+    createdAt: new Date(Date.now() - 15 * 60_000).toISOString(),
+    source: "table",
+    ...overrides,
+  };
+}
+
+describe("time-entry id isolation and transition authorization", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCurrentUserMock.mockResolvedValue({
@@ -95,5 +118,74 @@ describe("time-entry id isolation", () => {
     expect(getModernTimeEntryMock).not.toHaveBeenCalled();
     expect(getTimeEntryMock).not.toHaveBeenCalled();
     expect(upsertTimeEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("prevents a technician from approving submitted time", async () => {
+    const response = await POST(request({ action: "approve", entryId: "time-1" }), params);
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Du saknar behörighet att attestera tid" });
+    expect(getModernTimeEntryMock).not.toHaveBeenCalled();
+    expect(getTimeEntryMock).not.toHaveBeenCalled();
+    expect(upsertTimeEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves kind, billable flag and note when a technician stops their timer", async () => {
+    const latest = timeEntry();
+    getModernTimeEntryMock.mockResolvedValue(latest);
+
+    const response = await POST(request({
+      action: "stop",
+      entryId: "time-1",
+      kind: "work",
+      billable: true,
+      note: "Försök skriva över",
+    }), params);
+
+    expect(response.status).toBe(201);
+    const payload = upsertTimeEntryMock.mock.calls[0][1];
+    expect(payload.kind).toBe("travel");
+    expect(payload.billable).toBe(false);
+    expect(payload.note).toBe("Behåll originalanteckningen");
+    expect(payload.status).toBe("submitted");
+    expect(payload.startedAt).toBe(latest.startedAt);
+  });
+
+  it("lets a manager approve time without changing the submitted row semantics", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.com",
+      name: "Manager",
+      role: "manager",
+      company_id: "company-1",
+    });
+    findAccessibleWorkOrderMock.mockResolvedValue({ id: "work-order-1", assigned_to_id: "tech-1", title: "Test" });
+    const latest = timeEntry({
+      status: "submitted",
+      action: "manual",
+      endedAt: "2026-08-31T09:00:00.000Z",
+      minutes: 60,
+      kind: "break",
+      billable: false,
+      note: "Godkänn utan att ändra",
+    });
+    getModernTimeEntryMock.mockResolvedValue(latest);
+
+    const response = await POST(request({
+      action: "approve",
+      entryId: "time-1",
+      kind: "work",
+      billable: true,
+      note: "Försök skriva över",
+    }), params);
+
+    expect(response.status).toBe(201);
+    const payload = upsertTimeEntryMock.mock.calls[0][1];
+    expect(payload.status).toBe("approved");
+    expect(payload.kind).toBe("break");
+    expect(payload.billable).toBe(false);
+    expect(payload.note).toBe("Godkänn utan att ändra");
+    expect(payload.minutes).toBe(60);
+    expect(payload.actorId).toBe("manager-1");
   });
 });
