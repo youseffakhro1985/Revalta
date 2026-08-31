@@ -220,7 +220,7 @@ export async function GET(request: Request) {
     })
     .filter((item): item is { companyId: string; workOrderId: string; job: Job; createdAt: Date } => Boolean(item));
 
-  const result = { queued: queued.length, sent: 0, failed: 0, skipped: 0 };
+  const result = { queued: queued.length, sent: 0, failed: 0, skipped: 0, reconciliationRequired: 0 };
 
   for (const item of queued) {
     const { companyId, workOrderId, job } = item;
@@ -251,6 +251,7 @@ export async function GET(request: Request) {
       continue;
     }
 
+    let providerAccepted = false;
     try {
       const workOrder = await db.workOrder.findFirst({
         where: { deleted_at: null, id: workOrderId, company_id: companyId, property: { deleted_at: null } },
@@ -280,6 +281,7 @@ export async function GET(request: Request) {
 
       const payload = exportPayload({ job: modernJob, invoice, workOrder });
       const providerResult = await send(modernJob, payload);
+      providerAccepted = true;
       // Receipt fields live on WorkOrderInvoiceExportJob (sent_at/external_id/provider_response).
       await saveJob(companyId, modernJob, "sent", {
         sentAt: new Date().toISOString(),
@@ -290,6 +292,22 @@ export async function GET(request: Request) {
       });
       result.sent += 1;
     } catch (error) {
+      // Once the provider has returned success, the external side effect may already
+      // be irreversible. Never downgrade that job to retryable "failed" merely because
+      // persisting the local receipt failed. Leaving the atomically claimed row in
+      // "processing" fails closed: the queue cron will not resend it and finance users
+      // cannot safely cancel an in-flight/ambiguous export. Reconciliation is required.
+      if (providerAccepted) {
+        console.error("Invoice export requires reconciliation after provider success", {
+          companyId,
+          workOrderId,
+          jobId: modernJob.jobId,
+          provider: modernJob.provider,
+        });
+        result.reconciliationRequired += 1;
+        continue;
+      }
+
       const message = error instanceof Error ? error.message : "Okänt integrationsfel";
       await saveJob(companyId, modernJob, "failed", {
         failedAt: new Date().toISOString(),
