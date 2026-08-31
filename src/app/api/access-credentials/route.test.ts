@@ -5,8 +5,10 @@ const {
   auditFindManyMock,
   auditFindFirstMock,
   propertyFindManyMock,
+  propertyFindFirstMock,
   accessCredentialFindManyMock,
   accessCredentialFindFirstMock,
+  accessCredentialCreateMock,
   accessCredentialUpdateManyMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
@@ -14,8 +16,10 @@ const {
   auditFindManyMock: vi.fn(),
   auditFindFirstMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
   accessCredentialFindManyMock: vi.fn(),
   accessCredentialFindFirstMock: vi.fn(),
+  accessCredentialCreateMock: vi.fn(),
   accessCredentialUpdateManyMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
@@ -30,15 +34,15 @@ vi.mock("@/lib/db", () => ({
     accessCredential: {
       findMany: accessCredentialFindManyMock,
       findFirst: accessCredentialFindFirstMock,
-      create: vi.fn(),
+      create: accessCredentialCreateMock,
       updateMany: accessCredentialUpdateManyMock,
     },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
-    property: { findMany: propertyFindManyMock, findFirst: vi.fn() },
+    property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
   },
 }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, POST } from "./route";
 
 describe("access credentials route", () => {
   beforeEach(() => {
@@ -72,7 +76,103 @@ describe("access credentials route", () => {
     }));
   });
 
-  it("updates modern credential fields and writes field audit", async () => {
+  it("filters audit mirrors for modern access credentials without relying on matching timestamps", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    accessCredentialFindManyMock.mockResolvedValue([{
+      id: "cred-1",
+      property_id: "property-1",
+      identifier: "NYCKEL-1",
+      credential_type: "key",
+      holder: "Anna Andersson",
+      unit: "1201",
+      access_area: "Entré",
+      status: "issued",
+      issued_at: new Date("2026-08-31T08:00:00.000Z"),
+      return_due: null,
+      note: "Modern sanningskälla",
+      created_at: new Date("2026-08-31T08:00:00.000Z"),
+      property: { name: "Fastighet 1" },
+      created_by: { name: "Manager", email: "manager@example.com" },
+    }]);
+    auditFindManyMock.mockResolvedValue([{
+      id: "audit-1",
+      entity_id: "cred-1",
+      metadata: {
+        storage: "AccessCredential",
+        identifier: "NYCKEL-1",
+        credential_type: "key",
+        holder: "Anna Andersson",
+      },
+      created_at: new Date("2026-08-31T08:00:03.000Z"),
+    }]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.credentials).toHaveLength(1);
+    expect(body.credentials[0]).toEqual(expect.objectContaining({
+      id: "cred-1",
+      property_id: "property-1",
+      identifier: "NYCKEL-1",
+      source: "table",
+    }));
+  });
+
+  it("creates credentials without duplicating raw passage secrets into audit metadata", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      company_id: "company-1",
+      role: "manager",
+      name: "Manager",
+      email: "manager@example.com",
+    });
+    propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Fastighet 1" });
+    accessCredentialCreateMock.mockResolvedValue({
+      id: "cred-2",
+      created_at: new Date("2026-08-31T09:00:00.000Z"),
+    });
+
+    const response = await POST(new Request("http://localhost/api/access-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-1",
+        identifier: "PORTKOD-7391",
+        credentialType: "code",
+        holder: "Anna Andersson",
+        unit: "1201",
+        accessArea: "Entré och garage",
+        status: "issued",
+        note: "Tillfällig kod till entreprenör",
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(accessCredentialCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        company_id: "company-1",
+        property_id: "property-1",
+        identifier: "PORTKOD-7391",
+        holder: "Anna Andersson",
+        access_area: "Entré och garage",
+        note: "Tillfällig kod till entreprenör",
+      }),
+    }));
+    expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+    const auditPayload = writeAuditLogMock.mock.calls[0][1];
+    expect(auditPayload.metadata).toEqual({
+      property_id: "property-1",
+      credential_type: "code",
+      status: "issued",
+      storage: "AccessCredential",
+    });
+    expect(JSON.stringify(auditPayload.metadata)).not.toContain("PORTKOD-7391");
+    expect(JSON.stringify(auditPayload.metadata)).not.toContain("Anna Andersson");
+    expect(JSON.stringify(auditPayload.metadata)).not.toContain("entreprenör");
+  });
+
+  it("updates modern credential fields and writes field audit without raw credential data", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
     accessCredentialFindFirstMock.mockResolvedValueOnce({
       id: "cred-1",
@@ -118,8 +218,19 @@ describe("access credentials route", () => {
       expect.objectContaining({
         action: "access.credential.updated",
         entityId: "cred-1",
+        metadata: {
+          previousStatus: "in_stock",
+          status: "in_stock",
+          credential_type: "key",
+          changed_fields: ["identifier", "holder", "unit", "accessArea", "note"],
+          storage: "AccessCredential",
+        },
       }),
     );
+    const auditPayload = writeAuditLogMock.mock.calls[0][1];
+    expect(JSON.stringify(auditPayload.metadata)).not.toContain("NYCKEL-2");
+    expect(JSON.stringify(auditPayload.metadata)).not.toContain("Anna Andersson");
+    expect(JSON.stringify(auditPayload.metadata)).not.toContain("Utlämnad till styrelsen");
   });
 
   it("rejects issued status without holder", async () => {
