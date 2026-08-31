@@ -33,17 +33,31 @@ describe("DELETE /api/work-orders/[id] authorization", () => {
     writeAuditLogMock.mockResolvedValue(undefined);
   });
 
-  it("denies an assigned technician before looking up or deleting the work order", async () => {
+  it("denies an assigned technician after scoped lookup but before deletion", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    workOrderFindFirstMock.mockResolvedValue({ id: "wo-1", title: "Byt pump", status: "planned", assigned_to_id: "tech-1" });
 
     const response = await DELETE(new Request("http://localhost/api/work-orders/wo-1", { method: "DELETE" }), { params });
     const body = await response.json();
 
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/ta bort arbetsordrar/i);
-    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "wo-1", company_id: "company-1", deleted_at: null, property: { deleted_at: null } },
+      select: { id: true, title: true, status: true, assigned_to_id: true },
+    });
     expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("conceals an unassigned work order from a technician", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    workOrderFindFirstMock.mockResolvedValue({ id: "wo-1", title: "Byt pump", status: "planned", assigned_to_id: "tech-2" });
+
+    const response = await DELETE(new Request("http://localhost/api/work-orders/wo-1", { method: "DELETE" }), { params });
+
+    expect(response.status).toBe(404);
+    expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("allows a manager to soft-delete a company-scoped work order", async () => {
@@ -53,10 +67,6 @@ describe("DELETE /api/work-orders/[id] authorization", () => {
     const response = await DELETE(new Request("http://localhost/api/work-orders/wo-1", { method: "DELETE" }), { params });
 
     expect(response.status).toBe(200);
-    expect(workOrderFindFirstMock).toHaveBeenCalledWith({
-      where: { id: "wo-1", company_id: "company-1", deleted_at: null, property: { deleted_at: null } },
-      select: { id: true, title: true, status: true, assigned_to_id: true },
-    });
     expect(workOrderUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "wo-1", company_id: "company-1", deleted_at: null },
       data: { deleted_at: expect.any(Date) },
