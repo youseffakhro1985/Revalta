@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { updateManyMock, workOrderFindFirstMock, listQueuedMock, getModernJobMock, getModernDraftMock, getLegacyDraftMock, upsertJobMock } =
   vi.hoisted(() => ({
@@ -50,10 +50,20 @@ describe("invoice export cron — duplicate-submission guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("CRON_SECRET", "test-cron-secret");
+    vi.stubEnv("INVOICE_WEBHOOK_URL", "https://billing.example.test/invoices");
+    vi.stubEnv("INVOICE_WEBHOOK_SECRET", "test-webhook-secret");
     listQueuedMock.mockResolvedValue([
       { companyId: "company-1", workOrderId: "wo-1", job: baseJob, createdAt: new Date() },
     ]);
     getModernJobMock.mockResolvedValue(baseJob);
+    getLegacyDraftMock.mockResolvedValue(null);
+    upsertJobMock.mockResolvedValue(baseJob);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it("skips the job instead of re-sending it when the atomic claim loses the race", async () => {
@@ -70,7 +80,7 @@ describe("invoice export cron — duplicate-submission guard", () => {
     });
     // Never fetched the work order or invoice draft, never attempted to send.
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
-    expect(body).toEqual({ queued: 1, sent: 0, failed: 0, skipped: 1 });
+    expect(body).toEqual({ queued: 1, sent: 0, failed: 0, skipped: 1, reconciliationRequired: 0 });
   });
 
   it("proceeds to process the job when the atomic claim wins", async () => {
@@ -85,9 +95,56 @@ describe("invoice export cron — duplicate-submission guard", () => {
     // Work order missing -> job recorded as failed, but the important assertion is
     // that we actually attempted processing (claim succeeded), not that it "sent".
     expect(body.failed).toBe(1);
+    expect(body.reconciliationRequired).toBe(0);
+  });
+
+  it("does not downgrade a provider-accepted export to retryable failed when receipt persistence fails", async () => {
+    updateManyMock.mockResolvedValue({ count: 1 });
+    workOrderFindFirstMock.mockResolvedValue({
+      id: "wo-1",
+      title: "Arbetsorder",
+      property: { name: "Fastigheten", address: "Storgatan 1", postal_code: "411 01", city: "Göteborg" },
+      unit: null,
+      company: { name: "Bolaget AB", org_number: "556000-0000" },
+    });
+    getModernDraftMock.mockResolvedValue({
+      versionId: "v1",
+      workOrderId: "wo-1",
+      status: "ready",
+      lines: [],
+      total: 1000,
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("accepted", {
+      status: 200,
+      headers: { "x-external-id": "provider-123" },
+    })));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // The provider has already returned 2xx. Simulate only the subsequent local
+    // receipt write failing.
+    upsertJobMock.mockRejectedValueOnce(new Error("database unavailable"));
+
+    const response = await GET(cronRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(upsertJobMock).toHaveBeenCalledTimes(1);
+    expect(upsertJobMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
+      jobId: "job-1",
+      status: "sent",
+      providerStatus: 200,
+      externalId: "provider-123",
+    }));
+    // Critically, there is no second persistence call that turns the same export into
+    // "failed" and therefore manually retryable after the provider already accepted it.
+    expect(body).toEqual({ queued: 1, sent: 0, failed: 0, skipped: 0, reconciliationRequired: 1 });
+    expect(consoleError).toHaveBeenCalledWith(
+      "Invoice export requires reconciliation after provider success",
+      expect.objectContaining({ jobId: "job-1", provider: "webhook" }),
+    );
   });
 
   it("returns 401 without a valid CRON_SECRET", async () => {
+    vi.stubEnv("CRON_SECRET", "test-cron-secret");
     const response = await GET(new Request("https://www.revalta.se/api/cron/invoice-export-jobs"));
     expect(response.status).toBe(401);
     expect(listQueuedMock).not.toHaveBeenCalled();
