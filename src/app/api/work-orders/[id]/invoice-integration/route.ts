@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canManageWorkOrderFinance, canViewFinanceData, getCurrentUser } from "@/lib/current-user";
@@ -18,6 +19,27 @@ function configured(provider: string) {
   if (provider === "fortnox") return Boolean(process.env.FORTNOX_ACCESS_TOKEN && process.env.FORTNOX_INVOICE_ENDPOINT);
   if (provider === "visma") return Boolean(process.env.VISMA_ACCESS_TOKEN && process.env.VISMA_INVOICE_ENDPOINT);
   return Boolean(process.env.INVOICE_WEBHOOK_URL && process.env.INVOICE_WEBHOOK_SECRET);
+}
+
+function logicalExportJobId(args: {
+  companyId: string;
+  workOrderId: string;
+  provider: string;
+  invoiceVersionId: string;
+}) {
+  const digest = createHash("sha256")
+    .update([args.companyId, args.workOrderId, args.provider, args.invoiceVersionId].join("\u0000"))
+    .digest("hex")
+    .slice(0, 40);
+  return `iex_${digest}`;
+}
+
+function duplicateExportError(status: string) {
+  if (status === "sent") return "Samma fakturaversion har redan exporterats till leverantören";
+  if (status === "failed") return "Samma fakturaversion har ett misslyckat exportjobb. Återförsök det befintliga jobbet i stället.";
+  if (status === "cancelled") return "Ett äldre avbrutet exportjobb har oklar leverantörsstatus. Stäm av exporten innan ett nytt jobb skapas.";
+  if (activeStatuses.has(status)) return "Samma fakturaversion har redan ett aktivt exportjobb för leverantören";
+  return "Samma fakturaversion har redan ett exportjobb för leverantören";
 }
 
 async function getOrder(id: string, companyId: string) {
@@ -86,21 +108,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     if (typeof invoice.versionId !== "string") return NextResponse.json({ error: "Faktureringsunderlaget saknar versions-ID" }, { status: 400 });
 
+    const stableJobId = logicalExportJobId({
+      companyId: user.company_id,
+      workOrderId: id,
+      provider,
+      invoiceVersionId: invoice.versionId,
+    });
     const jobs = await listInvoiceExportJobs(user.company_id, id);
-    const duplicate = jobs.find((job) =>
-      job.provider === provider && job.invoiceVersionId === invoice.versionId && activeStatuses.has(String(job.status ?? "")),
-    );
-    if (duplicate) return NextResponse.json({ error: "Samma fakturaversion har redan ett aktivt exportjobb för leverantören" }, { status: 409 });
+    const matchingJobs = jobs.filter((job) => job.provider === provider && job.invoiceVersionId === invoice.versionId);
+    const nonCancelled = matchingJobs.find((job) => String(job.status ?? "") !== "cancelled");
+    if (nonCancelled) {
+      return NextResponse.json({ error: duplicateExportError(String(nonCancelled.status ?? "")) }, { status: 409 });
+    }
+
+    // Before this hardening, a processing export could be marked cancelled. Its
+    // provider outcome is therefore ambiguous and its random legacy job ID cannot be
+    // replaced with a fresh idempotency identity safely. Only a cancelled job that
+    // already has the deterministic ID below is known to have been created under the
+    // safe queued-only cancellation rule and may be restarted.
+    const ambiguousCancelled = matchingJobs.find((job) => String(job.status ?? "") === "cancelled" && job.jobId !== stableJobId);
+    if (ambiguousCancelled) {
+      return NextResponse.json({ error: duplicateExportError("cancelled") }, { status: 409 });
+    }
+    const safeCancelled = matchingJobs.find((job) => String(job.status ?? "") === "cancelled" && job.jobId === stableJobId);
 
     payload = {
-      jobId: crypto.randomUUID(),
+      // A logical export keeps the same identity even when two queue requests race.
+      // upsertInvoiceExportJob is keyed by jobId, and the cron forwards jobId as the
+      // provider idempotency key. This prevents concurrent queue requests from
+      // materializing two separately sendable jobs for the same invoice/provider.
+      jobId: stableJobId,
       workOrderId: id,
       provider,
       status: "queued",
-      attempt: 1,
+      attempt: safeCancelled ? Number(safeCancelled.attempt ?? 0) + 1 : 1,
       invoiceVersionId: invoice.versionId,
-      createdById: user.id,
-      createdAt: now,
+      createdById: safeCancelled?.createdById ?? user.id,
+      createdAt: safeCancelled?.createdAt ?? now,
       updatedAt: now,
       error: null,
     };
@@ -122,8 +166,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (currentStatus !== "failed") return NextResponse.json({ error: "Endast misslyckade jobb kan återförsökas" }, { status: 409 });
       if (!configured(provider)) return NextResponse.json({ error: "Integrationen är inte konfigurerad" }, { status: 400 });
     }
-    if (action === "cancel" && !activeStatuses.has(currentStatus)) {
-      return NextResponse.json({ error: "Endast köade eller pågående jobb kan avbrytas" }, { status: 409 });
+    // A processing request may already have crossed the external side-effect boundary.
+    // The API cannot safely cancel that HTTP request, so only not-yet-claimed jobs are
+    // cancellable. This keeps an ambiguous in-flight export from being re-queued under
+    // a new logical attempt while the provider may still accept the original request.
+    if (action === "cancel" && currentStatus !== "queued") {
+      return NextResponse.json({ error: "Endast köade exportjobb kan avbrytas säkert" }, { status: 409 });
     }
 
     payload = {
