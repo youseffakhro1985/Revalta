@@ -344,9 +344,6 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canAssignWorkOrders(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att ta bort ärenden" }, { status: 403 });
-    }
     if (!user.company_id) {
       return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
@@ -358,6 +355,9 @@ export async function DELETE(
     });
     if (!existing) return notFoundTicket();
     if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
+    if (!canAssignWorkOrders(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet att ta bort ärenden" }, { status: 403 });
+    }
 
     const deleteResult = await db.ticket.updateMany({
       where: { id: existing.id, company_id: user.company_id, deleted_at: null },
