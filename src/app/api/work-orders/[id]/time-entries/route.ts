@@ -69,6 +69,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let userEmail = user.email;
 
   if (action === "start") {
+    const existingEntries = await listTimeEntries(user.company_id, id);
+    if (existingEntries.some((entry) => entry.status === "running" && entry.source !== "legacy")) {
+      return NextResponse.json({ error: "Det finns redan en aktiv timer på arbetsordern" }, { status: 409 });
+    }
     startedAt = new Date().toISOString();
     status = "running";
   } else if (action === "manual") {
