@@ -89,4 +89,27 @@ describe("work-order profitability route", () => {
     expect(response.status).toBe(200);
     expect(body.canManage).toBe(false);
   });
+
+  it("uses only approved material in official profitability", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    listMaterialEntriesMock.mockResolvedValue([
+      { entryId: "approved", status: "approved", total: 100, billable: true },
+      { entryId: "submitted", status: "submitted", total: 900, billable: true },
+      { entryId: "rejected", status: "rejected", total: 700, billable: true },
+      { entryId: "deleted", status: "deleted", total: 500, billable: true },
+    ]);
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/profitability"), {
+      params: Promise.resolve({ id: "wo-1" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.summary.materialCost).toBe(100);
+    expect(body.summary.billableMaterial).toBe(100);
+    expect(body.summary.materialRevenue).toBe(115);
+    expect(body.summary.totalCost).toBe(100);
+    expect(body.summary.totalRevenue).toBe(115);
+    expect(body.summary.margin).toBe(15);
+  });
 });

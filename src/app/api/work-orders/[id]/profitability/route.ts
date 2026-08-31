@@ -51,7 +51,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   let materialCost = 0;
   let billableMaterial = 0;
   for (const row of materials) {
-    if (row.status === "deleted" || row.status === "rejected") continue;
+    if (row.status !== "approved") continue;
     materialCost += numberValue(row.total);
     if (row.billable === true) billableMaterial += numberValue(row.total);
   }
