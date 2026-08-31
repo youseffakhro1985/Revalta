@@ -20,6 +20,7 @@ const plans = {
   professional: { label: "Standard", price: 995, propertyLimit: 75, teamLimit: 15 },
   enterprise: { label: "Professional", price: 1995, propertyLimit: 999, teamLimit: 100 },
 };
+const allowedPlans = new Set(Object.keys(plans));
 
 function successResponse(
   observability: ReturnType<typeof createRouteObservability>,
@@ -191,7 +192,7 @@ export async function PATCH(request: Request) {
 
     const body = await request.json().catch(() => ({}));
     const plan = typeof body?.plan === "string" ? body.plan : "";
-    if (!(plan in plans)) {
+    if (!allowedPlans.has(plan)) {
       return reject(observability, {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
