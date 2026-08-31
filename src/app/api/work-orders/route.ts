@@ -447,6 +447,12 @@ export async function POST(request: Request) {
           context: { userId: user.id, companyId: user.company_id },
         });
       }
+      if (!ticket.property_id) {
+        return validationFailure("Ärendet måste kopplas till en fastighet innan det kan länkas till en arbetsorder", "ticket_missing_property");
+      }
+      if (ticket.property_id !== propertyId) {
+        return validationFailure("Ärendet tillhör inte vald fastighet", "ticket_property_mismatch");
+      }
     }
     try {
       await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId, buildingId, technicalAssetId });
