@@ -45,6 +45,7 @@ type TransitionData = {
   canManage: boolean;
   canAssign?: boolean;
 };
+type WorkOrderCapabilities = { canAssign: boolean; canManageFinance: boolean; canViewFinance: boolean };
 type BuildingOption = { id: string; name: string; address: string | null };
 type AssetOption = { id: string; name: string; category: string; component_class: string | null; location: string | null; status: string; criticality: string; building_id: string | null; building_name: string | null };
 
@@ -71,6 +72,7 @@ export default function WorkOrderDetailPage() {
   const router = useRouter();
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [transitions, setTransitions] = useState<TransitionData | null>(null);
+  const [capabilities, setCapabilities] = useState<WorkOrderCapabilities>({ canAssign: false, canManageFinance: false, canViewFinance: false });
   const [buildings, setBuildings] = useState<BuildingOption[]>([]);
   const [assets, setAssets] = useState<AssetOption[]>([]);
   const [buildingId, setBuildingId] = useState("");
@@ -101,6 +103,11 @@ export default function WorkOrderDetailPage() {
       if (!transitionResponse.ok) throw new Error(transitionData.error || "Kunde inte hämta styrningsalternativ");
       setWorkOrder(workOrderData.workOrder);
       setTransitions(transitionData);
+      setCapabilities({
+        canAssign: Boolean(workOrderData.canAssign),
+        canManageFinance: Boolean(workOrderData.canManageFinance),
+        canViewFinance: Boolean(workOrderData.canViewFinance),
+      });
       setBuildings(optionsData.buildings || []);
       setAssets(optionsData.assets || []);
       setBuildingId(workOrderData.workOrder.enterprise?.building_id || "");
@@ -158,8 +165,8 @@ export default function WorkOrderDetailPage() {
   if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
   if (!workOrder || !transitions) return <InlineAlert>{error || "Arbetsordern hittades inte"}</InlineAlert>;
 
-  const estimated = Number(workOrder.estimated_cost || 0);
-  const actual = Number(workOrder.actual_cost || 0);
+  const estimated = workOrder.estimated_cost === null ? null : Number(workOrder.estimated_cost);
+  const actual = workOrder.actual_cost === null ? null : Number(workOrder.actual_cost);
   const enterprise = workOrder.enterprise;
 
   async function createProjectFromWorkOrder() {
@@ -215,7 +222,7 @@ export default function WorkOrderDetailPage() {
       <MetricCard icon={MapPin} label="Fastighet" value={workOrder.property.name} hint={`${workOrder.property.address}, ${workOrder.property.city}`} />
       <MetricCard icon={UserRound} label="Ansvarig" value={workOrder.assigned_to?.name || workOrder.assigned_to?.email || "Ej tilldelad"} />
       <MetricCard icon={CalendarClock} label="Planerat slut" value={workOrder.scheduled_end ? date.format(new Date(workOrder.scheduled_end)) : "Ej satt"} />
-      <MetricCard icon={Banknote} label="Kostnadsutfall" value={money.format(actual)} hint={`Beräknat ${money.format(estimated)}`} />
+      {capabilities.canViewFinance ? <MetricCard icon={Banknote} label="Kostnadsutfall" value={actual === null ? "Ej satt" : money.format(actual)} hint={estimated === null ? "Beräknat ej satt" : `Beräknat ${money.format(estimated)}`} /> : null}
     </section>
 
     <Panel title="Identifiering och spårning" description="Operativ identifiering, SLA och oföränderligt revisionsspår för arbetsordern.">
@@ -253,15 +260,17 @@ export default function WorkOrderDetailPage() {
           <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={!editable} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
           <input name="scheduledStart" type="date" disabled={!editable} defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat startdatum" />
           <input name="scheduledEnd" type="date" disabled={!editable} defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat slutdatum" />
-          <input name="estimatedCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={estimated || ""} placeholder="Beräknad kostnad" className={premiumFieldClass} aria-label="Beräknad kostnad" />
-          <input name="actualCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={actual || ""} placeholder="Faktisk kostnad" className={premiumFieldClass} aria-label="Faktisk kostnad" />
+          {capabilities.canManageFinance ? <>
+            <input name="estimatedCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={estimated ?? ""} placeholder="Beräknad kostnad" className={premiumFieldClass} aria-label="Beräknad kostnad" />
+            <input name="actualCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={actual ?? ""} placeholder="Faktisk kostnad" className={premiumFieldClass} aria-label="Faktisk kostnad" />
+          </> : null}
           {transitions.canManage ? <button disabled={!editable || saving || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : editable ? "Spara låst och validerad ändring" : "Väntar på redigeringslås"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
         </form>
         <div className="mt-5 space-y-3 border-t border-sand-100 pt-5 text-sm text-ink-500">
           {workOrder.unit ? <p>Enhet: <strong className="text-ink-800">{workOrder.unit.designation}</strong></p> : null}
           {workOrder.ticket ? <p>Ursprungsärende: <strong className="text-ink-800">{workOrder.ticket.public_reference || workOrder.ticket.title}</strong></p> : null}
           {workOrder.projects.map((project) => <Link key={project.id} href={`/dashboard/projekt/${project.id}`} className="flex items-center gap-2 font-semibold text-petroleum-700 hover:text-petroleum-900"><FolderKanban className="h-4 w-4" />{project.name}</Link>)}
-          {transitions.canManage && workOrder.projects.length === 0 ? (
+          {capabilities.canManageFinance && workOrder.projects.length === 0 ? (
             <button
               type="button"
               disabled={creatingProject}
@@ -272,7 +281,7 @@ export default function WorkOrderDetailPage() {
               {creatingProject ? "Skapar projekt…" : "Skapa projekt från arbetsorder"}
             </button>
           ) : null}
-          {transitions.canManage ? (
+          {capabilities.canAssign ? (
             <button
               type="button"
               disabled={deleting}
@@ -292,13 +301,13 @@ export default function WorkOrderDetailPage() {
     </Panel>
 
     <WorkOrderExecutionPanel workOrderId={workOrder.id} />
-    <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
+    {capabilities.canViewFinance ? <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>
         <p className="mt-1 text-sm text-ink-500">Här samlas attesterad tid, material, lönsamhet och exportbart fakturaunderlag (Fortnox/Visma). Fältregistreringen ovan är driftunderlag, inte fakturarader.</p>
       </div>
       <WorkOrderEconomicsPanel workOrderId={workOrder.id} />
-    </section>
+    </section> : null}
     <WorkOrderReportingPanel workOrderId={workOrder.id} />
     <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
   </div>;
