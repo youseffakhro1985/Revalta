@@ -4,6 +4,7 @@ const root = new URL("../", import.meta.url);
 const paths = {
   vercel: new URL("vercel.json", root),
   package: new URL("package.json", root),
+  vercelBuild: new URL("scripts/vercel-build.mjs", root),
   ci: new URL(".github/workflows/ci.yml", root),
   codeql: new URL(".github/workflows/codeql.yml", root),
 };
@@ -52,9 +53,10 @@ function validatePinnedActions(source, label) {
   }
 }
 
-const [vercel, packageJson, ci, codeql] = await Promise.all([
+const [vercel, packageJson, vercelBuild, ci, codeql] = await Promise.all([
   readJson(paths.vercel, "vercel.json"),
   readJson(paths.package, "package.json"),
+  readFile(paths.vercelBuild, "utf8"),
   readFile(paths.ci, "utf8"),
   readFile(paths.codeql, "utf8"),
 ]);
@@ -62,6 +64,26 @@ const [vercel, packageJson, ci, codeql] = await Promise.all([
 if (vercel.framework !== "nextjs") fail("vercel.json framework must remain nextjs");
 if (vercel.installCommand !== "npm ci") fail("vercel.json must install with npm ci");
 if (vercel.buildCommand !== "npm run build") fail("vercel.json must build with npm run build");
+
+requireText(
+  vercelBuild,
+  'process.env.RUN_DB_MIGRATIONS === "true"',
+  "The application build must explicitly reject RUN_DB_MIGRATIONS=true",
+);
+requireText(
+  vercelBuild,
+  "Apply production migrations only through the protected Database Release workflow.",
+  "The application build must direct migrations to the protected Database Release workflow",
+);
+requireOrder(
+  vercelBuild,
+  'process.env.RUN_DB_MIGRATIONS === "true"',
+  'run("npx", ["prisma", "generate"])',
+  "The migration guard must run before Prisma generation and the application build",
+);
+if (vercelBuild.includes('["prisma", "migrate", "deploy"]') || vercelBuild.includes("prisma migrate deploy")) {
+  fail("The application build must never execute prisma migrate deploy");
+}
 
 if (!Array.isArray(vercel.crons) || vercel.crons.length === 0) fail("vercel.json must define scheduled operational jobs");
 const cronPaths = vercel.crons.map((entry) => entry?.path);
@@ -116,4 +138,4 @@ if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run 
 if (!scripts.quality.includes("npm run audit:ui-interactions")) fail("The quality command must audit UI interactions");
 if (!scripts.quality.includes("npm run audit:dashboard-integrity")) fail("The quality command must audit dashboard route integrity");
 
-console.log("Release configuration is valid: Vercel commands and cron contracts, main/release-preview CI coverage, immutable GitHub Action pins, digest-pinned PostgreSQL, least-privilege checkout, database migration checks, UI and dashboard integrity audits, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
+console.log("Release configuration is valid: Vercel builds cannot run database migrations; Vercel commands and cron contracts, main/release-preview CI coverage, immutable GitHub Action pins, digest-pinned PostgreSQL, least-privilege checkout, clean-database migration checks, UI and dashboard integrity audits, tests, typechecking, dependency audit, production build and CodeQL enforcement are present");
