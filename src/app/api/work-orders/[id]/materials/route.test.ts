@@ -171,4 +171,27 @@ describe("material-entry id isolation and attestation state", () => {
     expect(upsertMaterialEntryMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
+
+  it("allows a technician to delete their own submitted material", async () => {
+    getModernMaterialEntryMock.mockResolvedValue(materialEntry());
+
+    const response = await POST(request({ action: "delete", entryId: "material-1" }), params);
+
+    expect(response.status).toBe(201);
+    const payload = upsertMaterialEntryMock.mock.calls[0][1];
+    expect(payload.status).toBe("deleted");
+    expect(payload.actorId).toBe("tech-1");
+    expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["approved", "rejected", "deleted"] as const)("rejects deletion from %s material state", async (status) => {
+    getModernMaterialEntryMock.mockResolvedValue(materialEntry({ status }));
+
+    const response = await POST(request({ action: "delete", entryId: "material-1" }), params);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "Materialraden kan bara tas bort innan den har attesterats" });
+    expect(upsertMaterialEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });
