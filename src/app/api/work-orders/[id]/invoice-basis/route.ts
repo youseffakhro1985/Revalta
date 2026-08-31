@@ -11,7 +11,9 @@ import {
   type InvoiceDraftPayload,
 } from "@/lib/work-order-ops-storage";
 
-const statuses = new Set(["draft", "ready", "exported", "cancelled"]);
+// "exported" is intentionally not client-writable. Provider delivery is tracked by
+// WorkOrderInvoiceExportJob and must not be asserted by an invoice-basis request.
+const clientWritableStatuses = new Set(["draft", "ready", "cancelled"]);
 
 type Line = {
   id: string;
@@ -178,7 +180,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const body = await request.json();
   const status = String(body.status ?? "draft");
-  if (!statuses.has(status)) return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
+  if (status === "exported") {
+    return NextResponse.json({
+      error: "Statusen exporterad kan inte sättas via fakturaunderlaget. Exportstatus hämtas från exportjobbet.",
+    }, { status: 409 });
+  }
+  if (!clientWritableStatuses.has(status)) return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
   if (!Array.isArray(body.lines) || body.lines.length > 100) return NextResponse.json({ error: "Fakturarader saknas eller är för många" }, { status: 400 });
   const lines = body.lines.map(cleanLine);
   if (lines.some((line: Line | null) => !line)) return NextResponse.json({ error: "En eller flera fakturarader är ogiltiga" }, { status: 400 });
