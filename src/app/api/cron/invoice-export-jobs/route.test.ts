@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { updateManyMock, workOrderFindFirstMock, listQueuedMock, getModernJobMock, getModernDraftMock, getLegacyDraftMock, upsertJobMock } =
+const { createLoggerMock, loggerErrorMock, loggerInfoMock, loggerWarnMock, updateManyMock, workOrderFindFirstMock, listQueuedMock, getModernJobMock, getModernDraftMock, getLegacyDraftMock, upsertJobMock } =
   vi.hoisted(() => ({
+    createLoggerMock: vi.fn(),
+    loggerErrorMock: vi.fn(),
+    loggerInfoMock: vi.fn(),
+    loggerWarnMock: vi.fn(),
     updateManyMock: vi.fn(),
     workOrderFindFirstMock: vi.fn(),
     listQueuedMock: vi.fn(),
@@ -25,6 +29,7 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
   getInvoiceDraftByVersion: getLegacyDraftMock,
   upsertInvoiceExportJob: upsertJobMock,
 }));
+vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { GET } from "./route";
 
@@ -49,6 +54,7 @@ function cronRequest() {
 describe("invoice export cron — duplicate-submission guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({ debug: vi.fn(), info: loggerInfoMock, warn: loggerWarnMock, error: loggerErrorMock });
     vi.stubEnv("CRON_SECRET", "test-cron-secret");
     vi.stubEnv("INVOICE_WEBHOOK_URL", "https://billing.example.test/invoices");
     vi.stubEnv("INVOICE_WEBHOOK_SECRET", "test-webhook-secret");
@@ -98,6 +104,27 @@ describe("invoice export cron — duplicate-submission guard", () => {
     expect(body.reconciliationRequired).toBe(0);
   });
 
+  it("persists a generic message for an unexpected per-job failure", async () => {
+    updateManyMock.mockResolvedValue({ count: 1 });
+    workOrderFindFirstMock.mockRejectedValue(new Error("postgres://user:secret@internal/revalta"));
+
+    const response = await GET(cronRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.failed).toBe(1);
+    expect(upsertJobMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({ status: "failed", error: "Exportjobbet misslyckades" }),
+    );
+    expect(JSON.stringify(upsertJobMock.mock.calls)).not.toContain("postgres://");
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "invoice export job failed",
+      expect.any(Error),
+      expect.objectContaining({ event: "cron.invoice_exports.job_failed", jobId: "job-1" }),
+    );
+  });
+
   it("does not downgrade a provider-accepted export to retryable failed when receipt persistence fails", async () => {
     updateManyMock.mockResolvedValue({ count: 1 });
     workOrderFindFirstMock.mockResolvedValue({
@@ -118,7 +145,6 @@ describe("invoice export cron — duplicate-submission guard", () => {
       status: 200,
       headers: { "x-external-id": "provider-123" },
     })));
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     // The provider has already returned 2xx. Simulate only the subsequent local
     // receipt write failing.
     upsertJobMock.mockRejectedValueOnce(new Error("database unavailable"));
@@ -137,9 +163,28 @@ describe("invoice export cron — duplicate-submission guard", () => {
     // Critically, there is no second persistence call that turns the same export into
     // "failed" and therefore manually retryable after the provider already accepted it.
     expect(body).toEqual({ queued: 1, sent: 0, failed: 0, skipped: 0, reconciliationRequired: 1 });
-    expect(consoleError).toHaveBeenCalledWith(
-      "Invoice export requires reconciliation after provider success",
-      expect.objectContaining({ jobId: "job-1", provider: "webhook" }),
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "invoice export requires reconciliation after provider success",
+      expect.any(Error),
+      expect.objectContaining({ event: "cron.invoice_exports.reconciliation_required", jobId: "job-1", provider: "webhook" }),
+    );
+  });
+
+  it("returns a safe correlated 500 when queue loading fails", async () => {
+    listQueuedMock.mockRejectedValue(new Error("postgres://user:secret@internal/revalta"));
+
+    const response = await GET(cronRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.errorCode).toBe("INTERNAL_ERROR");
+    expect(typeof body.requestId).toBe("string");
+    expect(JSON.stringify(body)).not.toContain("postgres://");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "invoice export cron failed",
+      expect.any(Error),
+      expect.objectContaining({ event: "cron.invoice_exports.failed" }),
     );
   });
 

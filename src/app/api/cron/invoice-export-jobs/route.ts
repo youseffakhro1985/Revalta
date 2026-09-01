@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { isCronRequestAuthorized } from "@/lib/request-security";
+import { createRouteObservability } from "@/lib/route-observability";
 import {
   getInvoiceDraftByVersion,
   getModernInvoiceDraftByVersion,
@@ -15,8 +17,21 @@ export const maxDuration = 60;
 
 const MAX_JOBS_PER_RUN = 20;
 const REQUEST_TIMEOUT_MS = 20_000;
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 type Obj = Record<string, unknown>;
+class InvoiceExportJobError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvoiceExportJobError";
+  }
+}
+
 type Job = InvoiceExportJobPayload & {
   provider: "fortnox" | "visma" | "webhook";
 };
@@ -162,8 +177,8 @@ function exportPayload(args: {
 
 async function send(job: Job, payload: ReturnType<typeof exportPayload>) {
   const config = providerConfig(job.provider);
-  if (!config.endpoint) throw new Error(`${job.provider} saknar konfigurerad fakturaendpoint`);
-  if (!config.token) throw new Error(`${job.provider} saknar konfigurerad åtkomstnyckel`);
+  if (!config.endpoint) throw new InvoiceExportJobError(`${job.provider} saknar konfigurerad fakturaendpoint`);
+  if (!config.token) throw new InvoiceExportJobError(`${job.provider} saknar konfigurerad åtkomstnyckel`);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -185,7 +200,7 @@ async function send(job: Job, payload: ReturnType<typeof exportPayload>) {
     });
     const responseText = await response.text();
     if (!response.ok) {
-      throw new Error(`${job.provider} svarade ${response.status}: ${responseText.slice(0, 600) || response.statusText}`);
+      throw new InvoiceExportJobError(`${job.provider} svarade med HTTP ${response.status}`);
     }
     return {
       status: response.status,
@@ -193,7 +208,9 @@ async function send(job: Job, payload: ReturnType<typeof exportPayload>) {
       response: responseText.slice(0, 2000),
     };
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") throw new Error(`${job.provider} svarade inte inom ${REQUEST_TIMEOUT_MS / 1000} sekunder`);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new InvoiceExportJobError(`${job.provider} svarade inte inom ${REQUEST_TIMEOUT_MS / 1000} sekunder`);
+    }
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -209,9 +226,7 @@ async function saveJob(companyId: string, job: Job, status: string, extra: Parti
   });
 }
 
-export async function GET(request: Request) {
-  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-
+async function execute(observability: ReturnType<typeof createRouteObservability>) {
   const queuedRaw = await listQueuedInvoiceExportJobs(MAX_JOBS_PER_RUN);
   const queued = queuedRaw
     .map((item) => {
@@ -264,20 +279,20 @@ export async function GET(request: Request) {
         },
       });
 
-      if (!workOrder) throw new Error("Arbetsordern hittades inte längre");
-      if (!modernJob.invoiceVersionId) throw new Error("Exportjobbet saknar fakturaversion");
+      if (!workOrder) throw new InvoiceExportJobError("Arbetsordern hittades inte längre");
+      if (!modernJob.invoiceVersionId) throw new InvoiceExportJobError("Exportjobbet saknar fakturaversion");
       const modernInvoice = await getModernInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
       if (!modernInvoice) {
         const legacyInvoice = await getInvoiceDraftByVersion(companyId, workOrderId, modernJob.invoiceVersionId);
-        throw new Error(
+        throw new InvoiceExportJobError(
           legacyInvoice
             ? "Faktureringsunderlaget finns kvar i äldre lagring. Kör backfill till WorkOrderInvoiceDraft innan export."
             : "Den kopplade fakturaversionen hittades inte",
         );
       }
       const invoice = asInvoice(modernInvoice);
-      if (!invoice) throw new Error("Den kopplade fakturaversionen hittades inte");
-      if (!["ready", "exported"].includes(invoice.status)) throw new Error("Faktureringsunderlaget måste vara markerat som redo före export");
+      if (!invoice) throw new InvoiceExportJobError("Den kopplade fakturaversionen hittades inte");
+      if (!["ready", "exported"].includes(invoice.status)) throw new InvoiceExportJobError("Faktureringsunderlaget måste vara markerat som redo före export");
 
       const payload = exportPayload({ job: modernJob, invoice, workOrder });
       const providerResult = await send(modernJob, payload);
@@ -298,7 +313,8 @@ export async function GET(request: Request) {
       // "processing" fails closed: the queue cron will not resend it and finance users
       // cannot safely cancel an in-flight/ambiguous export. Reconciliation is required.
       if (providerAccepted) {
-        console.error("Invoice export requires reconciliation after provider success", {
+        observability.logger.error("invoice export requires reconciliation after provider success", error, {
+          event: "cron.invoice_exports.reconciliation_required",
           companyId,
           workOrderId,
           jobId: modernJob.jobId,
@@ -308,7 +324,14 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const message = error instanceof Error ? error.message : "Okänt integrationsfel";
+      observability.logger.error("invoice export job failed", error, {
+        event: "cron.invoice_exports.job_failed",
+        companyId,
+        workOrderId,
+        jobId: modernJob.jobId,
+        provider: modernJob.provider,
+      });
+      const message = error instanceof InvoiceExportJobError ? error.message : "Exportjobbet misslyckades";
       await saveJob(companyId, modernJob, "failed", {
         failedAt: new Date().toISOString(),
         error: message.slice(0, 2000),
@@ -317,5 +340,29 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
+  return result;
+}
+
+export async function GET(request: Request) {
+  const observability = createRouteObservability(request, "/api/cron/invoice-export-jobs");
+  if (!isCronRequestAuthorized(request)) {
+    observability.logger.warn("invoice export cron rejected", observability.elapsed({ event: "cron.invoice_exports.unauthorized" }));
+    return apiErrorResponse({ status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", requestId: observability.requestId });
+  }
+
+  try {
+    const result = await execute(observability);
+    observability.logger.info("invoice export cron completed", observability.elapsed({
+      event: "cron.invoice_exports.completed",
+      queued: result.queued,
+      sent: result.sent,
+      failed: result.failed,
+      skipped: result.skipped,
+      reconciliationRequired: result.reconciliationRequired,
+    }));
+    return observability.correlate(NextResponse.json(result, { headers: SUCCESS_HEADERS }));
+  } catch (error) {
+    observability.logger.error("invoice export cron failed", error, observability.elapsed({ event: "cron.invoice_exports.failed" }));
+    return apiErrorResponse({ status: 500, code: API_ERROR_CODES.internalError, message: "Internt serverfel", requestId: observability.requestId });
+  }
 }

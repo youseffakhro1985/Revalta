@@ -1,9 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { deliverServiceEmail, type ServiceEmailDelivery } from "@/lib/component-service-email";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { isCronRequestAuthorized } from "@/lib/request-security";
+import { createRouteObservability } from "@/lib/route-observability";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,8 +21,13 @@ const defaults: Preferences = { enabled: true, daysAhead: 30, roles: [...allowed
 const userDefaults: UserPreferences = { enabled: true, overdueOnly: false };
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROCESSING_LEASE_MS = 15 * 60_000;
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
-function noStore(body: unknown, init?: ResponseInit) { return NextResponse.json(body, { ...init, headers: { "Cache-Control": "private, no-store", ...(init?.headers || {}) } }); }
 function dateKey(date = new Date()) { return date.toISOString().slice(0, 10); }
 function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 function toJson(value: unknown): Prisma.InputJsonValue { return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue; }
@@ -165,8 +172,7 @@ async function finalizeRun(input: {
   });
 }
 
-export async function GET(request: Request) {
-  if (!isCronRequestAuthorized(request)) return noStore({ error: "Obehörig" }, { status: 401 });
+async function execute() {
   const now = new Date();
   const maxDueBefore = new Date(now.getTime() + 90 * 86400000);
   const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
@@ -274,5 +280,30 @@ export async function GET(request: Request) {
     else result.failed += 1;
   }
 
-  return noStore(result);
+  return result;
+}
+
+export async function GET(request: Request) {
+  const observability = createRouteObservability(request, "/api/cron/component-service-reminders");
+  if (!isCronRequestAuthorized(request)) {
+    observability.logger.warn("component service reminder cron rejected", observability.elapsed({ event: "cron.component_service_reminders.unauthorized" }));
+    return apiErrorResponse({ status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", requestId: observability.requestId });
+  }
+
+  try {
+    const result = await execute();
+    observability.logger.info("component service reminder cron completed", observability.elapsed({
+      event: "cron.component_service_reminders.completed",
+      companies: result.companies,
+      components: result.components,
+      sent: result.sent,
+      partial: result.partial,
+      skipped: result.skipped,
+      failed: result.failed,
+    }));
+    return observability.correlate(NextResponse.json(result, { headers: SUCCESS_HEADERS }));
+  } catch (error) {
+    observability.logger.error("component service reminder cron failed", error, observability.elapsed({ event: "cron.component_service_reminders.failed" }));
+    return apiErrorResponse({ status: 500, code: API_ERROR_CODES.internalError, message: "Internt serverfel", requestId: observability.requestId });
+  }
 }
