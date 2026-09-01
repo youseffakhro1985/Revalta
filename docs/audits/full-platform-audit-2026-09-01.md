@@ -5,6 +5,40 @@ Produktions-URL: `https://www.revalta.se`
 Verifierad `main` och Production SHA: `48be6cbe10eac06710bdb8ce049e8c2c18e7d68e`  
 Revisionstyp: källkod, GitHub, tillgänglig Vercel-scope, publik runtime och autentiserad read-only produktionsverifiering
 
+## Uppföljning efter genomförande — 2026-09-01 15:28 UTC
+
+Den ursprungliga revisionsbaslinjen nedan bevaras för spårbarhet. Efter revisionen har fyra isolerade releaser passerat lokal full quality, exact-SHA Vercel Preview, Revalta CI, CodeQL och Preview Browser E2E, mergats via pull request och verifierats i Production.
+
+Aktuell verifierad `main` och Production SHA är `20fcce104d7224f8f5775be19312da2b984fc202`. Production health rapporterar `status=ok`, `database=ok`, `schema.ready=true`, `modernStorageOnly=true` och deployment `dpl_EfcwuZeDaaSt8BvnG9cLqZG1DfNe`.
+
+| Leverans | Resultat |
+| --- | --- |
+| PR #365 | Truthful integrationsstatus, neutral juridisk footer, borttagen inert länk, skärpt UI-audit och H1 i underhållsportföljens alla tillstånd. |
+| PR #366 | H1 för överlämning/besiktning och sann loading-state i integrationsmått. |
+| PR #360 | Ärendetilldelning och delete-affordance följer API:ts capability-kontrakt; tekniker skickar inte förbjuden assignee-mutation. |
+| PR #367 / issue #361 | Terminalt arbetsorderutförande låst, legacy SLA-mutation avvecklad, kanonisk och transaktionell completion med status-event samt ticket-/komponentsynk, och roll-/finanskorrekt read-only UI. |
+
+Senaste fulla lokala kvalitetsgrind: **177/177 testfiler, 1 092/1 092 tester, 0 produktionssårbarheter och 131 statiska sidor i Next.js-produktionsbuilden**. Det är 31 fler regressionstester än revisionsbaslinjen.
+
+Den uppdaterade evidensbaserade arbetsbedömningen är cirka **87 % tekniskt genomförande**, **64 % säker kommersiell lanseringsberedskap** och **76 % sammanvägd status**. Förbättringen kommer främst från stängda behörighets- och arbetsorderlivscykelrisker; data/release operations, juridik och ägarbeslut är oförändrade blockerare.
+
+### P0 som nu är slutfört
+
+- Vercels deploymentkvot återhämtade sig; exact-SHA previews kunde byggas igen.
+- PR #360 är mergead och exakt Production-verifierad.
+- Issue #361 är implementerad, regressionstestad, mergead och exakt Production-verifierad.
+- Golden-pathens execution-finalisering har nu en gemensam completion-sanning för status, statushistorik, ticket, komponent och ekonomiskt fältutfall.
+- Viewer och terminala arbetsorderlägen visar inte längre mutationskontroller som servern ska avvisa; teknikers redakterade kostnader renderas inte som falskt `0 kr`.
+
+### P0 som fortfarande kräver extern åtkomst eller ägarbeslut
+
+1. Kör read-only `Database Status` på exakt `20fcce104d7224f8f5775be19312da2b984fc202` och bevisa aktuell restore point. Tillgänglig GitHub-anslutning kan läsa workflows men inte dispatcha dem.
+2. Ge Vercel-anslutningen åtkomst till projektet `revalta`; teamet syns men projektlistan är fortfarande tom, så runtime-loggar, cronhistorik, rollback och usage kan inte granskas via API:t.
+3. Aktivera branchskydd/ruleset för `main` med PR, Revalta CI, CodeQL, Vercel och Preview Browser E2E som obligatoriska gates. Tillgänglig GitHub-anslutning saknar settings-/ruleset-mutation.
+4. Bekräfta portalägaren. Publik Production-portal är explicit kopplad till tenant `yousef AB` och visar en aktiv fastighet; det autentiserade arbetsutrymmet är den separata tenantorganisationen `Bovalta`. Koden gissar inte mellan dem och tenant-ID får inte bytas utan beslut.
+5. Fastställ juridisk identitet, organisationsnummer, kontaktväg, personuppgiftsansvarig, underbiträden, lagringstider, DPA och slutliga villkor/integritetstexter.
+6. Besluta om det publika GitHub-repot ska vara avsiktligt open source eller privat/proprietärt och välj licens-/IP-strategi.
+
 ## Sammanfattning
 
 Revalta är inte en prototyp. Det är en stor, sammanhängande Next.js-applikation med verklig produktionsdata, bred domänmodell, autentisering, tenant-kontext, premium-UI, driftstatus, faktiska arbetsflöden och en ovanligt omfattande lokal kvalitetsgrind.
@@ -287,4 +321,3 @@ Revalta kan kallas fullt produktionsredo först när:
 - Vercel/loggar/cron/usage går att läsa och övervaka,
 - juridisk identitet och avtalstexter är fastställda,
 - minst de kommersiellt exponerade huvudmodulerna kan flyttas från `PARTIAL` till `READY` enligt den dokumenterade evidence-gaten.
-
