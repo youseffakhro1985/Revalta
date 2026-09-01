@@ -122,7 +122,7 @@ describe("POST /api/auth/password-reset/request", () => {
     }));
   });
 
-  it("issues a token synchronously but schedules email delivery after the neutral response", async () => {
+  it("returns before lookup and runs the complete reset pipeline after the neutral response", async () => {
     userFindUniqueMock.mockResolvedValue({
       id: "user-1",
       email: "owner@example.se",
@@ -135,6 +135,14 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+    expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(passwordResetTokenCreateMock).not.toHaveBeenCalled();
+    expect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+
+    await runScheduledAfterCallbacks();
     expect(userFindUniqueMock).toHaveBeenCalledWith({
       where: { email: "owner@example.se" },
       select: { id: true, email: true, status: true, company: { select: { status: true } } },
@@ -152,12 +160,6 @@ describe("POST /api/auth/password-reset/request", () => {
       },
     });
     expect(transactionMock.mock.calls[1]?.[1]).toEqual(TOKEN_OPTIONS);
-    expect(afterMock).toHaveBeenCalledTimes(1);
-    expect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
-    expect(response.headers.get("cache-control")).toContain("no-store");
-    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-
-    await runScheduledAfterCallbacks();
     expect(sendPasswordResetEmailMock).toHaveBeenCalledWith("owner@example.se", "a".repeat(64));
   });
 
@@ -179,7 +181,7 @@ describe("POST /api/auth/password-reset/request", () => {
     expect(response.status).toBe(200);
     expect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
     const afterPromise = scheduledAfterCallbacks.shift()?.();
-    expect(sendPasswordResetEmailMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(sendPasswordResetEmailMock).toHaveBeenCalledTimes(1));
 
     let settled = false;
     void Promise.resolve(afterPromise).then(() => { settled = true; });
@@ -202,10 +204,13 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(afterMock).toHaveBeenCalledTimes(1);
+
+    await runScheduledAfterCallbacks();
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(transactionMock.mock.calls[0]?.[1]).toEqual(LOOKUP_OPTIONS);
     expect(passwordResetTokenCreateMock).not.toHaveBeenCalled();
-    expect(afterMock).not.toHaveBeenCalled();
     expect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
   });
 
@@ -217,11 +222,13 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
-    expect(afterMock).not.toHaveBeenCalled();
+    expect(afterMock).toHaveBeenCalledTimes(1);
+
+    await runScheduledAfterCallbacks();
     expect(loggerErrorMock).toHaveBeenCalledWith(
-      "auth password reset request failed",
+      "auth password reset background processing failed",
       expect.any(Error),
-      expect.objectContaining({ event: "auth.password_reset.request_failed" }),
+      expect.objectContaining({ event: "auth.password_reset.background_failed" }),
     );
   });
 
@@ -238,8 +245,9 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+
+    await runScheduledAfterCallbacks();
     expect(passwordResetTokenCreateMock).not.toHaveBeenCalled();
-    expect(afterMock).not.toHaveBeenCalled();
   });
 
   it("returns the same neutral response when the user's company is inactive", async () => {
@@ -255,8 +263,9 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+
+    await runScheduledAfterCallbacks();
     expect(passwordResetTokenCreateMock).not.toHaveBeenCalled();
-    expect(afterMock).not.toHaveBeenCalled();
   });
 
   it("returns the neutral response for a malformed email without querying the database", async () => {
@@ -265,6 +274,7 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+    expect(afterMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
@@ -274,6 +284,7 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+    expect(afterMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
@@ -287,6 +298,7 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+    expect(afterMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
@@ -303,6 +315,8 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+
+    await runScheduledAfterCallbacks();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
@@ -319,6 +333,8 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
+
+    await runScheduledAfterCallbacks();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
@@ -336,7 +352,7 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
-    expect(passwordResetTokenUpdateManyMock).toHaveBeenCalledTimes(1);
+    expect(passwordResetTokenUpdateManyMock).not.toHaveBeenCalled();
 
     await runScheduledAfterCallbacks();
 
@@ -402,12 +418,14 @@ describe("POST /api/auth/password-reset/request", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual(NEUTRAL_BODY);
     expect(JSON.stringify(body)).not.toContain("database connection");
-    expect(afterMock).not.toHaveBeenCalled();
+    expect(afterMock).toHaveBeenCalledTimes(1);
     expect(sendPasswordResetEmailMock).not.toHaveBeenCalled();
+
+    await runScheduledAfterCallbacks();
     expect(loggerErrorMock).toHaveBeenCalledWith(
-      "auth password reset request failed",
+      "auth password reset background processing failed",
       expect.any(Error),
-      expect.objectContaining({ event: "auth.password_reset.request_failed" }),
+      expect.objectContaining({ event: "auth.password_reset.background_failed" }),
     );
   });
 

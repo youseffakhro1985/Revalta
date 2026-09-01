@@ -23,24 +23,17 @@ function phaseLatency(startedAt: number) {
   return Math.max(0, Date.now() - startedAt);
 }
 
-export async function POST(request: Request) {
-  const observability = createRouteObservability(request, "/api/auth/password-reset/request");
-  const neutralResponse = () => {
-    observability.logger.info("auth password reset request completed", observability.elapsed({
-      event: "auth.password_reset.request_completed",
-    }));
-    return observability.correlate(NextResponse.json(RESPONSE, { headers: HEADERS }));
-  };
-
+async function processResetRequest(input: {
+  email: string;
+  ip: string;
+  observability: ReturnType<typeof createRouteObservability>;
+}) {
+  const { email, ip, observability } = input;
   try {
-    const body = await request.json().catch(() => ({})) as { email?: unknown };
-    const email = normalizeEmail(body.email);
-    const ip = getClientIp(request);
-
     const rateLimitStartedAt = Date.now();
     const [ipLimit, accountLimit] = await Promise.all([
       checkRateLimit(`password-reset-request:ip:${ip}`, 8, 60 * 60 * 1000),
-      checkRateLimit(`password-reset-request:account:${email || "invalid"}`, 3, 60 * 60 * 1000),
+      checkRateLimit(`password-reset-request:account:${email}`, 3, 60 * 60 * 1000),
     ]);
     observability.logger.info("auth password reset rate limit completed", {
       event: "auth.password_reset.rate_limit_completed",
@@ -49,9 +42,7 @@ export async function POST(request: Request) {
       accountSource: accountLimit.source,
     });
 
-    if (!ipLimit.allowed || !accountLimit.allowed || !isValidEmail(email)) {
-      return neutralResponse();
-    }
+    if (!ipLimit.allowed || !accountLimit.allowed) return;
 
     const lookupStartedAt = Date.now();
     const user = await db.$transaction(
@@ -66,9 +57,7 @@ export async function POST(request: Request) {
       phaseLatencyMs: phaseLatency(lookupStartedAt),
     });
 
-    if (!user || user.status !== "active" || (user.company && user.company.status !== "active")) {
-      return neutralResponse();
-    }
+    if (!user || user.status !== "active" || (user.company && user.company.status !== "active")) return;
 
     const tokenStartedAt = Date.now();
     const token = createResetToken();
@@ -92,50 +81,63 @@ export async function POST(request: Request) {
       phaseLatencyMs: phaseLatency(tokenStartedAt),
     });
 
-    after(async () => {
-      const deliveryStartedAt = Date.now();
+    const deliveryStartedAt = Date.now();
+    try {
+      await sendPasswordResetEmail(user.email, token);
+      observability.logger.info("auth password reset delivery completed", {
+        event: "auth.password_reset.delivery_completed",
+        userId: user.id,
+        phaseLatencyMs: phaseLatency(deliveryStartedAt),
+      });
+    } catch (error) {
+      const cleanupStartedAt = Date.now();
       try {
-        await sendPasswordResetEmail(user.email, token);
-        observability.logger.info("auth password reset delivery completed", {
-          event: "auth.password_reset.delivery_completed",
-          userId: user.id,
-          phaseLatencyMs: phaseLatency(deliveryStartedAt),
-        });
-      } catch (error) {
-        const cleanupStartedAt = Date.now();
-        try {
-          await db.$transaction(
-            (tx) => tx.passwordResetToken.updateMany({
-              where: { token_hash: tokenHash, used_at: null },
-              data: { used_at: new Date() },
-            }),
-            RESET_TOKEN_TRANSACTION_OPTIONS,
-          );
-        } catch (cleanupError) {
-          observability.logger.error(
-            "auth password reset token cleanup failed",
-            cleanupError,
-            {
-              event: "auth.password_reset.token_cleanup_failed",
-              userId: user.id,
-              cleanupLatencyMs: phaseLatency(cleanupStartedAt),
-            },
-          );
-        }
-        observability.logger.warn("auth password reset delivery failed", observability.elapsed({
-          event: "auth.password_reset.delivery_failed",
-          userId: user.id,
-          errorName: error instanceof Error ? error.name : "UnknownError",
-          deliveryLatencyMs: phaseLatency(deliveryStartedAt),
-        }));
+        await db.$transaction(
+          (tx) => tx.passwordResetToken.updateMany({
+            where: { token_hash: tokenHash, used_at: null },
+            data: { used_at: new Date() },
+          }),
+          RESET_TOKEN_TRANSACTION_OPTIONS,
+        );
+      } catch (cleanupError) {
+        observability.logger.error(
+          "auth password reset token cleanup failed",
+          cleanupError,
+          {
+            event: "auth.password_reset.token_cleanup_failed",
+            userId: user.id,
+            cleanupLatencyMs: phaseLatency(cleanupStartedAt),
+          },
+        );
       }
-    });
-
-    return neutralResponse();
+      observability.logger.warn("auth password reset delivery failed", observability.elapsed({
+        event: "auth.password_reset.delivery_failed",
+        userId: user.id,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        deliveryLatencyMs: phaseLatency(deliveryStartedAt),
+      }));
+    }
   } catch (error) {
-    observability.logger.error("auth password reset request failed", error, observability.elapsed({
-      event: "auth.password_reset.request_failed",
+    observability.logger.error("auth password reset background processing failed", error, observability.elapsed({
+      event: "auth.password_reset.background_failed",
     }));
-    return neutralResponse();
   }
+}
+
+export async function POST(request: Request) {
+  const observability = createRouteObservability(request, "/api/auth/password-reset/request");
+  const neutralResponse = () => {
+    observability.logger.info("auth password reset request completed", observability.elapsed({
+      event: "auth.password_reset.request_completed",
+    }));
+    return observability.correlate(NextResponse.json(RESPONSE, { headers: HEADERS }));
+  };
+
+  const body = await request.json().catch(() => ({})) as { email?: unknown };
+  const email = normalizeEmail(body.email);
+  if (isValidEmail(email)) {
+    const ip = getClientIp(request);
+    after(() => processResetRequest({ email, ip, observability }));
+  }
+  return neutralResponse();
 }
