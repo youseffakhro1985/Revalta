@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -26,7 +27,19 @@ export function HandoverReportCenter() {
     <div className="space-y-4">
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       <select className={premiumFieldClass} aria-label="Välj avtal" value={leaseId} onChange={(event) => setLeaseId(event.target.value)}><option value="">Välj avtal</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.property.name} · {lease.unit.designation}</option>)}</select>
-      <div className="flex justify-end"><a href={leaseId ? `/dashboard/uthyrning/overlamning/rapport/${leaseId}` : "#"} className={`${premiumPrimaryButtonClass} ${!leaseId ? "pointer-events-none opacity-50" : ""}`}><FileText className="mr-2 h-4 w-4" />Öppna rapport</a></div>
+      <div className="flex justify-end">
+        {leaseId ? (
+          <Link href={`/dashboard/uthyrning/overlamning/rapport/${leaseId}`} className={premiumPrimaryButtonClass}>
+            <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+            Öppna rapport
+          </Link>
+        ) : (
+          <button type="button" disabled className={`${premiumPrimaryButtonClass} cursor-not-allowed opacity-50`}>
+            <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+            Öppna rapport
+          </button>
+        )}
+      </div>
     </div>
   </Panel>;
 }

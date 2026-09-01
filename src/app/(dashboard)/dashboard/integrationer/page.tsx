@@ -22,6 +22,16 @@ const labels: Record<string, string> = {
   invoice_webhook: "Fakturawebhook",
   "work_order.invoice_integration_job": "Fakturaexport",
 };
+const statusLabels: Record<string, string> = {
+  queued: "Köad",
+  processing: "Bearbetas",
+  sent: "Skickad",
+  success: "Lyckad",
+  completed: "Slutförd",
+  failed: "Misslyckad",
+  mocked: "Mockad",
+  cancelled: "Avbruten",
+};
 const descriptions: Record<string, string> = {
   email: "Utskick av inbjudningar, notiser och bekräftelser.",
   sms: "Snabba driftmeddelanden och kritiska aviseringar.",
@@ -80,7 +90,7 @@ export default function IntegrationsPage() {
         <MetricCard icon={Plug} label="Integrationer" value={integrations.length} />
         <MetricCard icon={CheckCircle2} label="Konfigurerade" value={summary.configured} />
         <MetricCard icon={CircleDashed} label="Väntar på konfiguration" value={summary.pending} />
-        <MetricCard icon={Send} label="Lyckade händelser" value={summary.successfulEvents} />
+        <MetricCard icon={Send} label="Slutförda händelser" value={summary.successfulEvents} />
       </section>
 
       <Link href="/dashboard/integrationer/fakturaexporter" className="group block rounded-2xl border border-petroleum-100 bg-gradient-to-br from-white to-petroleum-50/50 p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)] transition hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-lg">
@@ -111,7 +121,7 @@ export default function IntegrationsPage() {
       </section>
 
       <Panel title="Senaste integrationshändelser" description="Teknisk historik för utskick, betalningar, fakturaexporter och externa anrop." bodyClassName="p-0">
-        {loading ? <div className="space-y-4 p-6">{[1,2,3].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-sand-100" />)}</div> : events.length > 0 ? <div className="divide-y divide-sand-100">{events.map((event) => <article key={event.id} className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-950">{labels[event.type] || event.type}</h3><p className="mt-1 text-sm text-ink-500">{event.recipient || "Ingen mottagare"} · {dateFormatter.format(new Date(event.created_at))}</p></div><span className="w-fit rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{event.status}</span></article>)}</div> : <EmptyState title="Inga integrationshändelser ännu" description="När Revalta skickar eller tar emot data via en integration visas händelsen här." />}
+        {loading ? <div className="space-y-4 p-6">{[1,2,3].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-sand-100" />)}</div> : events.length > 0 ? <div className="divide-y divide-sand-100">{events.map((event) => <article key={event.id} className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-950">{labels[event.type] || event.type}</h3><p className="mt-1 text-sm text-ink-500">{event.recipient || "Ingen mottagare"} · {dateFormatter.format(new Date(event.created_at))}</p></div><span className="w-fit rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{statusLabels[event.status] || event.status}</span></article>)}</div> : <EmptyState title="Inga integrationshändelser ännu" description="När Revalta skickar eller tar emot data via en integration visas händelsen här." />}
       </Panel>
     </div>
   );

@@ -224,13 +224,17 @@ export async function queueSmsNotification(
 }
 
 export async function recordPaymentEvent(user: IntegrationUser, payload: Record<string, unknown>) {
-  return recordIntegrationEvent(user, "stripe", payload);
+  const mode = typeof payload.mode === "string" ? payload.mode : "";
+  const status = mode.includes("mock") || mode === "plan_change"
+    ? mockOrFail().status
+    : "completed";
+  return recordIntegrationEvent(user, "stripe", payload, undefined, status);
 }
 
 export async function recordStorageEvent(user: IntegrationUser, payload: Record<string, unknown>) {
-  return recordIntegrationEvent(user, "storage", payload);
+  return recordIntegrationEvent(user, "storage", payload, undefined, "completed");
 }
 
 export async function recordAiEvent(user: IntegrationUser, payload: Record<string, unknown>) {
-  return recordIntegrationEvent(user, "ai", payload);
+  return recordIntegrationEvent(user, "ai", payload, undefined, "completed");
 }
