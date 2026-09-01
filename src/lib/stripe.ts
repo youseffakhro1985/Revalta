@@ -1,18 +1,21 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { type BillingPlanKey, isBillingPlanKey } from "@/lib/billing-plans";
 
 const stripeApi = "https://api.stripe.com/v1";
 
-export const stripePriceEnv: Record<string, string | undefined> = {
+export const stripePriceEnv: Readonly<Record<BillingPlanKey, string | undefined>> = Object.freeze({
   start: process.env.STRIPE_PRICE_START,
   professional: process.env.STRIPE_PRICE_PROFESSIONAL,
   enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
-};
+});
 
-export function isStripeReady(plan?: string) {
+export function isStripeReady(plan?: unknown) {
+  if (plan !== undefined && !isBillingPlanKey(plan)) return false;
+
   return Boolean(
     process.env.STRIPE_SECRET_KEY &&
       process.env.STRIPE_WEBHOOK_SECRET &&
-      (!plan || stripePriceEnv[plan])
+      (plan === undefined || stripePriceEnv[plan])
   );
 }
 
@@ -36,7 +39,7 @@ async function stripePost(path: string, params: Record<string, string>) {
 }
 
 export async function createCheckoutSession(input: {
-  plan: string;
+  plan: BillingPlanKey;
   customerEmail: string;
   companyId: string;
   successUrl: string;
