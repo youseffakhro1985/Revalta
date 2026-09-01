@@ -7,6 +7,7 @@ import db from "@/lib/db";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
 import { isProductionRuntime } from "@/lib/runtime-env";
+import { isStripeBillingReady } from "@/lib/stripe";
 
 const ROUTE = "/api/billing";
 const SUCCESS_HEADERS = {
@@ -120,7 +121,7 @@ export async function GET(request: Request) {
       // production, plan changes must go through Stripe Checkout so billing stays
       // in sync with what the customer actually pays.
       canDirectChangePlan: !isProductionRuntime(),
-      stripeConfigured: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
+      stripeConfigured: isStripeBillingReady(),
       stripeCustomerId: company?.stripe_customer_id || null,
       stripeSubscriptionId: company?.stripe_subscription_id || null,
       subscriptionStatus: company?.subscription_status || null,
