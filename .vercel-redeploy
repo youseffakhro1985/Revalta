@@ -10,3 +10,9 @@ pattern used for the 2026-07-15 redeploy. No application code changed.
 
 See AI_COLLABORATION.md ("Verifierad snapshot") and docs/AI_TASKS.yml
 (snapshot.production) for the full finding.
+
+PR #381 preview retry — 2026-09-01T21:23:00Z.
+The previous exact-SHA candidate cc18f3de54e0425b7a44ee2d640e292a5732128b was
+rejected by Vercel with build-rate-limit before Preview Browser E2E could run.
+This marker intentionally creates a fresh candidate SHA without changing application
+behavior so the normal Vercel Preview + exact-SHA release gates can be retried.
