@@ -32,12 +32,15 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
-
 function request() {
   return new Request("https://www.revalta.se/api/billing", {
     headers: { "x-request-id": "550e8400-e29b-41d4-a716-446655440000" },
   });
+}
+
+async function getBilling() {
+  const { GET } = await import("./route");
+  return GET(request());
 }
 
 describe("billing Stripe readiness contract", () => {
@@ -78,7 +81,7 @@ describe("billing Stripe readiness contract", () => {
     vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "price_standard");
     vi.stubEnv("STRIPE_PRICE_ENTERPRISE", "price_professional");
 
-    const response = await GET(request());
+    const response = await getBilling();
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -98,7 +101,7 @@ describe("billing Stripe readiness contract", () => {
     vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "price_standard");
     vi.stubEnv("STRIPE_PRICE_ENTERPRISE", "");
 
-    const response = await GET(request());
+    const response = await getBilling();
     const body = await response.json();
 
     expect(body.stripeConfigured).toBe(false);
@@ -122,7 +125,7 @@ describe("billing Stripe readiness contract", () => {
       subscription_status: null,
     });
 
-    const response = await GET(request());
+    const response = await getBilling();
     const body = await response.json();
 
     expect(body.stripeConfigured).toBe(true);
