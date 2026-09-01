@@ -3,12 +3,17 @@
 import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function ForgotPasswordPage() {
+  const [hydrated, setHydrated] = useState(false);
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -59,7 +64,7 @@ export default function ForgotPasswordPage() {
             placeholder="namn@exempel.se"
           />
         </div>
-        <button type="submit" disabled={loading} className={authButtonClass}>
+        <button type="submit" disabled={!hydrated || loading} aria-busy={loading} className={authButtonClass}>
           {loading ? "Skickar..." : "Skicka återställningslänk"}
         </button>
       </form>
