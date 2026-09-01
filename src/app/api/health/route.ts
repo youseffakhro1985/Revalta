@@ -4,6 +4,7 @@ import { isModernStorageOnly } from "@/lib/dual-list";
 import { getSchemaReadiness } from "@/lib/schema-readiness";
 import { getStorageToken, hasStorageConfig } from "@/lib/storage";
 import { createLogger } from "@/lib/structured-logger";
+import { isStripeBillingReady } from "@/lib/stripe";
 import { NextRequest, NextResponse } from "next/server";
 
 function buildEnvSnapshot() {
@@ -15,8 +16,12 @@ function buildEnvSnapshot() {
     jwtSecret: Boolean(process.env.JWT_SECRET),
     emailFrom: Boolean(process.env.EMAIL_FROM),
     emailProvider: Boolean(process.env.EMAIL_PROVIDER_API_KEY),
+    demoRequestRecipient: Boolean(process.env.DEMO_REQUEST_TO?.trim()),
     smsProvider: Boolean(process.env.SMS_PROVIDER_API_KEY),
+    // Keep the historic pair-level flag for diagnostics while exposing the
+    // stronger checkout-level readiness separately below.
     stripe: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET),
+    stripeBilling: isStripeBillingReady(),
     storage: hasStorageConfig(),
     blobReadWriteToken: blobToken,
     storageProviderKeyLegacy: legacyStorageToken && !blobToken,
@@ -114,16 +119,21 @@ export async function GET(request: NextRequest) {
     }
 
     const schema = await getSchemaReadiness();
-    const criticalReady = Boolean(
-      env.databaseUrl
-      && env.directUrl
-      && env.jwtSecret
-      && env.emailFrom
-      && env.emailProvider
-      && env.storage
-      && env.cronSecret
-      && schema.ready,
+    const missingOperationalConfig = [
+      !env.databaseUrl && "DATABASE_URL",
+      !env.directUrl && "DIRECT_URL",
+      !env.jwtSecret && "JWT_SECRET",
+      !env.emailFrom && "EMAIL_FROM",
+      !env.emailProvider && "EMAIL_PROVIDER_API_KEY",
+      !env.storage && "STORAGE",
+      !env.cronSecret && "CRON_SECRET",
+      !schema.ready && "DATABASE_SCHEMA",
+    ].filter((item): item is string => Boolean(item));
+    const criticalReady = missingOperationalConfig.length === 0;
+    const demoLeadDeliveryReady = Boolean(
+      env.emailFrom && env.emailProvider && env.demoRequestRecipient,
     );
+    const commercialReady = Boolean(env.stripeBilling && demoLeadDeliveryReady);
 
     if (!schema.ready) {
       logger.warn("health schema readiness degraded", {
@@ -131,10 +141,16 @@ export async function GET(request: NextRequest) {
         missingSchemaItems: schema.missing,
       });
     }
+    if (!criticalReady) {
+      logger.warn("health operational readiness degraded", {
+        latencyMs: Date.now() - startedAt,
+        missingOperationalConfig,
+      });
+    }
 
     return healthResponse({
-      status: schema.ready ? "ok" : "degraded",
-      ok: schema.ready,
+      status: criticalReady ? "ok" : "degraded",
+      ok: criticalReady,
       database: "ok",
       schema,
       latencyMs: Date.now() - startedAt,
@@ -143,11 +159,14 @@ export async function GET(request: NextRequest) {
       env,
       readiness: {
         criticalReady,
+        commercialReady,
+        stripeBillingReady: env.stripeBilling,
+        demoLeadDeliveryReady,
         storageTokenPresent: Boolean(getStorageToken()),
         prefersBlobToken: env.blobReadWriteToken,
       },
       checkedAt: new Date().toISOString(),
-    }, schema.ready ? 200 : 503, release);
+    }, criticalReady ? 200 : 503, release);
   } catch (error) {
     logger.error("health check failed", error, {
       latencyMs: Date.now() - startedAt,
