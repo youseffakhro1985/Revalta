@@ -63,42 +63,50 @@ export async function POST(
 
     const authorName = name || ticket.reporter_name || "Boende";
     const authorEmail = ticket.reporter_email || authorizedEmail;
-    const comment = await db.ticketComment.create({
-      data: {
-        ticket_id: ticket.id,
-        user_id: ticket.user_id,
-        body,
-        is_internal: false,
-        author_type: "resident",
-        author_name: authorName,
-        author_email: authorEmail,
-      },
-      select: {
-        id: true,
-        body: true,
-        created_at: true,
-        author_type: true,
-        author_name: true,
-      },
+    const comment = await db.$transaction(async (tx) => {
+      const created = await tx.ticketComment.create({
+        data: {
+          ticket_id: ticket.id,
+          user_id: ticket.user_id,
+          body,
+          is_internal: false,
+          author_type: "resident",
+          author_name: authorName,
+          author_email: authorEmail,
+        },
+        select: {
+          id: true,
+          body: true,
+          created_at: true,
+          author_type: true,
+          author_name: true,
+        },
+      });
+
+      await writeAuditLog({ id: ticket.user_id, company_id: ticket.company_id }, {
+        entityType: "ticket",
+        entityId: ticket.id,
+        action: "public.comment_created",
+        metadata: {
+          commentId: created.id,
+          authorType: "resident",
+          schemaVersion: 2,
+        },
+      }, tx);
+
+      return created;
     });
 
-    await writeAuditLog({ id: ticket.user_id, company_id: ticket.company_id }, {
-      entityType: "ticket",
-      entityId: ticket.id,
-      action: "public.comment_created",
-      metadata: {
-        reporterName: authorName,
-        reporterEmail: authorEmail,
-        commentId: comment.id,
-        schemaVersion: 2,
-      },
-    });
-    await queueTicketNotification({ company_id: ticket.company_id }, {
-      ticketId: ticket.id,
-      title: ticket.title,
-      recipient: authorizedEmail,
-      event: "commented",
-    });
+    try {
+      await queueTicketNotification({ company_id: ticket.company_id }, {
+        ticketId: ticket.id,
+        title: ticket.title,
+        recipient: authorizedEmail,
+        event: "commented",
+      });
+    } catch (notificationError) {
+      logger.error("Public comment notification failed", notificationError);
+    }
 
     return NextResponse.json({
       success: true,
