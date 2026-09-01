@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import { isBillingPlanKey } from "@/lib/billing-plans";
 import db from "@/lib/db";
 import { createRouteObservability } from "@/lib/route-observability";
 import { verifyStripeSignature } from "@/lib/stripe";
@@ -37,7 +38,7 @@ const SUCCESS_HEADERS = {
 
 function getPlanFromMetadata(object: StripeObject) {
   const plan = object.metadata?.plan;
-  return plan === "start" || plan === "professional" || plan === "enterprise" ? plan : undefined;
+  return isBillingPlanKey(plan) ? plan : undefined;
 }
 
 async function resolveCompanyForStripeObject(client: Prisma.TransactionClient, object: StripeObject) {
