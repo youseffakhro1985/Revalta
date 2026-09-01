@@ -16,3 +16,10 @@ The previous exact-SHA candidate cc18f3de54e0425b7a44ee2d640e292a5732128b was
 rejected by Vercel with build-rate-limit before Preview Browser E2E could run.
 This marker intentionally creates a fresh candidate SHA without changing application
 behavior so the normal Vercel Preview + exact-SHA release gates can be retried.
+
+PR #382 preview retry — 2026-09-01T21:43:00Z.
+The first Stripe lifecycle candidate a108466b718af62a22972c69095444347ed77d16
+passed Revalta CI and CodeQL, but Vercel rejected its Preview with build-rate-limit
+before Browser E2E could resolve an exact-SHA deployment. This marker creates one
+fresh candidate SHA without changing application behavior so all release gates can
+be rerun on the same deployable candidate.
