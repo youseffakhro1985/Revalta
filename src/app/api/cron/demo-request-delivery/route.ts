@@ -31,8 +31,8 @@ type Obj = Record<string, unknown>;
 
 type RetrySnapshot = {
   attempts: number;
-  lastAttemptAt?: string;
-  previousReason?: string | null;
+  lastAttemptAt: string | null;
+  previousReason: string | null;
 };
 
 function object(value: unknown): Obj | null {
@@ -48,7 +48,7 @@ function retrySnapshot(payload: Obj): RetrySnapshot {
   const attempts = Number(retry?.attempts);
   return {
     attempts: Number.isSafeInteger(attempts) && attempts >= 0 ? attempts : 0,
-    lastAttemptAt: text(retry?.lastAttemptAt) || undefined,
+    lastAttemptAt: text(retry?.lastAttemptAt) || null,
     previousReason: text(retry?.previousReason) || null,
   };
 }
