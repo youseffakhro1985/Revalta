@@ -13,6 +13,7 @@ type InvoiceExportSummary = { total: number; active: number; failed: number; sen
 
 const labels: Record<string, string> = {
   email: "E-post",
+  demo_leads: "Demo-leads",
   sms: "SMS",
   stripe: "Stripe/betalning",
   storage: "Filuppladdning",
@@ -34,8 +35,9 @@ const statusLabels: Record<string, string> = {
 };
 const descriptions: Record<string, string> = {
   email: "Utskick av inbjudningar, notiser och bekräftelser.",
+  demo_leads: "Mottagning och e-postleverans av sparade demoförfrågningar från den publika webbplatsen.",
   sms: "Snabba driftmeddelanden och kritiska aviseringar.",
-  stripe: "Säker betalning och abonnemangshantering.",
+  stripe: "Checkout, abonnemang och webhookar med pris-ID för samtliga köpbara planer.",
   storage: "Dokument, bilder och bilagor i extern fillagring.",
   ai: "Diskret klassificering och prioritering bakom gränssnittet.",
   fortnox: "Automatisk export av godkända faktureringsunderlag till Fortnox.",
