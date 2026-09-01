@@ -1,6 +1,7 @@
 import db from "@/lib/db";
 import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
 import { hasStorageConfig } from "@/lib/storage";
+import { isStripeBillingReady } from "@/lib/stripe";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -8,14 +9,31 @@ const logger = createLogger({ route: "/api/integrations" });
 
 const requiredEnv: Record<string, string[]> = {
   email: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM"],
+  demo_leads: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM", "DEMO_REQUEST_TO"],
   sms: ["SMS_PROVIDER_API_KEY", "SMS_PROVIDER_WEBHOOK_URL"],
-  stripe: ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+  stripe: [
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRICE_START",
+    "STRIPE_PRICE_PROFESSIONAL",
+    "STRIPE_PRICE_ENTERPRISE",
+  ],
   storage: ["BLOB_READ_WRITE_TOKEN"],
   ai: ["AI_PROVIDER_API_KEY"],
   fortnox: ["FORTNOX_ACCESS_TOKEN", "FORTNOX_INVOICE_ENDPOINT"],
   visma: ["VISMA_ACCESS_TOKEN", "VISMA_INVOICE_ENDPOINT"],
   invoice_webhook: ["INVOICE_WEBHOOK_URL", "INVOICE_WEBHOOK_SECRET"],
 };
+
+function hasEnv(key: string) {
+  return Boolean(process.env[key]?.trim());
+}
+
+function isIntegrationConfigured(type: string, envKeys: string[]) {
+  if (type === "storage") return hasStorageConfig();
+  if (type === "stripe") return isStripeBillingReady();
+  return envKeys.every(hasEnv);
+}
 
 export async function GET() {
   try {
@@ -27,7 +45,7 @@ export async function GET() {
 
     const integrations = Object.entries(requiredEnv).map(([type, envKeys]) => ({
       type,
-      configured: type === "storage" ? hasStorageConfig() : envKeys.every((key) => Boolean(process.env[key])),
+      configured: isIntegrationConfigured(type, envKeys),
       requiredEnv: envKeys,
     }));
 
