@@ -14,9 +14,19 @@ export type DemoRequest = {
   message: string;
 };
 
+export type DemoDeliveryFailureReason =
+  | "not_configured"
+  | "provider_rejected"
+  | "network_error"
+  | "timeout";
+
 export type DemoDeliveryResult =
   | { ok: true; providerId: string | null }
-  | { ok: false; reason: "not_configured" | "provider_error" | "timeout" };
+  | { ok: false; reason: DemoDeliveryFailureReason };
+
+export type DemoDeliveryOptions = {
+  idempotencyKey?: string;
+};
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -39,7 +49,10 @@ export function demoRequestEmailHtml(request: DemoRequest) {
   return `<!doctype html><html lang="sv"><body style="margin:0;background:#f6f3ed;font-family:Arial,sans-serif;color:#22201d"><div style="max-width:720px;margin:0 auto;padding:32px 18px"><div style="overflow:hidden;border:1px solid #e7e1d7;border-radius:18px;background:#fff"><div style="padding:26px 30px;background:#174d45;color:#fff"><div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.82">Revalta</div><h1 style="margin:8px 0 0;font-size:25px">Ny demoförfrågan</h1></div><div style="padding:26px 30px"><table style="width:100%;border-collapse:collapse"><tbody>${line("Namn", request.name)}${line("E-post", request.email)}${line("Företag", request.company)}${line("Telefon", request.phone)}${line("Roll", request.role)}${line("Bestånd", request.portfolio)}</tbody></table>${message}</div></div></div></body></html>`;
 }
 
-export async function deliverDemoRequest(request: DemoRequest): Promise<DemoDeliveryResult> {
+export async function deliverDemoRequest(
+  request: DemoRequest,
+  options: DemoDeliveryOptions = {},
+): Promise<DemoDeliveryResult> {
   const apiKey = process.env.EMAIL_PROVIDER_API_KEY?.trim();
   const from = process.env.EMAIL_FROM?.trim();
   const to = process.env.DEMO_REQUEST_TO?.trim();
@@ -56,12 +69,17 @@ export async function deliverDemoRequest(request: DemoRequest): Promise<DemoDeli
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+    if (options.idempotencyKey) {
+      headers["Idempotency-Key"] = options.idempotencyKey.slice(0, 256);
+    }
+
     const response = await fetch(RESEND_ENDPOINT, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         from,
         to: [to],
@@ -74,11 +92,11 @@ export async function deliverDemoRequest(request: DemoRequest): Promise<DemoDeli
     const body = await response.text();
     if (!response.ok) {
       logger.error("demo request provider rejected delivery", undefined, {
-        event: "demo_request.delivery.provider_error",
+        event: "demo_request.delivery.provider_rejected",
         providerStatus: response.status,
         providerBodyLength: body.length,
       });
-      return { ok: false, reason: "provider_error" };
+      return { ok: false, reason: "provider_rejected" };
     }
     let providerId: string | null = null;
     try {
@@ -91,14 +109,15 @@ export async function deliverDemoRequest(request: DemoRequest): Promise<DemoDeli
       event: "demo_request.delivery.sent",
       providerStatus: response.status,
       hasProviderId: Boolean(providerId),
+      idempotent: Boolean(options.idempotencyKey),
     });
     return { ok: true, providerId };
   } catch (error) {
     const timedOut = error instanceof Error && error.name === "AbortError";
     logger.error("demo request delivery failed", error, {
-      event: timedOut ? "demo_request.delivery.timeout" : "demo_request.delivery.failed",
+      event: timedOut ? "demo_request.delivery.timeout" : "demo_request.delivery.network_error",
     });
-    return { ok: false, reason: timedOut ? "timeout" : "provider_error" };
+    return { ok: false, reason: timedOut ? "timeout" : "network_error" };
   } finally {
     clearTimeout(timeout);
   }
