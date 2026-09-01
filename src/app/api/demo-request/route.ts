@@ -1,5 +1,7 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import db from "@/lib/db";
 import { deliverDemoRequest, type DemoRequest } from "@/lib/demo-request-email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -97,23 +99,70 @@ export async function POST(request: Request) {
 
     const { website: _website, ...demoRequest } = input;
     void _website;
+
+    // Persist before contacting the email provider. The public demo form is now
+    // a primary acquisition path, so a transient provider outage must never be
+    // able to erase a valid lead after the visitor has submitted it.
+    const lead = await db.integrationEvent.create({
+      data: {
+        company_id: null,
+        type: "demo_request",
+        status: "received",
+        recipient: demoRequest.email,
+        payload: {
+          ...demoRequest,
+          source: "public_demo_form",
+          requestId: observability.requestId,
+          delivery: { status: "pending" },
+        } as Prisma.InputJsonValue,
+      },
+      select: { id: true },
+    });
+
     const delivery = await deliverDemoRequest(demoRequest);
-    if (!delivery.ok) {
-      observability.logger.error("demo request could not be delivered", undefined, observability.elapsed({
-        event: "demo_request.delivery_failed",
-        reason: delivery.reason,
-      }));
-      return apiErrorResponse({
-        status: 503,
-        code: API_ERROR_CODES.serviceUnavailable,
-        message: "Demoförfrågan kunde inte levereras just nu. Försök igen senare.",
-        requestId: observability.requestId,
+    const deliverySnapshot = delivery.ok
+      ? { status: "sent", providerId: delivery.providerId }
+      : { status: "failed", reason: delivery.reason };
+
+    try {
+      await db.integrationEvent.update({
+        where: { id: lead.id },
+        data: {
+          status: delivery.ok ? "sent" : "failed",
+          payload: {
+            ...demoRequest,
+            source: "public_demo_form",
+            requestId: observability.requestId,
+            delivery: deliverySnapshot,
+          } as Prisma.InputJsonValue,
+        },
       });
+    } catch (error) {
+      // The lead itself is already durable. Do not turn a successful capture
+      // into a false client failure merely because the delivery-status journal
+      // could not be updated after the external side effect.
+      observability.logger.error("demo request delivery status could not be persisted", error, observability.elapsed({
+        event: "demo_request.delivery_status_persist_failed",
+        leadId: lead.id,
+      }));
+    }
+
+    if (!delivery.ok) {
+      observability.logger.error("demo request delivery deferred after durable capture", undefined, observability.elapsed({
+        event: "demo_request.delivery_deferred",
+        reason: delivery.reason,
+        leadId: lead.id,
+      }));
+      return observability.correlate(NextResponse.json(
+        { ok: true, deliveryPending: true },
+        { status: 202, headers: SUCCESS_HEADERS },
+      ));
     }
 
     observability.logger.info("demo request completed", observability.elapsed({
       event: "demo_request.completed",
       rateLimitSource: identityLimit.source,
+      leadId: lead.id,
       hasProviderId: Boolean(delivery.providerId),
     }));
     return observability.correlate(NextResponse.json({ ok: true }, { headers: SUCCESS_HEADERS }));
