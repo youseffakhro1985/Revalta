@@ -94,37 +94,37 @@ export async function GET(request: Request) {
         skip: (page - 1) * pageSize,
         take: pageSize,
         select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        category: true,
-        priority: true,
-        property_id: true,
-        assigned_to_id: true,
-        created_at: true,
-        updated_at: true,
-        due_date: true,
-        property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-            city: true,
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          category: true,
+          priority: true,
+          property_id: true,
+          assigned_to_id: true,
+          created_at: true,
+          updated_at: true,
+          due_date: true,
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+            },
           },
-        },
-        assigned_to: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+          assigned_to: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
-        },
-        _count: {
-          select: {
-            comments: true,
+          _count: {
+            select: {
+              comments: true,
+            },
           },
-        },
         },
       }),
       db.ticket.count({ where }),
@@ -351,37 +351,37 @@ export async function POST(request: Request) {
           user_id: user.id,
         },
         select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        category: true,
-        priority: true,
-        property_id: true,
-        assigned_to_id: true,
-        created_at: true,
-        updated_at: true,
-        due_date: true,
-        property: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-            city: true,
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          category: true,
+          priority: true,
+          property_id: true,
+          assigned_to_id: true,
+          created_at: true,
+          updated_at: true,
+          due_date: true,
+          property: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              city: true,
+            },
           },
-        },
-        assigned_to: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+          assigned_to: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
-        },
-        _count: {
-          select: {
-            comments: true,
+          _count: {
+            select: {
+              comments: true,
+            },
           },
-        },
         },
       });
       await writeAuditLog(user, {
@@ -397,18 +397,38 @@ export async function POST(request: Request) {
       }, tx);
       return created;
     });
-    await queueTicketNotification(user, {
-      ticketId: ticket.id,
-      title: ticket.title,
-      recipient: user.email,
-      event: "created",
-    });
-    await recordAiEvent(user, {
-      ticketId: ticket.id,
-      action: "classification.requested",
-      category: ticket.category,
-      priority: ticket.priority,
-    });
+
+    try {
+      await queueTicketNotification(user, {
+        ticketId: ticket.id,
+        title: ticket.title,
+        recipient: user.email,
+        event: "created",
+      });
+    } catch {
+      observability.logger.warn("ticket create notification failed", observability.elapsed({
+        event: "tickets.create.notification_failed",
+        userId: user.id,
+        companyId: user.company_id,
+        ticketId: ticket.id,
+      }));
+    }
+
+    try {
+      await recordAiEvent(user, {
+        ticketId: ticket.id,
+        action: "classification.requested",
+        category: ticket.category,
+        priority: ticket.priority,
+      });
+    } catch {
+      observability.logger.warn("ticket create ai telemetry failed", observability.elapsed({
+        event: "tickets.create.ai_telemetry_failed",
+        userId: user.id,
+        companyId: user.company_id,
+        ticketId: ticket.id,
+      }));
+    }
 
     observability.logger.info("ticket create completed", observability.elapsed({
       event: "tickets.create.completed",
