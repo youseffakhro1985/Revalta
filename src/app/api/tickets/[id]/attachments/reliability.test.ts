@@ -22,8 +22,6 @@ const {
   loggerErrorMock: vi.fn(),
 }));
 
-class StorageConfigurationError extends Error {}
-
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: () => true,
@@ -42,7 +40,7 @@ vi.mock("@/lib/document-file-security", () => ({
   }),
 }));
 vi.mock("@/lib/storage", () => ({
-  StorageConfigurationError,
+  StorageConfigurationError: class StorageConfigurationError extends Error {},
   storeAttachment: storeAttachmentMock,
   deleteStoredFile: deleteStoredFileMock,
 }));
