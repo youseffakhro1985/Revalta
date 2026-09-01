@@ -5,6 +5,24 @@ Produktions-URL: `https://www.revalta.se`
 Verifierad `main` och Production SHA: `48be6cbe10eac06710bdb8ce049e8c2c18e7d68e`  
 Revisionstyp: källkod, GitHub, tillgänglig Vercel-scope, publik runtime och autentiserad read-only produktionsverifiering
 
+## Andra genomförandeuppföljningen — 2026-09-01 16:28 UTC
+
+Aktuell verifierad `main` och Production SHA är `37d7321e84a2a9fc2d0d2fe212e6cbf5503acd7d`. Production kör deployment `dpl_Yrfsn4JtCNLj75xoBZb5oG1JLhh3` och rapporterar `status=ok`, `database=ok`, `schema.ready=true`, `modernStorageOnly=true`, komplett kritisk miljönärvaro och 12 ms health-latens vid slutkontrollen.
+
+Två ytterligare releaser har passerat exact-SHA Vercel Preview, Revalta CI, CodeQL och Preview Browser E2E samt verifierats i Production:
+
+| Leverans | Resultat |
+| --- | --- |
+| PR #369 | Samtliga sju produktions-cronroutes har korrelations-ID, strukturerad loggning, privata no-store-svar och säkra toppnivåfel. Råa interna fel lagras inte längre i preventive-/incidenthistorik, service-assignment-escalation har durable `CronJobRun`, fakturaexport lagrar inte leverantörsbody eller oväntade DB-detaljer och rå `console.error` är borttagen utanför den centrala loggtransporten. |
+| PR #369 / issue #265 | Password reset returnerar det neutrala anti-enumerationssvaret före rate limit, lookup, token och e-post via Next.js `after()`. Kall exact-SHA Preview passerade på 1 248 ms. |
+| PR #370 | Både submit och kontrollerat e-postfält skyddas fram till hydration så en omedelbar kall sidinteraktion varken kan tappa POST eller få ifyllt värde återställt. Ny kall Preview passerade på 692 ms och slutlig kall Production-kontroll på 4 092 ms. |
+
+Senaste fulla lokala kvalitetsgrind: **181/181 testfiler, 1 111/1 111 tester, 0 produktionssårbarheter och 131 statiska sidor i Next.js 16.3-produktionsbuilden**. Exakt kandidat-SHA passerade dessutom ren databas/migration, CI-build, CodeQL och full auth/navigation/mobile/Command Center-E2E.
+
+Den evidensbaserade arbetsbedömningen höjs försiktigt till cirka **89 % tekniskt genomförande**, **65 % säker kommersiell lanseringsberedskap** och **78 % sammanvägd status**. Förbättringen gäller runtime-felhantering, cronspårbarhet och återställningsflödets determinism; de externa P0-blockerarna nedan är fortfarande oförändrade.
+
+Cron-reliability är nu kodmässigt starkare genom auth, kandidat-/jobbidempotens, advisory-/atomic claims, processing leases där externa side effects förekommer, partiell felisolering, batchinggränser, svensk datumkontext, korrelerad loggning och durable run/resultat för de kritiska jobben. P1-punkten kan dock inte markeras helt klar förrän alla sju jobb har körts med Production-`CRON_SECRET`, deras run-/alert-/reconciliationutfall har lästs i drift och Vercel-loggar/cronhistorik är åtkomliga för revision.
+
 ## Uppföljning efter genomförande — 2026-09-01 15:28 UTC
 
 Den ursprungliga revisionsbaslinjen nedan bevaras för spårbarhet. Efter revisionen har fyra isolerade releaser passerat lokal full quality, exact-SHA Vercel Preview, Revalta CI, CodeQL och Preview Browser E2E, mergats via pull request och verifierats i Production.
