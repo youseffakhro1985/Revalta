@@ -8,6 +8,7 @@ const {
   isModernStorageOnlyMock,
   hasStorageConfigMock,
   getStorageTokenMock,
+  isStripeBillingReadyMock,
   loggerWarnMock,
   loggerErrorMock,
   createLoggerMock,
@@ -18,6 +19,7 @@ const {
   isModernStorageOnlyMock: vi.fn(),
   hasStorageConfigMock: vi.fn(),
   getStorageTokenMock: vi.fn(),
+  isStripeBillingReadyMock: vi.fn(),
   loggerWarnMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   createLoggerMock: vi.fn(),
@@ -45,6 +47,10 @@ vi.mock("@/lib/storage", () => ({
   getStorageToken: getStorageTokenMock,
 }));
 
+vi.mock("@/lib/stripe", () => ({
+  isStripeBillingReady: isStripeBillingReadyMock,
+}));
+
 vi.mock("@/lib/structured-logger", () => ({
   createLogger: createLoggerMock,
 }));
@@ -55,6 +61,16 @@ function healthRequest(headers?: HeadersInit) {
   return new NextRequest("https://www.revalta.se/api/health", { headers });
 }
 
+function stubCriticalEnv() {
+  vi.stubEnv("DATABASE_URL", "postgres://example");
+  vi.stubEnv("DIRECT_URL", "postgres://example");
+  vi.stubEnv("JWT_SECRET", "x".repeat(40));
+  vi.stubEnv("EMAIL_FROM", "noreply@example.se");
+  vi.stubEnv("EMAIL_PROVIDER_API_KEY", "key");
+  vi.stubEnv("BLOB_READ_WRITE_TOKEN", "blob");
+  vi.stubEnv("CRON_SECRET", "cron");
+}
+
 describe("health route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -63,6 +79,7 @@ describe("health route", () => {
     isModernStorageOnlyMock.mockReturnValue(true);
     hasStorageConfigMock.mockReturnValue(true);
     getStorageTokenMock.mockReturnValue("blob-token");
+    isStripeBillingReadyMock.mockReturnValue(false);
     getSchemaReadinessMock.mockResolvedValue({ ready: true, missing: [], checkedAt: new Date().toISOString() });
     createLoggerMock.mockReturnValue({
       debug: vi.fn(),
@@ -111,15 +128,11 @@ describe("health route", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
-  it("ops GET includes schema and critical env flags", async () => {
+  it("ops GET includes critical and commercial readiness flags", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
-    vi.stubEnv("DATABASE_URL", "postgres://example");
-    vi.stubEnv("DIRECT_URL", "postgres://example");
-    vi.stubEnv("JWT_SECRET", "x".repeat(40));
-    vi.stubEnv("EMAIL_FROM", "noreply@example.se");
-    vi.stubEnv("EMAIL_PROVIDER_API_KEY", "key");
-    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "blob");
-    vi.stubEnv("CRON_SECRET", "cron");
+    stubCriticalEnv();
+    vi.stubEnv("DEMO_REQUEST_TO", "demo@example.se");
+    isStripeBillingReadyMock.mockReturnValue(true);
 
     const response = await GET(healthRequest());
     const body = await response.json();
@@ -132,11 +145,53 @@ describe("health route", () => {
       jwtSecret: true,
       emailFrom: true,
       emailProvider: true,
+      demoRequestRecipient: true,
+      stripeBilling: true,
       blobReadWriteToken: true,
       cronSecret: true,
       modernStorageOnly: true,
     });
-    expect(body.readiness.criticalReady).toBe(true);
+    expect(body.readiness).toMatchObject({
+      criticalReady: true,
+      commercialReady: true,
+      stripeBillingReady: true,
+      demoLeadDeliveryReady: true,
+    });
+  });
+
+  it("returns degraded when critical runtime configuration is missing even if schema is ready", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
+    stubCriticalEnv();
+    vi.stubEnv("CRON_SECRET", "");
+
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({ status: "degraded", ok: false });
+    expect(body.schema.ready).toBe(true);
+    expect(body.readiness.criticalReady).toBe(false);
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "health operational readiness degraded",
+      expect.objectContaining({ missingOperationalConfig: ["CRON_SECRET"] }),
+    );
+  });
+
+  it("keeps optional commercial readiness separate from core runtime health", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
+    stubCriticalEnv();
+    isStripeBillingReadyMock.mockReturnValue(false);
+
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.readiness).toMatchObject({
+      criticalReady: true,
+      commercialReady: false,
+      stripeBillingReady: false,
+      demoLeadDeliveryReady: false,
+    });
   });
 
   it("logs degraded schema readiness with correlation context", async () => {
@@ -176,7 +231,6 @@ describe("health route", () => {
     expect(response.status).toBe(500);
     expect(body).toMatchObject({ status: "error", ok: false, database: "error" });
     expect(body.env).toBeUndefined();
-    // A sustained failure retries once (Neon cold-start tolerance) and still reports unhealthy.
     expect(queryRawMock).toHaveBeenCalledTimes(2);
     expect(loggerErrorMock).toHaveBeenCalledWith(
       "health check failed",
