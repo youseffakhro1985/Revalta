@@ -106,6 +106,7 @@ export async function GET(request: Request) {
     const stripePlanReadiness = Object.fromEntries(
       BILLING_PLAN_KEYS.map((plan) => [plan, isStripeReady(plan)]),
     );
+    const stripePortalReady = Boolean(company?.stripe_customer_id) && isStripeReady();
 
     observability.logger.info("billing summary completed", observability.elapsed({
       event: "billing.read.completed",
@@ -127,6 +128,7 @@ export async function GET(request: Request) {
       canDirectChangePlan: !isProductionRuntime(),
       stripeConfigured: isStripeBillingReady(),
       stripePlanReadiness,
+      stripePortalReady,
       stripeCustomerId: company?.stripe_customer_id || null,
       stripeSubscriptionId: company?.stripe_subscription_id || null,
       subscriptionStatus: company?.subscription_status || null,
@@ -177,9 +179,6 @@ export async function PATCH(request: Request) {
       });
     }
 
-    // Plan changes are a money flow. In production this must go through a real
-    // Stripe Checkout session; the webhook is the only production writer of the
-    // paid plan so a customer can never self-grant a higher tier.
     if (isProductionRuntime()) {
       return reject(observability, {
         status: 403,
