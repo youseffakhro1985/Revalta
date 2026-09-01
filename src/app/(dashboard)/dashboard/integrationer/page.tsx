@@ -87,10 +87,10 @@ export default function IntegrationsPage() {
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Plug} label="Integrationer" value={integrations.length} />
-        <MetricCard icon={CheckCircle2} label="Konfigurerade" value={summary.configured} />
-        <MetricCard icon={CircleDashed} label="Väntar på konfiguration" value={summary.pending} />
-        <MetricCard icon={Send} label="Slutförda händelser" value={summary.successfulEvents} />
+        <MetricCard icon={Plug} label="Integrationer" value={loading ? "—" : integrations.length} />
+        <MetricCard icon={CheckCircle2} label="Konfigurerade" value={loading ? "—" : summary.configured} />
+        <MetricCard icon={CircleDashed} label="Väntar på konfiguration" value={loading ? "—" : summary.pending} />
+        <MetricCard icon={Send} label="Slutförda händelser" value={loading ? "—" : summary.successfulEvents} />
       </section>
 
       <Link href="/dashboard/integrationer/fakturaexporter" className="group block rounded-2xl border border-petroleum-100 bg-gradient-to-br from-white to-petroleum-50/50 p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)] transition hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-lg">
@@ -100,10 +100,10 @@ export default function IntegrationsPage() {
             <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Ekonomidrift</p><h2 className="mt-1 text-xl font-semibold text-ink-950">Driftcenter för fakturaexporter</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-ink-600">Övervaka Fortnox-, Visma- och webhookjobb, se fel och externa kvittenser samt hantera säkra återförsök och avbrytningar.</p></div>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[380px]">
-            <div className="rounded-xl border border-sand-200 bg-white px-3 py-3"><p className="text-xs text-ink-500">Totalt</p><p className="mt-1 text-lg font-semibold text-ink-950">{invoiceExportSummary.total}</p></div>
-            <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-3"><p className="text-xs text-amber-700">Aktiva</p><p className="mt-1 text-lg font-semibold text-amber-900">{invoiceExportSummary.active}</p></div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3"><p className="text-xs text-emerald-700">Skickade</p><p className="mt-1 text-lg font-semibold text-emerald-900">{invoiceExportSummary.sent}</p></div>
-            <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-3"><p className="text-xs text-red-700">Fel</p><p className="mt-1 text-lg font-semibold text-red-900">{invoiceExportSummary.failed}</p></div>
+            <div className="rounded-xl border border-sand-200 bg-white px-3 py-3"><p className="text-xs text-ink-500">Totalt</p><p className="mt-1 text-lg font-semibold text-ink-950">{loading ? "—" : invoiceExportSummary.total}</p></div>
+            <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-3"><p className="text-xs text-amber-700">Aktiva</p><p className="mt-1 text-lg font-semibold text-amber-900">{loading ? "—" : invoiceExportSummary.active}</p></div>
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3"><p className="text-xs text-emerald-700">Skickade</p><p className="mt-1 text-lg font-semibold text-emerald-900">{loading ? "—" : invoiceExportSummary.sent}</p></div>
+            <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-3"><p className="text-xs text-red-700">Fel</p><p className="mt-1 text-lg font-semibold text-red-900">{loading ? "—" : invoiceExportSummary.failed}</p></div>
           </div>
           <ArrowRight className="hidden h-5 w-5 shrink-0 text-petroleum-700 transition group-hover:translate-x-1 lg:block" />
         </div>
