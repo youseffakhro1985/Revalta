@@ -58,6 +58,8 @@ export default function ForgotPasswordPage() {
             maxLength={254}
             autoComplete="email"
             autoFocus
+            readOnly={!hydrated || loading}
+            aria-disabled={!hydrated}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className={authInputClass}
