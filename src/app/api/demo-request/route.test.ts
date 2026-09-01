@@ -89,15 +89,18 @@ describe("POST /api/demo-request", () => {
         }),
       }),
     }));
-    expect(mocks.deliverDemoRequest).toHaveBeenCalledWith({
-      name: "Anna Andersson",
-      email: "anna@example.se",
-      company: "Exempel Fastigheter AB",
-      phone: "0701234567",
-      role: "Förvaltare",
-      portfolio: "12 fastigheter",
-      message: "Vi vill se arbetsorder och planering.",
-    });
+    expect(mocks.deliverDemoRequest).toHaveBeenCalledWith(
+      {
+        name: "Anna Andersson",
+        email: "anna@example.se",
+        company: "Exempel Fastigheter AB",
+        phone: "0701234567",
+        role: "Förvaltare",
+        portfolio: "12 fastigheter",
+        message: "Vi vill se arbetsorder och planering.",
+      },
+      { idempotencyKey: "demo-request/lead_123" },
+    );
     expect(mocks.integrationEventUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "lead_123" },
       data: expect.objectContaining({
