@@ -120,3 +120,44 @@ describe("queueEmailVerification", () => {
     expect(JSON.stringify(eventInput)).not.toContain("one-time-secret");
   });
 });
+
+describe("completed integration telemetry", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubEnv("NODE_ENV", "production");
+    integrationEventCreateMock.mockResolvedValue({ id: "event-1" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it.each([
+    ["recordPaymentEvent", { mode: "checkout", sessionCreated: true }, "stripe"],
+    ["recordStorageEvent", { provider: "vercel-blob" }, "storage"],
+    ["recordAiEvent", { action: "classification.completed" }, "ai"],
+  ] as const)("records %s as completed instead of leaving a false queue item", async (method, payload, type) => {
+    const integrations = await loadIntegrations();
+
+    await integrations[method]({ company_id: "company-1" }, payload);
+
+    expect(integrationEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ company_id: "company-1", type, status: "completed" }),
+    });
+  });
+
+  it("records unavailable production payment mocks as failed", async () => {
+    const { recordPaymentEvent } = await loadIntegrations();
+
+    await recordPaymentEvent(
+      { company_id: "company-1" },
+      { mode: "checkout_mock", reason: "stripe_not_configured" },
+    );
+
+    expect(integrationEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: "stripe", status: "failed" }),
+    });
+  });
+});
