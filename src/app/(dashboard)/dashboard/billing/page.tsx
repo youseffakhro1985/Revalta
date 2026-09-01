@@ -23,6 +23,8 @@ type BillingData = {
   canManage: boolean;
   canDirectChangePlan: boolean;
   stripeConfigured: boolean;
+  stripePlanReadiness: Record<string, boolean>;
+  stripePortalReady: boolean;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   subscriptionStatus: string | null;
@@ -39,6 +41,18 @@ const subscriptionStatusLabels: Record<string, string> = {
   paused: "Pausat",
 };
 
+function checkoutReturnMessage() {
+  if (typeof window === "undefined") return null;
+  const checkout = new URLSearchParams(window.location.search).get("checkout");
+  if (checkout === "success") {
+    return { type: "success" as const, message: "Stripe Checkout är slutförd. Abonnemangsstatus uppdateras när Stripe-webhooken har behandlats." };
+  }
+  if (checkout === "cancelled") {
+    return { type: "error" as const, message: "Stripe Checkout avbröts. Ingen planändring har genomförts." };
+  }
+  return null;
+}
+
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingData | null>(null);
   const [savingPlan, setSavingPlan] = useState("");
@@ -50,6 +64,9 @@ export default function BillingPage() {
 
   useEffect(() => {
     let isMounted = true;
+    const returnMessage = checkoutReturnMessage();
+    if (returnMessage?.type === "success") setSuccess(returnMessage.message);
+    if (returnMessage?.type === "error") setError(returnMessage.message);
 
     async function loadBilling() {
       try {
@@ -96,7 +113,7 @@ export default function BillingPage() {
       }
 
       setBilling((current) => current ? { ...current, currentPlan: data.company.plan } : current);
-      setSuccess("Planen är uppdaterad och Stripe-händelsen är loggad.");
+      setSuccess("Planen är uppdaterad.");
     } catch {
       setError("Kunde inte kontakta servern");
     } finally {
@@ -121,7 +138,7 @@ export default function BillingPage() {
         return;
       }
       if (data.mode === "mock") {
-        setSuccess("Stripe är inte livekopplat ännu. Checkout-händelsen är loggad i mockläge.");
+        setSuccess("Checkout simulerades i utvecklingsmiljön.");
         return;
       }
       window.location.assign(data.url);
@@ -149,7 +166,7 @@ export default function BillingPage() {
         return;
       }
       if (data.mode === "mock") {
-        setSuccess("Stripe Customer Portal är inte livekopplad ännu. Händelsen är loggad i mockläge.");
+        setSuccess("Kundportalen simulerades i utvecklingsmiljön.");
         return;
       }
       window.location.assign(data.url);
@@ -167,13 +184,13 @@ export default function BillingPage() {
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Abonnemang</p>
           <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px]">Planer och kapacitet</h1>
           <p className="mt-3 max-w-2xl text-ink-500">
-            Hantera abonnemangsplaner i Revalta. I utvecklingsläge loggas planbyten som Stripe-mockar.
+            Se aktiv plan, kapacitetsgränser och betalningsstatus. Planbyten i produktion genomförs säkert via Stripe Checkout.
           </p>
         </div>
       </header>
 
       {(error || success) && (
-        <div className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>
+        <div role="status" className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>
           {error || success}
         </div>
       )}
@@ -196,62 +213,73 @@ export default function BillingPage() {
             <div className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
               <p className="text-sm font-medium text-ink-500">Stripe</p>
               <p className={`mt-3 text-lg font-semibold ${billing.stripeConfigured ? "text-success-700" : "text-warning-700"}`}>
-                {billing.stripeConfigured ? "Live redo" : "Mockläge"}
+                {billing.stripeConfigured ? "Redo för alla planer" : "Konfiguration behöver slutföras"}
               </p>
               {billing.subscriptionStatus && (
-                <p className="mt-2 text-xs font-medium text-ink-500">Status: {subscriptionStatusLabels[billing.subscriptionStatus] || billing.subscriptionStatus}</p>
+                <p className="mt-2 text-xs font-medium text-ink-500">Abonnemang: {subscriptionStatusLabels[billing.subscriptionStatus] || billing.subscriptionStatus}</p>
               )}
               <button
                 type="button"
                 onClick={openCustomerPortal}
-                disabled={openingPortal || !billing.canManage}
+                disabled={openingPortal || !billing.canManage || !billing.stripePortalReady}
+                title={!billing.stripePortalReady ? "Kundportalen blir tillgänglig när Stripe-kund och Stripe-konfiguration är klara." : undefined}
                 className={`mt-4 ${premiumSecondaryButtonClass}`}
               >
-                {openingPortal ? "Öppnar..." : "Kundportal"}
+                {openingPortal ? "Öppnar..." : "Öppna kundportal"}
               </button>
+              {!billing.stripePortalReady && (
+                <p className="mt-2 text-xs text-ink-500">Kundportalen aktiveras när Stripe-kopplingen och kund-ID:t är klara.</p>
+              )}
             </div>
           </section>
 
           <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            {Object.entries(billing.plans).map(([key, plan]) => (
-              <article key={key} className={`rounded-2xl border bg-white p-7 shadow-premium-sm ${billing.currentPlan === key ? "border-petroleum-300 ring-4 ring-petroleum-50" : "border-sand-200"}`}>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">{plan.label}</p>
-                <p className="mt-4 text-[30px] font-semibold tracking-[-0.03em] text-ink-950">{plan.price} kr</p>
-                <p className="mt-1 text-sm text-ink-500">per månad</p>
-                <ul className="mt-6 space-y-3 text-sm text-ink-600">
-                  <li>{plan.propertyLimit} fastigheter</li>
-                  <li>{plan.teamLimit} teammedlemmar</li>
-                  <li>Audit log och integration events</li>
-                  <li>AI-analys i dev/mockläge</li>
-                </ul>
-                {billing.currentPlan === key ? (
-                  <button type="button" disabled className={`mt-7 w-full ${premiumPrimaryButtonClass}`}>
-                    Aktiv plan
-                  </button>
-                ) : billing.canDirectChangePlan ? (
-                  // Dev/preview convenience only — hidden in production, where plan
-                  // changes must go through a real Stripe Checkout session below.
-                  <button
-                    type="button"
-                    disabled={!billing.canManage || savingPlan === key}
-                    onClick={() => changePlan(key)}
-                    className={`mt-7 w-full ${premiumPrimaryButtonClass}`}
-                  >
-                    {savingPlan === key ? "Uppdaterar..." : "Byt plan"}
-                  </button>
-                ) : null}
-                {billing.currentPlan !== key && (
-                  <button
-                    type="button"
-                    disabled={!billing.canManage || checkoutPlan === key}
-                    onClick={() => startCheckout(key)}
-                    className={`mt-3 w-full ${premiumSecondaryButtonClass}`}
-                  >
-                    {checkoutPlan === key ? "Startar..." : "Starta Stripe Checkout"}
-                  </button>
-                )}
-              </article>
-            ))}
+            {Object.entries(billing.plans).map(([key, plan]) => {
+              const checkoutReady = billing.stripePlanReadiness?.[key] ?? billing.stripeConfigured;
+              return (
+                <article key={key} className={`rounded-2xl border bg-white p-7 shadow-premium-sm ${billing.currentPlan === key ? "border-petroleum-300 ring-4 ring-petroleum-50" : "border-sand-200"}`}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">{plan.label}</p>
+                  <p className="mt-4 text-[30px] font-semibold tracking-[-0.03em] text-ink-950">{plan.price} kr</p>
+                  <p className="mt-1 text-sm text-ink-500">per månad</p>
+                  <ul className="mt-6 space-y-3 text-sm text-ink-600">
+                    <li>{plan.propertyLimit} fastigheter</li>
+                    <li>{plan.teamLimit} teammedlemmar</li>
+                    <li>Auditlogg och integrationshistorik</li>
+                    <li>AI-stöd för analys och prioritering</li>
+                  </ul>
+                  {billing.currentPlan === key ? (
+                    <button type="button" disabled className={`mt-7 w-full ${premiumPrimaryButtonClass}`}>
+                      Aktiv plan
+                    </button>
+                  ) : billing.canDirectChangePlan ? (
+                    <button
+                      type="button"
+                      disabled={!billing.canManage || savingPlan === key}
+                      onClick={() => changePlan(key)}
+                      className={`mt-7 w-full ${premiumPrimaryButtonClass}`}
+                    >
+                      {savingPlan === key ? "Uppdaterar..." : "Byt plan"}
+                    </button>
+                  ) : null}
+                  {billing.currentPlan !== key && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={!billing.canManage || checkoutPlan === key || !checkoutReady}
+                        onClick={() => startCheckout(key)}
+                        title={!checkoutReady ? "Stripe Checkout är inte konfigurerad för den här planen ännu." : undefined}
+                        className={`mt-3 w-full ${premiumSecondaryButtonClass}`}
+                      >
+                        {checkoutPlan === key ? "Startar..." : "Byt plan via Stripe"}
+                      </button>
+                      {!checkoutReady && (
+                        <p className="mt-2 text-xs text-ink-500">Stripe Checkout för den här planen är ännu inte tillgänglig.</p>
+                      )}
+                    </>
+                  )}
+                </article>
+              );
+            })}
           </section>
         </>
       ) : (
