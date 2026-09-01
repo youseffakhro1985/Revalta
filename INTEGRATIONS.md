@@ -1,6 +1,6 @@
 # Revalta integrationer
 
-Revalta fungerar fullt i mockläge utan externa nycklar. När nycklar finns i Vercel aktiveras live-läge automatiskt för respektive provider.
+Revalta kan använda deterministiska eller lokala fallback-lägen för flera interna funktioner när externa providers saknas. Funktioner som innebär extern leverans eller permanent filhantering får däremot inte rapportera falsk framgång: de failar tydligt när nödvändig produktionskonfiguration saknas.
 
 ## E-post
 
@@ -10,14 +10,33 @@ Miljövariabler:
 
 - `EMAIL_PROVIDER_API_KEY`
 - `EMAIL_FROM`
+- `DEMO_REQUEST_TO` — server-side mottagare för publika demoförfrågningar
 
-När dessa finns skickar Revalta e-post via Resend för:
+När provider-nyckel och avsändare finns kan Revalta skicka e-post via Resend för bland annat:
 
 - e-postverifiering
 - lösenordsåterställning
 - ärendekvitto
 - statusuppdateringar
 - nya kommentarer
+- serviceaviseringar
+
+### Publika demoförfrågningar
+
+`POST /api/demo-request` är en fail-closed publik kontaktkanal. Den kräver både den gemensamma e-postkonfigurationen och `DEMO_REQUEST_TO` för att returnera leveransframgång.
+
+Säkerhetskontrakt:
+
+- same-origin-kontroll för mutationer
+- bounded JSON-fält och request-size-guard
+- honeypot för automatiserad spam
+- persistent rate limit per IP och normaliserad e-postidentitet
+- besökarens e-post används som `reply_to`, aldrig som serverbestämd mottagare
+- HTML-escaping av samtliga besökarstyrda fält
+- provider-timeout och standardiserad `503 SERVICE_UNAVAILABLE` om leverans inte kan bekräftas
+- `private/no-store` för origin och CDN samt request-correlation för felsökning
+
+`DEMO_REQUEST_TO` ska sättas explicit i Vercel Production och Preview där demoflödet ska kunna leverera. Lägg inte in en påhittad mottagaradress i källkoden.
 
 ## SMS
 
