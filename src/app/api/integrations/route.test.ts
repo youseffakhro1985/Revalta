@@ -135,4 +135,18 @@ describe("integrations summary", () => {
 
     expect(demoLeads.configured).toBe(true);
   });
+
+  it("shows both modern and legacy storage tokens while using the canonical storage readiness", async () => {
+    hasStorageConfigMock.mockReturnValue(true);
+
+    const response = await GET();
+    const body = await response.json();
+    const storage = body.integrations.find((integration: { type: string }) => integration.type === "storage");
+
+    expect(storage).toEqual({
+      type: "storage",
+      configured: true,
+      requiredEnv: ["BLOB_READ_WRITE_TOKEN", "STORAGE_PROVIDER_KEY"],
+    });
+  });
 });
