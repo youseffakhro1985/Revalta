@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { getPublicAppUrl } from "@/lib/app-url";
 import { writeAuditLog } from "@/lib/audit";
+import { isBillingPlanKey } from "@/lib/billing-plans";
 import { canManageBilling, getCurrentUser } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -9,7 +10,6 @@ import { isProductionRuntime } from "@/lib/runtime-env";
 import { createCheckoutSession, isStripeReady } from "@/lib/stripe";
 
 const ROUTE = "/api/billing/checkout";
-const allowedPlans = new Set(["start", "professional", "enterprise"]);
 const SUCCESS_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
   "CDN-Cache-Control": "no-store",
@@ -80,8 +80,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const plan = typeof body?.plan === "string" ? body.plan : "";
-    if (!allowedPlans.has(plan)) {
+    const plan = body?.plan;
+    if (!isBillingPlanKey(plan)) {
       return reject(observability, {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
