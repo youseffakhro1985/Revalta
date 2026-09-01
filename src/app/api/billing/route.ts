@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { writeAuditLog } from "@/lib/audit";
+import { BILLING_PLANS, isBillingPlanKey } from "@/lib/billing-plans";
 import { canManageBilling, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import db from "@/lib/db";
 import { recordPaymentEvent } from "@/lib/integrations";
@@ -14,13 +15,6 @@ const SUCCESS_HEADERS = {
   "Vercel-CDN-Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
 };
-
-const plans = {
-  start: { label: "Start", price: 495, propertyLimit: 10, teamLimit: 3 },
-  professional: { label: "Standard", price: 995, propertyLimit: 75, teamLimit: 15 },
-  enterprise: { label: "Professional", price: 1995, propertyLimit: 999, teamLimit: 100 },
-};
-const allowedPlans = new Set(Object.keys(plans));
 
 function successResponse(
   observability: ReturnType<typeof createRouteObservability>,
@@ -119,7 +113,7 @@ export async function GET(request: Request) {
 
     return successResponse(observability, {
       currentPlan: user.company?.plan || "professional",
-      plans,
+      plans: BILLING_PLANS,
       usage: { properties, teamMembers, openTickets },
       canManage: canManageBilling(user.role),
       // Direct plan writes (PATCH below) are a dev/preview convenience only — in
@@ -191,8 +185,8 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const plan = typeof body?.plan === "string" ? body.plan : "";
-    if (!allowedPlans.has(plan)) {
+    const plan = body?.plan;
+    if (!isBillingPlanKey(plan)) {
       return reject(observability, {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
