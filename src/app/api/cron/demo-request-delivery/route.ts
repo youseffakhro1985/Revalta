@@ -116,7 +116,8 @@ async function execute(observability: ReturnType<typeof createRouteObservability
     const payload = object(candidate.payload);
     if (!payload) {
       const marked = await transition(candidate.id, "failed", "invalid", { error: "invalid_demo_request_payload" });
-      marked.count ? result.invalid += 1 : result.skipped += 1;
+      if (marked.count) result.invalid += 1;
+      else result.skipped += 1;
       continue;
     }
 
@@ -128,7 +129,8 @@ async function execute(observability: ReturnType<typeof createRouteObservability
         "invalid",
         withRetry(payload, retrySnapshot(payload), { delivery: { status: "invalid" } }),
       );
-      marked.count ? result.invalid += 1 : result.skipped += 1;
+      if (marked.count) result.invalid += 1;
+      else result.skipped += 1;
       continue;
     }
 
@@ -147,7 +149,8 @@ async function execute(observability: ReturnType<typeof createRouteObservability
           },
         }),
       );
-      marked.count ? result.reconciliationRequired += 1 : result.skipped += 1;
+      if (marked.count) result.reconciliationRequired += 1;
+      else result.skipped += 1;
       continue;
     }
 
@@ -163,7 +166,8 @@ async function execute(observability: ReturnType<typeof createRouteObservability
           },
         }),
       );
-      marked.count ? result.exhausted += 1 : result.skipped += 1;
+      if (marked.count) result.exhausted += 1;
+      else result.skipped += 1;
       continue;
     }
 
