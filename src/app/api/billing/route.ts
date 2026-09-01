@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { writeAuditLog } from "@/lib/audit";
-import { BILLING_PLANS, isBillingPlanKey } from "@/lib/billing-plans";
+import { BILLING_PLANS, BILLING_PLAN_KEYS, isBillingPlanKey } from "@/lib/billing-plans";
 import { canManageBilling, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import db from "@/lib/db";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
 import { isProductionRuntime } from "@/lib/runtime-env";
-import { isStripeBillingReady } from "@/lib/stripe";
+import { isStripeBillingReady, isStripeReady } from "@/lib/stripe";
 
 const ROUTE = "/api/billing";
 const SUCCESS_HEADERS = {
@@ -103,6 +103,10 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    const stripePlanReadiness = Object.fromEntries(
+      BILLING_PLAN_KEYS.map((plan) => [plan, isStripeReady(plan)]),
+    );
+
     observability.logger.info("billing summary completed", observability.elapsed({
       event: "billing.read.completed",
       userId: user.id,
@@ -122,6 +126,7 @@ export async function GET(request: Request) {
       // in sync with what the customer actually pays.
       canDirectChangePlan: !isProductionRuntime(),
       stripeConfigured: isStripeBillingReady(),
+      stripePlanReadiness,
       stripeCustomerId: company?.stripe_customer_id || null,
       stripeSubscriptionId: company?.stripe_subscription_id || null,
       subscriptionStatus: company?.subscription_status || null,
@@ -217,9 +222,6 @@ export async function PATCH(request: Request) {
     try {
       await recordPaymentEvent(user, { companyId, plan, mode: "plan_change" });
     } catch {
-      // IntegrationEvent is operational telemetry, not the source of truth for
-      // this non-production plan change. Do not report a false failed mutation
-      // after the atomic company+audit transaction has committed.
       observability.logger.warn("billing payment event recording failed", observability.elapsed({
         event: "billing.plan_change.telemetry_failed",
         userId: user.id,
