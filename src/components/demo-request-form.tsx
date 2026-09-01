@@ -6,6 +6,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 
 type DemoResponse = {
   ok?: boolean;
+  deliveryPending?: boolean;
   error?: string;
   errorCode?: string;
   requestId?: string;
@@ -85,7 +86,7 @@ export function DemoRequestForm() {
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold">Tack — förfrågan är mottagen.</p>
-            <p className="mt-1 text-xs leading-5 text-emerald-800">Dina uppgifter har skickats till Revaltas kontaktkanal.</p>
+            <p className="mt-1 text-xs leading-5 text-emerald-800">Din förfrågan är sparad så att Revalta kan följa upp den.</p>
           </div>
         </div>
       ) : null}
