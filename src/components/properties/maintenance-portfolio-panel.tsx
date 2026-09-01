@@ -28,6 +28,19 @@ const initialFilters: Filters = { property: "all", category: "all", risk: "all" 
 const riskLabels: Record<string, string> = { low: "Låg", medium: "Medel", high: "Hög", critical: "Kritisk" };
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 
+function PortfolioHeading({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Portföljstyrning</p>
+        <h1 id="portfolio-maintenance-heading" className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-ink-950">Underhållsbudget för hela beståndet</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Jämför investeringsbehov, finansiering, risker och underhållsskuld mellan organisationens fastigheter.</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function expand(row: Row, endYear: number): Occurrence[] {
   if (!row.action_id || !row.planned_year || row.estimated_cost == null || row.status === "cancelled") return [];
   const result: Occurrence[] = [];
@@ -112,27 +125,22 @@ export function MaintenancePortfolioPanel() {
     return { properties, total, debt, nearTerm, criticalValue, peak, yearly };
   }, [filteredRows, zoom]);
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-  if (error) return <InlineAlert>{error}</InlineAlert>;
-  if (rows.length === 0) return <EmptyState title="Inga aktiva underhållsplaner" description="Aktivera minst en plan för att bygga portföljbudgeten." />;
+  if (loading) return <section className="space-y-6" aria-labelledby="portfolio-maintenance-heading"><PortfolioHeading /><div className="h-96 animate-pulse rounded-2xl bg-sand-100" /></section>;
+  if (error) return <section className="space-y-6" aria-labelledby="portfolio-maintenance-heading"><PortfolioHeading /><InlineAlert>{error}</InlineAlert></section>;
+  if (rows.length === 0) return <section className="space-y-6" aria-labelledby="portfolio-maintenance-heading"><PortfolioHeading /><EmptyState title="Inga aktiva underhållsplaner" description="Aktivera minst en plan för att bygga portföljbudgeten." /></section>;
 
   const maxYear = Math.max(1, ...portfolio.yearly.map((item) => item.amount));
   const hasFilters = Object.values(filters).some((value) => value !== "all");
 
   return (
     <section className="space-y-6" aria-labelledby="portfolio-maintenance-heading">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Portföljstyrning</p>
-          <h1 id="portfolio-maintenance-heading" className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-ink-950">Underhållsbudget för hela beståndet</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Jämför investeringsbehov, finansiering, risker och underhållsskuld mellan organisationens fastigheter.</p>
-        </div>
+      <PortfolioHeading>
         <div className="grid grid-cols-4 rounded-xl bg-sand-50 p-1" aria-label="Välj tidshorisont">
           {[5, 10, 20, 30].map((years) => (
             <button key={years} type="button" onClick={() => setZoom(years as 5 | 10 | 20 | 30)} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${zoom === years ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500 hover:text-ink-800"}`}>{years} år</button>
           ))}
         </div>
-      </div>
+      </PortfolioHeading>
 
       <Panel title="Filtrera portföljen" description="Alla nyckeltal och diagram räknas om efter valda filter.">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

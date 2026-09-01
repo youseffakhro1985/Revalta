@@ -41,6 +41,24 @@ function stringAttributeValue(node, name) {
   return null;
 }
 
+function stringAttributeValues(node, name) {
+  const item = attribute(node, name);
+  if (!item?.initializer) return [];
+  if (ts.isStringLiteral(item.initializer)) return [item.initializer.text];
+  if (!ts.isJsxExpression(item.initializer) || !item.initializer.expression) return [];
+
+  const values = [];
+  function visit(current) {
+    if (ts.isStringLiteralLike(current)) {
+      values.push(current.text);
+      return;
+    }
+    ts.forEachChild(current, visit);
+  }
+  visit(item.initializer.expression);
+  return values;
+}
+
 function hasFormAncestor(node) {
   let current = node.parent;
   while (current) {
@@ -77,9 +95,11 @@ function inspectOpeningElement(sourceFile, node) {
   }
 
   if (name === "a" || name === "Link") {
-    const href = stringAttributeValue(node, "href")?.trim().toLowerCase();
-    if (href === "" || href === "#" || href?.startsWith("javascript:")) {
-      report(sourceFile, node, `ogiltig eller tom navigationslänk: ${JSON.stringify(href)}`);
+    const invalidHref = stringAttributeValues(node, "href")
+      .map((value) => value.trim().toLowerCase())
+      .find((value) => value === "" || value === "#" || value.startsWith("javascript:"));
+    if (invalidHref !== undefined) {
+      report(sourceFile, node, `ogiltig eller tom navigationslänk: ${JSON.stringify(invalidHref)}`);
     }
   }
 }
