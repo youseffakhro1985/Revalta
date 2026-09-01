@@ -11,6 +11,10 @@ function trackingSecret() {
   );
 }
 
+export function hasPortalTrackingConfig() {
+  return trackingSecret() !== null;
+}
+
 function sign(payload: string) {
   const secret = trackingSecret();
   if (!secret) throw new Error("Portal tracking secret is not configured");
