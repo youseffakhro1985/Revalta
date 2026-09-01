@@ -9,6 +9,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
+    {
+      url: `${siteUrl}/demo`,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
     ...["integritet", "cookies", "villkor", "gdpr"].map((slug) => ({
       url: `${siteUrl}/juridik/${slug}`,
       changeFrequency: "monthly" as const,
