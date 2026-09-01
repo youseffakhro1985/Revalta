@@ -119,7 +119,9 @@ export async function POST(request: Request) {
       select: { id: true },
     });
 
-    const delivery = await deliverDemoRequest(demoRequest);
+    const delivery = await deliverDemoRequest(demoRequest, {
+      idempotencyKey: `demo-request/${lead.id}`,
+    });
     const deliverySnapshot = delivery.ok
       ? { status: "sent", providerId: delivery.providerId }
       : { status: "failed", reason: delivery.reason };
