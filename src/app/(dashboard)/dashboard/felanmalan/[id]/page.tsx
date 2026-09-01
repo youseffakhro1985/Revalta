@@ -27,6 +27,7 @@ type WorkOrder = {
   created_at: string;
   assigned_to: TeamMember | null;
 };
+type TicketPermissions = { canManage: boolean; canAssign: boolean };
 type Ticket = {
   id: string;
   title: string;
@@ -94,6 +95,7 @@ export default function TicketDetailPage() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [canCreateWorkOrder, setCanCreateWorkOrder] = useState(false);
+  const [permissions, setPermissions] = useState<TicketPermissions>({ canManage: false, canAssign: false });
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [status, setStatus] = useState("new");
@@ -152,6 +154,10 @@ export default function TicketDetailPage() {
         if (!timelineResponse.ok) throw new Error(timelineData.error || "Kunde inte hämta historiken");
         if (!workOrderResponse.ok) throw new Error(workOrderData.error || "Kunde inte hämta arbetsorderkopplingen");
         setTicket(ticketData.ticket);
+        setPermissions({
+          canManage: Boolean(ticketData.permissions?.canManage),
+          canAssign: Boolean(ticketData.permissions?.canAssign),
+        });
         setStatus(ticketData.ticket.status);
         setPriority(ticketData.ticket.priority);
         setAssignedToId(ticketData.ticket.assigned_to_id || "");
@@ -177,10 +183,13 @@ export default function TicketDetailPage() {
     event.preventDefault();
     setError(""); setSuccess(""); setSaving(true);
     try {
+      const payload = permissions.canAssign
+        ? { status, priority, assignedToId }
+        : { status, priority };
       const response = await fetch(`/api/tickets/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, priority, assignedToId }),
+        body: JSON.stringify(payload),
       });
       const data = await readResponseJson(response);
       if (response.status === 401) { router.push("/login"); return; }
@@ -439,10 +448,10 @@ export default function TicketDetailPage() {
           <form onSubmit={updateTicket} className="space-y-4">
             <SelectField label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} />
             <SelectField label="Prioritet" value={priority} onChange={setPriority} options={Object.entries(priorityLabels)} />
-            <label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select></label>
-            <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button>
+            <label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select disabled={!permissions.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>{!permissions.canAssign ? <span className="mt-2 block text-xs text-ink-500">Endast förvaltare och administratörer kan ändra ansvarig.</span> : null}</label>
+            <button disabled={!permissions.canManage || saving} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button>
           </form>
-          <div className="mt-5 border-t border-sand-100 pt-4">
+          {permissions.canAssign ? <div className="mt-5 border-t border-sand-100 pt-4">
             <button
               type="button"
               disabled={deleting}
@@ -451,7 +460,7 @@ export default function TicketDetailPage() {
             >
               {deleting ? "Tar bort…" : "Ta bort ärende"}
             </button>
-          </div>
+          </div> : null}
         </Panel>
 
         <Panel title="Ny kommentar" description="Dokumentera nästa åtgärd." bodyClassName="p-6"><form onSubmit={addComment}><textarea required minLength={2} rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className={premiumTextareaClass} placeholder="Skriv en uppdatering…" aria-label="Skriv en uppdatering…" /><button disabled={saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Send className="h-4 w-4" />Lägg till kommentar</button></form></Panel>
