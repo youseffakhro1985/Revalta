@@ -2,7 +2,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, queueSmsNotification } from "@/lib/integrations";
 import { analyzeTicket } from "@/lib/ai";
-import { createPortalTrackingToken } from "@/lib/portal-tracking";
+import { createPortalTrackingToken, hasPortalTrackingConfig } from "@/lib/portal-tracking";
 import { extractPortalCompanySlug, generatePublicReference, resolvePublicPortalCompany } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { calculateDueDate } from "@/lib/sla";
@@ -52,6 +52,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
     }
 
+    if (!hasPortalTrackingConfig()) {
+      observability.logger.warn("public ticket rejected because tracking is unavailable", observability.elapsed({
+        event: "public.ticket.tracking_unavailable",
+        companyId: portal.company.id,
+      }));
+      return NextResponse.json({ error: "Boendeportalen är tillfälligt inte tillgänglig" }, { status: 503 });
+    }
+
     let property = null;
     if (normalizedPropertyId) {
       property = await db.property.findFirst({
@@ -71,70 +79,94 @@ export async function POST(request: Request) {
       publicReference = generatePublicReference();
     }
 
-    const ticket = await db.ticket.create({
-      data: {
-        title: normalizedTitle,
-        description: normalizedDescription,
-        status: "new",
-        category: analysis.category,
-        priority: analysis.priority,
-        due_date: calculateDueDate(analysis.priority),
-        company_id: portal.company.id,
-        user_id: portal.owner.id,
-        property_id: property?.id ?? null,
-        public_reference: publicReference,
-        source: "public_portal",
-        reporter_name: normalizedReporterName,
-        reporter_email: normalizedReporterEmail,
-        reporter_phone: normalizedReporterPhone || null,
-        reporter_unit: normalizedReporterUnit || null,
-        ai_summary: analysis.summary,
-        ai_recommended_action: analysis.recommendedAction,
-        ai_confidence: analysis.confidence,
-        ai_processed_at: new Date(),
-      },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        priority: true,
-        category: true,
-        public_reference: true,
-        reporter_email: true,
-        created_at: true,
-        property: { select: { name: true, address: true, city: true } },
-      },
-    });
-
-    await writeAuditLog({ id: portal.owner.id, company_id: portal.company.id }, {
-      entityType: "ticket",
-      entityId: ticket.id,
-      action: "public.ticket_created",
-      metadata: {
-        publicReference,
-        reporterEmail: normalizedReporterEmail,
-        property: property?.name ?? null,
-      },
-    });
-    await queueTicketNotification({ company_id: portal.company.id }, {
-      ticketId: ticket.id,
-      title: ticket.title,
-      recipient: normalizedReporterEmail,
-      event: "created",
-    });
-    if (normalizedReporterPhone) {
-      await queueSmsNotification({ company_id: portal.company.id }, {
-        ticketId: ticket.id,
-        recipient: normalizedReporterPhone,
-        message: `Tack! Ärende ${publicReference} är mottaget.`,
-      });
-    }
-
+    // Build the tracking token before any persistent mutation. If signing cannot
+    // succeed, the caller receives a truthful failure and no ticket is created.
     const trackingToken = createPortalTrackingToken({
       reference: publicReference,
       email: normalizedReporterEmail,
       companyId: portal.company.id,
     });
+
+    const ticket = await db.$transaction(async (tx) => {
+      const created = await tx.ticket.create({
+        data: {
+          title: normalizedTitle,
+          description: normalizedDescription,
+          status: "new",
+          category: analysis.category,
+          priority: analysis.priority,
+          due_date: calculateDueDate(analysis.priority),
+          company_id: portal.company.id,
+          user_id: portal.owner.id,
+          property_id: property?.id ?? null,
+          public_reference: publicReference,
+          source: "public_portal",
+          reporter_name: normalizedReporterName,
+          reporter_email: normalizedReporterEmail,
+          reporter_phone: normalizedReporterPhone || null,
+          reporter_unit: normalizedReporterUnit || null,
+          ai_summary: analysis.summary,
+          ai_recommended_action: analysis.recommendedAction,
+          ai_confidence: analysis.confidence,
+          ai_processed_at: new Date(),
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          category: true,
+          public_reference: true,
+          reporter_email: true,
+          created_at: true,
+          property: { select: { name: true, address: true, city: true } },
+        },
+      });
+
+      await writeAuditLog({ id: portal.owner.id, company_id: portal.company.id }, {
+        entityType: "ticket",
+        entityId: created.id,
+        action: "public.ticket_created",
+        metadata: {
+          publicReference,
+          propertyId: property?.id ?? null,
+          source: "public_portal",
+        },
+      }, tx);
+
+      return created;
+    });
+
+    try {
+      await queueTicketNotification({ company_id: portal.company.id }, {
+        ticketId: ticket.id,
+        title: ticket.title,
+        recipient: normalizedReporterEmail,
+        event: "created",
+      });
+    } catch {
+      observability.logger.warn("public ticket email notification failed", observability.elapsed({
+        event: "public.ticket.email_failed",
+        ticketId: ticket.id,
+        companyId: portal.company.id,
+      }));
+    }
+
+    if (normalizedReporterPhone) {
+      try {
+        await queueSmsNotification({ company_id: portal.company.id }, {
+          ticketId: ticket.id,
+          recipient: normalizedReporterPhone,
+          message: `Tack! Ärende ${publicReference} är mottaget.`,
+        });
+      } catch {
+        observability.logger.warn("public ticket sms notification failed", observability.elapsed({
+          event: "public.ticket.sms_failed",
+          ticketId: ticket.id,
+          companyId: portal.company.id,
+        }));
+      }
+    }
 
     observability.logger.info("public ticket created", observability.elapsed({
       event: "public.ticket.created",
