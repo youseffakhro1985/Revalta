@@ -17,6 +17,7 @@ type StripeObject = {
 type StripeEvent = {
   id?: string;
   type?: string;
+  created?: number;
   data?: { object?: StripeObject };
 };
 
@@ -29,12 +30,35 @@ const supportedEvents = new Set([
   "invoice.payment_failed",
 ]);
 
+const subscriptionEvents = new Set([
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+]);
+
+const invoiceEvents = new Set([
+  "invoice.payment_succeeded",
+  "invoice.payment_failed",
+]);
+
 const SUCCESS_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
   "CDN-Cache-Control": "no-store",
   "Vercel-CDN-Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
 };
+
+function object(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function previousReplayCount(payload: unknown) {
+  const row = object(payload);
+  const value = row?.replayCount;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
 
 function getPlanFromMetadata(object: StripeObject) {
   const plan = object.metadata?.plan;
@@ -98,21 +122,66 @@ async function resolveCompanyForStripeObject(client: Prisma.TransactionClient, o
   return null;
 }
 
-async function updateCompanyFromStripeObject(client: Prisma.TransactionClient, object: StripeObject) {
-  const company = await resolveCompanyForStripeObject(client, object);
+async function applyStripeEventToCompany(
+  client: Prisma.TransactionClient,
+  eventType: string,
+  stripeObject: StripeObject,
+) {
+  const company = await resolveCompanyForStripeObject(client, stripeObject);
   if (!company) return null;
 
-  const plan = getPlanFromMetadata(object);
+  // Invoice state (paid/open/etc.) and Checkout Session state (complete/open/etc.)
+  // are not subscription lifecycle states. Only subscription events may write
+  // Company.subscription_status. Invoice events are journal-only after matching.
+  if (invoiceEvents.has(eventType)) return company;
+
+  const plan = getPlanFromMetadata(stripeObject);
+  const customerId = typeof stripeObject.customer === "string" ? stripeObject.customer : undefined;
+  const subscriptionId =
+    typeof stripeObject.subscription === "string"
+      ? stripeObject.subscription
+      : subscriptionEvents.has(eventType) && typeof stripeObject.id === "string" && stripeObject.id.startsWith("sub_")
+        ? stripeObject.id
+        : undefined;
+
   return client.company.update({
     where: { id: company.id },
     data: {
       ...(plan ? { plan } : {}),
-      stripe_customer_id: typeof object.customer === "string" ? object.customer : undefined,
-      stripe_subscription_id: typeof object.subscription === "string" ? object.subscription : object.id,
-      subscription_status: object.status,
+      ...(customerId ? { stripe_customer_id: customerId } : {}),
+      ...(subscriptionId ? { stripe_subscription_id: subscriptionId } : {}),
+      ...(subscriptionEvents.has(eventType) && typeof stripeObject.status === "string"
+        ? { subscription_status: stripeObject.status }
+        : {}),
     },
-    select: { id: true, name: true, plan: true, stripe_customer_id: true, stripe_subscription_id: true, subscription_status: true },
+    select: {
+      id: true,
+      name: true,
+      plan: true,
+      stripe_customer_id: true,
+      stripe_subscription_id: true,
+      subscription_status: true,
+    },
   });
+}
+
+function journalPayload(
+  event: StripeEvent & { id: string; type: string },
+  stripeObject: StripeObject,
+  matchedCompany: boolean,
+  replayCount: number,
+) {
+  return {
+    eventType: event.type,
+    eventCreated: typeof event.created === "number" && Number.isFinite(event.created) ? event.created : null,
+    objectId: stripeObject.id,
+    customer: stripeObject.customer,
+    subscription: stripeObject.subscription,
+    status: stripeObject.status,
+    matchedCompany,
+    metadataCompanyId: stripeObject.metadata?.companyId || null,
+    replayCount,
+  } as Prisma.InputJsonValue;
 }
 
 export async function POST(request: Request) {
@@ -162,70 +231,106 @@ export async function POST(request: Request) {
     });
   }
 
-  const object = event.data?.object;
-  const supported = supportedEvents.has(event.type);
+  const safeEvent = event as StripeEvent & { id: string; type: string };
+  const stripeObject = safeEvent.data?.object;
+  const supported = supportedEvents.has(safeEvent.type);
+  if (supported && !stripeObject) {
+    observability.logger.warn("stripe webhook payload rejected", observability.elapsed({
+      event: "stripe.webhook.payload_invalid",
+      stripeEventId: safeEvent.id,
+      stripeEventType: safeEvent.type,
+    }));
+    return apiErrorResponse({
+      status: 400,
+      code: API_ERROR_CODES.validationFailed,
+      message: "Ogiltig Stripe-payload",
+      requestId: observability.requestId,
+    });
+  }
+
   observability.logger.info("stripe webhook received", observability.elapsed({
     event: "stripe.webhook.received",
-    stripeEventId: event.id,
-    stripeEventType: event.type,
+    stripeEventId: safeEvent.id,
+    stripeEventType: safeEvent.type,
     supported,
   }));
 
   try {
-    if (object && supported) {
-      const duplicate = await db.$transaction(async (tx) => {
-        // Serialize deliveries of the same Stripe event without requiring a new
-        // database table to exist before this application version is deployed.
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe:${event.id}`}))`;
+    if (stripeObject && supported) {
+      const outcome = await db.$transaction(async (tx) => {
+        // Serialize deliveries of the same Stripe event. A completed event is a
+        // true duplicate. An earlier unmatched/ignored event is deliberately
+        // replayable so a later Stripe mapping can recover it without creating
+        // a second journal row.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe:${safeEvent.id}`}))`;
         const existingEvent = await tx.integrationEvent.findFirst({
-          where: { type: "stripe", recipient: event.id },
-          select: { id: true },
+          where: { type: "stripe", recipient: safeEvent.id },
+          select: { id: true, status: true, payload: true },
         });
-        if (existingEvent) return true;
+        if (existingEvent && existingEvent.status !== "ignored") {
+          return { duplicate: true, replayed: false, matchedCompany: true };
+        }
 
-        const company = await updateCompanyFromStripeObject(tx, object);
+        const replayCount = existingEvent ? previousReplayCount(existingEvent.payload) + 1 : 0;
+        const company = await applyStripeEventToCompany(tx, safeEvent.type, stripeObject);
+        const status = company ? "received" : "ignored";
+        const eventPayload = journalPayload(safeEvent, stripeObject, Boolean(company), replayCount);
+
+        if (existingEvent) {
+          await tx.integrationEvent.update({
+            where: { id: existingEvent.id },
+            data: {
+              company_id: company?.id ?? null,
+              status,
+              payload: eventPayload,
+            },
+          });
+          return { duplicate: false, replayed: true, matchedCompany: Boolean(company) };
+        }
+
         await tx.integrationEvent.create({
           data: {
             company_id: company?.id,
             type: "stripe",
-            status: company ? "received" : "ignored",
-            recipient: event.id,
-            payload: {
-              eventType: event.type,
-              objectId: object.id,
-              customer: object.customer,
-              subscription: object.subscription,
-              status: object.status,
-              matchedCompany: Boolean(company),
-              metadataCompanyId: object.metadata?.companyId || null,
-            },
+            status,
+            recipient: safeEvent.id,
+            payload: eventPayload,
           },
         });
-        return false;
+        return { duplicate: false, replayed: false, matchedCompany: Boolean(company) };
       });
 
-      if (duplicate) {
+      if (outcome.duplicate) {
         observability.logger.info("stripe webhook duplicate acknowledged", observability.elapsed({
           event: "stripe.webhook.duplicate",
-          stripeEventId: event.id,
-          stripeEventType: event.type,
+          stripeEventId: safeEvent.id,
+          stripeEventType: safeEvent.type,
         }));
         return acknowledge({ received: true, duplicate: true });
+      }
+
+      if (outcome.replayed) {
+        observability.logger.info("stripe webhook replay evaluated", observability.elapsed({
+          event: "stripe.webhook.replayed",
+          stripeEventId: safeEvent.id,
+          stripeEventType: safeEvent.type,
+          matchedCompany: outcome.matchedCompany,
+        }));
       }
     }
 
     observability.logger.info("stripe webhook processed", observability.elapsed({
       event: "stripe.webhook.processed",
-      stripeEventId: event.id,
-      stripeEventType: event.type,
+      stripeEventId: safeEvent.id,
+      stripeEventType: safeEvent.type,
       supported,
     }));
     return acknowledge({ received: true });
   } catch (error) {
     observability.logger.error("stripe webhook failed", error, observability.elapsed({
       event: "stripe.webhook.failed",
-      stripeEventId: event.id,
-      stripeEventType: event.type,
+      stripeEventId: safeEvent.id,
+      stripeEventType: safeEvent.type,
     }));
     return apiErrorResponse({
       status: 500,
