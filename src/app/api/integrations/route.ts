@@ -18,7 +18,9 @@ const requiredEnv: Record<string, string[]> = {
     "STRIPE_PRICE_PROFESSIONAL",
     "STRIPE_PRICE_ENTERPRISE",
   ],
-  storage: ["BLOB_READ_WRITE_TOKEN"],
+  // BLOB_READ_WRITE_TOKEN is preferred. STORAGE_PROVIDER_KEY remains an
+  // accepted legacy fallback until the modern-storage cutover is complete.
+  storage: ["BLOB_READ_WRITE_TOKEN", "STORAGE_PROVIDER_KEY"],
   ai: ["AI_PROVIDER_API_KEY"],
   fortnox: ["FORTNOX_ACCESS_TOKEN", "FORTNOX_INVOICE_ENDPOINT"],
   visma: ["VISMA_ACCESS_TOKEN", "VISMA_INVOICE_ENDPOINT"],
