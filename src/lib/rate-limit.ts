@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
+import { createLogger } from "@/lib/structured-logger";
 
 type Bucket = {
   count: number;
@@ -15,6 +16,7 @@ export type RateLimitResult = {
 };
 
 const fallbackBuckets = new Map<string, Bucket>();
+const logger = createLogger({ component: "rate-limit" });
 let cleanupCounter = 0;
 
 export const RATE_LIMIT_TRANSACTION_OPTIONS = {
@@ -97,10 +99,9 @@ export async function checkRateLimit(key: string, limit: number, windowMs: numbe
 
     return { ...result, source: "database" };
   } catch (error) {
-    console.error(
-      "Persistent rate limiter unavailable; using bounded in-memory fallback",
-      error instanceof Error ? error.name : "UnknownError",
-    );
+    logger.error("persistent rate limiter unavailable; using bounded in-memory fallback", error, {
+      event: "rate_limit.database_fallback",
+    });
     return checkMemoryFallback(keyHash, limit, windowMs);
   }
 }

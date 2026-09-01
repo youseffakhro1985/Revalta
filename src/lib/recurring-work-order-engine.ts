@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { isModernStorageOnly } from "@/lib/dual-list";
+import { createLogger } from "@/lib/structured-logger";
 import {
   addWorkOrderStatusEvent,
   allocateWorkOrderNumber,
@@ -11,6 +12,7 @@ import {
 export const RECURRING_SCHEDULE_ACTION = "work_order.recurring.schedule";
 export const RECURRING_FREQUENCIES = ["weekly", "monthly", "quarterly", "yearly"] as const;
 export const RECURRING_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+const logger = createLogger({ component: "recurring-work-order-engine" });
 
 export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number];
 export type RecurringPriority = (typeof RECURRING_PRIORITIES)[number];
@@ -476,7 +478,11 @@ export async function runRecurringWorkOrderEngine(input: { companyId?: string; n
         else if (generated.status === "failed") result.failed += 1;
         else result.skipped += 1;
       } catch (error) {
-        console.error("Recurring work order generation failed:", companyId, schedule.id, error);
+        logger.error("recurring work-order generation failed", error, {
+          event: "recurring_work_order.generation_failed",
+          companyId,
+          scheduleId: schedule.id,
+        });
         result.failed += 1;
       }
     }

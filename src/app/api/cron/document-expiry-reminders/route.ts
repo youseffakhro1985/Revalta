@@ -1,22 +1,25 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { isCronRequestAuthorized } from "@/lib/request-security";
-import { createLogger } from "@/lib/structured-logger";
-
-const logger = createLogger({ route: "/api/cron/document-expiry-reminders" });
+import { createRouteObservability } from "@/lib/route-observability";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const SUCCESS_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+  "X-Content-Type-Options": "nosniff",
+};
 
 function daysUntil(date: Date) {
   return Math.ceil((date.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
-export async function GET(request: Request) {
-  if (!isCronRequestAuthorized(request)) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-
-  try {
+async function execute() {
     const horizon = new Date();
     horizon.setUTCDate(horizon.getUTCDate() + 30);
 
@@ -116,14 +119,32 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({
+    return {
       ok: true,
       scanned: documents.length,
       created,
       skipped,
-    }, { headers: { "Cache-Control": "private, no-store" } });
+    };
+}
+
+export async function GET(request: Request) {
+  const observability = createRouteObservability(request, "/api/cron/document-expiry-reminders");
+  if (!isCronRequestAuthorized(request)) {
+    observability.logger.warn("document expiry reminder cron rejected", observability.elapsed({ event: "cron.document_expiry_reminders.unauthorized" }));
+    return apiErrorResponse({ status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", requestId: observability.requestId });
+  }
+
+  try {
+    const result = await execute();
+    observability.logger.info("document expiry reminder cron completed", observability.elapsed({
+      event: "cron.document_expiry_reminders.completed",
+      scanned: result.scanned,
+      created: result.created,
+      skipped: result.skipped,
+    }));
+    return observability.correlate(NextResponse.json(result, { headers: SUCCESS_HEADERS }));
   } catch (error) {
-    logger.error("Document expiry reminders error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("document expiry reminder cron failed", error, observability.elapsed({ event: "cron.document_expiry_reminders.failed" }));
+    return apiErrorResponse({ status: 500, code: API_ERROR_CODES.internalError, message: "Internt serverfel", requestId: observability.requestId });
   }
 }
