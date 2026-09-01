@@ -19,6 +19,7 @@ import {
 } from "@/lib/work-order-enterprise-core";
 import { getWorkOrderAssetLink, setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { syncCompletedWorkOrderToComponent } from "@/lib/component-work-order-sync";
+import { completeWorkOrderLifecycle } from "@/lib/work-order-completion";
 import { syncWorkOrderToTicket } from "@/lib/work-order-ticket-sync";
 import {
   normalizeWorkOrderPriority,
@@ -242,19 +243,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const now = new Date();
   const transactionResult = await db.$transaction(async (tx) => {
-    const updateResult = await tx.workOrder.updateMany({
-      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
-      data,
-    });
-    if (updateResult.count === 0) {
-      throw new Error("WORK_ORDER_NOT_FOUND");
+    const isCompletionTransition = nextStatus === "completed" && normalizeWorkOrderStatus(existing.status) === "in_progress";
+    const regularData = { ...data };
+    const completionActualCost = regularData.actual_cost;
+    if (isCompletionTransition) {
+      delete regularData.status;
+      delete regularData.completed_at;
+      delete regularData.actual_cost;
     }
-    const updated = await tx.workOrder.findFirst({
-      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
-      include,
-    });
-    if (!updated) {
-      throw new Error("WORK_ORDER_NOT_FOUND");
+    if (Object.keys(regularData).length > 0) {
+      const updateResult = await tx.workOrder.updateMany({
+        where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+        data: regularData,
+      });
+      if (updateResult.count === 0) {
+        throw new Error("WORK_ORDER_NOT_FOUND");
+      }
     }
 
     if (assetLinksChanged) {
@@ -269,6 +273,38 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         WHERE "id" = ${existing.id} AND "company_id" = ${user.company_id!}
       `);
     }
+
+    if (isCompletionTransition) {
+      const lifecycle = await completeWorkOrderLifecycle(tx, {
+        companyId: user.company_id!,
+        workOrderId: existing.id,
+        actorUserId: user.id,
+        completedAt: now,
+        actualCost: completionActualCost === undefined ? undefined : completionActualCost === null ? null : Number(completionActualCost),
+        statusReason,
+        statusEventMetadata: {
+          priorityBefore: existing.priority,
+          priorityAfter: nextPriority ?? existing.priority,
+          scheduledStart: finalStart?.toISOString() ?? null,
+          scheduledEnd: finalEnd?.toISOString() ?? null,
+          buildingId,
+          technicalAssetId,
+          source: "work-order.patch",
+        },
+      });
+      const completedWorkOrder = await tx.workOrder.findFirst({
+        where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+        include,
+      });
+      if (!completedWorkOrder) throw new Error("WORK_ORDER_NOT_FOUND");
+      return { workOrder: completedWorkOrder, componentSync: lifecycle.componentSync, ticketSync: lifecycle.ticketSync };
+    }
+
+    const updated = await tx.workOrder.findFirst({
+      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+      include,
+    });
+    if (!updated) throw new Error("WORK_ORDER_NOT_FOUND");
 
     if (nextStatus && nextStatus !== normalizeWorkOrderStatus(existing.status)) {
       const becomesResponded = !enterpriseBefore?.responded_at && ["in_progress", "waiting_material", "blocked", "completed", "invoiced"].includes(nextStatus);

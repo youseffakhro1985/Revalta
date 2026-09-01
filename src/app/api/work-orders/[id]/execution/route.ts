@@ -5,6 +5,8 @@ import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, canViewFinanceData, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import { completeWorkOrderLifecycle, WorkOrderCompletionConflict } from "@/lib/work-order-completion";
+import { canFinalizeWorkOrderExecution, isWorkOrderExecutionLocked } from "@/lib/work-order-execution-policy";
 import {
   getModernMaterialEntry,
   getModernTimeEntry,
@@ -13,7 +15,6 @@ import {
 } from "@/lib/work-order-ops-storage";
 
 const entryTypes = new Set(["time", "material", "travel", "external"]);
-const slaStatuses = new Set(["not_set", "on_track", "at_risk", "breached", "met"]);
 
 type ChecklistRow = {
   id: string;
@@ -84,9 +85,13 @@ async function resolveWorkOrder(user: CompanyUser, id: string) {
   return workOrder;
 }
 
-async function getCompletionState(id: string, companyId: string) {
+async function getCompletionState(
+  client: typeof db | Prisma.TransactionClient,
+  id: string,
+  companyId: string,
+) {
   const documentGuard = await sqlSoftDeleteGuard(db, "OperationalDocument", "d");
-  const rows = await db.$queryRaw<CompletionRow[]>(Prisma.sql`
+  const rows = await client.$queryRaw<CompletionRow[]>(Prisma.sql`
     SELECT
       (SELECT COUNT(*)::integer
        FROM "WorkOrderChecklistItem"
@@ -161,7 +166,7 @@ export async function GET(
         LIMIT 1
       `);
     })(),
-    getCompletionState(id, user.company_id),
+    getCompletionState(db, id, user.company_id),
   ]);
 
   const includeFinance = canViewFinanceData(user.role);
@@ -181,7 +186,14 @@ export async function GET(
     entries: visibleEntries,
     summary: visibleSummary,
     sla: slaRows[0] ?? { response_due_at: null, completion_due_at: null, responded_at: null, sla_status: "not_set" },
-    completion,
+    completion: {
+      status: workOrder.status,
+      required_incomplete: completion.required_incomplete,
+      before_photo_count: completion.before_photos,
+      after_photo_count: completion.after_photos,
+    },
+    canManage: canManageTickets(user.role),
+    canViewFinance: includeFinance,
   });
 }
 
@@ -200,6 +212,10 @@ export async function POST(
 
   const body = await request.json();
   const action = String(body.action || "");
+
+  if (["checklist.create", "checklist.complete", "entry.create"].includes(action) && isWorkOrderExecutionLocked(workOrder.status)) {
+    return NextResponse.json({ error: "Arbetsorderns utförande är låst i nuvarande status" }, { status: 409 });
+  }
 
   if (action === "checklist.create") {
     const title = String(body.title || "").trim();
@@ -285,43 +301,18 @@ export async function POST(
   }
 
   if (action === "sla.update") {
-    const responseDueAt = optionalDate(body.responseDueAt);
-    const completionDueAt = optionalDate(body.completionDueAt);
-    const respondedAt = optionalDate(body.respondedAt);
-    const slaStatus = String(body.slaStatus || "not_set");
-    if ([responseDueAt, completionDueAt, respondedAt].includes(undefined)) {
-      return NextResponse.json({ error: "Ett SLA-datum är ogiltigt" }, { status: 400 });
-    }
-    if (!slaStatuses.has(slaStatus)) return NextResponse.json({ error: "Ogiltig SLA-status" }, { status: 400 });
-    if (responseDueAt && completionDueAt && completionDueAt < responseDueAt) {
-      return NextResponse.json({ error: "Sluttiden kan inte ligga före svarstiden" }, { status: 400 });
-    }
-
-    await db.$executeRaw(Prisma.sql`
-      UPDATE "WorkOrder"
-      SET "response_due_at" = ${responseDueAt},
-          "completion_due_at" = ${completionDueAt},
-          "responded_at" = ${respondedAt},
-          "sla_status" = ${slaStatus},
-          "updated_at" = CURRENT_TIMESTAMP
-      WHERE "id" = ${id} AND "company_id" = ${user.company_id}
-    `);
-
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: "work_order.sla_updated",
-      metadata: { responseDueAt, completionDueAt, respondedAt, slaStatus },
-    });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      error: "SLA ändras via arbetsorderns styrda SLA-funktion",
+      code: "canonical_sla_route_required",
+    }, { status: 409 });
   }
 
   if (action === "completion.finalize") {
-    if (workOrder.status === "completed") {
-      return NextResponse.json({ error: "Arbetsordern är redan slutförd" }, { status: 409 });
+    if (!canFinalizeWorkOrderExecution(workOrder.status)) {
+      return NextResponse.json({ error: "Arbetsordern kan bara slutföras när den är påbörjad" }, { status: 409 });
     }
 
-    const completion = await getCompletionState(id, user.company_id);
+    const completion = await getCompletionState(db, id, user.company_id);
     if (completion.required_incomplete > 0) {
       return NextResponse.json({ error: `${completion.required_incomplete} obligatoriska kontrollpunkter återstår` }, { status: 400 });
     }
@@ -330,134 +321,149 @@ export async function POST(
     }
 
     const companyId = user.company_id;
-    const totals = await db.$queryRaw<{ total_cost: number }[]>(Prisma.sql`
-      SELECT COALESCE(SUM("total_amount"), 0)::double precision AS "total_cost"
-      FROM "WorkOrderExecutionEntry"
-      WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
-    `);
-    const actualCost = totals[0]?.total_cost ?? 0;
     const completedAt = new Date();
-    const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
-    const slaRows = await db.$queryRaw<{ completion_due_at: Date | null }[]>(Prisma.sql`
-      SELECT w."completion_due_at"
-      FROM "WorkOrder" w
-      WHERE w."id" = ${id} AND w."company_id" = ${companyId}
-        ${workOrderGuard}
-      LIMIT 1
-    `);
-    const completionDueAt = slaRows[0]?.completion_due_at ?? null;
-    const finalSlaStatus = completionDueAt && completedAt > completionDueAt ? "breached" : completionDueAt ? "met" : "not_set";
+    let result: { actualCost: number; finalSlaStatus: string; promotedTime: number; promotedMaterial: number };
+    try {
+      result = await db.$transaction(async (tx) => {
+        const totals = await tx.$queryRaw<{ total_cost: number }[]>(Prisma.sql`
+          SELECT COALESCE(SUM("total_amount"), 0)::double precision AS "total_cost"
+          FROM "WorkOrderExecutionEntry"
+          WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
+        `);
+        const actualCost = totals[0]?.total_cost ?? 0;
+        const workOrderGuard = await sqlSoftDeleteGuard(db, "WorkOrder", "w");
+        const slaRows = await tx.$queryRaw<{ completion_due_at: Date | null }[]>(Prisma.sql`
+          SELECT w."completion_due_at"
+          FROM "WorkOrder" w
+          WHERE w."id" = ${id} AND w."company_id" = ${companyId}
+            ${workOrderGuard}
+          LIMIT 1
+        `);
+        const completionDueAt = slaRows[0]?.completion_due_at ?? null;
+        const finalSlaStatus = completionDueAt && completedAt > completionDueAt ? "breached" : completionDueAt ? "met" : "not_set";
 
-    // Promote field execution time/material into attestable billable rows (idempotent by execution entry id).
-    const executionEntries = await db.$queryRaw<Array<{
-      id: string;
-      entry_type: string;
-      description: string;
-      quantity: number;
-      unit: string | null;
-      unit_cost: number | null;
-      total_amount: number;
-      minutes: number | null;
-      supplier: string | null;
-      occurred_at: Date;
-    }>>(Prisma.sql`
-      SELECT "id", "entry_type", "description",
-             "quantity"::double precision AS "quantity",
-             "unit",
-             "unit_cost"::double precision AS "unit_cost",
-             "total_amount"::double precision AS "total_amount",
-             "minutes",
-             "supplier",
-             "occurred_at"
-      FROM "WorkOrderExecutionEntry"
-      WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
-      ORDER BY "occurred_at" ASC, "created_at" ASC
-    `);
+        const executionEntries = await tx.$queryRaw<Array<{
+          id: string;
+          entry_type: string;
+          description: string;
+          quantity: number;
+          unit: string | null;
+          unit_cost: number | null;
+          total_amount: number;
+          minutes: number | null;
+          supplier: string | null;
+          occurred_at: Date;
+        }>>(Prisma.sql`
+          SELECT "id", "entry_type", "description",
+                 "quantity"::double precision AS "quantity",
+                 "unit",
+                 "unit_cost"::double precision AS "unit_cost",
+                 "total_amount"::double precision AS "total_amount",
+                 "minutes",
+                 "supplier",
+                 "occurred_at"
+          FROM "WorkOrderExecutionEntry"
+          WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
+          ORDER BY "occurred_at" ASC, "created_at" ASC
+        `);
 
-    let promotedTime = 0;
-    let promotedMaterial = 0;
-    for (const entry of executionEntries) {
-      if (entry.entry_type === "time" || entry.entry_type === "travel") {
-        const existing = await getModernTimeEntry(companyId, id, entry.id);
-        if (existing) continue;
-        const minutes = Math.max(1, Math.floor(Number(entry.minutes || 0)) || Math.max(1, Math.round((Number(entry.quantity) || 0) * 60)));
-        const endedAt = entry.occurred_at.toISOString();
-        const startedAt = new Date(entry.occurred_at.getTime() - minutes * 60_000).toISOString();
-        await upsertTimeEntry(companyId, {
-          entryId: entry.id,
+        let promotedTime = 0;
+        let promotedMaterial = 0;
+        for (const entry of executionEntries) {
+          if (entry.entry_type === "time" || entry.entry_type === "travel") {
+            const existing = await getModernTimeEntry(companyId, id, entry.id, tx);
+            if (existing) continue;
+            const minutes = Math.max(1, Math.floor(Number(entry.minutes || 0)) || Math.max(1, Math.round((Number(entry.quantity) || 0) * 60)));
+            const endedAt = entry.occurred_at.toISOString();
+            const startedAt = new Date(entry.occurred_at.getTime() - minutes * 60_000).toISOString();
+            await upsertTimeEntry(companyId, {
+              entryId: entry.id,
+              workOrderId: id,
+              userId: user.id,
+              userName: user.name,
+              userEmail: user.email,
+              kind: entry.entry_type === "travel" ? "travel" : "work",
+              action: "manual",
+              startedAt,
+              endedAt,
+              minutes,
+              billable: true,
+              note: entry.description.slice(0, 1000),
+              status: "submitted",
+              actorId: user.id,
+            }, tx);
+            promotedTime += 1;
+          } else if (entry.entry_type === "material" || entry.entry_type === "external") {
+            const existing = await getModernMaterialEntry(companyId, id, entry.id, tx);
+            if (existing) continue;
+            const quantity = Math.max(0.01, Number(entry.quantity) || 1);
+            const unitPrice = Number(entry.unit_cost ?? 0);
+            const total = Number(entry.total_amount ?? quantity * unitPrice);
+            await upsertMaterialEntry(companyId, {
+              entryId: entry.id,
+              workOrderId: id,
+              name: entry.description.slice(0, 200) || (entry.entry_type === "external" ? "Extern kostnad" : "Material"),
+              quantity,
+              unit: (entry.unit || "st").slice(0, 30),
+              unitPrice,
+              total: Math.round(total * 100) / 100,
+              supplier: entry.supplier,
+              stockStatus: "used",
+              billable: true,
+              note: entry.entry_type === "external" ? "Promoted från fältregistrering (extern)" : "Promoted från fältregistrering",
+              status: "submitted",
+              createdById: user.id,
+              createdByName: user.name,
+              createdByEmail: user.email,
+              actorId: user.id,
+            }, tx);
+            promotedMaterial += 1;
+          }
+        }
+
+        await completeWorkOrderLifecycle(tx, {
+          companyId,
           workOrderId: id,
-          userId: user.id,
-          userName: user.name,
-          userEmail: user.email,
-          kind: entry.entry_type === "travel" ? "travel" : "work",
-          action: "manual",
-          startedAt,
-          endedAt,
-          minutes,
-          billable: true,
-          note: entry.description.slice(0, 1000),
-          status: "submitted",
-          actorId: user.id,
+          actorUserId: user.id,
+          completedAt,
+          actualCost,
+          legacySlaStatus: finalSlaStatus,
+          statusEventMetadata: {
+            source: "execution.finalize",
+            promotedTime,
+            promotedMaterial,
+          },
         });
-        promotedTime += 1;
-      } else if (entry.entry_type === "material" || entry.entry_type === "external") {
-        const existing = await getModernMaterialEntry(companyId, id, entry.id);
-        if (existing) continue;
-        const quantity = Math.max(0.01, Number(entry.quantity) || 1);
-        const unitPrice = Number(entry.unit_cost ?? 0);
-        const total = Number(entry.total_amount ?? quantity * unitPrice);
-        await upsertMaterialEntry(companyId, {
-          entryId: entry.id,
-          workOrderId: id,
-          name: entry.description.slice(0, 200) || (entry.entry_type === "external" ? "Extern kostnad" : "Material"),
-          quantity,
-          unit: (entry.unit || "st").slice(0, 30),
-          unitPrice,
-          total: Math.round(total * 100) / 100,
-          supplier: entry.supplier,
-          stockStatus: "used",
-          billable: true,
-          note: entry.entry_type === "external" ? "Promoted från fältregistrering (extern)" : "Promoted från fältregistrering",
-          status: "submitted",
-          createdById: user.id,
-          createdByName: user.name,
-          createdByEmail: user.email,
-          actorId: user.id,
-        });
-        promotedMaterial += 1;
+
+        return { actualCost, finalSlaStatus, promotedTime, promotedMaterial };
+      });
+    } catch (error) {
+      if (error instanceof WorkOrderCompletionConflict) {
+        return NextResponse.json({ error: error.message }, { status: 409 });
       }
+      throw error;
     }
-
-    await db.$executeRaw(Prisma.sql`
-      UPDATE "WorkOrder"
-      SET "status" = 'completed',
-          "completed_at" = ${completedAt},
-          "actual_cost" = ${actualCost},
-          "sla_status" = ${finalSlaStatus},
-          "updated_at" = CURRENT_TIMESTAMP
-      WHERE "id" = ${id} AND "company_id" = ${companyId}
-    `);
 
     await writeAuditLog(user, {
       entityType: "work_order",
       entityId: id,
       action: "work_order.completed",
       metadata: {
-        actualCost,
-        slaStatus: finalSlaStatus,
+        actualCost: result.actualCost,
+        slaStatus: result.finalSlaStatus,
         beforePhotos: completion.before_photos,
         afterPhotos: completion.after_photos,
-        promotedTime,
-        promotedMaterial,
+        promotedTime: result.promotedTime,
+        promotedMaterial: result.promotedMaterial,
         storage: "WorkOrderExecutionEntry+WorkOrderTimeEntry+WorkOrderMaterialEntry",
       },
     });
 
     return NextResponse.json({
       success: true,
-      actualCost,
-      slaStatus: finalSlaStatus,
-      promoted: { time: promotedTime, material: promotedMaterial },
+      actualCost: result.actualCost,
+      slaStatus: result.finalSlaStatus,
+      promoted: { time: result.promotedTime, material: result.promotedMaterial },
     });
   }
 
