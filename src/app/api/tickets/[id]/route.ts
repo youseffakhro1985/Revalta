@@ -309,22 +309,31 @@ export async function PATCH(
       return NextResponse.json({ error: "Ärende hittades inte" }, { status: 404 });
     }
 
-    await writeAuditLog(user, {
-      entityType: "ticket",
-      entityId: ticket.id,
-      action: "ticket.lifecycle_processed",
-      metadata: {
-        status: ticket.status,
-        priority: ticket.priority,
-        assignedToId: ticket.assigned_to?.id ?? null,
-      },
-    });
-    await queueTicketNotification(user, {
-      ticketId: ticket.id,
-      title: ticket.title,
-      recipient: user.email,
-      event: "updated",
-    });
+    try {
+      await writeAuditLog(user, {
+        entityType: "ticket",
+        entityId: ticket.id,
+        action: "ticket.lifecycle_processed",
+        metadata: {
+          status: ticket.status,
+          priority: ticket.priority,
+          assignedToId: ticket.assigned_to?.id ?? null,
+        },
+      });
+    } catch (auditError) {
+      logger.error("Ticket lifecycle telemetry audit failed", auditError);
+    }
+
+    try {
+      await queueTicketNotification(user, {
+        ticketId: ticket.id,
+        title: ticket.title,
+        recipient: user.email,
+        event: "updated",
+      });
+    } catch (notificationError) {
+      logger.error("Ticket update notification failed", notificationError);
+    }
 
     return NextResponse.json({
       success: true,
@@ -370,12 +379,16 @@ export async function DELETE(
       return NextResponse.json({ error: "Ärendet hittades inte" }, { status: 404 });
     }
 
-    await writeAuditLog(user, {
-      entityType: "ticket",
-      entityId: existing.id,
-      action: "ticket.deleted",
-      metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
-    });
+    try {
+      await writeAuditLog(user, {
+        entityType: "ticket",
+        entityId: existing.id,
+        action: "ticket.deleted",
+        metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+      });
+    } catch (auditError) {
+      logger.error("Ticket delete audit failed after committed soft-delete", auditError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

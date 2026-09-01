@@ -35,45 +35,54 @@ export async function POST(
     if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const authorName = user.name || user.email;
-    const comment = await db.ticketComment.create({
-      data: {
-        ticket_id: ticket.id,
-        user_id: user.id,
-        body: normalizedBody,
-        is_internal: Boolean(isInternal),
-        author_type: "staff",
-        author_name: authorName,
-        author_email: user.email,
-      },
-      select: {
-        id: true,
-        body: true,
-        is_internal: true,
-        created_at: true,
-        author_type: true,
-        author_name: true,
-        author_email: true,
-        user: {
-          select: {
-            name: true,
-            email: true,
+    const comment = await db.$transaction(async (tx) => {
+      const created = await tx.ticketComment.create({
+        data: {
+          ticket_id: ticket.id,
+          user_id: user.id,
+          body: normalizedBody,
+          is_internal: Boolean(isInternal),
+          author_type: "staff",
+          author_name: authorName,
+          author_email: user.email,
+        },
+        select: {
+          id: true,
+          body: true,
+          is_internal: true,
+          created_at: true,
+          author_type: true,
+          author_name: true,
+          author_email: true,
+          user: {
+            select: {
+              name: true,
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      await writeAuditLog(user, {
+        entityType: "ticket",
+        entityId: ticket.id,
+        action: "ticket.comment_created",
+        metadata: { commentId: created.id, isInternal: created.is_internal },
+      }, tx);
+
+      return created;
     });
 
-    await writeAuditLog(user, {
-      entityType: "ticket",
-      entityId: ticket.id,
-      action: "ticket.comment_created",
-      metadata: { commentId: comment.id, isInternal: comment.is_internal },
-    });
-    await queueTicketNotification(user, {
-      ticketId: ticket.id,
-      title: ticket.title,
-      recipient: user.email,
-      event: "commented",
-    });
+    try {
+      await queueTicketNotification(user, {
+        ticketId: ticket.id,
+        title: ticket.title,
+        recipient: user.email,
+        event: "commented",
+      });
+    } catch (notificationError) {
+      logger.error("Ticket comment notification failed", notificationError);
+    }
 
     return NextResponse.json({ success: true, comment }, { status: 201 });
   } catch (error) {
