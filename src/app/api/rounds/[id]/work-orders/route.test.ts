@@ -98,11 +98,6 @@ describe("rounds/[id]/work-orders route", () => {
   });
 
   it("returns 409 without creating anything when a concurrent request already holds the round lock", async () => {
-    // Regression test: two concurrent POSTs against the same round used to
-    // both read the same stale checklist, both create real WorkOrder rows,
-    // and race on the final updateMany (last write wins, silently losing
-    // the other's checklist linkage). The advisory lock must reject the
-    // loser instead.
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     roundFindFirstMock.mockResolvedValue(baseRound);
     const tx = { $queryRaw: vi.fn().mockResolvedValue([{ locked: false }]) };
@@ -124,7 +119,6 @@ describe("rounds/[id]/work-orders route", () => {
       inspectionRound: {
         findFirst: vi.fn().mockResolvedValue({
           status: "in_progress",
-          // A concurrent request already linked item-1 to a work order.
           checklist: [
             { ...baseRound.checklist[0], workOrderId: "work-order-other" },
             baseRound.checklist[1],
@@ -140,8 +134,9 @@ describe("rounds/[id]/work-orders route", () => {
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
-  it("creates a work order per fresh candidate and links it in the same checklist write", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+  it("creates a work order per fresh candidate, links it and audits in the same transaction", async () => {
+    const user = { id: "user-1", company_id: "company-1", role: "owner" };
+    getCurrentUserMock.mockResolvedValue(user);
     roundFindFirstMock.mockResolvedValue(baseRound);
     const workOrderCreateMock = vi.fn().mockResolvedValue({ id: "work-order-new" });
     const updateManyMock = vi.fn().mockResolvedValue({ count: 1 });
@@ -161,13 +156,48 @@ describe("rounds/[id]/work-orders route", () => {
     expect(response.status).toBe(201);
     expect(workOrderCreateMock).toHaveBeenCalledTimes(1);
     expect(body.created).toEqual([{ itemId: "item-1", workOrderId: "work-order-new", workOrderNumber: "AO-0001" }]);
-    // Only the deviation item (item-1) is linked; the non-deviation item
-    // (item-2) is untouched, and the round status advances from planned.
     expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "round-1", company_id: "company-1" },
       data: expect.objectContaining({ status: "in_progress" }),
     }));
-    expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      user,
+      expect.objectContaining({
+        entityType: "round",
+        entityId: "round-1",
+        action: "round.work_orders_created",
+        metadata: expect.objectContaining({
+          count: 1,
+          itemIds: ["item-1"],
+          workOrderIds: ["work-order-new"],
+        }),
+      }),
+      tx,
+    );
+  });
+
+  it("returns 500 when mandatory audit fails inside the transaction instead of committing a partial round linkage", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    roundFindFirstMock.mockResolvedValue(baseRound);
+    const workOrderCreateMock = vi.fn().mockResolvedValue({ id: "work-order-new" });
+    const updateManyMock = vi.fn().mockResolvedValue({ count: 1 });
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
+      inspectionRound: {
+        findFirst: vi.fn().mockResolvedValue({ status: "planned", checklist: baseRound.checklist }),
+        updateMany: updateManyMock,
+      },
+      workOrder: { create: workOrderCreateMock },
+    };
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+    transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => callback(tx));
+
+    const response = await POST(postRequest({}), { params: Promise.resolve({ id: "round-1" }) });
+
+    expect(response.status).toBe(500);
+    expect(workOrderCreateMock).toHaveBeenCalledTimes(1);
+    expect(updateManyMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx);
   });
 
   it("only creates work orders for requested itemIds when the client scopes the request", async () => {
