@@ -7,6 +7,7 @@ const {
   calendarCreateMock,
   calendarUpdateManyMock,
   calendarDeleteManyMock,
+  workOrderFindManyMock,
   auditFindManyMock,
   auditFindFirstMock,
   transactionMock,
@@ -18,6 +19,7 @@ const {
   calendarCreateMock: vi.fn(),
   calendarUpdateManyMock: vi.fn(),
   calendarDeleteManyMock: vi.fn(),
+  workOrderFindManyMock: vi.fn(),
   auditFindManyMock: vi.fn(),
   auditFindFirstMock: vi.fn(),
   transactionMock: vi.fn(),
@@ -50,12 +52,13 @@ vi.mock("@/lib/db", () => ({
       updateMany: calendarUpdateManyMock,
       deleteMany: calendarDeleteManyMock,
     },
+    workOrder: { findMany: workOrderFindManyMock },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
     $transaction: transactionMock,
   },
 }));
 
-import { DELETE, PATCH, POST } from "./route";
+import { DELETE, GET, PATCH, POST } from "./route";
 
 const user = { id: "user-1", company_id: "company-1", role: "owner" };
 const existingEvent = {
@@ -74,12 +77,55 @@ describe("calendar route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     calendarFindManyMock.mockResolvedValue([]);
+    workOrderFindManyMock.mockResolvedValue([]);
     auditFindManyMock.mockResolvedValue([]);
     calendarCreateMock.mockResolvedValue({ id: "event-1" });
     calendarUpdateManyMock.mockResolvedValue({ count: 1 });
     calendarDeleteManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
     transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
+  });
+
+  it("projects scheduled work orders from canonical WorkOrder storage", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+    workOrderFindManyMock.mockResolvedValue([{
+      id: "wo-1",
+      title: "Byt cirkulationspump",
+      status: "in_progress",
+      scheduled_start: new Date("2026-09-10T08:30:00Z"),
+      work_order_number: "AO-1042",
+      created_at: new Date("2026-09-01T10:00:00Z"),
+      property: { name: "Storgatan 1" },
+      assigned_to: { name: "Anna Tekniker", email: "anna@example.com" },
+    }]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        deleted_at: null,
+        scheduled_start: { not: null },
+      }),
+    }));
+    expect(body.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "work-order:wo-1",
+        entity_id: "wo-1",
+        work_order_id: "wo-1",
+        title: "Byt cirkulationspump",
+        date: "2026-09-10",
+        time: "10:30",
+        type: "Arbetsorder",
+        property_name: "Storgatan 1",
+        responsible: "Anna Tekniker",
+        status: "planned",
+        source: "work_order",
+      }),
+    ]));
   });
 
   it("creates a calendar event and mandatory audit in the same transaction", async () => {
@@ -114,6 +160,20 @@ describe("calendar route", () => {
       }),
       tx,
     );
+  });
+
+  it("rejects manual work-order calendar events", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+
+    const response = await POST(new Request("http://localhost/api/calendar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Duplicerad AO", date: "2026-09-10", type: "Arbetsorder" }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/arbetsorder/i);
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 500 when mandatory create audit fails inside the transaction", async () => {
@@ -153,6 +213,20 @@ describe("calendar route", () => {
       expect.objectContaining({ action: "calendar.event.updated" }),
       tx,
     );
+  });
+
+  it("rejects projected work-order updates without opening a transaction", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+
+    const response = await PATCH(new Request("http://localhost/api/calendar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "work-order:wo-1", status: "done" }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/arbetsorder/i);
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 500 when mandatory update audit fails inside the transaction", async () => {
@@ -214,6 +288,20 @@ describe("calendar route", () => {
       expect.objectContaining({ action: "calendar.event.deleted" }),
       tx,
     );
+  });
+
+  it("rejects projected work-order deletes without opening a transaction", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+
+    const response = await DELETE(new Request("http://localhost/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "work-order:wo-1" }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/arbetsorder/i);
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 500 when mandatory delete audit fails inside the transaction", async () => {
