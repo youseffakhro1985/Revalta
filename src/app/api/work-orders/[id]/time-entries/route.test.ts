@@ -8,6 +8,7 @@ const {
   listTimeEntriesMock,
   upsertTimeEntryMock,
   writeAuditLogMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   findAccessibleWorkOrderMock: vi.fn(),
@@ -16,6 +17,7 @@ const {
   listTimeEntriesMock: vi.fn(),
   upsertTimeEntryMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", () => ({
@@ -37,6 +39,11 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 }));
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+
+const tx = { workOrderTimeEntry: {}, auditLog: {} };
+vi.mock("@/lib/db", () => ({
+  default: { $transaction: transactionMock },
+}));
 
 import { POST } from "./route";
 
@@ -96,6 +103,7 @@ describe("time-entry id isolation and transition authorization", () => {
     listTimeEntriesMock.mockResolvedValue([]);
     upsertTimeEntryMock.mockImplementation(async (_companyId, payload) => payload);
     writeAuditLogMock.mockResolvedValue(undefined);
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
   it.each(["manual", "start"] as const)("uses a server-owned id for %s creation", async (action) => {
@@ -116,8 +124,55 @@ describe("time-entry id isolation and transition authorization", () => {
     expect(payload.entryId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(payload.workOrderId).toBe("work-order-1");
     expect(upsertTimeEntryMock.mock.calls[0][0]).toBe("company-1");
+    expect(upsertTimeEntryMock.mock.calls[0][2]).toBe(tx);
     expect(getModernTimeEntryMock).not.toHaveBeenCalled();
     expect(getTimeEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("writes the time entry and audit record in the same transaction", async () => {
+    const response = await POST(request({
+      action: "manual",
+      kind: "work",
+      startedAt: "2026-08-31T08:00:00.000Z",
+      endedAt: "2026-08-31T09:00:00.000Z",
+    }), params);
+
+    expect(response.status).toBe(201);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(upsertTimeEntryMock).toHaveBeenCalledWith("company-1", expect.any(Object), tx);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "tech-1", company_id: "company-1" }),
+      expect.objectContaining({ action: "work_order.time_manual" }),
+      tx,
+    );
+  });
+
+  it("propagates audit failure through the transaction so the time write is rolled back", async () => {
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+    await expect(POST(request({
+      action: "manual",
+      kind: "work",
+      startedAt: "2026-08-31T08:00:00.000Z",
+      endedAt: "2026-08-31T09:00:00.000Z",
+    }), params)).rejects.toThrow("audit unavailable");
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(upsertTimeEntryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects malformed JSON before opening a write transaction", async () => {
+    const malformed = new Request("https://www.revalta.se/api/work-orders/work-order-1/time-entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(malformed, params);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Ogiltigt innehåll" });
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("rejects a second start while a modern timer is already running", async () => {
