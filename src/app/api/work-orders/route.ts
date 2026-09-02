@@ -476,10 +476,10 @@ export async function POST(request: Request) {
       await setWorkOrderEnterpriseFields(tx, { workOrderId: created.id, companyId: user.company_id!, workOrderNumber, workType, source, responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt });
       await setWorkOrderAssetLinks(tx, { workOrderId: created.id, companyId: user.company_id!, buildingId, technicalAssetId });
       await addWorkOrderStatusEvent(tx, { companyId: user.company_id!, workOrderId: created.id, actorUserId: user.id, fromStatus: null, toStatus: status, reason: "Arbetsorder skapad", metadata: { workOrderNumber, priority, workType, source, buildingId, technicalAssetId } });
-      return { ...created, enterprise: { work_order_number: workOrderNumber, work_type: workType, source, sla_response_due_at: sla.responseDueAt, sla_resolution_due_at: sla.resolutionDueAt, responded_at: null, paused_at: null, pause_reason: null, closed_at: null, building_id: buildingId, technical_asset_id: technicalAssetId } };
+      const enterprise = { work_order_number: workOrderNumber, work_type: workType, source, sla_response_due_at: sla.responseDueAt, sla_resolution_due_at: sla.resolutionDueAt, responded_at: null, paused_at: null, pause_reason: null, closed_at: null, building_id: buildingId, technical_asset_id: technicalAssetId };
+      await writeAuditLog(user, { entityType: "work_order", entityId: created.id, action: "work_order.created", metadata: { workOrderNumber, propertyId, buildingId, technicalAssetId, unitId, assignedToId, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } }, tx);
+      return { ...created, enterprise };
     });
-
-    await writeAuditLog(user, { entityType: "work_order", entityId: workOrder.id, action: "work_order.created", metadata: { workOrderNumber: workOrder.enterprise.work_order_number, propertyId, buildingId, technicalAssetId, unitId, assignedToId, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } });
 
     observability.logger.info("work-order create completed", observability.elapsed({
       event: "work_orders.create.completed",
