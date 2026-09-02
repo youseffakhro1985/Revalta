@@ -171,7 +171,7 @@ describe("work-order execution lifecycle boundaries", () => {
       $queryRaw: vi.fn().mockImplementation(async (query: unknown) => {
         const text = sqlText(query);
         if (text.includes("total_cost")) return [{ total_cost: 225 }];
-        if (text.includes("completion_due_at")) return [{ completion_due_at: new Date("2026-09-02T10:00:00.000Z") }];
+        if (text.includes("completion_due_at")) return [{ completion_due_at: new Date(Date.now() + 60_000) }];
         if (text.includes("WorkOrderExecutionEntry")) return [];
         return [];
       }),
