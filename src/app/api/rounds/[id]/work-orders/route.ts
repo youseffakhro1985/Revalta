@@ -67,15 +67,6 @@ export async function POST(
       return NextResponse.json({ error: "Högst 50 arbetsorder kan skapas åt gången" }, { status: 400 });
     }
 
-    // Two concurrent POSTs against the same round (even for different
-    // itemIds) can both read this stale checklist, both create real
-    // WorkOrder rows, and then race on inspectionRound.updateMany — the
-    // second write silently overwrites the first's checklist linkage
-    // (lost update), leaving an orphaned-but-real duplicate WorkOrder. Guard
-    // with an advisory lock scoped to this round, then re-read the checklist
-    // *inside* the lock and recompute candidates from that fresh state —
-    // same pattern as tryCreateRecurringIncidentEscalation in
-    // src/lib/recurring-incident-storage.ts.
     const created = await db.$transaction(async (tx) => {
       const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
         SELECT pg_try_advisory_xact_lock(hashtext(${`round-work-orders:${round.id}`})) AS locked
@@ -157,6 +148,18 @@ export async function POST(
         },
       });
 
+      await writeAuditLog(user, {
+        entityType: "round",
+        entityId: round.id,
+        action: "round.work_orders_created",
+        metadata: {
+          count: result.length,
+          itemIds: result.map((item) => item.itemId),
+          workOrderIds: result.map((item) => item.workOrderId),
+          storage: "InspectionRound",
+        },
+      }, tx);
+
       return { conflict: null, result, checklist: nextChecklist };
     });
 
@@ -169,18 +172,6 @@ export async function POST(
     if (created.conflict === "no_candidates") {
       return NextResponse.json({ error: "Avvikelserna hanteras redan av en annan förfrågan" }, { status: 409 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "round",
-      entityId: round.id,
-      action: "round.work_orders_created",
-      metadata: {
-        count: created.result.length,
-        itemIds: created.result.map((item) => item.itemId),
-        workOrderIds: created.result.map((item) => item.workOrderId),
-        storage: "InspectionRound",
-      },
-    });
 
     return NextResponse.json({
       created: created.result,
