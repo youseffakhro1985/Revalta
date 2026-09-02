@@ -22,10 +22,11 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
 
   const { id } = await params;
   const workOrder = await db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
+    where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
     include: {
       property: { select: { id: true, name: true } },
       projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
@@ -59,7 +60,7 @@ export async function POST(
 
   if (managerId) {
     const manager = await db.user.findFirst({
-      where: { id: managerId, company_id: user.company_id, status: "active" },
+      where: { id: managerId, company_id: companyId, status: "active" },
       select: { id: true },
     });
     if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
@@ -68,7 +69,7 @@ export async function POST(
   const project = await db.$transaction(async (tx) => {
     const createdProject = await tx.project.create({
       data: {
-        company_id: user.company_id,
+        company_id: companyId,
         property_id: workOrder.property_id,
         source_work_order_id: workOrder.id,
         manager_id: managerId,
