@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     });
 
     const inviteUrl = `${getPublicAppUrl(request.url)}/accept-invite?token=${encodeURIComponent(token)}`;
-    await queueTicketNotification(user, {
+    const deliveryEvent = await queueTicketNotification(user, {
       ticketId: invite.id,
       title: "Inbjudan till Revalta",
       recipient: invite.email,
@@ -124,6 +124,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       invite,
+      deliveryStatus: deliveryEvent?.status ?? "unknown",
       inviteUrl: canExposeInviteUrl ? inviteUrl : undefined,
     }, { status: 201 });
   } catch (error) {
