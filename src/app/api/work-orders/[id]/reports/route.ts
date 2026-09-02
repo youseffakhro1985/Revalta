@@ -221,7 +221,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     let billableMaterial = 0;
     for (const row of materials) {
-      if (row.status !== "deleted" && row.status !== "rejected" && row.billable === true) {
+      if (row.status === "approved" && row.billable === true) {
         billableMaterial += Number(row.total || 0);
       }
     }
