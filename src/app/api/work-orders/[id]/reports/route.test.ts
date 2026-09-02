@@ -182,6 +182,22 @@ describe("work-order reports route atomicity", () => {
     );
   });
 
+  it("excludes billable material until it is approved", async () => {
+    listTimeEntriesMock.mockResolvedValue([{ status: "approved", billable: true, kind: "work", minutes: 60 }]);
+    listMaterialEntriesMock.mockResolvedValue([{ status: "pending", billable: true, total: 1000 }]);
+
+    const response = await POST(request({ action: "invoice.create" }), context);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.total).toBe(812.5);
+    expect(createInvoiceDraftMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({ subtotal: 650, total: 812.5 }),
+      tx,
+    );
+  });
+
   it("approves invoice basis and audit atomically", async () => {
     const response = await POST(request({ action: "invoice.approve", invoiceId: "invoice-1" }), context);
 
