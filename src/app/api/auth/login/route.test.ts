@@ -55,6 +55,21 @@ function loginRequest(body: unknown) {
   });
 }
 
+function activeUser(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "user-1",
+    email: "owner@example.se",
+    password: "password-hash",
+    name: "Yousef",
+    role: "owner",
+    status: "active",
+    email_verified_at: new Date("2026-09-01T12:00:00.000Z"),
+    email_verification_tokens: [{ id: "verification-1" }],
+    company: { status: "active" },
+    ...overrides,
+  };
+}
+
 describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -111,15 +126,7 @@ describe("POST /api/auth/login", () => {
   });
 
   it("creates the hardened session cookie and logs only verified internal identity", async () => {
-    userFindUniqueMock.mockResolvedValue({
-      id: "user-1",
-      email: "owner@example.se",
-      password: "password-hash",
-      name: "Yousef",
-      role: "owner",
-      status: "active",
-      company: { status: "active" },
-    });
+    userFindUniqueMock.mockResolvedValue(activeUser());
     comparePasswordMock.mockResolvedValue(true);
 
     const response = await POST(loginRequest({ email: "OWNER@example.se", password: "secret-value" }));
@@ -127,6 +134,13 @@ describe("POST /api/auth/login", () => {
 
     expect(response.status).toBe(200);
     expect(body).toMatchObject({ success: true, user: { id: "user-1", role: "owner" } });
+    expect(userFindUniqueMock).toHaveBeenCalledWith({
+      where: { email: "owner@example.se" },
+      include: {
+        company: { select: { status: true } },
+        email_verification_tokens: { select: { id: true }, take: 1 },
+      },
+    });
     expect(signTokenMock).toHaveBeenCalledWith(expect.objectContaining({ sub: "user-1" }));
     expect(cookieSetMock).toHaveBeenCalledTimes(2);
     expect(response.headers.get("x-request-id")).toBe(requestId);
@@ -135,6 +149,64 @@ describe("POST /api/auth/login", () => {
       expect.objectContaining({ event: "auth.login.succeeded", userId: "user-1" }),
     );
     expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("secret-value");
+  });
+
+  it("blocks an enrolled but unverified account after valid credentials without creating a session", async () => {
+    userFindUniqueMock.mockResolvedValue(activeUser({ email_verified_at: null }));
+    comparePasswordMock.mockResolvedValue(true);
+
+    const response = await POST(loginRequest({ email: "owner@example.se", password: "secret-value" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "Verifiera din e-postadress innan du loggar in.",
+      errorCode: "EMAIL_VERIFICATION_REQUIRED",
+      requestId,
+    });
+    expect(signTokenMock).not.toHaveBeenCalled();
+    expect(cookieSetMock).not.toHaveBeenCalled();
+    expect(auditLogFindFirstMock).not.toHaveBeenCalled();
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "auth login requires email verification",
+      expect.objectContaining({ event: "auth.login.email_verification_required", userId: "user-1" }),
+    );
+  });
+
+  it("keeps pre-verification legacy accounts usable when they have no verification-token history", async () => {
+    userFindUniqueMock.mockResolvedValue(activeUser({
+      email_verified_at: null,
+      email_verification_tokens: [],
+    }));
+    comparePasswordMock.mockResolvedValue(true);
+
+    const response = await POST(loginRequest({ email: "owner@example.se", password: "secret-value" }));
+
+    expect(response.status).toBe(200);
+    expect(signTokenMock).toHaveBeenCalledTimes(1);
+    expect(cookieSetMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows a verified account even when verification-token history remains for auditability", async () => {
+    userFindUniqueMock.mockResolvedValue(activeUser());
+    comparePasswordMock.mockResolvedValue(true);
+
+    const response = await POST(loginRequest({ email: "owner@example.se", password: "secret-value" }));
+
+    expect(response.status).toBe(200);
+    expect(signTokenMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reveal verification state when the password is wrong", async () => {
+    userFindUniqueMock.mockResolvedValue(activeUser({ email_verified_at: null }));
+    comparePasswordMock.mockResolvedValue(false);
+
+    const response = await POST(loginRequest({ email: "owner@example.se", password: "wrong-password" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body.errorCode).toBe("UNAUTHORIZED");
+    expect(body.error).toBe("Ogiltiga uppgifter");
   });
 
   it("performs a password comparison for missing accounts to reduce timing enumeration", async () => {
