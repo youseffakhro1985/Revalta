@@ -58,8 +58,6 @@ export async function GET() {
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "asc" },
         select: { id: true, entity_id: true, metadata: true, created_at: true },
-        // Matches the cap used by every sibling "legacy audit rows" read in this
-        // module family (rent-notices, energy, budget, calendar, imd-readings, etc.).
         take: 500,
       })),
       db.property.findMany({
@@ -152,39 +150,43 @@ export async function POST(request: Request) {
     const property = await db.property.findFirst({ where: { id: propertyId, deleted_at: null, ...tenantWhere(user) }, select: { id: true, name: true } });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
-    const item = await db.portfolioMaintenanceItem.create({
-      data: {
-        id: randomUUID(),
-        company_id: user.company_id,
-        property_id: property.id,
-        component,
-        measure,
-        planned_year: plannedYear,
-        estimated_cost: estimatedCost,
-        priority,
-        interval_years: intervalYears,
-        status: "planned",
-        created_by_id: user.id,
-      },
-      select: { id: true },
-    });
+    const item = await db.$transaction(async (tx) => {
+      const createdItem = await tx.portfolioMaintenanceItem.create({
+        data: {
+          id: randomUUID(),
+          company_id: user.company_id!,
+          property_id: property.id,
+          component,
+          measure,
+          planned_year: plannedYear,
+          estimated_cost: estimatedCost,
+          priority,
+          interval_years: intervalYears,
+          status: "planned",
+          created_by_id: user.id,
+        },
+        select: { id: true },
+      });
 
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: property.id,
-      action,
-      metadata: {
-        item_id: item.id,
-        property_name: property.name,
-        component,
-        measure,
-        planned_year: plannedYear,
-        estimated_cost: estimatedCost,
-        priority,
-        interval_years: intervalYears,
-        status: "planned",
-        storage: "PortfolioMaintenanceItem",
-      },
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: property.id,
+        action,
+        metadata: {
+          item_id: createdItem.id,
+          property_name: property.name,
+          component,
+          measure,
+          planned_year: plannedYear,
+          estimated_cost: estimatedCost,
+          priority,
+          interval_years: intervalYears,
+          status: "planned",
+          storage: "PortfolioMaintenanceItem",
+        },
+      }, tx);
+
+      return createdItem;
     });
 
     return NextResponse.json({ success: true, itemId: item.id }, { status: 201 });
@@ -311,49 +313,55 @@ export async function PATCH(request: Request) {
       nextWorkOrderId = workOrderId;
     }
 
-    const updateResult = await db.portfolioMaintenanceItem.updateMany({
-      where: { id: modern.id, company_id: user.company_id },
-      data: {
-        ...(hasStatus || workOrderId
-          ? {
-              status: nextStatus,
-              work_order_id: nextWorkOrderId,
-              work_order_number: workOrderNumber,
-            }
-          : {}),
-        ...(hasFieldUpdate
-          ? {
-              component,
-              measure,
-              planned_year: plannedYear,
-              estimated_cost: estimatedCost,
-              priority,
-              interval_years: intervalYears,
-            }
-          : {}),
-      },
+    const updateResult = await db.$transaction(async (tx) => {
+      const result = await tx.portfolioMaintenanceItem.updateMany({
+        where: { id: modern.id, company_id: user.company_id! },
+        data: {
+          ...(hasStatus || workOrderId
+            ? {
+                status: nextStatus,
+                work_order_id: nextWorkOrderId,
+                work_order_number: workOrderNumber,
+              }
+            : {}),
+          ...(hasFieldUpdate
+            ? {
+                component,
+                measure,
+                planned_year: plannedYear,
+                estimated_cost: estimatedCost,
+                priority,
+                interval_years: intervalYears,
+              }
+            : {}),
+        },
+      });
+      if (result.count === 0) return result;
+
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: modern.property_id,
+        action: hasFieldUpdate ? "maintenance.plan.item.updated" : action,
+        metadata: {
+          item_id: modern.id,
+          component,
+          measure,
+          planned_year: plannedYear,
+          estimated_cost: estimatedCost,
+          priority,
+          interval_years: intervalYears,
+          status: nextStatus,
+          work_order_id: nextWorkOrderId,
+          work_order_number: workOrderNumber,
+          updated_at: new Date().toISOString(),
+          storage: "PortfolioMaintenanceItem",
+        },
+      }, tx);
+
+      return result;
     });
     if (updateResult.count === 0) return NextResponse.json({ error: "Underhållsåtgärden hittades inte" }, { status: 404 });
 
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: modern.property_id,
-      action: hasFieldUpdate ? "maintenance.plan.item.updated" : action,
-      metadata: {
-        item_id: modern.id,
-        component,
-        measure,
-        planned_year: plannedYear,
-        estimated_cost: estimatedCost,
-        priority,
-        interval_years: intervalYears,
-        status: nextStatus,
-        work_order_id: nextWorkOrderId,
-        work_order_number: workOrderNumber,
-        updated_at: new Date().toISOString(),
-        storage: "PortfolioMaintenanceItem",
-      },
-    });
     return NextResponse.json({ success: true, id: modern.id, status: nextStatus });
   } catch (error) {
     logger.error("Update maintenance item error", error);
