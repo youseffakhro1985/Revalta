@@ -28,7 +28,6 @@ async function resolveWorkOrder(user: CompanyUser, id: string) {
   return workOrder;
 }
 
-
 async function buildSnapshot(user: CompanyUser, id: string) {
   const companyId = user.company_id;
   const workOrder = await resolveWorkOrder(user, id);
@@ -131,51 +130,75 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!signerName) return NextResponse.json({ error: "Namn krävs för signering" }, { status: 400 });
 
     const signatureId = crypto.randomUUID();
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "WorkOrderSignature"
-        ("id", "company_id", "work_order_id", "created_by_id", "signer_role", "signer_name", "signer_email", "confirmation_text")
-      VALUES
-        (${signatureId}, ${user.company_id}, ${id}, ${user.id}, ${signerRole}, ${signerName}, ${signerEmail}, ${confirmationText})
-      ON CONFLICT ("work_order_id", "signer_role") DO UPDATE
-      SET "signer_name" = EXCLUDED."signer_name", "signer_email" = EXCLUDED."signer_email",
-          "confirmation_text" = EXCLUDED."confirmation_text", "signed_at" = CURRENT_TIMESTAMP,
-          "created_by_id" = EXCLUDED."created_by_id"
-    `);
+    await db.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "WorkOrderSignature"
+          ("id", "company_id", "work_order_id", "created_by_id", "signer_role", "signer_name", "signer_email", "confirmation_text")
+        VALUES
+          (${signatureId}, ${user.company_id}, ${id}, ${user.id}, ${signerRole}, ${signerName}, ${signerEmail}, ${confirmationText})
+        ON CONFLICT ("work_order_id", "signer_role") DO UPDATE
+        SET "signer_name" = EXCLUDED."signer_name", "signer_email" = EXCLUDED."signer_email",
+            "confirmation_text" = EXCLUDED."confirmation_text", "signed_at" = CURRENT_TIMESTAMP,
+            "created_by_id" = EXCLUDED."created_by_id"
+      `);
 
-    await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.signature_recorded", metadata: { signerRole, signerName } });
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.signature_recorded",
+        metadata: { signerRole, signerName },
+      }, tx);
+    });
     return NextResponse.json({ success: true });
   }
 
   if (action === "report.create") {
     const snapshot = await buildSnapshot(user as CompanyUser, id);
     if (!snapshot) return notFoundWorkOrder();
-    const versions = await db.$queryRaw<{ next_version: number }[]>(Prisma.sql`
-      SELECT COALESCE(MAX("version"), 0) + 1 AS "next_version"
-      FROM "WorkOrderReport"
-      WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
-    `);
-    const version = Number(versions[0]?.next_version || 1);
     const reportId = crypto.randomUUID();
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "WorkOrderReport"
-        ("id", "company_id", "work_order_id", "created_by_id", "version", "status", "title", "snapshot")
-      VALUES
-        (${reportId}, ${user.company_id}, ${id}, ${user.id}, ${version}, 'draft', ${`Arbetsrapport – ${workOrder.title}`}, ${JSON.stringify(snapshot)}::jsonb)
-    `);
-    await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.report_created", metadata: { reportId, version } });
+    const version = await db.$transaction(async (tx) => {
+      const versions = await tx.$queryRaw<{ next_version: number }[]>(Prisma.sql`
+        SELECT COALESCE(MAX("version"), 0) + 1 AS "next_version"
+        FROM "WorkOrderReport"
+        WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+      `);
+      const nextVersion = Number(versions[0]?.next_version || 1);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "WorkOrderReport"
+          ("id", "company_id", "work_order_id", "created_by_id", "version", "status", "title", "snapshot")
+        VALUES
+          (${reportId}, ${user.company_id}, ${id}, ${user.id}, ${nextVersion}, 'draft', ${`Arbetsrapport – ${workOrder.title}`}, ${JSON.stringify(snapshot)}::jsonb)
+      `);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.report_created",
+        metadata: { reportId, version: nextVersion },
+      }, tx);
+      return nextVersion;
+    });
     return NextResponse.json({ id: reportId, version }, { status: 201 });
   }
 
   if (action === "report.approve") {
     const reportId = String(body.reportId || "");
     if (!reportId) return NextResponse.json({ error: "Rapport saknas" }, { status: 400 });
-    const changed = await db.$executeRaw(Prisma.sql`
-      UPDATE "WorkOrderReport"
-      SET "status" = 'approved', "approved_by_id" = ${user.id}, "approved_at" = CURRENT_TIMESTAMP
-      WHERE "id" = ${reportId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
-    `);
+    const changed = await db.$transaction(async (tx) => {
+      const result = await tx.$executeRaw(Prisma.sql`
+        UPDATE "WorkOrderReport"
+        SET "status" = 'approved', "approved_by_id" = ${user.id}, "approved_at" = CURRENT_TIMESTAMP
+        WHERE "id" = ${reportId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+      `);
+      if (!result) return result;
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.report_approved",
+        metadata: { reportId },
+      }, tx);
+      return result;
+    });
     if (!changed) return NextResponse.json({ error: "Rapporten hittades inte" }, { status: 404 });
-    await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.report_approved", metadata: { reportId } });
     return NextResponse.json({ success: true });
   }
 
@@ -198,7 +221,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     let billableMaterial = 0;
     for (const row of materials) {
-      if (row.status !== "deleted" && row.status !== "rejected" && row.billable === true) {
+      if (row.status === "approved" && row.billable === true) {
         billableMaterial += Number(row.total || 0);
       }
     }
@@ -282,34 +305,37 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       updatedById: user.id,
       updatedAt: new Date().toISOString(),
     };
-    const draft = await createInvoiceDraft(user.company_id, draftPayload);
 
     const reference = `REV-${new Date().getFullYear()}-${id.slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-5)}`;
     const invoiceId = crypto.randomUUID();
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "WorkOrderInvoiceBasis"
-        ("id", "company_id", "work_order_id", "created_by_id", "reference", "subtotal", "vat_rate", "vat_amount", "total", "snapshot")
-      VALUES
-        (${invoiceId}, ${user.company_id}, ${id}, ${user.id}, ${reference}, ${subtotal}, ${vatRate}, ${vatAmount}, ${total}, ${JSON.stringify({
-          ...snapshot,
-          canonicalDraftVersionId: versionId,
-          source: "approved_time_material",
-        })}::jsonb)
-    `);
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: "work_order.invoice_basis_created",
-      metadata: {
-        invoiceId,
-        reference,
-        subtotal,
-        vatAmount,
-        total,
-        draftVersionId: versionId,
-        storage: "WorkOrderInvoiceDraft",
-        archive: "WorkOrderInvoiceBasis",
-      },
+    const draft = await db.$transaction(async (tx) => {
+      const persistedDraft = await createInvoiceDraft(user.company_id!, draftPayload, tx);
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "WorkOrderInvoiceBasis"
+          ("id", "company_id", "work_order_id", "created_by_id", "reference", "subtotal", "vat_rate", "vat_amount", "total", "snapshot")
+        VALUES
+          (${invoiceId}, ${user.company_id}, ${id}, ${user.id}, ${reference}, ${subtotal}, ${vatRate}, ${vatAmount}, ${total}, ${JSON.stringify({
+            ...snapshot,
+            canonicalDraftVersionId: versionId,
+            source: "approved_time_material",
+          })}::jsonb)
+      `);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.invoice_basis_created",
+        metadata: {
+          invoiceId,
+          reference,
+          subtotal,
+          vatAmount,
+          total,
+          draftVersionId: versionId,
+          storage: "WorkOrderInvoiceDraft",
+          archive: "WorkOrderInvoiceBasis",
+        },
+      }, tx);
+      return persistedDraft;
     });
     return NextResponse.json({
       id: invoiceId,
@@ -324,13 +350,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (action === "invoice.approve") {
     const invoiceId = String(body.invoiceId || "");
     if (!invoiceId) return NextResponse.json({ error: "Fakturaunderlag saknas" }, { status: 400 });
-    const changed = await db.$executeRaw(Prisma.sql`
-      UPDATE "WorkOrderInvoiceBasis"
-      SET "status" = 'approved', "approved_by_id" = ${user.id}, "approved_at" = CURRENT_TIMESTAMP, "updated_at" = CURRENT_TIMESTAMP
-      WHERE "id" = ${invoiceId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
-    `);
+    const changed = await db.$transaction(async (tx) => {
+      const result = await tx.$executeRaw(Prisma.sql`
+        UPDATE "WorkOrderInvoiceBasis"
+        SET "status" = 'approved', "approved_by_id" = ${user.id}, "approved_at" = CURRENT_TIMESTAMP, "updated_at" = CURRENT_TIMESTAMP
+        WHERE "id" = ${invoiceId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+      `);
+      if (!result) return result;
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.invoice_basis_approved",
+        metadata: { invoiceId },
+      }, tx);
+      return result;
+    });
     if (!changed) return NextResponse.json({ error: "Fakturaunderlaget hittades inte" }, { status: 404 });
-    await writeAuditLog(user, { entityType: "work_order", entityId: id, action: "work_order.invoice_basis_approved", metadata: { invoiceId } });
     return NextResponse.json({ success: true });
   }
 
