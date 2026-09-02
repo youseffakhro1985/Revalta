@@ -103,51 +103,55 @@ export async function POST(request: Request) {
     if (body.startDate && !startDate) return NextResponse.json({ error: "Ogiltigt startdatum" }, { status: 400 });
     if (body.endDate && !endDate) return NextResponse.json({ error: "Ogiltigt slutdatum" }, { status: 400 });
 
-    const vendor = await db.vendorContract.create({
-      data: {
-        company_id: user.company_id,
-        property_id: propertyId || null,
-        name,
-        org_number: String(body.orgNumber || "").trim() || null,
-        category: String(body.category || "Övrigt"),
-        contact_name: String(body.contactName || "").trim() || null,
-        email: String(body.email || "").trim() || null,
-        phone: String(body.phone || "").trim() || null,
-        contract_title: String(body.contractTitle || "").trim() || null,
-        contract_value: contractValue,
-        start_date: startDate,
-        end_date: endDate,
-        notice_months: noticeMonths,
-        status: "active",
-        created_by_id: user.id,
-      },
+    const result = await db.$transaction(async (tx) => {
+      const vendor = await tx.vendorContract.create({
+        data: {
+          company_id: user.company_id!,
+          property_id: propertyId || null,
+          name,
+          org_number: String(body.orgNumber || "").trim() || null,
+          category: String(body.category || "Övrigt"),
+          contact_name: String(body.contactName || "").trim() || null,
+          email: String(body.email || "").trim() || null,
+          phone: String(body.phone || "").trim() || null,
+          contract_title: String(body.contractTitle || "").trim() || null,
+          contract_value: contractValue,
+          start_date: startDate,
+          end_date: endDate,
+          notice_months: noticeMonths,
+          status: "active",
+          created_by_id: user.id,
+        },
+      });
+
+      const metadata = {
+        name: vendor.name,
+        orgNumber: vendor.org_number || "",
+        category: vendor.category,
+        contactName: vendor.contact_name || "",
+        email: vendor.email || "",
+        phone: vendor.phone || "",
+        contractTitle: vendor.contract_title || "",
+        contractValue,
+        startDate: vendor.start_date?.toISOString().slice(0, 10) || "",
+        endDate: vendor.end_date?.toISOString().slice(0, 10) || "",
+        noticeMonths,
+        propertyId: vendor.property_id || "",
+        status: vendor.status,
+        storage: "VendorContract",
+      };
+
+      await writeAuditLog(user, {
+        entityType,
+        entityId: vendor.id,
+        action: "vendor_contract.created",
+        metadata,
+      }, tx);
+
+      return { vendor, metadata };
     });
 
-    const metadata = {
-      name: vendor.name,
-      orgNumber: vendor.org_number || "",
-      category: vendor.category,
-      contactName: vendor.contact_name || "",
-      email: vendor.email || "",
-      phone: vendor.phone || "",
-      contractTitle: vendor.contract_title || "",
-      contractValue,
-      startDate: vendor.start_date?.toISOString().slice(0, 10) || "",
-      endDate: vendor.end_date?.toISOString().slice(0, 10) || "",
-      noticeMonths,
-      propertyId: vendor.property_id || "",
-      status: vendor.status,
-      storage: "VendorContract",
-    };
-
-    await writeAuditLog(user, {
-      entityType,
-      entityId: vendor.id,
-      action: "vendor_contract.created",
-      metadata,
-    });
-
-    return NextResponse.json({ vendor: { id: vendor.id, ...metadata } }, { status: 201 });
+    return NextResponse.json({ vendor: { id: result.vendor.id, ...result.metadata } }, { status: 201 });
   } catch (error) {
     logger.error("Create vendor error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -297,32 +301,38 @@ export async function PATCH(request: Request) {
       data.notice_months = noticeMonths;
     }
 
-    const updateResult = await db.vendorContract.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
-      data,
+    const updateResult = await db.$transaction(async (tx) => {
+      const result = await tx.vendorContract.updateMany({
+        where: { id: existing.id, company_id: user.company_id! },
+        data,
+      });
+      if (result.count === 0) return result;
+
+      await writeAuditLog(user, {
+        entityType,
+        entityId: existing.id,
+        action: statusOnly ? "vendor_contract.status_updated" : "vendor_contract.updated",
+        metadata: {
+          name,
+          previousStatus: existing.status,
+          status: nextStatus,
+          contactName,
+          email,
+          phone,
+          contractTitle,
+          contractValue,
+          endDate: endDate?.toISOString().slice(0, 10) || "",
+          noticeMonths,
+          storage: "VendorContract",
+        },
+      }, tx);
+
+      return result;
     });
+
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType,
-      entityId: existing.id,
-      action: statusOnly ? "vendor_contract.status_updated" : "vendor_contract.updated",
-      metadata: {
-        name,
-        previousStatus: existing.status,
-        status: nextStatus,
-        contactName,
-        email,
-        phone,
-        contractTitle,
-        contractValue,
-        endDate: endDate?.toISOString().slice(0, 10) || "",
-        noticeMonths,
-        storage: "VendorContract",
-      },
-    });
 
     return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
   } catch (error) {
