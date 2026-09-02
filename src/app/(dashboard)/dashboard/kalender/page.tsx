@@ -34,13 +34,15 @@ type CalendarEvent = {
   responsible?: string;
   note?: string;
   status?: string;
-  source?: "table" | "legacy";
+  source?: "table" | "legacy" | "work_order";
+  work_order_id?: string;
 };
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { weekday: "short", day: "numeric", month: "long" });
 const compactDateFormatter = new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "short" });
 const statusLabels: Record<string, string> = { planned: "Planerad", done: "Genomförd", cancelled: "Inställd" };
-const typeOptions = ["Aktivitet", "Arbetsorder", "Rond", "Underhåll", "Avtal", "Besiktning", "Möte"];
+const manualTypeOptions = ["Aktivitet", "Rond", "Underhåll", "Avtal", "Besiktning", "Möte"];
+const filterTypeOptions = ["Arbetsorder", ...manualTypeOptions];
 
 function startOfToday() {
   const today = new Date();
@@ -56,6 +58,10 @@ function statusClass(status?: string) {
   if (status === "done") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (status === "cancelled") return "border-sand-200 bg-sand-100 text-ink-500";
   return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
+}
+
+function isEditableCalendarEvent(event: CalendarEvent) {
+  return event.source !== "legacy" && event.source !== "work_order";
 }
 
 export default function CalendarPage() {
@@ -91,6 +97,7 @@ export default function CalendarPage() {
   useEffect(() => { void load(); }, []);
 
   function startEdit(event: CalendarEvent) {
+    if (!isEditableCalendarEvent(event)) return;
     setEditingId(event.id);
     setEditForm({
       title: event.title || "",
@@ -126,8 +133,10 @@ export default function CalendarPage() {
   }
 
   async function updateStatus(event: CalendarEvent, status: string) {
-    if (event.source === "legacy") {
-      setError("Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.");
+    if (!isEditableCalendarEvent(event)) {
+      setError(event.source === "work_order"
+        ? "Arbetsorderns status hanteras från arbetsordervyn."
+        : "Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.");
       return;
     }
     if (status === event.status) return;
@@ -152,8 +161,10 @@ export default function CalendarPage() {
   }
 
   async function saveEdit(event: CalendarEvent) {
-    if (event.source === "legacy") {
-      setError("Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.");
+    if (!isEditableCalendarEvent(event)) {
+      setError(event.source === "work_order"
+        ? "Arbetsordern redigeras från arbetsordervyn."
+        : "Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.");
       return;
     }
     setUpdatingId(event.id);
@@ -186,8 +197,10 @@ export default function CalendarPage() {
   }
 
   async function removeEvent(event: CalendarEvent) {
-    if (event.source === "legacy") {
-      setError("Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan tas bort.");
+    if (!isEditableCalendarEvent(event)) {
+      setError(event.source === "work_order"
+        ? "Arbetsordern hanteras från arbetsordervyn."
+        : "Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan tas bort.");
       return;
     }
     if (!window.confirm("Ta bort den här aktiviteten?")) return;
@@ -285,7 +298,7 @@ export default function CalendarPage() {
         {canManage ? (
           <Panel
             title="Planera aktivitet"
-            description="Skapa ett tydligt planeringsunderlag med datum, ansvar och fastighetskoppling."
+            description="Skapa ett tydligt planeringsunderlag med datum, ansvar och fastighetskoppling. Arbetsorder schemaläggs i arbetsordervyn och visas automatiskt här."
             className="xl:sticky xl:top-[118px]"
           >
             <form id="ny-aktivitet" onSubmit={submit} className="space-y-4">
@@ -295,7 +308,7 @@ export default function CalendarPage() {
                 <input type="time" aria-label="Tid" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className={premiumFieldClass} />
               </div>
               <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })} className={premiumFieldClass} aria-label="Typ">
-                {typeOptions.map((type) => <option key={type}>{type}</option>)}
+                {manualTypeOptions.map((type) => <option key={type}>{type}</option>)}
               </select>
               <input placeholder="Fastighet" aria-label="Fastighet" value={form.propertyName} onChange={(event) => setForm({ ...form, propertyName: event.target.value })} className={premiumFieldClass} />
               <input placeholder="Ansvarig" aria-label="Ansvarig" value={form.responsible} onChange={(event) => setForm({ ...form, responsible: event.target.value })} className={premiumFieldClass} />
@@ -309,7 +322,7 @@ export default function CalendarPage() {
 
         <Panel
           title="Operativ tidslinje"
-          description="Aktiviteter grupperade efter när de ska genomföras."
+          description="Aktiviteter grupperade efter när de ska genomföras. Schemalagda arbetsorder hämtas direkt från arbetsorderregistret."
           bodyClassName="p-0"
         >
           <div className="flex flex-col gap-3 border-b border-sand-200 bg-sand-50/55 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -319,7 +332,7 @@ export default function CalendarPage() {
             </div>
             <select value={filter} onChange={(event) => setFilter(event.target.value)} className={`${premiumFieldClass} sm:w-48`} aria-label="Filtrera efter typ">
               <option>Alla</option>
-              {typeOptions.map((type) => <option key={type}>{type}</option>)}
+              {filterTypeOptions.map((type) => <option key={type}>{type}</option>)}
             </select>
           </div>
 
@@ -360,9 +373,16 @@ export default function CalendarPage() {
                             </p>
                             {event.note ? <p className="mt-2 text-xs leading-5 text-ink-500">{event.note}</p> : null}
                             {event.source === "legacy" ? <InlineAlert tone="warning">Äldre rad – kör backfill innan uppdatering eller borttagning.</InlineAlert> : null}
+                            {event.source === "work_order" ? <InlineAlert tone="info">Canonical arbetsorder – tid, ansvar och status ändras i arbetsordervyn och speglas automatiskt här.</InlineAlert> : null}
                           </div>
 
-                          {canManage && event.source !== "legacy" ? (
+                          {event.source === "work_order" && event.work_order_id ? (
+                            <div className="lg:text-right">
+                              <a href={`/dashboard/arbetsorder/${event.work_order_id}`} className={`${premiumSecondaryButtonClass} h-9 px-3 text-xs`}>
+                                Öppna arbetsorder
+                              </a>
+                            </div>
+                          ) : canManage && isEditableCalendarEvent(event) ? (
                             <div className="space-y-2 lg:text-right">
                               <select
                                 disabled={updatingId === event.id}
@@ -396,7 +416,7 @@ export default function CalendarPage() {
                           ) : null}
                         </div>
 
-                        {canManage && editingId === event.id && event.source !== "legacy" ? (
+                        {canManage && editingId === event.id && isEditableCalendarEvent(event) ? (
                           <div className="mt-5 rounded-xl border border-sand-200 bg-[#FCFBF8] p-4">
                             <div className="mb-4 flex items-center gap-2">
                               <Pencil className="h-4 w-4 text-petroleum-700" aria-hidden="true" />
