@@ -152,50 +152,54 @@ export async function POST(request: Request) {
     const indexedRent = baseRent * (1 + indexPercent / 100);
     const total = Math.max(0, indexedRent + additions - deductions);
 
-    const notice = await db.rentNotice.create({
-      data: {
-        company_id: user.company_id,
-        property_id: property.id,
-        lease_id: leaseId || null,
-        tenant_name: tenantName,
-        unit: unit || null,
-        period,
-        due_date: parsedDue,
-        status,
-        base_rent: baseRent,
-        index_percent: indexPercent,
-        indexed_rent: indexedRent,
-        additions,
-        deductions,
-        total,
-        note: note || null,
-        created_by_id: user.id,
-      },
-      select: { id: true },
-    });
+    const notice = await db.$transaction(async (tx) => {
+      const created = await tx.rentNotice.create({
+        data: {
+          company_id: user.company_id,
+          property_id: property.id,
+          lease_id: leaseId || null,
+          tenant_name: tenantName,
+          unit: unit || null,
+          period,
+          due_date: parsedDue,
+          status,
+          base_rent: baseRent,
+          index_percent: indexPercent,
+          indexed_rent: indexedRent,
+          additions,
+          deductions,
+          total,
+          note: note || null,
+          created_by_id: user.id,
+        },
+        select: { id: true },
+      });
 
-    await writeAuditLog(user, {
-      entityType: "rent_notice",
-      entityId: notice.id,
-      action: noticeAction,
-      metadata: {
-        property_id: property.id,
-        property_name: property.name,
-        lease_id: leaseId || null,
-        tenant_name: tenantName,
-        unit,
-        period,
-        due_date: dueDate,
-        status,
-        base_rent: baseRent,
-        index_percent: indexPercent,
-        indexed_rent: indexedRent,
-        additions,
-        deductions,
-        total,
-        note,
-        storage: "RentNotice",
-      },
+      await writeAuditLog(user, {
+        entityType: "rent_notice",
+        entityId: created.id,
+        action: noticeAction,
+        metadata: {
+          property_id: property.id,
+          property_name: property.name,
+          lease_id: leaseId || null,
+          tenant_name: tenantName,
+          unit,
+          period,
+          due_date: dueDate,
+          status,
+          base_rent: baseRent,
+          index_percent: indexPercent,
+          indexed_rent: indexedRent,
+          additions,
+          deductions,
+          total,
+          note,
+          storage: "RentNotice",
+        },
+      }, tx);
+
+      return created;
     });
 
     return NextResponse.json({ success: true, notice }, { status: 201 });
@@ -320,34 +324,39 @@ export async function PATCH(request: Request) {
         }
       : { status: nextStatus };
 
-    const updateResult = await db.rentNotice.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
-      data,
+    const updateResult = await db.$transaction(async (tx) => {
+      const result = await tx.rentNotice.updateMany({
+        where: { id: existing.id, company_id: user.company_id },
+        data,
+      });
+      if (result.count === 0) return null;
+
+      await writeAuditLog(user, {
+        entityType: "rent_notice",
+        entityId: existing.id,
+        action: statusOnly ? "rent_notice.status_updated" : "rent_notice.updated",
+        metadata: {
+          tenant_name: existing.tenant_name,
+          period,
+          previousStatus: existing.status,
+          status: nextStatus,
+          base_rent: baseRent,
+          index_percent: indexPercent,
+          indexed_rent: indexedRent,
+          additions,
+          deductions,
+          total,
+          due_date: dueDate.toISOString().slice(0, 10),
+          note,
+          storage: "RentNotice",
+        },
+      }, tx);
+
+      return result;
     });
-    if (updateResult.count === 0) {
+    if (!updateResult) {
       return NextResponse.json({ error: "Hyresavin hittades inte" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "rent_notice",
-      entityId: existing.id,
-      action: statusOnly ? "rent_notice.status_updated" : "rent_notice.updated",
-      metadata: {
-        tenant_name: existing.tenant_name,
-        period,
-        previousStatus: existing.status,
-        status: nextStatus,
-        base_rent: baseRent,
-        index_percent: indexPercent,
-        indexed_rent: indexedRent,
-        additions,
-        deductions,
-        total,
-        due_date: dueDate.toISOString().slice(0, 10),
-        note,
-        storage: "RentNotice",
-      },
-    });
 
     return NextResponse.json({
       success: true,
