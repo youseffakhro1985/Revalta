@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import db from "@/lib/db";
 import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
@@ -44,11 +45,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
   const { id } = await params;
   const order = await ensureOrder(user as CompanyUser, id);
   if (!order) return notFoundWorkOrder();
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
   const action = String(body.action || "manual");
   let kind = String(body.kind || "work");
   if (!allowedActions.has(action) || !allowedKinds.has(kind)) return NextResponse.json({ error: "Ogiltig åtgärd eller tidstyp" }, { status: 400 });
@@ -69,7 +74,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let userEmail = user.email;
 
   if (action === "start") {
-    const existingEntries = await listTimeEntries(user.company_id, id);
+    const existingEntries = await listTimeEntries(companyId, id);
     if (existingEntries.some((entry) => entry.status === "running" && entry.source !== "legacy")) {
       return NextResponse.json({ error: "Det finns redan en aktiv timer på arbetsordern" }, { status: 409 });
     }
@@ -82,8 +87,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (end.getTime() - start.getTime() > 24 * 60 * 60 * 1000) return NextResponse.json({ error: "En tidsrad får vara högst 24 timmar" }, { status: 400 });
     startedAt = start.toISOString(); endedAt = end.toISOString(); minutes = Math.round((end.getTime() - start.getTime()) / 60000);
   } else {
-    const modern = await getModernTimeEntry(user.company_id, id, entryId);
-    const latest = modern ?? await getTimeEntry(user.company_id, id, entryId);
+    const modern = await getModernTimeEntry(companyId, id, entryId);
+    const latest = modern ?? await getTimeEntry(companyId, id, entryId);
     if (!latest) return NextResponse.json({ error: "Tidsraden hittades inte" }, { status: 404 });
     if (!modern) {
       return NextResponse.json({
@@ -124,12 +129,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     status,
     actorId: user.id,
   };
-  const entry = await upsertTimeEntry(user.company_id, payload);
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: `work_order.time_${action}`,
-    metadata: { entryId, kind, minutes, billable, status, storage: "WorkOrderTimeEntry" },
+  const entry = await db.$transaction(async (tx) => {
+    const persistedEntry = await upsertTimeEntry(companyId, payload, tx);
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: `work_order.time_${action}`,
+      metadata: { entryId, kind, minutes, billable, status, storage: "WorkOrderTimeEntry" },
+    }, tx);
+    return persistedEntry;
   });
   return NextResponse.json({ entry }, { status: 201 });
 }
