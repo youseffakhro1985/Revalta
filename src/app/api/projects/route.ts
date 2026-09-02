@@ -114,8 +114,13 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
+
   const propertyId = String(body.propertyId || "").trim();
   const sourceWorkOrderId = body.sourceWorkOrderId ? String(body.sourceWorkOrderId).trim() : null;
   const managerId = body.managerId ? String(body.managerId).trim() : null;
@@ -140,14 +145,14 @@ export async function POST(request: Request) {
   if (startDate && endDate && endDate < startDate) return NextResponse.json({ error: "Slutdatum kan inte vara före startdatum" }, { status: 400 });
 
   const property = await db.property.findFirst({
-    where: { id: propertyId, company_id: user.company_id, deleted_at: null },
+    where: { id: propertyId, company_id: companyId, deleted_at: null },
     select: { id: true, name: true },
   });
   if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
   if (managerId) {
     const manager = await db.user.findFirst({
-      where: { id: managerId, company_id: user.company_id, status: "active" },
+      where: { id: managerId, company_id: companyId, status: "active" },
       select: { id: true },
     });
     if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
@@ -155,53 +160,57 @@ export async function POST(request: Request) {
 
   if (sourceWorkOrderId) {
     const source = await db.workOrder.findFirst({
-      where: { deleted_at: null, id: sourceWorkOrderId, company_id: user.company_id, property_id: propertyId },
+      where: { deleted_at: null, id: sourceWorkOrderId, company_id: companyId, property_id: propertyId },
       select: { id: true },
     });
     if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 400 });
   }
 
-  const project = await db.project.create({
-    data: {
-      company_id: user.company_id,
-      property_id: propertyId,
-      source_work_order_id: sourceWorkOrderId,
-      manager_id: managerId,
-      created_by_id: user.id,
-      name,
-      description,
-      contractor,
-      status,
-      risk,
-      start_date: startDate,
-      end_date: endDate,
-      budget: budget ?? 0,
-      forecast: forecast ?? 0,
-      actual: actual ?? 0,
-      completed_at: status === "completed" ? new Date() : null,
-    },
-    include: {
-      property: { select: { id: true, name: true } },
-      manager: { select: { id: true, name: true, email: true } },
-      source_work_order: { select: { id: true, title: true, status: true } },
-    },
-  });
+  const project = await db.$transaction(async (tx) => {
+    const createdProject = await tx.project.create({
+      data: {
+        company_id: companyId,
+        property_id: propertyId,
+        source_work_order_id: sourceWorkOrderId,
+        manager_id: managerId,
+        created_by_id: user.id,
+        name,
+        description,
+        contractor,
+        status,
+        risk,
+        start_date: startDate,
+        end_date: endDate,
+        budget: budget ?? 0,
+        forecast: forecast ?? 0,
+        actual: actual ?? 0,
+        completed_at: status === "completed" ? new Date() : null,
+      },
+      include: {
+        property: { select: { id: true, name: true } },
+        manager: { select: { id: true, name: true, email: true } },
+        source_work_order: { select: { id: true, title: true, status: true } },
+      },
+    });
 
-  await writeAuditLog(user, {
-    entityType: "project",
-    entityId: project.id,
-    action: "project.created",
-    metadata: {
-      propertyId,
-      propertyName: property.name,
-      sourceWorkOrderId,
-      managerId,
-      status,
-      risk,
-      budget,
-      forecast,
-      actual,
-    },
+    await writeAuditLog(user, {
+      entityType: "project",
+      entityId: createdProject.id,
+      action: "project.created",
+      metadata: {
+        propertyId,
+        propertyName: property.name,
+        sourceWorkOrderId,
+        managerId,
+        status,
+        risk,
+        budget,
+        forecast,
+        actual,
+      },
+    }, tx);
+
+    return createdProject;
   });
 
   return NextResponse.json({ project }, { status: 201 });
