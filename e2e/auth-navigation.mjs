@@ -3,14 +3,17 @@ import { chromium } from "playwright";
 
 const baseUrl = String(process.env.E2E_BASE_URL || "").replace(/\/$/, "");
 const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
+const allowHttpLocalhost = String(process.env.E2E_ALLOW_HTTP_LOCALHOST || "").trim() === "1";
 const RESET_MAX_LATENCY_MS = 8_000;
 const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
 const REGISTER_MAX_LATENCY_MS = 8_000;
 const REGISTER_REQUEST_EMIT_TIMEOUT_MS = 5_000;
 const REGISTER_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 
-if (!baseUrl || !/^https:\/\//.test(baseUrl)) {
-  console.error("E2E_BASE_URL must be an https Preview origin");
+const isHttpsOrigin = /^https:\/\//.test(baseUrl);
+const isAllowedLocalOrigin = allowHttpLocalhost && /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(baseUrl);
+if (!baseUrl || (!isHttpsOrigin && !isAllowedLocalOrigin)) {
+  console.error("E2E_BASE_URL must be an https Preview origin, or an explicitly allowed localhost origin");
   process.exit(1);
 }
 
@@ -45,7 +48,7 @@ async function waitForValue(read, timeout, label) {
   fail(`${label} within ${timeout}ms`);
 }
 
-const extraHTTPHeaders = bypass
+const extraHTTPHeaders = isHttpsOrigin && bypass
   ? {
       "x-vercel-protection-bypass": bypass,
       "x-vercel-set-bypass-cookie": "true",
