@@ -26,14 +26,21 @@ export function isStripeBillingReady() {
   return hasStripeSecrets() && BILLING_PLAN_KEYS.every((plan) => Boolean(stripePriceEnv[plan]));
 }
 
-async function stripePost(path: string, params: Record<string, string>) {
+async function stripePost(
+  path: string,
+  params: Record<string, string>,
+  options: { idempotencyKey?: string } = {},
+) {
   const body = new URLSearchParams(params);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+
   const response = await fetch(`${stripeApi}${path}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers,
     body,
   });
   const data = await response.json().catch(() => ({}));
@@ -51,6 +58,7 @@ export async function createCheckoutSession(input: {
   companyId: string;
   successUrl: string;
   cancelUrl: string;
+  idempotencyKey?: string;
 }) {
   const price = stripePriceEnv[input.plan];
   if (!price) throw new Error("Stripe price saknas för vald plan");
@@ -66,17 +74,18 @@ export async function createCheckoutSession(input: {
     "metadata[plan]": input.plan,
     "subscription_data[metadata][companyId]": input.companyId,
     "subscription_data[metadata][plan]": input.plan,
-  });
+  }, { idempotencyKey: input.idempotencyKey });
 }
 
 export async function createCustomerPortalSession(input: {
   customerId: string;
   returnUrl: string;
+  idempotencyKey?: string;
 }) {
   return stripePost("/billing_portal/sessions", {
     customer: input.customerId,
     return_url: input.returnUrl,
-  });
+  }, { idempotencyKey: input.idempotencyKey });
 }
 
 export function verifyStripeSignature(payload: string, signatureHeader: string | null, toleranceSeconds = 300) {
