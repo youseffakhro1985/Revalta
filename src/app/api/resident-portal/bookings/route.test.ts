@@ -8,6 +8,8 @@ const {
   bookingFindFirstMock,
   bookingCreateMock,
   bookingUpdateMock,
+  transactionMock,
+  executeRawMock,
   writeAuditLogMock,
   checkRateLimitMock,
   loggerErrorMock,
@@ -21,6 +23,8 @@ const {
   bookingFindFirstMock: vi.fn(),
   bookingCreateMock: vi.fn(),
   bookingUpdateMock: vi.fn(),
+  transactionMock: vi.fn(),
+  executeRawMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
   checkRateLimitMock: vi.fn(),
   loggerErrorMock: vi.fn(),
@@ -44,14 +48,22 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
+const tx = {
+  booking: {
+    findFirst: bookingFindFirstMock,
+    create: bookingCreateMock,
+    update: bookingUpdateMock,
+  },
+  $executeRaw: executeRawMock,
+};
+
 vi.mock("@/lib/db", () => ({
   default: {
     booking: {
       findMany: bookingFindManyMock,
       findFirst: bookingFindFirstMock,
-      create: bookingCreateMock,
-      update: bookingUpdateMock,
     },
+    $transaction: transactionMock,
   },
 }));
 
@@ -74,6 +86,19 @@ const lease = {
   property: { id: "property-1", name: "Storgatan 1", address: "Storgatan 1", city: "Stockholm" },
   unit: { id: "unit-1", designation: "1201" },
   lease_holder: { name: "Boende Test", contact_name: null },
+};
+
+const createdBooking = {
+  id: "booking-1",
+  resource: "Tvättstuga",
+  resident_name: "Boende Test",
+  unit: "1201",
+  start_at: new Date("2026-08-01T10:00:00.000Z"),
+  end_at: new Date("2026-08-01T12:00:00.000Z"),
+  note: "Ta med nyckel",
+  status: "confirmed",
+  created_at: new Date("2026-07-27T10:00:00.000Z"),
+  property: lease.property,
 };
 
 function request(method = "GET", body?: Record<string, unknown>) {
@@ -100,7 +125,11 @@ describe("resident-portal bookings route", () => {
     listResidentMatchedLeasesMock.mockResolvedValue([lease]);
     bookingFindManyMock.mockResolvedValue([]);
     bookingFindFirstMock.mockResolvedValue(null);
+    bookingCreateMock.mockResolvedValue(createdBooking);
+    bookingUpdateMock.mockResolvedValue({ id: "booking-1", status: "cancelled" });
+    executeRawMock.mockResolvedValue(1);
     writeAuditLogMock.mockResolvedValue(undefined);
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
   it("lists bookings for matched leases with correlated private success", async () => {
@@ -128,20 +157,8 @@ describe("resident-portal bookings route", () => {
     expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("boende@exempel.se");
   });
 
-  it("creates a booking on a matched lease with correlated success", async () => {
+  it("serializes conflict detection, create and audit in one transaction", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
-    bookingCreateMock.mockResolvedValue({
-      id: "booking-1",
-      resource: "Tvättstuga",
-      resident_name: "Boende Test",
-      unit: "1201",
-      start_at: new Date("2026-08-01T10:00:00.000Z"),
-      end_at: new Date("2026-08-01T12:00:00.000Z"),
-      note: "Ta med nyckel",
-      status: "confirmed",
-      created_at: new Date("2026-07-27T10:00:00.000Z"),
-      property: lease.property,
-    });
 
     const response = await POST(request("POST", {
       leaseId: "lease-1",
@@ -154,13 +171,29 @@ describe("resident-portal bookings route", () => {
     expect(response.status).toBe(201);
     expect(response.headers.get("x-request-id")).toBe(requestId);
     expect(response.headers.get("cache-control")).toContain("private");
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    expect(bookingFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        property_id: "property-1",
+        resource: "Tvättstuga",
+        status: { not: "cancelled" },
+      }),
+    }));
     expect(bookingCreateMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
+        company_id: "company-1",
         property_id: "property-1",
         created_by_id: "user-resident",
         unit: "1201",
       }),
     }));
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      residentUser,
+      expect.objectContaining({ action: "booking.created", entityId: "booking-1" }),
+      tx,
+    );
     expect(loggerInfoMock).toHaveBeenCalledWith(
       "resident booking created",
       expect.objectContaining({
@@ -173,6 +206,47 @@ describe("resident-portal bookings route", () => {
     expect(logged).not.toContain("Tvättstuga");
     expect(logged).not.toContain("Ta med nyckel");
     expect(logged).not.toContain("Boende Test");
+  });
+
+  it("returns correlated 409 from the locked transaction before create or audit", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    bookingFindFirstMock.mockResolvedValue({ id: "existing-booking" });
+
+    const response = await POST(request("POST", {
+      leaseId: "lease-1",
+      resource: "Tvättstuga",
+      start: "2026-08-01T10:00:00.000Z",
+      end: "2026-08-01T12:00:00.000Z",
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.errorCode).toBe("CONFLICT");
+    expect(body.requestId).toBe(requestId);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    expect(bookingCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("does not report create success when mandatory audit persistence fails", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+    const response = await POST(request("POST", {
+      leaseId: "lease-1",
+      resource: "Tvättstuga",
+      start: "2026-08-01T10:00:00.000Z",
+      end: "2026-08-01T12:00:00.000Z",
+    }));
+
+    expect(response.status).toBe(500);
+    expect(bookingCreateMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      residentUser,
+      expect.objectContaining({ action: "booking.created" }),
+      tx,
+    );
   });
 
   it("returns a stable correlated 429 without parsing booking data when rate limited", async () => {
@@ -189,6 +263,7 @@ describe("resident-portal bookings route", () => {
       requestId,
     });
     expect(listResidentMatchedLeasesMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("does not log an unverified submitted lease id when no matched lease exists", async () => {
@@ -203,42 +278,54 @@ describe("resident-portal bookings route", () => {
     }));
 
     expect(response.status).toBe(404);
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-lease");
   });
 
-  it("returns correlated 409 for a verified booking conflict", async () => {
-    getCurrentUserMock.mockResolvedValue(residentUser);
-    bookingFindFirstMock.mockResolvedValue({ id: "existing-booking" });
-
-    const response = await POST(request("POST", {
-      leaseId: "lease-1",
-      resource: "Tvättstuga",
-      start: "2026-08-01T10:00:00.000Z",
-      end: "2026-08-01T12:00:00.000Z",
-    }));
-    const body = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(body.errorCode).toBe("CONFLICT");
-    expect(body.requestId).toBe(requestId);
-    expect(bookingCreateMock).not.toHaveBeenCalled();
-  });
-
-  it("cancels only the resident's own booking with correlated success", async () => {
+  it("cancels only the resident's own booking with update and audit in one transaction", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
     bookingFindFirstMock.mockResolvedValue({ id: "booking-1", status: "confirmed" });
-    bookingUpdateMock.mockResolvedValue({ id: "booking-1", status: "cancelled" });
 
     const response = await PATCH(request("PATCH", { bookingId: "booking-1", status: "cancelled" }));
 
     expect(response.status).toBe(200);
     expect(response.headers.get("x-request-id")).toBe(requestId);
     expect(bookingFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ created_by_id: "user-resident" }),
+      where: expect.objectContaining({
+        company_id: "company-1",
+        created_by_id: "user-resident",
+      }),
     }));
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(bookingUpdateMock).toHaveBeenCalledWith({
+      where: { id: "booking-1" },
+      data: { status: "cancelled" },
+      select: { id: true, status: true },
+    });
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      residentUser,
+      expect.objectContaining({ action: "booking.cancelled", entityId: "booking-1" }),
+      tx,
+    );
     expect(loggerInfoMock).toHaveBeenCalledWith(
       "resident booking cancelled",
       expect.objectContaining({ event: "resident_bookings.cancel.completed", bookingId: "booking-1" }),
+    );
+  });
+
+  it("does not report cancel success when mandatory audit persistence fails", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    bookingFindFirstMock.mockResolvedValue({ id: "booking-1", status: "confirmed" });
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+    const response = await PATCH(request("PATCH", { bookingId: "booking-1", status: "cancelled" }));
+
+    expect(response.status).toBe(500);
+    expect(bookingUpdateMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      residentUser,
+      expect.objectContaining({ action: "booking.cancelled" }),
+      tx,
     );
   });
 
@@ -250,6 +337,7 @@ describe("resident-portal bookings route", () => {
 
     expect(response.status).toBe(404);
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-booking");
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(bookingUpdateMock).not.toHaveBeenCalled();
   });
 
