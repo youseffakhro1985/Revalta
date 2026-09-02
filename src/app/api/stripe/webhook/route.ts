@@ -21,6 +21,8 @@ type StripeEvent = {
   data?: { object?: StripeObject };
 };
 
+type SafeStripeEvent = StripeEvent & { id: string; type: string };
+
 const supportedEvents = new Set([
   "checkout.session.completed",
   "customer.subscription.created",
@@ -60,20 +62,25 @@ function previousReplayCount(payload: unknown) {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
 }
 
-function getPlanFromMetadata(object: StripeObject) {
-  const plan = object.metadata?.plan;
+function getPlanFromMetadata(stripeObject: StripeObject) {
+  const plan = stripeObject.metadata?.plan;
   return isBillingPlanKey(plan) ? plan : undefined;
 }
 
-async function resolveCompanyForStripeObject(client: Prisma.TransactionClient, object: StripeObject) {
-  const customerId = typeof object.customer === "string" ? object.customer : null;
-  const subscriptionId =
-    typeof object.subscription === "string"
-      ? object.subscription
-      : typeof object.id === "string" && object.id.startsWith("sub_")
-        ? object.id
-        : null;
-  const metadataCompanyId = object.metadata?.companyId?.trim() || null;
+function getSubscriptionId(stripeObject: StripeObject) {
+  if (typeof stripeObject.subscription === "string" && stripeObject.subscription.startsWith("sub_")) {
+    return stripeObject.subscription;
+  }
+  if (typeof stripeObject.id === "string" && stripeObject.id.startsWith("sub_")) {
+    return stripeObject.id;
+  }
+  return null;
+}
+
+async function resolveCompanyForStripeObject(client: Prisma.TransactionClient, stripeObject: StripeObject) {
+  const customerId = typeof stripeObject.customer === "string" ? stripeObject.customer : null;
+  const subscriptionId = getSubscriptionId(stripeObject);
+  const metadataCompanyId = stripeObject.metadata?.companyId?.trim() || null;
 
   if (subscriptionId) {
     const bySubscription = await client.company.findFirst({
@@ -122,9 +129,49 @@ async function resolveCompanyForStripeObject(client: Prisma.TransactionClient, o
   return null;
 }
 
+async function isStaleSubscriptionEvent(
+  client: Prisma.TransactionClient,
+  companyId: string,
+  event: SafeStripeEvent,
+  stripeObject: StripeObject,
+) {
+  if (!subscriptionEvents.has(event.type)) return false;
+  const incomingCreated = typeof event.created === "number" && Number.isFinite(event.created)
+    ? event.created
+    : null;
+  const subscriptionId = getSubscriptionId(stripeObject);
+  if (incomingCreated === null || !subscriptionId) return false;
+
+  const recentEvents = await client.integrationEvent.findMany({
+    where: { company_id: companyId, type: "stripe", status: "received" },
+    orderBy: { created_at: "desc" },
+    take: 100,
+    select: { payload: true },
+  });
+
+  return recentEvents.some(({ payload }) => {
+    const row = object(payload);
+    const eventType = typeof row?.eventType === "string" ? row.eventType : null;
+    if (!eventType || !subscriptionEvents.has(eventType)) return false;
+
+    const eventCreated = typeof row?.eventCreated === "number" && Number.isFinite(row.eventCreated)
+      ? row.eventCreated
+      : null;
+    if (eventCreated === null || eventCreated <= incomingCreated) return false;
+
+    const storedSubscriptionId =
+      typeof row?.subscription === "string" && row.subscription.startsWith("sub_")
+        ? row.subscription
+        : typeof row?.objectId === "string" && row.objectId.startsWith("sub_")
+          ? row.objectId
+          : null;
+    return storedSubscriptionId === subscriptionId;
+  });
+}
+
 async function applyStripeEventToCompany(
   client: Prisma.TransactionClient,
-  eventType: string,
+  event: SafeStripeEvent,
   stripeObject: StripeObject,
 ) {
   const company = await resolveCompanyForStripeObject(client, stripeObject);
@@ -133,24 +180,22 @@ async function applyStripeEventToCompany(
   // Invoice state (paid/open/etc.) and Checkout Session state (complete/open/etc.)
   // are not subscription lifecycle states. Only subscription events may write
   // Company.subscription_status. Invoice events are journal-only after matching.
-  if (invoiceEvents.has(eventType)) return company;
+  if (invoiceEvents.has(event.type)) return { company, stale: false };
+
+  const stale = await isStaleSubscriptionEvent(client, company.id, event, stripeObject);
+  if (stale) return { company, stale: true };
 
   const plan = getPlanFromMetadata(stripeObject);
   const customerId = typeof stripeObject.customer === "string" ? stripeObject.customer : undefined;
-  const subscriptionId =
-    typeof stripeObject.subscription === "string"
-      ? stripeObject.subscription
-      : subscriptionEvents.has(eventType) && typeof stripeObject.id === "string" && stripeObject.id.startsWith("sub_")
-        ? stripeObject.id
-        : undefined;
+  const subscriptionId = getSubscriptionId(stripeObject) ?? undefined;
 
-  return client.company.update({
+  const updatedCompany = await client.company.update({
     where: { id: company.id },
     data: {
       ...(plan ? { plan } : {}),
       ...(customerId ? { stripe_customer_id: customerId } : {}),
       ...(subscriptionId ? { stripe_subscription_id: subscriptionId } : {}),
-      ...(subscriptionEvents.has(eventType) && typeof stripeObject.status === "string"
+      ...(subscriptionEvents.has(event.type) && typeof stripeObject.status === "string"
         ? { subscription_status: stripeObject.status }
         : {}),
     },
@@ -163,13 +208,15 @@ async function applyStripeEventToCompany(
       subscription_status: true,
     },
   });
+  return { company: updatedCompany, stale: false };
 }
 
 function journalPayload(
-  event: StripeEvent & { id: string; type: string },
+  event: SafeStripeEvent,
   stripeObject: StripeObject,
   matchedCompany: boolean,
   replayCount: number,
+  stale: boolean,
 ) {
   return {
     eventType: event.type,
@@ -181,6 +228,7 @@ function journalPayload(
     matchedCompany,
     metadataCompanyId: stripeObject.metadata?.companyId || null,
     replayCount,
+    stale,
   } as Prisma.InputJsonValue;
 }
 
@@ -231,7 +279,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const safeEvent = event as StripeEvent & { id: string; type: string };
+  const safeEvent = event as SafeStripeEvent;
   const stripeObject = safeEvent.data?.object;
   const supported = supportedEvents.has(safeEvent.type);
   if (supported && !stripeObject) {
@@ -263,18 +311,27 @@ export async function POST(request: Request) {
         // replayable so a later Stripe mapping can recover it without creating
         // a second journal row.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe:${safeEvent.id}`}))`;
+        const subscriptionId = subscriptionEvents.has(safeEvent.type) ? getSubscriptionId(stripeObject) : null;
+        if (subscriptionId) {
+          // Different event ids for the same subscription must also serialize,
+          // otherwise two out-of-order deliveries can both observe old state.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`stripe-subscription:${subscriptionId}`}))`;
+        }
+
         const existingEvent = await tx.integrationEvent.findFirst({
           where: { type: "stripe", recipient: safeEvent.id },
           select: { id: true, status: true, payload: true },
         });
         if (existingEvent && existingEvent.status !== "ignored") {
-          return { duplicate: true, replayed: false, matchedCompany: true };
+          return { duplicate: true, replayed: false, matchedCompany: true, stale: false };
         }
 
         const replayCount = existingEvent ? previousReplayCount(existingEvent.payload) + 1 : 0;
-        const company = await applyStripeEventToCompany(tx, safeEvent.type, stripeObject);
+        const application = await applyStripeEventToCompany(tx, safeEvent, stripeObject);
+        const company = application?.company ?? null;
+        const stale = application?.stale ?? false;
         const status = company ? "received" : "ignored";
-        const eventPayload = journalPayload(safeEvent, stripeObject, Boolean(company), replayCount);
+        const eventPayload = journalPayload(safeEvent, stripeObject, Boolean(company), replayCount, stale);
 
         if (existingEvent) {
           await tx.integrationEvent.update({
@@ -285,7 +342,7 @@ export async function POST(request: Request) {
               payload: eventPayload,
             },
           });
-          return { duplicate: false, replayed: true, matchedCompany: Boolean(company) };
+          return { duplicate: false, replayed: true, matchedCompany: Boolean(company), stale };
         }
 
         await tx.integrationEvent.create({
@@ -297,7 +354,7 @@ export async function POST(request: Request) {
             payload: eventPayload,
           },
         });
-        return { duplicate: false, replayed: false, matchedCompany: Boolean(company) };
+        return { duplicate: false, replayed: false, matchedCompany: Boolean(company), stale };
       });
 
       if (outcome.duplicate) {
@@ -309,12 +366,21 @@ export async function POST(request: Request) {
         return acknowledge({ received: true, duplicate: true });
       }
 
+      if (outcome.stale) {
+        observability.logger.info("stripe webhook stale subscription event ignored", observability.elapsed({
+          event: "stripe.webhook.stale_subscription_event",
+          stripeEventId: safeEvent.id,
+          stripeEventType: safeEvent.type,
+        }));
+      }
+
       if (outcome.replayed) {
         observability.logger.info("stripe webhook replay evaluated", observability.elapsed({
           event: "stripe.webhook.replayed",
           stripeEventId: safeEvent.id,
           stripeEventType: safeEvent.type,
           matchedCompany: outcome.matchedCompany,
+          stale: outcome.stale,
         }));
       }
     }
