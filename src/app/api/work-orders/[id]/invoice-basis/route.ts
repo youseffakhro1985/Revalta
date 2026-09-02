@@ -11,8 +11,6 @@ import {
   type InvoiceDraftPayload,
 } from "@/lib/work-order-ops-storage";
 
-// "exported" is intentionally not client-writable. Provider delivery is tracked by
-// WorkOrderInvoiceExportJob and must not be asserted by an invoice-basis request.
 const clientWritableStatuses = new Set(["draft", "ready", "cancelled"]);
 
 type Line = {
@@ -175,10 +173,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  const companyId = user.company_id;
   const { id } = await params;
-  if (!(await order(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!(await order(id, companyId))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
   const status = String(body.status ?? "draft");
   if (status === "exported") {
     return NextResponse.json({
@@ -224,12 +226,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     updatedAt: new Date().toISOString(),
   };
 
-  const draft = await createInvoiceDraft(user.company_id, payload);
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: `work_order.invoice_basis_${status}`,
-    metadata: { versionId: payload.versionId, subtotal, vat, total, lineCount: validLines.length, storage: "WorkOrderInvoiceDraft" },
+  const draft = await db.$transaction(async (tx) => {
+    const persistedDraft = await createInvoiceDraft(companyId, payload, tx);
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: `work_order.invoice_basis_${status}`,
+      metadata: { versionId: payload.versionId, subtotal, vat, total, lineCount: validLines.length, storage: "WorkOrderInvoiceDraft" },
+    }, tx);
+    return persistedDraft;
   });
   return NextResponse.json({ draft }, { status: 201 });
 }

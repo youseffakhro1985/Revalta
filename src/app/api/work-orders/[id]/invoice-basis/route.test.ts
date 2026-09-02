@@ -8,6 +8,7 @@ const {
   getProfitabilitySettingsMock,
   getLatestInvoiceDraftMock,
   createInvoiceDraftMock,
+  transactionMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
@@ -17,6 +18,7 @@ const {
   getProfitabilitySettingsMock: vi.fn(),
   getLatestInvoiceDraftMock: vi.fn(),
   createInvoiceDraftMock: vi.fn(),
+  transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -28,6 +30,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },
+    $transaction: transactionMock,
   },
 }));
 
@@ -44,6 +47,7 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 import { GET, POST } from "./route";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
+const tx = { marker: "invoice-draft-tx" };
 
 function postRequest(status: string) {
   return new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
@@ -97,8 +101,9 @@ describe("work-order invoice basis material approval", () => {
       fixedRevenue: 0,
     });
     getLatestInvoiceDraftMock.mockResolvedValue(null);
-    createInvoiceDraftMock.mockResolvedValue(null);
+    createInvoiceDraftMock.mockImplementation(async (_companyId, payload) => payload);
     writeAuditLogMock.mockResolvedValue(undefined);
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
   it("includes only approved billable material in generated invoice source and lines", async () => {
@@ -149,19 +154,55 @@ describe("work-order invoice basis material approval", () => {
     expect(body.error).toContain("exportjobbet");
     expect(createInvoiceDraftMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("still allows the canonical ready transition", async () => {
-    createInvoiceDraftMock.mockImplementation(async (_companyId, payload) => payload);
-
+  it("still allows the canonical ready transition and audits it in the same transaction", async () => {
     const response = await POST(postRequest("ready"), params);
     const body = await response.json();
 
     expect(response.status).toBe(201);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(createInvoiceDraftMock).toHaveBeenCalledWith(
       "company-1",
       expect.objectContaining({ workOrderId: "wo-1", status: "ready" }),
+      tx,
+    );
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "manager-1", company_id: "company-1" }),
+      expect.objectContaining({ entityType: "work_order", entityId: "wo-1", action: "work_order.invoice_basis_ready" }),
+      tx,
     );
     expect(body.draft.status).toBe("ready");
+  });
+
+  it("does not report success when the mandatory invoice audit write fails", async () => {
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+    await expect(POST(postRequest("draft"), params)).rejects.toThrow("audit unavailable");
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(createInvoiceDraftMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "work_order.invoice_basis_draft" }),
+      tx,
+    );
+  });
+
+  it("rejects malformed JSON before creating an invoice version", async () => {
+    const malformed = new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not-json",
+    });
+
+    const response = await POST(malformed, params);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Ogiltigt innehåll" });
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });
