@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import db from "@/lib/db";
 import { canManageTickets, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
@@ -56,7 +57,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
+
   const action = String(body.action || "create");
   if (!["create", "approve", "reject", "delete"].includes(action)) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
   const entryId = action === "create" ? crypto.randomUUID() : String(body.entryId || "").trim();
@@ -121,12 +126,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     };
   }
 
-  const material = await upsertMaterialEntry(user.company_id, row);
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: `work_order.material_${action}`,
-    metadata: { entryId, name: row.name, quantity: row.quantity, total: row.total, status: row.status, storage: "WorkOrderMaterialEntry" },
+  const material = await db.$transaction(async (tx) => {
+    const persistedMaterial = await upsertMaterialEntry(user.company_id, row, tx);
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: `work_order.material_${action}`,
+      metadata: { entryId, name: row.name, quantity: row.quantity, total: row.total, status: row.status, storage: "WorkOrderMaterialEntry" },
+    }, tx);
+    return persistedMaterial;
   });
+
   return NextResponse.json({ material }, { status: 201 });
 }
