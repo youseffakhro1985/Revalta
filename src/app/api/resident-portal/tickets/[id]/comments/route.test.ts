@@ -10,6 +10,7 @@ const {
   loggerWarnMock,
   queueTicketNotificationMock,
   ticketCommentCreateMock,
+  transactionMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   checkRateLimitMock: vi.fn(),
@@ -21,6 +22,7 @@ const {
   loggerWarnMock: vi.fn(),
   queueTicketNotificationMock: vi.fn(),
   ticketCommentCreateMock: vi.fn(),
+  transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -42,9 +44,13 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
+const tx = {
+  ticketComment: { create: ticketCommentCreateMock },
+};
+
 vi.mock("@/lib/db", () => ({
   default: {
-    ticketComment: { create: ticketCommentCreateMock },
+    $transaction: transactionMock,
   },
 }));
 
@@ -99,9 +105,10 @@ describe("resident-portal ticket comments route", () => {
       author_type: "resident",
       author_name: "Boende Test",
     });
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
-  it("lets a resident post a public comment with correlation and private caching", async () => {
+  it("lets a resident post a public comment with comment and audit in one transaction", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
 
     const response = await POST(request(), { params: Promise.resolve({ id: "ticket-1" }) });
@@ -118,6 +125,7 @@ describe("resident-portal ticket comments route", () => {
       body: "Porten är fortfarande trasig",
       author: { type: "resident", name: "Boende Test" },
     });
+    expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(ticketCommentCreateMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         ticket_id: "ticket-1",
@@ -128,6 +136,7 @@ describe("resident-portal ticket comments route", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       residentUser,
       expect.objectContaining({ action: "resident_portal.comment_created" }),
+      tx,
     );
     expect(queueTicketNotificationMock).toHaveBeenCalled();
     expect(loggerInfoMock).toHaveBeenCalledWith(
@@ -148,6 +157,46 @@ describe("resident-portal ticket comments route", () => {
     expect(logged).not.toContain("Boende Test");
   });
 
+  it("returns a safe 500 and does not notify when mandatory audit fails inside the transaction", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+    const response = await POST(request(), { params: Promise.resolve({ id: "ticket-1" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(ticketCommentCreateMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      residentUser,
+      expect.objectContaining({ action: "resident_portal.comment_created" }),
+      tx,
+    );
+    expect(queueTicketNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a successful comment response when post-commit notification delivery fails", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    queueTicketNotificationMock.mockRejectedValue(new Error("provider unavailable"));
+
+    const response = await POST(request(), { params: Promise.resolve({ id: "ticket-1" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.comment.id).toBe("comment-1");
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "resident ticket comment notification failed",
+      expect.objectContaining({
+        event: "resident_tickets.comments.notification_failed",
+        companyId: "company-1",
+        ticketId: "ticket-1",
+        commentId: "comment-1",
+      }),
+    );
+    expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("provider unavailable");
+  });
+
   it("returns correlated validation errors without logging comment text", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
 
@@ -160,6 +209,7 @@ describe("resident-portal ticket comments route", () => {
       errorCode: "VALIDATION_FAILED",
       requestId,
     });
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(ticketCommentCreateMock).not.toHaveBeenCalled();
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("Porten");
   });
@@ -177,6 +227,7 @@ describe("resident-portal ticket comments route", () => {
     });
     expect(checkRateLimitMock).not.toHaveBeenCalled();
     expect(findAccessibleResidentPortalTicketMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns a stable correlated 429 before ticket access when rate limited", async () => {
@@ -195,6 +246,7 @@ describe("resident-portal ticket comments route", () => {
       requestId,
     });
     expect(findAccessibleResidentPortalTicketMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-ticket");
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("Kommentar");
   });
@@ -214,6 +266,7 @@ describe("resident-portal ticket comments route", () => {
       errorCode: "NOT_FOUND",
       requestId,
     });
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(ticketCommentCreateMock).not.toHaveBeenCalled();
     const logged = JSON.stringify(loggerWarnMock.mock.calls);
     expect(logged).not.toContain("external-secret-ticket");
@@ -233,6 +286,7 @@ describe("resident-portal ticket comments route", () => {
     });
     expect(checkRateLimitMock).not.toHaveBeenCalled();
     expect(findAccessibleResidentPortalTicketMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns a safe correlated 500 without leaking dependency details", async () => {
