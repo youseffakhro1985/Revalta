@@ -134,6 +134,7 @@ export async function POST(request: Request) {
       companyId,
       successUrl: `${origin}/dashboard/billing?checkout=success&plan=${plan}`,
       cancelUrl: `${origin}/dashboard/billing?checkout=cancelled`,
+      idempotencyKey: `revalta-checkout:${companyId}:${plan}:${observability.requestId}`,
     });
 
     // Stripe already created an external side effect. Audit and telemetry are
