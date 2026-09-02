@@ -7,6 +7,7 @@ const {
   integrationCreateMock,
   integrationUpdateMock,
   integrationFindFirstMock,
+  integrationFindManyMock,
   transactionMock,
   executeRawMock,
   createLoggerMock,
@@ -19,6 +20,7 @@ const {
   integrationCreateMock: vi.fn(),
   integrationUpdateMock: vi.fn(),
   integrationFindFirstMock: vi.fn(),
+  integrationFindManyMock: vi.fn(),
   transactionMock: vi.fn(),
   executeRawMock: vi.fn(),
   createLoggerMock: vi.fn(),
@@ -34,6 +36,7 @@ vi.mock("@/lib/db", () => {
       create: integrationCreateMock,
       update: integrationUpdateMock,
       findFirst: integrationFindFirstMock,
+      findMany: integrationFindManyMock,
     },
     $executeRaw: executeRawMock,
   };
@@ -77,6 +80,7 @@ describe("Stripe webhook route", () => {
     integrationCreateMock.mockResolvedValue({});
     integrationUpdateMock.mockResolvedValue({});
     integrationFindFirstMock.mockResolvedValue(null);
+    integrationFindManyMock.mockResolvedValue([]);
     executeRawMock.mockResolvedValue(1);
     companyFindFirstMock.mockResolvedValue(null);
     transactionMock.mockImplementation(async (callback) => callback({
@@ -85,6 +89,7 @@ describe("Stripe webhook route", () => {
         create: integrationCreateMock,
         update: integrationUpdateMock,
         findFirst: integrationFindFirstMock,
+        findMany: integrationFindManyMock,
       },
       $executeRaw: executeRawMock,
     }));
