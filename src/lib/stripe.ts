@@ -1,7 +1,8 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { BILLING_PLAN_KEYS, type BillingPlanKey, isBillingPlanKey } from "@/lib/billing-plans";
 
 const stripeApi = "https://api.stripe.com/v1";
+const checkoutIdempotencyWindowMs = 30 * 60 * 1000;
 
 export const stripePriceEnv: Readonly<Record<BillingPlanKey, string | undefined>> = Object.freeze({
   start: process.env.STRIPE_PRICE_START,
@@ -26,14 +27,41 @@ export function isStripeBillingReady() {
   return hasStripeSecrets() && BILLING_PLAN_KEYS.every((plan) => Boolean(stripePriceEnv[plan]));
 }
 
-async function stripePost(path: string, params: Record<string, string>) {
+function normalizeIdempotencyKey(value: string | undefined) {
+  const key = value?.trim();
+  if (!key) return null;
+  if (key.length > 255) throw new Error("Stripe idempotency key är för lång");
+  return key;
+}
+
+function createCheckoutIdempotencyKey(params: Record<string, string>, now = Date.now()) {
+  const bucket = Math.floor(now / checkoutIdempotencyWindowMs);
+  const canonicalParams = Object.entries(params)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join("&");
+  const digest = createHash("sha256")
+    .update(`${bucket}\n${canonicalParams}`)
+    .digest("hex");
+  return `revalta_checkout_${digest}`;
+}
+
+async function stripePost(
+  path: string,
+  params: Record<string, string>,
+  options: { idempotencyKey?: string } = {},
+) {
   const body = new URLSearchParams(params);
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  const idempotencyKey = normalizeIdempotencyKey(options.idempotencyKey);
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+
   const response = await fetch(`${stripeApi}${path}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers,
     body,
   });
   const data = await response.json().catch(() => ({}));
@@ -51,11 +79,12 @@ export async function createCheckoutSession(input: {
   companyId: string;
   successUrl: string;
   cancelUrl: string;
+  idempotencyKey?: string;
 }) {
   const price = stripePriceEnv[input.plan];
   if (!price) throw new Error("Stripe price saknas för vald plan");
 
-  return stripePost("/checkout/sessions", {
+  const params = {
     mode: "subscription",
     "line_items[0][price]": price,
     "line_items[0][quantity]": "1",
@@ -66,7 +95,11 @@ export async function createCheckoutSession(input: {
     "metadata[plan]": input.plan,
     "subscription_data[metadata][companyId]": input.companyId,
     "subscription_data[metadata][plan]": input.plan,
-  });
+  };
+  const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey)
+    ?? createCheckoutIdempotencyKey(params);
+
+  return stripePost("/checkout/sessions", params, { idempotencyKey });
 }
 
 export async function createCustomerPortalSession(input: {
