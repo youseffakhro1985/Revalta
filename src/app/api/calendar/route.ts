@@ -8,13 +8,41 @@ import { createLogger } from "@/lib/structured-logger";
 const logger = createLogger({ route: "/api/calendar" });
 
 const action = "calendar.event";
+const stockholmDateTimeFormatter = new Intl.DateTimeFormat("sv-SE", {
+  timeZone: "Europe/Stockholm",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+function stockholmDateTime(value: Date) {
+  const parts = Object.fromEntries(
+    stockholmDateTimeFormatter
+      .formatToParts(value)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${parts.hour}:${parts.minute}`,
+  };
+}
+
+function calendarStatusFromWorkOrder(status: string) {
+  if (status === "completed" || status === "invoiced") return "done";
+  if (status === "cancelled") return "cancelled";
+  return "planned";
+}
 
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-    const [rows, events] = await Promise.all([
+    const [rows, events, workOrders] = await Promise.all([
       user.company_id
         ? db.calendarEvent.findMany({
             where: { company_id: user.company_id },
@@ -28,6 +56,28 @@ export async function GET() {
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       })),
+      user.company_id
+        ? db.workOrder.findMany({
+            where: {
+              company_id: user.company_id,
+              deleted_at: null,
+              scheduled_start: { not: null },
+              property: { deleted_at: null },
+            },
+            orderBy: { scheduled_start: "asc" },
+            take: 500,
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              scheduled_start: true,
+              work_order_number: true,
+              created_at: true,
+              property: { select: { name: true } },
+              assigned_to: { select: { name: true, email: true } },
+            },
+          })
+        : Promise.resolve([]),
     ]);
 
     const modern = rows.map((row) => ({
@@ -55,14 +105,35 @@ export async function GET() {
         source: "legacy" as const,
       }));
 
+    const canonicalWorkOrders = workOrders.flatMap((workOrder) => {
+      if (!workOrder.scheduled_start) return [];
+      const scheduled = stockholmDateTime(workOrder.scheduled_start);
+      return [{
+        id: `work-order:${workOrder.id}`,
+        entity_id: workOrder.id,
+        work_order_id: workOrder.id,
+        title: workOrder.title,
+        date: scheduled.date,
+        time: scheduled.time,
+        type: "Arbetsorder",
+        property_name: workOrder.property.name,
+        responsible: workOrder.assigned_to?.name || workOrder.assigned_to?.email || "",
+        note: workOrder.work_order_number ? `Arbetsorder ${workOrder.work_order_number}` : "Schemalagd arbetsorder",
+        status: calendarStatusFromWorkOrder(workOrder.status),
+        created_at: workOrder.created_at,
+        source: "work_order" as const,
+      }];
+    });
+
+    const calendarEvents = mergeByCreatedAt(modern, legacy, 500);
     return NextResponse.json({
-      events: mergeByCreatedAt(modern, legacy, 500).sort((left, right) => {
-        const leftDate = String((left as { date?: string }).date || "");
-        const rightDate = String((right as { date?: string }).date || "");
+      events: [...calendarEvents, ...canonicalWorkOrders].sort((left, right) => {
+        const leftDate = `${String((left as { date?: string }).date || "")}T${String((left as { time?: string }).time || "00:00")}`;
+        const rightDate = `${String((right as { date?: string }).date || "")}T${String((right as { time?: string }).time || "00:00")}`;
         return leftDate.localeCompare(rightDate);
       }),
       permissions: { canManage: canManageTickets(user.role) },
-    });
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     logger.error("Get calendar events error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
@@ -89,38 +160,45 @@ export async function POST(request: Request) {
     if (!title || !parsedDate) {
       return NextResponse.json({ error: "Titel och giltigt datum krävs" }, { status: 400 });
     }
+    if (type === "Arbetsorder") {
+      return NextResponse.json({ error: "Arbetsorder ska schemaläggas från arbetsordern och visas automatiskt i kalendern" }, { status: 400 });
+    }
 
-    const event = await db.calendarEvent.create({
-      data: {
-        company_id: user.company_id,
-        title,
-        date: parsedDate,
-        time: time || null,
-        type,
-        property_name: propertyName || null,
-        responsible: responsible || null,
-        note: note || null,
-        status: "planned",
-        created_by_id: user.id,
-      },
-      select: { id: true },
-    });
+    const event = await db.$transaction(async (tx) => {
+      const created = await tx.calendarEvent.create({
+        data: {
+          company_id: user.company_id!,
+          title,
+          date: parsedDate,
+          time: time || null,
+          type,
+          property_name: propertyName || null,
+          responsible: responsible || null,
+          note: note || null,
+          status: "planned",
+          created_by_id: user.id,
+        },
+        select: { id: true },
+      });
 
-    await writeAuditLog(user, {
-      entityType: "calendar_event",
-      entityId: event.id,
-      action,
-      metadata: {
-        title,
-        date,
-        time,
-        type,
-        property_name: propertyName,
-        responsible,
-        note,
-        status: "planned",
-        storage: "CalendarEvent",
-      },
+      await writeAuditLog(user, {
+        entityType: "calendar_event",
+        entityId: created.id,
+        action,
+        metadata: {
+          title,
+          date,
+          time,
+          type,
+          property_name: propertyName,
+          responsible,
+          note,
+          status: "planned",
+          storage: "CalendarEvent",
+        },
+      }, tx);
+
+      return created;
     });
 
     return NextResponse.json({ success: true, event }, { status: 201 });
@@ -142,6 +220,9 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const eventId = String(body.eventId || body.id || "").trim();
     if (!eventId) return NextResponse.json({ error: "Aktivitets-id krävs" }, { status: 400 });
+    if (eventId.startsWith("work-order:")) {
+      return NextResponse.json({ error: "Arbetsorder uppdateras från arbetsordervyn" }, { status: 400 });
+    }
 
     const hasStatus = body.status !== undefined && body.status !== null && String(body.status).trim() !== "";
     const status = hasStatus ? String(body.status).trim() : "";
@@ -199,7 +280,12 @@ export async function PATCH(request: Request) {
         date = parsedDate;
       }
       if (body.time !== undefined) time = String(body.time || "").trim();
-      if (body.type !== undefined) type = String(body.type || "Aktivitet").trim() || "Aktivitet";
+      if (body.type !== undefined) {
+        type = String(body.type || "Aktivitet").trim() || "Aktivitet";
+        if (type === "Arbetsorder") {
+          return NextResponse.json({ error: "Arbetsorder ska schemaläggas från arbetsordern och visas automatiskt i kalendern" }, { status: 400 });
+        }
+      }
       if (body.propertyName !== undefined) propertyName = String(body.propertyName || "").trim();
       if (body.responsible !== undefined) responsible = String(body.responsible || "").trim();
       if (body.note !== undefined) note = String(body.note || "").trim();
@@ -224,29 +310,34 @@ export async function PATCH(request: Request) {
         }
       : { status: nextStatus };
 
-    const updateResult = await db.calendarEvent.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
-      data,
+    const updateResult = await db.$transaction(async (tx) => {
+      const result = await tx.calendarEvent.updateMany({
+        where: { id: existing.id, company_id: user.company_id! },
+        data,
+      });
+      if (result.count === 0) return result;
+
+      await writeAuditLog(user, {
+        entityType: "calendar_event",
+        entityId: existing.id,
+        action: statusOnly ? "calendar.event.status_updated" : "calendar.event.updated",
+        metadata: {
+          title,
+          previousStatus: existing.status,
+          status: nextStatus,
+          date: date.toISOString().slice(0, 10),
+          time,
+          responsible,
+          note,
+          storage: "CalendarEvent",
+        },
+      }, tx);
+
+      return result;
     });
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "calendar_event",
-      entityId: existing.id,
-      action: statusOnly ? "calendar.event.status_updated" : "calendar.event.updated",
-      metadata: {
-        title,
-        previousStatus: existing.status,
-        status: nextStatus,
-        date: date.toISOString().slice(0, 10),
-        time,
-        responsible,
-        note,
-        storage: "CalendarEvent",
-      },
-    });
 
     return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
   } catch (error) {
@@ -265,6 +356,9 @@ export async function DELETE(request: Request) {
     const body = await request.json().catch(() => ({} as Record<string, unknown>));
     const eventId = String(body.eventId || body.id || "").trim();
     if (!eventId) return NextResponse.json({ error: "Aktivitets-id krävs" }, { status: 400 });
+    if (eventId.startsWith("work-order:")) {
+      return NextResponse.json({ error: "Arbetsorder hanteras från arbetsordervyn" }, { status: 400 });
+    }
 
     const existing = await db.calendarEvent.findFirst({
       where: { id: eventId, company_id: user.company_id },
@@ -283,24 +377,29 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
     }
 
-    const deleteResult = await db.calendarEvent.deleteMany({
-      where: { id: existing.id, company_id: user.company_id },
+    const deleteResult = await db.$transaction(async (tx) => {
+      const result = await tx.calendarEvent.deleteMany({
+        where: { id: existing.id, company_id: user.company_id! },
+      });
+      if (result.count === 0) return result;
+
+      await writeAuditLog(user, {
+        entityType: "calendar_event",
+        entityId: existing.id,
+        action: "calendar.event.deleted",
+        metadata: {
+          title: existing.title,
+          date: existing.date.toISOString().slice(0, 10),
+          status: existing.status,
+          storage: "CalendarEvent",
+        },
+      }, tx);
+
+      return result;
     });
     if (deleteResult.count === 0) {
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "calendar_event",
-      entityId: existing.id,
-      action: "calendar.event.deleted",
-      metadata: {
-        title: existing.title,
-        date: existing.date.toISOString().slice(0, 10),
-        status: existing.status,
-        storage: "CalendarEvent",
-      },
-    });
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
