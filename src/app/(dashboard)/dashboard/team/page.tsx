@@ -82,7 +82,14 @@ export default function TeamPage() {
       const response = await fetch("/api/team/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, email, role }) });
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte skapa inbjudan");
-      setInvites((current) => [data.invite, ...current]); setInviteUrl(data.inviteUrl || ""); setName(""); setEmail(""); setRole("technician"); setSuccess("Inbjudan är skapad och skickad till mottagaren.");
+      setInvites((current) => [data.invite, ...current]); setInviteUrl(data.inviteUrl || ""); setName(""); setEmail(""); setRole("technician");
+      if (data.deliveryStatus === "failed") {
+        setError("Inbjudan skapades, men e-postleveransen misslyckades. Kontrollera integrationsloggen innan du skapar en ny inbjudan.");
+      } else if (data.deliveryStatus === "mocked") {
+        setSuccess("Inbjudan är skapad i utvecklingsläge. Använd den lokala inbjudningslänken nedan.");
+      } else {
+        setSuccess("Inbjudan är skapad och skickad till mottagaren.");
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte kontakta servern"); }
     finally { setSubmitting(false); }
   }
