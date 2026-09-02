@@ -52,40 +52,48 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
 
   const { id } = await params;
   const workOrder = await findAccessibleWorkOrder(user as CompanyUser, id, { id: true, assigned_to_id: true, title: true });
   if (!workOrder) return notFoundWorkOrder();
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
   const text = String(body.body || "").trim();
   const isInternal = body.isInternal !== false;
 
   if (!text) return NextResponse.json({ error: "Kommentaren får inte vara tom" }, { status: 400 });
   if (text.length > 5000) return NextResponse.json({ error: "Kommentaren är för lång" }, { status: 400 });
 
-  const comment = await db.workOrderComment.create({
-    data: {
-      company_id: user.company_id,
-      work_order_id: id,
-      user_id: user.id,
-      body: text,
-      is_internal: isInternal,
-    },
-    select: {
-      id: true,
-      body: true,
-      is_internal: true,
-      created_at: true,
-      user: { select: { id: true, name: true, email: true } },
-    },
-  });
+  const comment = await db.$transaction(async (tx) => {
+    const createdComment = await tx.workOrderComment.create({
+      data: {
+        company_id: companyId,
+        work_order_id: id,
+        user_id: user.id,
+        body: text,
+        is_internal: isInternal,
+      },
+      select: {
+        id: true,
+        body: true,
+        is_internal: true,
+        created_at: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
 
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: "work_order.comment_added",
-    metadata: { commentId: comment.id, isInternal, title: workOrder.title },
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: "work_order.comment_added",
+      metadata: { commentId: createdComment.id, isInternal, title: workOrder.title },
+    }, tx);
+
+    return createdComment;
   });
 
   return NextResponse.json({ comment }, { status: 201 });
