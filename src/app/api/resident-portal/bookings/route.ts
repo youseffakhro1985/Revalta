@@ -209,19 +209,83 @@ export async function POST(request: Request) {
       });
     }
 
-    const conflict = await db.booking.findFirst({
-      where: {
-        company_id: user.company_id,
-        property_id: lease.property_id,
-        property: { deleted_at: null },
-        resource,
-        status: { not: "cancelled" },
-        start_at: { lt: end },
-        end_at: { gt: start },
-      },
-      select: { id: true },
+    const residentName = user.name?.trim()
+      || lease.lease_holder.contact_name
+      || lease.lease_holder.name
+      || "Boende";
+    const lockKey = `resident-booking:${user.company_id}:${lease.property_id}:${resource.toLocaleLowerCase("sv-SE")}`;
+
+    const bookingResult = await db.$transaction(async (tx) => {
+      // Serialize create attempts for the same tenant/property/resource. The
+      // conflict check must happen after this lock so two concurrent requests
+      // cannot both observe an empty slot and double-book it.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+      const conflict = await tx.booking.findFirst({
+        where: {
+          company_id: user.company_id,
+          property_id: lease.property_id,
+          property: { deleted_at: null },
+          resource,
+          status: { not: "cancelled" },
+          start_at: { lt: end },
+          end_at: { gt: start },
+        },
+        select: { id: true },
+      });
+      if (conflict) return { conflict: true as const, booking: null };
+
+      const booking = await tx.booking.create({
+        data: {
+          company_id: user.company_id,
+          property_id: lease.property_id,
+          resource,
+          resident_name: residentName,
+          unit: lease.unit.designation,
+          start_at: start,
+          end_at: end,
+          note: note || null,
+          status: "confirmed",
+          created_by_id: user.id,
+        },
+        select: {
+          id: true,
+          resource: true,
+          resident_name: true,
+          unit: true,
+          start_at: true,
+          end_at: true,
+          note: true,
+          status: true,
+          created_at: true,
+          property: { select: { id: true, name: true, address: true, city: true } },
+        },
+      });
+
+      await writeAuditLog(user, {
+        entityType: "booking",
+        entityId: booking.id,
+        action,
+        metadata: {
+          property_id: lease.property_id,
+          property_name: lease.property.name,
+          resource,
+          resident_name: residentName,
+          unit: lease.unit.designation,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          note,
+          status: "confirmed",
+          storage: "Booking",
+          accessMode: "resident_self_service",
+          leaseId: lease.id,
+        },
+      }, tx);
+
+      return { conflict: false as const, booking };
     });
-    if (conflict) {
+
+    if (bookingResult.conflict) {
       return reject(observability, {
         status: 409,
         code: API_ERROR_CODES.conflict,
@@ -231,58 +295,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const residentName = user.name?.trim()
-      || lease.lease_holder.contact_name
-      || lease.lease_holder.name
-      || "Boende";
-
-    const booking = await db.booking.create({
-      data: {
-        company_id: user.company_id,
-        property_id: lease.property_id,
-        resource,
-        resident_name: residentName,
-        unit: lease.unit.designation,
-        start_at: start,
-        end_at: end,
-        note: note || null,
-        status: "confirmed",
-        created_by_id: user.id,
-      },
-      select: {
-        id: true,
-        resource: true,
-        resident_name: true,
-        unit: true,
-        start_at: true,
-        end_at: true,
-        note: true,
-        status: true,
-        created_at: true,
-        property: { select: { id: true, name: true, address: true, city: true } },
-      },
-    });
-
-    await writeAuditLog(user, {
-      entityType: "booking",
-      entityId: booking.id,
-      action,
-      metadata: {
-        property_id: lease.property_id,
-        property_name: lease.property.name,
-        resource,
-        resident_name: residentName,
-        unit: lease.unit.designation,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        note,
-        status: "confirmed",
-        storage: "Booking",
-        accessMode: "resident_self_service",
-        leaseId: lease.id,
-      },
-    });
-
+    const booking = bookingResult.booking;
     observability.logger.info("resident booking created", observability.elapsed({
       event: "resident_bookings.create.completed",
       userId: user.id,
@@ -356,16 +369,35 @@ export async function PATCH(request: Request) {
       });
     }
 
-    const booking = await db.booking.findFirst({
-      where: {
-        id: bookingId,
-        company_id: user.company_id,
-        created_by_id: user.id,
-        property: { deleted_at: null },
-      },
-      select: { id: true, status: true },
+    const updated = await db.$transaction(async (tx) => {
+      const booking = await tx.booking.findFirst({
+        where: {
+          id: bookingId,
+          company_id: user.company_id,
+          created_by_id: user.id,
+          property: { deleted_at: null },
+        },
+        select: { id: true, status: true },
+      });
+      if (!booking) return null;
+
+      const cancelled = await tx.booking.update({
+        where: { id: booking.id },
+        data: { status: "cancelled" },
+        select: { id: true, status: true },
+      });
+
+      await writeAuditLog(user, {
+        entityType: "booking",
+        entityId: booking.id,
+        action: "booking.cancelled",
+        metadata: { accessMode: "resident_self_service", previousStatus: booking.status },
+      }, tx);
+
+      return cancelled;
     });
-    if (!booking) {
+
+    if (!updated) {
       return reject(observability, {
         status: 404,
         code: API_ERROR_CODES.notFound,
@@ -375,24 +407,11 @@ export async function PATCH(request: Request) {
       });
     }
 
-    const updated = await db.booking.update({
-      where: { id: booking.id },
-      data: { status: "cancelled" },
-      select: { id: true, status: true },
-    });
-
-    await writeAuditLog(user, {
-      entityType: "booking",
-      entityId: booking.id,
-      action: "booking.cancelled",
-      metadata: { accessMode: "resident_self_service", previousStatus: booking.status },
-    });
-
     observability.logger.info("resident booking cancelled", observability.elapsed({
       event: "resident_bookings.cancel.completed",
       userId: user.id,
       companyId: user.company_id,
-      bookingId: booking.id,
+      bookingId: updated.id,
     }));
     return successResponse(observability, { success: true, booking: updated });
   } catch (error) {
