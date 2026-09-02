@@ -54,6 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
   const { id } = await params;
   if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
 
@@ -99,8 +100,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       actorId: user.id,
     };
   } else {
-    const modern = await getModernMaterialEntry(user.company_id, id, entryId);
-    const existing = modern ?? await getMaterialEntry(user.company_id, id, entryId);
+    const modern = await getModernMaterialEntry(companyId, id, entryId);
+    const existing = modern ?? await getMaterialEntry(companyId, id, entryId);
     if (!existing) return NextResponse.json({ error: "Materialraden hittades inte" }, { status: 404 });
     if (!modern) {
       return NextResponse.json({
@@ -127,7 +128,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const material = await db.$transaction(async (tx) => {
-    const persistedMaterial = await upsertMaterialEntry(user.company_id, row, tx);
+    const persistedMaterial = await upsertMaterialEntry(companyId, row, tx);
     await writeAuditLog(user, {
       entityType: "work_order",
       entityId: id,
