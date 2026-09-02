@@ -7,6 +7,7 @@ const {
   loggerInfoMock,
   loggerWarnMock,
   notDeletedFilterMock,
+  propertyCountMock,
   propertyCreateMock,
   propertyFindManyMock,
   transactionMock,
@@ -18,6 +19,7 @@ const {
   loggerInfoMock: vi.fn(),
   loggerWarnMock: vi.fn(),
   notDeletedFilterMock: vi.fn(),
+  propertyCountMock: vi.fn(),
   propertyCreateMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   transactionMock: vi.fn(),
@@ -38,7 +40,7 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/db", () => ({
   default: {
-    property: { findMany: propertyFindManyMock },
+    property: { findMany: propertyFindManyMock, count: propertyCountMock },
     $transaction: transactionMock,
   },
 }));
@@ -48,8 +50,8 @@ import { GET, POST } from "./route";
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const owner = { id: "owner-1", company_id: "company-1", role: "owner" };
 
-function getRequest() {
-  return new Request("https://www.revalta.se/api/properties", {
+function getRequest(query = "") {
+  return new Request(`https://www.revalta.se/api/properties${query}`, {
     headers: { "x-request-id": requestId },
   });
 }
@@ -76,13 +78,14 @@ describe("properties root route", () => {
     });
     notDeletedFilterMock.mockResolvedValue({ deleted_at: null });
     propertyFindManyMock.mockResolvedValue([]);
+    propertyCountMock.mockResolvedValue(0);
     writeAuditLogMock.mockResolvedValue(undefined);
     transactionMock.mockImplementation(async (callback) => callback({
       property: { create: propertyCreateMock },
     }));
   });
 
-  it("lists tenant-scoped properties with correlation, private caching and the existing safety cap", async () => {
+  it("keeps the legacy no-query list tenant scoped and bounded for existing consumers", async () => {
     getCurrentUserMock.mockResolvedValue(owner);
 
     const response = await GET(getRequest());
@@ -96,7 +99,9 @@ describe("properties root route", () => {
       where: { deleted_at: null, company_id: "company-1" },
       take: 2000,
     }));
+    expect(propertyCountMock).not.toHaveBeenCalled();
     expect(body.properties).toEqual([]);
+    expect(body.pagination).toBeUndefined();
     expect(body.permissions.canCreate).toBe(true);
     expect(loggerInfoMock).toHaveBeenCalledWith(
       "property list completed",
@@ -106,8 +111,84 @@ describe("properties root route", () => {
         companyId: "company-1",
         returned: 0,
         canCreate: true,
+        paginated: false,
       }),
     );
+  });
+
+  it("paginates, searches, filters and sorts inside the tenant boundary", async () => {
+    getCurrentUserMock.mockResolvedValue(owner);
+    propertyFindManyMock.mockResolvedValue([{ id: "property-26" }]);
+    propertyCountMock.mockResolvedValue(51);
+
+    const response = await GET(getRequest(
+      "?page=2&pageSize=25&q=kvarn&city=Stockholm&status=active&manager=Anna&sort=name_desc",
+    ));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    const expectedWhere = {
+      deleted_at: null,
+      company_id: "company-1",
+      AND: [
+        {
+          OR: [
+            { name: { contains: "kvarn", mode: "insensitive" } },
+            { address: { contains: "kvarn", mode: "insensitive" } },
+            { city: { contains: "kvarn", mode: "insensitive" } },
+            { property_identifier: { contains: "kvarn", mode: "insensitive" } },
+          ],
+        },
+        { city: "Stockholm" },
+        { status: "active" },
+        { manager_name: "Anna" },
+      ],
+    };
+    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expectedWhere,
+      orderBy: [{ name: "desc" }, { id: "desc" }],
+      skip: 25,
+      take: 25,
+    }));
+    expect(propertyCountMock).toHaveBeenCalledWith({ where: expectedWhere });
+    expect(body.properties).toEqual([{ id: "property-26" }]);
+    expect(body.pagination).toEqual({
+      page: 2,
+      pageSize: 25,
+      total: 51,
+      totalPages: 3,
+      hasPrevious: true,
+      hasNext: true,
+    });
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      "property list completed",
+      expect.objectContaining({
+        paginated: true,
+        page: 2,
+        pageSize: 25,
+        total: 51,
+        returned: 1,
+      }),
+    );
+  });
+
+  it.each([
+    ["?page=0"],
+    ["?page=abc"],
+    ["?pageSize=101"],
+    ["?sort=unknown"],
+    [`?q=${"x".repeat(161)}`],
+  ])("rejects invalid list parameters before querying properties: %s", async (query) => {
+    getCurrentUserMock.mockResolvedValue(owner);
+
+    const response = await GET(getRequest(query));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.errorCode).toBe("VALIDATION_FAILED");
+    expect(body.requestId).toBe(requestId);
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(propertyCountMock).not.toHaveBeenCalled();
   });
 
   it("returns a stable correlated 401 before property data is queried", async () => {

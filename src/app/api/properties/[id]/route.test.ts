@@ -10,6 +10,7 @@ const {
   propertyFindFirstMock,
   propertyUpdateManyMock,
   ticketCountMock,
+  transactionMock,
   workOrderCountMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
@@ -22,6 +23,7 @@ const {
   propertyFindFirstMock: vi.fn(),
   propertyUpdateManyMock: vi.fn(),
   ticketCountMock: vi.fn(),
+  transactionMock: vi.fn(),
   workOrderCountMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
@@ -38,6 +40,7 @@ vi.mock("@/lib/db", () => ({
     lease: { count: leaseCountMock },
     ticket: { count: ticketCountMock },
     workOrder: { count: workOrderCountMock },
+    $transaction: transactionMock,
   },
 }));
 
@@ -86,10 +89,14 @@ describe("properties/[id] route", () => {
     leaseCountMock.mockResolvedValue(0);
     ticketCountMock.mockResolvedValue(0);
     workOrderCountMock.mockResolvedValue(0);
+    transactionMock.mockImplementation(async (callback) => callback({
+      property: { findFirst: propertyFindFirstMock, updateMany: propertyUpdateManyMock },
+      auditLog: {},
+    }));
   });
 
   describe("PATCH", () => {
-    it("updates a tenant-scoped property with correlated private success and audit", async () => {
+    it("updates and audits a tenant-scoped property in one transaction", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock
         .mockResolvedValueOnce({ id: "property-1" })
@@ -106,12 +113,14 @@ describe("properties/[id] route", () => {
       expect(propertyFindFirstMock).toHaveBeenNthCalledWith(1, {
         where: { id: "property-1", deleted_at: null, company_id: "company-1" },
       });
+      expect(transactionMock).toHaveBeenCalledTimes(1);
       expect(propertyUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
         where: { id: "property-1", company_id: "company-1", deleted_at: null },
       }));
       expect(writeAuditLogMock).toHaveBeenCalledWith(
         owner,
         expect.objectContaining({ action: "property.updated", entityId: "property-1" }),
+        expect.anything(),
       );
       expect(loggerInfoMock).toHaveBeenCalledWith(
         "property update completed",
@@ -154,6 +163,7 @@ describe("properties/[id] route", () => {
       expect(body.errorCode).toBe("NOT_FOUND");
       expect(body.requestId).toBe(requestId);
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
+      expect(transactionMock).not.toHaveBeenCalled();
       expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-property");
     });
 
@@ -168,6 +178,7 @@ describe("properties/[id] route", () => {
       expect(body.errorCode).toBe("VALIDATION_FAILED");
       expect(body.requestId).toBe(requestId);
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
+      expect(transactionMock).not.toHaveBeenCalled();
       const logged = JSON.stringify(loggerWarnMock.mock.calls);
       expect(logged).not.toContain("Hemligt namn");
       expect(logged).not.toContain("Stockholm");
@@ -185,6 +196,24 @@ describe("properties/[id] route", () => {
       propertyUpdateManyMock.mockResolvedValue({ count: 0 });
       const raced = await PATCH(patchRequest(validPatchBody), { params });
       expect(raced.status).toBe(404);
+      expect(writeAuditLogMock).not.toHaveBeenCalled();
+    });
+
+    it("fails the transaction if the audit write fails instead of acknowledging a partial update", async () => {
+      getCurrentUserMock.mockResolvedValue(owner);
+      propertyFindFirstMock
+        .mockResolvedValueOnce({ id: "property-1" })
+        .mockResolvedValueOnce(samplePropertyRow);
+      writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+      const response = await PATCH(patchRequest(validPatchBody), { params });
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body.errorCode).toBe("INTERNAL_ERROR");
+      expect(transactionMock).toHaveBeenCalledTimes(1);
+      expect(writeAuditLogMock).toHaveBeenCalledWith(owner, expect.anything(), expect.anything());
+      expect(loggerInfoMock).not.toHaveBeenCalledWith("property update completed", expect.anything());
     });
 
     it("returns a safe correlated 500", async () => {
@@ -206,7 +235,7 @@ describe("properties/[id] route", () => {
   });
 
   describe("DELETE", () => {
-    it("soft-deletes a verified tenant property with correlated private success", async () => {
+    it("soft-deletes and audits a verified tenant property in one transaction", async () => {
       getCurrentUserMock.mockResolvedValue(owner);
       propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
 
@@ -222,6 +251,7 @@ describe("properties/[id] route", () => {
       }));
       expect(ticketCountMock).toHaveBeenCalled();
       expect(workOrderCountMock).toHaveBeenCalled();
+      expect(transactionMock).toHaveBeenCalledTimes(1);
       expect(propertyUpdateManyMock).toHaveBeenCalledWith({
         where: { id: "property-1", company_id: "company-1", deleted_at: null },
         data: { deleted_at: expect.any(Date) },
@@ -229,6 +259,7 @@ describe("properties/[id] route", () => {
       expect(writeAuditLogMock).toHaveBeenCalledWith(
         owner,
         expect.objectContaining({ action: "property.deleted", entityId: "property-1" }),
+        expect.anything(),
       );
       expect(loggerInfoMock).toHaveBeenCalledWith(
         "property delete completed",
@@ -256,6 +287,7 @@ describe("properties/[id] route", () => {
       expect(body.error).toMatch(new RegExp(messagePart));
       expect(body.requestId).toBe(requestId);
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
+      expect(transactionMock).not.toHaveBeenCalled();
     });
 
     it("returns 404 for another tenant without dependency queries or id leakage", async () => {
@@ -269,7 +301,23 @@ describe("properties/[id] route", () => {
       expect(response.status).toBe(404);
       expect(leaseCountMock).not.toHaveBeenCalled();
       expect(propertyUpdateManyMock).not.toHaveBeenCalled();
+      expect(transactionMock).not.toHaveBeenCalled();
       expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-property");
+    });
+
+    it("fails the transaction if audit persistence fails instead of acknowledging a partial delete", async () => {
+      getCurrentUserMock.mockResolvedValue(owner);
+      propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Kvarnhuset", status: "active" });
+      writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+      const response = await DELETE(deleteRequest(), { params });
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body.errorCode).toBe("INTERNAL_ERROR");
+      expect(transactionMock).toHaveBeenCalledTimes(1);
+      expect(writeAuditLogMock).toHaveBeenCalledWith(owner, expect.anything(), expect.anything());
+      expect(loggerInfoMock).not.toHaveBeenCalledWith("property delete completed", expect.anything());
     });
 
     it("returns safe correlated 500 on unexpected failure", async () => {

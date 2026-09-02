@@ -139,27 +139,44 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
     }
 
-    const updateResult = await db.property.updateMany({
-      where: { id, company_id: user.company_id, deleted_at: null },
-      data: {
-        name,
-        address,
-        postal_code: optionalText(body.postalCode),
-        city,
-        property_identifier: optionalText(body.propertyIdentifier),
-        property_type: optionalText(body.propertyType) || "residential",
-        status: optionalText(body.status) || "active",
-        construction_year: constructionYear,
-        total_area: totalArea,
-        boa,
-        loa,
-        manager_name: optionalText(body.managerName),
-        contact_name: optionalText(body.contactName),
-        contact_email: optionalText(body.contactEmail),
-        contact_phone: optionalText(body.contactPhone),
-      },
+    const property = await db.$transaction(async (tx) => {
+      const updateResult = await tx.property.updateMany({
+        where: { id, company_id: user.company_id, deleted_at: null },
+        data: {
+          name,
+          address,
+          postal_code: optionalText(body.postalCode),
+          city,
+          property_identifier: optionalText(body.propertyIdentifier),
+          property_type: optionalText(body.propertyType) || "residential",
+          status: optionalText(body.status) || "active",
+          construction_year: constructionYear,
+          total_area: totalArea,
+          boa,
+          loa,
+          manager_name: optionalText(body.managerName),
+          contact_name: optionalText(body.contactName),
+          contact_email: optionalText(body.contactEmail),
+          contact_phone: optionalText(body.contactPhone),
+        },
+      });
+      if (updateResult.count === 0) return null;
+
+      const updated = await tx.property.findFirst({
+        where: { id, company_id: user.company_id, deleted_at: null },
+      });
+      if (!updated) return null;
+
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: id,
+        action: "property.updated",
+        metadata: { name: updated.name, propertyIdentifier: updated.property_identifier },
+      }, tx);
+      return updated;
     });
-    if (updateResult.count === 0) {
+
+    if (!property) {
       return reject(observability, {
         status: 404,
         code: API_ERROR_CODES.notFound,
@@ -168,26 +185,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         context: { userId: user.id, companyId: user.company_id, propertyId: existing.id },
       });
     }
-
-    const property = await db.property.findFirst({
-      where: { id, company_id: user.company_id, deleted_at: null },
-    });
-    if (!property) {
-      return reject(observability, {
-        status: 404,
-        code: API_ERROR_CODES.notFound,
-        message: "Fastigheten hittades inte",
-        event: "properties.update.not_found_after_refetch",
-        context: { userId: user.id, companyId: user.company_id, propertyId: existing.id },
-      });
-    }
-
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: id,
-      action: "property.updated",
-      metadata: { name: property.name, propertyIdentifier: property.property_identifier },
-    });
 
     observability.logger.info("property update completed", observability.elapsed({
       event: "properties.update.completed",
@@ -294,11 +291,23 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (openTickets > 0) return conflict("Fastigheten kan inte tas bort medan det finns öppna ärenden", "open_tickets", openTickets);
     if (openWorkOrders > 0) return conflict("Fastigheten kan inte tas bort medan det finns öppna arbetsordrar", "open_work_orders", openWorkOrders);
 
-    const deleteResult = await db.property.updateMany({
-      where: { id: existing.id, company_id: user.company_id, deleted_at: null },
-      data: { deleted_at: new Date() },
+    const deleted = await db.$transaction(async (tx) => {
+      const deleteResult = await tx.property.updateMany({
+        where: { id: existing.id, company_id: user.company_id, deleted_at: null },
+        data: { deleted_at: new Date() },
+      });
+      if (deleteResult.count === 0) return false;
+
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: existing.id,
+        action: "property.deleted",
+        metadata: { name: existing.name, previousStatus: existing.status, softDelete: true },
+      }, tx);
+      return true;
     });
-    if (deleteResult.count === 0) {
+
+    if (!deleted) {
       return reject(observability, {
         status: 404,
         code: API_ERROR_CODES.notFound,
@@ -307,13 +316,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         context: { userId: user.id, companyId: user.company_id, propertyId: existing.id },
       });
     }
-
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: existing.id,
-      action: "property.deleted",
-      metadata: { name: existing.name, previousStatus: existing.status, softDelete: true },
-    });
 
     observability.logger.info("property delete completed", observability.elapsed({
       event: "properties.delete.completed",
