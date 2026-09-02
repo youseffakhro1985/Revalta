@@ -45,7 +45,7 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const tx = { marker: "invoice-export-tx" };
@@ -64,7 +64,7 @@ const invoice = {
   source: "table",
 };
 
-function existingJob(status: string) {
+function existingJob(status: string, overrides: Record<string, unknown> = {}) {
   return {
     jobId: `job-${status}`,
     workOrderId: "wo-1",
@@ -75,10 +75,11 @@ function existingJob(status: string) {
     createdById: "manager-1",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    ...overrides,
   };
 }
 
-describe("work-order invoice integration — logical export idempotency", () => {
+describe("work-order invoice integration — logical export idempotency and reconciliation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("INVOICE_WEBHOOK_URL", "https://billing.example.test/invoices");
@@ -202,6 +203,142 @@ describe("work-order invoice integration — logical export idempotency", () => 
     expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
   });
 
+  it("marks only stale modern processing jobs as eligible for manual reconciliation", async () => {
+    listInvoiceExportJobsMock.mockResolvedValue([
+      existingJob("processing", {
+        jobId: "stale-job",
+        source: "table",
+        processingStartedAt: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
+      }),
+      existingJob("processing", {
+        jobId: "fresh-job",
+        source: "table",
+        processingStartedAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+      }),
+      existingJob("processing", {
+        jobId: "legacy-job",
+        source: "legacy",
+        processingStartedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+      }),
+    ]);
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-integration"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.jobs.find((job: { jobId: string }) => job.jobId === "stale-job").reconciliationEligible).toBe(true);
+    expect(body.jobs.find((job: { jobId: string }) => job.jobId === "fresh-job").reconciliationEligible).toBe(false);
+    expect(body.jobs.find((job: { jobId: string }) => job.jobId === "legacy-job").reconciliationEligible).toBe(false);
+  });
+
+  it("refuses reconciliation while a processing job can still be active", async () => {
+    getModernInvoiceExportJobMock.mockResolvedValue(existingJob("processing", {
+      processingStartedAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+      source: "table",
+    }));
+
+    const response = await POST(request({
+      action: "reconcile",
+      jobId: "job-processing",
+      resolution: "sent",
+      note: "Kontrollerad hos leverantören och bekräftad som skickad.",
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("fortfarande aktivt");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("reconciles a stale processing job as sent with job state and audit in one transaction", async () => {
+    const stale = existingJob("processing", {
+      processingStartedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+      source: "table",
+      externalId: null,
+    });
+    getModernInvoiceExportJobMock.mockResolvedValue(stale);
+
+    const response = await POST(request({
+      action: "reconcile",
+      jobId: "job-processing",
+      resolution: "sent",
+      note: "Kontrollerad manuellt hos Fortnox och fakturan är mottagen.",
+      externalId: "FTX-12345",
+    }), params);
+
+    expect(response.status).toBe(201);
+    expect(upsertInvoiceExportJobMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({
+        status: "sent",
+        externalId: "FTX-12345",
+        actedById: "manager-1",
+        sentAt: expect.any(String),
+      }),
+      tx,
+    );
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "manager-1", company_id: "company-1" }),
+      expect.objectContaining({
+        action: "work_order.invoice_integration_reconcile_sent",
+        metadata: expect.objectContaining({
+          reconciliationResolution: "sent",
+          reconciliationNote: "Kontrollerad manuellt hos Fortnox och fakturan är mottagen.",
+          externalId: "FTX-12345",
+        }),
+      }),
+      tx,
+    );
+  });
+
+  it("reconciles a stale processing job as failed without making it look provider-accepted", async () => {
+    getModernInvoiceExportJobMock.mockResolvedValue(existingJob("processing", {
+      processingStartedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+      source: "table",
+    }));
+
+    const response = await POST(request({
+      action: "reconcile",
+      jobId: "job-processing",
+      resolution: "failed",
+      note: "Kontrollerad hos leverantören; ingen faktura skapades externt.",
+    }), params);
+
+    expect(response.status).toBe(201);
+    expect(upsertInvoiceExportJobMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({
+        status: "failed",
+        error: "Kontrollerad hos leverantören; ingen faktura skapades externt.",
+        failedAt: expect.any(String),
+      }),
+      tx,
+    );
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "work_order.invoice_integration_reconcile_failed" }),
+      tx,
+    );
+  });
+
+  it("requires a meaningful reconciliation note", async () => {
+    getModernInvoiceExportJobMock.mockResolvedValue(existingJob("processing", {
+      processingStartedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+      source: "table",
+    }));
+
+    const response = await POST(request({
+      action: "reconcile",
+      jobId: "job-processing",
+      resolution: "sent",
+      note: "ok",
+    }), params);
+
+    expect(response.status).toBe(400);
+    expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("persists the export job and mandatory audit event in the same transaction", async () => {
     const response = await POST(request({ action: "queue", provider: "webhook" }), params);
 
@@ -233,6 +370,32 @@ describe("work-order invoice integration — logical export idempotency", () => 
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ action: "work_order.invoice_integration_queue" }),
+      tx,
+    );
+  });
+
+  it("does not report reconciliation success when mandatory audit persistence fails", async () => {
+    getModernInvoiceExportJobMock.mockResolvedValue(existingJob("processing", {
+      processingStartedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+      source: "table",
+    }));
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+    await expect(POST(request({
+      action: "reconcile",
+      jobId: "job-processing",
+      resolution: "sent",
+      note: "Kontrollerad hos leverantören och bekräftad som skickad.",
+    }), params)).rejects.toThrow("audit unavailable");
+
+    expect(upsertInvoiceExportJobMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({ status: "sent" }),
+      tx,
+    );
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "work_order.invoice_integration_reconcile_sent" }),
       tx,
     );
   });

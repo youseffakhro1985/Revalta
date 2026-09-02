@@ -14,6 +14,7 @@ import {
 
 const providers = new Set(["fortnox", "visma", "webhook"]);
 const activeStatuses = new Set(["queued", "processing"]);
+const RECONCILIATION_STALE_MS = 10 * 60 * 1000;
 
 function configured(provider: string) {
   if (provider === "fortnox") return Boolean(process.env.FORTNOX_ACCESS_TOKEN && process.env.FORTNOX_INVOICE_ENDPOINT);
@@ -42,6 +43,13 @@ function duplicateExportError(status: string) {
   return "Samma fakturaversion har redan ett exportjobb för leverantören";
 }
 
+function staleProcessingStartedAt(value: string | null | undefined) {
+  if (!value) return null;
+  const startedAt = new Date(value);
+  if (Number.isNaN(startedAt.getTime())) return null;
+  return Date.now() - startedAt.getTime() >= RECONCILIATION_STALE_MS ? startedAt : null;
+}
+
 async function getOrder(id: string, companyId: string) {
   return db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } }, select: { id: true, title: true } });
 }
@@ -60,7 +68,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     listInvoiceExportJobs(user.company_id, id),
     getLatestInvoiceDraft(user.company_id, id),
   ]);
-  const rows = jobs.sort((a, b) => String(b.updatedAt ?? b.createdAt).localeCompare(String(a.updatedAt ?? a.createdAt)));
+  const rows = jobs
+    .sort((a, b) => String(b.updatedAt ?? b.createdAt).localeCompare(String(a.updatedAt ?? a.createdAt)))
+    .map((job) => ({
+      ...job,
+      reconciliationEligible: job.source === "table" && job.status === "processing" && Boolean(staleProcessingStartedAt(job.processingStartedAt)),
+    }));
 
   return NextResponse.json({
     providers: [
@@ -90,9 +103,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
   }
   const action = String(body.action ?? "queue");
-  if (!["queue", "retry", "cancel"].includes(action)) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
+  if (!["queue", "retry", "cancel", "reconcile"].includes(action)) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
   const now = new Date().toISOString();
   let payload: InvoiceExportJobPayload;
+  let auditAction = `work_order.invoice_integration_${action}`;
+  let reconciliationNote: string | null = null;
+  let reconciliationResolution: "sent" | "failed" | null = null;
 
   if (action === "queue") {
     const provider = String(body.provider ?? "");
@@ -170,15 +186,47 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (action === "cancel" && currentStatus !== "queued") {
       return NextResponse.json({ error: "Endast köade exportjobb kan avbrytas säkert" }, { status: 409 });
     }
+    if (action === "reconcile") {
+      if (currentStatus !== "processing") {
+        return NextResponse.json({ error: "Endast exportjobb som väntar på avstämning kan hanteras manuellt" }, { status: 409 });
+      }
+      if (!staleProcessingStartedAt(existing.processingStartedAt)) {
+        return NextResponse.json({ error: "Exportjobbet är fortfarande aktivt eller saknar säker avstämningsålder" }, { status: 409 });
+      }
+      const resolution = String(body.resolution ?? "");
+      if (resolution !== "sent" && resolution !== "failed") {
+        return NextResponse.json({ error: "Avstämningen måste markeras som skickad eller misslyckad" }, { status: 400 });
+      }
+      const note = String(body.note ?? "").trim();
+      if (note.length < 10 || note.length > 1000) {
+        return NextResponse.json({ error: "Avstämningsnoteringen måste vara 10–1000 tecken" }, { status: 400 });
+      }
+      const externalId = String(body.externalId ?? "").trim();
+      if (externalId.length > 200) return NextResponse.json({ error: "Externt ID är för långt" }, { status: 400 });
 
-    payload = {
-      ...existing,
-      status: action === "cancel" ? "cancelled" : "queued",
-      attempt: Number(existing.attempt ?? 0) + (action === "retry" ? 1 : 0),
-      updatedAt: now,
-      error: null,
-      actedById: user.id,
-    };
+      reconciliationNote = note;
+      reconciliationResolution = resolution;
+      auditAction = `work_order.invoice_integration_reconcile_${resolution}`;
+      payload = {
+        ...existing,
+        status: resolution,
+        updatedAt: now,
+        actedById: user.id,
+        error: resolution === "failed" ? note : null,
+        sentAt: resolution === "sent" ? now : existing.sentAt ?? null,
+        failedAt: resolution === "failed" ? now : null,
+        externalId: resolution === "sent" ? (externalId || existing.externalId || null) : existing.externalId ?? null,
+      };
+    } else {
+      payload = {
+        ...existing,
+        status: action === "cancel" ? "cancelled" : "queued",
+        attempt: Number(existing.attempt ?? 0) + (action === "retry" ? 1 : 0),
+        updatedAt: now,
+        error: null,
+        actedById: user.id,
+      };
+    }
   }
 
   const job = await db.$transaction(async (tx) => {
@@ -186,7 +234,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await writeAuditLog(user, {
       entityType: "work_order",
       entityId: id,
-      action: `work_order.invoice_integration_${action}`,
+      action: auditAction,
       metadata: {
         jobId: payload.jobId,
         provider: payload.provider,
@@ -194,6 +242,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         attempt: payload.attempt,
         invoiceVersionId: payload.invoiceVersionId,
         storage: "WorkOrderInvoiceExportJob",
+        ...(reconciliationResolution ? {
+          reconciliationResolution,
+          reconciliationNote,
+          externalId: payload.externalId ?? null,
+          processingStartedAt: payload.processingStartedAt ?? null,
+        } : {}),
       },
     }, tx);
     return persistedJob;
