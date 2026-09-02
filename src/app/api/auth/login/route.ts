@@ -53,13 +53,37 @@ export async function POST(request: Request) {
       });
     }
 
-    const user = await db.user.findUnique({ where: { email: normalizedEmail }, include: { company: { select: { status: true } } } });
+    const user = await db.user.findUnique({
+      where: { email: normalizedEmail },
+      include: {
+        company: { select: { status: true } },
+        email_verification_tokens: { select: { id: true }, take: 1 },
+      },
+    });
     const valid = await comparePassword(password, user?.password || INVALID_ACCOUNT_PASSWORD_HASH);
     if (!user || !valid || user.status !== "active" || (user.company && user.company.status !== "active")) {
       return apiErrorResponse({
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Ogiltiga uppgifter",
+        requestId: observability.requestId,
+      });
+    }
+
+    // Backward-compatible rollout: legacy accounts predate the verification-token
+    // flow and may legitimately have email_verified_at = null. Only accounts with
+    // token history are known to have been enrolled in email verification.
+    const requiresEmailVerification =
+      user.email_verified_at === null && user.email_verification_tokens.length > 0;
+    if (requiresEmailVerification) {
+      observability.logger.info("auth login requires email verification", observability.elapsed({
+        event: "auth.login.email_verification_required",
+        userId: user.id,
+      }));
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.emailVerificationRequired,
+        message: "Verifiera din e-postadress innan du loggar in.",
         requestId: observability.requestId,
       });
     }
