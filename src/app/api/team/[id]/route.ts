@@ -1,6 +1,5 @@
 import db from "@/lib/db";
 import { canGrantTeamRole, canManageTeam, getCurrentUser } from "@/lib/current-user";
-import { updateOwnedByCompany } from "@/lib/tenant-writes";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
@@ -9,15 +8,6 @@ const logger = createLogger({ route: "/api/team/[id]" });
 
 const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer", "resident"]);
 const allowedStatuses = new Set(["active", "inactive"]);
-
-type TeamMemberRecord = {
-  id: string;
-  name: string | null;
-  email: string;
-  role: string;
-  status: string;
-  created_at: Date;
-};
 
 const memberSelect = {
   id: true,
@@ -38,6 +28,19 @@ const memberSelect = {
   },
 };
 
+class TeamMutationConflict extends Error {
+  constructor() {
+    super("Teammedlemmen ändrades samtidigt");
+    this.name = "TeamMutationConflict";
+  }
+}
+
+type TeamMutationResult =
+  | { kind: "not_found" }
+  | { kind: "forbidden_member" }
+  | { kind: "last_owner" }
+  | { kind: "ok"; member: unknown };
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
@@ -45,6 +48,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!user.company_id || !canManageTeam(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att hantera teammedlemmar" }, { status: 403 });
     }
+    const companyId = user.company_id;
 
     const { id: targetId } = await params;
     if (targetId === user.id) {
@@ -52,16 +56,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         { error: "Du kan inte ändra ditt eget konto här — använd kontoinställningarna" },
         { status: 400 },
       );
-    }
-
-    const target = await db.user.findFirst({
-      where: { id: targetId, company_id: user.company_id },
-      select: { id: true, role: true, status: true },
-    });
-    if (!target) return NextResponse.json({ error: "Teammedlemmen hittades inte" }, { status: 404 });
-
-    if (!canGrantTeamRole(user.role, target.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att ändra den här medlemmen" }, { status: 403 });
     }
 
     const body = (await request.json().catch(() => null)) as { role?: unknown; status?: unknown } | null;
@@ -81,48 +75,75 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
     }
 
-    const demotesFromOwner = requestedRole !== undefined && target.role === "owner" && requestedRole !== "owner";
-    const deactivatesOwner = requestedStatus === "inactive" && target.role === "owner" && target.status === "active";
-    if (demotesFromOwner || deactivatesOwner) {
-      const otherActiveOwners = await db.user.count({
-        where: { company_id: user.company_id, role: "owner", status: "active", id: { not: targetId } },
-      });
-      if (otherActiveOwners === 0) {
-        return NextResponse.json(
-          { error: "Företaget måste ha minst en aktiv ägare" },
-          { status: 400 },
-        );
-      }
-    }
-
     const data: Record<string, unknown> = {};
     if (requestedRole !== undefined) data.role = requestedRole;
     if (requestedStatus !== undefined) data.status = requestedStatus;
 
-    const updated = await updateOwnedByCompany<TeamMemberRecord>(
-      "user",
-      { id: targetId, companyId: user.company_id, data },
-      db,
-    );
-    if (!updated) return NextResponse.json({ error: "Teammedlemmen hittades inte" }, { status: 404 });
+    const lockKey = `team-membership:${companyId}`;
+    const result = await db.$transaction<TeamMutationResult>(async (tx) => {
+      // Serialize privilege mutations for one company. This makes the last-owner
+      // invariant race-safe when two owners are changed concurrently.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
-    const member = await db.user.findFirst({
-      where: { id: targetId, company_id: user.company_id },
-      select: memberSelect,
+      const target = await tx.user.findFirst({
+        where: { id: targetId, company_id: companyId },
+        select: { id: true, role: true, status: true },
+      });
+      if (!target) return { kind: "not_found" };
+
+      if (!canGrantTeamRole(user.role, target.role)) {
+        return { kind: "forbidden_member" };
+      }
+
+      const demotesFromOwner = requestedRole !== undefined && target.role === "owner" && requestedRole !== "owner";
+      const deactivatesOwner = requestedStatus === "inactive" && target.role === "owner" && target.status === "active";
+      if (demotesFromOwner || deactivatesOwner) {
+        const otherActiveOwners = await tx.user.count({
+          where: { company_id: companyId, role: "owner", status: "active", id: { not: targetId } },
+        });
+        if (otherActiveOwners === 0) return { kind: "last_owner" };
+      }
+
+      const update = await tx.user.updateMany({
+        where: { id: targetId, company_id: companyId },
+        data,
+      });
+      if (update.count !== 1) return { kind: "not_found" };
+
+      const member = await tx.user.findFirst({
+        where: { id: targetId, company_id: companyId },
+        select: memberSelect,
+      });
+      if (!member) throw new TeamMutationConflict();
+
+      await writeAuditLog(user, {
+        entityType: "user",
+        entityId: targetId,
+        action: requestedStatus !== undefined ? "team.member_status_changed" : "team.member_role_changed",
+        metadata: {
+          ...(requestedRole !== undefined ? { previousRole: target.role, role: requestedRole } : {}),
+          ...(requestedStatus !== undefined ? { previousStatus: target.status, status: requestedStatus } : {}),
+        },
+      }, tx);
+
+      return { kind: "ok", member };
     });
 
-    await writeAuditLog(user, {
-      entityType: "user",
-      entityId: targetId,
-      action: requestedStatus !== undefined ? "team.member_status_changed" : "team.member_role_changed",
-      metadata: {
-        ...(requestedRole !== undefined ? { previousRole: target.role, role: requestedRole } : {}),
-        ...(requestedStatus !== undefined ? { previousStatus: target.status, status: requestedStatus } : {}),
-      },
-    });
+    if (result.kind === "not_found") {
+      return NextResponse.json({ error: "Teammedlemmen hittades inte" }, { status: 404 });
+    }
+    if (result.kind === "forbidden_member") {
+      return NextResponse.json({ error: "Du saknar behörighet att ändra den här medlemmen" }, { status: 403 });
+    }
+    if (result.kind === "last_owner") {
+      return NextResponse.json({ error: "Företaget måste ha minst en aktiv ägare" }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true, member });
+    return NextResponse.json({ success: true, member: result.member });
   } catch (error) {
+    if (error instanceof TeamMutationConflict) {
+      return NextResponse.json({ error: "Teammedlemmen ändrades samtidigt. Ladda om och försök igen." }, { status: 409 });
+    }
     logger.error("Update team member error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
