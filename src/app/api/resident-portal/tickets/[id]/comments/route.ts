@@ -125,43 +125,57 @@ export async function POST(
       ? (ticket.reporter_email || user.email)
       : user.email;
 
-    const comment = await db.ticketComment.create({
-      data: {
-        ticket_id: ticket.id,
-        user_id: isResident(user.role) ? ticket.user_id : user.id,
-        body,
-        is_internal: false,
-        author_type: authorType,
-        author_name: authorName,
-        author_email: authorEmail,
-      },
-      select: {
-        id: true,
-        body: true,
-        created_at: true,
-        author_type: true,
-        author_name: true,
-      },
-    });
+    const comment = await db.$transaction(async (tx) => {
+      const created = await tx.ticketComment.create({
+        data: {
+          ticket_id: ticket.id,
+          user_id: isResident(user.role) ? ticket.user_id : user.id,
+          body,
+          is_internal: false,
+          author_type: authorType,
+          author_name: authorName,
+          author_email: authorEmail,
+        },
+        select: {
+          id: true,
+          body: true,
+          created_at: true,
+          author_type: true,
+          author_name: true,
+        },
+      });
 
-    await writeAuditLog(user, {
-      entityType: "ticket",
-      entityId: ticket.id,
-      action: isResident(user.role) ? "resident_portal.comment_created" : "ticket.comment_created",
-      metadata: {
-        commentId: comment.id,
-        accessMode: isResident(user.role) ? "resident_self_service" : "operations",
-        schemaVersion: 2,
-      },
+      await writeAuditLog(user, {
+        entityType: "ticket",
+        entityId: ticket.id,
+        action: isResident(user.role) ? "resident_portal.comment_created" : "ticket.comment_created",
+        metadata: {
+          commentId: created.id,
+          accessMode: isResident(user.role) ? "resident_self_service" : "operations",
+          schemaVersion: 2,
+        },
+      }, tx);
+
+      return created;
     });
 
     if (isResident(user.role) && ticket.company_id) {
-      await queueTicketNotification({ company_id: ticket.company_id }, {
-        ticketId: ticket.id,
-        title: ticket.title,
-        recipient: authorEmail,
-        event: "commented",
-      });
+      try {
+        await queueTicketNotification({ company_id: ticket.company_id }, {
+          ticketId: ticket.id,
+          title: ticket.title,
+          recipient: authorEmail,
+          event: "commented",
+        });
+      } catch {
+        observability.logger.warn("resident ticket comment notification failed", observability.elapsed({
+          event: "resident_tickets.comments.notification_failed",
+          userId: user.id,
+          companyId: user.company_id,
+          ticketId: ticket.id,
+          commentId: comment.id,
+        }));
+      }
     }
 
     observability.logger.info("resident ticket comment created", observability.elapsed({
