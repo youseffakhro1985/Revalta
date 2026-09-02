@@ -101,10 +101,6 @@ describe("inspections/[id]/work-order route", () => {
   };
 
   it("returns 409 without creating a work order when a concurrent request already holds the lock", async () => {
-    // Regression test: two concurrent POSTs used to both pass the
-    // work_order_id === null check before either transaction committed,
-    // creating two real WorkOrder rows for one inspection. The advisory
-    // lock must reject the loser instead of letting it create anything.
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     inspectionFindFirstMock.mockResolvedValue(validInspection);
     const tx = { $queryRaw: vi.fn().mockResolvedValue([{ locked: false }]) };
@@ -141,7 +137,7 @@ describe("inspections/[id]/work-order route", () => {
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
-  it("creates exactly one work order and links it back when the lock is held and nothing else won the race", async () => {
+  it("creates exactly one work order, links it back and writes audit in the same transaction", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     inspectionFindFirstMock.mockResolvedValue(validInspection);
     const workOrderCreateMock = vi.fn().mockResolvedValue({ id: "work-order-new" });
@@ -168,12 +164,45 @@ describe("inspections/[id]/work-order route", () => {
       data: { work_order_id: "work-order-new" },
     }));
     expect(body).toEqual(expect.objectContaining({ success: true, workOrderId: "work-order-new" }));
-    expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", company_id: "company-1" }),
+      expect.objectContaining({
+        entityType: "compliance_inspection",
+        entityId: "inspection-1",
+        action: "inspection.work_order_created",
+        metadata: expect.objectContaining({ workOrderId: "work-order-new", propertyId: "property-1" }),
+      }),
+      tx,
+    );
+  });
+
+  it("returns 500 when mandatory audit fails inside the transaction instead of committing a silent partial success", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    inspectionFindFirstMock.mockResolvedValue(validInspection);
+    const workOrderCreateMock = vi.fn().mockResolvedValue({ id: "work-order-new" });
+    const updateManyMock = vi.fn().mockResolvedValue({ count: 1 });
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
+      complianceInspection: {
+        findFirst: vi.fn().mockResolvedValue({ work_order_id: null }),
+        updateMany: updateManyMock,
+      },
+      workOrder: { create: workOrderCreateMock },
+    };
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+    transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => callback(tx));
+
+    const response = await POST(new Request("http://localhost/api/inspections/inspection-1/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "inspection-1" }) });
+
+    expect(response.status).toBe(500);
+    expect(workOrderCreateMock).toHaveBeenCalledTimes(1);
+    expect(updateManyMock).toHaveBeenCalledTimes(1);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx);
   });
 
   it("returns 500 without reporting success if the in-lock updateMany somehow links zero rows", async () => {
-    // Belt-and-suspenders: even inside the lock, never claim success for a
-    // work order that didn't actually get linked back to the inspection.
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     inspectionFindFirstMock.mockResolvedValue(validInspection);
     const tx = {
