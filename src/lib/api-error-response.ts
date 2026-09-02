@@ -6,6 +6,7 @@ export const API_ERROR_CODES = {
   untrustedMutation: "UNTRUSTED_MUTATION",
   residentPortalOnly: "RESIDENT_PORTAL_ONLY",
   unauthorized: "UNAUTHORIZED",
+  emailVerificationRequired: "EMAIL_VERIFICATION_REQUIRED",
   validationFailed: "VALIDATION_FAILED",
   notFound: "NOT_FOUND",
   conflict: "CONFLICT",
