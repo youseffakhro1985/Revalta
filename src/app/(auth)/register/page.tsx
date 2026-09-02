@@ -43,7 +43,7 @@ export default function RegisterPage() {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        router.push("/login");
+        router.push("/login?registered=1");
       } else {
         const data = await readResponseJson(res);
         setError(data.error || "Kunde inte skapa konto");

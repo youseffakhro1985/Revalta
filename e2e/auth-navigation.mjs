@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright";
 
 const baseUrl = String(process.env.E2E_BASE_URL || "").replace(/\/$/, "");
@@ -6,6 +7,7 @@ const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
 const allowHttpLocalhost = String(process.env.E2E_ALLOW_HTTP_LOCALHOST || "").trim() === "1";
 const RESET_MAX_LATENCY_MS = 8_000;
 const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
+const VERIFY_RESEND_NEUTRAL_MESSAGE = "Om kontot behöver verifieras skickar vi en ny verifieringslänk.";
 const REGISTER_MAX_LATENCY_MS = 8_000;
 const REGISTER_REQUEST_EMIT_TIMEOUT_MS = 5_000;
 const REGISTER_DIAGNOSTIC_TIMEOUT_MS = 20_000;
@@ -46,6 +48,24 @@ async function waitForValue(read, timeout, label) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   fail(`${label} within ${timeout}ms`);
+}
+
+async function markLocalAccountVerified() {
+  if (!isAllowedLocalOrigin) return false;
+
+  const prisma = new PrismaClient();
+  try {
+    const result = await prisma.user.updateMany({
+      where: { email },
+      data: { email_verified_at: new Date() },
+    });
+    if (result.count !== 1) {
+      fail(`local verification fixture expected one user for ${email}, updated ${result.count}`);
+    }
+    return true;
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 const extraHTTPHeaders = isHttpsOrigin && bypass
@@ -171,73 +191,127 @@ try {
   console.log(`register API: HTTP 201 in ${registerLatencyMs}ms (limit ${REGISTER_MAX_LATENCY_MS}ms)`);
   await expectPath(page, "/login");
   await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after registration");
+  await expectVisible(
+    page.getByText("Kontot är skapat. Kontrollera din e-post och verifiera adressen innan du loggar in.", { exact: true }),
+    "registration verification notice",
+  );
   console.log("register: browser flow passed");
 
-  // Login through the real form.
+  // A freshly registered account must not receive a session before proving
+  // email ownership. This is intentionally the opposite of the pre-hardening
+  // browser contract and protects against bypassing email verification.
   await page.getByLabel("E-post").fill(email);
   await page.getByLabel("Lösenord").fill(password);
+  const blockedLoginResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/auth/login") && response.request().method() === "POST",
+    { timeout: 10_000 },
+  );
   await page.getByRole("button", { name: "Logga in" }).click();
-  await expectPath(page, "/dashboard");
-  await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
-  console.log("login: browser flow passed");
-
-  // Desktop critical navigation: compact IA + expandable Drift.
-  await expectVisible(page.getByRole("link", { name: "Översikt", exact: true }), "Översikt navigation");
-  await expectVisible(page.getByRole("button", { name: "Drift" }), "Drift navigation group");
-  await page.getByRole("button", { name: "Drift" }).click();
-  const desktopNavigation = page.getByRole("navigation", { name: "Dashboardmeny" });
-  await expectVisible(desktopNavigation.getByRole("link", { name: "Ärenden", exact: true }), "Ärenden navigation");
-  await expectVisible(desktopNavigation.getByRole("link", { name: "Arbetsordrar", exact: true }), "Arbetsordrar navigation");
-  await expectVisible(desktopNavigation.getByRole("link", { name: "Kalender", exact: true }), "Kalender navigation");
-  for (const nestedLabel of ["Arbetsorderöversikt", "Planering", "Återkommande"]) {
-    if (await desktopNavigation.getByRole("link", { name: nestedLabel, exact: true }).count()) {
-      fail(`${nestedLabel} leaked into the global Drift navigation`);
-    }
+  const blockedLoginResponse = await blockedLoginResponsePromise;
+  if (blockedLoginResponse.status() !== 403) {
+    fail(`fresh account login returned HTTP ${blockedLoginResponse.status()} instead of 403`);
   }
-  console.log("critical desktop navigation: passed");
-
-  // Command Center must be the single global search surface.
-  await page.keyboard.press("Control+K");
-  const commandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
-  await expectVisible(commandCenter, "Command Center dialog");
-  await expectVisible(commandCenter.getByText("Navigera", { exact: true }), "Command Center navigation section");
-  const commandInput = commandCenter.getByLabel("Sök i Revalta eller välj kommando");
-  await commandInput.fill(`missing-${runId}`);
-  await expectVisible(commandCenter.getByText(/Inga träffar för/i), "Command Center empty search state");
-  await page.getByRole("button", { name: "Stäng Command Center" }).click();
-  console.log("global search / Command Center: passed");
-
-  // Mobile menu and mobile Command Center must both remain reachable.
-  await page.setViewportSize({ width: 390, height: 844 });
-  const mobileMenuButton = page.getByRole("button", { name: "Öppna meny" });
-  await expectVisible(mobileMenuButton, "mobile menu button");
-  await mobileMenuButton.click();
-  const mobileMenu = page.getByRole("dialog", { name: "Dashboardmeny" });
-  await expectVisible(mobileMenu, "mobile dashboard menu");
-  await expectVisible(mobileMenu.getByRole("link", { name: "Fastigheter", exact: true }), "mobile Fastigheter navigation");
-  await expectVisible(mobileMenu.getByRole("button", { name: "Drift" }), "mobile Drift navigation group");
-  const mobilePanel = mobileMenu.getByRole("complementary");
-  await mobilePanel.getByRole("button", { name: "Stäng meny" }).click();
-
-  const mobileCommandButton = page.getByRole("button", { name: "Öppna Revalta Command Center" });
-  await expectVisible(mobileCommandButton, "mobile Command Center trigger");
-  await mobileCommandButton.click();
-  const mobileCommandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
-  await expectVisible(mobileCommandCenter, "mobile Command Center dialog");
-  await mobileCommandCenter.getByRole("button", { name: "Stäng Command Center" }).click();
-  console.log("mobile navigation + Command Center: passed");
-
-  // Logout and verify the protected dashboard is no longer the active surface.
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  const logout = page.getByRole("button", { name: "Logga ut" }).first();
-  await expectVisible(logout, "logout button");
-  await logout.click();
+  const blockedLoginBody = await blockedLoginResponse.json();
+  if (blockedLoginBody?.errorCode !== "EMAIL_VERIFICATION_REQUIRED") {
+    fail("fresh account login did not return EMAIL_VERIFICATION_REQUIRED");
+  }
   await expectPath(page, "/login");
-  await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after logout");
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
-  await expectPath(page, "/login");
-  await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after protected redirect");
-  console.log("logout + protected dashboard redirect: passed");
+  await expectVisible(
+    page.getByText("Verifiera din e-postadress innan du loggar in.", { exact: true }),
+    "email-verification-required error",
+  );
+  await expectVisible(page.getByRole("button", { name: "Skicka ny verifieringslänk" }), "verification resend action");
+  console.log("email verification gate: unverified login correctly blocked");
+
+  const resendResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith("/api/auth/email-verification/resend") && response.request().method() === "POST",
+    { timeout: 10_000 },
+  );
+  await page.getByRole("button", { name: "Skicka ny verifieringslänk" }).click();
+  const resendResponse = await resendResponsePromise;
+  if (resendResponse.status() !== 200) {
+    fail(`verification resend returned HTTP ${resendResponse.status()}`);
+  }
+  const resendBody = await resendResponse.json();
+  if (resendBody?.message !== VERIFY_RESEND_NEUTRAL_MESSAGE) {
+    fail("verification resend did not preserve the neutral anti-enumeration response");
+  }
+  await expectVisible(page.getByText(VERIFY_RESEND_NEUTRAL_MESSAGE, { exact: true }), "neutral verification resend confirmation");
+  console.log("email verification resend: neutral browser flow passed");
+
+  if (isAllowedLocalOrigin) {
+    // The isolated local fallback owns its Postgres fixture, so it can mark the
+    // just-created account verified strictly to continue the dashboard/navigation
+    // smoke suite. Verification-token semantics themselves are covered by route
+    // tests; no production or Preview database is ever mutated by this fixture.
+    await markLocalAccountVerified();
+    await page.getByRole("button", { name: "Logga in" }).click();
+    await expectPath(page, "/dashboard");
+    await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
+    console.log("verified login: local isolated browser flow passed");
+
+    // Desktop critical navigation: compact IA + expandable Drift.
+    await expectVisible(page.getByRole("link", { name: "Översikt", exact: true }), "Översikt navigation");
+    await expectVisible(page.getByRole("button", { name: "Drift" }), "Drift navigation group");
+    await page.getByRole("button", { name: "Drift" }).click();
+    const desktopNavigation = page.getByRole("navigation", { name: "Dashboardmeny" });
+    await expectVisible(desktopNavigation.getByRole("link", { name: "Ärenden", exact: true }), "Ärenden navigation");
+    await expectVisible(desktopNavigation.getByRole("link", { name: "Arbetsordrar", exact: true }), "Arbetsordrar navigation");
+    await expectVisible(desktopNavigation.getByRole("link", { name: "Kalender", exact: true }), "Kalender navigation");
+    for (const nestedLabel of ["Arbetsorderöversikt", "Planering", "Återkommande"]) {
+      if (await desktopNavigation.getByRole("link", { name: nestedLabel, exact: true }).count()) {
+        fail(`${nestedLabel} leaked into the global Drift navigation`);
+      }
+    }
+    console.log("critical desktop navigation: passed");
+
+    // Command Center must be the single global search surface.
+    await page.keyboard.press("Control+K");
+    const commandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
+    await expectVisible(commandCenter, "Command Center dialog");
+    await expectVisible(commandCenter.getByText("Navigera", { exact: true }), "Command Center navigation section");
+    const commandInput = commandCenter.getByLabel("Sök i Revalta eller välj kommando");
+    await commandInput.fill(`missing-${runId}`);
+    await expectVisible(commandCenter.getByText(/Inga träffar för/i), "Command Center empty search state");
+    await page.getByRole("button", { name: "Stäng Command Center" }).click();
+    console.log("global search / Command Center: passed");
+
+    // Mobile menu and mobile Command Center must both remain reachable.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileMenuButton = page.getByRole("button", { name: "Öppna meny" });
+    await expectVisible(mobileMenuButton, "mobile menu button");
+    await mobileMenuButton.click();
+    const mobileMenu = page.getByRole("dialog", { name: "Dashboardmeny" });
+    await expectVisible(mobileMenu, "mobile dashboard menu");
+    await expectVisible(mobileMenu.getByRole("link", { name: "Fastigheter", exact: true }), "mobile Fastigheter navigation");
+    await expectVisible(mobileMenu.getByRole("button", { name: "Drift" }), "mobile Drift navigation group");
+    const mobilePanel = mobileMenu.getByRole("complementary");
+    await mobilePanel.getByRole("button", { name: "Stäng meny" }).click();
+
+    const mobileCommandButton = page.getByRole("button", { name: "Öppna Revalta Command Center" });
+    await expectVisible(mobileCommandButton, "mobile Command Center trigger");
+    await mobileCommandButton.click();
+    const mobileCommandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
+    await expectVisible(mobileCommandCenter, "mobile Command Center dialog");
+    await mobileCommandCenter.getByRole("button", { name: "Stäng Command Center" }).click();
+    console.log("mobile navigation + Command Center: passed");
+
+    // Logout and verify the protected dashboard is no longer the active surface.
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const logout = page.getByRole("button", { name: "Logga ut" }).first();
+    await expectVisible(logout, "logout button");
+    await logout.click();
+    await expectPath(page, "/login");
+    await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after logout");
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await expectPath(page, "/login");
+    await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after protected redirect");
+    console.log("logout + protected dashboard redirect: passed");
+  } else {
+    console.log(
+      "Preview mode: verification gate and resend were exercised, but dashboard continuation is skipped because the runner has no trusted Preview mailbox/DB fixture.",
+    );
+  }
 
   if (pageErrors.length > 0) {
     fail(`browser emitted page errors: ${pageErrors.join(" | ")}`);
