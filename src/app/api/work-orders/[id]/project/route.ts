@@ -22,10 +22,11 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
 
   const { id } = await params;
   const workOrder = await db.workOrder.findFirst({
-    where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
+    where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
     include: {
       property: { select: { id: true, name: true } },
       projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
@@ -36,7 +37,11 @@ export async function POST(
     return NextResponse.json({ error: "Arbetsordern är redan kopplad till ett projekt", project: workOrder.projects[0] }, { status: 409 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
+
   const managerId = body.managerId ? String(body.managerId).trim() : null;
   const name = String(body.name || workOrder.title).trim();
   const description = body.description ? String(body.description).trim() : workOrder.description;
@@ -55,51 +60,55 @@ export async function POST(
 
   if (managerId) {
     const manager = await db.user.findFirst({
-      where: { id: managerId, company_id: user.company_id, status: "active" },
+      where: { id: managerId, company_id: companyId, status: "active" },
       select: { id: true },
     });
     if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
   }
 
-  const project = await db.project.create({
-    data: {
-      company_id: user.company_id,
-      property_id: workOrder.property_id,
-      source_work_order_id: workOrder.id,
-      manager_id: managerId,
-      created_by_id: user.id,
-      name,
-      description,
-      contractor,
-      status: "planned",
-      risk,
-      start_date: startDate,
-      end_date: endDate,
-      budget,
-      forecast,
-      actual: 0,
-    },
-    include: {
-      property: { select: { id: true, name: true } },
-      manager: { select: { id: true, name: true, email: true } },
-      source_work_order: { select: { id: true, title: true, status: true } },
-    },
-  });
+  const project = await db.$transaction(async (tx) => {
+    const createdProject = await tx.project.create({
+      data: {
+        company_id: companyId,
+        property_id: workOrder.property_id,
+        source_work_order_id: workOrder.id,
+        manager_id: managerId,
+        created_by_id: user.id,
+        name,
+        description,
+        contractor,
+        status: "planned",
+        risk,
+        start_date: startDate,
+        end_date: endDate,
+        budget,
+        forecast,
+        actual: 0,
+      },
+      include: {
+        property: { select: { id: true, name: true } },
+        manager: { select: { id: true, name: true, email: true } },
+        source_work_order: { select: { id: true, title: true, status: true } },
+      },
+    });
 
-  await writeAuditLog(user, {
-    entityType: "project",
-    entityId: project.id,
-    action: "project.created_from_work_order",
-    metadata: {
-      workOrderId: workOrder.id,
-      workOrderTitle: workOrder.title,
-      propertyId: workOrder.property_id,
-      propertyName: workOrder.property.name,
-      managerId,
-      budget,
-      forecast,
-      risk,
-    },
+    await writeAuditLog(user, {
+      entityType: "project",
+      entityId: createdProject.id,
+      action: "project.created_from_work_order",
+      metadata: {
+        workOrderId: workOrder.id,
+        workOrderTitle: workOrder.title,
+        propertyId: workOrder.property_id,
+        propertyName: workOrder.property.name,
+        managerId,
+        budget,
+        forecast,
+        risk,
+      },
+    }, tx);
+
+    return createdProject;
   });
 
   return NextResponse.json({ project }, { status: 201 });
