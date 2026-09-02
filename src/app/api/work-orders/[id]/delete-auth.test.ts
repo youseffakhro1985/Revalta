@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, workOrderFindFirstMock, workOrderUpdateManyMock, writeAuditLogMock } = vi.hoisted(() => ({
+const {
+  getCurrentUserMock,
+  workOrderFindFirstMock,
+  workOrderUpdateManyMock,
+  transactionMock,
+  writeAuditLogMock,
+} = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
   workOrderUpdateManyMock: vi.fn(),
+  transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -14,11 +21,15 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 
+const tx = {
+  workOrder: { updateMany: workOrderUpdateManyMock },
+};
+
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock, updateMany: workOrderUpdateManyMock },
     user: { findMany: vi.fn(), findFirst: vi.fn() },
-    $transaction: vi.fn(),
+    $transaction: transactionMock,
   },
 }));
 
@@ -31,6 +42,7 @@ describe("DELETE /api/work-orders/[id] authorization", () => {
     vi.clearAllMocks();
     workOrderUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
   it("denies an assigned technician after scoped lookup but before deletion", async () => {
@@ -46,6 +58,7 @@ describe("DELETE /api/work-orders/[id] authorization", () => {
       where: { id: "wo-1", company_id: "company-1", deleted_at: null, property: { deleted_at: null } },
       select: { id: true, title: true, status: true, assigned_to_id: true },
     });
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
@@ -57,6 +70,7 @@ describe("DELETE /api/work-orders/[id] authorization", () => {
     const response = await DELETE(new Request("http://localhost/api/work-orders/wo-1", { method: "DELETE" }), { params });
 
     expect(response.status).toBe(404);
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
   });
 
@@ -67,14 +81,19 @@ describe("DELETE /api/work-orders/[id] authorization", () => {
     const response = await DELETE(new Request("http://localhost/api/work-orders/wo-1", { method: "DELETE" }), { params });
 
     expect(response.status).toBe(200);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(workOrderUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "wo-1", company_id: "company-1", deleted_at: null },
       data: { deleted_at: expect.any(Date) },
     });
-    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      entityType: "work_order",
-      entityId: "wo-1",
-      action: "work_order.deleted",
-    }));
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        entityType: "work_order",
+        entityId: "wo-1",
+        action: "work_order.deleted",
+      }),
+      tx,
+    );
   });
 });
