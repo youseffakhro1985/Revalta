@@ -61,14 +61,24 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       },
-      units: {
-        select: { unit_type: true, area: true },
-      },
       _count: { select: { buildings: true, units: true } },
     },
   });
 
   if (!property) notFound();
+
+  // Aggregate object metrics in the database instead of materializing every
+  // unit row into the server-rendered page. The result cardinality is bounded
+  // by the small set of unit_type values regardless of portfolio size.
+  const unitMetrics = await db.unit.groupBy({
+    by: ["unit_type"],
+    where: { property_id: property.id },
+    _count: { _all: true },
+    _sum: { area: true },
+  });
+  const apartmentCount = unitMetrics.find((item) => item.unit_type === "apartment")?._count._all ?? 0;
+  const commercialCount = unitMetrics.find((item) => item.unit_type === "commercial")?._count._all ?? 0;
+  const totalRegisteredArea = unitMetrics.reduce((sum, item) => sum + Number(item._sum.area || 0), 0);
 
   const [openTickets, recentTickets] = capabilities.canOperate
     ? await Promise.all([
@@ -99,9 +109,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       ])
     : [0, []];
 
-  const apartmentCount = property.units.filter((unit) => unit.unit_type === "apartment").length;
-  const commercialCount = property.units.filter((unit) => unit.unit_type === "commercial").length;
-  const totalRegisteredArea = property.units.reduce((sum, unit) => sum + (unit.area || 0), 0);
   const metrics = [
     ...(capabilities.canOperate ? [{ label: "Öppna ärenden", value: openTickets, icon: ClipboardList }] : []),
     { label: "Byggnader", value: property._count.buildings, icon: Building2 },
