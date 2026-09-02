@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import db from "@/lib/db";
 import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
@@ -48,7 +49,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const order = await ensureOrder(user as CompanyUser, id);
   if (!order) return notFoundWorkOrder();
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
   const action = String(body.action || "manual");
   let kind = String(body.kind || "work");
   if (!allowedActions.has(action) || !allowedKinds.has(kind)) return NextResponse.json({ error: "Ogiltig åtgärd eller tidstyp" }, { status: 400 });
@@ -124,12 +128,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     status,
     actorId: user.id,
   };
-  const entry = await upsertTimeEntry(user.company_id, payload);
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: `work_order.time_${action}`,
-    metadata: { entryId, kind, minutes, billable, status, storage: "WorkOrderTimeEntry" },
+  const entry = await db.$transaction(async (tx) => {
+    const persistedEntry = await upsertTimeEntry(user.company_id, payload, tx);
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: `work_order.time_${action}`,
+      metadata: { entryId, kind, minutes, billable, status, storage: "WorkOrderTimeEntry" },
+    }, tx);
+    return persistedEntry;
   });
   return NextResponse.json({ entry }, { status: 201 });
 }
