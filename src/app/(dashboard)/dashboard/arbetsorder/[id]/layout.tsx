@@ -2,8 +2,9 @@ import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import db from "@/lib/db";
 import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
+import { InvoiceExportReconciliationPanel } from "@/components/dashboard/invoice-export-reconciliation-panel";
 import { WorkOrderSlaDetailPanel } from "@/components/dashboard/work-order-sla-detail-panel";
-import { getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
+import { canManageWorkOrderFinance, getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
 import { getWorkOrderEnterpriseState } from "@/lib/work-order-enterprise-core";
 
 export default async function WorkOrderDetailLayout({
@@ -43,6 +44,7 @@ export default async function WorkOrderDetailLayout({
       ]}
     />
     {children}
+    {canManageWorkOrderFinance(user.role) ? <InvoiceExportReconciliationPanel workOrderId={id} /> : null}
     <WorkOrderSlaDetailPanel workOrderId={id} />
   </div>;
 }
