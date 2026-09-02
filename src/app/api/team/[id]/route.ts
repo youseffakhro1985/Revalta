@@ -1,4 +1,5 @@
 import db from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { canGrantTeamRole, canManageTeam, getCurrentUser } from "@/lib/current-user";
 import { updateOwnedByCompany } from "@/lib/tenant-writes";
 import { writeAuditLog } from "@/lib/audit";
@@ -18,6 +19,16 @@ type TeamMemberRecord = {
   status: string;
   created_at: Date;
 };
+
+class TeamMutationError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+function isTransactionConflict(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2034");
+}
 
 const memberSelect = {
   id: true,
@@ -45,6 +56,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!user.company_id || !canManageTeam(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att hantera teammedlemmar" }, { status: 403 });
     }
+    const companyId = user.company_id;
 
     const { id: targetId } = await params;
     if (targetId === user.id) {
@@ -52,16 +64,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         { error: "Du kan inte ändra ditt eget konto här — använd kontoinställningarna" },
         { status: 400 },
       );
-    }
-
-    const target = await db.user.findFirst({
-      where: { id: targetId, company_id: user.company_id },
-      select: { id: true, role: true, status: true },
-    });
-    if (!target) return NextResponse.json({ error: "Teammedlemmen hittades inte" }, { status: 404 });
-
-    if (!canGrantTeamRole(user.role, target.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att ändra den här medlemmen" }, { status: 403 });
     }
 
     const body = (await request.json().catch(() => null)) as { role?: unknown; status?: unknown } | null;
@@ -81,48 +83,69 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
     }
 
-    const demotesFromOwner = requestedRole !== undefined && target.role === "owner" && requestedRole !== "owner";
-    const deactivatesOwner = requestedStatus === "inactive" && target.role === "owner" && target.status === "active";
-    if (demotesFromOwner || deactivatesOwner) {
-      const otherActiveOwners = await db.user.count({
-        where: { company_id: user.company_id, role: "owner", status: "active", id: { not: targetId } },
+    const member = await db.$transaction(async (tx) => {
+      const target = await tx.user.findFirst({
+        where: { id: targetId, company_id: companyId },
+        select: { id: true, role: true, status: true },
       });
-      if (otherActiveOwners === 0) {
-        return NextResponse.json(
-          { error: "Företaget måste ha minst en aktiv ägare" },
-          { status: 400 },
-        );
+      if (!target) throw new TeamMutationError(404, "Teammedlemmen hittades inte");
+
+      if (!canGrantTeamRole(user.role, target.role)) {
+        throw new TeamMutationError(403, "Du saknar behörighet att ändra den här medlemmen");
       }
-    }
 
-    const data: Record<string, unknown> = {};
-    if (requestedRole !== undefined) data.role = requestedRole;
-    if (requestedStatus !== undefined) data.status = requestedStatus;
+      const demotesFromOwner = requestedRole !== undefined && target.role === "owner" && requestedRole !== "owner";
+      const deactivatesOwner = requestedStatus === "inactive" && target.role === "owner" && target.status === "active";
+      if (demotesFromOwner || deactivatesOwner) {
+        const otherActiveOwners = await tx.user.count({
+          where: { company_id: companyId, role: "owner", status: "active", id: { not: targetId } },
+        });
+        if (otherActiveOwners === 0) {
+          throw new TeamMutationError(400, "Företaget måste ha minst en aktiv ägare");
+        }
+      }
 
-    const updated = await updateOwnedByCompany<TeamMemberRecord>(
-      "user",
-      { id: targetId, companyId: user.company_id, data },
-      db,
-    );
-    if (!updated) return NextResponse.json({ error: "Teammedlemmen hittades inte" }, { status: 404 });
+      const data: Record<string, unknown> = {};
+      if (requestedRole !== undefined) data.role = requestedRole;
+      if (requestedStatus !== undefined) data.status = requestedStatus;
 
-    const member = await db.user.findFirst({
-      where: { id: targetId, company_id: user.company_id },
-      select: memberSelect,
-    });
+      const updated = await updateOwnedByCompany<TeamMemberRecord>(
+        "user",
+        { id: targetId, companyId, data },
+        tx,
+      );
+      if (!updated) throw new TeamMutationError(404, "Teammedlemmen hittades inte");
 
-    await writeAuditLog(user, {
-      entityType: "user",
-      entityId: targetId,
-      action: requestedStatus !== undefined ? "team.member_status_changed" : "team.member_role_changed",
-      metadata: {
-        ...(requestedRole !== undefined ? { previousRole: target.role, role: requestedRole } : {}),
-        ...(requestedStatus !== undefined ? { previousStatus: target.status, status: requestedStatus } : {}),
-      },
-    });
+      const refreshedMember = await tx.user.findFirst({
+        where: { id: targetId, company_id: companyId },
+        select: memberSelect,
+      });
+      if (!refreshedMember) throw new TeamMutationError(404, "Teammedlemmen hittades inte");
+
+      await writeAuditLog(user, {
+        entityType: "user",
+        entityId: targetId,
+        action: requestedStatus !== undefined ? "team.member_status_changed" : "team.member_role_changed",
+        metadata: {
+          ...(requestedRole !== undefined ? { previousRole: target.role, role: requestedRole } : {}),
+          ...(requestedStatus !== undefined ? { previousStatus: target.status, status: requestedStatus } : {}),
+        },
+      }, tx);
+
+      return refreshedMember;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return NextResponse.json({ success: true, member });
   } catch (error) {
+    if (error instanceof TeamMutationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (isTransactionConflict(error)) {
+      return NextResponse.json(
+        { error: "Teamet ändrades samtidigt av någon annan. Ladda om och försök igen." },
+        { status: 409 },
+      );
+    }
     logger.error("Update team member error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

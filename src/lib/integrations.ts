@@ -147,6 +147,11 @@ export async function queueTicketNotification(
     title: string;
     recipient?: string;
     event: "created" | "updated" | "commented" | "password_reset" | "email_verification";
+    /** Optional one-off email copy. It is intentionally never persisted because it may contain a one-time URL/token. */
+    emailContent?: {
+      subject: string;
+      text: string;
+    };
   }
 ) {
   const subjectByEvent = {
@@ -156,16 +161,17 @@ export async function queueTicketNotification(
     password_reset: "Återställ ditt lösenord i Revalta",
     email_verification: "Verifiera din e-postadress i Revalta",
   };
+  const { emailContent, ...eventPayload } = payload;
   const delivery = await sendEmail({
     recipient: payload.recipient,
-    subject: subjectByEvent[payload.event],
-    text: `Hej!\n\n${subjectByEvent[payload.event]}\n\nLogga in i Revalta eller följ ärendet via boendeportalen för mer information.\n\nVänliga hälsningar,\nRevalta`,
+    subject: emailContent?.subject ?? subjectByEvent[payload.event],
+    text: emailContent?.text ?? `Hej!\n\n${subjectByEvent[payload.event]}\n\nLogga in i Revalta eller följ ärendet via boendeportalen för mer information.\n\nVänliga hälsningar,\nRevalta`,
   });
 
   return recordIntegrationEvent(
     user,
     "email",
-    { ...payload, delivery },
+    { ...eventPayload, delivery },
     payload.recipient,
     delivery.status
   );

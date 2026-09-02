@@ -1,5 +1,6 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { createResetToken, hashResetToken } from "@/lib/auth";
 import { canManageTeam, getCurrentUser } from "@/lib/current-user";
 import { queueTicketNotification } from "@/lib/integrations";
@@ -94,18 +95,36 @@ export async function POST(request: Request) {
       return created;
     });
 
-    const inviteUrl = `${new URL(request.url).origin}/accept-invite?token=${token}`;
-    await queueTicketNotification(user, {
+    const inviteUrl = `${getPublicAppUrl(request.url)}/accept-invite?token=${encodeURIComponent(token)}`;
+    const deliveryEvent = await queueTicketNotification(user, {
       ticketId: invite.id,
       title: "Inbjudan till Revalta",
       recipient: invite.email,
       event: "updated",
+      emailContent: {
+        subject: "Du är inbjuden till Revalta",
+        text: [
+          `Hej${invite.name ? ` ${invite.name}` : ""}!`,
+          "",
+          "Du har blivit inbjuden till Revalta för att samarbeta i er fastighetsförvaltning.",
+          "",
+          "Acceptera inbjudan och skapa ditt konto via länken nedan:",
+          inviteUrl,
+          "",
+          "Länken gäller i 7 dagar och kan bara användas för den här inbjudan.",
+          "Om du inte väntade dig inbjudan kan du bortse från meddelandet.",
+          "",
+          "Vänliga hälsningar,",
+          "Revalta",
+        ].join("\n"),
+      },
     });
 
     const canExposeInviteUrl = !process.env.EMAIL_PROVIDER_API_KEY && process.env.NODE_ENV !== "production";
     return NextResponse.json({
       success: true,
       invite,
+      deliveryStatus: deliveryEvent?.status ?? "unknown",
       inviteUrl: canExposeInviteUrl ? inviteUrl : undefined,
     }, { status: 201 });
   } catch (error) {

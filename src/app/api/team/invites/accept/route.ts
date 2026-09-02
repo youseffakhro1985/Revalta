@@ -16,6 +16,13 @@ import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/team/invites/accept" });
 
+class InviteClaimConflictError extends Error {}
+class InviteEmailConflictError extends Error {}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
+}
+
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
     ...init,
@@ -91,10 +98,14 @@ export async function POST(request: Request) {
       password?: unknown;
       name?: unknown;
     };
-    const token = typeof body.token === "string" ? body.token : "";
+    const token = typeof body.token === "string" ? body.token.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const requestedName = typeof body.name === "string" ? body.name.trim() : "";
     if (!token) {
       return noStore({ error: "Inbjudningslänken saknas" }, { status: 400 });
+    }
+    if (requestedName.length > 120) {
+      return noStore({ error: "Namnet får vara högst 120 tecken" }, { status: 400 });
     }
     if (!isStrongPassword(password)) {
       return noStore({ error: passwordPolicyMessage }, { status: 400 });
@@ -114,41 +125,54 @@ export async function POST(request: Request) {
       },
     });
 
-    if (!invite || invite.accepted_at || invite.expires_at < new Date()) {
+    const now = new Date();
+    if (!invite || invite.accepted_at || invite.expires_at < now) {
       return noStore({ error: "Inbjudan är ogiltig eller har gått ut" }, { status: 400 });
     }
     if (invite.company.status !== "active") {
       return noStore({ error: "Organisationen är inte aktiv" }, { status: 400 });
     }
 
-    const normalizedName = typeof body.name === "string" && body.name.trim() ? body.name.trim() : invite.name;
+    const normalizedName = requestedName || invite.name;
+    const passwordHash = await hashPassword(password);
     const user = await db.$transaction(async (tx) => {
+      const existingUser = await tx.user.findUnique({
+        where: { email: invite.email },
+        select: { id: true },
+      });
+      if (existingUser) throw new InviteEmailConflictError();
+
+      const claimed = await tx.teamInvite.updateMany({
+        where: {
+          id: invite.id,
+          accepted_at: null,
+          expires_at: { gte: now },
+        },
+        data: { accepted_at: now },
+      });
+      if (claimed.count !== 1) throw new InviteClaimConflictError();
+
       const createdUser = await tx.user.create({
         data: {
           email: invite.email,
-          password: await hashPassword(password),
+          password: passwordHash,
           name: normalizedName,
           role: invite.role,
           status: "active",
           company_id: invite.company_id,
-          email_verified_at: new Date(),
+          email_verified_at: now,
         },
         select: { id: true, email: true, name: true, role: true, company_id: true },
       });
 
-      await tx.teamInvite.update({
-        where: { id: invite.id },
-        data: { accepted_at: new Date() },
-      });
+      await writeAuditLog(createdUser, {
+        entityType: "user",
+        entityId: createdUser.id,
+        action: "team.invite_accepted",
+        metadata: { email: createdUser.email, role: createdUser.role },
+      }, tx);
 
       return createdUser;
-    });
-
-    await writeAuditLog(user, {
-      entityType: "user",
-      entityId: user.id,
-      action: "team.invite_accepted",
-      metadata: { email: user.email, role: user.role },
     });
 
     const sessionToken = await signToken({
@@ -173,6 +197,12 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    if (error instanceof InviteClaimConflictError) {
+      return noStore({ error: "Inbjudan har redan använts eller gått ut" }, { status: 409 });
+    }
+    if (error instanceof InviteEmailConflictError || isUniqueConstraintError(error)) {
+      return noStore({ error: "Det finns redan ett konto med den här e-postadressen. Logga in i stället." }, { status: 409 });
+    }
     logger.error("Accept team invite error", error);
     return noStore({ error: "Internt serverfel" }, { status: 500 });
   }

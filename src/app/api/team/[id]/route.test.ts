@@ -5,12 +5,14 @@ const {
   userFindFirstMock,
   userUpdateManyMock,
   userCountMock,
+  transactionMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   userFindFirstMock: vi.fn(),
   userUpdateManyMock: vi.fn(),
   userCountMock: vi.fn(),
+  transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -30,7 +32,9 @@ vi.mock("@/lib/db", () => {
       updateMany: userUpdateManyMock,
       count: userCountMock,
     },
+    $transaction: transactionMock,
   };
+  transactionMock.mockImplementation((callback: (tx: typeof dbMock) => unknown) => callback(dbMock));
   return { default: dbMock };
 });
 
@@ -48,7 +52,21 @@ function ctx(id = "target-user") {
   return { params: Promise.resolve({ id }) };
 }
 
-const managerCaller = { id: "caller-1", company_id: "company-1", role: "admin" };
+const adminCaller = { id: "caller-1", company_id: "company-1", role: "admin" };
+const ownerCaller = { id: "caller-owner", company_id: "company-1", role: "owner" };
+
+function updatedMember(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "target-user",
+    name: "Medlem",
+    email: "medlem@exempel.se",
+    role: "manager",
+    status: "active",
+    created_at: new Date(),
+    _count: { assigned_tickets: 0 },
+    ...overrides,
+  };
+}
 
 describe("PATCH /api/team/[id]", () => {
   beforeEach(() => {
@@ -56,6 +74,19 @@ describe("PATCH /api/team/[id]", () => {
     writeAuditLogMock.mockResolvedValue(undefined);
     userUpdateManyMock.mockResolvedValue({ count: 1 });
     userCountMock.mockResolvedValue(1);
+    transactionMock.mockImplementation((callback: (tx: {
+      user: {
+        findFirst: typeof userFindFirstMock;
+        updateMany: typeof userUpdateManyMock;
+        count: typeof userCountMock;
+      };
+    }) => unknown) => callback({
+      user: {
+        findFirst: userFindFirstMock,
+        updateMany: userUpdateManyMock,
+        count: userCountMock,
+      },
+    }));
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -64,7 +95,7 @@ describe("PATCH /api/team/[id]", () => {
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
 
     expect(response.status).toBe(401);
-    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 403 for a role that cannot manage the team", async () => {
@@ -75,7 +106,7 @@ describe("PATCH /api/team/[id]", () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toBe("Du saknar behörighet att hantera teammedlemmar");
-    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 403 when the caller has no company_id, even if role is owner", async () => {
@@ -84,22 +115,51 @@ describe("PATCH /api/team/[id]", () => {
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
 
     expect(response.status).toBe(403);
-    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 when the caller targets their own account", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
+    getCurrentUserMock.mockResolvedValue(adminCaller);
 
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx("caller-1"));
     const body = await response.json();
 
     expect(response.status).toBe(400);
     expect(body.error).toContain("eget konto");
-    expect(userFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("validates the mutation before opening a transaction", async () => {
+    getCurrentUserMock.mockResolvedValue(adminCaller);
+
+    const emptyResponse = await PATCH(patchRequest({}), ctx());
+    expect(emptyResponse.status).toBe(400);
+    expect(await emptyResponse.json()).toEqual({ error: "Ingen ändring angiven" });
+
+    const roleResponse = await PATCH(patchRequest({ role: "superadmin" }), ctx());
+    expect(roleResponse.status).toBe(400);
+    expect(await roleResponse.json()).toEqual({ error: "Ogiltig användarroll" });
+
+    const statusResponse = await PATCH(patchRequest({ status: "deleted" }), ctx());
+    expect(statusResponse.status).toBe(400);
+    expect(await statusResponse.json()).toEqual({ error: "Ogiltig status" });
+
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when a non-owner tries to promote a member to owner before database work", async () => {
+    getCurrentUserMock.mockResolvedValue(adminCaller);
+
+    const response = await PATCH(patchRequest({ role: "owner" }), ctx());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att tilldela ägarrollen");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the target does not belong to the caller's company", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
+    getCurrentUserMock.mockResolvedValue(adminCaller);
     userFindFirstMock.mockResolvedValueOnce(null);
 
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
@@ -114,7 +174,7 @@ describe("PATCH /api/team/[id]", () => {
   });
 
   it("returns 403 when a non-owner targets an existing owner", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
+    getCurrentUserMock.mockResolvedValue(adminCaller);
     userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "owner", status: "active" });
 
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
@@ -125,44 +185,8 @@ describe("PATCH /api/team/[id]", () => {
     expect(userUpdateManyMock).not.toHaveBeenCalled();
   });
 
-  it("returns 403 when a non-owner tries to promote a member to owner", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
-    userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "manager", status: "active" });
-
-    const response = await PATCH(patchRequest({ role: "owner" }), ctx());
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body.error).toBe("Du saknar behörighet att tilldela ägarrollen");
-    expect(userUpdateManyMock).not.toHaveBeenCalled();
-  });
-
-  it("returns 400 for a role not in the allowed set", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "caller-1", company_id: "company-1", role: "owner" });
-    userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "manager", status: "active" });
-
-    const response = await PATCH(patchRequest({ role: "superadmin" }), ctx());
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe("Ogiltig användarroll");
-    expect(userUpdateManyMock).not.toHaveBeenCalled();
-  });
-
-  it("returns 400 when no role or status is provided", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
-    userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "manager", status: "active" });
-
-    const response = await PATCH(patchRequest({}), ctx());
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBe("Ingen ändring angiven");
-    expect(userUpdateManyMock).not.toHaveBeenCalled();
-  });
-
-  it("blocks deactivating the last active owner", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "caller-1", company_id: "company-1", role: "owner" });
+  it("blocks deactivating the last active owner inside the serializable transaction", async () => {
+    getCurrentUserMock.mockResolvedValue(ownerCaller);
     userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "owner", status: "active" });
     userCountMock.mockResolvedValueOnce(0);
 
@@ -172,10 +196,11 @@ describe("PATCH /api/team/[id]", () => {
     expect(response.status).toBe(400);
     expect(body.error).toBe("Företaget måste ha minst en aktiv ägare");
     expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "Serializable" });
   });
 
   it("blocks demoting the last active owner to a lower role", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "caller-1", company_id: "company-1", role: "owner" });
+    getCurrentUserMock.mockResolvedValue(ownerCaller);
     userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "owner", status: "active" });
     userCountMock.mockResolvedValueOnce(0);
 
@@ -187,21 +212,18 @@ describe("PATCH /api/team/[id]", () => {
     expect(userUpdateManyMock).not.toHaveBeenCalled();
   });
 
-  it("allows deactivating an owner when another active owner exists", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "caller-1", company_id: "company-1", role: "owner" });
-    const updatedMember = {
-      id: "target-user",
+  it("allows deactivating an owner when another active owner exists and audits in the same transaction", async () => {
+    getCurrentUserMock.mockResolvedValue(ownerCaller);
+    const member = updatedMember({
       name: "Andra Ägaren",
       email: "andra@exempel.se",
       role: "owner",
       status: "inactive",
-      created_at: new Date(),
-      _count: { assigned_tickets: 0 },
-    };
+    });
     userFindFirstMock
-      .mockResolvedValueOnce({ id: "target-user", role: "owner", status: "active" }) // initial tenant-scoped lookup
-      .mockResolvedValueOnce(updatedMember) // internal findFirst inside updateOwnedByCompany
-      .mockResolvedValueOnce(updatedMember); // final findFirst for the response shape
+      .mockResolvedValueOnce({ id: "target-user", role: "owner", status: "active" })
+      .mockResolvedValueOnce(member)
+      .mockResolvedValueOnce(member);
     userCountMock.mockResolvedValueOnce(1);
 
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
@@ -211,10 +233,18 @@ describe("PATCH /api/team/[id]", () => {
       where: { id: "target-user", company_id: "company-1" },
       data: { status: "inactive" },
     });
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "caller-owner", company_id: "company-1" }),
+      expect.objectContaining({
+        action: "team.member_status_changed",
+        metadata: { previousStatus: "active", status: "inactive" },
+      }),
+      expect.anything(),
+    );
   });
 
-  it("returns 404 when the tenant-scoped update matches no row (race/cross-tenant)", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
+  it("returns 404 when the tenant-scoped update matches no row", async () => {
+    getCurrentUserMock.mockResolvedValue(adminCaller);
     userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "manager", status: "active" });
     userUpdateManyMock.mockResolvedValueOnce({ count: 0 });
 
@@ -225,21 +255,13 @@ describe("PATCH /api/team/[id]", () => {
     expect(body.error).toBe("Teammedlemmen hittades inte");
   });
 
-  it("updates the role, scoped to the caller's company, and writes an audit log", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
-    const updatedMember = {
-      id: "target-user",
-      name: "Medlem",
-      email: "medlem@exempel.se",
-      role: "manager",
-      status: "active",
-      created_at: new Date(),
-      _count: { assigned_tickets: 2 },
-    };
+  it("updates a role tenant-scoped and returns the refreshed member", async () => {
+    getCurrentUserMock.mockResolvedValue(adminCaller);
+    const member = updatedMember({ role: "manager", _count: { assigned_tickets: 2 } });
     userFindFirstMock
       .mockResolvedValueOnce({ id: "target-user", role: "technician", status: "active" })
-      .mockResolvedValueOnce(updatedMember)
-      .mockResolvedValueOnce(updatedMember);
+      .mockResolvedValueOnce(member)
+      .mockResolvedValueOnce(member);
 
     const response = await PATCH(patchRequest({ role: "manager" }), ctx());
     const body = await response.json();
@@ -247,7 +269,7 @@ describe("PATCH /api/team/[id]", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({
       success: true,
-      member: { ...updatedMember, created_at: updatedMember.created_at.toISOString() },
+      member: { ...member, created_at: member.created_at.toISOString() },
     });
     expect(userUpdateManyMock).toHaveBeenCalledWith({
       where: { id: "target-user", company_id: "company-1" },
@@ -261,44 +283,24 @@ describe("PATCH /api/team/[id]", () => {
         action: "team.member_role_changed",
         metadata: { previousRole: "technician", role: "manager" },
       }),
+      expect.anything(),
     );
   });
 
-  it("reactivates an inactive member", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
-    const updatedMember = {
-      id: "target-user",
-      name: "Medlem",
-      email: "medlem@exempel.se",
-      role: "manager",
-      status: "active",
-      created_at: new Date(),
-      _count: { assigned_tickets: 0 },
-    };
-    userFindFirstMock
-      .mockResolvedValueOnce({ id: "target-user", role: "manager", status: "inactive" })
-      .mockResolvedValueOnce(updatedMember)
-      .mockResolvedValueOnce(updatedMember);
+  it("maps a serializable transaction conflict to a retryable 409", async () => {
+    getCurrentUserMock.mockResolvedValue(ownerCaller);
+    transactionMock.mockRejectedValueOnce({ code: "P2034" });
 
-    const response = await PATCH(patchRequest({ status: "active" }), ctx());
+    const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
+    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(userUpdateManyMock).toHaveBeenCalledWith({
-      where: { id: "target-user", company_id: "company-1" },
-      data: { status: "active" },
-    });
-    expect(writeAuditLogMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "caller-1" }),
-      expect.objectContaining({
-        action: "team.member_status_changed",
-        metadata: { previousStatus: "inactive", status: "active" },
-      }),
-    );
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("ändrades samtidigt");
   });
 
-  it("returns 500 when the database call fails", async () => {
-    getCurrentUserMock.mockResolvedValue(managerCaller);
-    userFindFirstMock.mockRejectedValueOnce(new Error("db down"));
+  it("returns 500 for an unexpected database failure", async () => {
+    getCurrentUserMock.mockResolvedValue(adminCaller);
+    transactionMock.mockRejectedValueOnce(new Error("db down"));
 
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
 
