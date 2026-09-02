@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-  findUniqueMock,
+  teamInviteFindUniqueMock,
+  userFindUniqueMock,
   userCreateMock,
-  teamInviteUpdateMock,
+  teamInviteUpdateManyMock,
   transactionMock,
   writeAuditLogMock,
   hashPasswordMock,
@@ -12,9 +13,10 @@ const {
   cookieSetMock,
   checkRateLimitMock,
 } = vi.hoisted(() => ({
-  findUniqueMock: vi.fn(),
+  teamInviteFindUniqueMock: vi.fn(),
+  userFindUniqueMock: vi.fn(),
   userCreateMock: vi.fn(),
-  teamInviteUpdateMock: vi.fn(),
+  teamInviteUpdateManyMock: vi.fn(),
   transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
   hashPasswordMock: vi.fn(),
@@ -31,10 +33,13 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/db", () => ({
   default: {
     teamInvite: {
-      findUnique: findUniqueMock,
-      update: teamInviteUpdateMock,
+      findUnique: teamInviteFindUniqueMock,
+      updateMany: teamInviteUpdateManyMock,
     },
-    user: { create: userCreateMock },
+    user: {
+      findUnique: userFindUniqueMock,
+      create: userCreateMock,
+    },
     $transaction: transactionMock,
   },
 }));
@@ -68,6 +73,19 @@ const invite = {
   company: { name: "Testfastigheter AB", status: "active" },
 };
 
+function acceptRequest(overrides: Record<string, unknown> = {}) {
+  return new Request("https://www.revalta.se/api/team/invites/accept", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token: "raw-token",
+      password: "Password123",
+      name: "Boende Test",
+      ...overrides,
+    }),
+  });
+}
+
 describe("team invite accept route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,13 +94,14 @@ describe("team invite accept route", () => {
     hashPasswordMock.mockResolvedValue("hashed-password");
     signTokenMock.mockResolvedValue("session-token");
     writeAuditLogMock.mockResolvedValue(undefined);
-    findUniqueMock.mockResolvedValue(invite);
+    teamInviteFindUniqueMock.mockResolvedValue(invite);
+    userFindUniqueMock.mockResolvedValue(null);
     transactionMock.mockImplementation(async (callback: (tx: {
-      user: { create: typeof userCreateMock };
-      teamInvite: { update: typeof teamInviteUpdateMock };
+      user: { findUnique: typeof userFindUniqueMock; create: typeof userCreateMock };
+      teamInvite: { updateMany: typeof teamInviteUpdateManyMock };
     }) => unknown) => callback({
-      user: { create: userCreateMock },
-      teamInvite: { update: teamInviteUpdateMock },
+      user: { findUnique: userFindUniqueMock, create: userCreateMock },
+      teamInvite: { updateMany: teamInviteUpdateManyMock },
     }));
     userCreateMock.mockResolvedValue({
       id: "user-1",
@@ -91,7 +110,7 @@ describe("team invite accept route", () => {
       role: "resident",
       company_id: "company-1",
     });
-    teamInviteUpdateMock.mockResolvedValue({ id: invite.id });
+    teamInviteUpdateManyMock.mockResolvedValue({ count: 1 });
   });
 
   it("previews a valid resident invite", async () => {
@@ -111,7 +130,7 @@ describe("team invite accept route", () => {
   });
 
   it("rejects expired invites on preview", async () => {
-    findUniqueMock.mockResolvedValue({
+    teamInviteFindUniqueMock.mockResolvedValue({
       ...invite,
       expires_at: new Date(Date.now() - 1_000),
     });
@@ -126,18 +145,8 @@ describe("team invite accept route", () => {
     });
   });
 
-  it("accepts an invite, sets a session cookie, and redirects residents to the portal", async () => {
-    const response = await POST(
-      new Request("https://www.revalta.se/api/team/invites/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: "raw-token",
-          password: "Password123",
-          name: "Boende Test",
-        }),
-      }),
-    );
+  it("accepts an invite atomically, writes the audit entry inside the transaction, sets a session cookie, and redirects residents to the portal", async () => {
+    const response = await POST(acceptRequest());
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -146,6 +155,32 @@ describe("team invite accept route", () => {
       redirectTo: "/dashboard/boendeportal",
       user: { role: "resident", email: "boende@exempel.se" },
     });
+    expect(userFindUniqueMock).toHaveBeenCalledWith({
+      where: { email: "boende@exempel.se" },
+      select: { id: true },
+    });
+    expect(teamInviteUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: invite.id,
+        accepted_at: null,
+        expires_at: expect.objectContaining({ gte: expect.any(Date) }),
+      }),
+      data: { accepted_at: expect.any(Date) },
+    }));
+    expect(hashPasswordMock).toHaveBeenCalledWith("Password123");
+    expect(userCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        email: invite.email,
+        password: "hashed-password",
+        company_id: "company-1",
+        email_verified_at: expect.any(Date),
+      }),
+    }));
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", company_id: "company-1" }),
+      expect.objectContaining({ action: "team.invite_accepted", entityId: "user-1" }),
+      expect.anything(),
+    );
     expect(signTokenMock).toHaveBeenCalledWith(expect.objectContaining({
       sub: "user-1",
       email: "boende@exempel.se",
@@ -158,8 +193,53 @@ describe("team invite accept route", () => {
     );
   });
 
+  it("returns a conflict when another request already claimed the invite", async () => {
+    teamInviteUpdateManyMock.mockResolvedValue({ count: 0 });
+
+    const response = await POST(acceptRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("Inbjudan har redan använts eller gått ut");
+    expect(userCreateMock).not.toHaveBeenCalled();
+    expect(signTokenMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a conflict when the invited email already has an account", async () => {
+    userFindUniqueMock.mockResolvedValue({ id: "existing-user" });
+
+    const response = await POST(acceptRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("Det finns redan ett konto");
+    expect(teamInviteUpdateManyMock).not.toHaveBeenCalled();
+    expect(userCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an overlong display name before hashing the password or mutating the invite", async () => {
+    const response = await POST(acceptRequest({ name: "a".repeat(121) }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Namnet får vara högst 120 tecken");
+    expect(hashPasswordMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("maps a concurrent unique-email violation to a safe conflict instead of a 500", async () => {
+    userCreateMock.mockRejectedValue({ code: "P2002", meta: { target: ["email"] } });
+
+    const response = await POST(acceptRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("Det finns redan ett konto");
+    expect(signTokenMock).not.toHaveBeenCalled();
+  });
+
   it("redirects staff invites to the dashboard", async () => {
-    findUniqueMock.mockResolvedValue({
+    teamInviteFindUniqueMock.mockResolvedValue({
       ...invite,
       role: "technician",
       email: "tekniker@exempel.se",
@@ -172,16 +252,7 @@ describe("team invite accept route", () => {
       company_id: "company-1",
     });
 
-    const response = await POST(
-      new Request("https://www.revalta.se/api/team/invites/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: "raw-token",
-          password: "Password123",
-        }),
-      }),
-    );
+    const response = await POST(acceptRequest({ name: "Tekniker" }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
