@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
@@ -11,6 +12,10 @@ import {
 import { createRouteObservability } from "@/lib/route-observability";
 
 const ROUTE = "/api/properties";
+const DEFAULT_PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 100;
+const MAX_PAGE = 10_000;
+const MAX_FILTER_LENGTH = 160;
 const SUCCESS_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
   "CDN-Cache-Control": "no-store",
@@ -68,6 +73,26 @@ function reject(
   });
 }
 
+function parseBoundedInteger(value: string | null, fallback: number, min: number, max: number) {
+  if (value === null || value === "") return fallback;
+  if (!/^\d+$/.test(value)) return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) return null;
+  return parsed;
+}
+
+function normalizedFilter(value: string | null) {
+  const normalized = value?.trim() || "";
+  return normalized === "all" ? "" : normalized;
+}
+
+function propertyOrderBy(sort: string): Prisma.PropertyOrderByWithRelationInput[] | null {
+  if (sort === "name_asc") return [{ name: "asc" }, { id: "asc" }];
+  if (sort === "name_desc") return [{ name: "desc" }, { id: "desc" }];
+  if (sort === "created_desc") return [{ created_at: "desc" }, { id: "desc" }];
+  return null;
+}
+
 export async function GET(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
@@ -82,29 +107,116 @@ export async function GET(request: Request) {
       });
     }
 
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
+    const paginatedRequest = ["page", "pageSize", "q", "city", "status", "manager", "sort"]
+      .some((key) => searchParams.has(key));
+    const page = parseBoundedInteger(searchParams.get("page"), 1, 1, MAX_PAGE);
+    const pageSize = parseBoundedInteger(searchParams.get("pageSize"), DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
+    const query = normalizedFilter(searchParams.get("q"));
+    const city = normalizedFilter(searchParams.get("city"));
+    const status = normalizedFilter(searchParams.get("status"));
+    const manager = normalizedFilter(searchParams.get("manager"));
+    const sort = normalizedFilter(searchParams.get("sort")) || "created_desc";
+    const orderBy = propertyOrderBy(sort);
+
+    if (
+      page === null
+      || pageSize === null
+      || !orderBy
+      || [query, city, status, manager].some((value) => value.length > MAX_FILTER_LENGTH)
+    ) {
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message: "Ogiltiga listparametrar",
+        event: "properties.list.validation_failed",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
+
     const [propertyActive, ticketActive] = await Promise.all([
       notDeletedFilter("Property"),
       notDeletedFilter("Ticket"),
     ]);
-    const properties = await db.property.findMany({
-      where: { ...propertyActive, ...tenantWhere(user) },
-      orderBy: { created_at: "desc" },
-      select: propertyListSelect(ticketActive),
-      // Safety cap: the property list is not yet paginated client-side, but must
-      // not be truly unbounded for a very large multi-property landlord/company.
-      take: 2000,
-    });
+    const baseWhere: Prisma.PropertyWhereInput = { ...propertyActive, ...tenantWhere(user) };
+    const filters: Prisma.PropertyWhereInput[] = [];
+    if (query) {
+      filters.push({
+        OR: [
+          { name: { contains: query, mode: "insensitive" } },
+          { address: { contains: query, mode: "insensitive" } },
+          { city: { contains: query, mode: "insensitive" } },
+          { property_identifier: { contains: query, mode: "insensitive" } },
+        ],
+      });
+    }
+    if (city) filters.push({ city });
+    if (status) filters.push({ status });
+    if (manager) filters.push({ manager_name: manager });
+    const where: Prisma.PropertyWhereInput = filters.length ? { ...baseWhere, AND: filters } : baseWhere;
+
+    if (!paginatedRequest) {
+      const properties = await db.property.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        select: propertyListSelect(ticketActive),
+        // Backward-compatible safety path for existing consumers. The dashboard
+        // uses the paginated contract; this legacy path remains bounded while
+        // older internal consumers migrate.
+        take: 2000,
+      });
+
+      observability.logger.info("property list completed", observability.elapsed({
+        event: "properties.list.completed",
+        userId: user.id,
+        companyId: user.company_id,
+        returned: properties.length,
+        canCreate: canCreateProperties(user.role),
+        paginated: false,
+      }));
+
+      return successResponse(observability, {
+        properties,
+        permissions: { canCreate: canCreateProperties(user.role) },
+      });
+    }
+
+    const skip = (page - 1) * pageSize;
+    const [properties, total] = await Promise.all([
+      db.property.findMany({
+        where,
+        orderBy,
+        select: propertyListSelect(ticketActive),
+        skip,
+        take: pageSize,
+      }),
+      db.property.count({ where }),
+    ]);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     observability.logger.info("property list completed", observability.elapsed({
       event: "properties.list.completed",
       userId: user.id,
       companyId: user.company_id,
       returned: properties.length,
+      total,
+      page,
+      pageSize,
       canCreate: canCreateProperties(user.role),
+      paginated: true,
     }));
 
     return successResponse(observability, {
       properties,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages,
+        hasPrevious: page > 1,
+        hasNext: page < totalPages,
+      },
       permissions: { canCreate: canCreateProperties(user.role) },
     });
   } catch (error) {
