@@ -90,37 +90,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Titel och giltigt datum krävs" }, { status: 400 });
     }
 
-    const event = await db.calendarEvent.create({
-      data: {
-        company_id: user.company_id,
-        title,
-        date: parsedDate,
-        time: time || null,
-        type,
-        property_name: propertyName || null,
-        responsible: responsible || null,
-        note: note || null,
-        status: "planned",
-        created_by_id: user.id,
-      },
-      select: { id: true },
-    });
+    const event = await db.$transaction(async (tx) => {
+      const created = await tx.calendarEvent.create({
+        data: {
+          company_id: user.company_id!,
+          title,
+          date: parsedDate,
+          time: time || null,
+          type,
+          property_name: propertyName || null,
+          responsible: responsible || null,
+          note: note || null,
+          status: "planned",
+          created_by_id: user.id,
+        },
+        select: { id: true },
+      });
 
-    await writeAuditLog(user, {
-      entityType: "calendar_event",
-      entityId: event.id,
-      action,
-      metadata: {
-        title,
-        date,
-        time,
-        type,
-        property_name: propertyName,
-        responsible,
-        note,
-        status: "planned",
-        storage: "CalendarEvent",
-      },
+      await writeAuditLog(user, {
+        entityType: "calendar_event",
+        entityId: created.id,
+        action,
+        metadata: {
+          title,
+          date,
+          time,
+          type,
+          property_name: propertyName,
+          responsible,
+          note,
+          status: "planned",
+          storage: "CalendarEvent",
+        },
+      }, tx);
+
+      return created;
     });
 
     return NextResponse.json({ success: true, event }, { status: 201 });
@@ -224,29 +228,34 @@ export async function PATCH(request: Request) {
         }
       : { status: nextStatus };
 
-    const updateResult = await db.calendarEvent.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
-      data,
+    const updateResult = await db.$transaction(async (tx) => {
+      const result = await tx.calendarEvent.updateMany({
+        where: { id: existing.id, company_id: user.company_id! },
+        data,
+      });
+      if (result.count === 0) return result;
+
+      await writeAuditLog(user, {
+        entityType: "calendar_event",
+        entityId: existing.id,
+        action: statusOnly ? "calendar.event.status_updated" : "calendar.event.updated",
+        metadata: {
+          title,
+          previousStatus: existing.status,
+          status: nextStatus,
+          date: date.toISOString().slice(0, 10),
+          time,
+          responsible,
+          note,
+          storage: "CalendarEvent",
+        },
+      }, tx);
+
+      return result;
     });
     if (updateResult.count === 0) {
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "calendar_event",
-      entityId: existing.id,
-      action: statusOnly ? "calendar.event.status_updated" : "calendar.event.updated",
-      metadata: {
-        title,
-        previousStatus: existing.status,
-        status: nextStatus,
-        date: date.toISOString().slice(0, 10),
-        time,
-        responsible,
-        note,
-        storage: "CalendarEvent",
-      },
-    });
 
     return NextResponse.json({ success: true, id: existing.id, status: nextStatus });
   } catch (error) {
@@ -283,24 +292,29 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
     }
 
-    const deleteResult = await db.calendarEvent.deleteMany({
-      where: { id: existing.id, company_id: user.company_id },
+    const deleteResult = await db.$transaction(async (tx) => {
+      const result = await tx.calendarEvent.deleteMany({
+        where: { id: existing.id, company_id: user.company_id! },
+      });
+      if (result.count === 0) return result;
+
+      await writeAuditLog(user, {
+        entityType: "calendar_event",
+        entityId: existing.id,
+        action: "calendar.event.deleted",
+        metadata: {
+          title: existing.title,
+          date: existing.date.toISOString().slice(0, 10),
+          status: existing.status,
+          storage: "CalendarEvent",
+        },
+      }, tx);
+
+      return result;
     });
     if (deleteResult.count === 0) {
       return NextResponse.json({ error: "Aktiviteten hittades inte" }, { status: 404 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "calendar_event",
-      entityId: existing.id,
-      action: "calendar.event.deleted",
-      metadata: {
-        title: existing.title,
-        date: existing.date.toISOString().slice(0, 10),
-        status: existing.status,
-        storage: "CalendarEvent",
-      },
-    });
 
     return NextResponse.json({ success: true, id: existing.id });
   } catch (error) {
