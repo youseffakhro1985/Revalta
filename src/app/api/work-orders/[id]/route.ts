@@ -99,11 +99,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
 
   const { id } = await params;
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
-      where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
+      where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
       select: {
         id: true,
         ticket_id: true,
@@ -120,8 +121,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         created_at: true,
       },
     }),
-    getWorkOrderEnterpriseState(db, user.company_id, id),
-    getWorkOrderAssetLink(db, user.company_id, id),
+    getWorkOrderEnterpriseState(db, companyId, id),
+    getWorkOrderAssetLink(db, companyId, id),
   ]);
   if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
   if (shouldScopeToAssignedWork(user.role) && existing.assigned_to_id !== user.id) {
@@ -193,7 +194,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const assignee = await db.user.findFirst({
           where: {
             id: assignedToId,
-            company_id: user.company_id,
+            company_id: companyId,
             status: "active",
             role: { in: ["owner", "admin", "manager", "technician"] },
           },
@@ -235,7 +236,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (assetLinksChanged) {
     try {
-      await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId: existing.property_id, buildingId, technicalAssetId });
+      await validateWorkOrderAssetLinks(db, { companyId, propertyId: existing.property_id, buildingId, technicalAssetId });
     } catch (error) {
       return NextResponse.json({ error: error instanceof Error ? error.message : "Ogiltig komponentkoppling" }, { status: 400 });
     }
@@ -253,16 +254,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (Object.keys(regularData).length > 0) {
       const updateResult = await tx.workOrder.updateMany({
-        where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+        where: { deleted_at: null, id: existing.id, company_id: companyId },
         data: regularData,
       });
-      if (updateResult.count === 0) {
-        throw new Error("WORK_ORDER_NOT_FOUND");
-      }
+      if (updateResult.count === 0) throw new Error("WORK_ORDER_NOT_FOUND");
     }
 
     if (assetLinksChanged) {
-      await setWorkOrderAssetLinks(tx, { workOrderId: existing.id, companyId: user.company_id!, buildingId, technicalAssetId });
+      await setWorkOrderAssetLinks(tx, { workOrderId: existing.id, companyId, buildingId, technicalAssetId });
     }
 
     if (nextPriority && nextPriority !== normalizeWorkOrderPriority(existing.priority) && !enterpriseBefore?.responded_at) {
@@ -270,13 +269,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await tx.$executeRaw(Prisma.sql`
         UPDATE "WorkOrder"
         SET "sla_response_due_at" = ${sla.responseDueAt}, "sla_resolution_due_at" = ${sla.resolutionDueAt}
-        WHERE "id" = ${existing.id} AND "company_id" = ${user.company_id!}
+        WHERE "id" = ${existing.id} AND "company_id" = ${companyId}
       `);
     }
 
     if (isCompletionTransition) {
       const lifecycle = await completeWorkOrderLifecycle(tx, {
-        companyId: user.company_id!,
+        companyId,
         workOrderId: existing.id,
         actorUserId: user.id,
         completedAt: now,
@@ -293,15 +292,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         },
       });
       const completedWorkOrder = await tx.workOrder.findFirst({
-        where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+        where: { deleted_at: null, id: existing.id, company_id: companyId },
         include,
       });
       if (!completedWorkOrder) throw new Error("WORK_ORDER_NOT_FOUND");
-      return { workOrder: completedWorkOrder, componentSync: lifecycle.componentSync, ticketSync: lifecycle.ticketSync };
+
+      const [enterprise, statusEvents, assetLink] = await Promise.all([
+        getWorkOrderEnterpriseState(tx, companyId, existing.id),
+        getWorkOrderStatusEvents(tx, companyId, existing.id),
+        getWorkOrderAssetLink(tx, companyId, existing.id),
+      ]);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: completedWorkOrder.id,
+        action: "work_order.updated",
+        metadata: {
+          previousStatus: existing.status,
+          status: completedWorkOrder.status,
+          statusReason,
+          assignedToId: completedWorkOrder.assigned_to_id,
+          buildingId,
+          technicalAssetId,
+          estimatedCost: completedWorkOrder.estimated_cost?.toString() ?? null,
+          actualCost: completedWorkOrder.actual_cost?.toString() ?? null,
+          componentSync: lifecycle.componentSync,
+          ticketSync: lifecycle.ticketSync,
+          enterprise,
+        },
+      }, tx);
+      return { workOrder: completedWorkOrder, componentSync: lifecycle.componentSync, ticketSync: lifecycle.ticketSync, enterprise, statusEvents, assetLink };
     }
 
     const updated = await tx.workOrder.findFirst({
-      where: { deleted_at: null, id: existing.id, company_id: user.company_id! },
+      where: { deleted_at: null, id: existing.id, company_id: companyId },
       include,
     });
     if (!updated) throw new Error("WORK_ORDER_NOT_FOUND");
@@ -316,10 +339,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             "paused_at" = CASE WHEN ${becomesPaused} THEN COALESCE("paused_at", ${now}) ELSE NULL END,
             "pause_reason" = CASE WHEN ${becomesPaused} THEN ${statusReason || (nextStatus === "waiting_material" ? "Väntar material" : "Blockerad")} ELSE NULL END,
             "closed_at" = CASE WHEN ${becomesClosed} THEN COALESCE("closed_at", ${now}) ELSE NULL END
-        WHERE "id" = ${existing.id} AND "company_id" = ${user.company_id!}
+        WHERE "id" = ${existing.id} AND "company_id" = ${companyId}
       `);
       await addWorkOrderStatusEvent(tx, {
-        companyId: user.company_id!,
+        companyId,
         workOrderId: existing.id,
         actorUserId: user.id,
         fromStatus: existing.status,
@@ -339,7 +362,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const finalStatus = normalizeWorkOrderStatus(updated.status);
     const finalAssignedToId = updated.assigned_to_id ?? existing.assigned_to_id;
     const ticketSync = await syncWorkOrderToTicket(tx, {
-      companyId: user.company_id!,
+      companyId,
       ticketId: existing.ticket_id,
       workOrderId: existing.id,
       status: finalStatus,
@@ -350,7 +373,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const isCompleted = finalStatus === "completed" || finalStatus === "invoiced";
     const componentSync = await syncCompletedWorkOrderToComponent(tx, {
-      companyId: user.company_id!,
+      companyId,
       propertyId: existing.property_id,
       technicalAssetId: isCompleted ? technicalAssetId : null,
       workOrderId: existing.id,
@@ -363,42 +386,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       actualCost: updated.actual_cost === null ? null : Number(updated.actual_cost),
     });
 
-    return { workOrder: updated, componentSync, ticketSync };
+    const [enterprise, statusEvents, assetLink] = await Promise.all([
+      getWorkOrderEnterpriseState(tx, companyId, existing.id),
+      getWorkOrderStatusEvents(tx, companyId, existing.id),
+      getWorkOrderAssetLink(tx, companyId, existing.id),
+    ]);
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: updated.id,
+      action: "work_order.updated",
+      metadata: {
+        previousStatus: existing.status,
+        status: updated.status,
+        statusReason,
+        assignedToId: updated.assigned_to_id,
+        buildingId,
+        technicalAssetId,
+        estimatedCost: updated.estimated_cost?.toString() ?? null,
+        actualCost: updated.actual_cost?.toString() ?? null,
+        componentSync,
+        ticketSync,
+        enterprise,
+      },
+    }, tx);
+
+    return { workOrder: updated, componentSync, ticketSync, enterprise, statusEvents, assetLink };
   }).catch((error) => {
-    if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") {
-      return null;
-    }
+    if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") return null;
     throw error;
   });
 
-  if (!transactionResult) {
-    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-  }
+  if (!transactionResult) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const workOrder = transactionResult.workOrder;
-  const [enterprise, statusEvents, assetLink] = await Promise.all([
-    getWorkOrderEnterpriseState(db, user.company_id, existing.id),
-    getWorkOrderStatusEvents(db, user.company_id, existing.id),
-    getWorkOrderAssetLink(db, user.company_id, existing.id),
-  ]);
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: workOrder.id,
-    action: "work_order.updated",
-    metadata: {
-      previousStatus: existing.status,
-      status: workOrder.status,
-      statusReason,
-      assignedToId: workOrder.assigned_to_id,
-      buildingId,
-      technicalAssetId,
-      estimatedCost: workOrder.estimated_cost?.toString() ?? null,
-      actualCost: workOrder.actual_cost?.toString() ?? null,
-      componentSync: transactionResult.componentSync,
-      ticketSync: transactionResult.ticketSync,
-      enterprise,
-    },
-  });
+  const { workOrder, enterprise, statusEvents, assetLink } = transactionResult;
   return NextResponse.json({
     workOrder: { ...workOrder, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
     ticketSync: transactionResult.ticketSync,
@@ -410,10 +430,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
 
   const { id } = await params;
   const existing = await db.workOrder.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
+    where: { id, company_id: companyId, deleted_at: null, property: { deleted_at: null } },
     select: { id: true, title: true, status: true, assigned_to_id: true },
   });
   if (!existing) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
@@ -422,19 +443,22 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
   if (!canAssignWorkOrders(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ta bort arbetsordrar" }, { status: 403 });
 
-  const deleteResult = await db.workOrder.updateMany({
-    where: { id: existing.id, company_id: user.company_id, deleted_at: null },
-    data: { deleted_at: new Date() },
-  });
-  if (deleteResult.count === 0) {
-    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-  }
+  const deleted = await db.$transaction(async (tx) => {
+    const deleteResult = await tx.workOrder.updateMany({
+      where: { id: existing.id, company_id: companyId, deleted_at: null },
+      data: { deleted_at: new Date() },
+    });
+    if (deleteResult.count === 0) return false;
 
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: existing.id,
-    action: "work_order.deleted",
-    metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: existing.id,
+      action: "work_order.deleted",
+      metadata: { title: existing.title, previousStatus: existing.status, softDelete: true },
+    }, tx);
+    return true;
   });
+
+  if (!deleted) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
   return NextResponse.json({ success: true });
 }
