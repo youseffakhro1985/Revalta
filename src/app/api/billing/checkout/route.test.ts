@@ -155,7 +155,7 @@ describe("billing checkout", () => {
     expect(createCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
-  it("uses Revalta's canonical production origin even when the request host is untrusted", async () => {
+  it("uses Revalta's canonical production origin and a stable correlated Stripe idempotency key", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
@@ -173,7 +173,24 @@ describe("billing checkout", () => {
       companyId: "company-1",
       successUrl: "https://www.revalta.se/dashboard/billing?checkout=success&plan=enterprise",
       cancelUrl: "https://www.revalta.se/dashboard/billing?checkout=cancelled",
+      idempotencyKey: `revalta-checkout:company-1:enterprise:${requestId}`,
     });
+  });
+
+  it("reuses the same Stripe idempotency key when the same correlated request is retried", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    isStripeReadyMock.mockReturnValue(true);
+
+    await POST(request());
+    await POST(request());
+
+    expect(createCheckoutSessionMock).toHaveBeenCalledTimes(2);
+    expect(createCheckoutSessionMock.mock.calls[0]?.[0]?.idempotencyKey).toBe(
+      `revalta-checkout:company-1:professional:${requestId}`,
+    );
+    expect(createCheckoutSessionMock.mock.calls[1]?.[0]?.idempotencyKey).toBe(
+      `revalta-checkout:company-1:professional:${requestId}`,
+    );
   });
 
   it("minimizes post-session audit and telemetry and does not persist the Stripe session id", async () => {
