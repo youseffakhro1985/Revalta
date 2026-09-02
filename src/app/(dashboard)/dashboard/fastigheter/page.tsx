@@ -307,8 +307,9 @@ export default function PropertiesPage() {
               <option value="all">Alla statusar</option>
               <option value="active">Aktiv</option>
               <option value="inactive">Inaktiv</option>
-              <option value="planned">Planerad</option>
-              <option value="renovation">Renovering</option>
+              <option value="sold">Såld</option>
+              <option value="archived">Arkiverad</option>
+              <option value="watch">Bevakning</option>
             </select>
           </label>
           <label>
@@ -480,10 +481,11 @@ function SidePanel({ title, icon: Icon, children }: { title: string; icon: Lucid
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const normalized = status.toLowerCase();
-  const classes = normalized === "active"
+  const active = status === "active";
+  const attention = status === "watch";
+  const classes = active
     ? "border-success-200 bg-success-50 text-success-700"
-    : normalized === "renovation" || normalized === "planned"
+    : attention
       ? "border-warning-200 bg-warning-50 text-warning-700"
       : "border-sand-200 bg-sand-50 text-ink-500";
   return <span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold ${classes}`}>{statusLabel(status)}</span>;
@@ -493,8 +495,9 @@ function statusLabel(status: string) {
   const labels: Record<string, string> = {
     active: "Aktiv",
     inactive: "Inaktiv",
-    planned: "Planerad",
-    renovation: "Renovering",
+    sold: "Såld",
+    archived: "Arkiverad",
+    watch: "Bevakning",
   };
   return labels[status] || status;
 }
