@@ -209,4 +209,45 @@ describe("projects POST reliability", () => {
     }));
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("rejects a project manager outside the authenticated company before writes", async () => {
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(projectRequest({
+      propertyId: "property-1",
+      managerId: "foreign-manager",
+      name: "Projekt",
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Projektledaren hittades inte" });
+    expect(userFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "foreign-manager", company_id: "company-1", status: "active" },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a source work order outside the authenticated company or selected property", async () => {
+    workOrderFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(projectRequest({
+      propertyId: "property-1",
+      sourceWorkOrderId: "foreign-work-order",
+      name: "Projekt",
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Arbetsordern hittades inte för vald fastighet" });
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        deleted_at: null,
+        id: "foreign-work-order",
+        company_id: "company-1",
+        property_id: "property-1",
+      },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });
