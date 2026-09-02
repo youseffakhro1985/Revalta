@@ -8,6 +8,7 @@ const {
   listMaterialEntriesMock,
   upsertMaterialEntryMock,
   writeAuditLogMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   findAccessibleWorkOrderMock: vi.fn(),
@@ -16,6 +17,7 @@ const {
   listMaterialEntriesMock: vi.fn(),
   upsertMaterialEntryMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", () => ({
@@ -38,6 +40,11 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 }));
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+
+const tx = { workOrderMaterialEntry: {}, auditLog: {} };
+vi.mock("@/lib/db", () => ({
+  default: { $transaction: transactionMock },
+}));
 
 import { POST } from "./route";
 
@@ -100,6 +107,7 @@ describe("material-entry id isolation and attestation state", () => {
     listMaterialEntriesMock.mockResolvedValue([]);
     upsertMaterialEntryMock.mockImplementation(async (_companyId, payload) => payload);
     writeAuditLogMock.mockResolvedValue(undefined);
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
   it("uses a server-owned id for create even when the client supplies an id", async () => {
@@ -121,8 +129,46 @@ describe("material-entry id isolation and attestation state", () => {
     expect(payload.entryId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(payload.workOrderId).toBe("work-order-1");
     expect(upsertMaterialEntryMock.mock.calls[0][0]).toBe("company-1");
+    expect(upsertMaterialEntryMock.mock.calls[0][2]).toBe(tx);
     expect(getModernMaterialEntryMock).not.toHaveBeenCalled();
     expect(getMaterialEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("writes material and audit in the same transaction", async () => {
+    const response = await POST(request({ action: "create", name: "Filter", quantity: 1, unit: "st", unitPrice: 125 }), params);
+
+    expect(response.status).toBe(201);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(upsertMaterialEntryMock).toHaveBeenCalledWith("company-1", expect.any(Object), tx);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "tech-1", company_id: "company-1" }),
+      expect.objectContaining({ action: "work_order.material_create" }),
+      tx,
+    );
+  });
+
+  it("propagates audit failure through the transaction so the material write is rolled back", async () => {
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+
+    await expect(POST(request({ action: "create", name: "Filter", quantity: 1, unit: "st", unitPrice: 125 }), params))
+      .rejects.toThrow("audit unavailable");
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(upsertMaterialEntryMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects malformed JSON before opening a write transaction", async () => {
+    const malformed = new Request("https://www.revalta.se/api/work-orders/work-order-1/materials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(malformed, params);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Ogiltigt innehåll" });
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("requires an explicit id for mutation actions", async () => {

@@ -210,7 +210,10 @@ export async function POST(
   const workOrder = await resolveWorkOrder(user as CompanyUser, id);
   if (!workOrder) return notFoundWorkOrder();
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
   const action = String(body.action || "");
 
   if (["checklist.create", "checklist.complete", "entry.create"].includes(action) && isWorkOrderExecutionLocked(workOrder.status)) {
@@ -225,18 +228,20 @@ export async function POST(
     if (title.length > 240) return NextResponse.json({ error: "Rubriken är för lång" }, { status: 400 });
 
     const itemId = crypto.randomUUID();
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "WorkOrderChecklistItem"
-        ("id", "company_id", "work_order_id", "created_by_id", "title", "description", "is_required", "sort_order")
-      VALUES
-        (${itemId}, ${user.company_id}, ${id}, ${user.id}, ${title}, ${description}, ${body.isRequired !== false}, ${sortOrder})
-    `);
+    await db.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "WorkOrderChecklistItem"
+          ("id", "company_id", "work_order_id", "created_by_id", "title", "description", "is_required", "sort_order")
+        VALUES
+          (${itemId}, ${user.company_id}, ${id}, ${user.id}, ${title}, ${description}, ${body.isRequired !== false}, ${sortOrder})
+      `);
 
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: "work_order.checklist_created",
-      metadata: { itemId, title, isRequired: body.isRequired !== false },
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.checklist_created",
+        metadata: { itemId, title, isRequired: body.isRequired !== false },
+      }, tx);
     });
     return NextResponse.json({ id: itemId }, { status: 201 });
   }
@@ -246,21 +251,25 @@ export async function POST(
     const completed = body.completed !== false;
     if (!itemId) return NextResponse.json({ error: "Kontrollpunkt saknas" }, { status: 400 });
 
-    const changed = await db.$executeRaw(Prisma.sql`
-      UPDATE "WorkOrderChecklistItem"
-      SET "completed_at" = ${completed ? new Date() : null},
-          "completed_by_id" = ${completed ? user.id : null},
-          "updated_at" = CURRENT_TIMESTAMP
-      WHERE "id" = ${itemId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
-    `);
-    if (!changed) return NextResponse.json({ error: "Kontrollpunkten hittades inte" }, { status: 404 });
+    const changed = await db.$transaction(async (tx) => {
+      const updated = await tx.$executeRaw(Prisma.sql`
+        UPDATE "WorkOrderChecklistItem"
+        SET "completed_at" = ${completed ? new Date() : null},
+            "completed_by_id" = ${completed ? user.id : null},
+            "updated_at" = CURRENT_TIMESTAMP
+        WHERE "id" = ${itemId} AND "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+      `);
+      if (!updated) return 0;
 
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: completed ? "work_order.checklist_completed" : "work_order.checklist_reopened",
-      metadata: { itemId },
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: completed ? "work_order.checklist_completed" : "work_order.checklist_reopened",
+        metadata: { itemId },
+      }, tx);
+      return updated;
     });
+    if (!changed) return NextResponse.json({ error: "Kontrollpunkten hittades inte" }, { status: 404 });
     return NextResponse.json({ success: true });
   }
 
@@ -284,18 +293,20 @@ export async function POST(
     if (occurredAt === undefined) return NextResponse.json({ error: "Ogiltigt datum" }, { status: 400 });
 
     const entryId = crypto.randomUUID();
-    await db.$executeRaw(Prisma.sql`
-      INSERT INTO "WorkOrderExecutionEntry"
-        ("id", "company_id", "work_order_id", "created_by_id", "entry_type", "description", "quantity", "unit", "unit_cost", "total_amount", "minutes", "distance_km", "supplier", "occurred_at")
-      VALUES
-        (${entryId}, ${user.company_id}, ${id}, ${user.id}, ${entryType}, ${description}, ${quantity}, ${body.unit ? String(body.unit).trim() : null}, ${unitCost}, ${totalAmount}, ${minutes === null ? null : Math.floor(Number(minutes))}, ${distanceKm}, ${body.supplier ? String(body.supplier).trim() : null}, ${occurredAt ?? new Date()})
-    `);
+    await db.$transaction(async (tx) => {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "WorkOrderExecutionEntry"
+          ("id", "company_id", "work_order_id", "created_by_id", "entry_type", "description", "quantity", "unit", "unit_cost", "total_amount", "minutes", "distance_km", "supplier", "occurred_at")
+        VALUES
+          (${entryId}, ${user.company_id}, ${id}, ${user.id}, ${entryType}, ${description}, ${quantity}, ${body.unit ? String(body.unit).trim() : null}, ${unitCost}, ${totalAmount}, ${minutes === null ? null : Math.floor(Number(minutes))}, ${distanceKm}, ${body.supplier ? String(body.supplier).trim() : null}, ${occurredAt ?? new Date()})
+      `);
 
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: `work_order.${entryType}_registered`,
-      metadata: { entryId, description, totalAmount, minutes, distanceKm },
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: `work_order.${entryType}_registered`,
+        metadata: { entryId, description, totalAmount, minutes, distanceKm },
+      }, tx);
     });
     return NextResponse.json({ id: entryId }, { status: 201 });
   }
@@ -435,6 +446,21 @@ export async function POST(
           },
         });
 
+        await writeAuditLog(user, {
+          entityType: "work_order",
+          entityId: id,
+          action: "work_order.completed",
+          metadata: {
+            actualCost,
+            slaStatus: finalSlaStatus,
+            beforePhotos: completion.before_photos,
+            afterPhotos: completion.after_photos,
+            promotedTime,
+            promotedMaterial,
+            storage: "WorkOrderExecutionEntry+WorkOrderTimeEntry+WorkOrderMaterialEntry",
+          },
+        }, tx);
+
         return { actualCost, finalSlaStatus, promotedTime, promotedMaterial };
       });
     } catch (error) {
@@ -443,21 +469,6 @@ export async function POST(
       }
       throw error;
     }
-
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: "work_order.completed",
-      metadata: {
-        actualCost: result.actualCost,
-        slaStatus: result.finalSlaStatus,
-        beforePhotos: completion.before_photos,
-        afterPhotos: completion.after_photos,
-        promotedTime: result.promotedTime,
-        promotedMaterial: result.promotedMaterial,
-        storage: "WorkOrderExecutionEntry+WorkOrderTimeEntry+WorkOrderMaterialEntry",
-      },
-    });
 
     return NextResponse.json({
       success: true,

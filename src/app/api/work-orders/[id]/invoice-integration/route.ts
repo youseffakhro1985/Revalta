@@ -81,10 +81,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  const companyId = user.company_id;
   const { id } = await params;
-  if (!(await getOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!(await getOrder(id, companyId))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
   const action = String(body.action ?? "queue");
   if (!["queue", "retry", "cancel"].includes(action)) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
   const now = new Date().toISOString();
@@ -95,8 +99,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!providers.has(provider)) return NextResponse.json({ error: "Ogiltig integrationsleverantör" }, { status: 400 });
     if (!configured(provider)) return NextResponse.json({ error: "Integrationen saknar endpoint eller åtkomstnyckel" }, { status: 400 });
 
-    const modernInvoice = await getModernLatestInvoiceDraft(user.company_id, id);
-    const invoice = modernInvoice ?? await getLatestInvoiceDraft(user.company_id, id);
+    const modernInvoice = await getModernLatestInvoiceDraft(companyId, id);
+    const invoice = modernInvoice ?? await getLatestInvoiceDraft(companyId, id);
     if (!invoice) return NextResponse.json({ error: "Faktureringsunderlag saknas" }, { status: 400 });
     if (!modernInvoice) {
       return NextResponse.json({
@@ -115,23 +119,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (typeof invoice.versionId !== "string") return NextResponse.json({ error: "Faktureringsunderlaget saknar versions-ID" }, { status: 400 });
 
     const stableJobId = logicalExportJobId({
-      companyId: user.company_id,
+      companyId,
       workOrderId: id,
       provider,
       invoiceVersionId: invoice.versionId,
     });
-    const jobs = await listInvoiceExportJobs(user.company_id, id);
+    const jobs = await listInvoiceExportJobs(companyId, id);
     const matchingJobs = jobs.filter((job) => job.provider === provider && job.invoiceVersionId === invoice.versionId);
     const nonCancelled = matchingJobs.find((job) => String(job.status ?? "") !== "cancelled");
     if (nonCancelled) {
       return NextResponse.json({ error: duplicateExportError(String(nonCancelled.status ?? "")) }, { status: 409 });
     }
 
-    // Before this hardening, a processing export could be marked cancelled. Its
-    // provider outcome is therefore ambiguous and its random legacy job ID cannot be
-    // replaced with a fresh idempotency identity safely. Only a cancelled job that
-    // already has the deterministic ID below is known to have been created under the
-    // safe queued-only cancellation rule and may be restarted.
     const ambiguousCancelled = matchingJobs.find((job) => String(job.status ?? "") === "cancelled" && job.jobId !== stableJobId);
     if (ambiguousCancelled) {
       return NextResponse.json({ error: duplicateExportError("cancelled") }, { status: 409 });
@@ -139,10 +138,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const safeCancelled = matchingJobs.find((job) => String(job.status ?? "") === "cancelled" && job.jobId === stableJobId);
 
     payload = {
-      // A logical export keeps the same identity even when two queue requests race.
-      // upsertInvoiceExportJob is keyed by jobId, and the cron forwards jobId as the
-      // provider idempotency key. This prevents concurrent queue requests from
-      // materializing two separately sendable jobs for the same invoice/provider.
       jobId: stableJobId,
       workOrderId: id,
       provider,
@@ -156,8 +151,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     };
   } else {
     const jobId = String(body.jobId ?? "");
-    const modern = await getModernInvoiceExportJob(user.company_id, id, jobId);
-    const jobs = modern ? null : await listInvoiceExportJobs(user.company_id, id);
+    const modern = await getModernInvoiceExportJob(companyId, id, jobId);
+    const jobs = modern ? null : await listInvoiceExportJobs(companyId, id);
     const existing = modern ?? jobs?.find((job) => job.jobId === jobId) ?? null;
     if (!existing) return NextResponse.json({ error: "Exportjobbet hittades inte" }, { status: 404 });
     if (!modern) {
@@ -172,10 +167,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (currentStatus !== "failed") return NextResponse.json({ error: "Endast misslyckade jobb kan återförsökas" }, { status: 409 });
       if (!configured(provider)) return NextResponse.json({ error: "Integrationen är inte konfigurerad" }, { status: 400 });
     }
-    // A processing request may already have crossed the external side-effect boundary.
-    // The API cannot safely cancel that HTTP request, so only not-yet-claimed jobs are
-    // cancellable. This keeps an ambiguous in-flight export from being re-queued under
-    // a new logical attempt while the provider may still accept the original request.
     if (action === "cancel" && currentStatus !== "queued") {
       return NextResponse.json({ error: "Endast köade exportjobb kan avbrytas säkert" }, { status: 409 });
     }
@@ -190,19 +181,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     };
   }
 
-  const job = await upsertInvoiceExportJob(user.company_id, payload);
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: `work_order.invoice_integration_${action}`,
-    metadata: {
-      jobId: payload.jobId,
-      provider: payload.provider,
-      status: payload.status,
-      attempt: payload.attempt,
-      invoiceVersionId: payload.invoiceVersionId,
-      storage: "WorkOrderInvoiceExportJob",
-    },
+  const job = await db.$transaction(async (tx) => {
+    const persistedJob = await upsertInvoiceExportJob(companyId, payload, tx);
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: `work_order.invoice_integration_${action}`,
+      metadata: {
+        jobId: payload.jobId,
+        provider: payload.provider,
+        status: payload.status,
+        attempt: payload.attempt,
+        invoiceVersionId: payload.invoiceVersionId,
+        storage: "WorkOrderInvoiceExportJob",
+      },
+    }, tx);
+    return persistedJob;
   });
   return NextResponse.json({ job: { ...job, source: "table" as const } }, { status: 201 });
 }

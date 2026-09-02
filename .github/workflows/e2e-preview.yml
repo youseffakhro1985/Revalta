@@ -22,9 +22,30 @@ jobs:
   auth-navigation:
     name: Auth, navigation, mobile and Command Center
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: revalta_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d revalta_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/revalta_e2e
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/revalta_e2e
+      JWT_SECRET: e2e-secret-only-for-browser-verification-at-least-32-bytes
+      EMAIL_FROM: noreply@revalta.se
+
     steps:
       - name: Check out candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,7 +61,7 @@ jobs:
       - name: Install application dependencies
         run: npm ci
 
-      - name: Resolve exact-SHA Preview
+      - name: Resolve exact-SHA Preview or select local fallback
         id: preview
         env:
           GH_TOKEN: ${{ github.token }}
@@ -51,10 +72,12 @@ jobs:
           set -euo pipefail
           if [[ -n "${MANUAL_PREVIEW_URL:-}" ]]; then
             echo "url=${MANUAL_PREVIEW_URL%/}" >> "$GITHUB_OUTPUT"
+            echo "mode=preview" >> "$GITHUB_OUTPUT"
+            echo "reason=manual_preview" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 24); do
             deployments=$(curl --fail --silent --show-error \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
@@ -73,20 +96,61 @@ jobs:
 
               if [[ "$state" == "success" && "$url" == https://*.vercel.app* ]]; then
                 echo "url=${url%/}" >> "$GITHUB_OUTPUT"
+                echo "mode=preview" >> "$GITHUB_OUTPUT"
+                echo "reason=exact_sha_preview" >> "$GITHUB_OUTPUT"
                 echo "Resolved exact-SHA Preview: ${url%/}"
                 exit 0
               fi
               if [[ "$state" == "failure" || "$state" == "error" ]]; then
-                echo "Preview deployment failed for ${HEAD_SHA}" >&2
+                echo "Preview deployment failed for ${HEAD_SHA}; refusing local fallback" >&2
                 exit 1
               fi
             fi
 
-            echo "Preview not ready yet (attempt ${attempt}/60)"
+            echo "Preview not ready yet (attempt ${attempt}/24)"
             sleep 10
           done
 
-          echo "Timed out waiting for exact-SHA Vercel Preview ${HEAD_SHA}" >&2
+          echo "Exact-SHA Vercel Preview was not published in time; using isolated local production fallback for ${HEAD_SHA}"
+          echo "url=http://127.0.0.1:3000" >> "$GITHUB_OUTPUT"
+          echo "mode=local" >> "$GITHUB_OUTPUT"
+          echo "reason=preview_timeout" >> "$GITHUB_OUTPUT"
+
+      - name: Apply migrations for local fallback
+        if: steps.preview.outputs.mode == 'local'
+        run: npx prisma migrate deploy
+
+      - name: Build exact-SHA local production candidate
+        if: steps.preview.outputs.mode == 'local'
+        env:
+          NODE_ENV: production
+        run: npm run build:ci
+
+      - name: Start exact-SHA local production candidate
+        if: steps.preview.outputs.mode == 'local'
+        env:
+          NODE_ENV: production
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup npm run start -- -H 127.0.0.1 -p 3000 > /tmp/revalta-e2e-server.log 2>&1 &
+          echo $! > /tmp/revalta-e2e-server.pid
+
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/login >/dev/null; then
+              echo "Local production candidate is ready"
+              exit 0
+            fi
+            if ! kill -0 "$(cat /tmp/revalta-e2e-server.pid)" 2>/dev/null; then
+              echo "Local production candidate exited before becoming ready" >&2
+              cat /tmp/revalta-e2e-server.log >&2 || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Timed out waiting for local production candidate" >&2
+          cat /tmp/revalta-e2e-server.log >&2 || true
           exit 1
 
       - name: Install pinned browser runner
@@ -97,4 +161,19 @@ jobs:
       - name: Run browser E2E
         env:
           E2E_BASE_URL: ${{ steps.preview.outputs.url }}
+          E2E_ALLOW_HTTP_LOCALHOST: ${{ steps.preview.outputs.mode == 'local' && '1' || '0' }}
         run: node e2e/auth-navigation.mjs
+
+      - name: Record verification mode
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.preview.outputs.mode }}" == "preview" ]]; then
+            echo "### Browser verification: exact Vercel Preview" >> "$GITHUB_STEP_SUMMARY"
+            echo "Candidate was exercised against the exact-SHA Vercel deployment." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "${{ steps.preview.outputs.mode }}" == "local" ]]; then
+            echo "### ⚠️ Browser verification: local exact-SHA fallback" >> "$GITHUB_STEP_SUMMARY"
+            echo "No exact-SHA Vercel Preview was published before the bounded timeout. The same candidate was built with Next.js production mode, migrated against isolated Postgres and exercised locally. A real Vercel failure/error never falls back." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Browser verification did not reach a runnable candidate" >> "$GITHUB_STEP_SUMMARY"
+          fi
