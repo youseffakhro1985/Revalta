@@ -107,12 +107,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  const companyId = user.company_id;
   const { id } = await params;
-  if (!(await getOrder(id, user.company_id))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  if (!(await getOrder(id, companyId))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const modern = await getModernProfitabilitySettings(user.company_id, id);
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
+  }
+
+  const modern = await getModernProfitabilitySettings(companyId, id);
   if (!modern) {
-    const existing = await getProfitabilitySettings(user.company_id, id);
+    const existing = await getProfitabilitySettings(companyId, id);
     if (existing.source === "legacy") {
       return NextResponse.json({
         error: "Lönsamhetsinställningarna finns kvar i äldre lagring. Kör backfill till WorkOrderProfitabilitySettings innan de kan uppdateras.",
@@ -120,7 +126,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  const body = await request.json();
   const settings = {
     internalHourlyCost: numberValue(body.internalHourlyCost),
     customerHourlyRate: numberValue(body.customerHourlyRate),
@@ -138,12 +143,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Ett eller flera belopp ligger utanför tillåtet intervall" }, { status: 400 });
   }
 
-  const saved = await upsertProfitabilitySettings(user.company_id, id, user.id, settings);
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: "work_order.profitability_updated",
-    metadata: { ...settings, storage: "WorkOrderProfitabilitySettings" },
+  const saved = await db.$transaction(async (tx) => {
+    const persistedSettings = await upsertProfitabilitySettings(companyId, id, user.id, settings, tx);
+    await writeAuditLog(user, {
+      entityType: "work_order",
+      entityId: id,
+      action: "work_order.profitability_updated",
+      metadata: { ...settings, storage: "WorkOrderProfitabilitySettings" },
+    }, tx);
+    return persistedSettings;
   });
   return NextResponse.json({ settings: { ...saved, source: "table" as const } }, { status: 201 });
 }
