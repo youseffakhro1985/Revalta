@@ -29,7 +29,10 @@ export async function POST(
     where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
     include: {
       property: { select: { id: true, name: true } },
-      projects: { where: { deleted_at: null }, select: { id: true, name: true, status: true } },
+      projects: {
+        where: { deleted_at: null, company_id: companyId },
+        select: { id: true, name: true, status: true },
+      },
     },
   });
   if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
@@ -66,7 +69,22 @@ export async function POST(
     if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
   }
 
-  const project = await db.$transaction(async (tx) => {
+  const lockKey = `work-order-project:${companyId}:${workOrder.id}`;
+  const result = await db.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+
+    const existingProject = await tx.project.findFirst({
+      where: {
+        company_id: companyId,
+        source_work_order_id: workOrder.id,
+        deleted_at: null,
+      },
+      select: { id: true, name: true, status: true },
+    });
+    if (existingProject) {
+      return { conflict: true as const, project: existingProject };
+    }
+
     const createdProject = await tx.project.create({
       data: {
         company_id: companyId,
@@ -108,8 +126,12 @@ export async function POST(
       },
     }, tx);
 
-    return createdProject;
+    return { conflict: false as const, project: createdProject };
   });
 
-  return NextResponse.json({ project }, { status: 201 });
+  if (result.conflict) {
+    return NextResponse.json({ error: "Arbetsordern är redan kopplad till ett projekt", project: result.project }, { status: 409 });
+  }
+
+  return NextResponse.json({ project: result.project }, { status: 201 });
 }
