@@ -5,12 +5,20 @@ import { writeAuditLog } from "@/lib/audit";
 import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
 
 type Obj = Record<string, unknown>;
+const exportFormats = new Set(["json", "csv", "fortnox", "visma"]);
+
 function asObject(v: unknown): Obj | null {
   return v && typeof v === "object" && !Array.isArray(v) ? v as Obj : null;
 }
 function csvCell(v: unknown) {
-  const s = String(v ?? "");
+  let s = String(v ?? "");
+  // Spreadsheet applications may interpret these prefixes as formulas even in CSV files.
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return `"${s.replaceAll('"', '""')}"`;
+}
+
+function noStoreHeaders(extra: Record<string, string> = {}) {
+  return { "Cache-Control": "private, no-store", ...extra };
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -37,6 +45,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const url = new URL(request.url);
   const format = (url.searchParams.get("format") || "json").toLowerCase();
+  if (!exportFormats.has(format)) {
+    return NextResponse.json({ error: "Ogiltigt exportformat" }, {
+      status: 400,
+      headers: noStoreHeaders(),
+    });
+  }
+
   const lines = Array.isArray(draft.lines) ? draft.lines.map(asObject).filter(Boolean) as Obj[] : [];
   const exportId = crypto.randomUUID();
   await writeAuditLog(user, {
@@ -54,10 +69,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       + "\n" + ["", "", "", "", "Totalt", draft.total ?? 0].map(csvCell).join(";");
     const body = "\uFEFF" + [header, ...rows, summary].join("\n");
     return new Response(body, {
-      headers: {
+      headers: noStoreHeaders({
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="revalta-fakturaunderlag-${id}.csv"`,
-      },
+      }),
     });
   }
 
@@ -72,6 +87,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     invoice: { ...draft, lines },
   };
   return NextResponse.json(integration, {
-    headers: { "Content-Disposition": `attachment; filename="revalta-fakturaunderlag-${id}-${format}.json"` },
+    headers: noStoreHeaders({
+      "Content-Disposition": `attachment; filename="revalta-fakturaunderlag-${id}-${format}.json"`,
+    }),
   });
 }
