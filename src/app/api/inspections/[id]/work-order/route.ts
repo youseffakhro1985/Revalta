@@ -126,6 +126,18 @@ export async function POST(
         // linked back to the inspection).
         throw new Error("Kunde inte länka arbetsordern till kontrollen");
       }
+
+      await writeAuditLog(user, {
+        entityType: "compliance_inspection",
+        entityId: inspection.id,
+        action: "inspection.work_order_created",
+        metadata: {
+          workOrderId: workOrder.id,
+          workOrderNumber,
+          propertyId: inspection.property_id,
+        },
+      }, tx);
+
       return { conflict: null, workOrderId: workOrder.id, workOrderNumber };
     });
 
@@ -135,17 +147,6 @@ export async function POST(
     if (created.conflict === "already_linked") {
       return NextResponse.json({ error: "Kontrollen har redan en arbetsorder", workOrderId: created.workOrderId }, { status: 409 });
     }
-
-    await writeAuditLog(user, {
-      entityType: "compliance_inspection",
-      entityId: inspection.id,
-      action: "inspection.work_order_created",
-      metadata: {
-        workOrderId: created.workOrderId,
-        workOrderNumber: created.workOrderNumber,
-        propertyId: inspection.property_id,
-      },
-    });
 
     return NextResponse.json({ success: true, workOrderId: created.workOrderId, workOrderNumber: created.workOrderNumber }, { status: 201 });
   } catch (error) {
