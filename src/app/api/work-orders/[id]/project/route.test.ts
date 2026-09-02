@@ -4,14 +4,18 @@ const {
   getCurrentUserMock,
   workOrderFindFirstMock,
   userFindFirstMock,
+  projectFindFirstMock,
   projectCreateMock,
+  executeRawMock,
   transactionMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
   userFindFirstMock: vi.fn(),
+  projectFindFirstMock: vi.fn(),
   projectCreateMock: vi.fn(),
+  executeRawMock: vi.fn(),
   transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
@@ -37,7 +41,11 @@ import { POST } from "./route";
 
 const params = Promise.resolve({ id: "work-order-1" });
 const transactionClient = {
-  project: { create: projectCreateMock },
+  project: {
+    findFirst: projectFindFirstMock,
+    create: projectCreateMock,
+  },
+  $executeRaw: executeRawMock,
   auditLog: { create: vi.fn() },
 };
 
@@ -79,17 +87,28 @@ describe("work-orders/[id]/project POST", () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
     workOrderFindFirstMock.mockResolvedValue(workOrder);
     userFindFirstMock.mockResolvedValue({ id: "manager-1" });
+    projectFindFirstMock.mockResolvedValue(null);
     projectCreateMock.mockResolvedValue(project);
+    executeRawMock.mockResolvedValue(1);
     writeAuditLogMock.mockResolvedValue(undefined);
     transactionMock.mockImplementation(async (callback: (tx: typeof transactionClient) => unknown) => callback(transactionClient));
   });
 
-  it("creates the project and required audit record in the same transaction", async () => {
+  it("creates the project only after a serialized recheck and audits it in the same transaction", async () => {
     const response = await POST(request(JSON.stringify({ managerId: "manager-1" })), { params });
 
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toEqual({ project });
     expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    expect(projectFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        company_id: "company-1",
+        source_work_order_id: "work-order-1",
+        deleted_at: null,
+      },
+      select: { id: true, name: true, status: true },
+    });
     expect(projectCreateMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         company_id: "company-1",
@@ -110,6 +129,38 @@ describe("work-orders/[id]/project POST", () => {
     );
   });
 
+  it("returns 409 after the serialized recheck when another request already created the project", async () => {
+    projectFindFirstMock.mockResolvedValue({ id: "project-existing", name: "Befintligt projekt", status: "planned" });
+
+    const response = await POST(request(JSON.stringify({})), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({
+      error: "Arbetsordern är redan kopplad till ett projekt",
+      project: { id: "project-existing", name: "Befintligt projekt", status: "planned" },
+    });
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
+    expect(projectFindFirstMock).toHaveBeenCalledTimes(1);
+    expect(projectCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("scopes the eager existing-project check to the authenticated company", async () => {
+    const response = await POST(request(JSON.stringify({})), { params });
+
+    expect(response.status).toBe(201);
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "work-order-1", company_id: "company-1" }),
+      include: expect.objectContaining({
+        projects: expect.objectContaining({
+          where: { deleted_at: null, company_id: "company-1" },
+        }),
+      }),
+    }));
+  });
+
   it("propagates an audit failure through the transaction so Prisma rolls the project creation back", async () => {
     const auditFailure = new Error("audit unavailable");
     writeAuditLogMock.mockRejectedValue(auditFailure);
@@ -117,6 +168,7 @@ describe("work-orders/[id]/project POST", () => {
     await expect(POST(request(JSON.stringify({})), { params })).rejects.toThrow("audit unavailable");
 
     expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
     expect(projectCreateMock).toHaveBeenCalledTimes(1);
     expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
   });
