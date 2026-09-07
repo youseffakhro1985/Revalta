@@ -245,6 +245,7 @@ export async function PATCH(request: Request) {
         deductions: true,
         note: true,
         total: true,
+        updated_at: true,
       },
     });
     if (!existing) {
@@ -320,33 +321,35 @@ export async function PATCH(request: Request) {
         }
       : { status: nextStatus };
 
-    const updateResult = await db.rentNotice.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
-      data,
-    });
-    if (updateResult.count === 0) {
-      return NextResponse.json({ error: "Hyresavin hittades inte" }, { status: 404 });
-    }
-
-    await writeAuditLog(user, {
-      entityType: "rent_notice",
-      entityId: existing.id,
-      action: statusOnly ? "rent_notice.status_updated" : "rent_notice.updated",
-      metadata: {
-        tenant_name: existing.tenant_name,
-        period,
-        previousStatus: existing.status,
-        status: nextStatus,
-        base_rent: baseRent,
-        index_percent: indexPercent,
-        indexed_rent: indexedRent,
-        additions,
-        deductions,
-        total,
-        due_date: dueDate.toISOString().slice(0, 10),
-        note,
-        storage: "RentNotice",
-      },
+    await db.$transaction(async (tx) => {
+      const updateResult = await tx.rentNotice.updateMany({
+        where: {
+          id: existing.id, company_id: user.company_id!, updated_at: existing.updated_at,
+          status: existing.status, property: { deleted_at: null },
+        },
+        data,
+      });
+      if (updateResult.count !== 1) throw new Error("RENT_NOTICE_UPDATE_CONFLICT");
+      await writeAuditLog(user, {
+        entityType: "rent_notice",
+        entityId: existing.id,
+        action: statusOnly ? "rent_notice.status_updated" : "rent_notice.updated",
+        metadata: {
+          tenant_name: existing.tenant_name,
+          period,
+          previousStatus: existing.status,
+          status: nextStatus,
+          base_rent: baseRent,
+          index_percent: indexPercent,
+          indexed_rent: indexedRent,
+          additions,
+          deductions,
+          total,
+          due_date: dueDate.toISOString().slice(0, 10),
+          note,
+          storage: "RentNotice",
+        },
+      }, tx);
     });
 
     return NextResponse.json({
@@ -357,6 +360,9 @@ export async function PATCH(request: Request) {
       indexed_rent: indexedRent,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "RENT_NOTICE_UPDATE_CONFLICT") {
+      return NextResponse.json({ error: "Hyresavin har ändrats. Ladda om och försök igen." }, { status: 409 });
+    }
     logger.error("Update rent notice error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
