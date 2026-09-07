@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
+import { getUserForSession } from "@/lib/current-user";
 import { isResident } from "@/lib/permissions";
 import {
   isStaffOnlyApiPath,
@@ -17,7 +18,7 @@ import {
   isTrustedMutationRequest,
 } from "@/lib/request-security";
 import { verifyToken } from "@/lib/session";
-import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
+import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME, expiredSessionCookieOptions } from "@/lib/session-policy";
 
 async function resolveSessionRole(sessionSub: string, sessionEmail: string) {
   const user = await db.user.findUnique({
@@ -67,8 +68,17 @@ export async function proxy(request: NextRequest) {
   }
 
   if ((pathname === "/login" || pathname === "/register") && session) {
-    const role = await resolveSessionRole(session.sub, session.email);
-    if (role && isResident(role)) {
+    // A signed token can still be revoked by password/email/role/company changes.
+    // Redirect only when the dashboard would accept the same session, otherwise
+    // login -> dashboard -> login loops make account recovery impossible.
+    const user = await getUserForSession(session);
+    if (!user) {
+      const response = NextResponse.next({ request: { headers: correlatedRequestHeaders(request.headers, requestId) } });
+      response.cookies.set(SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
+      response.cookies.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
+      return correlate(response);
+    }
+    if (isResident(user.role)) {
       return correlate(NextResponse.redirect(new URL(residentHomePath(), request.url)));
     }
     return correlate(NextResponse.redirect(new URL("/dashboard", request.url)));

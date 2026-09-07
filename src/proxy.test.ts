@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { verifyToken, findUnique } = vi.hoisted(() => ({
+const { verifyToken, findUnique, findFirst } = vi.hoisted(() => ({
   verifyToken: vi.fn(),
   findUnique: vi.fn(),
+  findFirst: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({ verifyToken }));
 vi.mock("@/lib/db", () => ({
-  default: { user: { findUnique } },
+  default: { user: { findUnique }, auditLog: { findFirst } },
 }));
 
 import { proxy } from "@/proxy";
@@ -47,6 +48,7 @@ describe("request proxy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     verifyToken.mockResolvedValue(validSession);
+    findFirst.mockResolvedValue(null);
     findUnique.mockResolvedValue({
       role: "owner",
       status: "active",
@@ -202,5 +204,26 @@ describe("request proxy", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal");
     expect(response.headers.get(REQUEST_ID_HEADER)).toMatch(requestIdPattern);
+  });
+
+  it.each(["/login", "/register"])("allows %s after password revocation instead of redirecting in a loop", async (path) => {
+    findFirst.mockResolvedValue({ created_at: new Date("2026-09-07T12:00:00Z") });
+    const response = await proxy(dashboardRequest(path, `${SESSION_COOKIE_NAME}=current-token`));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.cookies.get(SESSION_COOKIE_NAME)?.value).toBe("");
+    expect(response.cookies.get(LEGACY_SESSION_COOKIE_NAME)?.value).toBe("");
+  });
+
+  it.each([
+    { role: "unknown", status: "active" },
+    { role: "owner", status: "inactive" },
+    { role: "owner", status: "active", company: { status: "suspended" } },
+  ])("does not redirect a rejected account away from login: %j", async (account) => {
+    findUnique.mockResolvedValue({ email: validSession.email, ...account });
+    const response = await proxy(dashboardRequest("/login", `${SESSION_COOKIE_NAME}=current-token`));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
   });
 });

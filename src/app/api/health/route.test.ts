@@ -103,6 +103,20 @@ describe("health route", () => {
     expect(body.env).toBeUndefined();
   });
 
+  it("returns safe health failure when session lookup cannot reach the database", async () => {
+    stubCriticalEnv();
+    getCurrentUserMock.mockRejectedValueOnce(new Error("private database connection details"));
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toMatchObject({ status: "error", ok: false, database: "error" });
+    expect(body.env).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("private database connection details");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(loggerErrorMock).toHaveBeenCalledTimes(1);
+  });
+
   it("publishes immutable release provenance with cache-safe headers", async () => {
     getCurrentUserMock.mockResolvedValue(null);
     vi.stubEnv("VERCEL_GIT_COMMIT_SHA", "1234567890abcdef1234567890abcdef12345678");
