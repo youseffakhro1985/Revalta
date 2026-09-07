@@ -110,4 +110,12 @@ describe("dual-list helpers", () => {
     expect(parseDateOnly("26/07/2026")).toBeNull();
     expect(parseOptionalDate("2026-07-26T12:00:00.000Z")).toBeInstanceOf(Date);
   });
+
+  it.each(["2026-02-29", "2026-02-31", "2026-04-31", "2026-13-01", "2026-00-01", "2026-01-00"])("rejects an impossible calendar date: %s", (date) => {
+    expect(parseDateOnly(date)).toBeNull();
+  });
+
+  it("preserves a valid leap day", () => {
+    expect(parseDateOnly("2028-02-29")?.toISOString()).toBe("2028-02-29T00:00:00.000Z");
+  });
 });
