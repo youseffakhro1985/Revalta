@@ -25,10 +25,13 @@ function sanitizeValue(value: unknown, depth = 0, seen = new WeakSet<object>()):
   if (typeof value === "bigint") return value.toString();
   if (value instanceof Date) return value.toISOString();
   if (value instanceof Error) {
+    if (seen.has(value)) return "[CIRCULAR]";
+    seen.add(value);
     return {
-      name: value.name,
-      message: value.message,
-      ...(process.env.NODE_ENV === "production" ? {} : { stack: value.stack }),
+      name: sanitizeString(value.name),
+      message: sanitizeString(value.message),
+      ...(process.env.NODE_ENV === "production" ? {} : { stack: sanitizeValue(value.stack, depth + 1, seen) }),
+      ...(value.cause === undefined ? {} : { cause: sanitizeValue(value.cause, depth + 1, seen) }),
     };
   }
   if (Array.isArray(value)) return value.map((item) => sanitizeValue(item, depth + 1, seen));

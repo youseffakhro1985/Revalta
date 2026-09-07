@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import {
   canViewLeasingData,
+  isStaffRole,
   type CurrentUser,
   shouldScopeToAssignedWork,
   tenantWhere,
@@ -20,6 +21,7 @@ export function isAssignedWorkAccessible(
   user: Pick<CurrentUser, "id" | "role">,
   assignedToId: string | null | undefined,
 ) {
+  if (!isStaffRole(user.role)) return false;
   if (!shouldScopeToAssignedWork(user.role)) return true;
   return assignedToId === user.id;
 }

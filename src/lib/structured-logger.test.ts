@@ -40,6 +40,30 @@ describe("structured server logger", () => {
     expect(payload.message).toBe("upstream rejected Bearer [REDACTED]");
   });
 
+  it("redacts nested Error messages, stacks and chained causes", () => {
+    const cause = new Error("request failed Bearer private-provider-token");
+    const error = new Error("connect postgresql://service:private-db-password@db.example/revalta", { cause });
+    error.stack = "upstream failed token=private-stack-token";
+    const serialized = JSON.stringify(sanitizeLogContext({ nested: { failure: error } }));
+
+    expect(serialized).not.toContain("private-provider-token");
+    expect(serialized).not.toContain("private-db-password");
+    expect(serialized).not.toContain("private-stack-token");
+    expect(serialized).toContain("[REDACTED]");
+    expect(serialized).toContain("cause");
+  });
+
+  it("bounds cyclic Error causes and omits nested production stacks", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const error = new Error("token=nested-secret");
+    error.cause = error;
+    const serialized = JSON.stringify(serializeError(new Error("outer", { cause: error })));
+
+    expect(serialized).toContain("[CIRCULAR]");
+    expect(serialized).not.toContain("nested-secret");
+    expect(serialized).not.toContain("stack");
+  });
+
   it("redacts inline secrets from arbitrary context strings", () => {
     expect(sanitizeLogContext({
       upstream: "request failed password=plain-text&api_key=provider-key",

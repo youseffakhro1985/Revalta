@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import db from "@/lib/db";
-import { isResident } from "@/lib/permissions";
-import { verifyToken } from "@/lib/session";
+import { isStaffRole, isUserRole } from "@/lib/permissions";
+import { verifyToken, type SessionPayload } from "@/lib/session";
 import { LEGACY_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/lib/session-policy";
 
 export {
@@ -35,6 +35,11 @@ export async function getCurrentUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value || cookieStore.get(LEGACY_SESSION_COOKIE_NAME)?.value;
   const session = token ? await verifyToken(token) : null;
+  return getUserForSession(session);
+}
+
+/** Shared validation for protected data access and login redirects. */
+export async function getUserForSession(session: SessionPayload | null) {
   if (!session || typeof session.issuedAt !== "number") return null;
 
   const [user, latestPasswordChange] = await Promise.all([
@@ -59,6 +64,7 @@ export async function getCurrentUser() {
   ]);
 
   if (!user || user.status !== "active" || (user.company && user.company.status !== "active")) return null;
+  if (!isUserRole(user.role)) return null;
   if (user.email.toLowerCase() !== session.email.toLowerCase()) return null;
 
   const currentPasswordVersion = latestPasswordChange?.created_at.getTime() ?? null;
@@ -88,14 +94,14 @@ export function companyUserWhere(user: CurrentUser) {
 
 /** Organisation member with company scope (includes resident self-service). */
 export function requireCompanyMember(user: CurrentUser | null): CompanyUser | null {
-  if (!user?.company_id) return null;
+  if (!user?.company_id || !isUserRole(user.role)) return null;
   return user as CompanyUser;
 }
 
 /** Fail-closed helper for organisation-scoped staff API routes. */
 export function requireCompanyUser(user: CurrentUser | null): CompanyUser | null {
   const member = requireCompanyMember(user);
-  if (!member || isResident(member.role)) return null;
+  if (!member || !isStaffRole(member.role)) return null;
   return member;
 }
 

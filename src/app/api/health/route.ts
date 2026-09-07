@@ -82,8 +82,7 @@ function healthResponse(body: unknown, status = 200, release = buildReleaseSnaps
 }
 
 export async function GET(request: NextRequest) {
-  const user = await getCurrentUser();
-  const isPublic = !user;
+  let isPublic = true;
   const startedAt = Date.now();
   const release = buildReleaseSnapshot();
   const modernStorageOnly = isModernStorageOnly();
@@ -96,6 +95,8 @@ export async function GET(request: NextRequest) {
   });
 
   try {
+    const user = await getCurrentUser();
+    isPublic = !user;
     const ping = await pingDatabaseWithRetry();
     if (ping.retried) {
       logger.warn("health check database ping succeeded after retry", {
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
         audience: isPublic ? "public" : "operations",
       });
     }
-    if (isPublic) {
+    if (!user) {
       return healthResponse({
         status: "ok",
         ok: true,
