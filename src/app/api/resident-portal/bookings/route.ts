@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
+import { lockBookingResources } from "@/lib/booking-lock";
 import { writeAuditLog } from "@/lib/audit";
 import {
   canAccessResidentPortal,
@@ -77,23 +78,16 @@ export async function GET(request: Request) {
     }
 
     const leases = await listResidentMatchedLeases(user.company_id, user.email);
-    const propertyIds = [...new Set(leases.map((lease) => lease.property_id))];
-    const unitDesignations = leases.map((lease) => lease.unit.designation).filter(Boolean);
     const bookings = await db.booking.findMany({
       where: {
         company_id: user.company_id,
         property: { deleted_at: null },
-        OR: [
-          { created_by_id: user.id },
-          ...(propertyIds.length > 0 && unitDesignations.length > 0
-            ? [{
-                property_id: { in: propertyIds },
-                unit: { in: unitDesignations },
-              }]
-            : []),
-        ],
+        // Property/unit labels do not prove who owns a booking: several people
+        // can share or successively occupy a unit. Only the authenticated
+        // creator is an authoritative resident relationship in this model.
+        created_by_id: user.id,
       },
-      orderBy: { start_at: "desc" },
+      orderBy: [{ start_at: "desc" }, { id: "desc" }],
       take: 200,
       include: { property: { select: { id: true, name: true, address: true, city: true } } },
     });
@@ -213,20 +207,19 @@ export async function POST(request: Request) {
       || lease.lease_holder.contact_name
       || lease.lease_holder.name
       || "Boende";
-    const lockKey = `resident-booking:${user.company_id}:${lease.property_id}:${resource.toLocaleLowerCase("sv-SE")}`;
 
     const bookingResult = await db.$transaction(async (tx) => {
       // Serialize create attempts for the same tenant/property/resource. The
       // conflict check must happen after this lock so two concurrent requests
       // cannot both observe an empty slot and double-book it.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
+      await lockBookingResources(tx, user.company_id!, lease.property_id, [resource]);
 
       const conflict = await tx.booking.findFirst({
         where: {
           company_id: user.company_id,
           property_id: lease.property_id,
           property: { deleted_at: null },
-          resource,
+          resource: { equals: resource, mode: "insensitive" },
           status: { not: "cancelled" },
           start_at: { lt: end },
           end_at: { gt: start },
