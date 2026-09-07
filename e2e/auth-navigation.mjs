@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright";
+import { validateTarget, validateRelease } from "./target-policy.mjs";
 
-const baseUrl = String(process.env.E2E_BASE_URL || "").replace(/\/$/, "");
+const target = validateTarget(process.env);
+const { baseUrl, isLocal: isAllowedLocalOrigin } = target;
 const bypass = String(process.env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
-const allowHttpLocalhost = String(process.env.E2E_ALLOW_HTTP_LOCALHOST || "").trim() === "1";
 const RESET_MAX_LATENCY_MS = 8_000;
 const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
 const VERIFY_RESEND_NEUTRAL_MESSAGE = "Om kontot behöver verifieras skickar vi en ny verifieringslänk.";
@@ -12,16 +13,9 @@ const REGISTER_MAX_LATENCY_MS = 8_000;
 const REGISTER_REQUEST_EMIT_TIMEOUT_MS = 5_000;
 const REGISTER_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 
-const isHttpsOrigin = /^https:\/\//.test(baseUrl);
-const isAllowedLocalOrigin = allowHttpLocalhost && /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(baseUrl);
-if (!baseUrl || (!isHttpsOrigin && !isAllowedLocalOrigin)) {
-  console.error("E2E_BASE_URL must be an https Preview origin, or an explicitly allowed localhost origin");
-  process.exit(1);
-}
-
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const email = `e2e-owner-${runId}@example.com`;
-const password = `RevaltaE2E!${runId.slice(-8)}9`;
+const email = isAllowedLocalOrigin ? `e2e-owner-${runId}@example.com` : process.env.E2E_VERIFIED_EMAIL;
+const password = isAllowedLocalOrigin ? `RevaltaE2E!${runId.slice(-8)}9` : process.env.E2E_VERIFIED_PASSWORD;
 const companyName = `E2E Organisation ${runId.slice(-6)}`;
 
 function fail(message) {
@@ -68,21 +62,37 @@ async function markLocalAccountVerified() {
   }
 }
 
-const extraHTTPHeaders = isHttpsOrigin && bypass
-  ? {
-      "x-vercel-protection-bypass": bypass,
-      "x-vercel-set-bypass-cookie": "true",
-    }
-  : undefined;
+const bypassHeaders = !isAllowedLocalOrigin && bypass
+  ? { "x-vercel-protection-bypass": bypass, "x-vercel-set-bypass-cookie": "true" }
+  : {};
+// Refuse redirects: a protection token must only reach the verified origin.
+const healthResponse = await fetch(`${baseUrl}/api/health`, { headers: bypassHeaders, redirect: "error", signal: AbortSignal.timeout(15_000) });
+if (!healthResponse.ok) fail(`Candidate health returned HTTP ${healthResponse.status}`);
+validateRelease(await healthResponse.json(), target);
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
   baseURL: baseUrl,
-  extraHTTPHeaders,
   viewport: { width: 1440, height: 1000 },
 });
+// Vercel's response cookie is confined to this host. Context-wide bypass
+// headers can leak to subresources or redirected requests on other origins.
+const protectionCookies = healthResponse.headers.getSetCookie().map((header) => {
+  const pair = header.split(";", 1)[0];
+  const separator = pair.indexOf("=");
+  if (separator <= 0) fail("Invalid protection cookie response");
+  return { name: pair.slice(0, separator), value: pair.slice(separator + 1), url: baseUrl, httpOnly: true, secure: !isAllowedLocalOrigin, sameSite: "Lax" };
+});
+if (protectionCookies.length) await context.addCookies(protectionCookies);
 const page = await context.newPage();
 const pageErrors = [];
+const failedRequests = [];
+page.on("requestfailed", (request) => {
+  if (new URL(request.url()).origin === baseUrl && request.failure()?.errorText !== "net::ERR_ABORTED") failedRequests.push(new URL(request.url()).pathname);
+});
+page.on("response", (response) => {
+  if (new URL(response.url()).origin === baseUrl && response.status() >= 500) failedRequests.push(`${response.status()} ${new URL(response.url()).pathname}`);
+});
 let registerRequest = null;
 let registerResponse = null;
 let registerRequestFailure = null;
@@ -115,6 +125,7 @@ page.on("requestfailed", (request) => {
 try {
   console.log(`E2E auth/navigation against ${baseUrl}`);
 
+  if (isAllowedLocalOrigin) {
   // Password reset does not depend on registration. Prove the issue #265 path first
   // so a separate registration-navigation flake cannot hide reset latency evidence.
   await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
@@ -239,16 +250,25 @@ try {
   await expectVisible(page.getByText(VERIFY_RESEND_NEUTRAL_MESSAGE, { exact: true }), "neutral verification resend confirmation");
   console.log("email verification resend: neutral browser flow passed");
 
+  } else {
+    // Remote tests use an owner-provided, verified account in isolated test data.
+    // Never synthesize accounts or change Preview/Production verification state.
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
+    await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "Preview login heading");
+    await page.getByLabel("E-post").fill(email);
+    await page.getByLabel("Lösenord").fill(password);
+  }
   if (isAllowedLocalOrigin) {
     // The isolated local fallback owns its Postgres fixture, so it can mark the
     // just-created account verified strictly to continue the dashboard/navigation
     // smoke suite. Verification-token semantics themselves are covered by route
     // tests; no production or Preview database is ever mutated by this fixture.
     await markLocalAccountVerified();
+  }
     await page.getByRole("button", { name: "Logga in" }).click();
     await expectPath(page, "/dashboard");
     await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
-    console.log("verified login: local isolated browser flow passed");
+    console.log("verified login: browser flow passed");
 
     // Desktop critical navigation: compact IA + expandable Drift.
     await expectVisible(page.getByRole("link", { name: "Översikt", exact: true }), "Översikt navigation");
@@ -296,6 +316,14 @@ try {
     await mobileCommandCenter.getByRole("button", { name: "Stäng Command Center" }).click();
     console.log("mobile navigation + Command Center: passed");
 
+    // Record narrow responsive coverage for dashboard navigation, not all modules.
+    for (const width of [360, 390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+      if (overflows) fail(`Dashboard overflows the viewport at ${width}px`);
+      await expectVisible(page.getByRole("button", { name: width < 1024 ? "Öppna Revalta Command Center" : "Sök eller kör kommando" }), `Command Center at ${width}px`);
+    }
+
     // Logout and verify the protected dashboard is no longer the active surface.
     await page.setViewportSize({ width: 1440, height: 1000 });
     const logout = page.getByRole("button", { name: "Logga ut" }).first();
@@ -307,17 +335,13 @@ try {
     await expectPath(page, "/login");
     await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after protected redirect");
     console.log("logout + protected dashboard redirect: passed");
-  } else {
-    console.log(
-      "Preview mode: verification gate and resend were exercised, but dashboard continuation is skipped because the runner has no trusted Preview mailbox/DB fixture.",
-    );
-  }
 
   if (pageErrors.length > 0) {
     fail(`browser emitted page errors: ${pageErrors.join(" | ")}`);
   }
 
-  console.log("OK: browser auth/navigation E2E passed");
+  if (failedRequests.length) fail(`Application requests failed: ${failedRequests.join(" | ")}`);
+  console.log(`OK: ${isAllowedLocalOrigin ? "local isolated diagnostic" : "exact Preview"} auth/navigation passed for ${target.expectedSha}; widths=360,390,768,1024,1280,1440. Provider email and golden-path mutations remain separate gates.`);
 } finally {
   await context.close();
   await browser.close();
