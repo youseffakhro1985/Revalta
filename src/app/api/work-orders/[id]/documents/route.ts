@@ -106,38 +106,54 @@ export async function POST(request: Request, { params }: Params) {
     if (!validation.ok) return reject(observability, 400, API_ERROR_CODES.validationFailed, validation.error);
 
     const safeName = validation.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
-    const blob = await put(`work-orders/${ctx.user.company_id}/${id}/${crypto.randomUUID()}-${safeName}`, bytes, {
+    const documentId = crypto.randomUUID();
+    const blob = await put(`work-orders/${ctx.user.company_id}/${id}/${documentId}-${safeName}`, bytes, {
       access: "private",
       addRandomSuffix: false,
       contentType: validation.contentType,
       token,
     });
     let document;
+    let callbackFailed = false;
     try {
       // Audit failure must roll back the record before compensating the upload.
       // Otherwise compensation deletes a file still referenced by committed data.
       document = await db.$transaction(async (tx) => {
-        const created = await tx.operationalDocument.create({
-          data: {
-            company_id: ctx.user.company_id,
-            work_order_id: id,
-            uploaded_by_id: ctx.user.id,
-            file_name: validation.fileName.slice(0, 255),
-            storage_url: blob.url,
-            content_type: validation.contentType,
-            size_bytes: validation.sizeBytes,
-            category,
-            visibility,
-          },
-          select: documentSelect,
-        });
-        await writeAuditLog(ctx.user, {
-          entityType: "work_order", entityId: id, action: "work_order.document_uploaded",
-          metadata: { documentId: created.id, fileName: created.file_name, category, visibility, sizeBytes: created.size_bytes },
-        }, tx);
-        return created;
+        try {
+          const created = await tx.operationalDocument.create({
+            data: {
+              id: documentId,
+              company_id: ctx.user.company_id,
+              work_order_id: id,
+              uploaded_by_id: ctx.user.id,
+              file_name: validation.fileName.slice(0, 255),
+              storage_url: blob.url,
+              content_type: validation.contentType,
+              size_bytes: validation.sizeBytes,
+              category,
+              visibility,
+            },
+            select: documentSelect,
+          });
+          await writeAuditLog(ctx.user, {
+            entityType: "work_order", entityId: id, action: "work_order.document_uploaded",
+            metadata: { documentId: created.id, fileName: created.file_name, category, visibility, sizeBytes: created.size_bytes },
+          }, tx);
+          return created;
+        } catch (error) {
+          callbackFailed = true;
+          throw error;
+        }
       });
     } catch {
+      if (!callbackFailed) {
+        // A connection/commit acknowledgement can fail after persistence. Keep
+        // the file until reconciliation instead of deleting referenced data.
+        observability.logger.error("work-order document commit outcome unknown", undefined, observability.elapsed({
+          event: "work_order.documents.commit_requires_reconciliation", documentId,
+        }));
+        return failure(observability, "upload");
+      }
       try {
         await del(blob.url, { token });
       } catch {

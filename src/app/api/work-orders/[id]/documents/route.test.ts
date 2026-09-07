@@ -189,6 +189,18 @@ describe("work-order document persistence and audit", () => {
     expect(mocks.del).not.toHaveBeenCalled();
   });
 
+  it("retains the blob when the transaction commit acknowledgement is uncertain", async () => {
+    mocks.transaction.mockImplementation(async (callback) => {
+      await callback(tx);
+      throw new Error("connection lost after commit");
+    });
+    const response = await POST(upload(), params);
+    expect(response.status).toBe(500);
+    expect(mocks.audit).toHaveBeenCalled();
+    expect(mocks.del).not.toHaveBeenCalled();
+    expect(await response.text()).not.toContain("connection lost");
+  });
+
   it("soft-deletes within the same transaction as audit, retaining the blob", async () => {
     const response = await DELETE(deletion(), params);
     expect(response.status).toBe(200);
