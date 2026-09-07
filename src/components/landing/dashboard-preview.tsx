@@ -60,11 +60,11 @@ export function DashboardPreview() {
             <span className="h-2 w-2 rounded-full border border-sand-400 bg-white" />
           </div>
           <span className="absolute left-1/2 -translate-x-1/2 text-[9px] font-medium tracking-[0.08em] text-ink-500">
-            APP.REVALTA.SE
+            REVALTA · EXEMPELVY
           </span>
           <span aria-hidden="true" className="landing-demo-live flex items-center gap-1.5 text-[7px] font-semibold uppercase tracking-[0.11em] text-petroleum-700">
             <span className="landing-demo-live-dot h-1.5 w-1.5 rounded-full bg-petroleum-500" />
-            Live
+            Exempeldata
           </span>
         </div>
 
