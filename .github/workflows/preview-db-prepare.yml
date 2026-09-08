@@ -1,0 +1,112 @@
+name: Preview DB Prepare (temporary)
+
+on:
+  push:
+    branches:
+      - fix/revalta-preview-gate-2026-09-07
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revalta-preview-db-prepare-426
+  cancel-in-progress: false
+
+jobs:
+  migrate-isolated-preview:
+    name: Migrate isolated Preview database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://revalta_preview_e2e@ep-gentle-star-amrx3qg1.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=10
+      DIRECT_URL: postgresql://revalta_preview_e2e@ep-gentle-star-amrx3qg1.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=10
+      EXPECTED_BRANCH_ID: br-restless-salad-ambw5ig8
+      EXPECTED_PROJECT_ID: withered-cell-46849200
+      EXPECTED_DATABASE: neondb
+      EXPECTED_ROLE: revalta_preview_e2e
+
+    steps:
+      - name: Check out exact push SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fail closed unless PostgreSQL identity is the isolated Preview branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { PrismaClient } from '@prisma/client';
+          const prisma = new PrismaClient();
+          try {
+            const rows = await prisma.$queryRawUnsafe(`
+              SELECT current_database() AS database_name,
+                     current_user AS role_name,
+                     current_setting('neon.branch_id', true) AS branch_id,
+                     current_setting('neon.project_id', true) AS project_id
+            `);
+            const row = rows[0];
+            const expected = {
+              database_name: process.env.EXPECTED_DATABASE,
+              role_name: process.env.EXPECTED_ROLE,
+              branch_id: process.env.EXPECTED_BRANCH_ID,
+              project_id: process.env.EXPECTED_PROJECT_ID,
+            };
+            for (const [key, value] of Object.entries(expected)) {
+              if (row?.[key] !== value) throw new Error(`BLOCKED: PostgreSQL ${key} identity mismatch`);
+            }
+            console.log(`Verified isolated Preview database identity: ${row.project_id}/${row.branch_id}/${row.database_name}/${row.role_name}`);
+          } finally {
+            await prisma.$disconnect();
+          }
+          NODE
+
+      - name: Apply repository Prisma migrations to isolated Preview only
+        run: npx prisma migrate deploy
+
+      - name: Verify complete migration history and empty business data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { PrismaClient } from '@prisma/client';
+          const prisma = new PrismaClient();
+          try {
+            const migrationRows = await prisma.$queryRawUnsafe(`
+              SELECT migration_name, checksum
+              FROM "_prisma_migrations"
+              WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
+              ORDER BY migration_name
+            `);
+            if (migrationRows.length !== 49) throw new Error(`BLOCKED: expected 49 successful migrations, got ${migrationRows.length}`);
+            const counts = await prisma.$queryRawUnsafe(`
+              SELECT
+                (SELECT count(*)::int FROM "Company") AS companies,
+                (SELECT count(*)::int FROM "User") AS users,
+                (SELECT count(*)::int FROM "Property") AS properties,
+                (SELECT count(*)::int FROM "Ticket") AS tickets,
+                (SELECT count(*)::int FROM "WorkOrder") AS work_orders,
+                (SELECT count(*)::int FROM "Lease") AS leases,
+                (SELECT count(*)::int FROM "RentNotice") AS rent_notices,
+                (SELECT count(*)::int FROM "ImdReading") AS imd_readings
+            `);
+            const row = counts[0];
+            if (Object.values(row).some((value) => Number(value) !== 0)) throw new Error('BLOCKED: isolated Preview database contains unexpected business rows');
+            console.log(`Verified ${migrationRows.length} successful migrations and zero business fixture rows before synthetic seeding.`);
+          } finally {
+            await prisma.$disconnect();
+          }
+          NODE
