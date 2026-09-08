@@ -84,6 +84,9 @@ jobs:
       - name: Check migration status
         run: npx prisma migrate status
 
+      - name: Verify OperationalDocument parent constraint
+        run: node scripts/verify-operational-document-parent-constraint.mjs
+
       - name: Lint
         run: npm run lint
 
