@@ -184,6 +184,13 @@ validateActionPins(databaseStatus, "Database Status", { checkout: true, setupNod
 validateActionPins(cronSmoke, "Cron Smoke", { checkout: true, setupNode: true });
 validateActionPins(databaseRelease, "Database Release", { checkout: true, setupNode: true });
 validateActionPins(e2ePreview, "Preview Browser E2E", { checkout: true, setupNode: true });
+for (const [source, label] of [[ci, "Revalta CI"], [codeql, "CodeQL"], [e2ePreview, "Preview Browser E2E"]]) {
+  requireText(source, "ref: ${{ github.event.pull_request.head.sha || github.sha }}", `${label} must check out the exact candidate SHA`);
+  requireText(source, 'test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"', `${label} must verify the checked-out candidate SHA`);
+}
+requireText(codeql, "sha: ${{ github.event.pull_request.head.sha || github.sha }}", "CodeQL results must identify the exact candidate SHA");
+requireText(codeql, "format('refs/pull/{0}/head', github.event.pull_request.number)", "CodeQL PR results must use the candidate head ref");
+requireText(e2ePreview, "E2E_VERIFIED_COMPANY_ID: ${{ vars.E2E_VERIFIED_COMPANY_ID }}", "Preview E2E must bind the verified fixture to the expected company");
 
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");

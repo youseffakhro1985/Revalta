@@ -43,27 +43,29 @@ The restore copy and hold branch contain copied business data. **They are not Pr
 | Production deployment | `dpl_FZFke1XUNLyK1C3QXiKwLdqSPc1g` |
 | Initial #426 head | `8728ae62a0163572c8fbf0e44f7a46608c1ba27e` |
 | Tested #426 code correction | `440f6bc179e25a4ce3658e167371468c17da7536` |
-| Latest completed checks inspected | `4351a00802d7eb42bc49ce0ad7807701b1caff56` |
-| Corrected source blob `e2e/auth-navigation.mjs` | `9f9ce31109fdf5d73033b6943fa17f5c96a4bd74` |
+| Latest completed checks inspected | `1c752cecd364b5089c0783fc580b2495ba5b1209` |
+| Initial randomness correction blob `e2e/auth-navigation.mjs` | `9f9ce31109fdf5d73033b6943fa17f5c96a4bd74` |
 
 CodeQL's actual security check on the initial head failed with a high-severity **Insecure randomness** finding, despite the analysis workflow completing successfully. The fixture identifier and local-only fixture password now use independent `node:crypto.randomBytes` calls. The password has 24 random bytes; it no longer derives from a public run identifier. No workflow or security scan was disabled. No new product feature or visual redesign was introduced.
 
 ## Exact-SHA checks
 
-The following observations apply to SHA `4351a00802d7eb42bc49ce0ad7807701b1caff56`, including the previously published report. Any later commit, including this recovery update, needs fresh checks and must not inherit these results as its own.
+The following historical observations are attached to PR head `1c752cecd364b5089c0783fc580b2495ba5b1209`. CI/CodeQL used their then-default generated merge checkout. The current correction pins checkout and CodeQL upload metadata to the actual PR head and verifies `git rev-parse HEAD` before execution. Its new SHA needs fresh checks; these historical results do not prove the changed runner or authorize a merge.
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| Revalta CI | PASS | Run `34213277274`, job `102019027677`: 206 test files, 1,340 tests; lint, typecheck, migration/build checks and dependency audit succeeded |
-| CodeQL analysis | PASS | Run `34213277216`, job `102019027096` |
-| CodeQL security result | PASS | Check `102019486693`; initial insecure-randomness alert no longer fails the check |
-| Vercel Preview | PASS | Commit status `Vercel`; deployment `61iKE6knoXZ2bRNoNZHRWm9wksYg` |
-| Preview Browser E2E | BLOCKED / FAIL | Run `34213277225`, job `102019027324`: confirmed isolated data and verified fixture account missing |
-| Local targeted verification | PASS, limited | 30 target-policy tests; ESLint on edited E2E file; node syntax check; fail-closed assertions; no remote login |
+| Revalta CI | PASS | Run `34216008631`, job `102027791196`: 206 test files, 1,340 tests; lint, typecheck, migration/build checks and dependency audit succeeded |
+| CodeQL analysis | PASS | Run `34216008687`, job `102027791641` |
+| CodeQL security result | PASS | Check `102028198848`; initial insecure-randomness alert no longer fails the check |
+| Vercel Preview | PASS | Commit status `Vercel`; deployment `2tZx6dh4yMPusrcioVtusQaMn9Fg` |
+| Preview Browser E2E | BLOCKED / FAIL | Run `34216008635`, job `102027791289`: confirmed isolated data and verified fixture account missing |
+| Local targeted verification of current change | PASS, limited | 49 target-policy / response-contract tests; ESLint on changed JavaScript/TypeScript; node syntax and release-configuration checks; no remote login |
 
-Resolved Preview for that SHA: `https://revalta-4jj03vuuh-youseffakhro1985s-projects.vercel.app`.
+Resolved Preview for that SHA: `https://revalta-lkuf77yeb-youseffakhro1985s-projects.vercel.app`.
 
-The runner enforces a full health SHA and Preview environment, then login, dashboard navigation, desktop/mobile Command Center, logout and widths 360/390/768/1024/1280/1440. **These browser flows have not passed.** A local fallback is diagnostic and cannot satisfy the required Preview gate. Provider email and golden-path mutations are separate outstanding gates.
+The strengthened runner requires a healthy Preview with the exact head before and after the browser flow and an unchanged deployment ID. It verifies login's API response, an active owner with `email_verified_at` and the exact expected company relation, a working owner dashboard, real desktop/mobile navigation with successful property API responses, Command Center's search API and empty state, interactive menu/dialog controls at widths 360/390/768/1024/1280/1440, and logout followed by protected dashboard/API rejection. Matching pathnames on another origin do not pass. Raw Playwright/browser/request exceptions are withheld so filled credentials cannot enter CI logs.
+
+**These strengthened browser flows have not run against an authenticated Preview.** The 49 passing local tests cover rejection contracts, not provider E2E. A local fallback is diagnostic and cannot satisfy the required Preview gate. Provider email and golden-path mutations are separate outstanding gates. The existing Command Center UI can currently convert an unsuccessful search response to an empty state; the strengthened browser gate rejects that response. A proper recoverable UI error state remains part of the subsequent module audit.
 
 ## Preview isolation and access
 
@@ -73,7 +75,7 @@ The runner enforces a full health SHA and Preview environment, then login, dashb
 - `E2E_PREVIEW_DATA_ISOLATED` was **not set**. No E2E email/password or automation bypass secret was added. Secret values have not been included in this report or source changes.
 - An unauthenticated request to the initial Preview's `/api/health` succeeded with its exact head SHA without a bypass secret. This is evidence only for that request; bypass necessity for the complete browser flow is not yet proven.
 
-Required configuration after access recovery: create an empty isolated Preview datastore and synthetic Company/User fixture, verify both pooled/direct Preview database identities and isolation from Production, and record a non-secret attestation. Store the verified account credentials in GitHub Actions secrets available only to the trusted Preview workflow; set the isolation variable only after that proof. The current workflow reads repository variables/secrets and does not declare a GitHub Environment. If moving credentials to a dedicated Preview Environment, update the workflow and configure restricted deployment branches/review policy first. Never place these credentials in `NEXT_PUBLIC_*`, source, logs or PR text. Add a Vercel bypass secret only if actual protection requires it.
+Required configuration after access recovery: create an empty isolated Preview datastore and synthetic Company/User fixture, verify both pooled/direct Preview database identities and isolation from Production, and record a non-secret attestation. Store the verified owner account credentials in GitHub Actions secrets available only to the trusted Preview workflow; record its exact synthetic Company ID in the non-secret `E2E_VERIFIED_COMPANY_ID` Actions variable. Set `E2E_PREVIEW_DATA_ISOLATED=1` only after database/tenant isolation is proven. The runtime company assertion cannot establish database isolation on its own. The current workflow reads repository variables/secrets and does not declare a GitHub Environment. If moving credentials to a dedicated Preview Environment, update the workflow and configure restricted deployment branches/review policy first. Never place these credentials in `NEXT_PUBLIC_*`, source, logs or PR text. Add a Vercel bypass secret only if actual protection requires it.
 
 ## Migration and restore evidence
 

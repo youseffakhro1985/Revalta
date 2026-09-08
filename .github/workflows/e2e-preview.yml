@@ -53,6 +53,14 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
+      - name: Verify exact candidate checkout
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          echo "Verified candidate SHA: $EXPECTED_HEAD_SHA"
+
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -161,6 +169,7 @@ jobs:
         env:
           E2E_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           E2E_PREVIEW_DATA_ISOLATED: ${{ vars.E2E_PREVIEW_DATA_ISOLATED }}
+          E2E_VERIFIED_COMPANY_ID: ${{ vars.E2E_VERIFIED_COMPANY_ID }}
           E2E_VERIFIED_EMAIL: ${{ secrets.E2E_VERIFIED_EMAIL }}
           E2E_VERIFIED_PASSWORD: ${{ secrets.E2E_VERIFIED_PASSWORD }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
