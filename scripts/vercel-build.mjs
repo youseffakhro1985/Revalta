@@ -27,6 +27,10 @@ if (!process.env.DATABASE_URL) {
 }
 
 if (!process.env.DIRECT_URL) {
+  if (process.env.VERCEL_ENV === "preview") {
+    console.error("DIRECT_URL is required for Vercel Preview so pooled/direct isolation can be verified.");
+    process.exit(1);
+  }
   console.warn("DIRECT_URL is missing. Prisma generation will use DATABASE_URL.");
   process.env.DIRECT_URL = process.env.DATABASE_URL;
 }
