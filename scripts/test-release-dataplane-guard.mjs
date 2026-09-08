@@ -35,6 +35,17 @@ assert.throws(
 assert.throws(
   () => assertPreviewDataPlane({
     environment: "preview",
+    databaseUrl: "postgresql://user:secret@preview-db.example.test/revalta",
+    directUrl: undefined,
+    productionDataPlaneId: productionId,
+  }),
+  /valid PostgreSQL/,
+  "Preview must reject a missing direct target",
+);
+
+assert.throws(
+  () => assertPreviewDataPlane({
+    environment: "preview",
     databaseUrl: "not-a-postgres-url",
     directUrl: "not-a-postgres-url",
     productionDataPlaneId: productionId,
@@ -60,9 +71,11 @@ assert.doesNotThrow(() => assertPreviewDataPlane({
 const vercelBuild = await readFile(new URL("./vercel-build.mjs", import.meta.url), "utf8");
 const guardImport = 'import { assertPreviewDataPlane } from "./release-dataplane-guard.mjs";';
 const guardCall = "assertPreviewDataPlane({";
+const previewDirectUrlGuard = 'if (process.env.VERCEL_ENV === "preview")';
 const prismaGenerate = 'run("npx", ["prisma", "generate"])';
 
 assert.ok(vercelBuild.includes(guardImport), "Vercel build must import the Preview data-plane guard");
+assert.ok(vercelBuild.includes(previewDirectUrlGuard), "Vercel Preview build must require an explicit DIRECT_URL");
 assert.ok(vercelBuild.includes(guardCall), "Vercel build must invoke the Preview data-plane guard");
 assert.ok(vercelBuild.includes(prismaGenerate), "Vercel build must still generate Prisma after guards");
 assert.ok(
