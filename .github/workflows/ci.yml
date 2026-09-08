@@ -69,6 +69,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Preview data-plane build guard
+        run: node scripts/test-release-dataplane-guard.mjs
+
       - name: Validate release configuration
         run: npm run validate:release-config
 
