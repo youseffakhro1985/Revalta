@@ -1,23 +1,21 @@
 import { describe, expect, it } from "vitest";
+import { PREVIEW_DATA_PLANE_ID, PRODUCTION_DATA_PLANE_ID } from "./data-plane-attestations.mjs";
 import { validateRelease, validateTarget } from "./target-policy.mjs";
 
 const sha = "a".repeat(40);
-const previewDataPlaneId = "b".repeat(64);
-const productionDataPlaneId = "c".repeat(64);
 const env = {
   E2E_BASE_URL: "https://revalta-candidate.vercel.app",
   E2E_EXPECTED_SHA: sha,
   E2E_PREVIEW_DATA_ISOLATED: "1",
-  E2E_PREVIEW_DATA_PLANE_ID: previewDataPlaneId,
-  E2E_PRODUCTION_DATA_PLANE_ID: productionDataPlaneId,
   E2E_VERIFIED_EMAIL: "fixture@example.com",
   E2E_VERIFIED_PASSWORD: "fixture-only",
   E2E_VERIFIED_COMPANY_ID: "synthetic-company-a",
 };
 
 describe("browser target safety and release evidence", () => {
-  it("accepts a confirmed isolated exact Preview", () => {
-    expect(validateTarget(env)).toMatchObject({ isLocal: false, expectedDataPlaneId: previewDataPlaneId });
+  it("accepts a confirmed isolated exact Preview using reviewed data-plane attestations", () => {
+    expect(validateTarget(env)).toMatchObject({ isLocal: false, expectedDataPlaneId: PREVIEW_DATA_PLANE_ID });
+    expect(PREVIEW_DATA_PLANE_ID).not.toBe(PRODUCTION_DATA_PLANE_ID);
   });
 
   it.each([
@@ -42,8 +40,6 @@ describe("browser target safety and release evidence", () => {
 
   it.each([
     "E2E_PREVIEW_DATA_ISOLATED",
-    "E2E_PREVIEW_DATA_PLANE_ID",
-    "E2E_PRODUCTION_DATA_PLANE_ID",
     "E2E_VERIFIED_EMAIL",
     "E2E_VERIFIED_PASSWORD",
     "E2E_VERIFIED_COMPANY_ID",
@@ -51,12 +47,20 @@ describe("browser target safety and release evidence", () => {
     expect(() => validateTarget({ ...env, [key]: "" })).toThrow(/BLOCKED/);
   });
 
-  it("requires independently different Preview and Production data-plane identities", () => {
-    expect(() => validateTarget({ ...env, E2E_PRODUCTION_DATA_PLANE_ID: previewDataPlaneId })).toThrow(/different/);
+  it("accepts optional operations copies only when they confirm the reviewed attestations", () => {
+    expect(() => validateTarget({
+      ...env,
+      E2E_PREVIEW_DATA_PLANE_ID: PREVIEW_DATA_PLANE_ID,
+      E2E_PRODUCTION_DATA_PLANE_ID: PRODUCTION_DATA_PLANE_ID,
+    })).not.toThrow();
   });
 
-  it.each(["not-a-hash", "d".repeat(63), "g".repeat(64)])("rejects invalid data-plane identity %s", (identity) => {
-    expect(() => validateTarget({ ...env, E2E_PREVIEW_DATA_PLANE_ID: identity })).toThrow(/BLOCKED/);
+  it("rejects an operations Preview identity that tries to override the reviewed attestation", () => {
+    expect(() => validateTarget({ ...env, E2E_PREVIEW_DATA_PLANE_ID: "d".repeat(64) })).toThrow(/reviewed release attestation/);
+  });
+
+  it("rejects an operations Production identity that tries to override the reviewed attestation", () => {
+    expect(() => validateTarget({ ...env, E2E_PRODUCTION_DATA_PLANE_ID: "d".repeat(64) })).toThrow(/reviewed release attestation/);
   });
 
   const local = {
@@ -88,7 +92,7 @@ describe("browser target safety and release evidence", () => {
     status: "ok",
     database: "ok",
     release: { commitSha: sha, environment: "preview", deploymentId: "dpl_fixture" },
-    dataPlane: { identity: previewDataPlaneId, directMatches: true },
+    dataPlane: { identity: PREVIEW_DATA_PLANE_ID, directMatches: true },
   };
 
   it("accepts the exact healthy Preview with the attested isolated datastore", () => {
@@ -125,7 +129,7 @@ describe("browser target safety and release evidence", () => {
 
   it("rejects a Preview whose pooled and direct database targets disagree", () => {
     expect(() => validateRelease(
-      { ...health, dataPlane: { identity: previewDataPlaneId, directMatches: false } },
+      { ...health, dataPlane: { identity: PREVIEW_DATA_PLANE_ID, directMatches: false } },
       validateTarget(env),
     )).toThrow(/data-plane identity/);
   });
