@@ -13,6 +13,20 @@ jobs:
     if: github.head_ref == 'fix/revalta-preview-gate-2026-09-07'
     runs-on: ubuntu-latest
     steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Verify exact candidate checkout
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
       - name: Resolve exact-SHA Preview
         id: preview
         env:
@@ -54,11 +68,17 @@ jobs:
         env:
           PREVIEW_URL: ${{ steps.preview.outputs.url }}
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
-          EXPECTED_DATA_PLANE_ID: 2eb0d0064180411ff1a387ae263f65bffb286f72a903c79cc7eb23a729a8abdd
         shell: bash
         run: |
           set -euo pipefail
+          expected_data_plane=$(sed -n 's/^export const PREVIEW_DATA_PLANE_ID = "\([a-f0-9]\{64\}\)";$/\1/p' e2e/data-plane-attestations.mjs)
+          if [[ ! "$expected_data_plane" =~ ^[a-f0-9]{64}$ ]]; then
+            echo "Reviewed Preview data-plane attestation is invalid" >&2
+            exit 1
+          fi
+
           body=$(mktemp)
+          trap 'rm -f "$body"' EXIT
           status=$(curl --silent --show-error --location --max-redirs 0 --connect-timeout 10 --max-time 20 \
             -o "$body" -w '%{http_code}' "${PREVIEW_URL}/api/health" || true)
           echo "HTTP status: ${status}"
@@ -88,5 +108,5 @@ jobs:
           [[ "$commit_sha" == "$EXPECTED_SHA" ]]
           [[ "$environment" == "preview" ]]
           [[ "$deployment_id_present" == "true" ]]
-          [[ "$data_plane" == "$EXPECTED_DATA_PLANE_ID" ]]
+          [[ "$data_plane" == "$expected_data_plane" ]]
           [[ "$direct_matches" == "true" ]]
