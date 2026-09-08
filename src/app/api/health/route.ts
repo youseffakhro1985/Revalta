@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { previewDataPlaneIdentity } from "@/lib/database-target-identity";
 import { isModernStorageOnly } from "@/lib/dual-list";
 import { getSchemaReadiness } from "@/lib/schema-readiness";
 import { getStorageToken, hasStorageConfig } from "@/lib/storage";
@@ -41,32 +41,6 @@ function buildReleaseSnapshot() {
     branch: process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME || "local",
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
-  };
-}
-
-function databaseTargetIdentity(value: string | undefined) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "postgresql:" && url.protocol !== "postgres:") return null;
-    const labels = url.hostname.toLowerCase().split(".");
-    if (labels.length > 0) labels[0] = labels[0].replace(/-pooler$/, "");
-    const database = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
-    if (!labels[0] || !database) return null;
-    const canonicalTarget = `${labels.join(".")}:${url.port || "5432"}/${database}`;
-    return createHash("sha256").update(canonicalTarget).digest("hex");
-  } catch {
-    return null;
-  }
-}
-
-function buildPreviewDataPlaneSnapshot(release = buildReleaseSnapshot()) {
-  if (release.environment !== "preview") return undefined;
-  const pooled = databaseTargetIdentity(process.env.DATABASE_URL);
-  const direct = databaseTargetIdentity(process.env.DIRECT_URL);
-  return {
-    identity: pooled,
-    directMatches: Boolean(pooled && direct && pooled === direct),
   };
 }
 
@@ -113,7 +87,11 @@ export async function GET(request: NextRequest) {
   const isPublic = !user;
   const startedAt = Date.now();
   const release = buildReleaseSnapshot();
-  const previewDataPlane = buildPreviewDataPlaneSnapshot(release);
+  const previewDataPlane = previewDataPlaneIdentity(
+    release.environment,
+    process.env.DATABASE_URL,
+    process.env.DIRECT_URL,
+  );
   const modernStorageOnly = isModernStorageOnly();
   const env = buildEnvSnapshot();
   const logger = createLogger({
