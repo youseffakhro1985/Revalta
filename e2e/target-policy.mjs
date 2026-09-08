@@ -22,6 +22,7 @@ export function validateTarget(env) {
   if (!/^[a-f0-9]{40}$/.test(expectedSha)) throw new Error("An exact E2E_EXPECTED_SHA is required");
 
   let expectedDataPlaneId = null;
+  let fixtureReady = true;
   if (local) {
     for (const name of ["DATABASE_URL", "DIRECT_URL"]) {
       let database;
@@ -32,13 +33,10 @@ export function validateTarget(env) {
     }
   } else {
     validatePinnedDataPlanes();
-    const hasFixture = env.E2E_PREVIEW_DATA_ISOLATED === "1"
+    fixtureReady = env.E2E_PREVIEW_DATA_ISOLATED === "1"
       && Boolean(env.E2E_VERIFIED_EMAIL)
       && Boolean(env.E2E_VERIFIED_PASSWORD)
       && Boolean(String(env.E2E_VERIFIED_COMPANY_ID || "").trim());
-    if (!hasFixture) {
-      throw new Error("BLOCKED: Preview requires confirmed isolated test data and verified fixtures");
-    }
 
     // Data-plane identities are version-controlled reviewed attestations. Optional
     // environment copies may be supplied by operations, but can only confirm the
@@ -53,7 +51,7 @@ export function validateTarget(env) {
     }
     expectedDataPlaneId = PREVIEW_DATA_PLANE_ID;
   }
-  return { baseUrl: url.origin, isLocal: local, expectedSha, expectedDataPlaneId };
+  return { baseUrl: url.origin, isLocal: local, expectedSha, expectedDataPlaneId, fixtureReady };
 }
 
 export function validateRelease(health, target, initialHealth) {
@@ -66,6 +64,11 @@ export function validateRelease(health, target, initialHealth) {
     }
     if (!health?.dataPlane?.directMatches || health?.dataPlane?.identity !== target.expectedDataPlaneId) {
       throw new Error("Preview runtime data-plane identity does not match the independently attested isolated datastore");
+    }
+    // Check runtime identity before fixture presence. This keeps the gate fail-closed
+    // while making a wrong Preview database distinguishable from missing test data.
+    if (!target.fixtureReady) {
+      throw new Error("BLOCKED: Preview runtime data plane is attested, but confirmed isolated fixtures and verified credentials are still required");
     }
   }
   if (initialHealth && health.release.deploymentId !== initialHealth.release.deploymentId) {
