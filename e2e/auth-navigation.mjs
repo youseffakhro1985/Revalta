@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright";
+import { randomBytes } from "node:crypto";
 import { validateTarget, validateRelease } from "./target-policy.mjs";
 
 const target = validateTarget(process.env);
@@ -13,9 +14,9 @@ const REGISTER_MAX_LATENCY_MS = 8_000;
 const REGISTER_REQUEST_EMIT_TIMEOUT_MS = 5_000;
 const REGISTER_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 
-const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const runId = `${Date.now()}-${randomBytes(12).toString("hex")}`;
 const email = isAllowedLocalOrigin ? `e2e-owner-${runId}@example.com` : process.env.E2E_VERIFIED_EMAIL;
-const password = isAllowedLocalOrigin ? `RevaltaE2E!${runId.slice(-8)}9` : process.env.E2E_VERIFIED_PASSWORD;
+const password = isAllowedLocalOrigin ? `RevaltaE2E!${randomBytes(24).toString("base64url")}9` : process.env.E2E_VERIFIED_PASSWORD;
 const companyName = `E2E Organisation ${runId.slice(-6)}`;
 
 function fail(message) {
