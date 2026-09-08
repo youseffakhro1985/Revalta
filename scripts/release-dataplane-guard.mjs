@@ -34,6 +34,10 @@ export function assertPreviewDataPlane({
 }) {
   if (environment !== "preview") return;
 
+  if (!branch || typeof branch !== "string") {
+    throw new Error("Preview build requires an explicit Vercel Git branch identity");
+  }
+
   const pooled = databaseTargetIdentity(databaseUrl);
   const direct = databaseTargetIdentity(directUrl);
 
