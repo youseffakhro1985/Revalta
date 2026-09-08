@@ -38,6 +38,7 @@ if (!process.env.DIRECT_URL) {
 try {
   assertPreviewDataPlane({
     environment: process.env.VERCEL_ENV,
+    branch: process.env.VERCEL_GIT_COMMIT_REF,
     databaseUrl: process.env.DATABASE_URL,
     directUrl: process.env.DIRECT_URL,
   });
