@@ -169,6 +169,8 @@ jobs:
         env:
           E2E_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           E2E_PREVIEW_DATA_ISOLATED: ${{ vars.E2E_PREVIEW_DATA_ISOLATED }}
+          E2E_PREVIEW_DATA_PLANE_ID: ${{ vars.E2E_PREVIEW_DATA_PLANE_ID }}
+          E2E_PRODUCTION_DATA_PLANE_ID: ${{ vars.E2E_PRODUCTION_DATA_PLANE_ID }}
           E2E_VERIFIED_COMPANY_ID: ${{ vars.E2E_VERIFIED_COMPANY_ID }}
           E2E_VERIFIED_EMAIL: ${{ secrets.E2E_VERIFIED_EMAIL }}
           E2E_VERIFIED_PASSWORD: ${{ secrets.E2E_VERIFIED_PASSWORD }}
@@ -189,7 +191,7 @@ jobs:
         run: |
           if [[ "${{ steps.preview.outputs.mode }}" == "preview" ]]; then
             echo "### Browser verification: exact Vercel Preview" >> "$GITHUB_STEP_SUMMARY"
-            echo "Browser step outcome: ${{ steps.browser.outcome }}. Only success proves auth/navigation on the exact Preview. Golden-path mutations and provider email remain separate gates." >> "$GITHUB_STEP_SUMMARY"
+            echo "Browser step outcome: ${{ steps.browser.outcome }}. Only success proves auth/navigation on the exact Preview and the independently attested isolated data plane. Golden-path mutations and provider email remain separate gates." >> "$GITHUB_STEP_SUMMARY"
           elif [[ "${{ steps.preview.outputs.mode }}" == "local" ]]; then
             echo "### ⚠️ Browser verification: local exact-SHA fallback" >> "$GITHUB_STEP_SUMMARY"
             echo "Exact Preview verification is BLOCKED. Local diagnostic outcome: ${{ steps.browser.outcome }}. Local results never satisfy this required check." >> "$GITHUB_STEP_SUMMARY"
