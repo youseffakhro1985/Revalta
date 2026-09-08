@@ -4,6 +4,19 @@ Status: **BLOCKED / fail-closed**
 
 This document records observed release evidence for PR #426. It must not be used to waive a gate. A module, deployment, or release is READY only when the corresponding live evidence is green on the exact current head SHA.
 
+## Current exact-head evidence
+
+Current reviewed candidate after the npm-policy rollback:
+
+- exact head: `20f078e223fdb22796798c2b83e524ab27a86175`
+- Revalta CI run `34248991326`: **success**
+- CodeQL run `34248991446`: **success**
+- Preview Health Attestation run `34248991370`: **failure**, because the exact-SHA Vercel Preview deployment itself reports failure before health attestation can run
+- Preview Browser E2E run `34248991362`: **failure** for the same deployment blocker; browser fixture/login must not run against a failed or Production-bound Preview
+- Vercel commit status for this exact head: **failure**
+
+The current red Preview checks are therefore not evidence of a new application-code or migration failure. The release remains correctly blocked until Vercel publishes the exact candidate with the isolated Preview PostgreSQL data plane.
+
 ## Production baseline
 
 - `main`: `807457b5619ccf66b7ff2b48834245dd4fc8cc60`
@@ -67,7 +80,7 @@ The password follows Revalta's real bcrypt cost-12 authentication contract. Cred
 
 A credential-free GitHub Actions health attestation resolves only the successful Vercel Preview deployment associated with the exact PR head SHA, calls `/api/health`, and compares the runtime identity with the reviewed repository attestation.
 
-Observed on an exact-SHA Vercel Preview on 2026-09-08:
+Observed on an earlier exact-SHA Vercel Preview on 2026-09-08:
 
 - HTTP: `200`
 - `health.status`: `ok`
@@ -81,7 +94,7 @@ Observed on an exact-SHA Vercel Preview on 2026-09-08:
 
 The observed identity is the reviewed **Production** identity.
 
-Therefore the current Vercel Preview is using the Production PostgreSQL data plane. This is an explicit release blocker. Browser E2E must remain red and no Preview mutation/login fixture test may run against that runtime.
+Therefore Vercel Preview was using the Production PostgreSQL data plane. The build guard now blocks those Preview deployments before runtime. This is an explicit release blocker. Browser E2E must remain red and no Preview mutation/login fixture test may run against that runtime.
 
 ## Required Vercel correction
 
@@ -111,9 +124,9 @@ Only after these eight checks pass may the E2E fixture variables/credentials be 
 
 ## Connected Vercel access limitation
 
-The connected Vercel session can see team `team_4GYkeSBTtXApHmGlIycnqnci` (`youseffakhro1985s-projects`) but currently returns an empty project list / cannot independently read the Revalta project, even though GitHub's Vercel integration publishes working Revalta Preview deployments.
+The ChatGPT Vercel plugin has been explicitly set to full access. The connected Vercel session can see team `team_4GYkeSBTtXApHmGlIycnqnci` (`youseffakhro1985s-projects`) but still returns an empty project list and cannot independently read the Revalta project/deployment through its OAuth scope, even though GitHub's Vercel integration publishes Revalta Preview deployment statuses.
 
-Treat this as an OAuth/project-scope limitation of the connected administration session, not evidence that the Vercel project does not exist.
+Treat this as an OAuth/project-scope limitation of the connected administration session, not evidence that the Vercel project does not exist. No repository-side Vercel API token is referenced that could safely be reused to mutate project environment variables.
 
 ## GitHub release gates
 
