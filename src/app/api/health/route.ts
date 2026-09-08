@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { isModernStorageOnly } from "@/lib/dual-list";
@@ -40,6 +41,32 @@ function buildReleaseSnapshot() {
     branch: process.env.VERCEL_GIT_COMMIT_REF || process.env.GITHUB_REF_NAME || "local",
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV || "unknown",
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
+  };
+}
+
+function databaseTargetIdentity(value: string | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "postgresql:" && url.protocol !== "postgres:") return null;
+    const labels = url.hostname.toLowerCase().split(".");
+    if (labels.length > 0) labels[0] = labels[0].replace(/-pooler$/, "");
+    const database = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+    if (!labels[0] || !database) return null;
+    const canonicalTarget = `${labels.join(".")}:${url.port || "5432"}/${database}`;
+    return createHash("sha256").update(canonicalTarget).digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+function buildPreviewDataPlaneSnapshot(release = buildReleaseSnapshot()) {
+  if (release.environment !== "preview") return undefined;
+  const pooled = databaseTargetIdentity(process.env.DATABASE_URL);
+  const direct = databaseTargetIdentity(process.env.DIRECT_URL);
+  return {
+    identity: pooled,
+    directMatches: Boolean(pooled && direct && pooled === direct),
   };
 }
 
@@ -86,6 +113,7 @@ export async function GET(request: NextRequest) {
   const isPublic = !user;
   const startedAt = Date.now();
   const release = buildReleaseSnapshot();
+  const previewDataPlane = buildPreviewDataPlaneSnapshot(release);
   const modernStorageOnly = isModernStorageOnly();
   const env = buildEnvSnapshot();
   const logger = createLogger({
@@ -110,6 +138,7 @@ export async function GET(request: NextRequest) {
         database: "ok",
         latencyMs: Date.now() - startedAt,
         release,
+        ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
         modernStorageOnly,
         checkedAt: new Date().toISOString(),
       }, 200, release);
@@ -155,6 +184,7 @@ export async function GET(request: NextRequest) {
       schema,
       latencyMs: Date.now() - startedAt,
       release,
+      ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
       modernStorageOnly,
       env,
       readiness: {
@@ -178,6 +208,7 @@ export async function GET(request: NextRequest) {
       database: "error",
       latencyMs: Date.now() - startedAt,
       release,
+      ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
       modernStorageOnly,
       ...(isPublic ? {} : { env }),
       checkedAt: new Date().toISOString(),
