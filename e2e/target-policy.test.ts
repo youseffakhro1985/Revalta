@@ -14,7 +14,7 @@ const env = {
 
 describe("browser target safety and release evidence", () => {
   it("accepts a confirmed isolated exact Preview using reviewed data-plane attestations", () => {
-    expect(validateTarget(env)).toMatchObject({ isLocal: false, expectedDataPlaneId: PREVIEW_DATA_PLANE_ID });
+    expect(validateTarget(env)).toMatchObject({ isLocal: false, expectedDataPlaneId: PREVIEW_DATA_PLANE_ID, fixtureReady: true });
     expect(PREVIEW_DATA_PLANE_ID).not.toBe(PRODUCTION_DATA_PLANE_ID);
   });
 
@@ -38,13 +38,15 @@ describe("browser target safety and release evidence", () => {
     expect(() => validateTarget({ ...env, E2E_EXPECTED_SHA: candidateSha })).toThrow();
   });
 
-  it.each([
-    "E2E_PREVIEW_DATA_ISOLATED",
-    "E2E_VERIFIED_EMAIL",
-    "E2E_VERIFIED_PASSWORD",
-    "E2E_VERIFIED_COMPANY_ID",
-  ])("blocks missing %s rather than skipping dashboard tests", (key) => {
-    expect(() => validateTarget({ ...env, [key]: "" })).toThrow(/BLOCKED/);
+  it("records missing fixtures without hiding runtime data-plane verification", () => {
+    const target = validateTarget({
+      ...env,
+      E2E_PREVIEW_DATA_ISOLATED: "",
+      E2E_VERIFIED_EMAIL: "",
+      E2E_VERIFIED_PASSWORD: "",
+      E2E_VERIFIED_COMPANY_ID: "",
+    });
+    expect(target).toMatchObject({ expectedDataPlaneId: PREVIEW_DATA_PLANE_ID, fixtureReady: false });
   });
 
   it("accepts optional operations copies only when they confirm the reviewed attestations", () => {
@@ -72,7 +74,7 @@ describe("browser target safety and release evidence", () => {
   };
 
   it("accepts a dedicated local fixture database", () => {
-    expect(validateTarget(local).isLocal).toBe(true);
+    expect(validateTarget(local)).toMatchObject({ isLocal: true, fixtureReady: true });
   });
 
   it.each([
@@ -97,6 +99,15 @@ describe("browser target safety and release evidence", () => {
 
   it("accepts the exact healthy Preview with the attested isolated datastore", () => {
     expect(() => validateRelease(health, validateTarget(env))).not.toThrow();
+  });
+
+  it("rejects missing fixtures only after the runtime data plane matches", () => {
+    const target = validateTarget({ ...env, E2E_PREVIEW_DATA_ISOLATED: "" });
+    expect(() => validateRelease(health, target)).toThrow(/fixtures and verified credentials/);
+    expect(() => validateRelease(
+      { ...health, dataPlane: { identity: "d".repeat(64), directMatches: true } },
+      target,
+    )).toThrow(/data-plane identity/);
   });
 
   it("requires the same deployment at the end of the browser flow", () => {
