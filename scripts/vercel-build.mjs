@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { assertPreviewDataPlane } from "./release-dataplane-guard.mjs";
 
 function execute(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -28,6 +29,17 @@ if (!process.env.DATABASE_URL) {
 if (!process.env.DIRECT_URL) {
   console.warn("DIRECT_URL is missing. Prisma generation will use DATABASE_URL.");
   process.env.DIRECT_URL = process.env.DATABASE_URL;
+}
+
+try {
+  assertPreviewDataPlane({
+    environment: process.env.VERCEL_ENV,
+    databaseUrl: process.env.DATABASE_URL,
+    directUrl: process.env.DIRECT_URL,
+  });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
 }
 
 if (process.env.RUN_DB_MIGRATIONS === "true") {
