@@ -2,9 +2,9 @@
 
 Observed main and Production release: `807457b5619ccf66b7ff2b48834245dd4fc8cc60` (8 Sep 2026, live checks).
 
-**Release status: BLOCKED.** See [REVALTA_COMPLETION_REPORT.md](REVALTA_COMPLETION_REPORT.md) for the evidence and an unresolved database-routing incident during restore verification. Do not merge, migrate, or promote any module while that incident is unresolved.
+**Release status: BLOCKED.** The database-routing recovery was explicitly approved and completed on 8 Sep 2026: original endpoint, original `main` branch and default/primary designation are restored. Before/after checks found identical contents in all 85 public tables and Production-safe HTTP smoke passed. See [REVALTA_COMPLETION_REPORT.md](REVALTA_COMPLETION_REPORT.md). Preview isolation, credentials and provider access still prevent release; no module may be promoted on this limited smoke evidence.
 
-PR #426 code candidate `440f6bc179e25a4ce3658e167371468c17da7536` has passing Revalta CI (206 files / 1,340 tests), CodeQL security check and Vercel. Exact Preview Browser E2E fails closed because isolation and verified credentials are absent. These results apply only to that SHA; subsequent documentation commits require their own gates.
+PR #426 verified candidate `4351a00802d7eb42bc49ce0ad7807701b1caff56` has passing Revalta CI (206 files / 1,340 tests), CodeQL security check and Vercel. Exact Preview Browser E2E fails closed because isolation and verified credentials are absent. These results apply only to that SHA; subsequent documentation commits require their own gates.
 
 The visible Neon database has 48 successfully applied migrations matching repository checksums, two historical rolled-back attempts and one pending migration, `20260822010000_inspection_checklist_templates`. This is a read-only SQL comparison, **not** a completed Production `prisma migrate status` or proof of current Vercel environment mapping.
 
@@ -50,7 +50,7 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Ärenden | PARTIAL | Core ticket flows exist and are part of product golden path. | End-to-end tenant/SLA/search/pagination/audit/browser verification. |
 | Arbetsordrar | PARTIAL | Significant operational UI/API exists. | Golden-path linkage, tenant relation checks, mobile technician flow, cost/time/material evidence. |
 | Kalender | PARTIAL | Current module exists. | Prove calendar reflects canonical operational events rather than parallel truth. |
-| Ronder | BLOCKED | Checklist migration is pending in the observed Neon database; current Production mapping and CLI migration status remain unverified. | Resolve routing incident, read-only Production migration status, restore evidence, checklist tenant smoke. |
+| Ronder | BLOCKED | Checklist migration is pending in the restored Neon main; current Vercel mapping and CLI migration status remain unverified. | Read-only Production migration status, current restore evidence and checklist tenant smoke. |
 | Besiktningar | PARTIAL | Module exists. | Observation-to-work-order linkage and tenant/security/readiness audit. |
 | Underhåll | PARTIAL | Module exists. | Maintenance-plan-to-work-order lifecycle, query and tenant evidence. |
 | Skador & försäkring | PARTIAL | Module exists. | Claim relation/security/audit and work-order/project linkage verification. |
@@ -95,4 +95,4 @@ Required relationship proofs:
 
 Every status change must cite current-main code/tests/runtime evidence. If evidence becomes stale after material architecture/schema/auth changes, downgrade the status until reverified.
 
-The full module and design-consistency audit has not resumed: #426 and the database-routing recovery block the ordered sequence #425 → #429 → #428 → #427. No module has been promoted to READY in this revision. The existing Swedish premium design is unchanged.
+The routing recovery is complete. The full module and design-consistency audit has not resumed: #426 still blocks the ordered sequence #425 → #429 → #428 → #427 because isolated Preview data/account and Vercel access are not verified. No module has been promoted to READY in this revision. The existing Swedish premium design is unchanged.

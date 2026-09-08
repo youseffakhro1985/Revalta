@@ -2,31 +2,35 @@
 
 **BLOCKED — not complete and not ready for release.** This records verified observations, implementation and remaining work. It does not authorize a merge or a Production migration.
 
-## Immediate database-routing incident
+## Database-routing recovery — completed with owner approval
 
 During this session's restore verification, the assistant called the Neon snapshot restore tool without an existing target branch, intending to verify an independent restore. The tool finalized a replacement of the source branch: it moved the original endpoint and main/default designation to the restored copy. This was an unintended live-routing change and did not preserve the requested read-only operational boundary. No financial correction SQL or migration was executed.
 
-Both datasets are retained. A read-only comparison at **2026-09-08 09:56:54 UTC** found equal row counts and equal sorted row-content digests in **all 85 public tables**. This proves equality at that observation, not the absence of subsequent writes, transient errors or availability impact. A public Production health read at 09:56:48 UTC returned HTTP 200, database ok and the unchanged release SHA; that is not full customer-flow verification.
+The owner explicitly approved the concrete recovery plan after the initial automatic approval rejection. A fresh comparison immediately before recovery at **2026-09-08 10:24:05 UTC** found equal row counts and equal sorted row-content digests in **all 85 public tables** across the original and restored branches. A post-recovery comparison at **10:26:13 UTC** found all 85 tables on the original branch unchanged from that pre-recovery baseline. Earlier comparisons at 09:56:54 and 10:02:58 UTC also matched. These observations do not retrospectively prove the absence of transient availability or traffic impact during the incident.
+
+**The approved recovery is complete.** The original endpoint was reattached at 10:24:48 UTC; the original branch again became default/primary at 10:25:38 UTC. Production-safe HTTP checks then passed: `/api/health` 200 with database ok and the unchanged main SHA (checkedAt 10:26:20 UTC), `/login` 200, unauthenticated `/dashboard` 307 to `/login`, and unauthenticated `/api/properties` 401. No business-row correction, financial backfill or migration was performed.
 
 Project: `withered-cell-46849200`.
 
 | Resource | Before restore test | Latest verified state |
 | --- | --- | --- |
-| Original branch `br-damp-block-am62k8yz` | `main`, default/primary | Retained, renamed `revalta-restorecheck-426-20260908 (1)`, no longer default |
-| Existing endpoint `ep-autumn-hill-ambriker` | Original branch | Restored branch `br-patient-cell-ampkr94q` |
-| Restored branch `br-patient-cell-ampkr94q` | Did not exist | Named `main`, default/primary; restored from snapshot below |
-| Extra endpoint `ep-odd-fog-amncpiid` | Did not exist | Created by restore operation, attached to original branch |
-| Recovery hold branch `br-falling-king-amjczi6z` | Did not exist | Created without compute; no endpoint has been moved to it |
+| Original branch `br-damp-block-am62k8yz` | `main`, default/primary | Restored as `main`, default=true, primary=true, ready |
+| Existing endpoint `ep-autumn-hill-ambriker` | Original branch | Reattached to original branch `br-damp-block-am62k8yz`, active |
+| Restored branch `br-patient-cell-ampkr94q` | Did not exist | Retained as `revalta-restore-quarantine-426-20260908`, default=false, primary=false, no compute attached |
+| Extra endpoint `ep-odd-fog-amncpiid` | Did not exist | Parked on the recovery hold branch and suspended; provider read confirmed idle |
+| Recovery hold branch `br-falling-king-amjczi6z` | Did not exist | Retained with the suspended extra endpoint; neither default nor primary |
 
-The first routing recovery was rejected by automatic approval review. After baseline endpoint evidence and the complete table comparison were supplied, the original-endpoint recovery request reached Neon but failed with HTTP 409: the original branch already has a read-write endpoint. Deletion of the extra endpoint failed with HTTP 422: a root branch's read-write endpoint cannot be deleted. A subsequent request to park the extra endpoint on the recovery hold branch was rejected by automatic approval review as an unauthorized live-routing risk. **No alternative execution path will bypass that rejection.**
+Incident history: the first routing recovery was rejected by automatic approval review. After baseline endpoint evidence and the complete table comparison were supplied, the original-endpoint recovery request reached Neon but failed with HTTP 409 because the destination already had a read-write endpoint. Deletion of the extra endpoint failed with HTTP 422. Parking the extra endpoint was initially rejected as an unauthorized live-routing risk. The assistant stopped and asked the owner to approve that exact recovery plan. After approval, the documented endpoint moves and main/default restoration succeeded through the same provider tools.
 
-Concrete recovery plan requiring explicit owner approval:
+Approved recovery actions completed:
 
-1. Refresh the table comparison and capture any divergence; preserve both datasets and all snapshots. Never merge or overwrite divergent business rows automatically.
-2. If Neon permits it, temporarily move the restore-created endpoint `ep-odd-fog-amncpiid` to the hold branch `br-falling-king-amjczi6z` so the original branch can receive its original endpoint. Abort if provider constraints prevent this; do not delete the original branch or dataset.
-3. Reattach `ep-autumn-hill-ambriker` to its proven original branch `br-damp-block-am62k8yz`.
-4. Restore the original branch's `main` name/default designation, give the restored copy an explicit quarantine name and keep its dataset for comparison. Remove or suspend disposable computes only after confirming they are unused.
-5. Verify endpoint-to-branch mapping, current Production health, fresh migration state and any interval writes before resuming release work.
+1. Compared and retained both datasets; no divergent business rows were found or merged.
+2. Moved the restore-created endpoint to the hold branch at 10:24:28 UTC.
+3. Reattached the original endpoint to the original branch at 10:24:48 UTC.
+4. Renamed the copy to quarantine, restored the original `main` name and default/primary designation, and suspended the extra endpoint after confirming its hold-branch mapping. Both copies and the snapshot are retained.
+5. Verified provider mappings, all original public-table contents, read-only migration records and Production-safe HTTP behavior. A subsequent native CLI read-only preflight failed on network reachability, as recorded below.
+
+Future restore rehearsals must explicitly avoid finalization and verify original branch/endpoint/default mappings before and after the call. Omitting a target branch did not prevent replacement in this provider tool; the previous default behavior must not be reused for a Production rehearsal.
 
 The restore copy and hold branch contain copied business data. **They are not Preview E2E fixtures and must never be connected to Preview tests.**
 
@@ -39,30 +43,31 @@ The restore copy and hold branch contain copied business data. **They are not Pr
 | Production deployment | `dpl_FZFke1XUNLyK1C3QXiKwLdqSPc1g` |
 | Initial #426 head | `8728ae62a0163572c8fbf0e44f7a46608c1ba27e` |
 | Tested #426 code correction | `440f6bc179e25a4ce3658e167371468c17da7536` |
+| Latest completed checks inspected | `4351a00802d7eb42bc49ce0ad7807701b1caff56` |
 | Corrected source blob `e2e/auth-navigation.mjs` | `9f9ce31109fdf5d73033b6943fa17f5c96a4bd74` |
 
 CodeQL's actual security check on the initial head failed with a high-severity **Insecure randomness** finding, despite the analysis workflow completing successfully. The fixture identifier and local-only fixture password now use independent `node:crypto.randomBytes` calls. The password has 24 random bytes; it no longer derives from a public run identifier. No workflow or security scan was disabled. No new product feature or visual redesign was introduced.
 
 ## Exact-SHA checks
 
-The following observations apply to code correction SHA `440f6bc179e25a4ce3658e167371468c17da7536`. Any later commit, including this report, needs fresh checks and must not inherit these results as its own.
+The following observations apply to SHA `4351a00802d7eb42bc49ce0ad7807701b1caff56`, including the previously published report. Any later commit, including this recovery update, needs fresh checks and must not inherit these results as its own.
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| Revalta CI | PASS | Run `34212372548`, job `102016118016`: 206 test files, 1,340 tests; lint, typecheck, migration/build checks and dependency audit succeeded; zero reported vulnerabilities |
-| CodeQL analysis | PASS | Run `34212372395`, job `102016117706` |
-| CodeQL security result | PASS | Check `102016717043`; initial insecure-randomness alert no longer fails the check |
-| Vercel Preview | PASS | Commit status `Vercel`; deployment `J2gGszc5st6cAhQwQc35npeHmbYx` |
-| Preview Browser E2E | BLOCKED / FAIL | Run `34212372480`, job `102016117864`: confirmed isolated data and verified fixture account missing |
+| Revalta CI | PASS | Run `34213277274`, job `102019027677`: 206 test files, 1,340 tests; lint, typecheck, migration/build checks and dependency audit succeeded |
+| CodeQL analysis | PASS | Run `34213277216`, job `102019027096` |
+| CodeQL security result | PASS | Check `102019486693`; initial insecure-randomness alert no longer fails the check |
+| Vercel Preview | PASS | Commit status `Vercel`; deployment `61iKE6knoXZ2bRNoNZHRWm9wksYg` |
+| Preview Browser E2E | BLOCKED / FAIL | Run `34213277225`, job `102019027324`: confirmed isolated data and verified fixture account missing |
 | Local targeted verification | PASS, limited | 30 target-policy tests; ESLint on edited E2E file; node syntax check; fail-closed assertions; no remote login |
 
-Resolved Preview for the corrected SHA: `https://revalta-8uavf5umt-youseffakhro1985s-projects.vercel.app`.
+Resolved Preview for that SHA: `https://revalta-4jj03vuuh-youseffakhro1985s-projects.vercel.app`.
 
 The runner enforces a full health SHA and Preview environment, then login, dashboard navigation, desktop/mobile Command Center, logout and widths 360/390/768/1024/1280/1440. **These browser flows have not passed.** A local fallback is diagnostic and cannot satisfy the required Preview gate. Provider email and golden-path mutations are separate outstanding gates.
 
 ## Preview isolation and access
 
-- Vercel team discovery succeeds for `team_4GYkeSBTtXApHmGlIycnqnci`, but project listing returns an empty list; project and known deployment reads return 404. Runtime error and runtime log reads return 403. Project environment mapping, env presence, usage and Vercel cron execution history therefore remain unverified.
+- Vercel team discovery succeeds for `team_4GYkeSBTtXApHmGlIycnqnci`, but project listing still returns an empty list after routing recovery; earlier project and known deployment reads returned 404, and runtime error/log reads returned 403. Project environment mapping, env presence, usage and Vercel cron execution history therefore remain unverified. The existing Vercel connection needs actual access to project `revalta` before this blocker can be resolved.
 - Before the restore test, the accessible Neon project exposed one branch (`main`), one database (`neondb`) and one endpoint. This does not prove what a Vercel deployment uses.
 - Creation of a separate empty `revalta-preview-e2e` project was denied by Neon because the organization is managed by Vercel. No new test project, testtenant or verified E2E account was created.
 - `E2E_PREVIEW_DATA_ISOLATED` was **not set**. No E2E email/password or automation bypass secret was added. Secret values have not been included in this report or source changes.
@@ -72,18 +77,18 @@ Required configuration after access recovery: create an empty isolated Preview d
 
 ## Migration and restore evidence
 
-Read-only SQL compared `_prisma_migrations` against all 49 migration files on current main:
+Fresh read-only SQL after routing recovery compared `_prisma_migrations` on original Neon main against all 49 migration files on current GitHub main:
 
 - 48 successful applied migrations, matching file checksums.
 - Two rolled-back historical attempts for `20260713190000_add_work_orders_and_projects`; no unresolved failed migration.
 - Pending: `20260822010000_inspection_checklist_templates`.
 - No database-only migration and no successful checksum mismatch.
 
-This is not a literal completed `prisma migrate status` run. That requested CLI gate and a fresh verified Vercel Production mapping remain blocked. No `prisma migrate deploy` or financial backfill was run against the observed database.
+This is not a literal completed `prisma migrate status` run. A native Prisma 5.22.0 process was prepared with both database URLs set to the provider-confirmed original direct endpoint, startup `default_transaction_read_only=on`, and bounded statement/lock/connect timeouts. Credentials were passed without terminal echo and were not written to source, reports or logs. A SELECT-only preflight required both server read-only settings before allowing the status command. It failed with **P1001: cannot reach the direct database endpoint on port 5432**; the wrapper exited immediately, so `prisma migrate status` was not executed and server-side read-only enforcement was not falsely reported as proven. This CLI network gate and the current Vercel Production environment mapping remain blocked. No `prisma migrate deploy` or financial backfill was run.
 
-Snapshot evidence: `snap-mute-morning-amt5a54v`, name `revalta-release-426-readonly-20260908`, created 2026-09-08 09:53:03 UTC from original branch `br-damp-block-am62k8yz`. Restored copy reports `restored_from` that snapshot, parent LSN `0/16EFB5B0` and parent timestamp 09:52:31 UTC. Restored reads returned 48 successful migrations and the same aggregate counts. The comparison above verified all 85 table contents, but the unintended routing change makes the recovery procedure **BLOCKED**, not release-ready.
+Snapshot evidence: `snap-mute-morning-amt5a54v`, name `revalta-release-426-readonly-20260908`, created 2026-09-08 09:53:03 UTC from original branch `br-damp-block-am62k8yz`. Restored copy reports `restored_from` that snapshot, parent LSN `0/16EFB5B0` and parent timestamp 09:52:31 UTC. Restored reads returned 48 successful migrations and matching table contents. The unintended routing change has now been recovered with explicit owner approval and fresh evidence above. This is a retained restore point, not permission to skip a current restore/read-only check before a later migration.
 
-The original project metadata showed six hours of history retention, no pre-existing snapshots and an empty snapshot schedule. A retention number alone was not treated as restore evidence. Retain the snapshot and both datasets until routing and interval-write review are complete.
+The original project metadata showed six hours of history retention, no pre-existing snapshots and an empty snapshot schedule. A retention number alone was not treated as restore evidence. The snapshot, quarantine copy and hold branch remain retained; the extra endpoint is idle. No data has been purged as part of recovery.
 
 ## Read-only IMD / RentNotice findings
 
@@ -115,7 +120,7 @@ The module statuses and full UI/API/data/CRUD/tenant/RBAC/audit/loading/empty/er
 
 | Order | PR / unchanged head | Blocking work |
 | --- | --- | --- |
-| First | #426 — code correction and this report | Resolve routing incident; restore Vercel access; prove empty isolated test database and fixture; all checks green on exact current head |
+| First | #426 — code correction and this report | Routing recovered; restore Vercel access, prove empty isolated test database and fixture, and obtain all checks green on exact current head |
 | Then | #425 — `b0f22eeec1a8f1aedb73d301f1baeca327bc1d0d` | Reapply on new main; remove duplicated #426 diff; session/role/tenant E2E |
 | Then | #429 — `877bb5eafc5c556bb21ba3cd707f2040ae202077` | Reapply on then-current main; authoritative resident/lease attribution, no guessed historical backfill; real concurrency and browser proof |
 | Then | #428 — `906b6c488949969bb775ea034738f60f68cd50a5` | Reapply on then-current main; real concurrent PostgreSQL proof; verified Production read-only impact report |
@@ -148,4 +153,4 @@ Live branch metadata: `protected=false`; ruleset list empty. Repository metadata
 }
 ```
 
-Endpoint: `PUT /repos/youseffakhro1985/Revalta/branches/main/protection`. Vercel's check is required where accepted by GitHub; its app binding must be confirmed from accessible status metadata. PRs remain mandatory even with zero approving reviews required. Recovery approval and restored Vercel project visibility are separate current blockers, not silently satisfied by this proposed rule.
+Endpoint: `PUT /repos/youseffakhro1985/Revalta/branches/main/protection`. Vercel's check is required where accepted by GitHub; its app binding must be confirmed from accessible status metadata. PRs remain mandatory even with zero approving reviews required. Routing recovery is approved and complete. Actual Vercel project visibility, Preview data isolation and native read-only database connectivity remain separate blockers, not silently satisfied by this proposed rule.
