@@ -4,18 +4,20 @@ Status: **BLOCKED / fail-closed**
 
 This document records observed release evidence for PR #426. It must not be used to waive a gate. A module, deployment, or release is READY only when the corresponding live evidence is green on the exact current head SHA.
 
-## Current exact-head evidence
+## Exact-head evidence policy
 
-Current reviewed candidate after the npm-policy rollback:
+The current PR head SHA is intentionally **not** hardcoded as “current” in this file, because editing this file itself changes the PR head. The authoritative current head is always PR #426 metadata, and every required workflow must report that exact SHA.
 
-- exact head: `20f078e223fdb22796798c2b83e524ab27a86175`
-- Revalta CI run `34248991326`: **success**
-- CodeQL run `34248991446`: **success**
-- Preview Health Attestation run `34248991370`: **failure**, because the exact-SHA Vercel Preview deployment itself reports failure before health attestation can run
-- Preview Browser E2E run `34248991362`: **failure** for the same deployment blocker; browser fixture/login must not run against a failed or Production-bound Preview
-- Vercel commit status for this exact head: **failure**
+Latest fully observed candidate before this documentation-only update:
 
-The current red Preview checks are therefore not evidence of a new application-code or migration failure. The release remains correctly blocked until Vercel publishes the exact candidate with the isolated Preview PostgreSQL data plane.
+- candidate: `e8a60bf631a8e73499512beb3a8d873a34c7a0df`
+- Revalta CI run `34250744271`: **success**
+- CodeQL run `34250744170`: **success**
+- Preview Health Attestation run `34250744190`: **failure**, because the exact-SHA Vercel Preview deployment itself reported failure before health attestation could run
+- Preview Browser E2E run `34250744163`: **failure** at exact-SHA Preview resolution; browser, login and fixture steps were deliberately skipped
+- Vercel status for that candidate: **failure**
+
+These observed red Preview checks were not application-code or migration-test failures. The release remains correctly blocked until Vercel publishes the then-current exact candidate with the isolated Preview PostgreSQL data plane. After any new commit, all required checks must be evaluated again on the new head; the runs above become historical evidence only.
 
 ## Production baseline
 
@@ -35,7 +37,9 @@ A dedicated non-default, non-primary Neon branch exists for Preview/E2E:
 
 The two identities are intentionally different.
 
-Before fixture seeding, read-only verification showed zero rows in the key business tables including Company, User, Property, Ticket, WorkOrder, Lease, Booking, RentNotice, IMD, documents, AuditLog, IntegrationEvent, CronJobRun and RateLimitAttempt.
+Neon reports `init_source=parent-data` for this Preview branch because it was created from the project parent. It therefore must not be described as if data was never historically copied. Before the branch was accepted for E2E use, business data was sanitized and a read-only verification showed zero rows in the central business tables. Only after that verification was the synthetic fixture seeded.
+
+Current read-only verification of the central fixture surface shows only one synthetic Company, one synthetic owner User and one synthetic Property, with zero Tickets, WorkOrders, Leases, Bookings, RentNotices, IMD readings and AuditLogs.
 
 ## Migration evidence
 
@@ -59,22 +63,25 @@ It removes the obsolete parent checks and leaves exactly one canonical check req
 - `property_id`
 - `technical_asset_id`
 
-The isolated Preview database now contains 50 successful migrations including this fix. Clean Postgres CI also successfully applies the migration chain from zero. CI contains an explicit regression assertion for the final parent constraint.
+The isolated Preview database now contains 50 successful migrations including this fix and zero incomplete/rolled-back migration records. Clean Postgres CI applies the migration chain from zero and contains an explicit regression assertion for the final parent constraint.
+
+Production is intentionally not migrated by this release branch. Read-only Production evidence shows that `20260822010000_inspection_checklist_templates` and `20260908165000_fix_operational_document_parent_constraint` remain unapplied there until the release gate is green.
 
 ## Synthetic fixture
 
-Only after the clean isolated schema was verified, a synthetic tenant fixture was created in the isolated Preview database:
+The current isolated Preview fixture contains:
 
-- Company: `e2e-company-3a5fbd8533884f07c266ad39`
+- Company ID: `e2e-company-3a5fbd8533884f07c266ad39`
+- Company name: `Revalta Preview E2E`
 - Company status: active
 - User role: owner
 - User status: active
 - email verification: confirmed
-- synthetic property: present in the same Company
+- synthetic property name: `E2E Fastigheten`
 
-The password follows Revalta's real bcrypt cost-12 authentication contract. Credentials are not stored in repository source, PR text, or this document.
+The password follows Revalta's real bcrypt cost-12 authentication contract. Credentials are not stored in repository source, PR text, logs or this document.
 
-`E2E_VERIFIED_COMPANY_ID` may use the Company ID above after runtime isolation has independently passed. `E2E_PREVIEW_DATA_ISOLATED=1` must never be treated as proof by itself.
+`E2E_VERIFIED_COMPANY_ID` may use the Company ID above only after runtime isolation has independently passed. `E2E_PREVIEW_DATA_ISOLATED=1` must never be treated as proof by itself.
 
 ## Exact-SHA runtime attestation — critical blocker
 
@@ -92,9 +99,9 @@ Observed on an earlier exact-SHA Vercel Preview on 2026-09-08:
 - **observed data-plane identity: `e51d9599fa4b3c03898d33a44d3fb5973987e8fd3569896aa3c005fc5673ba2a`**
 - expected Preview identity: `2eb0d0064180411ff1a387ae263f65bffb286f72a903c79cc7eb23a729a8abdd`
 
-The observed identity is the reviewed **Production** identity.
+The observed identity was the reviewed **Production** identity.
 
-Therefore Vercel Preview was using the Production PostgreSQL data plane. The build guard now blocks those Preview deployments before runtime. This is an explicit release blocker. Browser E2E must remain red and no Preview mutation/login fixture test may run against that runtime.
+Therefore the build guard now blocks Preview deployments that are wired to Production before runtime. This is an explicit release blocker. Browser E2E must remain red and no Preview mutation/login fixture test may run against such a runtime.
 
 ## Required Vercel correction
 
@@ -107,9 +114,9 @@ At minimum, both of these must point to the isolated Neon Preview branch/databas
 - `DATABASE_URL`
 - `DIRECT_URL`
 
-Do not place either connection string in GitHub source, PR comments, logs, or documentation.
+Do not place either connection string in GitHub source, PR comments, logs or documentation.
 
-After the branch-specific variables are saved, force/redeploy the exact current candidate and require `/api/health` to prove all of the following before enabling browser login:
+After the branch-specific variables are saved, redeploy the exact then-current candidate and require `/api/health` to prove all of the following before enabling browser login:
 
 1. HTTP 200
 2. `status=ok`
@@ -126,7 +133,7 @@ Only after these eight checks pass may the E2E fixture variables/credentials be 
 
 The ChatGPT Vercel plugin has been explicitly set to full access. The connected Vercel session can see team `team_4GYkeSBTtXApHmGlIycnqnci` (`youseffakhro1985s-projects`) but still returns an empty project list and cannot independently read the Revalta project/deployment through its OAuth scope, even though GitHub's Vercel integration publishes Revalta Preview deployment statuses.
 
-Treat this as an OAuth/project-scope limitation of the connected administration session, not evidence that the Vercel project does not exist. No repository-side Vercel API token is referenced that could safely be reused to mutate project environment variables.
+The available Vercel tool surface exposes no Environment Variables write action and no generic authenticated Vercel API request action. Treat this as an OAuth/tool-scope limitation of the connected administration session, not evidence that the Vercel project does not exist. No repository-side Vercel API token is referenced that could safely be reused to mutate project environment variables.
 
 ## GitHub release gates
 
@@ -138,15 +145,15 @@ Required sequence after #426:
 
 After every merge, the next PR must be reapplied/rebased on the then-current `main` and must receive fresh exact-SHA quality and Preview evidence.
 
-`main` branch protection is a separate required owner/admin gate and must not be marked complete until live protection/ruleset evidence exists.
+Live branch metadata currently reports `main` as unprotected. Branch protection is a separate required owner/admin gate and must not be marked complete until live protection/ruleset evidence exists. The connected GitHub app exposes no branch-protection/ruleset write action.
 
 ## Non-negotiable safety rules
 
 - Never point Preview at Production data.
-- Never copy customer rows into the Preview fixture.
+- Never use customer rows as Preview fixtures.
 - Never use restore/quarantine/hold branches as fixtures.
 - Never set or trust `E2E_PREVIEW_DATA_ISOLATED=1` as a substitute for runtime identity evidence.
 - Never weaken `/api/health` identity checks to make CI green.
-- Never log database URLs, passwords, Vercel bypass secrets, cookies, or browser credentials.
+- Never log database URLs, passwords, Vercel bypass secrets, cookies or browser credentials.
 - Never run historical financial backfills without authoritative relationships and a separate explicit release decision.
 - Never mass-merge the release PR chain.
