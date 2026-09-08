@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { PRODUCTION_DATA_PLANE_ID } from "../e2e/data-plane-attestations.mjs";
+import { PREVIEW_DATA_PLANE_ID, PRODUCTION_DATA_PLANE_ID } from "../e2e/data-plane-attestations.mjs";
 
 const POSTGRES_PROTOCOLS = new Set(["postgres:", "postgresql:"]);
+const RELEASE_PREVIEW_BRANCH = "fix/revalta-preview-gate-2026-09-07";
 
 export function databaseTargetIdentity(value) {
   if (!value) return null;
@@ -25,9 +26,11 @@ export function databaseTargetIdentity(value) {
 
 export function assertPreviewDataPlane({
   environment,
+  branch,
   databaseUrl,
   directUrl,
   productionDataPlaneId = PRODUCTION_DATA_PLANE_ID,
+  reviewedPreviewDataPlaneId = PREVIEW_DATA_PLANE_ID,
 }) {
   if (environment !== "preview") return;
 
@@ -42,5 +45,8 @@ export function assertPreviewDataPlane({
   }
   if (pooled === productionDataPlaneId) {
     throw new Error("BLOCKED: Vercel Preview is configured to use the reviewed Production PostgreSQL data plane");
+  }
+  if (branch === RELEASE_PREVIEW_BRANCH && pooled !== reviewedPreviewDataPlaneId) {
+    throw new Error("BLOCKED: release Preview is not configured to use the reviewed isolated Preview PostgreSQL data plane");
   }
 }
