@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { assertPreviewDataPlane, databaseTargetIdentity } from "./release-dataplane-guard.mjs";
 
 const productionUrl = "postgresql://user:secret@prod-db.example.test:5432/revalta";
@@ -56,4 +57,17 @@ assert.doesNotThrow(() => assertPreviewDataPlane({
   productionDataPlaneId: productionId,
 }));
 
-console.log("Preview data-plane guard tests passed.");
+const vercelBuild = await readFile(new URL("./vercel-build.mjs", import.meta.url), "utf8");
+const guardImport = 'import { assertPreviewDataPlane } from "./release-dataplane-guard.mjs";';
+const guardCall = "assertPreviewDataPlane({";
+const prismaGenerate = 'run("npx", ["prisma", "generate"])';
+
+assert.ok(vercelBuild.includes(guardImport), "Vercel build must import the Preview data-plane guard");
+assert.ok(vercelBuild.includes(guardCall), "Vercel build must invoke the Preview data-plane guard");
+assert.ok(vercelBuild.includes(prismaGenerate), "Vercel build must still generate Prisma after guards");
+assert.ok(
+  vercelBuild.indexOf(guardCall) < vercelBuild.indexOf(prismaGenerate),
+  "Preview data-plane guard must run before Prisma generation and application build",
+);
+
+console.log("Preview data-plane guard tests passed and build wiring is fail-closed.");
