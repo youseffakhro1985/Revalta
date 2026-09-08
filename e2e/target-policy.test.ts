@@ -55,7 +55,7 @@ describe("browser target safety and release evidence", () => {
     expect(() => validateTarget({ ...env, E2E_PRODUCTION_DATA_PLANE_ID: previewDataPlaneId })).toThrow(/different/);
   });
 
-  it.each(["not-a-hash", "d".repeat(63), "D".repeat(64)])("rejects invalid data-plane identity %s", (identity) => {
+  it.each(["not-a-hash", "d".repeat(63), "g".repeat(64)])("rejects invalid data-plane identity %s", (identity) => {
     expect(() => validateTarget({ ...env, E2E_PREVIEW_DATA_PLANE_ID: identity })).toThrow(/BLOCKED/);
   });
 
