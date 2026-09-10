@@ -21,11 +21,11 @@ export default async function Dashboard() {
   return (
     <div className="animate-fade-in-soft space-y-6 sm:space-y-7">
       {!schema.ready ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm" role="status">
+        <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-warning-900 shadow-sm" role="status">
           <p className="font-semibold">Kompatibilitetsläge</p>
           <p className="mt-1 text-sm leading-6">{schemaCompatibilityBannerMessage()}</p>
           {schema.missing.length > 0 ? (
-            <p className="mt-2 text-xs text-amber-800/80">
+            <p className="mt-2 text-xs text-warning-800/80">
               Saknas: {schema.missing.map((item) => `${item.table}.${item.column}`).join(", ")}
             </p>
           ) : null}

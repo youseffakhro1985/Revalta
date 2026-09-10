@@ -121,7 +121,7 @@ export function NotificationAssignment({ notificationKey }: { notificationKey: s
               <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} maxLength={1000} placeholder="Nästa åtgärd eller viktig information" className="resize-none rounded-lg border border-sand-200 px-3 py-2 text-sm text-ink-800 outline-none focus:border-petroleum-400" />
             </label>
             {selectedUser ? <p className="text-[11px] text-ink-500">Tilldelas {selectedUser.name || selectedUser.email}.</p> : null}
-            {error ? <p className="text-xs font-semibold text-red-700">{error}</p> : null}
+            {error ? <p className="text-xs font-semibold text-danger-700">{error}</p> : null}
             <div className="flex gap-2">
               <button type="button" onClick={() => void save()} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-petroleum-800 px-3 py-2 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" /> {saving ? "Sparar…" : "Spara"}</button>
               <button type="button" onClick={() => setOpen(false)} disabled={saving} aria-label="Avbryt" className="inline-flex items-center justify-center rounded-lg border border-sand-200 px-3 py-2 text-ink-600 hover:bg-sand-50"><XCircle className="h-4 w-4" /></button>

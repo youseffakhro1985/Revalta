@@ -66,7 +66,7 @@ export function ComponentEntryCorrections({ propertyId, componentId }: { propert
   return (
     <Panel title="Korrigera komponenthistorik" description="Rätta felregistrerade händelser och kostnader utan att förlora revisionsspåret.">
       {error ? <InlineAlert>{error}</InlineAlert> : null}
-      {saved ? <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"><Check className="h-4 w-4" />{saved}</div> : null}
+      {saved ? <div className="mb-4 flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm font-semibold text-success-800"><Check className="h-4 w-4" />{saved}</div> : null}
       {editing ? <CorrectionForm editing={editing} workOrders={workOrders} projects={projects} saving={saving} onSubmit={submit} onCancel={() => { setEditing(null); setError(""); }} /> : (
         <div className="grid gap-6 xl:grid-cols-2">
           <CorrectionList title="Tekniska händelser" rows={events} kind="event" onEdit={(row) => setEditing({ kind: "event", row })} />
@@ -85,7 +85,7 @@ function CorrectionList({ title, rows, kind, onEdit }: { title: string; rows: Ro
 function CorrectionForm({ editing, workOrders, projects, saving, onSubmit, onCancel }: { editing: { kind: Kind; row: Row }; workOrders: Option[]; projects: Option[]; saving: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onCancel: () => void }) {
   const row = editing.row;
   return <form onSubmit={onSubmit} className="space-y-5">
-    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Korrigeringsläge:</strong> Ändringen ersätter visade värden men ursprungsvärdena sparas i revisionsloggen.</div>
+    <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900"><strong>Korrigeringsläge:</strong> Ändringen ersätter visade värden men ursprungsvärdena sparas i revisionsloggen.</div>
     {editing.kind === "event" ? <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Select name="event_type" label="Händelsetyp" options={eventTypes} defaultValue={text(row, "event_type")} required />

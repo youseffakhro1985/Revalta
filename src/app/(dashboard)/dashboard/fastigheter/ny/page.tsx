@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowLeft, Building2, CheckCircle2, MapPin } from "lucide-react";
 import { readResponseJson } from "@/lib/fetch-json";
 
-const fieldClass = "h-11 w-full rounded-xl border border-sand-200 bg-[#FCFBF8] px-3.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100";
+const fieldClass = "h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle px-3.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100";
 
 type CreatePropertyResponse = {
   property?: { id: string };

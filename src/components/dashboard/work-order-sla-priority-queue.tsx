@@ -33,9 +33,9 @@ function duration(minutes: number | null) {
 }
 
 function tone(risk: WorkOrderSlaEvaluation["risk"]) {
-  if (risk === "overdue") return "border-red-200 bg-red-50 text-red-800";
-  if (risk === "critical") return "border-orange-200 bg-orange-50 text-orange-800";
-  if (risk === "soon") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (risk === "overdue") return "border-danger-200 bg-danger-50 text-danger-800";
+  if (risk === "critical") return "border-warning-200 bg-warning-50 text-warning-800";
+  if (risk === "soon") return "border-warning-200 bg-warning-50 text-warning-800";
   return "border-sand-200 bg-sand-50 text-ink-700";
 }
 

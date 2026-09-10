@@ -202,7 +202,7 @@ export function DashboardShell({
   }, [mobileOpen]);
 
   return (
-    <div className="dashboard-surface min-h-screen bg-[#F8F7F2] text-ink-900">
+    <div className="dashboard-surface min-h-screen bg-surface-app text-ink-900">
       <a href="#dashboard-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-3 text-sm font-semibold text-petroleum-800 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">Hoppa till innehåll</a>
 
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] overflow-hidden border-r border-petroleum-900/35 bg-petroleum-900 text-white lg:flex lg:flex-col">
@@ -240,7 +240,7 @@ export function DashboardShell({
       ) : null}
 
       <div className="lg:pl-[264px]">
-        <header className="sticky top-0 z-30 border-b border-sand-200/90 bg-[#FCFBF8]/95 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-sand-200/90 bg-surface-subtle/95 backdrop-blur-xl">
           <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-3 px-4 sm:px-7 lg:h-[88px] lg:px-8 xl:px-10">
             <div className="flex items-center gap-3 lg:hidden">
               <button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button>

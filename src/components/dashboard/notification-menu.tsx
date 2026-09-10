@@ -105,7 +105,7 @@ export function NotificationMenu() {
     <div ref={containerRef} className="relative">
       <button type="button" onClick={() => setOpen((value) => !value)} aria-label={`Aviseringar${unread ? `, ${unread} olästa` : ""}`} aria-expanded={open} className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-600 transition hover:bg-sand-50 hover:text-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
         <BellRing className="h-5 w-5" />
-        {unread > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-[#FAFAF8]">{unread > 99 ? "99+" : unread}</span> : null}
+        {unread > 0 ? <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-danger-600 px-1 text-[10px] font-bold text-white ring-2 ring-[#FAFAF8]">{unread > 99 ? "99+" : unread}</span> : null}
       </button>
 
       {open ? (
@@ -124,7 +124,7 @@ export function NotificationMenu() {
                 const label = item.kind === "sla" ? "SLA" : item.kind === "security" ? "Säkerhet" : item.kind === "recurring" ? "Schema" : "Service";
                 return <div key={`${item.kind}-${item.key}`} className="p-4 hover:bg-sand-50/70">
                   <div className="flex gap-3">
-                    <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.kind === "security" || item.overdue ? "bg-red-50 text-red-700" : item.high ? "bg-amber-50 text-amber-700" : item.kind === "sla" ? "bg-orange-50 text-orange-700" : "bg-petroleum-50 text-petroleum-700"}`}><Icon className="h-4 w-4" /></div>
+                    <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.kind === "security" || item.overdue ? "bg-danger-50 text-danger-700" : item.high ? "bg-warning-50 text-warning-700" : item.kind === "sla" ? "bg-warning-50 text-warning-700" : "bg-petroleum-50 text-petroleum-700"}`}><Icon className="h-4 w-4" /></div>
                     <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-ink-900">{item.title}</p><span className="shrink-0 rounded-full bg-sand-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-500">{label}</span></div><p className="mt-1 line-clamp-2 text-xs leading-5 text-ink-500">{item.description}</p><p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-ink-500">{dateFormat.format(new Date(item.dueAt))}</p></div>
                   </div>
                   <div className="mt-3 flex items-center justify-end gap-2">

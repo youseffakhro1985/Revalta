@@ -295,7 +295,7 @@ export default function PropertiesPage() {
           <label className="relative block">
             <span className="sr-only">Sök fastighet</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} maxLength={160} placeholder="Sök namn, adress, ort eller objektsnummer" className="h-10 w-full rounded-xl border border-sand-200 bg-[#FCFBF8] pl-9 pr-3 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} maxLength={160} placeholder="Sök namn, adress, ort eller objektsnummer" className="h-10 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-9 pr-3 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
           </label>
           <label>
             <span className="sr-only">Filtrera ort</span>
@@ -347,7 +347,7 @@ export default function PropertiesPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[920px] text-left">
                 <thead>
-                  <tr className="border-b border-sand-100 bg-[#FCFBF8] text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-400">
+                  <tr className="border-b border-sand-100 bg-surface-subtle text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-400">
                     <th className="px-5 py-3">Fastighet</th>
                     <th className="px-3 py-3">Adress</th>
                     <th className="px-3 py-3">Ort</th>

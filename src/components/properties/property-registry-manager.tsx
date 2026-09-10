@@ -132,7 +132,7 @@ export function PropertyRegistryManager({
               type="button"
               disabled={deleting || busy !== null}
               onClick={() => void softDeleteProperty()}
-              className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+              className="text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60"
             >
               {deleting ? "Tar bort…" : "Ta bort fastighet"}
             </button>

@@ -42,9 +42,9 @@ function serviceState(value: string | null) {
   const due = new Date(value);
   const now = new Date();
   const days = Math.ceil((due.getTime() - now.getTime()) / 86_400_000);
-  if (days < 0) return { label: `${Math.abs(days)} dagar försenad`, className: "bg-red-50 text-red-800" };
-  if (days <= 7) return { label: `${days} dagar kvar`, className: "bg-amber-50 text-amber-800" };
-  if (days <= 30) return { label: `${days} dagar kvar`, className: "bg-orange-50 text-orange-800" };
+  if (days < 0) return { label: `${Math.abs(days)} dagar försenad`, className: "bg-danger-50 text-danger-800" };
+  if (days <= 7) return { label: `${days} dagar kvar`, className: "bg-warning-50 text-warning-800" };
+  if (days <= 30) return { label: `${days} dagar kvar`, className: "bg-warning-50 text-warning-800" };
   return { label: date.format(due), className: "bg-petroleum-50 text-petroleum-800" };
 }
 
@@ -114,7 +114,7 @@ export function PreventiveMaintenanceOverview() {
       </div>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
-      {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">{message}</div> : null}
+      {message ? <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm font-medium text-success-900">{message}</div> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         <MetricCard icon={Wrench} label="Komponenter" value={data.metrics.total} hint="Aktiva och planerade" />

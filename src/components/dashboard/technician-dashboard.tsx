@@ -125,7 +125,7 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-semibold text-petroleum-700">{nextOrder.work_order_number || `AO-${nextOrder.id.slice(0, 8)}`}</span>
-                {nextOrder.priority === "urgent" ? <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-700">Akut</span> : null}
+                {nextOrder.priority === "urgent" ? <span className="rounded-full bg-danger-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-danger-700">Akut</span> : null}
               </div>
               <h2 className="mt-3 text-xl font-semibold text-ink-950">{nextOrder.title}</h2>
               <p className="mt-2 text-sm text-ink-600">{nextOrder.property.name} · {nextOrder.property.address}, {nextOrder.property.city}</p>
@@ -145,11 +145,11 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
             return (
               <Link key={order.id} href={`/dashboard/arbetsorder/${order.id}`} className="grid gap-3 px-5 py-4 transition hover:bg-sand-50/70 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-petroleum-700">{order.work_order_number || `AO-${order.id.slice(0, 8)}`}</span>{order.priority === "urgent" ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">Akut</span> : null}</div>
+                  <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-petroleum-700">{order.work_order_number || `AO-${order.id.slice(0, 8)}`}</span>{order.priority === "urgent" ? <span className="rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-semibold text-danger-700">Akut</span> : null}</div>
                   <p className="mt-1 truncate text-sm font-semibold text-ink-900">{order.title}</p>
                   <p className="mt-1 truncate text-xs text-ink-500">{order.property.name} · {order.property.city}</p>
                 </div>
-                <div className="sm:text-right"><p className={`text-xs font-semibold ${overdue ? "text-red-700" : "text-ink-600"}`}>{deadline ? `${overdue ? "Försenad · " : "Deadline · "}${dateTime.format(deadline)}` : "Ingen deadline"}</p>{order.scheduled_start ? <p className="mt-1 text-[11px] text-ink-500">Start {time.format(order.scheduled_start)}</p> : null}</div>
+                <div className="sm:text-right"><p className={`text-xs font-semibold ${overdue ? "text-danger-700" : "text-ink-600"}`}>{deadline ? `${overdue ? "Försenad · " : "Deadline · "}${dateTime.format(deadline)}` : "Ingen deadline"}</p>{order.scheduled_start ? <p className="mt-1 text-[11px] text-ink-500">Start {time.format(order.scheduled_start)}</p> : null}</div>
               </Link>
             );
           })}</div> : <p className="p-8 text-center text-sm text-ink-500">Inga aktiva arbetsordrar.</p>}

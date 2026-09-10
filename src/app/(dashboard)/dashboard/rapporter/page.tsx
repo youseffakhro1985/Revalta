@@ -70,14 +70,14 @@ function Metric({ icon: Icon, label, value, detail, href, alert }: MetricProps) 
       className="group rounded-2xl border border-sand-200 bg-white p-4 shadow-premium-sm transition hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${alert ? "bg-red-50 text-red-700" : "bg-petroleum-50 text-petroleum-800"}`}>
+        <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${alert ? "bg-danger-50 text-danger-700" : "bg-petroleum-50 text-petroleum-800"}`}>
           <Icon className="h-4 w-4" />
         </div>
         <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" />
       </div>
       <p className="mt-4 text-[11px] font-medium text-ink-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-ink-950">{value}</p>
-      <p className={`mt-2 text-[10px] leading-4 ${alert ? "text-red-700" : "text-ink-500"}`}>{detail}</p>
+      <p className={`mt-2 text-[10px] leading-4 ${alert ? "text-danger-700" : "text-ink-500"}`}>{detail}</p>
     </Link>
   );
 }
@@ -381,7 +381,7 @@ export default async function ReportsPage({
           </p>
         </div>
         <div className="flex items-center gap-2 text-[10px] text-ink-500">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />Live-data · uppdaterad {updatedLabel}
+          <span className="h-2 w-2 rounded-full bg-success-500" />Live-data · uppdaterad {updatedLabel}
         </div>
       </header>
 
@@ -400,7 +400,7 @@ export default async function ReportsPage({
           ["Uthyrning", "Vakans, avtal och hyresparter", "/dashboard/uthyrning"],
           ["Ekonomi", "Budget, utfall och hyresintäkter", "/dashboard/ekonomi"],
         ].map(([title, description, href]) => (
-          <Link key={title} href={href} className="group flex items-center justify-between rounded-2xl border border-sand-200 bg-[#FCFBF8] px-4 py-3 transition hover:border-petroleum-200 hover:bg-white">
+          <Link key={title} href={href} className="group flex items-center justify-between rounded-2xl border border-sand-200 bg-surface-subtle px-4 py-3 transition hover:border-petroleum-200 hover:bg-white">
             <div><p className="text-xs font-semibold text-ink-800">{title}</p><p className="mt-0.5 text-[10px] text-ink-500">{description}</p></div>
             <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" />
           </Link>
@@ -441,9 +441,9 @@ export default async function ReportsPage({
             ))}
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl bg-[#FCFBF8] px-3.5 py-3"><p className="text-[10px] text-ink-500">Genomsnittlig åtgärdstid</p><p className="mt-1 text-sm font-semibold text-ink-900">{formatDays(averageResolution)}</p></div>
-            <div className="rounded-xl bg-[#FCFBF8] px-3.5 py-3"><p className="text-[10px] text-ink-500">Aktiva arbetsorder</p><p className="mt-1 text-sm font-semibold text-ink-900">{activeOrders.length}</p></div>
-            <div className="rounded-xl bg-[#FCFBF8] px-3.5 py-3"><p className="text-[10px] text-ink-500">Akuta öppna ärenden</p><p className={`mt-1 text-sm font-semibold ${urgentOpenTickets.length ? "text-red-700" : "text-ink-900"}`}>{urgentOpenTickets.length}</p></div>
+            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[10px] text-ink-500">Genomsnittlig åtgärdstid</p><p className="mt-1 text-sm font-semibold text-ink-900">{formatDays(averageResolution)}</p></div>
+            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[10px] text-ink-500">Aktiva arbetsorder</p><p className="mt-1 text-sm font-semibold text-ink-900">{activeOrders.length}</p></div>
+            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[10px] text-ink-500">Akuta öppna ärenden</p><p className={`mt-1 text-sm font-semibold ${urgentOpenTickets.length ? "text-danger-700" : "text-ink-900"}`}>{urgentOpenTickets.length}</p></div>
           </div>
         </article>
 
@@ -474,7 +474,7 @@ export default async function ReportsPage({
           {propertyRows.length === 0 ? <p className="p-6 text-sm text-ink-500">Inga fastigheter att rapportera ännu.</p> : (
             <div className="overflow-x-auto">
               <table className="min-w-[860px] w-full text-left">
-                <thead className="bg-[#FCFBF8] text-[9px] uppercase tracking-[0.08em] text-ink-400"><tr><th className="px-5 py-3 font-semibold">Fastighet</th><th className="px-3 py-3 font-semibold">Uthyrning</th><th className="px-3 py-3 font-semibold">Ärenden</th><th className="px-3 py-3 font-semibold">Arbetsorder</th><th className="px-3 py-3 font-semibold">Hyresintäkt</th><th className="px-3 py-3 font-semibold">Kostnadsutfall</th><th className="px-5 py-3"><span className="sr-only">Öppna</span></th></tr></thead>
+                <thead className="bg-surface-subtle text-[9px] uppercase tracking-[0.08em] text-ink-400"><tr><th className="px-5 py-3 font-semibold">Fastighet</th><th className="px-3 py-3 font-semibold">Uthyrning</th><th className="px-3 py-3 font-semibold">Ärenden</th><th className="px-3 py-3 font-semibold">Arbetsorder</th><th className="px-3 py-3 font-semibold">Hyresintäkt</th><th className="px-3 py-3 font-semibold">Kostnadsutfall</th><th className="px-5 py-3"><span className="sr-only">Öppna</span></th></tr></thead>
                 <tbody className="divide-y divide-sand-100">
                   {propertyRows.map((property) => (
                     <tr key={property.id} className="transition hover:bg-sand-50/60">
@@ -497,10 +497,10 @@ export default async function ReportsPage({
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Behöver uppmärksamhet</p>
           <h2 className="mt-1 font-display text-[19px] font-semibold text-ink-950">Operativa signaler</h2>
           <div className="mt-5 space-y-2.5">
-            <Link href="/dashboard/felanmalan" className="flex items-center justify-between rounded-xl border border-sand-100 bg-[#FCFBF8] px-3.5 py-3 transition hover:border-red-100 hover:bg-red-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><AlertTriangle className="h-4 w-4 text-red-600" />Akuta öppna ärenden</span><span className="text-sm font-semibold text-ink-950">{urgentOpenTickets.length}</span></Link>
-            <Link href="/dashboard/arbetsorder" className="flex items-center justify-between rounded-xl border border-sand-100 bg-[#FCFBF8] px-3.5 py-3 transition hover:border-amber-100 hover:bg-amber-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><Clock3 className="h-4 w-4 text-amber-700" />SLA försenade</span><span className="text-sm font-semibold text-ink-950">{overdueSlaOrders}</span></Link>
-            <Link href="/dashboard/uthyrning" className="flex items-center justify-between rounded-xl border border-sand-100 bg-[#FCFBF8] px-3.5 py-3 transition hover:border-petroleum-100 hover:bg-petroleum-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><DoorOpen className="h-4 w-4 text-petroleum-700" />Lediga objekt</span><span className="text-sm font-semibold text-ink-950">{vacantUnits}</span></Link>
-            <Link href="/dashboard/hyresavisering" className="flex items-center justify-between rounded-xl border border-sand-100 bg-[#FCFBF8] px-3.5 py-3 transition hover:border-amber-100 hover:bg-amber-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><CircleDollarSign className="h-4 w-4 text-amber-700" />Förfallna aviseringar</span><span className="text-sm font-semibold text-ink-950">{compactMoney(overdueAmount)}</span></Link>
+            <Link href="/dashboard/felanmalan" className="flex items-center justify-between rounded-xl border border-sand-100 bg-surface-subtle px-3.5 py-3 transition hover:border-danger-100 hover:bg-danger-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><AlertTriangle className="h-4 w-4 text-danger-600" />Akuta öppna ärenden</span><span className="text-sm font-semibold text-ink-950">{urgentOpenTickets.length}</span></Link>
+            <Link href="/dashboard/arbetsorder" className="flex items-center justify-between rounded-xl border border-sand-100 bg-surface-subtle px-3.5 py-3 transition hover:border-warning-100 hover:bg-warning-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><Clock3 className="h-4 w-4 text-warning-700" />SLA försenade</span><span className="text-sm font-semibold text-ink-950">{overdueSlaOrders}</span></Link>
+            <Link href="/dashboard/uthyrning" className="flex items-center justify-between rounded-xl border border-sand-100 bg-surface-subtle px-3.5 py-3 transition hover:border-petroleum-100 hover:bg-petroleum-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><DoorOpen className="h-4 w-4 text-petroleum-700" />Lediga objekt</span><span className="text-sm font-semibold text-ink-950">{vacantUnits}</span></Link>
+            <Link href="/dashboard/hyresavisering" className="flex items-center justify-between rounded-xl border border-sand-100 bg-surface-subtle px-3.5 py-3 transition hover:border-warning-100 hover:bg-warning-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><CircleDollarSign className="h-4 w-4 text-warning-700" />Förfallna aviseringar</span><span className="text-sm font-semibold text-ink-950">{compactMoney(overdueAmount)}</span></Link>
           </div>
         </article>
       </section>
@@ -524,7 +524,7 @@ export default async function ReportsPage({
           <div className="mt-5 divide-y divide-sand-100">
             <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Intäktsutfall</p><p className="text-[10px] text-ink-500">Budget {compactMoney(budgetIncome)}</p></div><p className="text-sm font-semibold text-ink-950">{compactMoney(actualIncome)}</p></div>
             <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Kostnadsutfall</p><p className="text-[10px] text-ink-500">Budget {compactMoney(budgetCosts)}</p></div><p className="text-sm font-semibold text-ink-950">{compactMoney(actualCosts)}</p></div>
-            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Registrerat driftnetto</p><p className="text-[10px] text-ink-500">Budgeterat netto {compactMoney(budgetNet)}</p></div><p className={`text-sm font-semibold ${registeredNet < 0 ? "text-red-700" : "text-ink-950"}`}>{compactMoney(registeredNet)}</p></div>
+            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Registrerat driftnetto</p><p className="text-[10px] text-ink-500">Budgeterat netto {compactMoney(budgetNet)}</p></div><p className={`text-sm font-semibold ${registeredNet < 0 ? "text-danger-700" : "text-ink-950"}`}>{compactMoney(registeredNet)}</p></div>
             <div className="flex items-center justify-between py-3"><p className="text-xs font-medium text-ink-700">Budgetutnyttjande kostnader</p><p className="text-sm font-semibold text-ink-950">{budgetUtilization === null ? "—" : `${budgetUtilization} %`}</p></div>
           </div>
         </article>
@@ -540,7 +540,7 @@ export default async function ReportsPage({
               ["Alla aktiviteter", recentAudit.length, Clock3],
             ].map(([label, value, Icon]) => {
               const ActivityIcon = Icon as LucideIcon;
-              return <div key={String(label)} className="rounded-xl border border-sand-100 bg-[#FCFBF8] p-3"><ActivityIcon className="h-4 w-4 text-petroleum-700" /><p className="mt-3 text-lg font-semibold text-ink-950">{String(value)}</p><p className="mt-0.5 text-[10px] text-ink-500">{String(label)}</p></div>;
+              return <div key={String(label)} className="rounded-xl border border-sand-100 bg-surface-subtle p-3"><ActivityIcon className="h-4 w-4 text-petroleum-700" /><p className="mt-3 text-lg font-semibold text-ink-950">{String(value)}</p><p className="mt-0.5 text-[10px] text-ink-500">{String(label)}</p></div>;
             })}
           </div>
         </article>

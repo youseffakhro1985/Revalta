@@ -35,7 +35,7 @@ const categories = ["Teknisk service", "Bygg", "El", "VVS", "Mark och utemiljö"
 
 function statusClass(status?: string) {
   if (status === "ended") return "border-sand-200 bg-sand-100 text-ink-500";
-  if (status === "cancelled") return "border-red-200 bg-red-50 text-red-700";
+  if (status === "cancelled") return "border-danger-200 bg-danger-50 text-danger-700";
   return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
 }
 
@@ -254,7 +254,7 @@ export default function VendorsPage() {
                 const daysToEnd = endDate ? Math.ceil((endDate.getTime() - Date.now()) / 86400000) : null;
                 const needsAttention = isActive && daysToEnd !== null && daysToEnd >= 0 && daysToEnd <= 120;
                 return (
-                  <article key={vendor.id} className={`relative p-5 transition hover:bg-sand-50/45 sm:p-6 ${needsAttention ? "before:absolute before:inset-y-5 before:left-0 before:w-1 before:rounded-r-full before:bg-amber-500" : ""}`}>
+                  <article key={vendor.id} className={`relative p-5 transition hover:bg-sand-50/45 sm:p-6 ${needsAttention ? "before:absolute before:inset-y-5 before:left-0 before:w-1 before:rounded-r-full before:bg-warning-500" : ""}`}>
                     <div className="grid gap-5 md:grid-cols-[1.35fr_1fr_auto] md:items-start">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -273,7 +273,7 @@ export default function VendorsPage() {
                       <div>
                         <p className="text-sm font-semibold text-ink-800">{vendor.contractTitle || "Inget avtal angivet"}</p>
                         <p className="mt-1 text-xs leading-5 text-ink-500">Uppsägning {vendor.noticeMonths || 0} mån · {vendor.endDate ? `slut ${new Date(vendor.endDate).toLocaleDateString("sv-SE")}` : "inget slutdatum"}</p>
-                        {needsAttention ? <p className="mt-2 text-xs font-semibold text-amber-800">{daysToEnd === 0 ? "Avtalet löper ut idag" : `${daysToEnd} dagar till avtalslut`}</p> : null}
+                        {needsAttention ? <p className="mt-2 text-xs font-semibold text-warning-800">{daysToEnd === 0 ? "Avtalet löper ut idag" : `${daysToEnd} dagar till avtalslut`}</p> : null}
                         {vendor.source !== "legacy" ? (
                           <select
                             disabled={updatingId === vendor.id}
@@ -299,7 +299,7 @@ export default function VendorsPage() {
                     </div>
 
                     {editingId === vendor.id && vendor.source !== "legacy" ? (
-                      <div className="mt-5 space-y-3 rounded-xl border border-sand-200 bg-[#FCFBF8] p-4">
+                      <div className="mt-5 space-y-3 rounded-xl border border-sand-200 bg-surface-subtle p-4">
                         {isActive ? (
                           <>
                             <input className={premiumFieldClass} placeholder="Företagsnamn" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} aria-label="Företagsnamn" />
