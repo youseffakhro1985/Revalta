@@ -28,8 +28,8 @@ type EventItem = {
 const priorityLabel = { normal: "Information", important: "Viktigt", urgent: "Brådskande" } as const;
 const priorityClass = {
   normal: "border-sand-200 bg-sand-50 text-ink-600",
-  important: "border-amber-200 bg-amber-50 text-amber-800",
-  urgent: "border-red-200 bg-red-50 text-red-800",
+  important: "border-warning-200 bg-warning-50 text-warning-800",
+  urgent: "border-danger-200 bg-danger-50 text-danger-800",
 } as const;
 
 function eventTitle(event: EventItem) {
@@ -131,7 +131,7 @@ export default function NotificationsPage() {
         </div>
       </header>
 
-      {error ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{error}</p> : null}
+      {error ? <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">{error}</p> : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         {[['Olästa notiser', unread], ['Brådskande', urgent], ['Senaste händelser', events.length]].map(([label, value]) => (
@@ -192,10 +192,10 @@ export default function NotificationsPage() {
                       </div>
                       <div className="flex shrink-0 flex-col gap-2 sm:items-end">
                         {item.source === "legacy" ? (
-                          <p className="max-w-xs text-xs font-medium text-amber-700">Äldre notis – kör backfill innan den kan markeras som läst eller tas bort.</p>
+                          <p className="max-w-xs text-xs font-medium text-warning-700">Äldre notis – kör backfill innan den kan markeras som läst eller tas bort.</p>
                         ) : (
                           <>
-                            {permissions.canManage ? <button type="button" onClick={() => void recallNotification(item.notificationId)} className="text-xs font-semibold text-red-700 hover:text-red-900">Ta bort</button> : null}
+                            {permissions.canManage ? <button type="button" onClick={() => void recallNotification(item.notificationId)} className="text-xs font-semibold text-danger-700 hover:text-danger-900">Ta bort</button> : null}
                             {!item.read ? (
                               <button type="button" onClick={() => void markRead(item.notificationId)} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-petroleum-800 hover:bg-sand-50">
                                 Markera som läst

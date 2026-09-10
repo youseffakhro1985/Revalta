@@ -196,7 +196,7 @@ export default function ResidentDocumentsPage() {
                       <span className="rounded-full bg-sand-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">
                         {categoryLabels[document.category] || document.category}
                       </span>
-                      {expired ? <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800">Utgånget</span> : null}
+                      {expired ? <span className="rounded-full bg-danger-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-danger-800">Utgånget</span> : null}
                     </div>
                     <p className="mt-2 text-sm text-ink-500">{document.fileName || "Dokumentfil"} · {formatBytes(document.sizeBytes)}</p>
                     <p className="mt-1 text-xs text-ink-500">
@@ -209,7 +209,7 @@ export default function ResidentDocumentsPage() {
                       <Download className="h-4 w-4" /> Hämta dokument
                     </a>
                   ) : (
-                    <span className="text-xs font-semibold text-red-700">Filen saknas eller har ett ogiltigt format</span>
+                    <span className="text-xs font-semibold text-danger-700">Filen saknas eller har ett ogiltigt format</span>
                   )}
                 </article>
               );

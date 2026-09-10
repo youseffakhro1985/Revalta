@@ -286,8 +286,8 @@ export default function SettingsPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Administration</p>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-800">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" /> Live-data
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-2.5 py-1 text-[10px] font-semibold text-success-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-success-500" aria-hidden="true" /> Live-data
               </span>
             </div>
             <h1 className="mt-3 text-[32px] font-semibold leading-tight tracking-[-0.04em] text-ink-950 sm:text-[38px]">Inställningar</h1>
@@ -355,7 +355,7 @@ export default function SettingsPage() {
               <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">E-post</p>
                 <p className="mt-1 break-all text-sm font-semibold text-ink-800">{profile?.email || "–"}</p>
-                <p className={`mt-2 inline-flex items-center gap-1.5 text-xs font-semibold ${profile?.email_verified_at ? "text-emerald-700" : "text-amber-700"}`}>
+                <p className={`mt-2 inline-flex items-center gap-1.5 text-xs font-semibold ${profile?.email_verified_at ? "text-success-700" : "text-warning-700"}`}>
                   <MailCheck className="h-3.5 w-3.5" aria-hidden="true" /> {profile?.email_verified_at ? "Verifierad" : "Ej verifierad"}
                 </p>
               </div>
@@ -420,10 +420,10 @@ export default function SettingsPage() {
             </label>
             <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4 lg:col-span-2">
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-                <span className={newPassword.length >= 10 ? "font-semibold text-emerald-700" : "text-ink-500"}>Minst 10 tecken</span>
-                <span className={/[A-Za-zÅÄÖåäö]/.test(newPassword) ? "font-semibold text-emerald-700" : "text-ink-500"}>Minst en bokstav</span>
-                <span className={/\d/.test(newPassword) ? "font-semibold text-emerald-700" : "text-ink-500"}>Minst en siffra</span>
-                <span className={confirmPassword && newPassword === confirmPassword ? "font-semibold text-emerald-700" : "text-ink-500"}>Lösenorden matchar</span>
+                <span className={newPassword.length >= 10 ? "font-semibold text-success-700" : "text-ink-500"}>Minst 10 tecken</span>
+                <span className={/[A-Za-zÅÄÖåäö]/.test(newPassword) ? "font-semibold text-success-700" : "text-ink-500"}>Minst en bokstav</span>
+                <span className={/\d/.test(newPassword) ? "font-semibold text-success-700" : "text-ink-500"}>Minst en siffra</span>
+                <span className={confirmPassword && newPassword === confirmPassword ? "font-semibold text-success-700" : "text-ink-500"}>Lösenorden matchar</span>
               </div>
             </div>
             <button disabled={!passwordReady || Boolean(saving)} className={`${premiumPrimaryButtonClass} w-full lg:w-auto`}>
@@ -435,7 +435,7 @@ export default function SettingsPage() {
         <Panel title="Säkerhetsöversikt" description="Snabb väg till de säkerhetsfunktioner som redan finns för din roll.">
           <div className="space-y-3">
             <div className="flex items-start gap-3 rounded-xl border border-sand-200 p-4">
-              <span className="mt-0.5 rounded-lg bg-emerald-50 p-2 text-emerald-700"><KeyRound className="h-4 w-4" /></span>
+              <span className="mt-0.5 rounded-lg bg-success-50 p-2 text-success-700"><KeyRound className="h-4 w-4" /></span>
               <div><p className="text-sm font-semibold text-ink-900">Sessionsskydd</p><p className="mt-1 text-xs leading-5 text-ink-500">Lösenordsbyte använder Revaltas befintliga flöde för att avsluta äldre sessioner.</p></div>
             </div>
             {canOpenAudit ? <Link href="/dashboard/audit" className="group flex items-center justify-between rounded-xl border border-sand-200 p-4 hover:border-petroleum-200 hover:bg-sand-50"><div className="flex items-center gap-3"><span className="rounded-lg bg-sand-50 p-2 text-petroleum-700"><FileClock className="h-4 w-4" /></span><div><p className="text-sm font-semibold text-ink-900">Händelselogg</p><p className="mt-1 text-xs text-ink-500">Granska spårbara administrativa händelser.</p></div></div><ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-petroleum-700" /></Link> : null}

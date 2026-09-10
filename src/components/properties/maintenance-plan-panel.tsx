@@ -25,7 +25,7 @@ const categories=["Tak","Fasad","Fönster","Ventilation","Värme","El","VA","His
 function Badge({value,type}:{value:string;type:"risk"|"priority"|"status"}){
   const warning=["urgent","critical","high","overdue"].includes(value);
   const label=type==="risk"?riskLabels[value]:type==="priority"?priorityLabels[value]:statusLabels[value];
-  return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${warning?"bg-amber-50 text-amber-800":"bg-petroleum-50 text-petroleum-800"}`}>{label||value}</span>;
+  return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${warning?"bg-warning-50 text-warning-800":"bg-petroleum-50 text-petroleum-800"}`}>{label||value}</span>;
 }
 
 export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
@@ -75,7 +75,7 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
         </Panel>
         <Panel title="Planstatus" description="Aktiv version och riskbild.">
           <dl className="space-y-4 text-sm"><Row label="Plan" value={`${data.activePlan.name} · v${data.activePlan.version}`}/><Row label="Tidshorisont" value={`${data.activePlan.horizon_years} år`}/><Row label="Åtgärder" value={String(data.actions.length)}/><Row label="Akuta/kritiska" value={String(data.forecast.urgent)}/><Row label="Försenade" value={String(data.forecast.overdue)}/></dl>
-          {(data.forecast.urgent>0||data.forecast.overdue>0)?<div className="mt-5 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle className="h-5 w-5 shrink-0"/><p>{data.forecast.urgent} kritiska och {data.forecast.overdue} försenade åtgärder behöver följas upp.</p></div>:<div className="mt-5 flex gap-3 rounded-xl border border-petroleum-100 bg-petroleum-50 p-4 text-sm text-petroleum-900"><CheckCircle2 className="h-5 w-5 shrink-0"/><p>Planen saknar kritiska eller försenade åtgärder.</p></div>}
+          {(data.forecast.urgent>0||data.forecast.overdue>0)?<div className="mt-5 flex gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900"><AlertTriangle className="h-5 w-5 shrink-0"/><p>{data.forecast.urgent} kritiska och {data.forecast.overdue} försenade åtgärder behöver följas upp.</p></div>:<div className="mt-5 flex gap-3 rounded-xl border border-petroleum-100 bg-petroleum-50 p-4 text-sm text-petroleum-900"><CheckCircle2 className="h-5 w-5 shrink-0"/><p>Planen saknar kritiska eller försenade åtgärder.</p></div>}
         </Panel>
       </div>
     </>:<EmptyState title="Ingen aktiv underhållsplan" description="Skapa en planversion och aktivera den för att börja prognostisera kostnader."/>}

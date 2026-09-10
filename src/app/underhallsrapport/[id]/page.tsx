@@ -21,7 +21,7 @@ export default function MaintenanceReportPage({params}:{params:Promise<{id:strin
   useEffect(()=>{void load();},[load]);
   const total=useMemo(()=>data?.forecast?.yearly.reduce((sum,item)=>sum+item.amount,0)||0,[data]);
 
-  if(error)return <main className="mx-auto max-w-3xl p-10"><p className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">{error}</p></main>;
+  if(error)return <main className="mx-auto max-w-3xl p-10"><p className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-800">{error}</p></main>;
   if(!data)return <main className="mx-auto max-w-5xl p-10"><div className="h-96 animate-pulse rounded-2xl bg-sand-100"/></main>;
   if(!data.activePlan)return <main className="mx-auto max-w-3xl p-10"><p>Ingen underhållsplan finns för fastigheten.</p></main>;
 

@@ -55,7 +55,7 @@ function eventDate(event: CalendarEvent) {
 }
 
 function statusClass(status?: string) {
-  if (status === "done") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "done") return "border-success-200 bg-success-50 text-success-800";
   if (status === "cancelled") return "border-sand-200 bg-sand-100 text-ink-500";
   return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
 }
@@ -346,7 +346,7 @@ export default function CalendarPage() {
             <div className="divide-y divide-sand-200">
               {sections.map((section) => (
                 <section key={section.key} aria-labelledby={`calendar-section-${section.key}`}>
-                  <div className="bg-[#FCFBF8] px-5 py-4 sm:px-6">
+                  <div className="bg-surface-subtle px-5 py-4 sm:px-6">
                     <h3 id={`calendar-section-${section.key}`} className="font-display text-lg font-semibold tracking-[-0.02em] text-ink-900">{section.title}</h3>
                     <p className="mt-1 text-xs leading-5 text-ink-500">{section.description}</p>
                   </div>
@@ -407,7 +407,7 @@ export default function CalendarPage() {
                                   disabled={removingId === event.id}
                                   onClick={() => void removeEvent(event)}
                                   aria-label={`Ta bort ${event.title}`}
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-100 bg-white text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-danger-100 bg-white text-danger-700 transition hover:bg-danger-50 disabled:opacity-50"
                                 >
                                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                                 </button>
@@ -417,7 +417,7 @@ export default function CalendarPage() {
                         </div>
 
                         {canManage && editingId === event.id && isEditableCalendarEvent(event) ? (
-                          <div className="mt-5 rounded-xl border border-sand-200 bg-[#FCFBF8] p-4">
+                          <div className="mt-5 rounded-xl border border-sand-200 bg-surface-subtle p-4">
                             <div className="mb-4 flex items-center gap-2">
                               <Pencil className="h-4 w-4 text-petroleum-700" aria-hidden="true" />
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-600">Redigera aktivitet</p>

@@ -139,7 +139,7 @@ export default function ProjectDetailPage() {
             type="button"
             disabled={saving}
             onClick={() => void removeProject()}
-            className="text-sm font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+            className="text-sm font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60"
           >
             Ta bort projekt
           </button>

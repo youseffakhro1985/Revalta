@@ -149,7 +149,7 @@ export default function NewPayoutPage() {
   );
 }
 
-const fieldClass = "h-11 w-full rounded-xl border border-sand-200 bg-[#FCFBF8] px-3.5 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100 disabled:cursor-not-allowed disabled:opacity-55";
+const fieldClass = "h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle px-3.5 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100 disabled:cursor-not-allowed disabled:opacity-55";
 
 function Field({ label, optional = false, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
   return <label className="block"><span className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-ink-650">{label}{optional ? <span className="font-normal text-ink-400">(valfritt)</span> : null}</span>{children}</label>;

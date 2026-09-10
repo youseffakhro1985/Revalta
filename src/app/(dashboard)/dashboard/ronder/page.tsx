@@ -155,9 +155,9 @@ function openDeviationCount(round: Round) {
 }
 
 function statusPill(round: Round, nowMs: number) {
-  if (isOverdue(round, nowMs)) return { label: "Försenad", className: "border-red-100 bg-red-50 text-red-700" };
-  if (round.status === "completed") return { label: statusLabels.completed, className: "border-emerald-100 bg-emerald-50 text-emerald-700" };
-  if (round.status === "in_progress") return { label: statusLabels.in_progress, className: "border-amber-100 bg-amber-50 text-amber-800" };
+  if (isOverdue(round, nowMs)) return { label: "Försenad", className: "border-danger-100 bg-danger-50 text-danger-700" };
+  if (round.status === "completed") return { label: statusLabels.completed, className: "border-success-100 bg-success-50 text-success-700" };
+  if (round.status === "in_progress") return { label: statusLabels.in_progress, className: "border-warning-100 bg-warning-50 text-warning-800" };
   return { label: statusLabels.planned, className: "border-petroleum-100 bg-petroleum-50 text-petroleum-800" };
 }
 
@@ -682,14 +682,14 @@ export default function RoundsPage() {
                         </td>
                         <td className="px-4 py-4 text-xs text-ink-700">{intervalLabels[round.interval || "monthly"] || round.interval}</td>
                         <td className="px-4 py-4">
-                          <p className={`text-xs font-semibold ${isOverdue(round, nowMs) ? "text-red-700" : "text-ink-800"}`}>{round.nextDue ? dateTimeFormat.format(new Date(round.nextDue)) : "Ej satt"}</p>
+                          <p className={`text-xs font-semibold ${isOverdue(round, nowMs) ? "text-danger-700" : "text-ink-800"}`}>{round.nextDue ? dateTimeFormat.format(new Date(round.nextDue)) : "Ej satt"}</p>
                           <p className="mt-1 text-[11px] text-ink-500">{intervalLongLabels[round.interval || "monthly"]}</p>
                         </td>
                         <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${pill.className}`}>{pill.label}</span></td>
-                        <td className="px-4 py-4">{round.status === "completed" && result !== null ? <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${result >= 90 ? "bg-emerald-50 text-emerald-700" : result >= 60 ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700"}`}>{result}%</span> : <span className="text-xs text-ink-400">—</span>}</td>
+                        <td className="px-4 py-4">{round.status === "completed" && result !== null ? <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${result >= 90 ? "bg-success-50 text-success-700" : result >= 60 ? "bg-warning-50 text-warning-800" : "bg-danger-50 text-danger-700"}`}>{result}%</span> : <span className="text-xs text-ink-400">—</span>}</td>
                         <td className="px-4 py-4">
                           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-700">
-                            {addressed === total && total > 0 ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Circle className="h-3.5 w-3.5 text-ink-300" />}
+                            {addressed === total && total > 0 ? <CheckCircle2 className="h-3.5 w-3.5 text-success-600" /> : <Circle className="h-3.5 w-3.5 text-ink-300" />}
                             {addressed}/{total}
                           </span>
                         </td>
@@ -723,7 +723,7 @@ export default function RoundsPage() {
                 {overdueRounds.slice(0, 5).map((round) => (
                   <button key={round.id} type="button" onClick={() => openRound(round)} className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-sand-50">
                     <span className="min-w-0"><span className="block truncate text-xs font-semibold text-ink-900">{round.propertyName || round.title}</span><span className="mt-1 block truncate text-[11px] text-ink-500">{round.title}</span></span>
-                    <span className="shrink-0 text-[11px] font-semibold text-red-700">{daysOverdue(round, nowMs)} dagar</span>
+                    <span className="shrink-0 text-[11px] font-semibold text-danger-700">{daysOverdue(round, nowMs)} dagar</span>
                   </button>
                 ))}
               </div>
@@ -739,7 +739,7 @@ export default function RoundsPage() {
                     const round = rounds.find((item) => item.id === deviation.roundId);
                     if (round) openRound(round);
                   }} className="w-full p-4 text-left transition hover:bg-sand-50">
-                    <div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-ink-900">{deviation.item.label}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${deviation.item.workOrderId ? "bg-emerald-50 text-emerald-700" : deviation.overdue ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"}`}>{deviation.item.workOrderId ? "Arbetsorder" : deviation.overdue ? "Hög" : "Öppen"}</span></div>
+                    <div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-ink-900">{deviation.item.label}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${deviation.item.workOrderId ? "bg-success-50 text-success-700" : deviation.overdue ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{deviation.item.workOrderId ? "Arbetsorder" : deviation.overdue ? "Hög" : "Öppen"}</span></div>
                     <p className="mt-1 text-[11px] text-ink-500">{deviation.propertyName} · {deviation.roundTitle}</p>
                   </button>
                 ))}
@@ -761,9 +761,9 @@ export default function RoundsPage() {
 
         <Panel title="Rondernas resultat" description="Genomförda ronder de senaste 12 månaderna, grupperade efter kontrollresultat." bodyClassName="px-5 pb-5 pt-3">
           <div className="mb-4 flex flex-wrap gap-4 text-[11px] font-medium text-ink-500">
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Godkända</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> Med anmärkning</span>
-            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-red-400" /> Underkända</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-success-500" /> Godkända</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-warning-400" /> Med anmärkning</span>
+            <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-danger-400" /> Underkända</span>
           </div>
           <div className="flex h-44 items-end gap-2 border-b border-sand-200 px-1 pb-0">
             {chartMonths.map((month) => {
@@ -775,9 +775,9 @@ export default function RoundsPage() {
               return (
                 <div key={month.key} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2">
                   <div className="flex w-full max-w-7 flex-col-reverse overflow-hidden rounded-t-sm bg-sand-100" style={{ height: `${height}px` }} title={`${month.label}: ${total} genomförda`}>
-                    {approvedPct ? <div className="bg-emerald-500" style={{ height: `${approvedPct}%` }} /> : null}
-                    {attentionPct ? <div className="bg-amber-400" style={{ height: `${attentionPct}%` }} /> : null}
-                    {failedPct ? <div className="bg-red-400" style={{ height: `${failedPct}%` }} /> : null}
+                    {approvedPct ? <div className="bg-success-500" style={{ height: `${approvedPct}%` }} /> : null}
+                    {attentionPct ? <div className="bg-warning-400" style={{ height: `${attentionPct}%` }} /> : null}
+                    {failedPct ? <div className="bg-danger-400" style={{ height: `${failedPct}%` }} /> : null}
                   </div>
                   <span className="text-[9px] font-medium capitalize text-ink-400">{month.label}</span>
                 </div>
@@ -848,7 +848,7 @@ export default function RoundsPage() {
       {selectedRound ? (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={`Rond ${selectedRound.title || ""}`}>
           <button type="button" className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" onClick={() => setSelectedRoundId("")} aria-label="Stäng rond" />
-          <aside className="absolute right-0 top-0 flex h-full w-full max-w-[620px] flex-col border-l border-sand-200 bg-[#FCFBF8] shadow-2xl">
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-[620px] flex-col border-l border-sand-200 bg-surface-subtle shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-sand-200 bg-white px-5 py-5 sm:px-6">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">{selectedRound.propertyName || "Fastighet"}</p>
@@ -877,17 +877,17 @@ export default function RoundsPage() {
                 <div className="flex items-end justify-between gap-3"><div><h3 className="font-display text-lg font-semibold text-ink-900">Checklista</h3><p className="mt-1 text-xs text-ink-500">Markera utförd kontroll eller registrera en avvikelse med anteckning.</p></div>{roundResult(selectedRound) !== null ? <span className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-bold text-petroleum-800">{roundResult(selectedRound)}%</span> : null}</div>
                 <div className="mt-4 space-y-3">
                   {(selectedRound.checklist || []).map((item, index) => (
-                    <div key={item.id} className={`rounded-2xl border p-4 ${item.hasDeviation ? "border-amber-200 bg-amber-50/40" : "border-sand-200 bg-white"}`}>
+                    <div key={item.id} className={`rounded-2xl border p-4 ${item.hasDeviation ? "border-warning-200 bg-warning-50/40" : "border-sand-200 bg-white"}`}>
                       <div className="flex items-start gap-3">
                         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sand-100 text-[10px] font-bold text-ink-500">{index + 1}</span>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-ink-900">{item.label}</p>
                           {canManage && selectedRound.source !== "legacy" ? (
                             <div className="mt-3 flex flex-wrap gap-4">
-                              <label className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700"><input type="checkbox" checked={item.completed} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { completed: event.target.checked })} /> Utförd</label>
-                              <label className="inline-flex items-center gap-2 text-xs font-semibold text-amber-800"><input type="checkbox" checked={item.hasDeviation} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { hasDeviation: event.target.checked, note: event.target.checked ? item.note : "" })} /> Avvikelse</label>
+                              <label className="inline-flex items-center gap-2 text-xs font-semibold text-success-700"><input type="checkbox" checked={item.completed} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { completed: event.target.checked })} /> Utförd</label>
+                              <label className="inline-flex items-center gap-2 text-xs font-semibold text-warning-800"><input type="checkbox" checked={item.hasDeviation} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { hasDeviation: event.target.checked, note: event.target.checked ? item.note : "" })} /> Avvikelse</label>
                             </div>
-                          ) : <div className="mt-2 flex gap-2">{item.completed ? <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Utförd</span> : null}{item.hasDeviation ? <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">Avvikelse</span> : null}</div>}
+                          ) : <div className="mt-2 flex gap-2">{item.completed ? <span className="rounded-full bg-success-50 px-2 py-1 text-[10px] font-semibold text-success-700">Utförd</span> : null}{item.hasDeviation ? <span className="rounded-full bg-warning-50 px-2 py-1 text-[10px] font-semibold text-warning-800">Avvikelse</span> : null}</div>}
                           {item.hasDeviation && canManage && selectedRound.source !== "legacy" ? <textarea value={item.note} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { note: event.target.value })} className={`${premiumTextareaClass} mt-3 min-h-20`} placeholder="Beskriv avvikelsen, plats och nästa steg" aria-label={`Avvikelse för ${item.label}`} /> : item.hasDeviation && item.note ? <p className="mt-3 text-xs leading-5 text-ink-600">{item.note}</p> : null}
                           {item.workOrderId ? <Link href={`/dashboard/arbetsorder/${item.workOrderId}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-petroleum-800 hover:text-petroleum-950"><Wrench className="h-3.5 w-3.5" /> Öppna arbetsorder</Link> : null}
                         </div>
@@ -917,7 +917,7 @@ function Modal({ title, description, onClose, maxWidth, children }: { title: str
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center p-0 sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" className="absolute inset-0 bg-ink-950/30 backdrop-blur-[1px]" onClick={onClose} aria-label="Stäng dialog" />
-      <div className={`relative max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-sand-200 bg-[#FCFBF8] shadow-2xl sm:rounded-3xl ${maxWidth}`}>
+      <div className={`relative max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-sand-200 bg-surface-subtle shadow-2xl sm:rounded-3xl ${maxWidth}`}>
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-sand-200 bg-white/95 px-5 py-5 backdrop-blur sm:px-6">
           <div><h2 className="font-display text-xl font-semibold tracking-[-0.025em] text-ink-950">{title}</h2><p className="mt-1 text-sm leading-6 text-ink-500">{description}</p></div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-600 hover:bg-sand-50 focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Stäng"><X className="h-4 w-4" /></button>
@@ -937,5 +937,5 @@ function Mini({ label, value }: { label: string; value: string }) {
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
-  return <div className="flex items-center justify-between rounded-xl border border-sand-200 bg-[#FCFBF8] px-3.5 py-3"><span className="text-xs text-ink-500">{label}</span><span className="text-sm font-semibold text-ink-900">{value}</span></div>;
+  return <div className="flex items-center justify-between rounded-xl border border-sand-200 bg-surface-subtle px-3.5 py-3"><span className="text-xs text-ink-500">{label}</span><span className="text-sm font-semibold text-ink-900">{value}</span></div>;
 }

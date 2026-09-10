@@ -103,9 +103,9 @@ export default function IntegrationsPage() {
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[380px]">
             <div className="rounded-xl border border-sand-200 bg-white px-3 py-3"><p className="text-xs text-ink-500">Totalt</p><p className="mt-1 text-lg font-semibold text-ink-950">{loading ? "—" : invoiceExportSummary.total}</p></div>
-            <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-3"><p className="text-xs text-amber-700">Aktiva</p><p className="mt-1 text-lg font-semibold text-amber-900">{loading ? "—" : invoiceExportSummary.active}</p></div>
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3"><p className="text-xs text-emerald-700">Skickade</p><p className="mt-1 text-lg font-semibold text-emerald-900">{loading ? "—" : invoiceExportSummary.sent}</p></div>
-            <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-3"><p className="text-xs text-red-700">Fel</p><p className="mt-1 text-lg font-semibold text-red-900">{loading ? "—" : invoiceExportSummary.failed}</p></div>
+            <div className="rounded-xl border border-warning-100 bg-warning-50 px-3 py-3"><p className="text-xs text-warning-700">Aktiva</p><p className="mt-1 text-lg font-semibold text-warning-900">{loading ? "—" : invoiceExportSummary.active}</p></div>
+            <div className="rounded-xl border border-success-100 bg-success-50 px-3 py-3"><p className="text-xs text-success-700">Skickade</p><p className="mt-1 text-lg font-semibold text-success-900">{loading ? "—" : invoiceExportSummary.sent}</p></div>
+            <div className="rounded-xl border border-danger-100 bg-danger-50 px-3 py-3"><p className="text-xs text-danger-700">Fel</p><p className="mt-1 text-lg font-semibold text-danger-900">{loading ? "—" : invoiceExportSummary.failed}</p></div>
           </div>
           <ArrowRight className="hidden h-5 w-5 shrink-0 text-petroleum-700 transition group-hover:translate-x-1 lg:block" />
         </div>

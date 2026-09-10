@@ -51,8 +51,8 @@ function daysUntil(value?: string) {
 }
 
 function statusClass(status?: string, urgent = false) {
-  if (status === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  if (status === "action_required" || urgent) return "border-red-200 bg-red-50 text-red-700";
+  if (status === "completed") return "border-success-200 bg-success-50 text-success-800";
+  if (status === "action_required" || urgent) return "border-danger-200 bg-danger-50 text-danger-700";
   if (status === "booked") return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
   if (status === "cancelled") return "border-sand-200 bg-sand-100 text-ink-500";
   return "border-sand-200 bg-sand-50 text-ink-600";
@@ -295,7 +295,7 @@ export default function InspectionsPage() {
                 const urgent = i.status !== "completed" && days <= 60;
                 const overdue = i.status !== "completed" && days < 0;
                 return (
-                  <article key={i.id} className={`relative p-5 transition hover:bg-sand-50/45 sm:p-6 ${overdue ? "before:absolute before:inset-y-5 before:left-0 before:w-1 before:rounded-r-full before:bg-red-500" : ""}`}>
+                  <article key={i.id} className={`relative p-5 transition hover:bg-sand-50/45 sm:p-6 ${overdue ? "before:absolute before:inset-y-5 before:left-0 before:w-1 before:rounded-r-full before:bg-danger-500" : ""}`}>
                     <div className="flex flex-col justify-between gap-4 sm:flex-row">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -307,7 +307,7 @@ export default function InspectionsPage() {
                       </div>
                       <div className="shrink-0 sm:text-right">
                         <p className="text-sm font-semibold text-ink-900">{i.due_date ? new Date(`${i.due_date}T00:00:00`).toLocaleDateString("sv-SE") : "—"}</p>
-                        <p className={`mt-1 text-xs font-medium ${urgent ? "text-red-700" : "text-ink-500"}`}>{days < 0 ? `${Math.abs(days)} dagar försenad` : days === 0 ? "Förfaller idag" : Number.isFinite(days) ? `${days} dagar kvar` : "Datum saknas"}</p>
+                        <p className={`mt-1 text-xs font-medium ${urgent ? "text-danger-700" : "text-ink-500"}`}>{days < 0 ? `${Math.abs(days)} dagar försenad` : days === 0 ? "Förfaller idag" : Number.isFinite(days) ? `${days} dagar kvar` : "Datum saknas"}</p>
                       </div>
                     </div>
 
@@ -346,7 +346,7 @@ export default function InspectionsPage() {
                     </div>
 
                     {canManage && editingId === i.id ? (
-                      <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-[#FCFBF8] p-4 sm:grid-cols-2">
+                      <div className="mt-4 grid gap-3 rounded-xl border border-sand-200 bg-surface-subtle p-4 sm:grid-cols-2">
                         <input className={premiumFieldClass} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} placeholder="Titel" aria-label="Titel" />
                         <select className={premiumFieldClass} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} aria-label="Kontrolltyp">{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
                         <input className={premiumFieldClass} type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} aria-label="Förfallodatum" />
@@ -373,5 +373,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-sand-200 bg-[#FCFBF8] px-3.5 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-500">{label}</p><p className="mt-1.5 line-clamp-2 text-sm font-semibold text-ink-800">{value}</p></div>;
+  return <div className="rounded-xl border border-sand-200 bg-surface-subtle px-3.5 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-500">{label}</p><p className="mt-1.5 line-clamp-2 text-sm font-semibold text-ink-800">{value}</p></div>;
 }

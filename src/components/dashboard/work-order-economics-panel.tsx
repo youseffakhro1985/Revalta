@@ -385,7 +385,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till tid"}</button>
           </form>
           {times.some((entry) => entry.source === "legacy") ? (
-            <p className="mt-4 text-xs font-medium text-amber-800">Äldre tidrader – kör backfill till WorkOrderTimeEntry innan attestering.</p>
+            <p className="mt-4 text-xs font-medium text-warning-800">Äldre tidrader – kör backfill till WorkOrderTimeEntry innan attestering.</p>
           ) : null}
           <div className="mt-4 space-y-3">
             {times.length === 0 ? (
@@ -406,7 +406,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                   {entry.billable ? " · Debiterbar" : " · Ej debiterbar"}
                 </p>
                 {entry.source === "legacy" ? (
-                  <p className="mt-2 text-[11px] font-medium text-amber-800">Äldre rad – kan inte attesteras innan backfill.</p>
+                  <p className="mt-2 text-[11px] font-medium text-warning-800">Äldre rad – kan inte attesteras innan backfill.</p>
                 ) : null}
                 {entry.status === "running" && entry.source !== "legacy" ? (
                   <div className="mt-3">
@@ -414,7 +414,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                       type="button"
                       disabled={saving}
                       onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "stop", entryId: entry.entryId }, "Timern har stoppats.")}
-                      className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900"
+                      className="rounded-lg border border-warning-200 bg-warning-50 px-3 py-1.5 text-xs font-semibold text-warning-900"
                     >
                       Stoppa timer
                     </button>
@@ -479,7 +479,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till material"}</button>
           </form>
           {materials.some((entry) => entry.source === "legacy") ? (
-            <p className="mt-4 text-xs font-medium text-amber-800">Äldre materialrader – kör backfill till WorkOrderMaterialEntry innan attestering.</p>
+            <p className="mt-4 text-xs font-medium text-warning-800">Äldre materialrader – kör backfill till WorkOrderMaterialEntry innan attestering.</p>
           ) : null}
           <div className="mt-4 space-y-3">
             {materials.length === 0 ? (
@@ -499,7 +499,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                   {entry.billable ? " · Debiterbar" : " · Ej debiterbar"}
                 </p>
                 {entry.source === "legacy" ? (
-                  <p className="mt-2 text-[11px] font-medium text-amber-800">Äldre rad – kan inte attesteras innan backfill.</p>
+                  <p className="mt-2 text-[11px] font-medium text-warning-800">Äldre rad – kan inte attesteras innan backfill.</p>
                 ) : null}
                 {entry.source !== "legacy" && (entry.status === "submitted" || entry.status === "rejected") ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -531,7 +531,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                           if (!window.confirm("Ta bort materialraden?")) return;
                           void post(`/api/work-orders/${workOrderId}/materials`, { action: "delete", entryId: entry.entryId }, "Materialraden har tagits bort.");
                         }}
-                        className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-semibold text-red-700"
+                        className="rounded-lg border border-danger-100 px-3 py-1.5 text-xs font-semibold text-danger-700"
                       >
                         Ta bort
                       </button>
@@ -546,7 +546,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
 
       <Panel title="Lönsamhet" description="Intern kostnad och kundpris för attesterad tid och material.">
         {settings.source === "legacy" ? (
-          <p className="mb-4 text-xs font-medium text-amber-800">Äldre lönsamhetsinställningar – kör backfill innan de kan sparas om.</p>
+          <p className="mb-4 text-xs font-medium text-warning-800">Äldre lönsamhetsinställningar – kör backfill innan de kan sparas om.</p>
         ) : null}
         <form onSubmit={saveProfit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <label className="space-y-2 text-sm">
@@ -583,7 +583,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         ) : (
           <div className="space-y-4">
             {draft.source === "legacy" ? (
-              <p className="text-xs font-medium text-amber-800">Äldre underlag – spara ett nytt utkast (modern tabell) innan export. Kör backfill för att behålla samma version-ID.</p>
+              <p className="text-xs font-medium text-warning-800">Äldre underlag – spara ett nytt utkast (modern tabell) innan export. Kör backfill för att behålla samma version-ID.</p>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <input
@@ -679,7 +679,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
           ) : null}
         </div>
         {draft?.source === "legacy" ? (
-          <p className="mt-3 text-xs font-medium text-amber-800">Äldre fakturaunderlag – spara ett nytt underlag eller kör backfill innan export.</p>
+          <p className="mt-3 text-xs font-medium text-warning-800">Äldre fakturaunderlag – spara ett nytt underlag eller kör backfill innan export.</p>
         ) : null}
         <div className="mt-4 space-y-3">
           {exportJobs.length === 0 ? (
@@ -697,9 +697,9 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 {job.attempt ? ` · Försök ${job.attempt}` : ""}
               </p>
               {job.source === "legacy" ? (
-                <p className="mt-2 text-xs font-medium text-amber-800">Äldre jobb – kör backfill innan omkörning eller avbryt.</p>
+                <p className="mt-2 text-xs font-medium text-warning-800">Äldre jobb – kör backfill innan omkörning eller avbryt.</p>
               ) : null}
-              {job.error ? <p className="mt-2 text-xs text-red-700">{job.error}</p> : null}
+              {job.error ? <p className="mt-2 text-xs text-danger-700">{job.error}</p> : null}
               {canManage && job.source !== "legacy" && (job.status === "failed" || job.status === "queued") ? (
                 <div className="mt-3 flex gap-2">
                   {job.status === "failed" ? (

@@ -78,7 +78,7 @@ export default function WorkOrderReportPage() {
   }, [reportId, router]);
 
   if (loading) return <div className="mx-auto mt-16 h-[760px] max-w-4xl animate-pulse rounded-3xl bg-sand-100" />;
-  if (!report) return <main className="mx-auto max-w-3xl p-8"><p className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-700">{error || "Rapporten hittades inte"}</p></main>;
+  if (!report) return <main className="mx-auto max-w-3xl p-8"><p className="rounded-2xl border border-danger-200 bg-danger-50 p-5 text-danger-700">{error || "Rapporten hittades inte"}</p></main>;
 
   const snapshot = report.snapshot || {};
   const workOrder = snapshot.workOrder;

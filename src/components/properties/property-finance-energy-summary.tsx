@@ -98,5 +98,5 @@ export async function PropertyFinanceEnergySummary({ user, propertyId }: { user:
 }
 
 function FinanceMetric({ label, value, tone = "normal" }: { label: string; value: string; tone?: "normal" | "risk" }) {
-  return <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4"><p className="text-xs font-medium text-ink-500">{label}</p><p className={`mt-2 text-xl font-semibold tracking-tight ${tone === "risk" ? "text-red-700" : "text-ink-950"}`}>{value}</p></div>;
+  return <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4"><p className="text-xs font-medium text-ink-500">{label}</p><p className={`mt-2 text-xl font-semibold tracking-tight ${tone === "risk" ? "text-danger-700" : "text-ink-950"}`}>{value}</p></div>;
 }

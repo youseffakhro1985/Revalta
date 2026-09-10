@@ -82,19 +82,19 @@ export function DemoRequestForm() {
       </div>
 
       {success ? (
-        <div role="status" aria-live="polite" className="mb-6 flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+        <div role="status" aria-live="polite" className="mb-6 flex gap-3 rounded-2xl border border-success-200 bg-success-50 p-4 text-success-900">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <div>
             <p className="text-sm font-semibold">Tack — förfrågan är mottagen.</p>
-            <p className="mt-1 text-xs leading-5 text-emerald-800">Din förfrågan är sparad så att Revalta kan följa upp den.</p>
+            <p className="mt-1 text-xs leading-5 text-success-800">Din förfrågan är sparad så att Revalta kan följa upp den.</p>
           </div>
         </div>
       ) : null}
 
       {error ? (
-        <div role="alert" aria-live="assertive" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <div role="alert" aria-live="assertive" className="mb-6 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
           <p className="font-semibold">{error}</p>
-          {requestId ? <p className="mt-1 text-xs text-red-700">Referens: {requestId}</p> : null}
+          {requestId ? <p className="mt-1 text-xs text-danger-700">Referens: {requestId}</p> : null}
         </div>
       ) : null}
 
