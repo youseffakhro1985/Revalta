@@ -47,8 +47,8 @@ const labels: Record<string, string> = { draft: "Utkast", sent: "Skickad", appro
 const statusClass: Record<string, string> = {
   draft: "border-sand-200 bg-sand-50 text-ink-600",
   sent: "border-blue-100 bg-blue-50 text-blue-800",
-  approved: "border-emerald-100 bg-emerald-50 text-emerald-800",
-  rejected: "border-red-100 bg-red-50 text-red-800",
+  approved: "border-success-100 bg-success-50 text-success-800",
+  rejected: "border-danger-100 bg-danger-50 text-danger-800",
   invoiced: "border-petroleum-100 bg-petroleum-50 text-petroleum-800",
   cancelled: "border-sand-200 bg-sand-100 text-ink-500",
 };
@@ -303,7 +303,7 @@ export default function QuotesPage() {
       <Panel title="Beslutsbevakning" description="Öppna offerter närmast sitt giltighetsdatum." bodyClassName="p-0">
         {decisionWatch.length === 0 ? <EmptyState title="Inga öppna offerter i urvalet" /> : <div className="divide-y divide-sand-100">{decisionWatch.map((quote) => {
           const days = daysUntil(quote.valid_until);
-          return <div key={quote.id} className="flex items-start justify-between gap-4 px-5 py-4"><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-800">{quote.title}</p><p className="mt-1 truncate text-xs text-ink-500">{quote.property_name}{quote.supplier ? ` · ${quote.supplier}` : ""}</p></div><div className="shrink-0 text-right"><p className="text-sm font-semibold text-ink-900">{money.format(Number(quote.total || 0))}</p><p className={`mt-1 text-xs ${days !== null && days <= 7 ? "text-red-700" : "text-ink-500"}`}>{days === null ? "Ingen giltighet" : days < 0 ? `${Math.abs(days)} dagar passerad` : days === 0 ? "Går ut idag" : `${days} dagar kvar`}</p></div></div>;
+          return <div key={quote.id} className="flex items-start justify-between gap-4 px-5 py-4"><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-800">{quote.title}</p><p className="mt-1 truncate text-xs text-ink-500">{quote.property_name}{quote.supplier ? ` · ${quote.supplier}` : ""}</p></div><div className="shrink-0 text-right"><p className="text-sm font-semibold text-ink-900">{money.format(Number(quote.total || 0))}</p><p className={`mt-1 text-xs ${days !== null && days <= 7 ? "text-danger-700" : "text-ink-500"}`}>{days === null ? "Ingen giltighet" : days < 0 ? `${Math.abs(days)} dagar passerad` : days === 0 ? "Går ut idag" : `${days} dagar kvar`}</p></div></div>;
         })}</div>}
       </Panel>
     </section>
@@ -318,8 +318,8 @@ export default function QuotesPage() {
               <div className="flex flex-wrap items-center gap-2"><h3 className="font-display text-lg font-semibold text-ink-900">{quote.title}</h3><span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${statusClass[quote.status || "draft"]}`}>{labels[quote.status || "draft"]}</span></div>
               <p className="mt-1 text-sm text-ink-500">{quote.property_name}{quote.supplier ? ` · ${quote.supplier}` : ""}</p>
               {quote.note ? <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-500">{quote.note}</p> : null}
-              {quote.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan status kan ändras.</p> : null}
-              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-500"><span>Giltig till <strong className={`font-semibold ${days !== null && days <= 7 && (quote.status === "draft" || quote.status === "sent") ? "text-red-700" : "text-ink-700"}`}>{quote.valid_until ? date.format(new Date(`${quote.valid_until}T12:00:00`)) : "Ej satt"}</strong></span>{quote.decision_by ? <span>Senaste beslut <strong className="font-semibold text-ink-700">{quote.decision_by}</strong></span> : null}</div>
+              {quote.source === "legacy" ? <p className="mt-2 text-xs font-medium text-warning-800">Äldre rad – kör backfill innan status kan ändras.</p> : null}
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-500"><span>Giltig till <strong className={`font-semibold ${days !== null && days <= 7 && (quote.status === "draft" || quote.status === "sent") ? "text-danger-700" : "text-ink-700"}`}>{quote.valid_until ? date.format(new Date(`${quote.valid_until}T12:00:00`)) : "Ej satt"}</strong></span>{quote.decision_by ? <span>Senaste beslut <strong className="font-semibold text-ink-700">{quote.decision_by}</strong></span> : null}</div>
             </div>
             <div className="shrink-0 lg:min-w-[260px] lg:text-right"><p className="text-2xl font-semibold tracking-[-0.03em] text-ink-900">{money.format(Number(quote.total || 0))}</p><p className="mt-1 text-xs text-ink-500">{money.format(Number(quote.subtotal || 0))} exkl. moms · moms {quote.vat_rate || 0} %</p>{canManage && canEditFields(quote) ? <button type="button" onClick={() => (editingId === quote.id ? setEditingId("") : startEdit(quote))} className="mt-3 text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950">{editingId === quote.id ? "Stäng redigering" : "Ändra offert"}</button> : null}</div>
           </div>
@@ -329,7 +329,7 @@ export default function QuotesPage() {
           <div className="mt-5 flex flex-wrap gap-2">
             {canManage && quote.source !== "legacy" && !["approved", "invoiced", "cancelled", "rejected"].includes(quote.status || "draft") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "approved")} className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-700 px-3.5 text-xs font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />Godkänn</button> : null}
             {canManage && quote.source !== "legacy" && !["rejected", "invoiced", "cancelled"].includes(quote.status || "draft") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "rejected")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><XCircle className="h-4 w-4" />Avslå</button> : null}
-            {canManage && quote.source !== "legacy" && (quote.status === "draft" || quote.status === "sent") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "cancelled")} className="inline-flex h-10 items-center rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">Makulera</button> : null}
+            {canManage && quote.source !== "legacy" && (quote.status === "draft" || quote.status === "sent") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "cancelled")} className="inline-flex h-10 items-center rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-danger-700 transition hover:bg-danger-50 disabled:opacity-50">Makulera</button> : null}
             {canManage && quote.source !== "legacy" && quote.status === "approved" ? <button type="button" disabled={updatingId === quote.id} onClick={() => void updateStatus(quote, "invoiced", "")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><FileCheck2 className="h-4 w-4" />Fakturerad</button> : null}
             <button type="button" onClick={() => printQuote(quote)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50"><Printer className="h-4 w-4" />Skriv ut / PDF</button>
           </div>

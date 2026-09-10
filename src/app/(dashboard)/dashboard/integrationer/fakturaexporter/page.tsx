@@ -29,11 +29,11 @@ const providerLabels: Record<string, string> = { fortnox: "Fortnox", visma: "Vis
 const dt = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 
 function badge(status: string) {
-  if (status === "sent") return "bg-emerald-50 text-emerald-800";
-  if (status === "failed") return "bg-red-50 text-red-700";
+  if (status === "sent") return "bg-success-50 text-success-800";
+  if (status === "failed") return "bg-danger-50 text-danger-700";
   if (status === "cancelled") return "bg-sand-100 text-ink-600";
   if (status === "processing") return "bg-blue-50 text-blue-800";
-  return "bg-amber-50 text-amber-800";
+  return "bg-warning-50 text-warning-800";
 }
 
 export default function InvoiceExportOperationsPage() {
@@ -109,7 +109,7 @@ export default function InvoiceExportOperationsPage() {
     </header>
 
     {error ? <InlineAlert>{error}</InlineAlert> : null}
-    {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">{message}</div> : null}
+    {message ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-medium text-success-800">{message}</div> : null}
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={CheckCircle2} label="Redo integrationer" value={configured} />
@@ -138,13 +138,13 @@ export default function InvoiceExportOperationsPage() {
                 <h2 className="mt-3 truncate text-base font-semibold text-ink-900">{job.workOrder?.title || "Arbetsorder saknas"}</h2>
                 <p className="mt-1 text-sm text-ink-600">{job.workOrder?.property ? `${job.workOrder.property.name} · ${job.workOrder.property.address}, ${job.workOrder.property.city}` : job.workOrderId}</p>
                 <p className="mt-2 text-xs text-ink-500">Senast uppdaterad {dt.format(new Date(job.updatedAt || job.createdAt))}{job.externalId ? ` · Externt ID ${job.externalId}` : ""}</p>
-                {job.source === "legacy" ? <p className="mt-3 text-xs font-medium text-amber-800">Äldre jobb – kör backfill till WorkOrderInvoiceExportJob innan omkörning eller avbryt.</p> : null}
-                {job.error ? <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{job.error}</p> : null}
+                {job.source === "legacy" ? <p className="mt-3 text-xs font-medium text-warning-800">Äldre jobb – kör backfill till WorkOrderInvoiceExportJob innan omkörning eller avbryt.</p> : null}
+                {job.error ? <p className="mt-3 rounded-xl bg-danger-50 px-3 py-2 text-sm text-danger-700">{job.error}</p> : null}
               </div>
               <div className="flex shrink-0 flex-wrap items-start gap-2">
                 <Link href={`/dashboard/arbetsorder/${job.workOrderId}`} className="inline-flex items-center gap-1.5 rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink-700"><ExternalLink className="h-3.5 w-3.5" />Öppna</Link>
                 {data.canManage && job.source !== "legacy" && job.status === "failed" ? <button onClick={() => void act(job, "retry")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg bg-petroleum-800 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Försök igen</button> : null}
-                {data.canManage && job.source !== "legacy" && ["queued", "processing"].includes(job.status) ? <button onClick={() => void act(job, "cancel")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50"><XCircle className="h-3.5 w-3.5" />Avbryt</button> : null}
+                {data.canManage && job.source !== "legacy" && ["queued", "processing"].includes(job.status) ? <button onClick={() => void act(job, "cancel")} disabled={saving === job.jobId} className="inline-flex items-center gap-1.5 rounded-lg border border-danger-200 px-3 py-2 text-xs font-semibold text-danger-700 disabled:opacity-50"><XCircle className="h-3.5 w-3.5" />Avbryt</button> : null}
               </div>
             </div>
           </article>)}
@@ -152,7 +152,7 @@ export default function InvoiceExportOperationsPage() {
       </Panel>
 
       <Panel title="Integrationsstatus" description="Konfiguration läses säkert från miljövariabler.">
-        <div className="space-y-3">{data?.providers.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-sand-200 p-4"><div><p className="font-semibold text-ink-900">{item.name}</p><p className="mt-1 text-xs text-ink-500">{item.configured ? "Redo för export" : "Konfiguration saknas"}</p></div>{item.configured ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <AlertTriangle className="h-5 w-5 text-amber-600" />}</div>)}</div>
+        <div className="space-y-3">{data?.providers.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-sand-200 p-4"><div><p className="font-semibold text-ink-900">{item.name}</p><p className="mt-1 text-xs text-ink-500">{item.configured ? "Redo för export" : "Konfiguration saknas"}</p></div>{item.configured ? <CheckCircle2 className="h-5 w-5 text-success-600" /> : <AlertTriangle className="h-5 w-5 text-warning-600" />}</div>)}</div>
         <div className="mt-5 rounded-xl bg-sand-50 p-4 text-sm leading-6 text-ink-600">Jobb och historik är tenant-säkra. Hemliga nycklar visas aldrig i gränssnittet eller sparas i integrationshistoriken.</div>
       </Panel>
     </div>

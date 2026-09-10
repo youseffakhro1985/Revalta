@@ -6,7 +6,7 @@ export const premiumTextareaClass = "min-h-24 w-full resize-y rounded-xl border 
 export const premiumPrimaryButtonClass = "inline-flex h-11 items-center justify-center rounded-xl border border-petroleum-800/15 bg-petroleum-700 px-5 text-sm font-semibold text-white shadow-premium-sm transition-[background-color,border-color,box-shadow,opacity,transform] duration-200 ease-in-out hover:bg-petroleum-800 hover:shadow-premium-md active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:translate-y-0";
 export const premiumSecondaryButtonClass = "inline-flex h-11 items-center justify-center rounded-xl border border-sand-200/90 bg-white px-4 text-sm font-semibold text-ink-700 shadow-[0_1px_2px_rgba(17,34,31,0.025)] transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-200 ease-in-out hover:border-sand-300 hover:bg-sand-50/80 hover:shadow-premium-sm active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0";
 export const premiumCompactButtonClass = "inline-flex h-9 items-center justify-center rounded-lg border border-sand-200/90 bg-white px-3 text-xs font-semibold text-ink-700 shadow-[0_1px_2px_rgba(17,34,31,0.02)] transition-[background-color,border-color,color,box-shadow,opacity] duration-200 hover:border-sand-300 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
-export const premiumDangerButtonClass = "inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-700 transition-[background-color,border-color,color,opacity] duration-200 hover:border-red-300 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+export const premiumDangerButtonClass = "inline-flex h-9 items-center justify-center rounded-lg border border-danger-200 bg-white px-3 text-xs font-semibold text-danger-700 transition-[background-color,border-color,color,opacity] duration-200 hover:border-danger-300 hover:bg-danger-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
   return <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
@@ -52,11 +52,11 @@ export function LoadingState({ label = "Hämtar data…", rows = 3 }: { label?: 
 
 export function StatusBadge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "info" | "success" | "warning" | "danger" }) {
   const styles = tone === "success"
-    ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+    ? "border-success-100 bg-success-50 text-success-800"
     : tone === "warning"
-      ? "border-amber-100 bg-amber-50 text-amber-900"
+      ? "border-warning-100 bg-warning-50 text-warning-900"
       : tone === "danger"
-        ? "border-red-100 bg-red-50 text-red-800"
+        ? "border-danger-100 bg-danger-50 text-danger-800"
         : tone === "info"
           ? "border-petroleum-100 bg-petroleum-50 text-petroleum-800"
           : "border-sand-200 bg-sand-50 text-ink-600";
@@ -65,11 +65,11 @@ export function StatusBadge({ children, tone = "neutral" }: { children: ReactNod
 
 export function InlineAlert({ children, tone = "error" }: { children: ReactNode; tone?: "error" | "success" | "info" | "warning" }) {
   const styles = tone === "error"
-    ? "border-red-200 bg-red-50 text-red-800"
+    ? "border-danger-200 bg-danger-50 text-danger-800"
     : tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+      ? "border-success-200 bg-success-50 text-success-800"
       : tone === "warning"
-        ? "border-amber-200 bg-amber-50 text-amber-900"
+        ? "border-warning-200 bg-warning-50 text-warning-900"
         : "border-sand-200 bg-sand-50 text-ink-600";
   return <div role={tone === "error" ? "alert" : "status"} className={`rounded-xl border px-3.5 py-3 text-sm leading-5 ${styles}`}>{children}</div>;
 }

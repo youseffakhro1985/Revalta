@@ -527,8 +527,8 @@ export default function DocumentsPage() {
           <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-500">Tenant-säkert dokumentarkiv med serverfiltrering, paginering, livscykel och spårbar åtkomst.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 text-[11px] font-semibold text-emerald-800">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" /> Live-data
+          <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-success-100 bg-success-50 px-3 text-[11px] font-semibold text-success-800">
+            <span className="h-1.5 w-1.5 rounded-full bg-success-600" /> Live-data
           </span>
           <button type="button" onClick={() => void exportMetadata()} disabled={exporting || data.pagination.total === 0} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[11px] font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-50">
             <Download className="h-4 w-4" /> {exporting ? "Exporterar…" : "Exportera filtrerad CSV"}
@@ -587,7 +587,7 @@ export default function DocumentsPage() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Åtkomst</p>
                 <p className="mt-1 text-sm font-semibold text-petroleum-950">{visibilityLabels[visibility]}</p>
               </div>
-              <label className="block rounded-2xl border border-dashed border-sand-300 bg-[#FCFBF8] p-5 text-center transition hover:border-petroleum-300">
+              <label className="block rounded-2xl border border-dashed border-sand-300 bg-surface-subtle p-5 text-center transition hover:border-petroleum-300">
                 <UploadCloud className="mx-auto h-6 w-6 text-petroleum-700" />
                 <span className="mt-2 block text-sm font-semibold text-ink-800">Välj dokument</span>
                 <span className="mt-1 block text-xs text-ink-500">PDF, JPG, PNG, DOCX eller XLSX · max 2 MB</span>
@@ -604,7 +604,7 @@ export default function DocumentsPage() {
         <Panel title="Digital fastighetspärm" description="Globala dokumentområden och fastighetsfördelning, oberoende av aktuell sida.">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {data.categoryRows.map((row) => (
-              <button key={row.category} type="button" onClick={() => { setCategoryFilter(row.category); setPage(1); }} className={`flex min-h-20 items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition ${categoryFilter === row.category ? "border-petroleum-200 bg-petroleum-50" : "border-sand-200 bg-[#FCFBF8] hover:border-petroleum-200"}`}>
+              <button key={row.category} type="button" onClick={() => { setCategoryFilter(row.category); setPage(1); }} className={`flex min-h-20 items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition ${categoryFilter === row.category ? "border-petroleum-200 bg-petroleum-50" : "border-sand-200 bg-surface-subtle hover:border-petroleum-200"}`}>
                 <span className="grid h-9 w-9 place-items-center rounded-lg bg-white text-petroleum-700 ring-1 ring-sand-200"><FolderOpen className="h-4 w-4" /></span>
                 <span><span className="block text-sm font-semibold text-ink-850">{categoryLabels[row.category] || row.category}</span><span className="text-[11px] text-ink-500">{row.count} dokument</span></span>
               </button>
@@ -614,7 +614,7 @@ export default function DocumentsPage() {
         <Panel title="Fastigheter" description="Flest aktiva dokument i fastighetspärmen.">
           <div className="space-y-2">
             {data.propertyRows.length ? data.propertyRows.map((row) => (
-              <button key={row.id} type="button" onClick={() => { setPropertyFilter(row.id); setPage(1); }} className="flex w-full items-center justify-between rounded-xl border border-sand-200 bg-[#FCFBF8] px-3.5 py-3 text-left hover:border-petroleum-200">
+              <button key={row.id} type="button" onClick={() => { setPropertyFilter(row.id); setPage(1); }} className="flex w-full items-center justify-between rounded-xl border border-sand-200 bg-surface-subtle px-3.5 py-3 text-left hover:border-petroleum-200">
                 <span className="truncate text-sm font-semibold text-ink-800">{row.name}</span><span className="text-xs text-ink-500">{row.count}</span>
               </button>
             )) : <p className="text-sm text-ink-500">Ingen fastighetskopplad dokumentation ännu.</p>}
@@ -661,7 +661,7 @@ export default function DocumentsPage() {
                         {item.property?.name || "Organisationsgemensamt"}{item.unit ? ` · ${item.unit.designation}` : ""}{item.lease ? ` · ${item.lease.leaseNumber}` : ""}
                       </p>
                       <p className="mt-1 text-xs text-ink-400">{item.fileName || "Fil"} · {formatBytes(item.sizeBytes)} · {item.uploadedBy} · {dateFormatter.format(new Date(item.createdAt))}</p>
-                      {item.validUntil ? <p className={`mt-1 text-xs font-medium ${(daysUntil(item.validUntil) ?? 9999) <= 60 ? "text-amber-700" : "text-ink-500"}`}>Giltigt till {item.validUntil}</p> : null}
+                      {item.validUntil ? <p className={`mt-1 text-xs font-medium ${(daysUntil(item.validUntil) ?? 9999) <= 60 ? "text-warning-700" : "text-ink-500"}`}>Giltigt till {item.validUntil}</p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <a href={item.downloadUrl} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 hover:border-petroleum-200"><Download className="h-3.5 w-3.5" /> Ladda ner</a>
@@ -691,7 +691,7 @@ export default function DocumentsPage() {
           <MiniList documents={data.recentDocuments} />
         </Panel>
         <Panel title="Behöver uppmärksamhet" description="Aktiva dokument som går ut inom 60 dagar, inklusive redan passerade datum.">
-          {data.attentionDocuments.length ? <MiniList documents={data.attentionDocuments} warning /> : <div className="flex items-center gap-2 text-sm text-ink-500"><AlertTriangle className="h-4 w-4 text-emerald-600" /> Inga dokument kräver datumåtgärd.</div>}
+          {data.attentionDocuments.length ? <MiniList documents={data.attentionDocuments} warning /> : <div className="flex items-center gap-2 text-sm text-ink-500"><AlertTriangle className="h-4 w-4 text-success-600" /> Inga dokument kräver datumåtgärd.</div>}
         </Panel>
       </section>
     </div>
@@ -710,7 +710,7 @@ function StatCard({ label, value, detail, active, warning, onClick }: { label: s
   return (
     <button type="button" onClick={onClick} className={`rounded-2xl border p-4 text-left shadow-premium-sm transition ${active ? "border-petroleum-200 bg-petroleum-50" : "border-sand-200 bg-white hover:border-petroleum-200"}`}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-500">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${warning ? "text-amber-700" : "text-ink-950"}`}>{value}</p>
+      <p className={`mt-2 text-2xl font-semibold ${warning ? "text-warning-700" : "text-ink-950"}`}>{value}</p>
       <p className="mt-1 text-[11px] text-ink-500">{detail}</p>
     </button>
   );
@@ -730,9 +730,9 @@ function MiniList({ documents, warning = false }: { documents: DocumentItem[]; w
   return (
     <div className="space-y-2">
       {documents.map((item) => (
-        <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-sand-200 bg-[#FCFBF8] px-3.5 py-3">
+        <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-sand-200 bg-surface-subtle px-3.5 py-3">
           <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-800">{item.name}</p><p className="mt-0.5 text-[10px] text-ink-500">{item.property?.name || "Organisationsgemensamt"}{item.validUntil ? ` · ${item.validUntil}` : ""}</p></div>
-          {warning ? <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" /> : <FileText className="h-4 w-4 shrink-0 text-petroleum-700" />}
+          {warning ? <AlertTriangle className="h-4 w-4 shrink-0 text-warning-600" /> : <FileText className="h-4 w-4 shrink-0 text-petroleum-700" />}
         </div>
       ))}
     </div>

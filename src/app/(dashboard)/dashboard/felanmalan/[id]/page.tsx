@@ -441,7 +441,7 @@ export default function TicketDetailPage() {
 
       <aside className="space-y-6">
         <Panel title="Arbetsorder" description="Operativ åtgärd kopplad till ärendet." bodyClassName="p-6">
-          {workOrder ? <div className="space-y-4"><div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-4"><div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-petroleum-700" /><div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">Kopplad arbetsorder</p><p className="mt-1 font-semibold text-ink-950">{workOrder.title}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-petroleum-700">{statusLabels[workOrder.status] || workOrder.status}</span><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-ink-600">{priorityLabels[workOrder.priority] || workOrder.priority}</span></div></div><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />Öppna arbetsorder</Link></div> : <div className="space-y-4"><p className="text-sm leading-6 text-ink-600">Skapa en arbetsorder med ärendets titel, beskrivning, prioritet, fastighet och ansvarig.</p><button type="button" onClick={createWorkOrder} disabled={!canCreateWorkOrder || creatingWorkOrder} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />{creatingWorkOrder ? "Skapar arbetsorder…" : "Skapa arbetsorder"}</button>{!canCreateWorkOrder ? <p className="text-xs font-medium text-amber-700">Fastighet måste väljas innan arbetsorder kan skapas.</p> : null}</div>}
+          {workOrder ? <div className="space-y-4"><div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-4"><div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-petroleum-700" /><div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">Kopplad arbetsorder</p><p className="mt-1 font-semibold text-ink-950">{workOrder.title}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-petroleum-700">{statusLabels[workOrder.status] || workOrder.status}</span><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-ink-600">{priorityLabels[workOrder.priority] || workOrder.priority}</span></div></div><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />Öppna arbetsorder</Link></div> : <div className="space-y-4"><p className="text-sm leading-6 text-ink-600">Skapa en arbetsorder med ärendets titel, beskrivning, prioritet, fastighet och ansvarig.</p><button type="button" onClick={createWorkOrder} disabled={!canCreateWorkOrder || creatingWorkOrder} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />{creatingWorkOrder ? "Skapar arbetsorder…" : "Skapa arbetsorder"}</button>{!canCreateWorkOrder ? <p className="text-xs font-medium text-warning-700">Fastighet måste väljas innan arbetsorder kan skapas.</p> : null}</div>}
         </Panel>
 
         <Panel title="Styr ärendet" description="Status, prioritet och ansvarig." bodyClassName="p-6">
@@ -456,7 +456,7 @@ export default function TicketDetailPage() {
               type="button"
               disabled={deleting}
               onClick={() => void softDeleteTicket()}
-              className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+              className="text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60"
             >
               {deleting ? "Tar bort…" : "Ta bort ärende"}
             </button>
@@ -503,7 +503,7 @@ export default function TicketDetailPage() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{operationTypeLabels[type] || type || "Registrering"}</p>
                       <p className="mt-1 text-sm text-ink-700">{detail}</p>
                       <p className="mt-1 text-[11px] text-ink-500">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p>
-                      {item.source === "legacy" ? <p className="mt-1 text-[11px] font-medium text-amber-800">Äldre registrering – kan inte ändras eller tas bort här. Kontakta support vid behov.</p> : null}
+                      {item.source === "legacy" ? <p className="mt-1 text-[11px] font-medium text-warning-800">Äldre registrering – kan inte ändras eller tas bort här. Kontakta support vid behov.</p> : null}
                     </div>
                     {item.source === "table" ? (
                       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -518,7 +518,7 @@ export default function TicketDetailPage() {
                           type="button"
                           disabled={deletingOperationId === item.id}
                           onClick={() => void removeOperation(item)}
-                          className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+                          className="text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60"
                         >
                           {deletingOperationId === item.id ? "Tar bort…" : "Ta bort"}
                         </button>

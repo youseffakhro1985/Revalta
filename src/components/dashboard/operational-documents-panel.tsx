@@ -161,7 +161,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
                   type="button"
                   disabled={saving}
                   onClick={() => void removeDocument(document.id)}
-                  className="shrink-0 text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60"
+                  className="shrink-0 text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60"
                 >
                   Ta bort
                 </button>

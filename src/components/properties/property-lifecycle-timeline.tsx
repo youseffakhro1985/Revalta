@@ -99,7 +99,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
             const overdue = item.date.getTime() < Date.now();
             return (
               <article key={item.id} className="flex items-start gap-4 p-5 sm:px-6">
-                <div className={`rounded-xl p-2.5 ${overdue ? "bg-amber-50 text-amber-800" : "bg-petroleum-50 text-petroleum-700"}`}><Icon className="h-5 w-5" /></div>
+                <div className={`rounded-xl p-2.5 ${overdue ? "bg-warning-50 text-warning-800" : "bg-petroleum-50 text-petroleum-700"}`}><Icon className="h-5 w-5" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
@@ -107,7 +107,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
                       <p className="mt-1 text-sm text-ink-500">{item.detail}</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm font-semibold ${overdue ? "text-amber-800" : "text-ink-800"}`}>{dateFormatter.format(item.date)}</p>
+                      <p className={`text-sm font-semibold ${overdue ? "text-warning-800" : "text-ink-800"}`}>{dateFormatter.format(item.date)}</p>
                       <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">{overdue ? "Försenad" : config[item.kind].label}</p>
                     </div>
                   </div>

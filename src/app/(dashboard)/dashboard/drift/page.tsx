@@ -58,7 +58,7 @@ function FlagCard({ label, hint, ok }: { label: string; hint: string; ok: boolea
           <p className="font-semibold text-ink-950">{label}</p>
           <p className="mt-1 text-sm text-ink-500">{hint}</p>
         </div>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${ok ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${ok ? "bg-success-50 text-success-800" : "bg-warning-50 text-warning-800"}`}>
           {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
           {ok ? "OK" : "Saknas"}
         </span>
@@ -139,7 +139,7 @@ export default function OperationsPage() {
               {criticalMissing.length > 0 ? `Saknade kritiska secrets: ${criticalMissing.join(", ")}.` : null}
             </InlineAlert>
           ) : (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-900">
+            <div className="rounded-2xl border border-success-200 bg-success-50 px-5 py-4 text-sm font-medium text-success-900">
               Kritiska produktionskrav ser kompletta ut. Schema ready, modern storage och grundläggande secrets är på plats.
             </div>
           )}
@@ -157,14 +157,14 @@ export default function OperationsPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-sand-200 px-4 py-3">
                   <span className="text-ink-500">Schema ready</span>
-                  <strong className={schemaReady ? "text-emerald-700" : "text-amber-800"}>{schemaReady ? "Ja" : "Nej"}</strong>
+                  <strong className={schemaReady ? "text-success-700" : "text-warning-800"}>{schemaReady ? "Ja" : "Nej"}</strong>
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-sand-200 px-4 py-3">
                   <span className="text-ink-500">Modern storage only</span>
-                  <strong className={modernOnly ? "text-emerald-700" : "text-amber-800"}>{modernOnly ? "Ja" : "Nej (dual-read)"}</strong>
+                  <strong className={modernOnly ? "text-success-700" : "text-warning-800"}>{modernOnly ? "Ja" : "Nej (dual-read)"}</strong>
                 </div>
                 {health.schema?.missing?.length ? (
-                  <p className="rounded-xl bg-amber-50 px-4 py-3 text-amber-900">
+                  <p className="rounded-xl bg-warning-50 px-4 py-3 text-warning-900">
                     Saknade schemaobjekt: {health.schema.missing.join(", ")}
                   </p>
                 ) : null}
@@ -175,7 +175,7 @@ export default function OperationsPage() {
             <Panel title="Cron-beredskap" description="Alla sju jobb i vercel.json ska kunna anropas med CRON_SECRET.">
               <div className="mb-4 flex items-center justify-between rounded-xl border border-sand-200 px-4 py-3 text-sm">
                 <span className="text-ink-500">CRON_SECRET</span>
-                <strong className={env.cronSecret ? "text-emerald-700" : "text-amber-800"}>{env.cronSecret ? "Konfigurerad" : "Saknas"}</strong>
+                <strong className={env.cronSecret ? "text-success-700" : "text-warning-800"}>{env.cronSecret ? "Konfigurerad" : "Saknas"}</strong>
               </div>
               <ul className="space-y-2 text-sm text-ink-700">
                 {cronJobs.map((job) => (

@@ -314,7 +314,7 @@ export default function BudgetPage() {
               return <div key={item.id} className="px-6 py-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-800">{item.account}</p><p className="mt-1 truncate text-xs text-ink-500">{item.property_name} · {categories[item.category || "other"]}</p></div>
-                  <p className={`shrink-0 text-sm font-semibold ${variance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{variance > 0 ? "+" : ""}{money.format(variance)}</p>
+                  <p className={`shrink-0 text-sm font-semibold ${variance > 0 ? "text-danger-700" : "text-petroleum-800"}`}>{variance > 0 ? "+" : ""}{money.format(variance)}</p>
                 </div>
               </div>;
             })}
@@ -349,7 +349,7 @@ export default function BudgetPage() {
                   <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{item.account}</h3><span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-600">{categories[item.category || "other"]}</span></div>
                   <p className="mt-1 text-sm text-ink-500">{item.property_name} · {item.year}</p>
                   {item.note ? <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-500">{item.note}</p> : null}
-                  {item.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering eller borttagning.</p> : null}
+                  {item.source === "legacy" ? <p className="mt-2 text-xs font-medium text-warning-800">Äldre rad – kör backfill innan uppdatering eller borttagning.</p> : null}
                   <div className="mt-4 grid grid-cols-3 gap-4 text-xs text-ink-500">
                     <span>Budget<strong className="mt-1 block text-ink-800">{money.format(Number(item.budget || 0))}</strong></span>
                     <span>Prognos<strong className="mt-1 block text-ink-800">{money.format(Number(item.forecast || 0))}</strong></span>
@@ -357,11 +357,11 @@ export default function BudgetPage() {
                   </div>
                 </div>
                 <div className="space-y-2 sm:text-right">
-                  <p className={`text-lg font-semibold ${itemVariance > 0 ? "text-red-700" : "text-petroleum-800"}`}>{itemVariance > 0 ? "+" : ""}{money.format(itemVariance)}</p>
+                  <p className={`text-lg font-semibold ${itemVariance > 0 ? "text-danger-700" : "text-petroleum-800"}`}>{itemVariance > 0 ? "+" : ""}{money.format(itemVariance)}</p>
                   <p className="text-xs text-ink-500">Avvikelse mot budget</p>
                   {canManage && item.source !== "legacy" ? <>
                     <button type="button" onClick={() => (editingId === item.id ? setEditingId("") : startEdit(item))} className="block text-xs font-semibold text-petroleum-800 transition hover:text-petroleum-950 sm:ml-auto">{editingId === item.id ? "Stäng" : "Ändra"}</button>
-                    <button type="button" disabled={removingId === item.id} onClick={() => void removeEntry(item)} className="block text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60 sm:ml-auto">{removingId === item.id ? "Tar bort…" : "Ta bort"}</button>
+                    <button type="button" disabled={removingId === item.id} onClick={() => void removeEntry(item)} className="block text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60 sm:ml-auto">{removingId === item.id ? "Tar bort…" : "Ta bort"}</button>
                   </> : null}
                 </div>
               </div>

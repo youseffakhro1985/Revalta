@@ -89,7 +89,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
                   <div className="flex flex-wrap items-center gap-2">
                     <History className="h-4 w-4 text-petroleum-700" aria-hidden="true" />
                     <h3 className="font-semibold text-ink-900">{plan.name} · version {plan.version}</h3>
-                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${plan.status === "active" ? "bg-emerald-50 text-emerald-800" : plan.status === "archived" ? "bg-sand-100 text-ink-500" : "bg-amber-50 text-amber-800"}`}>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${plan.status === "active" ? "bg-success-50 text-success-800" : plan.status === "archived" ? "bg-sand-100 text-ink-500" : "bg-warning-50 text-warning-800"}`}>
                       {statusLabels[plan.status] || plan.status}
                     </span>
                   </div>

@@ -102,9 +102,9 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 
 function leaseStatusClass(status: string) {
   if (status === "active" || status === "reserved") return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
-  if (status === "notice") return "border-amber-100 bg-amber-50 text-amber-800";
+  if (status === "notice") return "border-warning-100 bg-warning-50 text-warning-800";
   if (status === "ended") return "border-sand-200 bg-sand-50 text-ink-500";
-  if (status === "cancelled") return "border-red-100 bg-red-50 text-red-700";
+  if (status === "cancelled") return "border-danger-100 bg-danger-50 text-danger-700";
   return "border-sand-200 bg-white text-ink-600";
 }
 
@@ -399,8 +399,8 @@ export default function LeasingPage() {
           <div className="max-w-2xl">
             <div className="flex flex-wrap items-center gap-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Uthyrning</p>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Live-data
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success-100 bg-success-50 px-2.5 py-1 text-[10px] font-semibold text-success-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-success-500" /> Live-data
               </span>
             </div>
             <h1 className="mt-2 font-display text-[30px] font-semibold tracking-[-0.04em] text-ink-950 sm:text-[34px]">Uthyrningsöversikt</h1>
@@ -436,7 +436,7 @@ export default function LeasingPage() {
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {success ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success-200 bg-success-50 px-3.5 py-3 text-sm text-success-800">
           <p>{success}</p>
           {undoLeaseId ? <button type="button" disabled={restoringId === undoLeaseId} onClick={() => void restoreLease(undoLeaseId)} className="text-sm font-semibold text-petroleum-800 underline underline-offset-2 transition hover:text-petroleum-950 disabled:opacity-60">{restoringId === undoLeaseId ? "Återställer…" : "Återställ"}</button> : null}
           {undoHolderId ? <button type="button" disabled={restoringId === undoHolderId} onClick={() => void restoreHolder(undoHolderId)} className="text-sm font-semibold text-petroleum-800 underline underline-offset-2 transition hover:text-petroleum-950 disabled:opacity-60">{restoringId === undoHolderId ? "Återställer…" : "Återställ"}</button> : null}
@@ -459,7 +459,7 @@ export default function LeasingPage() {
                   </div>
                   <div className="flex items-center justify-between gap-2 sm:justify-end">
                     <span className="text-xs font-semibold text-ink-700">{property.occupancy.toLocaleString("sv-SE")} %</span>
-                    {property.vacant ? <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">{property.vacant} lediga</span> : null}
+                    {property.vacant ? <span className="rounded-full border border-warning-100 bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700">{property.vacant} lediga</span> : null}
                   </div>
                 </Link>
               ))}
@@ -495,7 +495,7 @@ export default function LeasingPage() {
               </div>
 
               <div className="grid gap-6 xl:grid-cols-3">
-                <fieldset className="space-y-3 rounded-2xl border border-sand-200 bg-[#FCFBF8] p-4 sm:p-5">
+                <fieldset className="space-y-3 rounded-2xl border border-sand-200 bg-surface-subtle p-4 sm:p-5">
                   <legend className="px-1 text-sm font-semibold text-ink-900">Objekt & status</legend>
                   <label><FieldLabel>Fastighet</FieldLabel><select required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value, unitId: "" })}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></label>
                   <label><FieldLabel>Objekt</FieldLabel><select required disabled={!form.propertyId} className={premiumFieldClass} value={form.unitId} onChange={(event) => setForm({ ...form, unitId: event.target.value })}><option value="">Välj objekt</option>{formUnits.map((unit) => { const occupied = currentLeaseByUnit.get(unit.id); return <option key={unit.id} value={unit.id}>{unit.designation}{occupied && occupied.id !== form.id ? ` · ${statusLabels[occupied.status]}` : ""}</option>; })}</select></label>
@@ -503,7 +503,7 @@ export default function LeasingPage() {
                   <label><FieldLabel>Status</FieldLabel><select className={premiumFieldClass} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
                 </fieldset>
 
-                <fieldset className="space-y-3 rounded-2xl border border-sand-200 bg-[#FCFBF8] p-4 sm:p-5">
+                <fieldset className="space-y-3 rounded-2xl border border-sand-200 bg-surface-subtle p-4 sm:p-5">
                   <legend className="px-1 text-sm font-semibold text-ink-900">Hyrespart</legend>
                   <label><FieldLabel>Befintlig hyrespart</FieldLabel><select className={premiumFieldClass} value={form.holderId} onChange={(event) => selectHolder(event.target.value)}><option value="">Skapa ny hyrespart</option>{holders.map((holder) => <option key={holder.id} value={holder.id}>{holder.name}{holder.organization_number ? ` · ${holder.organization_number}` : ""}</option>)}</select></label>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
@@ -514,10 +514,10 @@ export default function LeasingPage() {
                     <label><FieldLabel>E-post</FieldLabel><input type="email" className={premiumFieldClass} value={form.holderEmail} onChange={(event) => setForm({ ...form, holderEmail: event.target.value })} /></label>
                     <label><FieldLabel>Telefon</FieldLabel><input className={premiumFieldClass} value={form.holderPhone} onChange={(event) => setForm({ ...form, holderPhone: event.target.value })} /></label>
                   </div>
-                  {form.holderId ? <button type="button" disabled={deletingHolder} onClick={() => void softDeleteHolder(form.holderId, form.holderName || "hyresparten")} className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{deletingHolder ? "Tar bort…" : "Ta bort hyrespart"}</button> : null}
+                  {form.holderId ? <button type="button" disabled={deletingHolder} onClick={() => void softDeleteHolder(form.holderId, form.holderName || "hyresparten")} className="text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60">{deletingHolder ? "Tar bort…" : "Ta bort hyrespart"}</button> : null}
                 </fieldset>
 
-                <fieldset className="space-y-3 rounded-2xl border border-sand-200 bg-[#FCFBF8] p-4 sm:p-5">
+                <fieldset className="space-y-3 rounded-2xl border border-sand-200 bg-surface-subtle p-4 sm:p-5">
                   <legend className="px-1 text-sm font-semibold text-ink-900">Avtalsvillkor</legend>
                   <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
                     <label><FieldLabel>Startdatum</FieldLabel><input type="date" className={premiumFieldClass} value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></label>
@@ -535,7 +535,7 @@ export default function LeasingPage() {
               </div>
 
               <div className="flex flex-col gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div>{form.id && softDeletableLeaseStatuses.has(form.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease({ id: form.id, lease_number: form.leaseNumber || form.id, status: form.status })} className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort avtal"}</button> : null}</div>
+                <div>{form.id && softDeletableLeaseStatuses.has(form.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease({ id: form.id, lease_number: form.leaseNumber || form.id, status: form.status })} className="text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort avtal"}</button> : null}</div>
                 <div className="flex gap-2">
                   <button type="button" onClick={closeForm} className="h-10 rounded-xl border border-sand-200 bg-white px-4 text-xs font-semibold text-ink-700 transition hover:bg-sand-50">Avbryt</button>
                   <button disabled={saving} className={`${premiumPrimaryButtonClass} h-10 px-5 text-xs`}>{saving ? "Sparar…" : form.id ? "Spara ändringar" : "Skapa avtal"}</button>
@@ -547,7 +547,7 @@ export default function LeasingPage() {
       ) : null}
 
       <Panel title="Bestånd och vakans" description="Sök och arbeta direkt från objektet. Reserverade, aktiva och uppsagda avtal räknas som beläggning." bodyClassName="p-0">
-        <div className="grid gap-3 border-b border-sand-200 bg-[#FCFBF8] p-4 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_190px_170px_auto]">
+        <div className="grid gap-3 border-b border-sand-200 bg-surface-subtle p-4 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_190px_170px_auto]">
           <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input aria-label="Sök objekt eller hyrespart" placeholder="Sök objekt, adress, hyrespart eller avtal" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
           <select aria-label="Filtrera fastighet" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           <select aria-label="Filtrera beläggning" value={occupancyFilter} onChange={(event) => setOccupancyFilter(event.target.value)} className={premiumFieldClass}><option value="all">Alla objekt</option><option value="occupied">Belagda</option><option value="vacant">Lediga</option><option value="notice">Uppsagda</option></select>
@@ -567,7 +567,7 @@ export default function LeasingPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-sm font-semibold text-ink-900">{unit.designation}</h3>
                       <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-[10px] font-semibold text-ink-600">{typeLabels[unit.unit_type] || unit.unit_type}</span>
-                      <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${lease ? leaseStatusClass(lease.status) : "border-emerald-100 bg-emerald-50 text-emerald-700"}`}>{lease ? statusLabels[lease.status] : "Ledigt"}</span>
+                      <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${lease ? leaseStatusClass(lease.status) : "border-success-100 bg-success-50 text-success-700"}`}>{lease ? statusLabels[lease.status] : "Ledigt"}</span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
                       <Link href={`/dashboard/fastigheter/${property.id}`} className="font-medium text-ink-600 transition hover:text-petroleum-800">{property.name}</Link>
@@ -579,7 +579,7 @@ export default function LeasingPage() {
                   </div>
                   <div className="lg:text-right">
                     <p className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">{lease ? `${money.format(lease.monthly_rent)}/mån` : "Ledigt"}</p>
-                    {lease?.notice_date ? <p className="mt-1 text-[11px] font-medium text-amber-700">Uppsagt {dateValue(lease.notice_date)}</p> : null}
+                    {lease?.notice_date ? <p className="mt-1 text-[11px] font-medium text-warning-700">Uppsagt {dateValue(lease.notice_date)}</p> : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     <Link href={`/dashboard/fastigheter/${property.id}`} className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-[11px] font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800">Fastighet <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
@@ -598,7 +598,7 @@ export default function LeasingPage() {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-sand-200 bg-[#FCFBF8] text-[10px] uppercase tracking-[0.08em] text-ink-500">
+                <thead className="border-b border-sand-200 bg-surface-subtle text-[10px] uppercase tracking-[0.08em] text-ink-500">
                   <tr><th className="px-5 py-3 font-semibold">Avtal</th><th className="px-5 py-3 font-semibold">Hyrespart</th><th className="px-5 py-3 font-semibold">Objekt</th><th className="px-5 py-3 font-semibold">Period</th><th className="px-5 py-3 font-semibold">Hyra</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"><span className="sr-only">Åtgärd</span></th></tr>
                 </thead>
                 <tbody className="divide-y divide-sand-100">
@@ -610,7 +610,7 @@ export default function LeasingPage() {
                       <td className="whitespace-nowrap px-5 py-4 text-ink-500">{dateValue(lease.start_date) || "–"} – {dateValue(lease.end_date) || "Löpande"}</td>
                       <td className="whitespace-nowrap px-5 py-4 font-medium text-ink-700">{money.format(lease.monthly_rent)}</td>
                       <td className="px-5 py-4"><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${leaseStatusClass(lease.status)}`}>{statusLabels[lease.status] || lease.status}</span></td>
-                      <td className="px-5 py-4 text-right">{canManage ? <div className="flex items-center justify-end gap-3"><button type="button" onClick={() => editLease(lease)} className="text-xs font-semibold text-petroleum-700 hover:text-petroleum-900">Redigera</button>{softDeletableLeaseStatuses.has(lease.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease(lease)} className="text-xs font-semibold text-red-700 transition hover:text-red-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort"}</button> : null}</div> : null}</td>
+                      <td className="px-5 py-4 text-right">{canManage ? <div className="flex items-center justify-end gap-3"><button type="button" onClick={() => editLease(lease)} className="text-xs font-semibold text-petroleum-700 hover:text-petroleum-900">Redigera</button>{softDeletableLeaseStatuses.has(lease.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease(lease)} className="text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort"}</button> : null}</div> : null}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -638,7 +638,7 @@ function QuickLink({ href, icon: Icon, label, hint }: { href: string; icon: type
 }
 
 function LeasingMetric({ icon: Icon, label, value, hint, tone = "neutral" }: { icon: typeof Building2; label: string; value: string; hint: string; tone?: "neutral" | "petroleum" | "good" | "warning" }) {
-  const iconTone = tone === "good" ? "bg-emerald-50 text-emerald-700" : tone === "warning" ? "bg-amber-50 text-amber-700" : tone === "petroleum" ? "bg-petroleum-50 text-petroleum-800" : "bg-[#F3F2EA] text-petroleum-800";
+  const iconTone = tone === "good" ? "bg-success-50 text-success-700" : tone === "warning" ? "bg-warning-50 text-warning-700" : tone === "petroleum" ? "bg-petroleum-50 text-petroleum-800" : "bg-surface-muted text-petroleum-800";
   return (
     <article className="rounded-2xl border border-sand-200/90 bg-white p-4 shadow-premium-sm sm:p-5">
       <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconTone}`}><Icon className="h-4 w-4" strokeWidth={1.65} /></div>
@@ -650,6 +650,6 @@ function LeasingMetric({ icon: Icon, label, value, hint, tone = "neutral" }: { i
 }
 
 function SignalRow({ label, value, tone }: { label: string; value: number; tone: "good" | "warning" | "neutral" }) {
-  const dot = tone === "good" ? "bg-emerald-500" : tone === "warning" ? "bg-amber-400" : "bg-petroleum-300";
+  const dot = tone === "good" ? "bg-success-500" : tone === "warning" ? "bg-warning-400" : "bg-petroleum-300";
   return <div className="flex items-center justify-between gap-4 border-b border-sand-100 pb-3 last:border-0 last:pb-0"><span className="flex items-center gap-2 text-xs text-ink-600"><span className={`h-1.5 w-1.5 rounded-full ${dot}`} />{label}</span><span className="text-sm font-semibold text-ink-900">{value.toLocaleString("sv-SE")}</span></div>;
 }

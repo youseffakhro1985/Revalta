@@ -76,7 +76,7 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
     <Panel title="Förebyggande underhåll" description="Styr servicecykel, framförhållning och automatisk skapning av planerade arbetsorder.">
       <form onSubmit={submit} className="space-y-5">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
-        {saved ? <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" /> Inställningarna är sparade</div> : null}
+        {saved ? <div className="inline-flex items-center gap-2 rounded-full bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-800"><CheckCircle2 className="h-4 w-4" /> Inställningarna är sparade</div> : null}
 
         <div className="grid gap-4 rounded-2xl border border-sand-200 bg-sand-50 p-4 sm:grid-cols-3">
           <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Senast genomförd service</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings.last_service_completed_at)}</p></div>

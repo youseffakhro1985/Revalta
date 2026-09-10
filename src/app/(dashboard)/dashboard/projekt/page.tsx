@@ -44,8 +44,8 @@ const riskLabels: Record<string, string> = { low: "Låg", medium: "Medel", high:
 const statusTone: Record<string, string> = {
   planned: "border-sand-200 bg-sand-50 text-ink-600",
   active: "border-petroleum-100 bg-petroleum-50 text-petroleum-800",
-  paused: "border-amber-200 bg-amber-50 text-amber-800",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  paused: "border-warning-200 bg-warning-50 text-warning-800",
+  completed: "border-success-200 bg-success-50 text-success-800",
   cancelled: "border-sand-200 bg-sand-100 text-ink-500",
 };
 
@@ -214,7 +214,7 @@ export default function ProjectsPage() {
       </Panel>
 
       <Panel title="Behöver uppmärksamhet" description="Hög risk, budgetavvikelse eller passerat slutdatum." bodyClassName="p-0">
-        {attentionProjects.length === 0 ? <EmptyState title="Inga kritiska signaler på sidan" /> : <div className="divide-y divide-sand-100">{attentionProjects.map((project) => <Link key={project.id} href={`/dashboard/projekt/${project.id}`} className="flex items-start gap-3 px-5 py-4 transition hover:bg-sand-50/70"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-800"><AlertTriangle className="h-4 w-4" /></span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-ink-800">{project.name}</span><span className="mt-1 block truncate text-xs text-ink-500">{project.property_name} · {riskLabels[project.risk]} risk{Number(project.deviation || 0) > 0 ? ` · +${money.format(project.deviation)}` : ""}</span></span></Link>)}</div>}
+        {attentionProjects.length === 0 ? <EmptyState title="Inga kritiska signaler på sidan" /> : <div className="divide-y divide-sand-100">{attentionProjects.map((project) => <Link key={project.id} href={`/dashboard/projekt/${project.id}`} className="flex items-start gap-3 px-5 py-4 transition hover:bg-sand-50/70"><span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning-50 text-warning-800"><AlertTriangle className="h-4 w-4" /></span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-ink-800">{project.name}</span><span className="mt-1 block truncate text-xs text-ink-500">{project.property_name} · {riskLabels[project.risk]} risk{Number(project.deviation || 0) > 0 ? ` · +${money.format(project.deviation)}` : ""}</span></span></Link>)}</div>}
       </Panel>
     </section>
 
@@ -228,7 +228,7 @@ export default function ProjectsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Link href={`/dashboard/projekt/${project.id}`} className="font-display text-lg font-semibold text-ink-900 transition hover:text-petroleum-800 focus:outline-none focus:ring-2 focus:ring-petroleum-200 focus:ring-offset-2">{project.name}</Link>
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${statusTone[project.status] || statusTone.planned}`}>{statusLabels[project.status] || project.status}</span>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${project.risk === "high" ? "bg-red-50 text-red-800" : project.risk === "medium" ? "bg-amber-50 text-amber-800" : "bg-sand-100 text-ink-600"}`}>Risk {riskLabels[project.risk] || project.risk}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${project.risk === "high" ? "bg-danger-50 text-danger-800" : project.risk === "medium" ? "bg-warning-50 text-warning-800" : "bg-sand-100 text-ink-600"}`}>Risk {riskLabels[project.risk] || project.risk}</span>
                 </div>
                 <p className="mt-1 text-sm text-ink-500">{project.property_name}</p>
                 <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-500"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{formatDate(project.start_date)} – {formatDate(project.end_date)}</span><span>Projektledare <strong className="font-semibold text-ink-700">{project.project_manager || "Ej tilldelad"}</strong></span><span>Entreprenör <strong className="font-semibold text-ink-700">{project.contractor || "Ej vald"}</strong></span></div>
@@ -239,7 +239,7 @@ export default function ProjectsPage() {
                 <span>Budget<strong className="mt-1 block text-ink-800">{money.format(Number(project.budget || 0))}</strong></span>
                 <span>Prognos<strong className="mt-1 block text-ink-800">{money.format(Number(project.forecast || 0))}</strong></span>
                 <span>Utfall<strong className="mt-1 block text-ink-800">{money.format(Number(project.actual || 0))}</strong></span>
-                <span>Avvikelse<strong className={`mt-1 block ${Number(project.deviation || 0) > 0 ? "text-red-700" : "text-petroleum-800"}`}>{Number(project.deviation || 0) > 0 ? "+" : ""}{money.format(Number(project.deviation || 0))}</strong></span>
+                <span>Avvikelse<strong className={`mt-1 block ${Number(project.deviation || 0) > 0 ? "text-danger-700" : "text-petroleum-800"}`}>{Number(project.deviation || 0) > 0 ? "+" : ""}{money.format(Number(project.deviation || 0))}</strong></span>
               </div>
             </div>
             <div className="mt-5 flex flex-col gap-3 border-t border-sand-100 pt-4 sm:flex-row sm:items-center sm:justify-between">

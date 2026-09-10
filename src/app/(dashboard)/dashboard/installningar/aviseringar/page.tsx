@@ -153,7 +153,7 @@ export default function ServiceNotificationsPage() {
 
       <div aria-live="polite" aria-atomic="true">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
-        {success ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{success}</div> : null}
+        {success ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800">{success}</div> : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -182,19 +182,19 @@ export default function ServiceNotificationsPage() {
             <div>
               <p className="text-sm font-semibold text-ink-800">Roller som ska få utskick</p>
               <div className="mt-3 space-y-2">{roleOptions.map(([role, label]) => <label key={role} className="flex items-center gap-3 rounded-xl border border-sand-200 px-4 py-3"><input type="checkbox" checked={preferences.roles.includes(role)} onChange={() => toggleRole(role)} className="h-4 w-4 accent-petroleum-700" /><span className="text-sm font-medium text-ink-700">{label}</span></label>)}</div>
-              <p className={`mt-2 text-xs ${preferences.roles.length ? "text-ink-500" : "font-semibold text-red-700"}`}>{preferences.roles.length ? "Minst en roll måste vara vald." : "Välj minst en mottagarroll för att kunna spara."}</p>
+              <p className={`mt-2 text-xs ${preferences.roles.length ? "text-ink-500" : "font-semibold text-danger-700"}`}>{preferences.roles.length ? "Minst en roll måste vara vald." : "Välj minst en mottagarroll för att kunna spara."}</p>
             </div>
 
             <div>
               <label htmlFor="extra-emails" className="block text-sm font-semibold text-ink-800">Extra e-postmottagare</label>
               <textarea id="extra-emails" rows={7} value={extraEmails} onChange={(event) => setExtraEmails(event.target.value)} placeholder="teknik@foretag.se\njour@foretag.se" aria-describedby="extra-emails-help" className="mt-3 w-full rounded-xl border border-sand-200 px-3 py-3 text-sm" />
-              <p id="extra-emails-help" className={`mt-2 text-xs ${emailCount > 20 ? "font-semibold text-red-700" : "text-ink-500"}`}>{emailCount}/20 adresser. Dubbletter tas bort automatiskt.</p>
+              <p id="extra-emails-help" className={`mt-2 text-xs ${emailCount > 20 ? "font-semibold text-danger-700" : "text-ink-500"}`}>{emailCount}/20 adresser. Dubbletter tas bort automatiskt.</p>
             </div>
           </fieldset>
           <div className="mt-6 flex flex-col justify-between gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center">
             <div>
               <p className="text-xs text-ink-500">Senast ändrad: {data?.preferencesUpdatedAt ? dateTime.format(new Date(data.preferencesUpdatedAt)) : "Standardinställningar används"}</p>
-              <p className={`mt-1 text-xs font-semibold ${isDirty ? "text-amber-700" : "text-emerald-700"}`}>{isDirty ? "Du har osparade ändringar" : "Alla ändringar är sparade"}</p>
+              <p className={`mt-1 text-xs font-semibold ${isDirty ? "text-warning-700" : "text-success-700"}`}>{isDirty ? "Du har osparade ändringar" : "Alla ändringar är sparade"}</p>
             </div>
             <button type="submit" disabled={!data?.canManage || saving || !formValid || !isDirty} className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" /> {saving ? "Sparar…" : "Spara inställningar"}</button>
           </div>
@@ -203,7 +203,7 @@ export default function ServiceNotificationsPage() {
 
       <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <Panel title="Driftkonfiguration" description="Säker kontroll av nödvändiga produktionsvariabler.">
-          <div className="space-y-3">{[["CRON_SECRET", data?.configuration.cronSecret, "Skyddar den schemalagda endpointen"], ["EMAIL_PROVIDER_API_KEY", data?.configuration.emailApiKey, "Ansluter Revalta till e-postleverantören"], ["EMAIL_FROM", data?.configuration.emailFrom, "Verifierad avsändaradress"]].map(([label, enabled, description]) => <div key={String(label)} className="flex items-start justify-between gap-4 rounded-xl border border-sand-200 p-4"><div><p className="font-semibold text-ink-900">{String(label)}</p><p className="mt-1 text-sm text-ink-500">{String(description)}</p></div><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${enabled ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{enabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}{enabled ? "Aktiv" : "Saknas"}</span></div>)}</div>
+          <div className="space-y-3">{[["CRON_SECRET", data?.configuration.cronSecret, "Skyddar den schemalagda endpointen"], ["EMAIL_PROVIDER_API_KEY", data?.configuration.emailApiKey, "Ansluter Revalta till e-postleverantören"], ["EMAIL_FROM", data?.configuration.emailFrom, "Verifierad avsändaradress"]].map(([label, enabled, description]) => <div key={String(label)} className="flex items-start justify-between gap-4 rounded-xl border border-sand-200 p-4"><div><p className="font-semibold text-ink-900">{String(label)}</p><p className="mt-1 text-sm text-ink-500">{String(description)}</p></div><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${enabled ? "bg-success-50 text-success-800" : "bg-danger-50 text-danger-700"}`}>{enabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}{enabled ? "Aktiv" : "Saknas"}</span></div>)}</div>
         </Panel>
         <Panel title="Aktiva systemmottagare" description="Användare som matchar valda roller.">
           {loading && !data ? <div className="h-40 animate-pulse rounded-xl bg-sand-100" /> : null}
@@ -215,7 +215,7 @@ export default function ServiceNotificationsPage() {
       <Panel title="Körningshistorik" description="De senaste automatiska och manuella aviseringsförsöken.">
         {loading && !data ? <div className="h-48 animate-pulse rounded-xl bg-sand-100" /> : null}
         {!loading && data?.events.length === 0 ? <EmptyState title="Ingen körningshistorik ännu" description="Automatiska utskick och testutskick loggas här." /> : null}
-        {data?.events.length ? <div className="overflow-x-auto rounded-xl border border-sand-200"><table className="min-w-full divide-y divide-sand-100 text-sm"><thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-5 py-3">Tidpunkt</th><th className="px-5 py-3">Typ</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Mottagare / körning</th></tr></thead><tbody className="divide-y divide-sand-100">{data.events.map((event) => <tr key={event.id}><td className="px-5 py-4 font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</td><td className="px-5 py-4 text-ink-600">{event.type === "component_service_test" ? "Testutskick" : "Daglig sammanställning"}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-emerald-50 text-emerald-800" : event.status === "failed" ? "bg-red-50 text-red-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></td><td className="max-w-md truncate px-5 py-4 text-ink-500">{event.recipient || "–"}</td></tr>)}</tbody></table></div> : null}
+        {data?.events.length ? <div className="overflow-x-auto rounded-xl border border-sand-200"><table className="min-w-full divide-y divide-sand-100 text-sm"><thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-5 py-3">Tidpunkt</th><th className="px-5 py-3">Typ</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Mottagare / körning</th></tr></thead><tbody className="divide-y divide-sand-100">{data.events.map((event) => <tr key={event.id}><td className="px-5 py-4 font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</td><td className="px-5 py-4 text-ink-600">{event.type === "component_service_test" ? "Testutskick" : "Daglig sammanställning"}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-success-50 text-success-800" : event.status === "failed" ? "bg-danger-50 text-danger-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></td><td className="max-w-md truncate px-5 py-4 text-ink-500">{event.recipient || "–"}</td></tr>)}</tbody></table></div> : null}
       </Panel>
     </div>
   );

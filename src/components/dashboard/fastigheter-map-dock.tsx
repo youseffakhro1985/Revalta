@@ -152,7 +152,7 @@ export function FastigheterMapDock() {
                       <select
                         value={selected.id}
                         onChange={(event) => setSelectedId(event.target.value)}
-                        className="h-9 w-full rounded-xl border border-sand-200 bg-[#FCFBF8] px-3 text-[10px] font-semibold text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100"
+                        className="h-9 w-full rounded-xl border border-sand-200 bg-surface-subtle px-3 text-[10px] font-semibold text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100"
                       >
                         {properties.map((property) => (
                           <option key={property.id} value={property.id}>{property.name} · {property.city}</option>

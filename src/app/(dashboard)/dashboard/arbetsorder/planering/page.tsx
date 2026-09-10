@@ -47,9 +47,9 @@ function duration(item: WorkOrder) {
 }
 
 function badge(risk: SlaRisk) {
-  if (risk === "overdue") return "bg-red-50 text-red-700";
-  if (risk === "critical") return "bg-orange-50 text-orange-700";
-  if (risk === "soon") return "bg-amber-50 text-amber-700";
+  if (risk === "overdue") return "bg-danger-50 text-danger-700";
+  if (risk === "critical") return "bg-warning-50 text-warning-700";
+  if (risk === "soon") return "bg-warning-50 text-warning-700";
   if (risk === "not_configured") return "bg-sand-100 text-ink-600";
   return "bg-petroleum-50 text-petroleum-700";
 }
@@ -164,13 +164,13 @@ export default function TechnicianPlanningPage() {
       {loading && !orders.length ? <div className="h-64 animate-pulse rounded-xl bg-sand-50" /> : null}
       {!loading && groups.length === 0 ? <EmptyState title="Inga aktiva arbetsordrar" description="När arbetsordrar skapas eller planeras visas teamets arbetsbelastning här." /> : null}
       <div className="grid gap-5 xl:grid-cols-2">
-        {groups.map((group) => <section key={group.key} className={`overflow-hidden rounded-2xl border bg-white ${group.unassigned ? "border-amber-200" : "border-sand-200"}`}>
+        {groups.map((group) => <section key={group.key} className={`overflow-hidden rounded-2xl border bg-white ${group.unassigned ? "border-warning-200" : "border-sand-200"}`}>
           <header className="flex flex-col gap-3 border-b border-sand-100 p-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="flex items-center gap-2"><h2 className="font-semibold text-ink-950">{group.name}</h2>{group.unassigned ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Behöver fördelas</span> : null}</div>
+              <div className="flex items-center gap-2"><h2 className="font-semibold text-ink-950">{group.name}</h2>{group.unassigned ? <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[11px] font-semibold text-warning-700">Behöver fördelas</span> : null}</div>
               <p className="mt-1 text-sm text-ink-500">{group.email || `${group.orders.length} arbetsordrar utan ansvarig`}</p>
             </div>
-            <div className="flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-sand-50 px-2.5 py-1 text-ink-600">{group.orders.length} aktiva</span>{group.overdue ? <span className="rounded-full bg-red-50 px-2.5 py-1 text-red-700">{group.overdue} passerade</span> : null}{group.critical ? <span className="rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">{group.critical} kritiska</span> : null}</div>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-sand-50 px-2.5 py-1 text-ink-600">{group.orders.length} aktiva</span>{group.overdue ? <span className="rounded-full bg-danger-50 px-2.5 py-1 text-danger-700">{group.overdue} passerade</span> : null}{group.critical ? <span className="rounded-full bg-warning-50 px-2.5 py-1 text-warning-700">{group.critical} kritiska</span> : null}</div>
           </header>
           <div className="divide-y divide-sand-100">
             {group.orders.slice(0, 8).map((order) => (

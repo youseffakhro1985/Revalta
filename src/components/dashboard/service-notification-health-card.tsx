@@ -29,22 +29,22 @@ const healthPresentation = {
   healthy: {
     label: "Stabil drift",
     description: "Serviceaviseringarna körs utan identifierade leveransproblem.",
-    className: "border-emerald-200 bg-emerald-50/70 text-emerald-900",
-    iconClassName: "bg-emerald-100 text-emerald-800",
+    className: "border-success-200 bg-success-50/70 text-success-900",
+    iconClassName: "bg-success-100 text-success-800",
     Icon: CheckCircle2,
   },
   degraded: {
     label: "Nedsatt drift",
     description: "Minst en nylig körning har partiella leveranser eller ett felutfall.",
-    className: "border-amber-200 bg-amber-50/70 text-amber-950",
-    iconClassName: "bg-amber-100 text-amber-800",
+    className: "border-warning-200 bg-warning-50/70 text-warning-950",
+    iconClassName: "bg-warning-100 text-warning-800",
     Icon: AlertTriangle,
   },
   critical: {
     label: "Kräver åtgärd",
     description: "Konfiguration saknas, flera körningar har misslyckats eller en körning har fastnat.",
-    className: "border-red-200 bg-red-50/70 text-red-950",
-    iconClassName: "bg-red-100 text-red-800",
+    className: "border-danger-200 bg-danger-50/70 text-danger-950",
+    iconClassName: "bg-danger-100 text-danger-800",
     Icon: AlertTriangle,
   },
   idle: {
@@ -96,10 +96,10 @@ export function ServiceNotificationHealthCard() {
 
   if (error && !data) {
     return (
-      <section className="rounded-2xl border border-red-200 bg-red-50 p-5" role="alert">
+      <section className="rounded-2xl border border-danger-200 bg-danger-50 p-5" role="alert">
         <div className="flex items-start justify-between gap-4">
-          <div><p className="font-semibold text-red-900">Driftstatus kunde inte hämtas</p><p className="mt-1 text-sm text-red-700">{error}</p></div>
-          <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-800"><RefreshCw className="h-4 w-4" />Försök igen</button>
+          <div><p className="font-semibold text-danger-900">Driftstatus kunde inte hämtas</p><p className="mt-1 text-sm text-danger-700">{error}</p></div>
+          <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-danger-200 bg-white px-3 py-2 text-sm font-semibold text-danger-800"><RefreshCw className="h-4 w-4" />Försök igen</button>
         </div>
       </section>
     );

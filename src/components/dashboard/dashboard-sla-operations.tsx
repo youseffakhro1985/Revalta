@@ -36,9 +36,9 @@ function duration(minutes: number | null) {
 }
 
 function riskStyle(risk: string) {
-  if (risk === "overdue") return "bg-red-50 text-red-700 ring-red-100";
-  if (risk === "critical") return "bg-orange-50 text-orange-700 ring-orange-100";
-  if (risk === "soon") return "bg-amber-50 text-amber-700 ring-amber-100";
+  if (risk === "overdue") return "bg-danger-50 text-danger-700 ring-danger-100";
+  if (risk === "critical") return "bg-warning-50 text-warning-700 ring-warning-100";
+  if (risk === "soon") return "bg-warning-50 text-warning-700 ring-warning-100";
   return "bg-sand-100 text-ink-600 ring-sand-200";
 }
 
@@ -144,7 +144,7 @@ export async function DashboardSlaOperations() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-semibold text-ink-950">SLA och arbetsorderdrift</h2>
-            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${healthy ? "bg-emerald-50 text-emerald-700 ring-emerald-100" : "bg-amber-50 text-amber-700 ring-amber-100"}`}>{healthy ? "Stabilt läge" : "Kräver åtgärd"}</span>
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${healthy ? "bg-success-50 text-success-700 ring-success-100" : "bg-warning-50 text-warning-700 ring-warning-100"}`}>{healthy ? "Stabilt läge" : "Kräver åtgärd"}</span>
           </div>
           <p className="mt-1 text-sm text-ink-500">Serverberäknad riskbild för organisationens aktiva arbetsordrar.</p>
         </div>
@@ -153,9 +153,9 @@ export async function DashboardSlaOperations() {
 
       <div className="grid gap-px bg-sand-200 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "SLA passerad", value: summary.overdue, icon: AlertTriangle, tone: summary.overdue > 0 ? "text-red-700" : "text-ink-400" },
-          { label: "Kritiska inom 4 h", value: summary.critical, icon: Clock3, tone: summary.critical > 0 ? "text-orange-700" : "text-ink-400" },
-          { label: "Inom 24 timmar", value: summary.soon, icon: Clock3, tone: summary.soon > 0 ? "text-amber-700" : "text-ink-400" },
+          { label: "SLA passerad", value: summary.overdue, icon: AlertTriangle, tone: summary.overdue > 0 ? "text-danger-700" : "text-ink-400" },
+          { label: "Kritiska inom 4 h", value: summary.critical, icon: Clock3, tone: summary.critical > 0 ? "text-warning-700" : "text-ink-400" },
+          { label: "Inom 24 timmar", value: summary.soon, icon: Clock3, tone: summary.soon > 0 ? "text-warning-700" : "text-ink-400" },
           { label: "Ej tilldelade", value: summary.unassigned, icon: UserRoundX, tone: summary.unassigned > 0 ? "text-petroleum-700" : "text-ink-400" },
         ].map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="bg-white p-5 sm:p-6">
@@ -173,17 +173,17 @@ export async function DashboardSlaOperations() {
             return (
               <Link key={item.id} href={`/dashboard/arbetsorder/${item.id}`} className="grid gap-3 px-6 py-4 transition hover:bg-sand-50/70 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-7">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-petroleum-700">{item.workOrderNumber || `AO-${item.id.slice(0, 8)}`}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${riskStyle(item.sla.risk)}`}>{item.sla.label}</span>{!item.assigned_to_id ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">Ej tilldelad</span> : null}</div>
+                  <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-[11px] font-semibold text-petroleum-700">{item.workOrderNumber || `AO-${item.id.slice(0, 8)}`}</span><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${riskStyle(item.sla.risk)}`}>{item.sla.label}</span>{!item.assigned_to_id ? <span className="rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-semibold text-danger-700">Ej tilldelad</span> : null}</div>
                   <p className="mt-1 truncate font-semibold text-ink-900">{item.title}</p>
                   <p className="mt-1 text-xs text-ink-500">{item.property?.name || "Ingen fastighet"} · {item.assigned_to?.name || item.assigned_to?.email || "Saknar ansvarig"}</p>
                 </div>
-                <div className="sm:text-right"><p className={`text-sm font-semibold ${item.sla.risk === "overdue" ? "text-red-700" : item.sla.risk === "critical" ? "text-orange-700" : "text-amber-700"}`}>{timeText}</p>{item.sla.dueAt ? <p className="mt-1 text-[11px] text-ink-500">{dateTime.format(new Date(item.sla.dueAt))}</p> : null}</div>
+                <div className="sm:text-right"><p className={`text-sm font-semibold ${item.sla.risk === "overdue" ? "text-danger-700" : item.sla.risk === "critical" ? "text-warning-700" : "text-warning-700"}`}>{timeText}</p>{item.sla.dueAt ? <p className="mt-1 text-[11px] text-ink-500">{dateTime.format(new Date(item.sla.dueAt))}</p> : null}</div>
               </Link>
             );
           })}
         </div>
       ) : (
-        <div className="flex items-center gap-4 px-6 py-8 sm:px-7"><div className="rounded-xl bg-emerald-50 p-3 text-emerald-700"><ShieldCheck className="h-5 w-5" /></div><div><p className="font-semibold text-ink-900">Inga aktiva SLA-risker</p><p className="mt-1 text-sm text-ink-500">Alla aktiva arbetsordrar ligger inom normal SLA eller är hanterade.</p></div></div>
+        <div className="flex items-center gap-4 px-6 py-8 sm:px-7"><div className="rounded-xl bg-success-50 p-3 text-success-700"><ShieldCheck className="h-5 w-5" /></div><div><p className="font-semibold text-ink-900">Inga aktiva SLA-risker</p><p className="mt-1 text-sm text-ink-500">Alla aktiva arbetsordrar ligger inom normal SLA eller är hanterade.</p></div></div>
       )}
     </section>
   );
