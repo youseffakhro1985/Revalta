@@ -6,9 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
-  BadgeCheck,
   BellRing,
-  Building2,
   CreditCard,
   FileClock,
   KeyRound,
@@ -16,19 +14,18 @@ import {
   MailCheck,
   Plug,
   RefreshCw,
-  Settings2,
   ShieldCheck,
   Siren,
   UserRound,
   UsersRound,
-  WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 import {
   InlineAlert,
-  MetricCard,
   Panel,
   premiumFieldClass,
   premiumPrimaryButtonClass,
+  premiumSecondaryButtonClass,
 } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 import {
@@ -89,35 +86,43 @@ function friendlyStatus(value: string | undefined | null) {
   return statusLabels[value.toLowerCase()] || value;
 }
 
+function SummaryItem({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="min-w-0 px-5 py-4 sm:px-6">
+      <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-500">{label}</p>
+      <p className="mt-1.5 truncate text-[15px] font-semibold tracking-[-0.01em] text-ink-900">{value}</p>
+      {hint ? <p className="mt-1 truncate text-xs leading-5 text-ink-500">{hint}</p> : null}
+    </div>
+  );
+}
+
 function SettingsLink({
   href,
   title,
   description,
   icon: Icon,
-  eyebrow,
 }: {
   href: string;
   title: string;
   description: string;
-  icon: typeof Settings2;
-  eyebrow: string;
+  icon: LucideIcon;
 }) {
   return (
     <Link
       href={href}
-      className="group flex min-h-[154px] flex-col justify-between rounded-2xl border border-sand-200/80 bg-white p-5 shadow-premium-sm outline-none transition-[transform,border-color,box-shadow,background-color] hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-premium-md focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2"
+      className="group flex items-start gap-3.5 border-b border-sand-200/70 px-5 py-4 outline-none transition-colors last:border-b-0 hover:bg-sand-50/70 focus-visible:bg-sand-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-petroleum-200 sm:px-6"
     >
-      <div className="flex items-start justify-between gap-4">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-sand-200 bg-sand-50 text-petroleum-700">
-          <Icon className="h-4.5 w-4.5" strokeWidth={1.8} aria-hidden="true" />
-        </span>
-        <ArrowRight className="h-4 w-4 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
-      </div>
-      <div className="mt-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">{eyebrow}</p>
-        <h3 className="mt-1.5 text-[15px] font-semibold text-ink-950">{title}</h3>
-        <p className="mt-1.5 text-sm leading-5 text-ink-500">{description}</p>
-      </div>
+      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sand-200 bg-sand-50 text-petroleum-700">
+        <Icon className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14.5px] font-semibold tracking-[-0.01em] text-ink-900 group-hover:text-petroleum-800">{title}</span>
+        <span className="mt-0.5 block text-[13px] leading-5 text-ink-500">{description}</span>
+      </span>
+      <ArrowRight
+        className="mt-2 h-4 w-4 shrink-0 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-petroleum-700"
+        aria-hidden="true"
+      />
     </Link>
   );
 }
@@ -268,101 +273,92 @@ export default function SettingsPage() {
   }
 
   const settingsLinks = [
-    { href: "/dashboard/installningar/aviseringar", title: "Serviceaviseringar", description: "Styr automatiska servicepåminnelser, mottagare och leveransstatus.", icon: BellRing, eyebrow: "Aviseringar", visible: true },
-    { href: "/dashboard/installningar/mina-aviseringar", title: "Mina aviseringar", description: "Anpassa vilka personliga händelser och uppdateringar du vill få.", icon: UserRound, eyebrow: "Personligt", visible: true },
-    { href: "/dashboard/installningar/eskaleringar", title: "Eskaleringar", description: "Följ operativa eskaleringar och gå vidare till regelhanteringen.", icon: Siren, eyebrow: "Drift", visible: true },
-    { href: "/dashboard/team", title: "Team", description: "Hantera användare och organisationens arbetsgrupp.", icon: UsersRound, eyebrow: "Organisation", visible: canOpenTeam },
-    { href: "/dashboard/behorigheter", title: "Behörigheter", description: "Kontrollera roller och åtkomst till känsliga delar av systemet.", icon: ShieldCheck, eyebrow: "Åtkomst", visible: canManageOrganisation },
-    { href: "/dashboard/integrationer", title: "Integrationer", description: "Hantera systemkopplingar och befintliga integrationsflöden.", icon: Plug, eyebrow: "System", visible: canOpenIntegrations },
-    { href: "/dashboard/audit", title: "Händelselogg", description: "Granska spårbara ändringar och administrativa händelser.", icon: FileClock, eyebrow: "Säkerhet", visible: canOpenAudit },
-    { href: "/dashboard/drift", title: "Driftstatus", description: "Kontrollera teknisk status och operativa systemsignaler.", icon: Activity, eyebrow: "System", visible: canOpenOperationsAdmin },
-    { href: "/dashboard/billing", title: "Abonnemang", description: "Öppna Revaltas befintliga abonnemangs- och betalningshantering.", icon: CreditCard, eyebrow: "Abonnemang", visible: canOpenBilling },
+    { href: "/dashboard/installningar/aviseringar", title: "Serviceaviseringar", description: "Automatiska servicepåminnelser, mottagare och leveransstatus.", icon: BellRing, visible: true },
+    { href: "/dashboard/installningar/mina-aviseringar", title: "Mina aviseringar", description: "Vilka personliga händelser och uppdateringar du vill få.", icon: UserRound, visible: true },
+    { href: "/dashboard/installningar/eskaleringar", title: "Eskaleringar", description: "Operativa eskaleringar och vidare till regelhanteringen.", icon: Siren, visible: true },
+    { href: "/dashboard/team", title: "Team", description: "Användare och organisationens arbetsgrupp.", icon: UsersRound, visible: canOpenTeam },
+    { href: "/dashboard/behorigheter", title: "Behörigheter", description: "Roller och åtkomst till känsliga delar av systemet.", icon: ShieldCheck, visible: canManageOrganisation },
+    { href: "/dashboard/integrationer", title: "Integrationer", description: "Systemkopplingar och befintliga integrationsflöden.", icon: Plug, visible: canOpenIntegrations },
+    { href: "/dashboard/audit", title: "Händelselogg", description: "Spårbara ändringar och administrativa händelser.", icon: FileClock, visible: canOpenAudit },
+    { href: "/dashboard/drift", title: "Driftstatus", description: "Teknisk status och operativa systemsignaler.", icon: Activity, visible: canOpenOperationsAdmin },
+    { href: "/dashboard/billing", title: "Abonnemang", description: "Abonnemangs- och betalningshantering.", icon: CreditCard, visible: canOpenBilling },
   ].filter((item) => item.visible);
 
+  const loadingValue = (value: string | undefined | null) => value || (initialLoading ? "Laddar…" : "–");
+
   return (
-    <div className="mx-auto max-w-7xl animate-fade-in-soft space-y-6">
-      <header className="overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-premium-sm">
-        <div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Administration</p>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-800">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" /> Live-data
-              </span>
-            </div>
-            <h1 className="mt-3 text-[32px] font-semibold leading-tight tracking-[-0.04em] text-ink-950 sm:text-[38px]">Inställningar</h1>
-            <p className="mt-3 max-w-3xl text-[15px] leading-6 text-ink-600">Ett samlat nav för konto, organisation, säkerhet, aviseringar och de administrationsområden din roll har tillgång till.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void loadSettings()}
-            disabled={initialLoading || Boolean(saving)}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 shadow-sm outline-none transition-colors hover:bg-sand-50 focus-visible:ring-2 focus-visible:ring-petroleum-300 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${initialLoading ? "animate-spin" : ""}`} aria-hidden="true" />
-            Uppdatera
-          </button>
+    <div className="mx-auto max-w-7xl animate-fade-in-soft space-y-8">
+      <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-ink-500">Administration</p>
+          <h1 className="mt-2 font-display text-[32px] font-semibold leading-[1.06] tracking-[-0.035em] text-ink-950 sm:text-[36px]">
+            Inställningar
+          </h1>
+          <p className="mt-2.5 max-w-2xl text-[14.5px] leading-6 text-ink-600">
+            Konto, organisation, säkerhet och aviseringar – samt de administrationsområden din roll har tillgång till.
+          </p>
         </div>
-        <div className="grid border-t border-sand-100 sm:grid-cols-3">
-          <div className="px-6 py-4 sm:px-8">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Inloggad som</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{profile?.email || (initialLoading ? "Laddar…" : "–")}</p>
-          </div>
-          <div className="border-t border-sand-100 px-6 py-4 sm:border-l sm:border-t-0 sm:px-8">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Organisation</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{company?.name || (initialLoading ? "Laddar…" : "–")}</p>
-          </div>
-          <div className="border-t border-sand-100 px-6 py-4 sm:border-l sm:border-t-0 sm:px-8">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Åtkomstnivå</p>
-            <p className="mt-1 text-sm font-semibold text-ink-800">{role ? roleLabels[role] || role : initialLoading ? "Laddar…" : "–"}</p>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => void loadSettings()}
+          disabled={initialLoading || Boolean(saving)}
+          className={`${premiumSecondaryButtonClass} w-full gap-2 sm:w-auto`}
+        >
+          <RefreshCw className={`h-4 w-4 ${initialLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+          Uppdatera
+        </button>
       </header>
 
-      <div aria-live="polite" aria-atomic="true" className="space-y-2">
+      <div aria-live="polite" aria-atomic="true" className="space-y-2 empty:hidden">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={BadgeCheck} label="Kontostatus" value={initialLoading ? "–" : friendlyStatus(profile?.status)} hint={profile?.email_verified_at ? "E-post verifierad" : "Verifiering saknas"} />
-        <MetricCard icon={Building2} label="Organisation" value={initialLoading ? "–" : friendlyStatus(company?.status)} hint={company?.org_number || "Organisationsnummer ej angivet"} />
-        <MetricCard icon={WalletCards} label="Abonnemang" value={initialLoading ? "–" : company?.plan ? planLabels[company.plan] || company.plan : "–"} hint={canOpenBilling ? "Du kan hantera abonnemanget" : "Administreras av organisationens admin"} />
-        <MetricCard icon={ShieldCheck} label="Säkerhet" value={profile?.email_verified_at ? "Verifierad" : initialLoading ? "–" : "Kontrollera"} hint="Lösenordsbyte avslutar äldre sessioner" />
-      </section>
-
-      <section>
-        <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">Snabb åtkomst</p>
-            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink-950">Administrationsområden</h2>
-          </div>
-          <p className="text-sm text-ink-500">Visar endast områden som din nuvarande roll får öppna.</p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {settingsLinks.map((item) => <SettingsLink key={item.href} {...item} />)}
-        </div>
+      <section
+        aria-label="Kontosammanfattning"
+        className="grid divide-y divide-sand-200/80 overflow-hidden rounded-2xl border border-sand-200/90 bg-white shadow-premium-sm sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x"
+      >
+        <SummaryItem
+          label="Inloggad som"
+          value={loadingValue(profile?.email)}
+          hint={profile?.email_verified_at ? "E-post verifierad" : initialLoading ? "" : "Verifiering saknas"}
+        />
+        <SummaryItem
+          label="Organisation"
+          value={loadingValue(company?.name)}
+          hint={company?.org_number || "Organisationsnummer ej angivet"}
+        />
+        <SummaryItem
+          label="Åtkomstnivå"
+          value={role ? roleLabels[role] || role : initialLoading ? "Laddar…" : "–"}
+          hint={`Kontostatus: ${initialLoading ? "–" : friendlyStatus(profile?.status)}`}
+        />
+        <SummaryItem
+          label="Abonnemang"
+          value={company?.plan ? planLabels[company.plan] || company.plan : initialLoading ? "Laddar…" : "–"}
+          hint={canOpenBilling ? "Du kan hantera abonnemanget" : "Administreras av organisationens admin"}
+        />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <Panel title="Profil" description="Dina personliga uppgifter i Revalta. E-post och roll styrs av kontot och organisationens behörigheter.">
+        <Panel title="Profil" description="Dina personliga uppgifter. E-post och roll styrs av kontot och organisationens behörigheter.">
           <form onSubmit={saveProfile} className="space-y-5">
             <label className="block space-y-1.5">
-              <span className="text-xs font-semibold text-ink-700">Namn</span>
+              <span className="text-[13px] font-semibold text-ink-700">Namn</span>
               <input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} aria-label="Namn" placeholder="För- och efternamn" />
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">E-post</p>
-                <p className="mt-1 break-all text-sm font-semibold text-ink-800">{profile?.email || "–"}</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-500">E-post</p>
+                <p className="mt-1 break-all text-sm font-semibold text-ink-900">{profile?.email || "–"}</p>
                 <p className={`mt-2 inline-flex items-center gap-1.5 text-xs font-semibold ${profile?.email_verified_at ? "text-emerald-700" : "text-amber-700"}`}>
                   <MailCheck className="h-3.5 w-3.5" aria-hidden="true" /> {profile?.email_verified_at ? "Verifierad" : "Ej verifierad"}
                 </p>
               </div>
               <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Roll</p>
-                <p className="mt-1 text-sm font-semibold text-ink-800">{role ? roleLabels[role] || role : "–"}</p>
-                {canManageOrganisation ? <Link href="/dashboard/behorigheter" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700 hover:text-petroleum-900">Öppna behörigheter <ArrowRight className="h-3 w-3" /></Link> : null}
+                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-500">Roll</p>
+                <p className="mt-1 text-sm font-semibold text-ink-900">{role ? roleLabels[role] || role : "–"}</p>
+                {canManageOrganisation ? <Link href="/dashboard/behorigheter" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700 hover:text-petroleum-900">Öppna behörigheter <ArrowRight className="h-3 w-3" aria-hidden="true" /></Link> : null}
               </div>
             </div>
             <button disabled={initialLoading || Boolean(saving)} className={`${premiumPrimaryButtonClass} w-full sm:w-auto`}>
@@ -375,21 +371,21 @@ export default function SettingsPage() {
           <form onSubmit={saveCompany} className="space-y-5">
             <fieldset disabled={!canManageOrganisation || initialLoading || Boolean(saving)} className="space-y-4 disabled:opacity-60">
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-ink-700">Organisationsnamn</span>
+                <span className="text-[13px] font-semibold text-ink-700">Organisationsnamn</span>
                 <input required maxLength={180} value={companyName} onChange={(event) => setCompanyName(event.target.value)} className={premiumFieldClass} aria-label="Organisationsnamn" />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-xs font-semibold text-ink-700">Organisationsnummer</span>
+                <span className="text-[13px] font-semibold text-ink-700">Organisationsnummer</span>
                 <input maxLength={40} value={orgNumber} onChange={(event) => setOrgNumber(event.target.value)} className={premiumFieldClass} placeholder="556000-0000" aria-label="Organisationsnummer" />
               </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Plan</p>
-                  <p className="mt-1 text-sm font-semibold text-ink-800">{company?.plan ? planLabels[company.plan] || company.plan : "–"}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-500">Plan</p>
+                  <p className="mt-1 text-sm font-semibold text-ink-900">{company?.plan ? planLabels[company.plan] || company.plan : "–"}</p>
                 </div>
                 <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Status</p>
-                  <p className="mt-1 text-sm font-semibold text-ink-800">{friendlyStatus(company?.status)}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-ink-500">Status</p>
+                  <p className="mt-1 text-sm font-semibold text-ink-900">{friendlyStatus(company?.status)}</p>
                 </div>
               </div>
               <button className={`${premiumPrimaryButtonClass} w-full sm:w-auto`}>
@@ -397,25 +393,25 @@ export default function SettingsPage() {
               </button>
             </fieldset>
             {!canManageOrganisation && !initialLoading ? (
-              <p className="rounded-xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">Du kan läsa organisationsuppgifterna men din roll får inte ändra dem.</p>
+              <p className="rounded-xl border border-sand-200 bg-sand-50 p-4 text-[13px] leading-6 text-ink-600">Du kan läsa organisationsuppgifterna men din roll får inte ändra dem.</p>
             ) : null}
           </form>
         </Panel>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
-        <Panel title="Lösenord och sessioner" description="Byt lösenord här. Ett godkänt lösenordsbyte avslutar automatiskt tidigare sessioner enligt befintligt säkerhetsflöde.">
+        <Panel title="Lösenord och sessioner" description="Ett godkänt lösenordsbyte avslutar automatiskt tidigare sessioner enligt befintligt säkerhetsflöde.">
           <form onSubmit={changePassword} className="grid gap-4 lg:grid-cols-3">
             <label className="block space-y-1.5">
-              <span className="text-xs font-semibold text-ink-700">Nuvarande lösenord</span>
+              <span className="text-[13px] font-semibold text-ink-700">Nuvarande lösenord</span>
               <input required autoComplete="current-password" type="password" maxLength={512} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className={premiumFieldClass} aria-label="Nuvarande lösenord" />
             </label>
             <label className="block space-y-1.5">
-              <span className="text-xs font-semibold text-ink-700">Nytt lösenord</span>
+              <span className="text-[13px] font-semibold text-ink-700">Nytt lösenord</span>
               <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className={premiumFieldClass} aria-label="Nytt lösenord" />
             </label>
             <label className="block space-y-1.5">
-              <span className="text-xs font-semibold text-ink-700">Bekräfta nytt lösenord</span>
+              <span className="text-[13px] font-semibold text-ink-700">Bekräfta nytt lösenord</span>
               <input required autoComplete="new-password" type="password" minLength={10} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className={premiumFieldClass} aria-label="Bekräfta nytt lösenord" />
             </label>
             <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4 lg:col-span-2">
@@ -426,7 +422,7 @@ export default function SettingsPage() {
                 <span className={confirmPassword && newPassword === confirmPassword ? "font-semibold text-emerald-700" : "text-ink-500"}>Lösenorden matchar</span>
               </div>
             </div>
-            <button disabled={!passwordReady || Boolean(saving)} className={`${premiumPrimaryButtonClass} w-full lg:w-auto`}>
+            <button disabled={!passwordReady || Boolean(saving)} className={`${premiumPrimaryButtonClass} w-full gap-2 lg:w-auto`}>
               <LockKeyhole className="h-4 w-4" aria-hidden="true" /> {saving === "password" ? "Uppdaterar…" : "Byt lösenord"}
             </button>
           </form>
@@ -435,14 +431,51 @@ export default function SettingsPage() {
         <Panel title="Säkerhetsöversikt" description="Snabb väg till de säkerhetsfunktioner som redan finns för din roll.">
           <div className="space-y-3">
             <div className="flex items-start gap-3 rounded-xl border border-sand-200 p-4">
-              <span className="mt-0.5 rounded-lg bg-emerald-50 p-2 text-emerald-700"><KeyRound className="h-4 w-4" /></span>
-              <div><p className="text-sm font-semibold text-ink-900">Sessionsskydd</p><p className="mt-1 text-xs leading-5 text-ink-500">Lösenordsbyte använder Revaltas befintliga flöde för att avsluta äldre sessioner.</p></div>
+              <span className="mt-0.5 rounded-lg bg-emerald-50 p-2 text-emerald-700"><KeyRound className="h-4 w-4" aria-hidden="true" /></span>
+              <div>
+                <p className="text-sm font-semibold text-ink-900">Sessionsskydd</p>
+                <p className="mt-1 text-xs leading-5 text-ink-500">Lösenordsbyte använder Revaltas befintliga flöde för att avsluta äldre sessioner.</p>
+              </div>
             </div>
-            {canOpenAudit ? <Link href="/dashboard/audit" className="group flex items-center justify-between rounded-xl border border-sand-200 p-4 hover:border-petroleum-200 hover:bg-sand-50"><div className="flex items-center gap-3"><span className="rounded-lg bg-sand-50 p-2 text-petroleum-700"><FileClock className="h-4 w-4" /></span><div><p className="text-sm font-semibold text-ink-900">Händelselogg</p><p className="mt-1 text-xs text-ink-500">Granska spårbara administrativa händelser.</p></div></div><ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-petroleum-700" /></Link> : null}
-            {canOpenOperationsAdmin ? <Link href="/dashboard/arbetsorder/redigeringslas" className="group flex items-center justify-between rounded-xl border border-sand-200 p-4 hover:border-petroleum-200 hover:bg-sand-50"><div className="flex items-center gap-3"><span className="rounded-lg bg-sand-50 p-2 text-petroleum-700"><LockKeyhole className="h-4 w-4" /></span><div><p className="text-sm font-semibold text-ink-900">Redigeringslås</p><p className="mt-1 text-xs text-ink-500">Öppna hanteringen för samtidiga arbetsorderändringar.</p></div></div><ArrowRight className="h-4 w-4 text-ink-300 group-hover:text-petroleum-700" /></Link> : null}
+            {canOpenAudit ? (
+              <Link href="/dashboard/audit" className="group flex items-center justify-between gap-3 rounded-xl border border-sand-200 p-4 outline-none transition-colors hover:border-petroleum-200 hover:bg-sand-50 focus-visible:ring-2 focus-visible:ring-petroleum-200">
+                <span className="flex items-center gap-3">
+                  <span className="rounded-lg bg-sand-50 p-2 text-petroleum-700"><FileClock className="h-4 w-4" aria-hidden="true" /></span>
+                  <span>
+                    <span className="block text-sm font-semibold text-ink-900">Händelselogg</span>
+                    <span className="mt-1 block text-xs text-ink-500">Granska spårbara administrativa händelser.</span>
+                  </span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-ink-300 group-hover:text-petroleum-700" aria-hidden="true" />
+              </Link>
+            ) : null}
+            {canOpenOperationsAdmin ? (
+              <Link href="/dashboard/arbetsorder/redigeringslas" className="group flex items-center justify-between gap-3 rounded-xl border border-sand-200 p-4 outline-none transition-colors hover:border-petroleum-200 hover:bg-sand-50 focus-visible:ring-2 focus-visible:ring-petroleum-200">
+                <span className="flex items-center gap-3">
+                  <span className="rounded-lg bg-sand-50 p-2 text-petroleum-700"><LockKeyhole className="h-4 w-4" aria-hidden="true" /></span>
+                  <span>
+                    <span className="block text-sm font-semibold text-ink-900">Redigeringslås</span>
+                    <span className="mt-1 block text-xs text-ink-500">Öppna hanteringen för samtidiga arbetsorderändringar.</span>
+                  </span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-ink-300 group-hover:text-petroleum-700" aria-hidden="true" />
+              </Link>
+            ) : null}
           </div>
         </Panel>
       </section>
+
+      <Panel
+        title="Administrationsområden"
+        description="Visar endast de områden som din nuvarande roll får öppna."
+        bodyClassName="p-0"
+      >
+        <div className="grid sm:grid-cols-2 xl:grid-cols-3">
+          {settingsLinks.map((item) => (
+            <SettingsLink key={item.href} href={item.href} title={item.title} description={item.description} icon={item.icon} />
+          ))}
+        </div>
+      </Panel>
     </div>
   );
 }

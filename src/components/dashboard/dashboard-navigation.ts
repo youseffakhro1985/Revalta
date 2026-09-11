@@ -62,16 +62,16 @@ export const residentNavigation: DashboardNavItem[] = [
 export const staffPrimaryNavigation: DashboardNavItem[] = [
   { href: "/dashboard", label: "Översikt", icon: CircleGauge },
   { href: "/dashboard/fastigheter", label: "Fastigheter", icon: Building2 },
+  { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
+  { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
 ];
 
 export const staffNavigationSections: DashboardNavSection[] = [
   {
     id: "drift",
-    label: "Drift",
+    label: "Planering & underhåll",
     icon: Wrench,
     items: [
-      { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
-      { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
       { href: "/dashboard/kalender", label: "Kalender", icon: CalendarDays },
       { href: "/dashboard/ronder", label: "Ronder", icon: ClipboardCheck },
       { href: "/dashboard/besiktningar", label: "Besiktningar", icon: ClipboardSignature },
