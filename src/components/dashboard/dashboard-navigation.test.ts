@@ -17,13 +17,18 @@ function itemLabels(role: string, sectionId: string) {
 }
 
 describe("dashboard navigation v2", () => {
-  it("håller de två primära destinationerna stabila", () => {
-    expect(staffPrimaryNavigation.map((item) => item.label)).toEqual(["Översikt", "Fastigheter"]);
+  it("håller de fyra primära destinationerna stabila", () => {
+    expect(staffPrimaryNavigation.map((item) => item.label)).toEqual([
+      "Översikt",
+      "Fastigheter",
+      "Ärenden",
+      "Arbetsordrar",
+    ]);
   });
 
   it("ger owner de fem beslutade modulområdena i rätt ordning", () => {
     expect(sectionLabels("owner")).toEqual([
-      "Drift",
+      "Planering & underhåll",
       "Boende & uthyrning",
       "Ekonomi & analys",
       "Dokument & projekt",
@@ -33,8 +38,6 @@ describe("dashboard navigation v2", () => {
 
   it("håller globala Drift-menyn på modulnivå och lämnar arbetsorderns underflöden i modulen", () => {
     expect(itemLabels("owner", "drift")).toEqual([
-      "Ärenden",
-      "Arbetsordrar",
       "Kalender",
       "Ronder",
       "Besiktningar",
@@ -57,18 +60,16 @@ describe("dashboard navigation v2", () => {
 
   it("bevarar rollstyrningen för technician och kalendern som generell planeringsyta", () => {
     expect(itemLabels("technician", "drift")).toEqual([
-      "Ärenden",
-      "Arbetsordrar",
       "Kalender",
       "Ronder",
       "Besiktningar",
     ]);
-    expect(sectionLabels("technician")).toEqual(["Drift"]);
+    expect(sectionLabels("technician")).toEqual(["Planering & underhåll"]);
   });
 
   it("bevarar leasing- och finansläsning för viewer utan adminverktyg", () => {
     expect(sectionLabels("viewer")).toEqual([
-      "Drift",
+      "Planering & underhåll",
       "Boende & uthyrning",
       "Ekonomi & analys",
       "Dokument & projekt",
@@ -88,8 +89,8 @@ describe("dashboard navigation v2", () => {
 
   it("öppnar rätt modulområde för en aktiv underroute", () => {
     const sections = visibleDashboardSections("owner");
-    expect(activeDashboardSectionId("/dashboard/arbetsorder/operationsoversikt", sections)).toBe("drift");
-    expect(activeDashboardSectionId("/dashboard/arbetsorder/planering", sections)).toBe("drift");
+    expect(activeDashboardSectionId("/dashboard/arbetsorder/operationsoversikt", sections)).toBeNull();
+    expect(activeDashboardSectionId("/dashboard/arbetsorder/planering", sections)).toBeNull();
     expect(activeDashboardSectionId("/dashboard/kalender", sections)).toBe("drift");
     expect(activeDashboardSectionId("/dashboard/hyresavisering", sections)).toBe("boende-uthyrning");
     expect(activeDashboardSectionId("/dashboard/energi", sections)).toBe("ekonomi-analys");
