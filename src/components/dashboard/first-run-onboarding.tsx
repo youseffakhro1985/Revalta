@@ -45,6 +45,7 @@ function StepRow({
         {!step.completed ? (
           <Link
             href={step.href}
+            prefetch={false}
             className="inline-flex h-7 items-center gap-1 rounded-md border border-sand-200 bg-white px-2 text-[10px] font-semibold text-petroleum-800 shadow-premium-sm transition hover:border-petroleum-200 hover:bg-petroleum-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300"
           >
             <span className="hidden sm:inline">{step.actionLabel}</span>

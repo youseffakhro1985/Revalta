@@ -9,5 +9,6 @@ describe("command center links", () => {
     expect(source).toContain("function CommandLink");
     expect(source).toContain("router.push(href)");
     expect(source).toContain('<button type="button"');
+    expect(source).toContain('priority: "high"');
   });
 });

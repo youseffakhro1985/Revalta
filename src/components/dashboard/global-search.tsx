@@ -146,6 +146,7 @@ export function GlobalSearch() {
         const response = await fetch(`/api/search?q=${encodeURIComponent(normalized)}`, {
           signal: controller.signal,
           cache: "no-store",
+          priority: "high",
         });
         if (!active) return;
         const data = await readResponseJson<{ results?: unknown[] }>(response);

@@ -250,7 +250,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
             <CalendarDays className="h-4 w-4 text-petroleum-700" strokeWidth={1.7} aria-hidden="true" />
             Senaste 30 dagar
           </span>
-          <Link href="/dashboard/arbetsorder/ny" className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-[11px] font-semibold text-white shadow-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
+          <Link prefetch={false} href="/dashboard/arbetsorder/ny" className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-[11px] font-semibold text-white shadow-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
             <span className="text-base leading-none">＋</span>Ny arbetsorder
           </Link>
         </div>
@@ -280,14 +280,14 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
             <p className="mt-0.5 text-[10px] leading-4 text-ink-500">{attentionCount ? `${urgentTickets} akuta ärenden och ${overdueWorkOrders} försenade arbetsordrar.` : "Inga akuta ärenden eller försenade arbetsordrar är registrerade just nu."}</p>
           </div>
         </div>
-        {attentionCount ? <div className="flex flex-wrap gap-2 pl-11 sm:pl-0"><Link href="/dashboard/felanmalan" className="text-[10px] font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna ärenden →</Link><Link href="/dashboard/arbetsorder" className="text-[10px] font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna arbetsorder →</Link></div> : null}
+        {attentionCount ? <div className="flex flex-wrap gap-2 pl-11 sm:pl-0"><Link prefetch={false} href="/dashboard/felanmalan" className="text-[10px] font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna ärenden →</Link><Link prefetch={false} href="/dashboard/arbetsorder" className="text-[10px] font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna arbetsorder →</Link></div> : null}
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.58fr)_minmax(310px,0.82fr)]">
         <DashboardPanel
           title="Driftnetto"
           description={`Registrerat ekonomiskt utfall per fastighet, ${year}`}
-          action={<Link href="/dashboard/budget" className="inline-flex items-center gap-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Budget & prognos <ArrowRight className="h-3 w-3" /></Link>}
+          action={<Link prefetch={false} href="/dashboard/budget" className="inline-flex items-center gap-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Budget & prognos <ArrowRight className="h-3 w-3" /></Link>}
         >
           <div className="mb-4 flex flex-wrap gap-2">
             <MiniStat label="Utfall" value={compactMoney.format(actualTotal)} />
@@ -316,7 +316,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
                   <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sand-100"><div className="h-full rounded-full bg-petroleum-600" style={{ width: `${Math.max(0, Math.min(100, segment.percent))}%` }} /></div>
                 </div>
               )) : <p className="text-center text-sm text-ink-500">Segmentdata visas när objekt finns registrerade.</p>}
-              <Link href="/dashboard/uthyrning" className="inline-flex items-center gap-1 pt-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa uthyrning <ArrowRight className="h-3 w-3" /></Link>
+              <Link prefetch={false} href="/dashboard/uthyrning" className="inline-flex items-center gap-1 pt-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa uthyrning <ArrowRight className="h-3 w-3" /></Link>
             </div>
           </div>
         </DashboardPanel>
@@ -326,7 +326,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
         <DashboardPanel
           title="Senaste arbetsorder"
           description="Senast registrerade i organisationen"
-          action={<Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa alla <ArrowRight className="h-3 w-3" /></Link>}
+          action={<Link prefetch={false} href="/dashboard/arbetsorder" className="inline-flex items-center gap-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa alla <ArrowRight className="h-3 w-3" /></Link>}
           bodyClassName="p-0"
         >
           {recentWorkOrders.length ? (
@@ -345,8 +345,8 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
                 <tbody className="divide-y divide-sand-100">
                   {recentWorkOrders.map((workOrder) => (
                     <tr key={workOrder.id} className="group transition hover:bg-sand-50/55">
-                      <td className="px-5 py-3.5 text-[10px] font-medium text-ink-450"><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="hover:text-petroleum-800">{workOrder.work_order_number || "AO"}</Link></td>
-                      <td className="max-w-[240px] px-3 py-3.5"><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="block truncate text-[11px] font-semibold text-ink-800 transition group-hover:text-petroleum-800">{workOrder.title}</Link></td>
+                      <td className="px-5 py-3.5 text-[10px] font-medium text-ink-450"><Link prefetch={false} href={`/dashboard/arbetsorder/${workOrder.id}`} className="hover:text-petroleum-800">{workOrder.work_order_number || "AO"}</Link></td>
+                      <td className="max-w-[240px] px-3 py-3.5"><Link prefetch={false} href={`/dashboard/arbetsorder/${workOrder.id}`} className="block truncate text-[11px] font-semibold text-ink-800 transition group-hover:text-petroleum-800">{workOrder.title}</Link></td>
                       <td className="px-3 py-3.5 text-[10px] text-ink-500">{workOrder.property.name}</td>
                       <td className="px-3 py-3.5"><span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold ${priorityClass(workOrder.priority)}`}>{priorityLabel(workOrder.priority)}</span></td>
                       <td className="px-3 py-3.5"><span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold ${statusClass(workOrder.status)}`}>{statusLabel(workOrder.status)}</span></td>
@@ -361,7 +361,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-petroleum-50 text-petroleum-700"><Wrench className="h-4.5 w-4.5" strokeWidth={1.6} /></div>
               <p className="mt-3 text-[12px] font-semibold text-ink-700">Inga arbetsordrar ännu</p>
               <p className="mt-1 max-w-xs text-[10px] leading-4 text-ink-450">Skapa den första arbetsordern för att börja följa drift och utförande här.</p>
-              <Link href="/dashboard/arbetsorder/ny" className="mt-3 text-[10px] font-semibold text-petroleum-700">Skapa arbetsorder →</Link>
+              <Link prefetch={false} href="/dashboard/arbetsorder/ny" className="mt-3 text-[10px] font-semibold text-petroleum-700">Skapa arbetsorder →</Link>
             </div>
           )}
         </DashboardPanel>
@@ -373,7 +373,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
             <PerformanceRow icon={Gauge} label="Underhåll till nästa år" value={integer.format(maintenanceDue)} href="/dashboard/underhall" tone="neutral" />
             <PerformanceRow icon={CircleDollarSign} label="Budgetutfall" value={budgetTotal ? `${budgetProgress.toLocaleString("sv-SE")} %` : "—"} href="/dashboard/budget" tone={budgetTotal && budgetProgress > 105 ? "warning" : "good"} />
           </div>
-          <Link href="/dashboard/rapporter" className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa hela prestandarapporten <ArrowRight className="h-3 w-3" /></Link>
+          <Link prefetch={false} href="/dashboard/rapporter" className="mt-5 inline-flex items-center gap-1.5 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Visa hela prestandarapporten <ArrowRight className="h-3 w-3" /></Link>
         </DashboardPanel>
       </section>
     </div>
@@ -382,7 +382,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
 
 function QuickLink({ href, label, description, icon: Icon }: { href: string; label: string; description: string; icon: typeof Building2 }) {
   return (
-    <Link href={href} className="group flex items-center gap-3 rounded-xl px-3.5 py-3 transition hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200">
+    <Link prefetch={false} href={href} className="group flex items-center gap-3 rounded-xl px-3.5 py-3 transition hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sand-100 bg-[#F3F2EA] text-petroleum-800 transition group-hover:bg-petroleum-50"><Icon className="h-4 w-4" strokeWidth={1.65} aria-hidden="true" /></span>
       <span className="min-w-0 flex-1"><span className="block text-[10px] font-semibold text-ink-800">{label}</span><span className="mt-0.5 block truncate text-[9px] text-ink-400">{description}</span></span>
       <ArrowRight className="h-3.5 w-3.5 shrink-0 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
@@ -392,7 +392,7 @@ function QuickLink({ href, label, description, icon: Icon }: { href: string; lab
 
 function DashboardMetric({ icon: Icon, label, value, hint, href, tone = "default" }: { icon: typeof Building2; label: string; value: string; hint: string; href: string; tone?: "default" | "warning" }) {
   return (
-    <Link href={href} className="group flex min-h-[160px] flex-col rounded-2xl border border-sand-200/90 bg-[#FFFEFB] p-5 shadow-premium-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-sand-300 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200">
+    <Link prefetch={false} href={href} className="group flex min-h-[160px] flex-col rounded-2xl border border-sand-200/90 bg-[#FFFEFB] p-5 shadow-premium-sm transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-sand-300 hover:shadow-premium-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-200">
       <div className="flex items-start justify-between gap-4">
         <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${tone === "warning" ? "border-amber-100 bg-amber-50 text-amber-700" : "border-sand-100 bg-[#F3F2EA] text-petroleum-800"}`}><Icon className="h-[17px] w-[17px]" strokeWidth={1.65} aria-hidden="true" /></span>
         <ArrowRight className="h-3.5 w-3.5 text-ink-250 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
@@ -465,7 +465,7 @@ function PortfolioLineChart({ points }: { points: Array<{ label: string; value: 
 function PerformanceRow({ icon: Icon, label, value, href, tone }: { icon: typeof AlertTriangle; label: string; value: string; href: string; tone: "good" | "warning" | "neutral" }) {
   const dot = tone === "warning" ? "bg-amber-400" : tone === "good" ? "bg-emerald-500" : "bg-petroleum-300";
   return (
-    <Link href={href} className="group flex items-center gap-3 py-3.5 first:pt-1 last:pb-1">
+    <Link prefetch={false} href={href} className="group flex items-center gap-3 py-3.5 first:pt-1 last:pb-1">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-sand-100 bg-[#F7F5EF] text-petroleum-700"><Icon className="h-3.5 w-3.5" strokeWidth={1.6} aria-hidden="true" /></span>
       <span className="min-w-0 flex flex-1 items-center gap-2"><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" /><span className="truncate text-[10px] font-medium text-ink-600">{label}</span></span>
       <span className="text-[12px] font-semibold text-ink-900 transition group-hover:text-petroleum-800">{value}</span>

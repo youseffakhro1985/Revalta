@@ -57,6 +57,7 @@ function NavigationLink({
   return (
     <Link
       href={item.href}
+      prefetch={false}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={`group flex items-center gap-3 rounded-xl border font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:ring-2 focus-visible:ring-white/55 focus-visible:ring-offset-2 focus-visible:ring-offset-petroleum-900 ${compact ? "min-h-9 px-3 text-[12px]" : "min-h-11 px-3.5 text-[13px]"} ${active ? "border-white/10 bg-white/[0.12] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(4,22,18,0.12)]" : "border-transparent text-white/68 hover:border-white/[0.08] hover:bg-white/[0.07] hover:text-white"}`}
@@ -207,7 +208,7 @@ export function DashboardShell({
 
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] overflow-hidden border-r border-petroleum-900/35 bg-petroleum-900 text-white lg:flex lg:flex-col">
         <div className="relative flex h-[88px] items-center border-b border-white/10 px-7">
-          <Link href={homeHref} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Revalta dashboard">
+          <Link href={homeHref} prefetch={false} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Revalta dashboard">
             <span className="font-display text-[26px] font-semibold tracking-[-0.045em] text-white">REVALTA</span>
             <span className="mt-1 block text-[8px] font-semibold uppercase tracking-[0.22em] text-white/42">Fastighetsförvaltning</span>
           </Link>
@@ -230,7 +231,7 @@ export function DashboardShell({
           <button className="absolute inset-0 bg-ink-950/40 backdrop-blur-[2px]" aria-label="Stäng meny" onClick={() => setMobileOpen(false)} />
           <aside className="relative flex h-full w-[min(88vw,340px)] flex-col overflow-hidden border-r border-petroleum-900/40 bg-petroleum-900 text-white shadow-2xl">
             <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
-              <Link href={homeHref} className="font-display text-xl font-semibold tracking-[-0.04em] text-white">REVALTA</Link>
+              <Link href={homeHref} prefetch={false} className="font-display text-xl font-semibold tracking-[-0.04em] text-white">REVALTA</Link>
               <button type="button" onClick={() => setMobileOpen(false)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-white outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Stäng meny"><X className="h-5 w-5" /></button>
             </div>
             <nav aria-label="Mobil dashboardmeny" className="flex-1 overflow-y-auto px-3 py-5"><NavigationContent pathname={pathname} role={role} onNavigate={() => setMobileOpen(false)} /></nav>
@@ -244,14 +245,14 @@ export function DashboardShell({
           <div className="mx-auto flex h-16 w-full max-w-[1500px] items-center gap-3 px-4 sm:px-7 lg:h-[88px] lg:px-8 xl:px-10">
             <div className="flex items-center gap-3 lg:hidden">
               <button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button>
-              <Link href={homeHref} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-950">REVALTA</Link>
+              <Link href={homeHref} prefetch={false} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-950">REVALTA</Link>
             </div>
             <div className="flex min-w-0 flex-1 justify-end lg:justify-start">{resident ? null : <GlobalSearch />}</div>
             <div className="flex items-center gap-2 sm:gap-2.5">
               {resident ? null : <WorkOrderLockIndicator />}
               {resident ? null : <NotificationMenu />}
               {primaryCreateAction ? (
-                <Link href={primaryCreateAction.href} className="hidden h-11 items-center gap-2 rounded-xl border border-petroleum-900/15 bg-petroleum-950 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2 sm:inline-flex">
+                <Link href={primaryCreateAction.href} prefetch={false} className="hidden h-11 items-center gap-2 rounded-xl border border-petroleum-900/15 bg-petroleum-950 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2 sm:inline-flex">
                   <Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
                   {primaryCreateAction.label}
                 </Link>
