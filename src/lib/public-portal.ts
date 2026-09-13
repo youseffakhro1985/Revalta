@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import db from "@/lib/db";
 
 // Public deployment configuration for www.revalta.se. This identifier is already
@@ -146,7 +147,7 @@ export async function getPublicPortalCompany(propertyId?: string | null) {
 }
 
 export function generatePublicReference() {
-  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const random = randomBytes(4).toString("hex").slice(0, 6).toUpperCase();
   const year = new Date().getFullYear();
   return `RV-${year}-${random}`;
 }
