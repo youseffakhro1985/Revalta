@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import {
+  formatSchemaMissing,
+  formatSchemaMissingItem,
   isMissingSchemaColumnError,
   isMissingTableError,
   schemaCompatibilityBannerMessage,
@@ -55,5 +57,19 @@ describe("schema-readiness", () => {
     expect(schemaMismatchUserMessage()).toMatch(/Database Release/);
     expect(schemaMismatchUserMessage()).toMatch(/migrate deploy/);
     expect(schemaCompatibilityBannerMessage()).toMatch(/kompatibilitetsläge|utan soft-delete/i);
+  });
+
+  it("formats missing columns as table.column and missing tables by name", () => {
+    expect(formatSchemaMissingItem({ table: "Ticket", column: "deleted_at" })).toBe("Ticket.deleted_at");
+    expect(formatSchemaMissingItem({ table: "InspectionChecklistTemplate", column: "*" })).toBe(
+      "InspectionChecklistTemplate",
+    );
+    expect(
+      formatSchemaMissing([
+        { table: "Ticket", column: "deleted_at" },
+        { table: "InspectionChecklistTemplate", column: "*" },
+        "AuditLog.module",
+      ]),
+    ).toBe("Ticket.deleted_at, InspectionChecklistTemplate, AuditLog.module");
   });
 });

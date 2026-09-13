@@ -7,7 +7,7 @@ import { FirstRunOnboarding } from "@/components/dashboard/first-run-onboarding"
 import { dashboardModeForRole } from "@/components/dashboard/dashboard-role";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 import { residentHomePath } from "@/lib/resident-access";
-import { getCachedSchemaReadiness, schemaCompatibilityBannerMessage } from "@/lib/schema-readiness";
+import { getCachedSchemaReadiness, formatSchemaMissing, schemaCompatibilityBannerMessage } from "@/lib/schema-readiness";
 
 export default async function Dashboard() {
   const user = await getCurrentUser();
@@ -26,7 +26,7 @@ export default async function Dashboard() {
           <p className="mt-1 text-sm leading-6">{schemaCompatibilityBannerMessage()}</p>
           {schema.missing.length > 0 ? (
             <p className="mt-2 text-xs text-warning-800/80">
-              Saknas: {schema.missing.map((item) => `${item.table}.${item.column}`).join(", ")}
+              Saknas: {formatSchemaMissing(schema.missing)}
             </p>
           ) : null}
         </div>

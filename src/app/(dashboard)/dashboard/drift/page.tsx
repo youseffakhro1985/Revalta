@@ -4,10 +4,11 @@ import { readResponseJson } from "@/lib/fetch-json";
 import { Activity, AlertTriangle, CheckCircle2, Clock3, Database, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { formatSchemaMissing } from "@/lib/schema-readiness";
 
 type Schema = {
   ready?: boolean;
-  missing?: string[];
+  missing?: unknown[];
   checkedAt?: string;
 };
 
@@ -165,7 +166,7 @@ export default function OperationsPage() {
                 </div>
                 {health.schema?.missing?.length ? (
                   <p className="rounded-xl bg-warning-50 px-4 py-3 text-warning-900">
-                    Saknade schemaobjekt: {health.schema.missing.join(", ")}
+                    Saknade schemaobjekt: {formatSchemaMissing(health.schema.missing)}
                   </p>
                 ) : null}
                 <p className="text-xs text-ink-500">Kontrollerad {new Date(health.checkedAt).toLocaleString("sv-SE")}</p>
