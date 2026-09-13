@@ -104,13 +104,13 @@ async function getCompletionState(
        WHERE d."company_id" = ${companyId}
          AND d."work_order_id" = ${id}
          ${documentGuard}
-         AND d."category" = 'before_photo') AS "before_photos",
+         AND d."category" IN ('before_photo', 'before')) AS "before_photos",
       (SELECT COUNT(*)::integer
        FROM "OperationalDocument" d
        WHERE d."company_id" = ${companyId}
          AND d."work_order_id" = ${id}
          ${documentGuard}
-         AND d."category" = 'after_photo') AS "after_photos"
+         AND d."category" IN ('after_photo', 'after')) AS "after_photos"
   `);
   return rows[0] ?? { required_incomplete: 0, before_photos: 0, after_photos: 0 };
 }
