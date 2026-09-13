@@ -52,9 +52,9 @@ export function EscalationAdminActions({
       </div>
 
       {!canManage ? <div className="flex items-start gap-2 rounded-xl bg-sand-50 p-4 text-sm text-ink-600"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />Endast ägare och administratörer kan köra manuella driftåtgärder.</div> : null}
-      {canManage && !configured ? <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-4 text-sm font-medium text-amber-800"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />Komplettera CRON_SECRET, EMAIL_PROVIDER_API_KEY och EMAIL_FROM innan åtgärderna kan användas.</div> : null}
-      {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800" role="status">{message}</div> : null}
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700" role="alert">{error}</div> : null}
+      {canManage && !configured ? <div className="flex items-start gap-2 rounded-xl bg-warning-50 p-4 text-sm font-medium text-warning-800"><ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />Komplettera CRON_SECRET, EMAIL_PROVIDER_API_KEY och EMAIL_FROM innan åtgärderna kan användas.</div> : null}
+      {message ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800" role="status">{message}</div> : null}
+      {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm font-semibold text-danger-700" role="alert">{error}</div> : null}
     </div>
   );
 }

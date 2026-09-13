@@ -148,7 +148,7 @@ export default function NewWorkOrderPage() {
         <Panel title="Omfattning" description="Välj var arbetet ska utföras och vem som ansvarar för genomförandet.">
           <div className="grid gap-5 md:grid-cols-2">
             <label className="space-y-2 text-sm font-medium text-ink-700">
-              Fastighet <span className="text-red-600">*</span>
+              Fastighet <span className="text-danger-600">*</span>
               <select
                 className={premiumFieldClass}
                 value={form.propertyId}
@@ -209,11 +209,11 @@ export default function NewWorkOrderPage() {
         <Panel title="Arbetsbeskrivning" description="Beskriv uppdraget tydligt så att utföraren kan agera utan kompletterande frågor.">
           <div className="space-y-5">
             <label className="space-y-2 text-sm font-medium text-ink-700">
-              Rubrik <span className="text-red-600">*</span>
+              Rubrik <span className="text-danger-600">*</span>
               <input className={premiumFieldClass} maxLength={180} required value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Exempel: Åtgärda läckande blandare i lägenhet 1203" />
             </label>
             <label className="space-y-2 text-sm font-medium text-ink-700">
-              Beskrivning <span className="text-red-600">*</span>
+              Beskrivning <span className="text-danger-600">*</span>
               <textarea className={premiumTextareaClass} maxLength={10000} required value={form.description} onChange={(event) => updateField("description", event.target.value)} placeholder="Beskriv fel, önskat resultat, åtkomstförutsättningar och annan viktig information." />
             </label>
           </div>

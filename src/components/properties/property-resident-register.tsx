@@ -235,7 +235,7 @@ export function PropertyResidentRegister({ propertyId }: { propertyId: string })
                         {holder.phone ? <span className="inline-flex items-center gap-1.5"><Phone className="h-4 w-4 text-petroleum-600" />{holder.phone}</span> : null}
                       </div>
                     </div>
-                    {canManage ? <div className="flex shrink-0 gap-2"><button type="button" onClick={() => startEdit(holder)} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink-700">Redigera</button><button type="button" onClick={() => void remove(holder)} disabled={busy} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50">Ta bort</button></div> : null}
+                    {canManage ? <div className="flex shrink-0 gap-2"><button type="button" onClick={() => startEdit(holder)} className="rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink-700">Redigera</button><button type="button" onClick={() => void remove(holder)} disabled={busy} className="rounded-lg border border-danger-200 px-3 py-2 text-xs font-semibold text-danger-700 disabled:opacity-50">Ta bort</button></div> : null}
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     {holder.leases.map((lease) => <div key={lease.id} className="rounded-xl border border-sand-100 bg-sand-50/70 px-3 py-2.5 text-sm"><p className="font-semibold text-ink-800">{lease.unit.designation}</p><p className="mt-1 text-xs text-ink-500">Avtal {lease.lease_number} · {lease.status}</p></div>)}

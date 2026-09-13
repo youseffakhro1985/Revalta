@@ -39,14 +39,14 @@ const priorityLabel: Record<string, string> = { low: "Låg", normal: "Normal", h
 const statusLabel: Record<string, string> = { planned: "Planerad", approved: "Godkänd", in_progress: "Pågår", completed: "Slutförd", cancelled: "Avbruten" };
 
 function priorityClass(priority: string) {
-  if (priority === "critical") return "border-red-200 bg-red-50 text-red-700";
-  if (priority === "high") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (priority === "critical") return "border-danger-200 bg-danger-50 text-danger-700";
+  if (priority === "high") return "border-warning-200 bg-warning-50 text-warning-800";
   if (priority === "low") return "border-sand-200 bg-sand-50 text-ink-500";
   return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
 }
 
 function statusClass(status: string) {
-  if (status === "completed") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "completed") return "border-success-200 bg-success-50 text-success-800";
   if (status === "in_progress" || status === "approved") return "border-petroleum-100 bg-petroleum-50 text-petroleum-800";
   if (status === "cancelled") return "border-sand-200 bg-sand-100 text-ink-500";
   return "border-sand-200 bg-sand-50 text-ink-600";
@@ -264,7 +264,7 @@ export default function MaintenancePage() {
                 const yearCost = rows.reduce((sum, item) => sum + Number(item.estimated_cost || 0), 0);
                 return (
                   <section key={plannedYear} aria-labelledby={`maintenance-year-${plannedYear}`}>
-                    <div className="flex items-center justify-between gap-4 bg-[#FCFBF8] px-5 py-4 sm:px-6">
+                    <div className="flex items-center justify-between gap-4 bg-surface-subtle px-5 py-4 sm:px-6">
                       <div>
                         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">Planår</p>
                         <h3 id={`maintenance-year-${plannedYear}`} className="mt-1 font-display text-2xl font-semibold tracking-[-0.03em] text-petroleum-900">{plannedYear}</h3>
@@ -311,7 +311,7 @@ export default function MaintenancePage() {
                           ) : null}
 
                           {permissions.canManage && editingId === item.id && item.source !== "legacy" ? (
-                            <div className="mt-4 space-y-3 rounded-xl border border-sand-200 bg-[#FCFBF8] p-4">
+                            <div className="mt-4 space-y-3 rounded-xl border border-sand-200 bg-surface-subtle p-4">
                               <input className={premiumFieldClass} placeholder="Byggnadsdel" aria-label="Byggnadsdel" value={editForm.component} onChange={(e) => setEditForm({ ...editForm, component: e.target.value })} />
                               <textarea className={premiumTextareaClass} placeholder="Åtgärd" aria-label="Åtgärd" value={editForm.measure} onChange={(e) => setEditForm({ ...editForm, measure: e.target.value })} />
                               <div className="grid grid-cols-2 gap-3"><input className={premiumFieldClass} type="number" placeholder="Planerat år" aria-label="Planerat år" value={editForm.plannedYear} onChange={(e) => setEditForm({ ...editForm, plannedYear: e.target.value })} /><input className={premiumFieldClass} type="number" min="0" placeholder="Intervall, år" aria-label="Intervall, år" value={editForm.intervalYears} onChange={(e) => setEditForm({ ...editForm, intervalYears: e.target.value })} /></div>

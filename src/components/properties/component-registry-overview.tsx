@@ -85,7 +85,7 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold text-ink-900">{text(asset, "name")}</h3>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${warning ? "bg-amber-50 text-amber-800" : "bg-petroleum-50 text-petroleum-800"}`}>{condition ? `Skick ${condition}/5` : "Ej bedömd"}</span>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${warning ? "bg-warning-50 text-warning-800" : "bg-petroleum-50 text-petroleum-800"}`}>{condition ? `Skick ${condition}/5` : "Ej bedömd"}</span>
                     </div>
                     <p className="mt-1 text-xs text-ink-500">{text(asset, "component_class") || labels[text(asset, "category")] || text(asset, "category") || "Komponent"}{text(asset, "building_name") ? ` · ${text(asset, "building_name")}` : ""}{text(asset, "location") ? ` · ${text(asset, "location")}` : ""}</p>
                     <p className="mt-2 text-xs text-ink-500">Senaste händelse {formatDate(asset.last_event_at)} · {number(asset, "event_count")} livscykelhändelser</p>

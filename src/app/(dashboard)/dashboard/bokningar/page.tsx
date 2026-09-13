@@ -239,7 +239,7 @@ export default function BookingsPage() {
                       <h3 className="mt-2 font-semibold text-ink-900">{booking.resident_name || "Bokad resurs"}</h3>
                       <p className="mt-1 text-sm text-ink-500">{booking.property_name || "Fastighet"}{booking.unit ? ` · ${booking.unit}` : ""}</p>
                       {booking.note ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-ink-500">{booking.note}</p> : null}
-                      {booking.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan bokningen kan ändras eller avbokas.</p> : null}
+                      {booking.source === "legacy" ? <p className="mt-2 text-xs font-medium text-warning-800">Äldre rad – kör backfill innan bokningen kan ändras eller avbokas.</p> : null}
                     </div>
                     <div className="rounded-xl bg-sand-50 px-4 py-3"><p className="text-sm font-semibold text-ink-800">{dateTime.format(new Date(booking.start))}</p><p className="mt-1 text-xs text-ink-500">Till {dateTime.format(new Date(booking.end))}</p></div>
                     {canManage && booking.status !== "cancelled" && booking.source !== "legacy" ? <div className="flex flex-wrap gap-2 lg:justify-end"><button type="button" onClick={() => editingId === booking.id ? setEditingId("") : startEdit(booking)} className={premiumCompactButtonClass}>{editingId === booking.id ? "Stäng" : "Ändra"}</button><button type="button" disabled={cancellingId === booking.id} onClick={() => void cancelBooking(booking)} className={premiumDangerButtonClass}>{cancellingId === booking.id ? "Avbokar…" : "Avboka"}</button></div> : null}

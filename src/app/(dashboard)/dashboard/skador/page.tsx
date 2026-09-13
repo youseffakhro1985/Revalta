@@ -264,7 +264,7 @@ export default function InsuranceClaimsPage() {
                     <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{claim.title}</h3><StatusBadge tone={statusTone(claim.status)}>{statusLabel[claim.status || "reported"]}</StatusBadge><StatusBadge>{typeLabel[claim.damage_type || "other"]}</StatusBadge></div>
                     <p className="mt-2 text-sm text-ink-500">{claim.property_name}{claim.location ? ` · ${claim.location}` : ""}{claim.incident_date ? ` · ${date.format(new Date(claim.incident_date))}` : ""}</p>
                     {claim.note ? <p className="mt-2 line-clamp-2 max-w-2xl text-xs leading-5 text-ink-500">{claim.note}</p> : null}
-                    {claim.source === "legacy" ? <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering.</p> : null}
+                    {claim.source === "legacy" ? <p className="mt-2 text-xs font-medium text-warning-800">Äldre rad – kör backfill innan uppdatering.</p> : null}
                   </div>
                   <div className="rounded-xl bg-sand-50 px-4 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">Försäkring</p><p className="mt-1 text-sm font-semibold text-ink-800">{claim.insurer || "Ej angivet"}</p><p className="mt-1 text-xs text-ink-500">{claim.claim_number || "Skadenummer saknas"}</p></div>
                   <div className="rounded-xl bg-sand-50 px-4 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">Ekonomi</p><p className="mt-1 text-sm font-semibold text-ink-800">Netto {money.format(Number(claim.net_cost || 0))}</p><p className="mt-1 text-xs text-ink-500">Bedömt {money.format(Number(claim.estimated_cost || 0))}</p></div>

@@ -188,7 +188,7 @@ export default async function LegalPage({ params }: { params: Promise<{ slug: st
           <h1 className="text-4xl font-semibold tracking-tight text-ink-950">{page.title}</h1>
           <p className="mt-4 text-lg leading-8 text-ink-600">{page.intro}</p>
 
-          <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-warning-200 bg-warning-50 px-5 py-4 text-sm text-warning-950 sm:flex-row sm:items-center sm:justify-between">
             <strong>{page.status}</strong>
             <span>Senast uppdaterad {page.lastUpdated}</span>
           </div>

@@ -75,7 +75,7 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
       <form onSubmit={submit} className="space-y-5">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {linkError ? <InlineAlert>{linkError}</InlineAlert> : null}
-        {success ? <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{success}</div> : null}
+        {success ? <div role="status" className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm font-semibold text-success-800">{success}</div> : null}
 
         {tab === "event" ? (
           <>

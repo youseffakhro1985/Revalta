@@ -196,7 +196,7 @@ export function MaintenancePortfolioPanel() {
             <article key={property.id} className="grid gap-4 p-5 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center sm:px-6">
               <div><Link href={`/dashboard/fastigheter/${property.id}`} className="font-semibold text-ink-900 hover:text-petroleum-700">{property.name}</Link><p className="mt-1 text-xs text-ink-500">{property.actions.size} planerade åtgärder</p></div>
               <div className="sm:text-right"><p className="text-xs text-ink-500">Investeringsbehov</p><p className="mt-1 font-semibold text-ink-900">{money.format(property.total)}</p></div>
-              <div className="sm:text-right"><p className="text-xs text-ink-500">Underhållsskuld</p><p className={`mt-1 font-semibold ${property.debt > 0 ? "text-amber-800" : "text-ink-900"}`}>{money.format(property.debt)}</p></div>
+              <div className="sm:text-right"><p className="text-xs text-ink-500">Underhållsskuld</p><p className={`mt-1 font-semibold ${property.debt > 0 ? "text-warning-800" : "text-ink-900"}`}>{money.format(property.debt)}</p></div>
               <div className="sm:text-right"><p className="text-xs text-ink-500">Högriskposter</p><p className="mt-1 font-semibold text-ink-900">{property.critical}</p></div>
             </article>
           ))}
@@ -211,5 +211,5 @@ function FilterField({ label, value, onChange, children }: { label: string; valu
 }
 
 function SummaryRow({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
-  return <div className="flex items-center justify-between gap-4 border-b border-sand-100 pb-4 last:border-0 last:pb-0"><span className="text-sm text-ink-500">{label}</span><span className={`text-sm font-semibold ${emphasis ? "text-amber-800" : "text-ink-900"}`}>{value}</span></div>;
+  return <div className="flex items-center justify-between gap-4 border-b border-sand-100 pb-4 last:border-0 last:pb-0"><span className="text-sm text-ink-500">{label}</span><span className={`text-sm font-semibold ${emphasis ? "text-warning-800" : "text-ink-900"}`}>{value}</span></div>;
 }

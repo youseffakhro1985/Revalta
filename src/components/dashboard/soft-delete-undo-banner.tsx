@@ -61,7 +61,7 @@ function SoftDeleteUndoBannerInner({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-success-200 bg-success-50 px-3 py-2.5 text-sm text-success-800">
         <p>{entityLabel} har tagits bort och kan återställas.</p>
         <div className="flex items-center gap-3">
           <button
@@ -85,7 +85,7 @@ function SoftDeleteUndoBannerInner({
           </button>
         </div>
       </div>
-      {error ? <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">{error}</p> : null}
+      {error ? <p className="rounded-xl border border-danger-200 bg-danger-50 px-3 py-2.5 text-sm text-danger-800">{error}</p> : null}
     </div>
   );
 }

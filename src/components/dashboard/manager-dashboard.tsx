@@ -114,7 +114,7 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
         <Panel title="Otilldelade ärenden" description="Äldsta och viktigaste ärenden som fortfarande saknar ansvarig." bodyClassName="p-0">
           {ticketQueue.length ? <div className="divide-y divide-sand-100">{ticketQueue.map((ticket) => (
             <Link key={ticket.id} href={`/dashboard/felanmalan/${ticket.id}`} className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-sand-50/70">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold text-ink-900">{ticket.title}</p>{ticket.priority === "urgent" ? <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">Akut</span> : null}</div><p className="mt-1 text-xs text-ink-500">{ticket.public_reference || "Ärende"} · {ticket.property?.name || "Ingen fastighet"}</p></div>
+              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold text-ink-900">{ticket.title}</p>{ticket.priority === "urgent" ? <span className="rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-semibold text-danger-700">Akut</span> : null}</div><p className="mt-1 text-xs text-ink-500">{ticket.public_reference || "Ärende"} · {ticket.property?.name || "Ingen fastighet"}</p></div>
               <AlertTriangle className="h-4 w-4 shrink-0 text-ink-300" aria-hidden="true" />
             </Link>
           ))}</div> : <p className="p-8 text-center text-sm text-ink-500">Inga otilldelade ärenden.</p>}

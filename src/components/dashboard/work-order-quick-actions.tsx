@@ -132,7 +132,7 @@ export function WorkOrderQuickActions({
         </label>
       ) : null}
       {busy ? <p className="text-[11px] text-ink-500">Sparar…</p> : null}
-      {error ? <p className="text-[11px] font-medium text-red-700">{error}</p> : null}
+      {error ? <p className="text-[11px] font-medium text-danger-700">{error}</p> : null}
     </div>
   );
 }

@@ -139,8 +139,8 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
             <p className="mt-2 text-sm text-ink-500">{data.property.name}{text(component, "building_name") ? ` · ${text(component, "building_name")}` : ""}{text(component, "location") ? ` · ${text(component, "location")}` : ""}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {saved ? <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800"><Check className="h-3.5 w-3.5" /> Sparad</span> : null}
-            <span className={`w-fit rounded-full px-3 py-1.5 text-xs font-semibold ${warning ? "bg-amber-50 text-amber-800" : "bg-petroleum-50 text-petroleum-800"}`}>{condition ? `Skick ${condition}/5` : "Skick ej bedömt"}</span>
+            {saved ? <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-800"><Check className="h-3.5 w-3.5" /> Sparad</span> : null}
+            <span className={`w-fit rounded-full px-3 py-1.5 text-xs font-semibold ${warning ? "bg-warning-50 text-warning-800" : "bg-petroleum-50 text-petroleum-800"}`}>{condition ? `Skick ${condition}/5` : "Skick ej bedömt"}</span>
             {!editing ? <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-800 shadow-sm transition hover:border-petroleum-200 hover:text-petroleum-800"><Pencil className="h-4 w-4" /> Redigera</button> : null}
           </div>
         </div>

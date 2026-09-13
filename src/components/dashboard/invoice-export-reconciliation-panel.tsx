@@ -130,18 +130,18 @@ export function InvoiceExportReconciliationPanel({ workOrderId }: Props) {
           {jobs.map((job) => {
             const draft = drafts[job.jobId] || { note: "", externalId: "" };
             const saving = savingJobId === job.jobId;
-            return <article key={job.jobId} className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+            return <article key={job.jobId} className="rounded-2xl border border-warning-200 bg-warning-50/60 p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2 text-amber-900">
+                  <div className="flex items-center gap-2 text-warning-900">
                     <AlertTriangle className="h-5 w-5" aria-hidden="true" />
                     <h3 className="font-semibold">Avstämning krävs · {providerLabels[job.provider] || job.provider}</h3>
                   </div>
-                  <p className="mt-1 text-sm text-amber-900/80">
+                  <p className="mt-1 text-sm text-warning-900/80">
                     Jobb {job.jobId}{job.attempt ? ` · försök ${job.attempt}` : ""}{job.processingStartedAt ? ` · startad ${dateTime.format(new Date(job.processingStartedAt))}` : ""}
                   </p>
                 </div>
-                <span className="rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-900">Bearbetas · avstämning krävs</span>
+                <span className="rounded-full border border-warning-200 bg-white px-3 py-1 text-xs font-semibold text-warning-900">Bearbetas · avstämning krävs</span>
               </div>
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <label className="space-y-2 text-sm lg:col-span-2">
@@ -173,7 +173,7 @@ export function InvoiceExportReconciliationPanel({ workOrderId }: Props) {
                     {saving ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
                     Bekräfta skickad
                   </button>
-                  <button type="button" disabled={saving || draft.note.trim().length < 10} onClick={() => void reconcile(job, "failed")} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  <button type="button" disabled={saving || draft.note.trim().length < 10} onClick={() => void reconcile(job, "failed")} className="inline-flex items-center gap-2 rounded-xl border border-danger-200 bg-white px-4 py-2.5 text-sm font-semibold text-danger-700 hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50">
                     <XCircle className="h-4 w-4" aria-hidden="true" />
                     Bekräfta misslyckad
                   </button>

@@ -72,7 +72,7 @@ export default function MyServiceNotificationsPage() {
       </header>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
-      {success ? <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800"><CheckCircle2 className="h-4 w-4" />{success}</div> : null}
+      {success ? <div className="flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800"><CheckCircle2 className="h-4 w-4" />{success}</div> : null}
 
       <Panel title="E-postaviseringar" description="Personliga val för den dagliga serviceöversikten.">
         {loading ? <div className="h-52 animate-pulse rounded-xl bg-sand-100" /> : (
@@ -82,7 +82,7 @@ export default function MyServiceNotificationsPage() {
                 <div className={`rounded-xl p-3 ${preferences.enabled ? "bg-petroleum-800 text-white" : "bg-white text-ink-500"}`}>{preferences.enabled ? <BellRing className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}</div>
                 <div><p className="font-semibold text-ink-950">Ta emot serviceaviseringar</p><p className="mt-1 text-sm leading-6 text-ink-500">Skickas till {data?.email}. Du kan pausa utskicken utan att ändra organisationens inställningar.</p></div>
               </div>
-              <span className={`mt-1 rounded-full px-3 py-1 text-xs font-semibold ${preferences.enabled ? "bg-emerald-100 text-emerald-800" : "bg-sand-200 text-ink-600"}`}>{preferences.enabled ? "Aktiv" : "Pausad"}</span>
+              <span className={`mt-1 rounded-full px-3 py-1 text-xs font-semibold ${preferences.enabled ? "bg-success-100 text-success-800" : "bg-sand-200 text-ink-600"}`}>{preferences.enabled ? "Aktiv" : "Pausad"}</span>
             </button>
 
             <div className={`rounded-2xl border border-sand-200 p-5 ${!preferences.enabled ? "opacity-50" : ""}`}>

@@ -26,9 +26,9 @@ function serviceState(value: unknown) {
   const due = new Date(String(value));
   const now = new Date();
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  if (due < now) return { label: "Förfallen", className: "bg-red-50 text-red-700" };
-  if (due <= soon) return { label: "Inom 30 dagar", className: "bg-amber-50 text-amber-800" };
-  return { label: "Planerad", className: "bg-emerald-50 text-emerald-800" };
+  if (due < now) return { label: "Förfallen", className: "bg-danger-50 text-danger-700" };
+  if (due <= soon) return { label: "Inom 30 dagar", className: "bg-warning-50 text-warning-800" };
+  return { label: "Planerad", className: "bg-success-50 text-success-800" };
 }
 
 export function PropertyComponentOverview({ propertyId }: { propertyId: string }) {
@@ -89,7 +89,7 @@ export function PropertyComponentOverview({ propertyId }: { propertyId: string }
                 {rows.map((row) => { const state = serviceState(row.next_service_at); return (
                   <tr key={text(row, "id")} className="transition hover:bg-sand-50/70">
                     <td className="px-5 py-4"><p className="font-semibold text-ink-900">{text(row, "name")}</p><p className="mt-1 text-xs text-ink-500">{text(row, "building_name") || "Ingen byggnad"}{text(row, "location") ? ` · ${text(row, "location")}` : ""} · {statusLabels[text(row, "status")] || text(row, "status")}</p></td>
-                    <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${text(row, "criticality") === "critical" ? "bg-red-50 text-red-700" : text(row, "criticality") === "high" ? "bg-amber-50 text-amber-800" : "bg-sand-100 text-ink-600"}`}>{criticalityLabels[text(row, "criticality")] || "Normal"}</span></td>
+                    <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${text(row, "criticality") === "critical" ? "bg-danger-50 text-danger-700" : text(row, "criticality") === "high" ? "bg-warning-50 text-warning-800" : "bg-sand-100 text-ink-600"}`}>{criticalityLabels[text(row, "criticality")] || "Normal"}</span></td>
                     <td className="px-5 py-4"><p className="font-medium text-ink-700">{formatDate(row.next_service_at)}</p><span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${state.className}`}>{state.label}</span></td>
                     <td className="px-5 py-4 text-ink-600">{number(row, "condition_grade") ? `${number(row, "condition_grade")}/5` : "Ej bedömt"}</td>
                     <td className="px-5 py-4 text-right font-semibold text-ink-900">{money.format(number(row, "total_cost_ex_vat"))}</td>

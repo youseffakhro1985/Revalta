@@ -75,8 +75,8 @@ export default function EscalationRulesPage() {
         <p className="mt-3 max-w-3xl text-ink-600">Styr när eskaleringar ska skickas, hur ofta de upprepas och vilka roller som ska informeras.</p>
       </header>
 
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div> : null}
-      {message ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{message}</div> : null}
+      {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm font-semibold text-danger-700">{error}</div> : null}
+      {message ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800">{message}</div> : null}
 
       <section className="space-y-6 rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
         <label className="flex items-center justify-between gap-4 rounded-xl border border-sand-200 p-4"><span><strong className="block text-ink-900">Automatiska eskaleringar</strong><span className="text-sm text-ink-500">Pausa eller aktivera hela motorn.</span></span><input type="checkbox" checked={rules.enabled} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, enabled: e.target.checked })} /></label>

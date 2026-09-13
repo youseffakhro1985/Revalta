@@ -226,7 +226,7 @@ export default function RentNoticesPage() {
                     <p className="mt-1 text-sm text-ink-500">{notice.property_name}{notice.unit ? ` · ${notice.unit}` : ""}</p>
                     <p className="mt-2 text-xs text-ink-500">Period {notice.period || "–"} · Förfaller {notice.due_date || "–"}</p>
                     {notice.source === "legacy" ? (
-                      <p className="mt-2 text-xs font-medium text-amber-800">Äldre rad – kör backfill innan uppdatering.</p>
+                      <p className="mt-2 text-xs font-medium text-warning-800">Äldre rad – kör backfill innan uppdatering.</p>
                     ) : null}
                   </div>
                   <div className="space-y-2 sm:text-right">

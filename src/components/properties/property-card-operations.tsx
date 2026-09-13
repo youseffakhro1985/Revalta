@@ -37,7 +37,7 @@ const statusLabels: Record<string, string> = { active: "Aktiv", service_due: "Se
 
 function value(item: Record<string, unknown>, key: string) { return item[key] == null ? null : String(item[key]); }
 function formatDate(raw: unknown) { if (!raw) return "Ej satt"; const parsed = new Date(String(raw)); return Number.isNaN(parsed.getTime()) ? "Ej satt" : date.format(parsed); }
-function badge(status: unknown) { const raw = String(status || ""); const warning = ["critical", "out_of_service", "service_due", "remark", "overdue", "high"].includes(raw); return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${warning ? "bg-amber-50 text-amber-800" : "bg-petroleum-50 text-petroleum-800"}`}>{statusLabels[raw] || raw || "Aktiv"}</span>; }
+function badge(status: unknown) { const raw = String(status || ""); const warning = ["critical", "out_of_service", "service_due", "remark", "overdue", "high"].includes(raw); return <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${warning ? "bg-warning-50 text-warning-800" : "bg-petroleum-50 text-petroleum-800"}`}>{statusLabels[raw] || raw || "Aktiv"}</span>; }
 
 export function PropertyCardOperations({ propertyId }: Props) {
   const [data, setData] = useState<PropertyCardData | null>(null);
@@ -99,6 +99,6 @@ export function PropertyCardOperations({ propertyId }: Props) {
       </Panel>
     </div>
 
-    {(data.metrics.criticalAssets > 0 || data.metrics.inspectionsDue90Days > 0) ? <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Fastigheten kräver uppmärksamhet</p><p className="mt-1">{data.metrics.criticalAssets} kritiska installationer och {data.metrics.inspectionsDue90Days} besiktningar behöver följas upp.</p></div></div> : <div className="flex items-start gap-3 rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5 text-sm text-petroleum-900"><Gauge className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Driftläget ser stabilt ut</p><p className="mt-1">Inga kritiska installationer eller nära förestående besiktningar är registrerade.</p></div></div>}
+    {(data.metrics.criticalAssets > 0 || data.metrics.inspectionsDue90Days > 0) ? <div className="flex items-start gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm text-warning-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Fastigheten kräver uppmärksamhet</p><p className="mt-1">{data.metrics.criticalAssets} kritiska installationer och {data.metrics.inspectionsDue90Days} besiktningar behöver följas upp.</p></div></div> : <div className="flex items-start gap-3 rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5 text-sm text-petroleum-900"><Gauge className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Driftläget ser stabilt ut</p><p className="mt-1">Inga kritiska installationer eller nära förestående besiktningar är registrerade.</p></div></div>}
   </div>;
 }

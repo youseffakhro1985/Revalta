@@ -40,7 +40,7 @@ export function WorkOrderLockIndicator() {
   return (
     <Link
       href="/dashboard/arbetsorder/redigeringslas"
-      className="hidden h-10 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-900 transition hover:border-amber-300 hover:bg-amber-100 md:inline-flex"
+      className="hidden h-10 items-center gap-2 rounded-xl border border-warning-200 bg-warning-50 px-3 text-xs font-semibold text-warning-900 transition hover:border-warning-300 hover:bg-warning-100 md:inline-flex"
       aria-label={`${count} aktiva redigeringslås för arbetsordrar`}
     >
       <LockKeyhole className="h-4 w-4" aria-hidden="true" />

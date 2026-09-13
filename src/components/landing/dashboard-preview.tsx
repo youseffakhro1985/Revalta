@@ -32,13 +32,13 @@ const tickets = [
     title: "Vattenläcka i källare",
     property: "Kvarteret Eken 7",
     status: "Akut",
-    statusClass: "border-red-200 bg-red-50 text-red-700",
+    statusClass: "border-danger-200 bg-danger-50 text-danger-700",
   },
   {
     title: "Service av hiss, port B",
     property: "Linnégatan 42",
     status: "Pågår",
-    statusClass: "border-amber-200 bg-amber-50 text-amber-700",
+    statusClass: "border-warning-200 bg-warning-50 text-warning-700",
   },
   {
     title: "Belysning på innergård",

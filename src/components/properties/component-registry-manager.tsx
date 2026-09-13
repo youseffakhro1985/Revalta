@@ -137,5 +137,5 @@ function Field({ label, name, type = "text", defaultValue = "", required = false
 }
 
 function ModeButton({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: typeof Settings2; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${active ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500 hover:text-ink-800"}`}><Icon className="h-4 w-4" />{children}</button>;
+  return <button type="button" onClick={onClick} aria-pressed={active} className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${active ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500 hover:text-ink-800"}`}><Icon className="h-4 w-4" />{children}</button>;
 }
