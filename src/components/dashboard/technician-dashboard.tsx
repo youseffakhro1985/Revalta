@@ -4,7 +4,7 @@ import { AlertTriangle, Camera, CheckCircle2, Clock3, PackageOpen, Wrench } from
 import db from "@/lib/db";
 import { type CurrentUser } from "@/lib/current-user";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
-import { MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
+import { OverviewEmpty, OverviewHero, OverviewMetricLink, OverviewPanel } from "@/components/dashboard/overview-chrome";
 import { isMissingSchemaColumnError } from "@/lib/schema-readiness";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
@@ -59,7 +59,11 @@ async function loadDailyFieldSummary(companyId: string, userId: string, start: D
 
 export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
   if (!user.company_id) {
-    return <Panel title="Min dag" description="Teknikervyn kräver en aktiv organisation."><p className="text-sm text-ink-500">Kontot saknar organisationskoppling och kan därför inte läsa tilldelade arbetsordrar.</p></Panel>;
+    return (
+      <OverviewPanel title="Min dag" description="Teknikervyn kräver en aktiv organisation.">
+        <p className="text-sm text-ink-500">Kontot saknar organisationskoppling och kan därför inte läsa tilldelade arbetsordrar.</p>
+      </OverviewPanel>
+    );
   }
 
   const now = new Date();
@@ -104,41 +108,50 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
   const formattedMinutes = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
 
   return (
-    <div className="space-y-8">
-      <PageHeader
+    <div className="space-y-5 sm:space-y-6">
+      <OverviewHero
         eyebrow="Teknikervy"
         title="Min dag"
         description="Dina arbetsordrar, nästa uppdrag och dagens fältdokumentation — avgränsat till arbete som är tilldelat dig."
-        action={nextOrder ? <Link href={`/dashboard/arbetsorder/${nextOrder.id}`} className="inline-flex h-11 items-center rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white transition hover:bg-petroleum-800">Öppna nästa uppdrag</Link> : undefined}
+        userName={user.name}
+        userEmail={user.email}
+        role={user.role}
+        companyName={user.company?.name}
+        statusLabel={urgentCount ? `${urgentCount} akuta uppdrag` : "Dagens körning"}
+        statusTone={urgentCount ? "attention" : "good"}
+        actions={nextOrder ? [
+          { href: `/dashboard/arbetsorder/${nextOrder.id}`, label: "Öppna nästa uppdrag", primary: true },
+          { href: "/dashboard/arbetsorder", label: "Alla arbetsordrar" },
+        ] : [{ href: "/dashboard/arbetsorder", label: "Öppna arbetsordrar" }]}
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Wrench} label="Mina aktiva arbetsordrar" value={activeOrderCount} hint="Endast tilldelat arbete" />
-        <MetricCard icon={AlertTriangle} label="Akuta" value={urgentCount} hint="Prioritet akut" />
-        <MetricCard icon={Clock3} label="Tid registrerad idag" value={formattedMinutes} hint="Från arbetsorderutförande" />
-        <MetricCard icon={PackageOpen} label="Materialposter idag" value={fieldSummary.materialEntries} hint={`${fieldSummary.photoCount} fältbilder registrerade`} />
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Nyckeltal">
+        <OverviewMetricLink href="/dashboard/arbetsorder" icon={Wrench} label="Mina aktiva arbetsordrar" value={activeOrderCount} hint="Endast tilldelat arbete" />
+        <OverviewMetricLink href="/dashboard/arbetsorder" icon={AlertTriangle} label="Akuta" value={urgentCount} hint="Prioritet akut" tone={urgentCount ? "warning" : "default"} />
+        <OverviewMetricLink href={nextOrder ? `/dashboard/arbetsorder/${nextOrder.id}` : "/dashboard/arbetsorder"} icon={Clock3} label="Tid registrerad idag" value={formattedMinutes} hint="Från arbetsorderutförande" />
+        <OverviewMetricLink href={nextOrder ? `/dashboard/arbetsorder/${nextOrder.id}` : "/dashboard/arbetsorder"} icon={PackageOpen} label="Materialposter idag" value={fieldSummary.materialEntries} hint={`${fieldSummary.photoCount} fältbilder registrerade`} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-        <Panel title="Nästa uppdrag" description="Närmaste schemalagda uppdrag, annars första aktiva arbetsordern.">
+      <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+        <OverviewPanel title="Nästa uppdrag" description="Närmaste schemalagda uppdrag, annars första aktiva arbetsordern.">
           {nextOrder ? (
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs font-semibold text-petroleum-700">{nextOrder.work_order_number || `AO-${nextOrder.id.slice(0, 8)}`}</span>
                 {nextOrder.priority === "urgent" ? <span className="rounded-full bg-danger-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-danger-700">Akut</span> : null}
               </div>
-              <h2 className="mt-3 text-xl font-semibold text-ink-950">{nextOrder.title}</h2>
+              <h2 className="mt-3 font-display text-xl font-semibold text-ink-950">{nextOrder.title}</h2>
               <p className="mt-2 text-sm text-ink-600">{nextOrder.property.name} · {nextOrder.property.address}, {nextOrder.property.city}</p>
-              <div className="mt-5 rounded-xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">
+              <div className="mt-5 rounded-2xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">
                 <p><span className="font-semibold text-ink-800">Start:</span> {nextOrder.scheduled_start ? dateTime.format(nextOrder.scheduled_start) : "Inte schemalagd"}</p>
                 <p className="mt-2"><span className="font-semibold text-ink-800">Status:</span> {nextOrder.status}</p>
               </div>
               <Link href={`/dashboard/arbetsorder/${nextOrder.id}`} className="mt-5 inline-flex text-sm font-semibold text-petroleum-700">Öppna arbetsordern →</Link>
             </div>
-          ) : <p className="text-sm text-ink-500">Du har inga aktiva arbetsordrar tilldelade just nu.</p>}
-        </Panel>
+          ) : <OverviewEmpty icon={Wrench} title="Inga aktiva arbetsordrar" description="Du har inga aktiva arbetsordrar tilldelade just nu." />}
+        </OverviewPanel>
 
-        <Panel title="Mina arbetsordrar" description="Prioriterad lista över arbete som är tilldelat dig." bodyClassName="p-0">
+        <OverviewPanel title="Mina arbetsordrar" description="Prioriterad lista över arbete som är tilldelat dig." bodyClassName="p-0">
           {activeOrders.length ? <div className="divide-y divide-sand-100">{activeOrders.map((order) => {
             const deadline = order.completion_due_at || order.sla_resolution_due_at;
             const overdue = deadline ? deadline < now : false;
@@ -152,20 +165,20 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
                 <div className="sm:text-right"><p className={`text-xs font-semibold ${overdue ? "text-danger-700" : "text-ink-600"}`}>{deadline ? `${overdue ? "Försenad · " : "Deadline · "}${dateTime.format(deadline)}` : "Ingen deadline"}</p>{order.scheduled_start ? <p className="mt-1 text-[11px] text-ink-500">Start {time.format(order.scheduled_start)}</p> : null}</div>
               </Link>
             );
-          })}</div> : <p className="p-8 text-center text-sm text-ink-500">Inga aktiva arbetsordrar.</p>}
-        </Panel>
+          })}</div> : <OverviewEmpty icon={Wrench} title="Inga aktiva arbetsordrar" description="När du tilldelas arbete visas det här." />}
+        </OverviewPanel>
       </section>
 
       <DashboardSlaOperations />
 
-      <Panel title="Fältflöde idag" description="Tid, material, bilder och avslut ligger kvar på arbetsordern så att dokumentationen följer uppdraget.">
+      <OverviewPanel title="Fältflöde idag" description="Tid, material, bilder och avslut ligger kvar på arbetsordern så att dokumentationen följer uppdraget.">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <FieldStep icon={Clock3} label="Tid" value={formattedMinutes} href={nextOrder ? `/dashboard/arbetsorder/${nextOrder.id}` : "/dashboard/arbetsorder"} />
           <FieldStep icon={PackageOpen} label="Material" value={`${fieldSummary.materialEntries} poster`} href={nextOrder ? `/dashboard/arbetsorder/${nextOrder.id}` : "/dashboard/arbetsorder"} />
           <FieldStep icon={Camera} label="Bilder" value={`${fieldSummary.photoCount} idag`} href={nextOrder ? `/dashboard/arbetsorder/${nextOrder.id}` : "/dashboard/arbetsorder"} />
           <FieldStep icon={CheckCircle2} label="Avslutade" value={`${completedToday} idag`} href="/dashboard/arbetsorder" />
         </div>
-      </Panel>
+      </OverviewPanel>
     </div>
   );
 }

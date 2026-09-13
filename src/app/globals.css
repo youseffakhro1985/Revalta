@@ -414,3 +414,18 @@
     display: none;
   }
 }
+
+.overview-hero {
+  background:
+    radial-gradient(1180px 420px at 8% -18%, rgba(232, 215, 168, 0.22), transparent 54%),
+    radial-gradient(920px 380px at 94% 118%, rgba(90, 140, 126, 0.3), transparent 50%),
+    linear-gradient(165deg, #1c3732 0%, #142824 52%, #101f1c 100%);
+}
+
+.overview-hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 86%);
+}

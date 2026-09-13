@@ -21,7 +21,7 @@ export default async function Dashboard() {
   return (
     <div className="animate-fade-in-soft space-y-6 sm:space-y-7">
       {!schema.ready ? (
-        <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-warning-900 shadow-sm" role="status">
+        <div className="rounded-[24px] border border-warning-200 bg-warning-50 p-5 text-warning-900 shadow-premium-sm" role="status">
           <p className="font-semibold">Kompatibilitetsläge</p>
           <p className="mt-1 text-sm leading-6">{schemaCompatibilityBannerMessage()}</p>
           {schema.missing.length > 0 ? (
@@ -33,7 +33,7 @@ export default async function Dashboard() {
       ) : null}
 
       {!user.email_verified_at ? (
-        <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-warning-700 shadow-sm" role="status">
+        <div className="rounded-[24px] border border-warning-200 bg-warning-50 p-5 text-warning-700 shadow-premium-sm" role="status">
           <p className="font-semibold">E-postadressen är inte verifierad ännu.</p>
           <p className="mt-1 text-sm">Verifiera adressen för säkrare kontoåterställning och framtida systemnotiser.</p>
         </div>
@@ -47,9 +47,9 @@ export default async function Dashboard() {
             : mode === "technician" ? <TechnicianDashboard user={user} />
               : <ViewerDashboard user={user} />
       ) : (
-        <section className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm sm:p-8">
+        <section className="rounded-[24px] border border-sand-200 bg-[#FFFEFB] p-7 shadow-premium-sm sm:p-8">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Dashboard</p>
-          <h1 className="mt-2 text-[30px] font-semibold tracking-[-0.035em] text-ink-950">Dashboarden väntar på databasrelease</h1>
+          <h1 className="mt-2 font-display text-[30px] font-semibold tracking-[-0.035em] text-ink-950">Dashboarden väntar på databasrelease</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-600">Den rollbaserade arbetsytan aktiveras automatiskt när den dokumenterade produktionsmigreringen är klar. Inga osäkra fallback-frågor körs mot ett ofullständigt schema.</p>
         </section>
       )}
