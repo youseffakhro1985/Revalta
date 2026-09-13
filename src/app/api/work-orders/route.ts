@@ -32,6 +32,7 @@ import {
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { findAccessibleTicket } from "@/lib/assigned-work-access";
 import { createRouteObservability } from "@/lib/route-observability";
+import { analyzeTicket } from "@/lib/ai";
 
 const ROUTE = "/api/work-orders";
 const ACTIVE_WORK_ORDER_STATUSES = ["completed", "invoiced", "cancelled"] as const;
@@ -466,12 +467,14 @@ export async function POST(request: Request) {
       });
     }
 
+    const analysis = await analyzeTicket(`${title}. ${description}`);
+    const notes = String(body.notes || "").trim() || analysis.recommendedAction;
     const createdAt = new Date();
     const sla = calculateWorkOrderSla(createdAt, priority);
     const workOrder = await db.$transaction(async (tx) => {
       const workOrderNumber = await allocateWorkOrderNumber(tx, user.company_id!, createdAt);
       const created = await tx.workOrder.create({
-        data: { company_id: user.company_id!, property_id: propertyId, unit_id: unitId, assigned_to_id: assignedToId, ticket_id: ticketId, created_by_id: user.id, title, description, status, priority, scheduled_start: scheduledStart, scheduled_end: scheduledEnd, estimated_cost: estimatedCost, created_at: createdAt },
+        data: { company_id: user.company_id!, property_id: propertyId, unit_id: unitId, assigned_to_id: assignedToId, ticket_id: ticketId, created_by_id: user.id, title, description, notes, status, priority, scheduled_start: scheduledStart, scheduled_end: scheduledEnd, estimated_cost: estimatedCost, created_at: createdAt },
       });
       await setWorkOrderEnterpriseFields(tx, { workOrderId: created.id, companyId: user.company_id!, workOrderNumber, workType, source, responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt });
       await setWorkOrderAssetLinks(tx, { workOrderId: created.id, companyId: user.company_id!, buildingId, technicalAssetId });

@@ -52,6 +52,16 @@ vi.mock("@/lib/storage", () => ({
 }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+vi.mock("@/lib/integrations", () => ({ recordAiEvent: vi.fn() }));
+vi.mock("@/lib/ai", () => ({
+  analyzeDocument: vi.fn(async ({ existingCategory }: { existingCategory?: string }) => ({
+    category: existingCategory || "other",
+    confidence: 1,
+    summary: "test",
+  })),
+  documentTextSnippet: vi.fn(() => ""),
+  LIBRARY_DOCUMENT_CATEGORIES: ["contract", "invoice", "protocol", "drawing", "insurance", "energy", "inspection", "other"],
+}));
 vi.mock("@/lib/db", () => ({
   default: {
     property: { findFirst: propertyFindFirstMock },

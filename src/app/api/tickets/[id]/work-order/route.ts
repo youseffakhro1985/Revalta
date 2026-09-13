@@ -16,6 +16,7 @@ import {
 } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 import { createLogger } from "@/lib/structured-logger";
+import { analyzeTicket } from "@/lib/ai";
 
 const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
 
@@ -112,6 +113,9 @@ export async function POST(
       title: true,
       description: true,
       priority: true,
+      ai_summary: true,
+      ai_recommended_action: true,
+      ai_processed_at: true,
     },
   });
   if (!ticket) return notFoundTicket();
@@ -163,7 +167,11 @@ export async function POST(
     }
   }
 
-  const priority = normalizeWorkOrderPriority(ticket.priority);
+  const analysis = ticket.ai_processed_at
+    ? null
+    : await analyzeTicket(`${ticket.title}. ${ticket.description}`);
+  const recommendedAction = ticket.ai_recommended_action || analysis?.recommendedAction || null;
+  const priority = normalizeWorkOrderPriority(analysis?.priority || ticket.priority);
   const createdAt = new Date();
   const sla = calculateWorkOrderSla(createdAt, priority);
 
@@ -196,6 +204,7 @@ export async function POST(
           created_by_id: user.id,
           title: ticket.title,
           description: ticket.description,
+          notes: recommendedAction,
           status,
           priority,
           scheduled_start: scheduledStart,
@@ -229,6 +238,14 @@ export async function POST(
         data: {
           status: ticket.status === "new" ? "received" : ticket.status,
           assigned_to_id: assignedToId || ticket.assigned_to_id,
+          ...(analysis
+            ? {
+                ai_summary: analysis.summary,
+                ai_recommended_action: analysis.recommendedAction,
+                ai_confidence: analysis.confidence,
+                ai_processed_at: new Date(),
+              }
+            : {}),
         },
       });
 

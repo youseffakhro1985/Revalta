@@ -91,6 +91,7 @@ const ticket = {
 describe("ticket creation reliability", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("AI_PROVIDER_API_KEY", "");
     getCurrentUserMock.mockResolvedValue({
       id: "manager-1",
       email: "manager@example.se",
