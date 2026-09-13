@@ -96,3 +96,40 @@ describe("structured server logger", () => {
     });
   });
 });
+
+describe("nested Error security boundary", () => {
+  beforeEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+  it("redacts a provider Error.cause in the actual production log line", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const output = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const cause = new Error("token=SYNTHETIC_TOKEN postgresql://user:SYNTHETIC_DB@db.test/db");
+    cause.name = "secret=SYNTHETIC_NAME";
+    createLogger().error("request failed", new Error("outer", { cause }));
+    const line = String(output.mock.calls[0][0]);
+    expect(line).not.toContain("SYNTHETIC_");
+    expect(line).not.toContain('"stack"');
+    expect(JSON.parse(line).error.cause.message).toContain("[REDACTED]");
+  });
+  it("sanitizes errors embedded in ordinary context and arrays", () => {
+    const result = sanitizeLogContext({ items: [new Error("Bearer SYNTHETIC_ACCESS_TOKEN")], nested: { failure: new Error("password=SYNTHETIC_PASSWORD") } });
+    expect(JSON.stringify(result)).not.toContain("SYNTHETIC_");
+  });
+  it("redacts non-production nested stacks without hiding their diagnostic structure", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const cause = new Error("failure");
+    cause.stack = "at provider (api_key=SYNTHETIC_KEY)";
+    const result = serializeError(new Error("outer", { cause }));
+    expect(JSON.stringify(result)).toContain("at provider");
+    expect(JSON.stringify(result)).not.toContain("SYNTHETIC_KEY");
+  });
+  it("bounds circular and deeply nested error causes", () => {
+    const cause = new Error("cycle");
+    cause.cause = cause;
+    expect(JSON.stringify(serializeError(cause))).toContain("[CIRCULAR]");
+    let error = new Error("token=SYNTHETIC_DEEP");
+    for (let i = 0; i < 20; i++) error = new Error("outer", { cause: error });
+    const line = JSON.stringify(serializeError(error));
+    expect(line).toContain("[MAX_DEPTH]");
+    expect(line).not.toContain("SYNTHETIC_DEEP");
+  });
+});
