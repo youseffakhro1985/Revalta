@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("command center links", () => {
-  it("disables Next.js prefetch so opening search does not stampede the data plane", () => {
+  it("navigates without next/link so opening search does not prefetch every module", () => {
     const source = readFileSync(new URL("./global-search.tsx", import.meta.url), "utf8");
-    const links = [...source.matchAll(/<Link\b[^>]*>/g)].map((match) => match[0]);
-    expect(links.length).toBeGreaterThan(0);
-    for (const link of links) {
-      expect(link).toContain("prefetch={false}");
-    }
+    expect(source).not.toContain("next/link");
+    expect(source).toContain("function CommandLink");
+    expect(source).toContain("router.push(href)");
+    expect([...source.matchAll(/<a\b[^>]*>/g)].length).toBeGreaterThan(0);
   });
 });

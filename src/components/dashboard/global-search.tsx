@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Building2,
@@ -132,31 +132,36 @@ export function GlobalSearch() {
   }, [context]);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
+    const normalized = query.trim();
+    if (normalized.length < 2) {
       setResults([]);
       setLoading(false);
       return;
     }
     const controller = new AbortController();
+    let active = true;
     const timeout = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(normalized)}`, {
           signal: controller.signal,
           cache: "no-store",
         });
+        if (!active) return;
         const data = await readResponseJson<{ results?: unknown[] }>(response);
         const safeResults = response.ok && Array.isArray(data.results)
           ? data.results.map(sanitizeCommandCenterObject).filter((item): item is CommandCenterObject => Boolean(item))
           : [];
         setResults(safeResults);
       } catch (error) {
-        if ((error as Error).name !== "AbortError") setResults([]);
+        if (!active || (error as Error).name === "AbortError") return;
+        setResults([]);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }, 220);
     return () => {
+      active = false;
       controller.abort();
       window.clearTimeout(timeout);
     };
@@ -204,6 +209,7 @@ export function GlobalSearch() {
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
+        aria-expanded={open}
         className="hidden h-10 min-w-[280px] items-center gap-3 rounded-lg border border-sand-200 bg-white px-3 text-left text-[12px] text-ink-500 shadow-[0_1px_2px_rgba(17,34,31,0.04)] transition hover:border-sand-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 lg:flex"
       >
         <Search className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
@@ -216,6 +222,7 @@ export function GlobalSearch() {
         onClick={() => setOpen(true)}
         aria-label="Öppna Revalta Command Center"
         aria-haspopup="dialog"
+        aria-expanded={open}
         className="flex h-9 w-9 items-center justify-center rounded-lg border border-sand-200 bg-white text-ink-500 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 lg:hidden"
       >
         <Search className="h-4 w-4" aria-hidden="true" />
@@ -319,11 +326,11 @@ function CommandHome({
             {quickActions.map((action) => {
               const Icon = actionIcons[action.kind];
               return (
-                <Link key={action.id} href={action.href} prefetch={false} onClick={onNavigate} className="group flex items-center gap-3 rounded-xl border border-sand-200/80 bg-white px-3.5 py-3 outline-none transition hover:border-petroleum-200 hover:shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300">
+                <CommandLink key={action.id} href={action.href} onNavigate={onNavigate} className="group flex items-center gap-3 rounded-xl border border-sand-200/80 bg-white px-3.5 py-3 outline-none transition hover:border-petroleum-200 hover:shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-petroleum-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /></span>
                   <span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold text-ink-800">{action.label}</span><span className="mt-0.5 block truncate text-[11px] text-ink-500">{action.description}</span></span>
                   <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
-                </Link>
+                </CommandLink>
               );
             })}
           </div>
@@ -351,9 +358,9 @@ function CommandHome({
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     return (
-                      <Link key={item.href} href={item.href} prefetch={false} onClick={onNavigate} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-[12px] font-medium text-ink-600 outline-none transition hover:border-sand-200 hover:bg-sand-50 hover:text-petroleum-800 focus-visible:ring-2 focus-visible:ring-petroleum-300">
+                      <CommandLink key={item.href} href={item.href} onNavigate={onNavigate} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-[12px] font-medium text-ink-600 outline-none transition hover:border-sand-200 hover:bg-sand-50 hover:text-petroleum-800 focus-visible:ring-2 focus-visible:ring-petroleum-300">
                         <Icon className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />{item.label}
-                      </Link>
+                      </CommandLink>
                     );
                   })}
                 </div>
@@ -432,10 +439,10 @@ function ObjectRow({
   const Icon = resultIcons[item.type];
   return (
     <div className="group flex items-center gap-1 rounded-xl transition hover:bg-white hover:shadow-[0_1px_3px_rgba(17,34,31,0.06)]">
-      <Link href={item.href} prefetch={false} onClick={() => onOpen(item)} className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 ${compact ? "py-2.5" : "py-3"}`}>
+      <CommandLink href={item.href} onNavigate={() => onOpen(item)} className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 ${compact ? "py-2.5" : "py-3"}`}>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-petroleum-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /></span>
         <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-ink-800">{item.title}</span><span className="mt-0.5 block truncate text-[11px] text-ink-500">{item.subtitle}</span></span>
-      </Link>
+      </CommandLink>
       <button
         type="button"
         onClick={() => onToggleFavorite(item)}
@@ -447,6 +454,27 @@ function ObjectRow({
       </button>
     </div>
   );
+}
+
+function CommandLink({
+  href,
+  onNavigate,
+  className,
+  children,
+}: {
+  href: string;
+  onNavigate: () => void;
+  className: string;
+  children: ReactNode;
+}) {
+  const router = useRouter();
+  function onClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    onNavigate();
+    router.push(href);
+  }
+  return <a href={href} className={className} onClick={onClick}>{children}</a>;
 }
 
 function SectionHeading({ id, icon: Icon, children }: { id?: string; icon: typeof Plus; children: React.ReactNode }) {

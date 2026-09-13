@@ -331,7 +331,9 @@ async function run() {
     stage = "Command Center search API and navigation";
     // Command Center must be the single global search surface. Open it from the
     // visible desktop control: Chromium on Linux CI can swallow Control+K.
-    await page.getByRole("button", { name: "Sök eller kör kommando" }).click();
+    const commandTrigger = page.getByRole("button", { name: "Sök eller kör kommando" });
+    await expectVisible(commandTrigger, "Command Center desktop trigger");
+    await commandTrigger.click();
     const commandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
     await expectVisible(commandCenter, "Command Center dialog");
     await expectVisible(commandCenter.getByText("Navigera", { exact: true }), "Command Center navigation section");
