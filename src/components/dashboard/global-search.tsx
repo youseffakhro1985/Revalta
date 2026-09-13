@@ -314,11 +314,12 @@ function CommandHome({
       {quickActions.length > 0 ? (
         <section aria-labelledby="command-create-heading">
           <SectionHeading id="command-create-heading" icon={Plus}>Skapa nytt</SectionHeading>
+          {/* Prefetch is off: opening Command Center must not fan out every module RSC. */}
           <div className="grid gap-2 sm:grid-cols-2">
             {quickActions.map((action) => {
               const Icon = actionIcons[action.kind];
               return (
-                <Link key={action.id} href={action.href} onClick={onNavigate} className="group flex items-center gap-3 rounded-xl border border-sand-200/80 bg-white px-3.5 py-3 outline-none transition hover:border-petroleum-200 hover:shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300">
+                <Link key={action.id} href={action.href} prefetch={false} onClick={onNavigate} className="group flex items-center gap-3 rounded-xl border border-sand-200/80 bg-white px-3.5 py-3 outline-none transition hover:border-petroleum-200 hover:shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-petroleum-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /></span>
                   <span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold text-ink-800">{action.label}</span><span className="mt-0.5 block truncate text-[11px] text-ink-500">{action.description}</span></span>
                   <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
@@ -350,7 +351,7 @@ function CommandHome({
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     return (
-                      <Link key={item.href} href={item.href} onClick={onNavigate} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-[12px] font-medium text-ink-600 outline-none transition hover:border-sand-200 hover:bg-sand-50 hover:text-petroleum-800 focus-visible:ring-2 focus-visible:ring-petroleum-300">
+                      <Link key={item.href} href={item.href} prefetch={false} onClick={onNavigate} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-[12px] font-medium text-ink-600 outline-none transition hover:border-sand-200 hover:bg-sand-50 hover:text-petroleum-800 focus-visible:ring-2 focus-visible:ring-petroleum-300">
                         <Icon className="h-3.5 w-3.5" strokeWidth={1.7} aria-hidden="true" />{item.label}
                       </Link>
                     );
@@ -431,7 +432,7 @@ function ObjectRow({
   const Icon = resultIcons[item.type];
   return (
     <div className="group flex items-center gap-1 rounded-xl transition hover:bg-white hover:shadow-[0_1px_3px_rgba(17,34,31,0.06)]">
-      <Link href={item.href} onClick={() => onOpen(item)} className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 ${compact ? "py-2.5" : "py-3"}`}>
+      <Link href={item.href} prefetch={false} onClick={() => onOpen(item)} className={`flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 ${compact ? "py-2.5" : "py-3"}`}>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-petroleum-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" /></span>
         <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-semibold text-ink-800">{item.title}</span><span className="mt-0.5 block truncate text-[11px] text-ink-500">{item.subtitle}</span></span>
       </Link>

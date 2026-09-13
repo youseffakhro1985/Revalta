@@ -324,17 +324,20 @@ async function run() {
     console.log("desktop navigation + property API + return to dashboard: passed");
 
     stage = "Command Center search API and navigation";
-    // Command Center must be the single global search surface.
-    await page.keyboard.press("Control+K");
+    // Command Center must be the single global search surface. Open it from the
+    // visible desktop control: Chromium on Linux CI can swallow Control+K.
+    await page.getByRole("button", { name: "Sök eller kör kommando" }).click();
     const commandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
     await expectVisible(commandCenter, "Command Center dialog");
     await expectVisible(commandCenter.getByText("Navigera", { exact: true }), "Command Center navigation section");
     const commandInput = commandCenter.getByLabel("Sök i Revalta eller välj kommando");
+    await expectVisible(commandInput, "Command Center search input");
     const missingQuery = `missing-${runId}`;
     const searchResponse = await observeResponse("/api/search", () => commandInput.fill(missingQuery), { query: missingQuery });
     validateEmptySearchResponse(searchResponse.status(), await searchResponse.json());
     await expectVisible(commandCenter.getByText(/Inga träffar för/i), "Command Center empty search state");
     await commandInput.fill("");
+    await expectVisible(commandCenter.getByRole("link", { name: "Fastigheter", exact: true }), "Command Center Fastigheter");
     await visitProperties(commandCenter.getByRole("link", { name: "Fastigheter", exact: true }));
     await commandCenter.waitFor({ state: "hidden" });
     console.log("Command Center search API + empty state + navigation: passed");
