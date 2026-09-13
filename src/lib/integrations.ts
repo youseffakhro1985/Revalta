@@ -7,30 +7,72 @@ type IntegrationUser = {
   company_id: string | null;
 };
 
-const configured = {
-  email: Boolean(process.env.EMAIL_PROVIDER_API_KEY && process.env.EMAIL_FROM),
-  sms: Boolean(process.env.SMS_PROVIDER_API_KEY && (process.env.SMS_PROVIDER_WEBHOOK_URL || process.env.SMS_PROVIDER_API_KEY.startsWith("46elks:"))),
-  stripe: Boolean(process.env.STRIPE_SECRET_KEY),
-  storage: hasStorageConfig(),
-  ai: Boolean(process.env.AI_PROVIDER_API_KEY),
+type EmailDelivery = {
+  status: "mocked" | "failed" | "sent";
+  providerId: string | null;
+  reason?: "not_configured" | "provider_rejected" | "provider_unavailable";
+  providerStatus?: number;
 };
 
 const DELIVERY_TIMEOUT_MS = 12_000;
 
-/** Dev may mock; production records a hard failure instead of pretending delivery succeeded. */
-function mockOrFail() {
-  if (allowIntegrationMocks()) {
-    return { status: "mocked" as const, providerId: null };
+function isEmailConfigured() {
+  return Boolean(process.env.EMAIL_PROVIDER_API_KEY && process.env.EMAIL_FROM);
+}
+
+function isSmsConfigured() {
+  const apiKey = process.env.SMS_PROVIDER_API_KEY;
+  return Boolean(apiKey && (process.env.SMS_PROVIDER_WEBHOOK_URL || apiKey.startsWith("46elks:")));
+}
+
+function isStripeConfigured() {
+  return Boolean(process.env.STRIPE_SECRET_KEY);
+}
+
+function isAiConfigured() {
+  return Boolean(process.env.AI_PROVIDER_API_KEY);
+}
+
+function isIntegrationConfigured(type: string) {
+  switch (type) {
+    case "email":
+      return isEmailConfigured();
+    case "sms":
+      return isSmsConfigured();
+    case "stripe":
+      return isStripeConfigured();
+    case "storage":
+      return hasStorageConfig();
+    case "ai":
+      return isAiConfigured();
+    default:
+      return false;
   }
-  return { status: "failed" as const, providerId: null, reason: "not_configured" };
+}
+
+function publicEmailDelivery(delivery: EmailDelivery) {
+  return {
+    status: delivery.status,
+    providerId: delivery.providerId,
+    ...(delivery.reason ? { reason: delivery.reason } : {}),
+    ...(typeof delivery.providerStatus === "number" ? { providerStatus: delivery.providerStatus } : {}),
+  };
+}
+
+/** Dev may mock; production records a hard failure instead of pretending delivery succeeded. */
+function mockOrFail(): EmailDelivery {
+  if (allowIntegrationMocks()) {
+    return { status: "mocked", providerId: null };
+  }
+  return { status: "failed", providerId: null, reason: "not_configured" };
 }
 
 async function sendEmail(payload: {
   recipient?: string;
   subject: string;
   text: string;
-}) {
-  if (!configured.email || !payload.recipient) {
+}): Promise<EmailDelivery> {
+  if (!isEmailConfigured() || !payload.recipient) {
     return mockOrFail();
   }
 
@@ -62,7 +104,7 @@ async function sendEmail(payload: {
 }
 
 async function sendSms(payload: { recipient?: string; message: string }) {
-  if (!configured.sms || !payload.recipient) {
+  if (!isSmsConfigured() || !payload.recipient) {
     return mockOrFail();
   }
 
@@ -126,7 +168,7 @@ async function recordIntegrationEvent(
   recipient?: string,
   statusOverride?: string
 ) {
-  const isConfigured = configured[type as keyof typeof configured] ?? false;
+  const isConfigured = isIntegrationConfigured(type);
   const status = statusOverride ?? (isConfigured ? "queued" : allowIntegrationMocks() ? "mocked" : "failed");
 
   return db.integrationEvent.create({
@@ -171,7 +213,7 @@ export async function queueTicketNotification(
   return recordIntegrationEvent(
     user,
     "email",
-    { ...eventPayload, delivery },
+    { ...eventPayload, delivery: publicEmailDelivery(delivery) },
     payload.recipient,
     delivery.status
   );
@@ -207,10 +249,7 @@ export async function queueEmailVerification(
     "email",
     {
       event: "email_verification",
-      delivery: {
-        status: delivery.status,
-        providerId: delivery.providerId,
-      },
+      delivery: publicEmailDelivery(delivery),
     },
     payload.recipient,
     delivery.status,

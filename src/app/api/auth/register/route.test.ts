@@ -6,6 +6,7 @@ const {
   companyCreateMock,
   createLoggerMock,
   emailVerificationTokenCreateMock,
+  emailVerificationTokenUpdateManyMock,
   hashPasswordMock,
   loggerErrorMock,
   loggerInfoMock,
@@ -20,6 +21,7 @@ const {
   companyCreateMock: vi.fn(),
   createLoggerMock: vi.fn(),
   emailVerificationTokenCreateMock: vi.fn(),
+  emailVerificationTokenUpdateManyMock: vi.fn(),
   hashPasswordMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerInfoMock: vi.fn(),
@@ -37,7 +39,10 @@ vi.mock("next/server", async (importOriginal) => {
 vi.mock("@/lib/db", () => ({
   default: {
     company: { create: companyCreateMock },
-    emailVerificationToken: { create: emailVerificationTokenCreateMock },
+    emailVerificationToken: {
+      create: emailVerificationTokenCreateMock,
+      updateMany: emailVerificationTokenUpdateManyMock,
+    },
     $transaction: transactionMock,
   },
 }));
@@ -100,8 +105,9 @@ describe("POST /api/auth/register", () => {
       users: [{ id: "user-1", email: "owner@example.se", company_id: "company-1" }],
     });
     emailVerificationTokenCreateMock.mockResolvedValue({ id: "verification-1" });
+    emailVerificationTokenUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
-    queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1" });
+    queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1", status: "sent" });
     transactionMock.mockImplementation(async (callback) => callback({
       company: { create: companyCreateMock },
       emailVerificationToken: { create: emailVerificationTokenCreateMock },
@@ -248,11 +254,12 @@ describe("POST /api/auth/register", () => {
         verificationUrl: `https://www.revalta.se/verify-email?token=${"a".repeat(64)}`,
       },
     );
+    expect(emailVerificationTokenUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("returns 201 without waiting for a slow verification provider", async () => {
-    let resolveDelivery!: (value: { id: string }) => void;
-    const slowDelivery = new Promise<{ id: string }>((resolve) => {
+    let resolveDelivery!: (value: { id: string; status: string }) => void;
+    const slowDelivery = new Promise<{ id: string; status: string }>((resolve) => {
       resolveDelivery = resolve;
     });
     queueEmailVerificationMock.mockReturnValue(slowDelivery);
@@ -275,7 +282,7 @@ describe("POST /api/auth/register", () => {
     await Promise.resolve();
     expect(settled).toBe(false);
 
-    resolveDelivery({ id: "integration-event-1" });
+    resolveDelivery({ id: "integration-event-1", status: "sent" });
     await afterPromise;
     expect(loggerInfoMock).toHaveBeenCalledWith(
       "auth registration verification delivery completed",
@@ -294,9 +301,38 @@ describe("POST /api/auth/register", () => {
 
     expect(response.status).toBe(201);
     await runScheduledAfterCallbacks();
+    expect(emailVerificationTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { user_id: "user-1", used_at: null },
+      data: { used_at: expect.any(Date) },
+    });
     expect(loggerErrorMock).toHaveBeenCalledWith(
       "auth registration verification delivery failed",
       expect.any(Error),
+      expect.objectContaining({
+        event: "auth.registration.verification_delivery_failed",
+        companyId: "company-1",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("consumes the unused verification token when the provider records a failed delivery", async () => {
+    queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1", status: "failed" });
+
+    const response = await POST(registrationRequest({
+      companyName: "Exempel AB",
+      email: "owner@example.se",
+      password: "securepass1",
+    }));
+
+    expect(response.status).toBe(201);
+    await runScheduledAfterCallbacks();
+    expect(emailVerificationTokenUpdateManyMock).toHaveBeenCalledWith({
+      where: { user_id: "user-1", used_at: null },
+      data: { used_at: expect.any(Date) },
+    });
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "auth registration verification delivery failed",
       expect.objectContaining({
         event: "auth.registration.verification_delivery_failed",
         companyId: "company-1",

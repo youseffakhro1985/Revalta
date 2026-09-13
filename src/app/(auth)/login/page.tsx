@@ -13,7 +13,6 @@ const EMAIL_VERIFICATION_REQUIRED = "EMAIL_VERIFICATION_REQUIRED";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [verificationRequired, setVerificationRequired] = useState(false);
@@ -37,7 +36,6 @@ export default function LoginPage() {
     const submittedEmail = String(form.get("email") || "");
     const submittedPassword = String(form.get("password") || "");
     setEmail(submittedEmail);
-    setPassword(submittedPassword);
     setError("");
     setResendStatus("");
     setVerificationRequired(false);
@@ -143,8 +141,7 @@ export default function LoginPage() {
             autoComplete="email"
             autoFocus
             className={authInputClass}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            defaultValue=""
             placeholder="namn@exempel.se"
           />
         </div>
@@ -164,8 +161,7 @@ export default function LoginPage() {
             required
             autoComplete="current-password"
             className={authInputClass}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            defaultValue=""
             placeholder="••••••••"
           />
         </div>

@@ -13,5 +13,8 @@ describe("login form", () => {
     expect(source).toContain('method="post"');
     expect(source).toContain('action="/api/auth/login"');
     expect(source).toContain("data-ready");
+    expect(source).toContain('defaultValue=""');
+    expect(source).not.toContain("value={email}");
+    expect(source).not.toContain("value={password}");
   });
 });

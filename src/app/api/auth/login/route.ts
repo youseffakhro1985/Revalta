@@ -57,7 +57,11 @@ export async function POST(request: Request) {
       where: { email: normalizedEmail },
       include: {
         company: { select: { status: true } },
-        email_verification_tokens: { select: { id: true }, take: 1 },
+        email_verification_tokens: {
+          where: { used_at: null },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
     const valid = await comparePassword(password, user?.password || INVALID_ACCOUNT_PASSWORD_HASH);
@@ -70,9 +74,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // Backward-compatible rollout: legacy accounts predate the verification-token
-    // flow and may legitimately have email_verified_at = null. Only accounts with
-    // token history are known to have been enrolled in email verification.
+    // Backward-compatible rollout: legacy accounts predate verification tokens.
+    // Only an unused token means a verification email was issued and is still
+    // outstanding. Consumed tokens (used after failed delivery or confirm) must
+    // not permanently lock the account out of login.
     const requiresEmailVerification =
       user.email_verified_at === null && user.email_verification_tokens.length > 0;
     if (requiresEmailVerification) {

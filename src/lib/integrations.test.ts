@@ -69,6 +69,41 @@ describe("queueEmailVerification", () => {
     expect(JSON.stringify(eventInput)).not.toContain("one-time-secret");
   });
 
+  it("reads email credentials at send time instead of module load", async () => {
+    vi.stubEnv("EMAIL_PROVIDER_API_KEY", "");
+    vi.stubEnv("EMAIL_FROM", "");
+    const { queueEmailVerification } = await loadIntegrations();
+    vi.stubEnv("EMAIL_PROVIDER_API_KEY", "provider-key");
+    vi.stubEnv("EMAIL_FROM", "Revalta <noreply@revalta.se>");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "email-late" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await queueEmailVerification(
+      { company_id: "company-1" },
+      {
+        recipient: "owner@example.se",
+        verificationUrl: "https://www.revalta.se/verify-email?token=one-time-secret",
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(integrationEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        status: "sent",
+        payload: {
+          event: "email_verification",
+          delivery: { status: "sent", providerId: "email-late" },
+        },
+      }),
+    });
+    expect(JSON.stringify(integrationEventCreateMock.mock.calls[0][0])).not.toContain("one-time-secret");
+  });
+
   it("records a hard failure in production when email is not configured", async () => {
     vi.stubEnv("EMAIL_PROVIDER_API_KEY", "");
     vi.stubEnv("EMAIL_FROM", "");
@@ -90,7 +125,7 @@ describe("queueEmailVerification", () => {
         status: "failed",
         payload: {
           event: "email_verification",
-          delivery: { status: "failed", providerId: null },
+          delivery: { status: "failed", providerId: null, reason: "not_configured" },
         },
       }),
     });
@@ -115,6 +150,7 @@ describe("queueEmailVerification", () => {
     expect(eventInput.data.payload.delivery).toEqual({
       status: "failed",
       providerId: null,
+      reason: "provider_unavailable",
     });
     expect(JSON.stringify(eventInput)).not.toContain("upstream secret detail");
     expect(JSON.stringify(eventInput)).not.toContain("one-time-secret");

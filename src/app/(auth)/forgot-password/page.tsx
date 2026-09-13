@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 
 export default function ForgotPasswordPage() {
   const [hydrated, setHydrated] = useState(false);
-  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -15,15 +14,16 @@ export default function ForgotPasswordPage() {
     setHydrated(true);
   }, []);
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const submittedEmail = String(new FormData(event.currentTarget).get("email") || "");
     setLoading(true);
     setMessage("");
     try {
       const response = await fetch("/api/auth/password-reset/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: submittedEmail }),
       });
       const data = await readResponseJson(response);
       setMessage(data.message || "Om kontot finns skickar vi en återställningslänk.");
@@ -46,23 +46,29 @@ export default function ForgotPasswordPage() {
       }
     >
       {message ? <AuthAlert tone="neutral">{message}</AuthAlert> : null}
-      <form onSubmit={submit} className="mt-7 space-y-5">
+      <form
+        id="forgot-password-form"
+        method="post"
+        action="/api/auth/password-reset/request"
+        noValidate
+        data-ready={hydrated ? "1" : "0"}
+        onSubmit={submit}
+        className="mt-7 space-y-5"
+      >
         <div>
           <label htmlFor="forgot-password-email" className="block text-sm font-medium text-ink-700">
             E-post
           </label>
           <input
             id="forgot-password-email"
+            name="email"
             type="email"
             required
             maxLength={254}
             autoComplete="email"
             autoFocus
-            readOnly={!hydrated || loading}
-            aria-disabled={!hydrated}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
             className={authInputClass}
+            defaultValue=""
             placeholder="namn@exempel.se"
           />
         </div>
