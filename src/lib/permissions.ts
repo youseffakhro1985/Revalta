@@ -2,6 +2,10 @@ export const USER_ROLES = ["owner", "admin", "manager", "technician", "viewer", 
 
 export type UserRole = (typeof USER_ROLES)[number];
 
+export function isUserRole(role: unknown): role is UserRole {
+  return typeof role === "string" && USER_ROLES.includes(role as UserRole);
+}
+
 function hasRole(role: string, allowed: readonly UserRole[]) {
   return allowed.includes(role as UserRole);
 }
@@ -12,7 +16,7 @@ export function canManageTeam(role: string) {
 
 /** Admins manage the team but cannot mint another account with owner authority. */
 export function canGrantTeamRole(actorRole: string, targetRole: string) {
-  return canManageTeam(actorRole) && (targetRole !== "owner" || actorRole === "owner");
+  return isUserRole(targetRole) && canManageTeam(actorRole) && (targetRole !== "owner" || actorRole === "owner");
 }
 
 export function canManageTickets(role: string) {

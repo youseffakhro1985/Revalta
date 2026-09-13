@@ -31,4 +31,9 @@ describe("assigned-work-access", () => {
     });
     expect(redactTicketReporterPii({ role: "manager" }, ticket)).toEqual(ticket);
   });
+
+  it.each(["resident", "vendor", "superadmin", "OWNER", "", "__proto__"])("nekar intern arbetsåtkomst för rollen %s även vid egen tilldelning", (role) => {
+    expect(isAssignedWorkAccessible({ id: "u1", role }, "u1")).toBe(false);
+    expect(isAssignedWorkAccessible({ id: "u1", role }, "other")).toBe(false);
+  });
 });
