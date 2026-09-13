@@ -151,6 +151,11 @@ async function run() {
       }, { timeout }),
       action(),
     ]);
+    const bodyTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${pathname} body did not complete`)), timeout);
+    });
+    const failure = await Promise.race([response.finished(), bodyTimeout]);
+    if (failure) fail(`${pathname} request failed before the body completed`);
     return response;
   }
 
@@ -347,6 +352,7 @@ async function run() {
     const commandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
     await expectVisible(commandCenter, "Command Center dialog");
     await expectVisible(commandCenter.getByText("Navigera", { exact: true }), "Command Center navigation section");
+    await expectVisible(commandCenterDestination(commandCenter, "Fastigheter"), "Command Center Fastigheter before search");
     const commandInput = commandCenter.getByLabel("Sök i Revalta eller välj kommando");
     await expectVisible(commandInput, "Command Center search input");
     const missingQuery = `missing-${runId}`;
@@ -438,7 +444,11 @@ async function run() {
   }
 }
 
-await run().catch(() => {
-  console.error(`FAIL: browser verification stopped during ${stage}. Raw browser/request details are withheld to protect credentials.`);
+await run().catch((error) => {
+  const message = error instanceof Error ? error.message : "";
+  const safe = Boolean(message) && !/password|cookie|authorization|set-cookie|@/i.test(message);
+  console.error(safe
+    ? `FAIL: browser verification stopped during ${stage}: ${message}`
+    : `FAIL: browser verification stopped during ${stage}. Raw browser/request details are withheld to protect credentials.`);
   process.exitCode = 1;
 });

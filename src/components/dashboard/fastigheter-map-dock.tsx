@@ -177,6 +177,7 @@ export function FastigheterMapDock() {
                   <div className="grid grid-cols-2 gap-2">
                     <Link
                       href={`/dashboard/fastigheter/${selected.id}`}
+                      prefetch={false}
                       className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-petroleum-900 px-3 text-[10px] font-semibold text-white transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300"
                     >
                       <Building2 className="h-3.5 w-3.5" /> Öppna objekt

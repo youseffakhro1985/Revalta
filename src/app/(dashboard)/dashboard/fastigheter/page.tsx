@@ -274,7 +274,7 @@ export default function PropertiesPage() {
           <p className="mt-1 text-sm text-ink-500">Sök, filtrera och följ upp fastighetsbeståndet utan att ladda hela portföljen i webbläsaren.</p>
         </div>
         {canCreate ? (
-          <Link href="/dashboard/fastigheter/ny" className="inline-flex h-10 w-fit items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2">
+          <Link href="/dashboard/fastigheter/ny" prefetch={false} className="inline-flex h-10 w-fit items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2">
             <Plus className="h-4 w-4" /> Ny fastighet
           </Link>
         ) : null}
@@ -428,7 +428,7 @@ export default function PropertiesPage() {
             {upcomingMaintenance.length ? (
               <div className="space-y-1.5">
                 {upcomingMaintenance.map((item) => (
-                  <Link key={item.id} href={item.property_id ? `/dashboard/fastigheter/${item.property_id}` : "/dashboard/drift"} className="group flex items-start gap-2.5 rounded-lg px-1 py-2 transition hover:bg-sand-50">
+                  <Link key={item.id} href={item.property_id ? `/dashboard/fastigheter/${item.property_id}` : "/dashboard/drift"} prefetch={false} className="group flex items-start gap-2.5 rounded-lg px-1 py-2 transition hover:bg-sand-50">
                     <span className="mt-0.5 rounded-md border border-sand-200 bg-sand-50 px-1.5 py-1 text-[9px] font-semibold text-ink-500">{item.planned_year || "—"}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[11px] font-medium text-ink-750">{item.measure || item.component || "Planerad åtgärd"}</span>
