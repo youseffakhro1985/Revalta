@@ -79,7 +79,7 @@ describe("global search tenant isolation", () => {
     const response = await GET(new Request("https://www.revalta.se/api/search?q=port"));
     expect(response.status).toBe(200);
     expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ user_id: "user-solo" }),
+      where: expect.objectContaining({ company_id: { in: [] } }),
     }));
     expect(workOrderFindManyMock).not.toHaveBeenCalled();
     expect(leaseHolderFindManyMock).not.toHaveBeenCalled();

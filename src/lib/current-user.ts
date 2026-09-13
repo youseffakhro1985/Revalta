@@ -77,15 +77,16 @@ export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>
 export type CompanyUser = CurrentUser & { company_id: string };
 
 export function tenantWhere(user: CurrentUser) {
-  return user.company_id ? { company_id: user.company_id } : { user_id: user.id };
+  // Organisation data has no personal fallback after membership is removed.
+  return user.company_id ? { company_id: user.company_id } : { company_id: { in: [] as string[] } };
 }
 
 export function companyScopedWhere(user: CurrentUser) {
-  return user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" };
+  return user.company_id ? { company_id: user.company_id } : { company_id: { in: [] as string[] } };
 }
 
 export function auditScopedWhere(user: CurrentUser) {
-  return user.company_id ? { company_id: user.company_id } : { actor_user_id: user.id };
+  return user.company_id ? { company_id: user.company_id } : { company_id: { in: [] as string[] } };
 }
 
 export function companyUserWhere(user: CurrentUser) {

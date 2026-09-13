@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   isMissingSchemaColumnError,
@@ -104,6 +104,15 @@ export async function GET(request: Request) {
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "properties.list.unauthorized",
+      });
+    }
+
+    if (!requireCompanyUser(user)) {
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        requestId: observability.requestId,
       });
     }
 
@@ -257,6 +266,15 @@ export async function POST(request: Request) {
         event: "properties.create.unauthorized",
       });
     }
+    if (!requireCompanyUser(user)) {
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        requestId: observability.requestId,
+      });
+    }
+
     if (!canCreateProperties(user.role)) {
       return reject(observability, {
         status: 403,

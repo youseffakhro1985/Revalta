@@ -174,7 +174,7 @@ describe("documents/[id]/download", () => {
     expect(response.status).toBe(404);
   });
 
-  it("scopes actor-only users (no company_id) to their own audit log entries", async () => {
+  it("denies former-company legacy documents when membership is removed", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
     auditLogFindFirstMock.mockResolvedValue(null);
 
@@ -183,10 +183,11 @@ describe("documents/[id]/download", () => {
     expect(managedDocumentFindFirstMock).not.toHaveBeenCalled();
     expect(auditLogFindFirstMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ actor_user_id: "user-1" }),
+        where: expect.objectContaining({ company_id: { in: [] } }),
       }),
     );
     expect(response.status).toBe(404);
+    expect(blobGetMock).not.toHaveBeenCalled();
   });
 
   it("returns legacy audit-log-backed base64 documents scoped to the caller's company", async () => {
