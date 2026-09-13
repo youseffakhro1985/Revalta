@@ -32,7 +32,7 @@ A dedicated non-default, non-primary Neon branch exists for Preview/E2E:
 - Neon project: `withered-cell-46849200`
 - branch: `br-restless-salad-ambw5ig8`
 - database: `neondb`
-- reviewed Preview data-plane identity: `2eb0d0064180411ff1a387ae263f65bffb286f72a903c79cc7eb23a729a8abdd`
+- reviewed Preview data-plane identity: `6237f01010de725a8e35dcdb90b4f1b933bb009aa2d822155d6efe18f61ede3f`
 - reviewed Production data-plane identity: `e51d9599fa4b3c03898d33a44d3fb5973987e8fd3569896aa3c005fc5673ba2a`
 
 The two identities are intentionally different.
@@ -97,7 +97,7 @@ Observed on an earlier exact-SHA Vercel Preview on 2026-09-08:
 - deployment ID: present
 - `dataPlane.directMatches`: `true`
 - **observed data-plane identity: `e51d9599fa4b3c03898d33a44d3fb5973987e8fd3569896aa3c005fc5673ba2a`**
-- expected Preview identity: `2eb0d0064180411ff1a387ae263f65bffb286f72a903c79cc7eb23a729a8abdd`
+- expected Preview identity: `6237f01010de725a8e35dcdb90b4f1b933bb009aa2d822155d6efe18f61ede3f`
 
 The observed identity was the reviewed **Production** identity.
 
@@ -124,7 +124,7 @@ After the branch-specific variables are saved, redeploy the exact then-current c
 4. exact current commit SHA
 5. `release.environment=preview`
 6. deployment ID present
-7. `dataPlane.identity=2eb0d0064180411ff1a387ae263f65bffb286f72a903c79cc7eb23a729a8abdd`
+7. `dataPlane.identity=6237f01010de725a8e35dcdb90b4f1b933bb009aa2d822155d6efe18f61ede3f`
 8. `dataPlane.directMatches=true`
 
 Only after these eight checks pass may the E2E fixture variables/credentials be supplied and browser navigation proceed.
