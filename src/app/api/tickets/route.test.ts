@@ -249,3 +249,25 @@ describe("GET /api/tickets pagination", () => {
     );
   });
 });
+
+// Test the route itself; proxy/navigation restrictions are not authorization.
+describe("organisation scope is mandatory", () => {
+  beforeEach(() => vi.clearAllMocks());
+  it.each(["owner", "admin", "manager", "technician", "viewer"])("rejects detached %s before any data access or write", async (role) => {
+    getCurrentUserMock.mockResolvedValue({ id: "former-owner", company_id: null, role });
+    const read = await GET(getRequest());
+    const write = await POST(request());
+    expect(read.status).toBe(403);
+    expect(write.status).toBe(403);
+    expect(ticketFindManyMock).not.toHaveBeenCalled();
+    expect(ticketCountMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+  it.each(["resident", "unknown"])("rejects %s directly even with a company", async (role) => {
+    getCurrentUserMock.mockResolvedValue({ id: "user", company_id: "company-1", role });
+    expect((await GET(getRequest())).status).toBe(403);
+    expect((await POST(request())).status).toBe(403);
+    expect(ticketFindManyMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+});

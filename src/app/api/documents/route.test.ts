@@ -160,18 +160,18 @@ describe("documents route", () => {
     );
   });
 
-  it("scopes document audit logs by actor for solo users and never returns dataUrl", async () => {
+  it("returns no historical company documents after membership is removed", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
+    auditFindManyMock.mockResolvedValue([]);
     const response = await GET(request());
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(managedFindManyMock).not.toHaveBeenCalled();
     expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { actor_user_id: "user-1", entity_type: "document", action: "document.created" },
+      where: { company_id: { in: [] }, entity_type: "document", action: "document.created" },
     }));
-    expect(body.documents[0].dataUrl).toBeUndefined();
-    expect(body.documents[0].downloadUrl).toBe("/api/documents/doc-1/download");
+    expect(body.documents).toEqual([]);
   });
 
   it("omits company lease dump for technicians", async () => {

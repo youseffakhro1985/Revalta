@@ -128,6 +128,22 @@ describe("getCurrentUser", () => {
 });
 
 describe("tenant scoping helpers", () => {
+  it("removing membership cannot expose rows or audit entries from a former company via creator identity", () => {
+    const detached = { ...activeUser, company_id: null, company: null };
+    const retainedRows = [
+      { company_id: "company-1", user_id: detached.id, actor_user_id: detached.id },
+      { company_id: "company-2", user_id: detached.id, actor_user_id: detached.id },
+      { company_id: null, user_id: detached.id, actor_user_id: detached.id },
+      { company_id: "__no_company_scope__", user_id: detached.id, actor_user_id: detached.id },
+    ];
+    for (const scope of [tenantWhere(detached), companyScopedWhere(detached), auditScopedWhere(detached)]) {
+      // Prisma's positive IN predicate must match no tenant, including legacy null rows.
+      expect(scope.company_id).toEqual({ in: [] });
+      const allowed = typeof scope.company_id === "object" ? scope.company_id.in : [scope.company_id];
+      expect(retainedRows.filter((row) => row.company_id !== null && allowed.includes(row.company_id))).toEqual([]);
+    }
+  });
+
   it("uses company scope when the user belongs to a company", () => {
     expect(tenantWhere(activeUser)).toEqual({ company_id: "company-1" });
     expect(companyScopedWhere(activeUser)).toEqual({ company_id: "company-1" });
@@ -138,9 +154,9 @@ describe("tenant scoping helpers", () => {
 
   it("never returns an undefined company filter for users without a company", () => {
     const soloUser = { ...activeUser, company_id: null, company: null };
-    expect(tenantWhere(soloUser)).toEqual({ user_id: "user-1" });
-    expect(companyScopedWhere(soloUser)).toEqual({ company_id: "__no_company_scope__" });
-    expect(auditScopedWhere(soloUser)).toEqual({ actor_user_id: "user-1" });
+    expect(tenantWhere(soloUser)).toEqual({ company_id: { in: [] } });
+    expect(companyScopedWhere(soloUser)).toEqual({ company_id: { in: [] } });
+    expect(auditScopedWhere(soloUser)).toEqual({ company_id: { in: [] } });
     expect(companyUserWhere(soloUser)).toEqual({ id: "user-1" });
     expect(requireCompanyUser(soloUser)).toBeNull();
     expect(requireCompanyUser(null)).toBeNull();

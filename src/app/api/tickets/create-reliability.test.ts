@@ -22,7 +22,8 @@ const {
   loggerErrorMock: vi.fn(),
 }));
 
-vi.mock("@/lib/current-user", () => ({
+vi.mock("@/lib/current-user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/current-user")>()),
   getCurrentUser: getCurrentUserMock,
   canManageTickets: () => true,
   canAssignWorkOrders: () => true,

@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
-import { canAssignWorkOrders, canExportTickets, canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
+import { canAssignWorkOrders, canExportTickets, canManageTickets, getCurrentUser, requireCompanyUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { analyzeTicket } from "@/lib/ai";
@@ -54,6 +54,15 @@ export async function GET(request: Request) {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
+        requestId: observability.requestId,
+      });
+    }
+
+    if (!requireCompanyUser(user)) {
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
         requestId: observability.requestId,
       });
     }
@@ -195,6 +204,15 @@ export async function POST(request: Request) {
         requestId: observability.requestId,
       });
     }
+    if (!requireCompanyUser(user)) {
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        requestId: observability.requestId,
+      });
+    }
+
     if (!canManageTickets(user.role)) {
       observability.logger.warn("ticket create forbidden", observability.elapsed({
         event: "tickets.create.forbidden",
@@ -317,9 +335,7 @@ export async function POST(request: Request) {
 
     if (normalizedAssignedToId) {
       const assignee = await db.user.findFirst({
-        where: user.company_id
-          ? { id: normalizedAssignedToId, company_id: user.company_id }
-          : { id: user.id },
+        where: { id: normalizedAssignedToId, company_id: user.company_id },
         select: { id: true },
       });
 
