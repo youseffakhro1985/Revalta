@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { readResponseJson } from "@/lib/fetch-json";
-import { PageHeader, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
+import { premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Plan = {
   label: string;
@@ -179,14 +179,15 @@ export default function BillingPage() {
 
   return (
     <div className="mx-auto max-w-6xl animate-fade-in space-y-6">
-      <PageHeader
-        catalog="billing"
-        eyebrow="Administration · Abonnemang"
-        title="Planer och kapacitet"
-        description="Se aktiv plan, kapacitetsgränser och betalningsstatus. Planbyten i produktion genomförs säkert via Stripe Checkout."
-        records={billing ? (billing.plans[billing.currentPlan]?.label || billing.currentPlan) : undefined}
-        status={billing?.subscriptionStatus ? (subscriptionStatusLabels[billing.subscriptionStatus] || billing.subscriptionStatus) : "Live"}
-      />
+      <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white text-ink-950 shadow-premium-md">
+        <div className="p-7 sm:p-8">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Abonnemang</p>
+          <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px]">Planer och kapacitet</h1>
+          <p className="mt-3 max-w-2xl text-ink-500">
+            Se aktiv plan, kapacitetsgränser och betalningsstatus. Planbyten i produktion genomförs säkert via Stripe Checkout.
+          </p>
+        </div>
+      </header>
 
       {(error || success) && (
         <div role="status" className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>

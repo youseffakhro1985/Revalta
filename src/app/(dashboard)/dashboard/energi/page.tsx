@@ -202,7 +202,7 @@ export default function EnergyPage() {
   const maxMonthlyCost = Math.max(...monthlyCost.map((row) => row.cost), 1);
 
   return <div className="space-y-8">
-    <PageHeader catalog="energi"
+    <PageHeader
       eyebrow="Drift och hållbarhet"
       title="Energi och förbrukning"
       description="Följ el, värme och vatten per fastighet och period. Upptäck kostnadsdrivare, jämför beståndet och gå från mätvärde till åtgärd med en tydlig driftbild."

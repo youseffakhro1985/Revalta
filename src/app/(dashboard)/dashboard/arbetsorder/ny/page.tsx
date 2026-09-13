@@ -130,7 +130,7 @@ export default function NewWorkOrderPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader catalog="arbetsorder-ny"
+      <PageHeader
         eyebrow="Operativ förvaltning"
         title="Ny arbetsorder"
         description="Skapa en spårbar arbetsorder med ansvar, prioritet, SLA, kostnadsram och tydlig koppling till fastighet och objekt."

@@ -111,7 +111,7 @@ export default function TeamPage() {
   const pending = invites.filter((invite) => !invite.accepted_at).length;
 
   return <div className="space-y-8">
-    <PageHeader catalog="team" eyebrow={companyName} title="Team" description="Hantera roller, ansvar, arbetsbelastning och säker åtkomst för hela förvaltningsorganisationen." />
+    <PageHeader eyebrow={companyName} title="Team" description="Hantera roller, ansvar, arbetsbelastning och säker åtkomst för hela förvaltningsorganisationen." />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <MetricCard icon={UsersRound} label="Aktiva teammedlemmar" value={activeMembers} />

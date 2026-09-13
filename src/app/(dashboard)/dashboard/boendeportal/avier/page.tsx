@@ -69,7 +69,7 @@ export default function ResidentNoticesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader catalog="boende-avier"
+      <PageHeader
         eyebrow="Min boendeservice"
         title="Mina avier"
         description="Hyresavier kopplade till dina aktiva avtal. Kontakta förvaltningen om något saknas."

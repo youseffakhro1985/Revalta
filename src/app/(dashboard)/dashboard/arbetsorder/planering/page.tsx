@@ -142,7 +142,7 @@ export default function TechnicianPlanningPage() {
   }
 
   return <div className="space-y-8">
-    <PageHeader catalog="planering"
+    <PageHeader
       eyebrow="Operativ resursplanering"
       title="Teknikerplanering"
       description={scopedToAssigned

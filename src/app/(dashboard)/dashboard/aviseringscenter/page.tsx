@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, BellRing, CalendarClock, CheckCheck, Clock3, RefreshCw, RotateCcw, TimerReset } from "lucide-react";
-import { PageHeader, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 import { NotificationAssignment } from "@/components/dashboard/notification-assignment";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -168,19 +167,10 @@ export default function NotificationCenterPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
-      <PageHeader
-        catalog="aviseringscenter"
-        eyebrow="Drift · Leveranssäkerhet"
-        title="Aviseringscenter"
-        description="Prioritera service, schemakörningar och SLA-risker, markera läst och hantera aviseringar med full spårbarhet."
-        records={data ? String(data.summary.total) : undefined}
-        action={(
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void load()} disabled={loading} className={premiumSecondaryButtonClass}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
-            <button type="button" onClick={() => void markAllRead()} disabled={!data?.summary.unread} className={premiumPrimaryButtonClass}><CheckCheck className="mr-2 h-4 w-4" /> Markera alla som lästa</button>
-          </div>
-        )}
-      />
+      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-sand-200/80 bg-white p-7 shadow-premium-sm sm:flex-row sm:items-end sm:p-8">
+        <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och leveranssäkerhet</p><h1 className="mt-3 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Aviseringscenter</h1><p className="mt-3 max-w-2xl text-ink-600">Prioritera service, schemakörningar och SLA-risker, markera läst och hantera aviseringar med full spårbarhet.</p></div>
+        <div className="flex flex-wrap gap-2"><button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button><button onClick={() => void markAllRead()} disabled={!data?.summary.unread} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50"><CheckCheck className="h-4 w-4" /> Markera alla som lästa</button></div>
+      </header>
 
       {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm font-semibold text-danger-700">{error}</div> : null}
       {success ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800">{success}</div> : null}

@@ -84,7 +84,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in-soft">
-      <PageHeader catalog="integrationer" eyebrow="System och anslutningar" title="Integrationer" description="Samlad status för externa tjänster, ekonomisystem, tekniska krav och senaste integrationshändelser." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Hemligheter skyddas i miljövariabler</div>} />
+      <PageHeader eyebrow="System och anslutningar" title="Integrationer" description="Samlad status för externa tjänster, ekonomisystem, tekniska krav och senaste integrationshändelser." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Hemligheter skyddas i miljövariabler</div>} />
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 

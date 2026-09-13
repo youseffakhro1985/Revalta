@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertOctagon, CheckCircle2, Clock3, MailWarning, RefreshCw, ShieldCheck, SlidersHorizontal, Users } from "lucide-react";
 import { EscalationAdminActions } from "@/components/dashboard/escalation-admin-actions";
-import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Assignment = {
@@ -114,20 +114,17 @@ export default function EscalationAdminPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
-      <PageHeader
-        catalog="eskaleringar"
-        eyebrow="Administration · Eskaleringar"
-        title="Serviceeskaleringar"
-        description="Övervaka blockerade uppgifter, passerade deadlines, mottagare och den automatiska eskaleringsmotorns leveranshistorik."
-        action={(
-          <div className="flex flex-wrap gap-2">
-            <Link href="/dashboard/installningar/aviseringar" className={premiumSecondaryButtonClass}>Serviceaviseringar</Link>
-            <button type="button" onClick={() => void load()} disabled={loading} className={premiumSecondaryButtonClass}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera
-            </button>
-          </div>
-        )}
-      />
+      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-sand-200/80 bg-white p-7 shadow-premium-sm sm:flex-row sm:items-end sm:p-8">
+        <div>
+          <Link href="/dashboard/installningar/aviseringar" className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">← Serviceaviseringar</Link>
+          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och ansvar</p>
+          <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Serviceeskaleringar</h1>
+          <p className="mt-3 max-w-3xl text-ink-600">Övervaka blockerade uppgifter, passerade deadlines, mottagare och den automatiska eskaleringsmotorns leveranshistorik.</p>
+        </div>
+        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera
+        </button>
+      </header>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 

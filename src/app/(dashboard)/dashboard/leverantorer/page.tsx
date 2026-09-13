@@ -197,7 +197,7 @@ export default function VendorsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in-soft">
-      <PageHeader catalog="leverantorer"
+      <PageHeader
         eyebrow="Organisation · Leverantörsstyrning"
         title="Leverantörer och avtal"
         description="Samla kontaktuppgifter, avtalsvärden, uppsägningstider och kommande avtalsbevakning i ett professionellt leverantörsregister."

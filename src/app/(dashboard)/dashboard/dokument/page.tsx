@@ -24,11 +24,9 @@ import {
 import {
   EmptyState,
   InlineAlert,
-  PageHeader,
   Panel,
   premiumFieldClass,
   premiumPrimaryButtonClass,
-  premiumSecondaryButtonClass,
 } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -522,26 +520,27 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <PageHeader
-        catalog="dokument"
-        eyebrow="Dokument & projekt"
-        title="Dokument"
-        description="Tenant-säkert dokumentarkiv med serverfiltrering, paginering, livscykel, AI-klassificering och spårbar åtkomst."
-        records={data.pagination.total.toLocaleString("sv-SE")}
-        action={(
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void exportMetadata()} disabled={exporting || data.pagination.total === 0} className={premiumSecondaryButtonClass}>
-              <Download className="mr-2 h-4 w-4" /> {exporting ? "Exporterar…" : "Exportera filtrerad CSV"}
+      <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Dokument & fastighetspärm / Översikt</p>
+          <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Dokument</h1>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-500">Tenant-säkert dokumentarkiv med serverfiltrering, paginering, livscykel och spårbar åtkomst.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-success-100 bg-success-50 px-3 text-[11px] font-semibold text-success-800">
+            <span className="h-1.5 w-1.5 rounded-full bg-success-600" /> Live-data
+          </span>
+          <button type="button" onClick={() => void exportMetadata()} disabled={exporting || data.pagination.total === 0} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[11px] font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-50">
+            <Download className="h-4 w-4" /> {exporting ? "Exporterar…" : "Exportera filtrerad CSV"}
+          </button>
+          {data.canManageLifecycle ? (
+            <button type="button" onClick={() => setShowUpload((current) => !current)} className={premiumPrimaryButtonClass}>
+              {showUpload ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+              {showUpload ? "Stäng uppladdning" : "Nytt dokument"}
             </button>
-            {data.canManageLifecycle ? (
-              <button type="button" onClick={() => setShowUpload((current) => !current)} className={premiumPrimaryButtonClass}>
-                {showUpload ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
-                {showUpload ? "Stäng uppladdning" : "Nytt dokument"}
-              </button>
-            ) : null}
-          </div>
-        )}
-      />
+          ) : null}
+        </div>
+      </header>
 
       <nav className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Snabbvägar från dokument">
         <QuickLink href="/dashboard/fastigheter" icon={Building2} label="Fastigheter" detail="Öppna fastighetskort" />
