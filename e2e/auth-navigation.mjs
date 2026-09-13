@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { runVerifiedPreview } from "./preview-runner.mjs";
 import { isPaginatedPropertiesRequest, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
@@ -16,7 +17,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
     const REGISTER_REQUEST_EMIT_TIMEOUT_MS = 5_000;
     const REGISTER_DIAGNOSTIC_TIMEOUT_MS = 20_000;
 
-    const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const runId = `${Date.now()}-${randomBytes(4).toString("hex")}`;
     const email = `e2e-owner-${runId}@example.com`;
     const password = `RevaltaE2E!${runId.slice(-8)}9`;
     const companyName = `E2E Organisation ${runId.slice(-6)}`;
