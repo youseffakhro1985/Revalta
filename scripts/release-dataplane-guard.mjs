@@ -41,6 +41,10 @@ export function assertPreviewDataPlane({
   const pooled = databaseTargetIdentity(databaseUrl);
   const direct = databaseTargetIdentity(directUrl);
 
+  console.error(
+    `Preview data-plane diagnostic DATABASE_URL=${pooled ?? "invalid"} DIRECT_URL=${direct ?? "invalid"} expected=${reviewedPreviewDataPlaneId} production=${productionDataPlaneId}`,
+  );
+
   if (!pooled || !direct) {
     throw new Error("Preview build requires valid PostgreSQL DATABASE_URL and DIRECT_URL targets");
   }
