@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -94,6 +95,35 @@ describe("work-order execution lifecycle boundaries", () => {
     getModernMaterialEntryMock.mockResolvedValue(null);
     upsertTimeEntryMock.mockResolvedValue({});
     upsertMaterialEntryMock.mockResolvedValue({});
+  });
+
+  it.each([
+    { categories: ["before", "after"], before: 1, after: 1 },
+    { categories: ["before_photo", "after_photo"], before: 1, after: 1 },
+    { categories: ["before", "before_photo", "after", "after_photo"], before: 2, after: 2 },
+    { categories: ["invoice", "other"], before: 0, after: 0 },
+  ])("counts both upload vocabularies without cross-company/order photos: $categories", async ({ categories, before, after }) => {
+    // Execute the actual count query against relational fixtures. SQLite is used
+    // only for portable COUNT/WHERE semantics; PostgreSQL integration remains a CI/runtime gate.
+    const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
+    const database = new DatabaseSync(":memory:");
+    database.exec('CREATE TABLE "OperationalDocument" (company_id TEXT, work_order_id TEXT, category TEXT, deleted_at TEXT); CREATE TABLE "WorkOrderChecklistItem" (company_id TEXT, work_order_id TEXT, is_required INTEGER, completed_at TEXT);');
+    const insert = database.prepare('INSERT INTO "OperationalDocument" VALUES (?, ?, ?, NULL)');
+    for (const category of categories) insert.run("company-1", "wo-1", category);
+    for (const category of ["before", "after", "before_photo", "after_photo"]) {
+      insert.run("company-other", "wo-1", category);
+      insert.run("company-1", "wo-other", category);
+    }
+    workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
+    queryRawMock.mockImplementation(async (query: Prisma.Sql) => {
+      if (!sqlText(query).includes("required_incomplete")) return [];
+      return [database.prepare(query.sql.replace(/::integer/g, "")).get(...query.values)];
+    });
+    try {
+      const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/execution"), params);
+      expect(response.status).toBe(200);
+      expect((await response.json()).completion).toMatchObject({ before_photo_count: before, after_photo_count: after });
+    } finally { database.close(); }
   });
 
   it.each(["planned", "new", "waiting_material", "blocked", "completed", "invoiced", "cancelled"])("rejects finalization from %s before writes", async (status) => {
