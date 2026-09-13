@@ -29,6 +29,11 @@ import {
   type WorkOrderPriority,
   type WorkOrderStatus,
 } from "@/lib/work-order-workflow";
+import {
+  assertWorkOrderLockAndVersion,
+  parseWorkOrderLockInput,
+  WorkOrderLockError,
+} from "@/lib/work-order-edit-lock";
 
 function parseOptionalDate(value: unknown) {
   if (value === null || value === "" || value === undefined) return null;
@@ -119,6 +124,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         scheduled_end: true,
         completed_at: true,
         created_at: true,
+        updated_at: true,
       },
     }),
     getWorkOrderEnterpriseState(db, companyId, id),
@@ -242,8 +248,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
+  const lockInput = parseWorkOrderLockInput(body as Record<string, unknown>);
+  if (!lockInput.ok) {
+    if (lockInput.code === "invalid_version") {
+      return NextResponse.json({ error: "Ogiltig arbetsorderversion", code: "invalid_version" }, { status: 400 });
+    }
+    return NextResponse.json(
+      { error: "Ett aktivt redigeringslås och en dokumentversion krävs", code: "lock_required" },
+      { status: 409 },
+    );
+  }
+
   const now = new Date();
-  const transactionResult = await db.$transaction(async (tx) => {
+  let transactionResult;
+  try {
+    transactionResult = await db.$transaction(async (tx) => {
+    await assertWorkOrderLockAndVersion(tx, {
+      companyId,
+      workOrderId: existing.id,
+      userId: user.id,
+      token: lockInput.editToken,
+      expectedUpdatedAt: lockInput.expectedUpdatedAt,
+    });
     const isCompletionTransition = nextStatus === "completed" && normalizeWorkOrderStatus(existing.status) === "in_progress";
     const regularData = { ...data };
     const completionActualCost = regularData.actual_cost;
@@ -254,10 +280,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (Object.keys(regularData).length > 0) {
       const updateResult = await tx.workOrder.updateMany({
-        where: { deleted_at: null, id: existing.id, company_id: companyId },
+        where: {
+          deleted_at: null,
+          id: existing.id,
+          company_id: companyId,
+          updated_at: lockInput.expectedUpdatedAt,
+        },
         data: regularData,
       });
-      if (updateResult.count === 0) throw new Error("WORK_ORDER_NOT_FOUND");
+      if (updateResult.count === 0) throw new WorkOrderLockError("version_conflict");
     }
 
     if (assetLinksChanged) {
@@ -411,10 +442,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }, tx);
 
     return { workOrder: updated, componentSync, ticketSync, enterprise, statusEvents, assetLink };
-  }).catch((error) => {
-    if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") return null;
+    });
+  } catch (error) {
+    if (error instanceof WorkOrderLockError) {
+      if (error.code === "lock_lost") {
+        return NextResponse.json(
+          { error: "Redigeringslåset har gått förlorat. Ladda om arbetsordern.", code: "lock_lost" },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        {
+          error: "Arbetsordern har ändrats av någon annan sedan du öppnade den. Ladda om innan du sparar.",
+          code: "version_conflict",
+        },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") {
+      return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    }
     throw error;
-  });
+  }
 
   if (!transactionResult) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 

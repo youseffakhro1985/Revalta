@@ -27,6 +27,64 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+export class WorkOrderLockError extends Error {
+  readonly code: "lock_lost" | "version_conflict";
+
+  constructor(code: "lock_lost" | "version_conflict") {
+    super(code);
+    this.name = "WorkOrderLockError";
+    this.code = code;
+  }
+}
+
+export function parseWorkOrderLockInput(body: Record<string, unknown>) {
+  const editToken = typeof body.editToken === "string" ? body.editToken.trim() : "";
+  const version = typeof body.version === "string" ? body.version.trim() : "";
+  if (!editToken || !version) return { ok: false as const, code: "lock_required" as const };
+  const expectedUpdatedAt = new Date(version);
+  if (Number.isNaN(expectedUpdatedAt.getTime())) return { ok: false as const, code: "invalid_version" as const };
+  return { ok: true as const, editToken, expectedUpdatedAt };
+}
+
+export async function assertWorkOrderLockAndVersion(
+  tx: Prisma.TransactionClient,
+  args: {
+    companyId: string;
+    workOrderId: string;
+    userId: string;
+    token: string;
+    expectedUpdatedAt: Date;
+  },
+) {
+  const workOrderRows = await tx.$queryRaw<Array<{ updated_at: Date }>>(Prisma.sql`
+    SELECT w."updated_at"
+    FROM "WorkOrder" w
+    WHERE w."id" = ${args.workOrderId}
+      AND w."company_id" = ${args.companyId}
+      AND w."deleted_at" IS NULL
+    FOR UPDATE
+    LIMIT 1
+  `);
+  const workOrder = workOrderRows[0];
+  if (!workOrder) throw new Error("WORK_ORDER_NOT_FOUND");
+
+  const lockRows = await tx.$queryRaw<Array<{ token_hash: string }>>(Prisma.sql`
+    SELECT l."token_hash"
+    FROM "WorkOrderEditLock" l
+    WHERE l."work_order_id" = ${args.workOrderId}
+      AND l."company_id" = ${args.companyId}
+      AND l."user_id" = ${args.userId}
+      AND l."token_hash" = ${hashToken(args.token)}
+      AND l."expires_at" > CURRENT_TIMESTAMP
+    FOR UPDATE
+    LIMIT 1
+  `);
+  if (!lockRows[0]) throw new WorkOrderLockError("lock_lost");
+  if (workOrder.updated_at.getTime() !== args.expectedUpdatedAt.getTime()) {
+    throw new WorkOrderLockError("version_conflict");
+  }
+}
+
 function createToken() {
   return randomBytes(32).toString("base64url");
 }

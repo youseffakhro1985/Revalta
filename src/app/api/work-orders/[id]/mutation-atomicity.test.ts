@@ -72,6 +72,7 @@ const existing = {
   scheduled_end: null,
   completed_at: null,
   created_at: new Date("2026-09-01T08:00:00.000Z"),
+  updated_at: new Date("2026-09-01T09:00:00.000Z"),
 };
 
 const updated = {
@@ -94,6 +95,7 @@ const tx = {
     findFirst: txWorkOrderFindFirstMock,
   },
   $executeRaw: vi.fn(),
+  $queryRaw: vi.fn(),
 };
 
 function ownerUser() {
@@ -106,11 +108,15 @@ function ownerUser() {
   };
 }
 
-function patchRequest() {
+function patchRequest(body: Record<string, unknown> = { title: "Ny rubrik" }) {
   return new Request("https://www.revalta.se/api/work-orders/wo-1", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ title: "Ny rubrik" }),
+    body: JSON.stringify({
+      editToken: "lock-token",
+      version: existing.updated_at.toISOString(),
+      ...body,
+    }),
   });
 }
 
@@ -128,6 +134,9 @@ describe("core work-order mutation atomicity", () => {
     componentSyncMock.mockResolvedValue(null);
     writeAuditLogMock.mockResolvedValue(undefined);
     transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
+    (tx.$queryRaw as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([{ updated_at: existing.updated_at }])
+      .mockResolvedValueOnce([{ token_hash: "held" }]);
   });
 
   it("keeps PATCH mutation, final state reads and mandatory audit in the same transaction", async () => {
@@ -137,7 +146,12 @@ describe("core work-order mutation atomicity", () => {
     expect(response.status).toBe(200);
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(workOrderUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { deleted_at: null, id: "wo-1", company_id: "company-1" },
+      where: {
+        deleted_at: null,
+        id: "wo-1",
+        company_id: "company-1",
+        updated_at: existing.updated_at,
+      },
       data: expect.objectContaining({ title: "Ny rubrik" }),
     }));
     expect(getEnterpriseMock).toHaveBeenLastCalledWith(tx, "company-1", "wo-1");
@@ -149,6 +163,33 @@ describe("core work-order mutation atomicity", () => {
       tx,
     );
     expect(body.workOrder.title).toBe("Ny rubrik");
+  });
+
+  it("rejects PATCH without an edit lock before opening a transaction", async () => {
+    const response = await PATCH(new Request("https://www.revalta.se/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Ny rubrik" }),
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("lock_required");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects PATCH when the held lock version no longer matches inside the transaction", async () => {
+    (tx.$queryRaw as ReturnType<typeof vi.fn>)
+      .mockReset()
+      .mockResolvedValueOnce([{ updated_at: new Date("2026-09-01T10:00:00.000Z") }])
+      .mockResolvedValueOnce([{ token_hash: "held" }]);
+
+    const response = await PATCH(patchRequest(), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("version_conflict");
+    expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("does not report PATCH success when the mandatory audit write fails", async () => {
