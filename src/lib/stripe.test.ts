@@ -38,6 +38,46 @@ describe("verifyStripeSignature", () => {
   });
 });
 
+describe("Stripe catalog constraints", () => {
+  it("accepts an active SEK price that matches the server catalog", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_secret");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test");
+    vi.stubEnv("STRIPE_PRICE_PROFESSIONAL", "price_professional");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: "price_professional",
+      active: true,
+      unit_amount: 99500,
+      currency: "sek",
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+
+    const { assertConfiguredStripePrice } = await import("@/lib/stripe");
+    await expect(assertConfiguredStripePrice("professional")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.stripe.com/v1/prices/price_professional",
+      expect.objectContaining({ headers: { Authorization: "Bearer sk_test_secret" } }),
+    );
+  });
+
+  it("rejects a Stripe price whose amount or currency disagrees with the catalog", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_secret");
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_test");
+    vi.stubEnv("STRIPE_PRICE_START", "price_start");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: "price_start",
+      active: true,
+      unit_amount: 1,
+      currency: "usd",
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.resetModules();
+
+    const { assertConfiguredStripePrice, StripeCatalogError } = await import("@/lib/stripe");
+    await expect(assertConfiguredStripePrice("start")).rejects.toBeInstanceOf(StripeCatalogError);
+  });
+});
+
 describe("Stripe POST idempotency", () => {
   it("forwards the checkout idempotency key to Stripe without changing the form payload", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_secret");

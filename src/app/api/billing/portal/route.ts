@@ -6,7 +6,7 @@ import db from "@/lib/db";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
 import { isProductionRuntime } from "@/lib/runtime-env";
-import { createCustomerPortalSession, isStripeReady } from "@/lib/stripe";
+import { createCustomerPortalSession, isStripeReady, portalIdempotencyKey } from "@/lib/stripe";
 
 const ROUTE = "/api/billing/portal";
 const SUCCESS_HEADERS = {
@@ -125,6 +125,7 @@ export async function POST(request: Request) {
     const session = await createCustomerPortalSession({
       customerId,
       returnUrl: `${origin}/dashboard/billing`,
+      idempotencyKey: portalIdempotencyKey(companyId),
     });
 
     // Stripe already created the external portal session. Telemetry is

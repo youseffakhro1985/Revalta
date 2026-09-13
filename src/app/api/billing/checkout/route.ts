@@ -7,7 +7,13 @@ import { canManageBilling, getCurrentUser } from "@/lib/current-user";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
 import { isProductionRuntime } from "@/lib/runtime-env";
-import { createCheckoutSession, isStripeReady } from "@/lib/stripe";
+import {
+  assertConfiguredStripePrice,
+  checkoutIdempotencyKey,
+  createCheckoutSession,
+  isStripeReady,
+  StripeCatalogError,
+} from "@/lib/stripe";
 
 const ROUTE = "/api/billing/checkout";
 const SUCCESS_HEADERS = {
@@ -128,13 +134,28 @@ export async function POST(request: Request) {
       });
     }
 
+    try {
+      await assertConfiguredStripePrice(plan);
+    } catch (error) {
+      if (error instanceof StripeCatalogError || isProductionRuntime()) {
+        return reject(observability, {
+          status: 503,
+          code: API_ERROR_CODES.serviceUnavailable,
+          message: "Stripe är inte redo för checkout",
+          event: "billing.checkout.catalog_mismatch",
+          context: { userId: user.id, companyId, plan },
+        });
+      }
+      throw error;
+    }
+
     const session = await createCheckoutSession({
       plan,
       customerEmail: user.email,
       companyId,
       successUrl: `${origin}/dashboard/billing?checkout=success&plan=${plan}`,
       cancelUrl: `${origin}/dashboard/billing?checkout=cancelled`,
-      idempotencyKey: `revalta-checkout:${companyId}:${plan}:${observability.requestId}`,
+      idempotencyKey: checkoutIdempotencyKey(companyId, plan),
     });
 
     // Stripe already created an external side effect. Audit and telemetry are
