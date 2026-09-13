@@ -5,6 +5,7 @@ import { getSchemaReadiness } from "@/lib/schema-readiness";
 import { getStorageToken, hasStorageConfig } from "@/lib/storage";
 import { createLogger } from "@/lib/structured-logger";
 import { isStripeBillingReady } from "@/lib/stripe";
+import { previewDataPlaneIdentity } from "@/lib/database-target-identity";
 import { NextRequest, NextResponse } from "next/server";
 
 function buildEnvSnapshot() {
@@ -86,6 +87,11 @@ export async function GET(request: NextRequest) {
   const isPublic = !user;
   const startedAt = Date.now();
   const release = buildReleaseSnapshot();
+  const previewDataPlane = previewDataPlaneIdentity(
+    release.environment,
+    process.env.DATABASE_URL,
+    process.env.DIRECT_URL,
+  );
   const modernStorageOnly = isModernStorageOnly();
   const env = buildEnvSnapshot();
   const logger = createLogger({
@@ -110,6 +116,7 @@ export async function GET(request: NextRequest) {
         database: "ok",
         latencyMs: Date.now() - startedAt,
         release,
+        ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
         modernStorageOnly,
         checkedAt: new Date().toISOString(),
       }, 200, release);
@@ -155,6 +162,7 @@ export async function GET(request: NextRequest) {
       schema,
       latencyMs: Date.now() - startedAt,
       release,
+      ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
       modernStorageOnly,
       env,
       readiness: {
@@ -178,6 +186,7 @@ export async function GET(request: NextRequest) {
       database: "error",
       latencyMs: Date.now() - startedAt,
       release,
+      ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
       modernStorageOnly,
       ...(isPublic ? {} : { env }),
       checkedAt: new Date().toISOString(),

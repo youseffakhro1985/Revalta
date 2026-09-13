@@ -84,7 +84,7 @@ jobs:
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments?sha=${HEAD_SHA}")
 
-            statuses_url=$(printf '%s' "$deployments" | jq -r '[.[] | select(.environment == "Preview")][0].statuses_url // empty')
+            statuses_url=$(printf '%s' "$deployments" | jq -r --arg sha "$HEAD_SHA" '[.[] | select(.environment == "Preview" and .sha == $sha)][0].statuses_url // empty')
             if [[ -n "$statuses_url" ]]; then
               statuses=$(curl --fail --silent --show-error \
                 -H "Authorization: Bearer ${GH_TOKEN}" \
