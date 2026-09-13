@@ -54,6 +54,7 @@ function checkoutReturnMessage() {
 }
 
 export default function BillingPage() {
+  const [loading, setLoading] = useState(true);
   const [billing, setBilling] = useState<BillingData | null>(null);
   const [savingPlan, setSavingPlan] = useState("");
   const [checkoutPlan, setCheckoutPlan] = useState("");
@@ -84,6 +85,8 @@ export default function BillingPage() {
         setBilling(data);
       } catch {
         if (isMounted) setError("Kunde inte kontakta servern");
+      } finally {
+        if (isMounted) setLoading(false);
       }
     }
 
@@ -189,9 +192,9 @@ export default function BillingPage() {
         </div>
       </header>
 
-      {(error || success) && (
-        <div role="status" className={`rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>
-          {error || success}
+      {(success || (billing && error)) && (
+        <div role="status" className={`rounded-2xl border p-4 text-sm font-medium ${error && !success ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>
+          {success || error}
         </div>
       )}
 
@@ -282,8 +285,20 @@ export default function BillingPage() {
             })}
           </section>
         </>
+      ) : loading ? (
+        <div className="h-64 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />
       ) : (
-        <div className="h-64 animate-pulse rounded-2xl bg-sand-100" />
+        <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5 text-sm text-danger-800">
+          <p className="font-semibold">Abonnemangsuppgifterna kunde inte hämtas.</p>
+          <p className="mt-1">{error || "Försök igen om en stund."}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className={`mt-4 ${premiumSecondaryButtonClass}`}
+          >
+            Försök igen
+          </button>
+        </div>
       )}
     </div>
   );
