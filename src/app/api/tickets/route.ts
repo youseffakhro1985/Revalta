@@ -376,6 +376,7 @@ export async function POST(request: Request) {
           ai_recommended_action: analysis.recommendedAction,
           ai_confidence: analysis.confidence,
           ai_processed_at: new Date(),
+          ai_source: analysis.source,
         },
         select: {
           id: true,
@@ -449,6 +450,7 @@ export async function POST(request: Request) {
         priority: analysis.priority,
         confidence: analysis.confidence,
         summary: analysis.summary,
+        source: analysis.source,
       });
     } catch {
       observability.logger.warn("ticket create ai telemetry failed", observability.elapsed({

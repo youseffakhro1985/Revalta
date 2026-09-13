@@ -2,18 +2,22 @@ import { PRIORITIES } from "@/lib/domain-labels";
 
 const TICKET_CATEGORY_OPTIONS = ["vvs", "electricity", "elevator", "security", "cleaning", "other"] as const;
 
-type TicketAnalysis = {
+export type AiSource = "provider" | "fallback" | "staff";
+
+export type TicketAnalysis = {
   category: string;
   priority: string;
   confidence: number;
   summary: string;
   recommendedAction: string;
+  source: AiSource;
 };
 
 export type DocumentAnalysis = {
   category: string;
   confidence: number;
   summary: string;
+  source: AiSource;
 };
 
 export const WORK_ORDER_DOCUMENT_CATEGORIES = [
@@ -70,6 +74,7 @@ function deterministicAnalysis(description: string): TicketAnalysis {
       priority === "urgent"
         ? "Prioritera ärendet omgående och tilldela ansvarig tekniker."
         : "Planera åtgärd och återkoppla till kund med nästa steg.",
+    source: "fallback",
   };
 }
 
@@ -149,6 +154,7 @@ function deterministicDocumentAnalysis(
     category,
     confidence: category === "other" ? 0.52 : 0.84,
     summary: fileName.slice(0, 180),
+    source: "fallback",
   };
 }
 
@@ -199,6 +205,7 @@ export async function analyzeTicket(description: string): Promise<TicketAnalysis
       confidence: boundedConfidence(parsed.confidence, fallback.confidence),
       summary: boundedText(parsed.summary, fallback.summary, 500),
       recommendedAction: boundedText(parsed.recommendedAction, fallback.recommendedAction, 1_000),
+      source: "provider",
     };
   } catch {
     return fallback;
@@ -214,7 +221,7 @@ export async function analyzeDocument(input: {
   const allowed = input.allowedCategories.length > 0 ? input.allowedCategories : ["other"];
   const existing = pickAllowed(input.existingCategory, allowed, "");
   if (existing && existing !== "other") {
-    return { category: existing, confidence: 1, summary: input.fileName.slice(0, 180) };
+    return { category: existing, confidence: 1, summary: input.fileName.slice(0, 180), source: "staff" };
   }
 
   const fallback = deterministicDocumentAnalysis(input.fileName, input.textSnippet || "", allowed);
@@ -260,6 +267,7 @@ export async function analyzeDocument(input: {
       category: pickAllowed(parsed.category, allowed, fallback.category),
       confidence: boundedConfidence(parsed.confidence, fallback.confidence),
       summary: boundedText(parsed.summary, fallback.summary, 500),
+      source: "provider",
     };
   } catch {
     return fallback;

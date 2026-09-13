@@ -67,6 +67,7 @@ export async function GET(
         ai_recommended_action: true,
         ai_confidence: true,
         ai_processed_at: true,
+        ai_source: true,
         property: {
           select: {
             id: true,

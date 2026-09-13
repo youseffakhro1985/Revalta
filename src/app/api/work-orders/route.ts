@@ -468,7 +468,10 @@ export async function POST(request: Request) {
     }
 
     const analysis = await analyzeTicket(`${title}. ${description}`);
-    const notes = String(body.notes || "").trim() || analysis.recommendedAction;
+    const notes = String(body.notes || "").trim()
+      || (analysis.source === "fallback"
+        ? `${analysis.recommendedAction} (regelbaserad analys)`
+        : analysis.recommendedAction);
     const createdAt = new Date();
     const sla = calculateWorkOrderSla(createdAt, priority);
     const workOrder = await db.$transaction(async (tx) => {

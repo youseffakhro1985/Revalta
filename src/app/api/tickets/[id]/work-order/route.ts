@@ -244,6 +244,7 @@ export async function POST(
                 ai_recommended_action: analysis.recommendedAction,
                 ai_confidence: analysis.confidence,
                 ai_processed_at: new Date(),
+                ai_source: analysis.source,
               }
             : {}),
         },

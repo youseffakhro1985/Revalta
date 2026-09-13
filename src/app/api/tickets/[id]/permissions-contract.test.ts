@@ -43,6 +43,7 @@ function ticketRow() {
     ai_recommended_action: null,
     ai_confidence: null,
     ai_processed_at: null,
+    ai_source: null,
     property: { id: "property-1", name: "Storgatan 1", address: "Storgatan 1", city: "Stockholm" },
     assigned_to: { id: "tech-1", name: "Tekniker", email: "tech@example.com" },
     comments: [],

@@ -313,6 +313,7 @@ model Ticket {
   ai_recommended_action String?
   ai_confidence         Float?
   ai_processed_at       DateTime?
+  ai_source             String?
   company               Company?           @relation(fields: [company_id], references: [id])
   user                  User               @relation(fields: [user_id], references: [id])
   property              Property?          @relation(fields: [property_id], references: [id])

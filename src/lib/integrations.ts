@@ -281,5 +281,9 @@ export async function recordStorageEvent(user: IntegrationUser, payload: Record<
 }
 
 export async function recordAiEvent(user: IntegrationUser, payload: Record<string, unknown>) {
-  return recordIntegrationEvent(user, "ai", payload, undefined, "completed");
+  const source = typeof payload.source === "string" ? payload.source : "";
+  const status = source === "provider" || source === "staff" || source === ""
+    ? "completed"
+    : "fallback";
+  return recordIntegrationEvent(user, "ai", payload, undefined, status);
 }

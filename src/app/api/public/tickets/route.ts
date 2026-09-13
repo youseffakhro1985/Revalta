@@ -109,6 +109,7 @@ export async function POST(request: Request) {
           ai_recommended_action: analysis.recommendedAction,
           ai_confidence: analysis.confidence,
           ai_processed_at: new Date(),
+          ai_source: analysis.source,
         },
         select: {
           id: true,

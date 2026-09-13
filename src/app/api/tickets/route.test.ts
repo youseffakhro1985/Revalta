@@ -156,6 +156,7 @@ describe("POST /api/tickets", () => {
         ai_recommended_action: expect.any(String),
         ai_confidence: expect.any(Number),
         ai_processed_at: expect.any(Date),
+        ai_source: "fallback",
       }),
     }));
     expect(loggerInfoMock).toHaveBeenCalledWith(

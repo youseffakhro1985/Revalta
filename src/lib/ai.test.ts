@@ -21,9 +21,10 @@ describe("analyzeTicket", () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await analyzeTicket("Vattenläcka i badrummet");
+    const result = await analyzeTicket("Vattenläcka i badrummet");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.source).toBe("provider");
     const [, init] = fetchMock.mock.calls[0];
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
@@ -38,6 +39,7 @@ describe("analyzeTicket", () => {
     // or hanging — same contract as any other fetch failure in this function.
     expect(result.category).toBe("vvs");
     expect(result.priority).toBe("urgent");
+    expect(result.source).toBe("fallback");
   });
 
   it("uses the deterministic analysis directly when no API key is configured", async () => {
@@ -49,6 +51,7 @@ describe("analyzeTicket", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(result.category).toBe("electricity");
+    expect(result.source).toBe("fallback");
   });
 });
 
@@ -69,6 +72,7 @@ describe("analyzeDocument", () => {
     });
     expect(result.category).toBe("before");
     expect(result.confidence).toBe(1);
+    expect(result.source).toBe("staff");
   });
 
   it("classifies work-order invoices from the filename without sending bytes", async () => {
@@ -123,13 +127,13 @@ describe("untrusted provider response validation", () => {
   it("preserves valid classifications and bounds provider text", async () => {
     provider(JSON.stringify({ category: "cleaning", priority: "low", confidence: 0, summary: "s".repeat(5000), recommendedAction: "a".repeat(5000) }));
     const result = await analyzeTicket("Städning");
-    expect(result).toMatchObject({ category: "cleaning", priority: "low", confidence: 0 });
+    expect(result).toMatchObject({ category: "cleaning", priority: "low", confidence: 0, source: "provider" });
     expect(result.summary).toHaveLength(500);
     expect(result.recommendedAction).toHaveLength(1000);
   });
   it("also validates document confidence, category type and summary", async () => {
     provider(JSON.stringify({ category: { value: "invoice" }, confidence: 9, summary: {} }));
     const result = await analyzeDocument({ fileName: "faktura.pdf", allowedCategories: LIBRARY_DOCUMENT_CATEGORIES });
-    expect(result).toEqual({ category: "invoice", confidence: 0.84, summary: "faktura.pdf" });
+    expect(result).toEqual({ category: "invoice", confidence: 0.84, summary: "faktura.pdf", source: "fallback" });
   });
 });

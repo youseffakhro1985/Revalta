@@ -43,6 +43,7 @@ export async function POST(
         ai_recommended_action: analysis.recommendedAction,
         ai_confidence: analysis.confidence,
         ai_processed_at: new Date(),
+        ai_source: analysis.source,
       },
     });
     if (updateResult.count === 0) {
@@ -59,6 +60,7 @@ export async function POST(
         ai_recommended_action: true,
         ai_confidence: true,
         ai_processed_at: true,
+        ai_source: true,
       },
     });
     if (!ticket) {
