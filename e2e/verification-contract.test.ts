@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -32,6 +32,12 @@ describe("authenticated Preview evidence", () => {
   it("does not accept a missing expected company or an unsuccessful profile response", () => {
     expect(() => validateFixtureProfile(200, { user }, { ...fixture, companyId: "" })).toThrow();
     expect(() => validateFixtureProfile(401, { user }, fixture)).toThrow();
+  });
+
+  it("only treats the Fastigheter list contract as paginated property navigation", () => {
+    expect(isPaginatedPropertiesRequest("https://revalta-candidate.vercel.app/api/properties?page=1&pageSize=10")).toBe(true);
+    expect(isPaginatedPropertiesRequest("https://revalta-candidate.vercel.app/api/properties")).toBe(false);
+    expect(isPaginatedPropertiesRequest("https://revalta-candidate.vercel.app/api/search?q=fastighet")).toBe(false);
   });
 
   it("accepts a real empty property list but rejects error fallbacks and malformed pagination", () => {

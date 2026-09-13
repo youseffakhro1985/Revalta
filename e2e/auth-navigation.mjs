@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright";
 import { randomBytes } from "node:crypto";
 import { validateTarget, validateRelease } from "./target-policy.mjs";
-import { validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
+import { validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse, isPaginatedPropertiesRequest } from "./verification-contract.mjs";
 
 let stage = "target policy";
 async function run() {
@@ -140,13 +140,14 @@ async function run() {
     }
   });
 
-  async function observeResponse(pathname, action, { method = "GET", query, timeout = 20_000 } = {}) {
+  async function observeResponse(pathname, action, { method = "GET", query, paginated = false, timeout = 20_000 } = {}) {
     const [response] = await Promise.all([
       page.waitForResponse((response) => {
         const url = new URL(response.url());
         return url.origin === baseUrl && url.pathname === pathname
           && response.request().method() === method
-          && (query === undefined || url.searchParams.get("q") === query);
+          && (query === undefined || url.searchParams.get("q") === query)
+          && (!paginated || isPaginatedPropertiesRequest(response.url()));
       }, { timeout }),
       action(),
     ]);
@@ -159,7 +160,7 @@ async function run() {
   }
 
   async function visitProperties(link) {
-    const response = await observeResponse("/api/properties", () => link.click());
+    const response = await observeResponse("/api/properties", () => link.click(), { paginated: true });
     validatePropertiesResponse(response.status(), await response.json());
     await expectPath(page, "/dashboard/fastigheter");
     await expectVisible(page.getByRole("heading", { name: "Fastigheter", exact: true, level: 1 }), "property page heading");

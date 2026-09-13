@@ -24,6 +24,15 @@ export function validateFixtureProfile(status, body, { email, companyId }) {
   }
 }
 
+export function isPaginatedPropertiesRequest(url) {
+  try {
+    const parsed = new URL(url, "https://e2e.invalid");
+    return parsed.pathname === "/api/properties" && parsed.searchParams.has("page");
+  } catch {
+    return false;
+  }
+}
+
 export function validatePropertiesResponse(status, body) {
   if (
     status !== 200
