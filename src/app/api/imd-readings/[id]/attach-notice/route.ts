@@ -1,186 +1,141 @@
+import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { auditScopedWhere, canManageLeases, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { asNumber, parseDateOnly } from "@/lib/dual-list";
-import { createLogger } from "@/lib/structured-logger";
+import { parseDateOnly } from "@/lib/dual-list";
+import { createRouteObservability } from "@/lib/route-observability";
 
-const logger = createLogger({ route: "/api/imd-readings/[id]/attach-notice" });
+class AttachConflict extends Error {
+  constructor(message: string, readonly status = 409) { super(message); }
+}
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const observability = createRouteObservability(request, "/api/imd-readings/[id]/attach-notice");
+  const respond = (body: unknown, status = 200) => observability.correlate(NextResponse.json(body, {
+    status,
+    headers: { "Cache-Control": "private, no-store", "Vercel-CDN-Cache-Control": "no-store" },
+  }));
   try {
     const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-
+    if (!user) return respond({ error: "Obehörig" }, 401);
+    if (!canManageLeases(user.role)) return respond({ error: "Du saknar behörighet" }, 403);
+    if (!user.company_id) return respond({ error: "Användaren saknar organisation" }, 400);
+    const companyId = user.company_id;
     const { id } = await params;
-    const body = await request.json().catch(() => null) as {
-      rentNoticeId?: unknown;
-      leaseId?: unknown;
-      createNotice?: unknown;
-      dueDate?: unknown;
-    } | null;
+    const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return respond({ error: "Ogiltig begäran" }, 400);
+    const rentNoticeId = typeof body.rentNoticeId === "string" ? body.rentNoticeId.trim() : "";
+    const requestedLeaseId = typeof body.leaseId === "string" ? body.leaseId.trim() : "";
+    const createNotice = body.createNotice === true;
+    if ((!rentNoticeId && !createNotice) || (rentNoticeId && createNotice)) {
+      return respond({ error: "Välj en befintlig hyresavi eller skapa en ny" }, 400);
+    }
+    const dueDateRaw = typeof body.dueDate === "string" ? body.dueDate.trim() : "";
+    const parsedDueDate = parseDateOnly(dueDateRaw);
+    if (body.dueDate !== undefined && !parsedDueDate) return respond({ error: "Ogiltigt förfallodatum" }, 400);
 
-    const reading = await db.imdReading.findFirst({
-      where: { id, company_id: user.company_id, property: { deleted_at: null } },
-      include: { debit_line: true, property: { select: { id: true, name: true } } },
-    });
-    if (!reading) {
-      const orphaned = await db.imdReading.findFirst({
-        where: { id, company_id: user.company_id },
-        select: { id: true },
+    // All reads, the debit claim, the notice and its audit share one snapshot.
+    // Concurrent edits/attachments fail with 409 rather than overwriting money.
+    const result = await db.$transaction(async (tx) => {
+      const reading = await tx.imdReading.findFirst({
+        where: { id, company_id: companyId, property: { deleted_at: null } },
+        include: { debit_line: true },
       });
-      if (orphaned) {
-        return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
+      if (!reading) {
+        const legacy = await tx.auditLog.findFirst({
+          where: { ...auditScopedWhere(user), action: "imd.reading.created", id },
+          select: { metadata: true },
+        });
+        const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
+        if (legacy && metadata.storage !== "ImdReading") {
+          throw new AttachConflict("Avläsningen finns i äldre lagring och behöver backfill innan den kan kopplas till hyresavi.");
+        }
+        throw new AttachConflict("Avläsningen hittades inte", 404);
       }
-      const legacy = await db.auditLog.findFirst({
-        where: { ...auditScopedWhere(user), action: "imd.reading.created", id },
-        select: { id: true, metadata: true },
-      });
-      const metadata = (legacy?.metadata || {}) as Record<string, unknown>;
-      if (legacy && metadata.storage !== "ImdReading") {
-        return NextResponse.json({
-          error: "Avläsningen finns kvar i äldre lagring. Kör backfill till ImdReading innan den kan kopplas till hyresavi.",
-        }, { status: 409 });
+      if (reading.voided_at) throw new AttachConflict("Makulerade avläsningar kan inte kopplas till hyresavi");
+      const debit = reading.debit_line;
+      if (!debit) throw new AttachConflict("Debiteringsrad saknas för avläsningen");
+      if (debit.status !== "open" || debit.rent_notice_id) throw new AttachConflict("Debiteringsraden är inte öppen för koppling");
+      const charge = new Prisma.Decimal(reading.charge);
+      if (debit.company_id !== companyId || debit.property_id !== reading.property_id
+        || debit.unit !== reading.unit || debit.period !== reading.period
+        || !charge.isFinite() || charge.isNegative() || !charge.equals(debit.charge)) {
+        throw new AttachConflict("Avläsningen och debiteringsraden stämmer inte överens. Kontrollera underlaget.");
       }
-      return NextResponse.json({ error: "Avläsningen hittades inte" }, { status: 404 });
-    }
-    if (reading.voided_at) {
-      return NextResponse.json({ error: "Makulerade avläsningar kan inte kopplas till hyresavi" }, { status: 409 });
-    }
-    if (!reading.debit_line) return NextResponse.json({ error: "Debiteringsrad saknas för avläsningen" }, { status: 409 });
-    if (reading.debit_line.status === "linked" && reading.debit_line.rent_notice_id) {
-      return NextResponse.json({ error: "Debiteringsraden är redan kopplad till en hyresavi", rentNoticeId: reading.debit_line.rent_notice_id }, { status: 409 });
-    }
-    if (reading.debit_line.status === "voided") {
-      return NextResponse.json({ error: "Makulerade debiteringsrader kan inte kopplas till hyresavi" }, { status: 409 });
-    }
+      if (requestedLeaseId && debit.lease_id && requestedLeaseId !== debit.lease_id) {
+        throw new AttachConflict("Hyresavtalet stämmer inte med debiteringsraden");
+      }
 
-    const rentNoticeId = typeof body?.rentNoticeId === "string" ? body.rentNoticeId.trim() : "";
-    const leaseId = typeof body?.leaseId === "string" ? body.leaseId.trim() : reading.debit_line.lease_id || "";
-    const createNotice = body?.createNotice === true;
-    const charge = asNumber(reading.charge);
-
-    let notice = rentNoticeId
-      ? await db.rentNotice.findFirst({
-          where: {
-            id: rentNoticeId,
-            company_id: user.company_id,
-            property_id: reading.property_id,
-            property: { deleted_at: null },
-          },
-        })
-      : null;
-
-    if (!notice && createNotice) {
-      if (!leaseId) return NextResponse.json({ error: "Hyresavtal krävs för att skapa avi" }, { status: 400 });
-      const lease = await db.lease.findFirst({
-        where: { id: leaseId, company_id: user.company_id, property_id: reading.property_id, deleted_at: null },
-        include: {
-          lease_holder: { select: { name: true } },
-          unit: { select: { designation: true } },
-        },
-      });
-      if (!lease) return NextResponse.json({ error: "Hyresavtalet hittades inte" }, { status: 404 });
-
-      const dueDateRaw = typeof body?.dueDate === "string" ? body.dueDate.trim() : "";
-      const dueDate = parseDateOnly(dueDateRaw)
-        || new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1));
-      const baseRent = Number(lease.monthly_rent);
-      const indexedRent = baseRent;
-      const total = Math.max(0, indexedRent + charge);
-
-      notice = await db.rentNotice.create({
-        data: {
-          company_id: user.company_id,
-          property_id: reading.property_id,
-          lease_id: lease.id,
-          tenant_name: lease.lease_holder.name,
-          unit: lease.unit.designation,
-          period: reading.period,
-          due_date: dueDate,
-          status: "draft",
-          base_rent: baseRent,
-          index_percent: 0,
-          indexed_rent: indexedRent,
-          additions: charge,
-          deductions: 0,
-          total,
-          note: `IMD ${reading.meter_type} ${reading.meter_id}`,
-          created_by_id: user.id,
-        },
-      });
-    }
-
-    if (!notice) {
-      return NextResponse.json({ error: "Ange befintlig hyresavi eller skapa en ny" }, { status: 400 });
-    }
-
-    const nextAdditions = asNumber(notice.additions) + charge;
-    const nextTotal = Math.max(0, asNumber(notice.indexed_rent) + nextAdditions - asNumber(notice.deductions));
-
-    const updated = await db.$transaction(async (tx) => {
-      const debit = await tx.imdDebitLine.updateMany({
+      let notice = rentNoticeId ? await tx.rentNotice.findFirst({
+        where: { id: rentNoticeId, company_id: companyId, property_id: reading.property_id, property: { deleted_at: null } },
+      }) : null;
+      if (rentNoticeId && !notice) throw new AttachConflict("Hyresavin hittades inte", 404);
+      if (notice && (notice.status !== "draft" || notice.unit !== reading.unit || notice.period !== reading.period)) {
+        throw new AttachConflict("Välj ett utkast för samma objekt och period som avläsningen");
+      }
+      const leaseId = requestedLeaseId || debit.lease_id || notice?.lease_id || "";
+      if (!leaseId || (notice && notice.lease_id !== leaseId)) {
+        throw new AttachConflict("Ett verifierat hyresavtal krävs för kopplingen");
+      }
+      const lease = await tx.lease.findFirst({
         where: {
-          id: reading.debit_line!.id,
-          company_id: user.company_id!,
-          status: "open",
+          id: leaseId, company_id: companyId, property_id: reading.property_id, deleted_at: null,
+          property: { deleted_at: null },
+          unit: { property_id: reading.property_id, designation: reading.unit },
         },
-        data: {
-          status: "linked",
-          rent_notice_id: notice!.id,
-          lease_id: notice!.lease_id || leaseId || null,
-        },
+        include: { lease_holder: { select: { name: true } }, unit: { select: { designation: true } } },
       });
-      if (debit.count === 0) {
-        throw new Error("debit_already_linked");
+      if (!lease) throw new AttachConflict("Hyresavtalet för objektet hittades inte", 404);
+
+      if (!notice) {
+        const now = new Date();
+        const baseRent = new Prisma.Decimal(lease.monthly_rent);
+        notice = await tx.rentNotice.create({
+          data: {
+            company_id: companyId, property_id: reading.property_id, lease_id: lease.id,
+            tenant_name: lease.lease_holder.name, unit: lease.unit.designation, period: reading.period,
+            due_date: parsedDueDate || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
+            status: "draft", base_rent: baseRent, index_percent: 0, indexed_rent: baseRent,
+            // The single debit increment below is shared with existing notices.
+            additions: 0, deductions: 0, total: baseRent, created_by_id: user.id,
+          },
+        });
       }
-
-      await tx.rentNotice.updateMany({
-        where: { id: notice!.id, company_id: user.company_id! },
+      const claimed = await tx.imdDebitLine.updateMany({
+        where: { id: debit.id, company_id: companyId, status: "open", rent_notice_id: null, updated_at: debit.updated_at },
+        data: { status: "linked", rent_notice_id: notice.id, lease_id: lease.id },
+      });
+      if (claimed.count !== 1) throw new AttachConflict("Debiteringsraden har ändrats. Ladda om och försök igen.");
+      const additions = new Prisma.Decimal(notice.additions).plus(charge);
+      const total = Prisma.Decimal.max(0, new Prisma.Decimal(notice.indexed_rent).plus(additions).minus(notice.deductions));
+      const changed = await tx.rentNotice.updateMany({
+        where: { id: notice.id, company_id: companyId, status: "draft", updated_at: notice.updated_at },
         data: {
-          additions: nextAdditions,
-          total: nextTotal,
-          note: [notice!.note, `IMD ${reading.meter_type} ${reading.meter_id}: ${charge.toLocaleString("sv-SE")} kr`]
-            .filter(Boolean)
-            .join(" · ")
-            .slice(0, 1000),
+          additions, total,
+          note: [notice.note, `IMD ${reading.meter_type} ${reading.meter_id}: ${charge.toFixed(2)} kr`].filter(Boolean).join(" · ").slice(0, 1000),
         },
       });
-
-      return tx.imdDebitLine.findFirst({
-        where: { id: reading.debit_line!.id, company_id: user.company_id! },
-        select: { id: true, status: true, rent_notice_id: true, lease_id: true, charge: true },
-      });
-    });
-
-    await writeAuditLog(user, {
-      entityType: "imd_debit",
-      entityId: reading.debit_line.id,
-      action: "imd.debit.linked",
-      metadata: {
-        readingId: reading.id,
+      if (changed.count !== 1) throw new AttachConflict("Hyresavin har ändrats. Ladda om och försök igen.");
+      await writeAuditLog(user, {
+        entityType: "imd_debit", entityId: debit.id, action: "imd.debit.linked",
+        metadata: { readingId: reading.id, rentNoticeId: notice.id, charge: charge.toNumber(), propertyId: reading.property_id, createdNotice: createNotice },
+      }, tx);
+      return {
+        debit: await tx.imdDebitLine.findFirst({
+          where: { id: debit.id, company_id: companyId },
+          select: { id: true, status: true, rent_notice_id: true, lease_id: true, charge: true },
+        }),
         rentNoticeId: notice.id,
-        charge,
-        propertyId: reading.property_id,
-        createdNotice: createNotice && !rentNoticeId,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      debit: updated,
-      rentNoticeId: notice.id,
-    });
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    return respond({ success: true, ...result });
   } catch (error) {
-    if (error instanceof Error && error.message === "debit_already_linked") {
-      return NextResponse.json({ error: "Debiteringsraden är redan kopplad" }, { status: 409 });
+    if (error instanceof AttachConflict) return respond({ error: error.message }, error.status);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return respond({ error: "Underlaget ändrades samtidigt. Ladda om och försök igen." }, 409);
     }
-    logger.error("Attach IMD debit error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    observability.logger.error("imd.debit.attach_failed", undefined, observability.elapsed());
+    return respond({ error: "Kopplingen kunde inte slutföras. Försök igen." }, 500);
   }
 }
