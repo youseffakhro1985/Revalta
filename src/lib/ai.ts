@@ -199,9 +199,12 @@ export async function analyzeTicket(description: string): Promise<TicketAnalysis
 
     const parsed = providerRecord(JSON.parse(content));
     if (!parsed) return fallback;
+    const category = pickAllowed(parsed.category, TICKET_CATEGORY_OPTIONS, "");
+    const priority = pickAllowed(parsed.priority, PRIORITIES, "");
+    if (!category || !priority) return fallback;
     return {
-      category: pickAllowed(parsed.category, TICKET_CATEGORY_OPTIONS, fallback.category),
-      priority: pickAllowed(parsed.priority, PRIORITIES, fallback.priority),
+      category,
+      priority,
       confidence: boundedConfidence(parsed.confidence, fallback.confidence),
       summary: boundedText(parsed.summary, fallback.summary, 500),
       recommendedAction: boundedText(parsed.recommendedAction, fallback.recommendedAction, 1_000),
@@ -263,8 +266,10 @@ export async function analyzeDocument(input: {
     }
     const parsed = providerRecord(JSON.parse(content));
     if (!parsed) return fallback;
+    const category = pickAllowed(parsed.category, allowed, "");
+    if (!category) return fallback;
     return {
-      category: pickAllowed(parsed.category, allowed, fallback.category),
+      category,
       confidence: boundedConfidence(parsed.confidence, fallback.confidence),
       summary: boundedText(parsed.summary, fallback.summary, 500),
       source: "provider",
