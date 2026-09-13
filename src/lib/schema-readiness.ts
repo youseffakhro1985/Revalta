@@ -12,11 +12,37 @@ export { REQUIRED_SOFT_DELETE_COLUMNS, SOFT_DELETE_MODELS };
 export type SoftDeleteTable = SoftDeleteModel;
 export type SchemaColumnRequirement = (typeof REQUIRED_SOFT_DELETE_COLUMNS)[number];
 
+export type SchemaMissingItem = { table: string; column: string };
+
 export type SchemaReadiness = {
   ready: boolean;
-  missing: Array<{ table: string; column: string }>;
+  missing: SchemaMissingItem[];
   checkedAt: string;
 };
+
+/** Tables that APIs query directly and that 500 when absent even if soft-delete columns exist. */
+export const REQUIRED_OPERATIONAL_TABLES = ["InspectionChecklistTemplate"] as const;
+
+export function formatSchemaMissingItem(item: SchemaMissingItem) {
+  return item.column === "*" ? item.table : `${item.table}.${item.column}`;
+}
+
+export function formatSchemaMissing(missing: unknown) {
+  if (!Array.isArray(missing) || missing.length === 0) return "";
+  return missing
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object" && "table" in item) {
+        const table = String((item as SchemaMissingItem).table || "").trim();
+        const column = String((item as SchemaMissingItem).column || "").trim();
+        if (!table) return "";
+        return formatSchemaMissingItem({ table, column: column || "*" });
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join(", ");
+}
 
 function errorText(error: unknown): string {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -53,8 +79,24 @@ export function schemaCompatibilityBannerMessage() {
 }
 
 export async function getSchemaReadiness(): Promise<SchemaReadiness> {
-  const missingModels = await getMissingSoftDeleteModels(getPrismaBaseClient());
-  const missing = [...missingModels].map((table) => ({ table, column: "deleted_at" }));
+  const client = getPrismaBaseClient();
+  const missingModels = await getMissingSoftDeleteModels(client);
+  const missing: SchemaMissingItem[] = [...missingModels].map((table) => ({ table, column: "deleted_at" }));
+
+  const requiredTables = [...REQUIRED_OPERATIONAL_TABLES];
+  const tableRows = await client.$queryRaw<Array<{ table_name: string }>>`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name IN (${Prisma.join(requiredTables)})
+  `;
+  const presentTables = new Set(tableRows.map((row) => row.table_name));
+  for (const table of REQUIRED_OPERATIONAL_TABLES) {
+    if (!presentTables.has(table)) {
+      missing.push({ table, column: "*" });
+    }
+  }
+
   return {
     ready: missing.length === 0,
     missing,
