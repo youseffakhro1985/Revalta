@@ -167,11 +167,13 @@ function roleLabelFor(role: string) {
 
 export function DashboardShell({
   children,
+  userId,
   role,
   userName,
   userEmail,
 }: {
   children: React.ReactNode;
+  userId: string;
   role: string;
   userName?: string | null;
   userEmail: string;
@@ -247,7 +249,7 @@ export function DashboardShell({
               <button type="button" onClick={() => setMobileOpen(true)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-sand-200 bg-white text-ink-700 outline-none shadow-premium-sm focus-visible:ring-2 focus-visible:ring-petroleum-300" aria-label="Öppna meny" aria-expanded={mobileOpen}><Menu className="h-5 w-5" /></button>
               <Link href={homeHref} prefetch={false} className="font-display text-[20px] font-semibold tracking-[-0.04em] text-petroleum-950">REVALTA</Link>
             </div>
-            <div className="flex min-w-0 flex-1 justify-end lg:justify-start">{resident ? null : <GlobalSearch />}</div>
+            <div className="flex min-w-0 flex-1 justify-end lg:justify-start">{resident ? null : <GlobalSearch userId={userId} role={role} />}</div>
             <div className="flex items-center gap-2 sm:gap-2.5">
               {resident ? null : <WorkOrderLockIndicator />}
               {resident ? null : <NotificationMenu />}

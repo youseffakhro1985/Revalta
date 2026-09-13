@@ -6,9 +6,11 @@ describe("command center links", () => {
     const source = readFileSync(new URL("./global-search.tsx", import.meta.url), "utf8");
     expect(source).not.toContain("next/link");
     expect(source).not.toMatch(/<a[\s>]/);
+    expect(source).not.toContain("/api/settings/profile");
     expect(source).toContain("function CommandLink");
     expect(source).toContain("router.push(href)");
     expect(source).toContain('<button type="button"');
     expect(source).toContain('priority: "high"');
+    expect(source).toContain("userId");
   });
 });

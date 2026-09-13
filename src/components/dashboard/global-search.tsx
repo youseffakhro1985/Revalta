@@ -64,21 +64,12 @@ type NavigationGroup = {
 
 const EMPTY_STATE: CommandCenterState = { favorites: [], recents: [] };
 
-function isContext(value: unknown): value is { user: CommandCenterContext } {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const user = (value as { user?: unknown }).user;
-  if (!user || typeof user !== "object" || Array.isArray(user)) return false;
-  const candidate = user as Partial<CommandCenterContext>;
-  return typeof candidate.id === "string" && candidate.id.length > 0 && typeof candidate.role === "string" && candidate.role.length > 0;
-}
-
-export function GlobalSearch() {
+export function GlobalSearch({ userId, role }: { userId: string; role: string }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CommandCenterObject[]>([]);
   const [loading, setLoading] = useState(false);
-  const [context, setContext] = useState<CommandCenterContext | null>(null);
-  const [contextLoading, setContextLoading] = useState(false);
+  const context = useMemo<CommandCenterContext>(() => ({ id: userId, role }), [userId, role]);
   const [commandState, setCommandState] = useState<CommandCenterState>(EMPTY_STATE);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -105,25 +96,6 @@ export function GlobalSearch() {
   }, [open]);
 
   useEffect(() => {
-    if (!open || context || contextLoading) return;
-    let mounted = true;
-    setContextLoading(true);
-    void (async () => {
-      try {
-        const response = await fetch("/api/settings/profile", { cache: "no-store" });
-        const body = await readResponseJson(response);
-        if (mounted && response.ok && isContext(body)) setContext(body.user);
-      } finally {
-        if (mounted) setContextLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [context, contextLoading, open]);
-
-  useEffect(() => {
-    if (!context) return;
     try {
       setCommandState(parseCommandCenterState(window.localStorage.getItem(commandCenterStorageKey(context.id))));
     } catch {
@@ -169,20 +141,18 @@ export function GlobalSearch() {
   }, [query]);
 
   const navigationGroups = useMemo<NavigationGroup[]>(() => {
-    if (!context) return [];
     return [
       { label: "Arbetsyta", items: visibleDashboardItems(staffPrimaryNavigation, context.role) },
       ...visibleDashboardSections(context.role).map((section) => ({ label: section.label, items: section.items })),
       { label: "Administration", items: [staffSettingsNavigation] },
     ].filter((group) => group.items.length > 0);
-  }, [context]);
+  }, [context.role]);
 
-  const quickActions = useMemo(() => context ? commandCenterQuickActions(context.role) : [], [context]);
+  const quickActions = useMemo(() => commandCenterQuickActions(context.role), [context.role]);
   const normalizedQuery = query.trim();
 
   function persist(next: CommandCenterState) {
     setCommandState(next);
-    if (!context) return;
     try {
       window.localStorage.setItem(commandCenterStorageKey(context.id), JSON.stringify(next));
     } catch {
@@ -277,7 +247,6 @@ export function GlobalSearch() {
                 </div>
               ) : (
                 <CommandHome
-                  contextLoading={contextLoading}
                   navigationGroups={navigationGroups}
                   quickActions={quickActions}
                   state={commandState}
@@ -300,7 +269,6 @@ export function GlobalSearch() {
 }
 
 function CommandHome({
-  contextLoading,
   navigationGroups,
   quickActions,
   state,
@@ -308,7 +276,6 @@ function CommandHome({
   onNavigate,
   onToggleFavorite,
 }: {
-  contextLoading: boolean;
   navigationGroups: NavigationGroup[];
   quickActions: ReturnType<typeof commandCenterQuickActions>;
   state: CommandCenterState;
@@ -347,11 +314,8 @@ function CommandHome({
 
       <section aria-labelledby="command-modules-heading">
         <SectionHeading id="command-modules-heading" icon={Building2}>Navigera</SectionHeading>
-        {contextLoading && navigationGroups.length === 0 ? (
-          <p className="rounded-xl border border-sand-200 bg-white px-4 py-5 text-center text-[12px] text-ink-500">Läser in dina moduler…</p>
-        ) : (
-          <div className="space-y-3">
-            {navigationGroups.map((group) => (
+        <div className="space-y-3">
+          {navigationGroups.map((group) => (
               <div key={group.label} className="rounded-xl border border-sand-200/80 bg-white p-3">
                 <p className="px-1 pb-2 text-[9px] font-semibold uppercase tracking-[0.15em] text-ink-500">{group.label}</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -367,7 +331,6 @@ function CommandHome({
               </div>
             ))}
           </div>
-        )}
       </section>
     </div>
   );

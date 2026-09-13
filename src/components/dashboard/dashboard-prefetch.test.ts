@@ -15,5 +15,6 @@ describe("dashboard overview prefetch", () => {
     assertLinksDisablePrefetch(readFileSync(new URL("./portfolio-dashboard.tsx", import.meta.url), "utf8"));
     assertLinksDisablePrefetch(readFileSync(new URL("./fastigheter-map-dock.tsx", import.meta.url), "utf8"));
     assertLinksDisablePrefetch(readFileSync(new URL("../../app/(dashboard)/dashboard/fastigheter/page.tsx", import.meta.url), "utf8"));
+    expect(readFileSync(new URL("./dashboard-shell.tsx", import.meta.url), "utf8")).toContain("<GlobalSearch userId={userId} role={role} />");
   });
 });
