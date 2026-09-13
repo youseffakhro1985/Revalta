@@ -61,6 +61,11 @@ describe("getCurrentUser", () => {
     await expect(getCurrentUser()).resolves.toBeNull();
   });
 
+  it.each(["vendor", "superadmin", "OWNER", "", "__proto__"])("rejects an unsupported account role: %s", async (role) => {
+    findUnique.mockResolvedValue({ ...activeUser, role });
+    await expect(getCurrentUser()).resolves.toBeNull();
+  });
+
   it("rejects users in inactive companies", async () => {
     findUnique.mockResolvedValue({
       ...activeUser,
@@ -145,5 +150,11 @@ describe("tenant scoping helpers", () => {
     const residentUser = { ...activeUser, role: "resident" };
     expect(requireCompanyUser(residentUser)).toBeNull();
     expect(requireCompanyMember(residentUser)?.company_id).toBe("company-1");
+  });
+
+  it.each(["vendor", "superadmin", "OWNER", "", "__proto__"])("fail-closes company helpers for unsupported role: %s", (role) => {
+    const user = { ...activeUser, role };
+    expect(requireCompanyUser(user)).toBeNull();
+    expect(requireCompanyMember(user)).toBeNull();
   });
 });

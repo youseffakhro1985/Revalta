@@ -150,10 +150,19 @@ export async function POST(request: Request) {
     after(async () => {
       const deliveryStartedAt = Date.now();
       try {
-        await queueEmailVerification(owner, {
+        const delivery = await queueEmailVerification(owner, {
           recipient: owner.email,
           verificationUrl: verifyUrl,
         });
+        if (delivery.status === "failed") {
+          observability.logger.warn("auth registration verification delivery failed", {
+            event: "auth.registration.verification_delivery_failed",
+            companyId: company.id,
+            userId: owner.id,
+            phaseLatencyMs: phaseLatency(deliveryStartedAt),
+          });
+          return;
+        }
         observability.logger.info("auth registration verification delivery completed", {
           event: "auth.registration.verification_delivery_completed",
           companyId: company.id,

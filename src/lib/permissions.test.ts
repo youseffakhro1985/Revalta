@@ -19,6 +19,7 @@ import {
   canWriteOperations,
   isResident,
   isStaffRole,
+  isUserRole,
   shouldScopeToAssignedWork,
   USER_ROLES,
 } from "@/lib/permissions";
@@ -26,6 +27,12 @@ import {
 describe("permissions", () => {
   it("har en explicit och stabil rollista", () => {
     expect(USER_ROLES).toEqual(["owner", "admin", "manager", "technician", "viewer", "resident"]);
+  });
+
+  it.each(["vendor", "superadmin", "OWNER", "", "__proto__"])("tillåter inte en okänd roll: %s", (role) => {
+    expect(isUserRole(role)).toBe(false);
+    expect(canGrantTeamRole("owner", role)).toBe(false);
+    expect(canGrantTeamRole("admin", role)).toBe(false);
   });
 
   it.each(["owner", "admin"])("låter %s administrera team och granska audit", (role) => {

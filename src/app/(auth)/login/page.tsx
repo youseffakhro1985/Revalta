@@ -13,24 +13,29 @@ const EMAIL_VERIFICATION_REQUIRED = "EMAIL_VERIFICATION_REQUIRED";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [verificationRequired, setVerificationRequired] = useState(false);
   const [resendStatus, setResendStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setHydrated(true);
     const params = new URLSearchParams(window.location.search);
     if (params.get("registered") === "1") {
       setNotice("Kontot är skapat. Kontrollera din e-post och verifiera adressen innan du loggar in.");
     }
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const submittedEmail = String(form.get("email") || "");
+    const submittedPassword = String(form.get("password") || "");
+    setEmail(submittedEmail);
     setError("");
     setResendStatus("");
     setVerificationRequired(false);
@@ -39,7 +44,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: submittedEmail, password: submittedPassword }),
       });
       if (res.ok) {
         const data = await readResponseJson<{ user?: { role?: string } }>(res);
@@ -115,20 +120,28 @@ export default function LoginPage() {
           {resendStatus ? <p className="mt-2 text-xs leading-5 text-ink-500">{resendStatus}</p> : null}
         </div>
       ) : null}
-      <form onSubmit={handleLogin} className="mt-7 space-y-5">
+      <form
+        id="login-form"
+        method="post"
+        action="/api/auth/login"
+        noValidate
+        data-ready={hydrated ? "1" : "0"}
+        onSubmit={handleLogin}
+        className="mt-7 space-y-5"
+      >
         <div>
           <label htmlFor="login-email" className="block text-sm font-medium text-ink-700">
             E-post
           </label>
           <input
             id="login-email"
+            name="email"
             type="email"
             required
             autoComplete="email"
             autoFocus
             className={authInputClass}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            defaultValue=""
             placeholder="namn@exempel.se"
           />
         </div>
@@ -143,12 +156,12 @@ export default function LoginPage() {
           </div>
           <input
             id="login-password"
+            name="password"
             type="password"
             required
             autoComplete="current-password"
             className={authInputClass}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            defaultValue=""
             placeholder="••••••••"
           />
         </div>

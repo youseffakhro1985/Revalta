@@ -101,7 +101,7 @@ describe("POST /api/auth/register", () => {
     });
     emailVerificationTokenCreateMock.mockResolvedValue({ id: "verification-1" });
     writeAuditLogMock.mockResolvedValue(undefined);
-    queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1" });
+    queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1", status: "sent" });
     transactionMock.mockImplementation(async (callback) => callback({
       company: { create: companyCreateMock },
       emailVerificationToken: { create: emailVerificationTokenCreateMock },
@@ -251,8 +251,8 @@ describe("POST /api/auth/register", () => {
   });
 
   it("returns 201 without waiting for a slow verification provider", async () => {
-    let resolveDelivery!: (value: { id: string }) => void;
-    const slowDelivery = new Promise<{ id: string }>((resolve) => {
+    let resolveDelivery!: (value: { id: string; status: string }) => void;
+    const slowDelivery = new Promise<{ id: string; status: string }>((resolve) => {
       resolveDelivery = resolve;
     });
     queueEmailVerificationMock.mockReturnValue(slowDelivery);
@@ -275,7 +275,7 @@ describe("POST /api/auth/register", () => {
     await Promise.resolve();
     expect(settled).toBe(false);
 
-    resolveDelivery({ id: "integration-event-1" });
+    resolveDelivery({ id: "integration-event-1", status: "sent" });
     await afterPromise;
     expect(loggerInfoMock).toHaveBeenCalledWith(
       "auth registration verification delivery completed",
@@ -297,6 +297,27 @@ describe("POST /api/auth/register", () => {
     expect(loggerErrorMock).toHaveBeenCalledWith(
       "auth registration verification delivery failed",
       expect.any(Error),
+      expect.objectContaining({
+        event: "auth.registration.verification_delivery_failed",
+        companyId: "company-1",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("keeps the unused verification token outstanding when delivery is recorded as failed", async () => {
+    queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1", status: "failed" });
+
+    const response = await POST(registrationRequest({
+      companyName: "Exempel AB",
+      email: "owner@example.se",
+      password: "securepass1",
+    }));
+
+    expect(response.status).toBe(201);
+    await runScheduledAfterCallbacks();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "auth registration verification delivery failed",
       expect.objectContaining({
         event: "auth.registration.verification_delivery_failed",
         companyId: "company-1",

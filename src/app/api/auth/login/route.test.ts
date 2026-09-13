@@ -138,7 +138,11 @@ describe("POST /api/auth/login", () => {
       where: { email: "owner@example.se" },
       include: {
         company: { select: { status: true } },
-        email_verification_tokens: { select: { id: true }, take: 1 },
+        email_verification_tokens: {
+          where: { used_at: null },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
     expect(signTokenMock).toHaveBeenCalledWith(expect.objectContaining({ sub: "user-1" }));
@@ -173,7 +177,7 @@ describe("POST /api/auth/login", () => {
     );
   });
 
-  it("keeps pre-verification legacy accounts usable when they have no verification-token history", async () => {
+  it("keeps unverified accounts usable when outstanding verification tokens were consumed", async () => {
     userFindUniqueMock.mockResolvedValue(activeUser({
       email_verified_at: null,
       email_verification_tokens: [],
