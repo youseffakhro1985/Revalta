@@ -126,7 +126,7 @@ export default function ResidentBookingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader catalog="boende-bokningar"
+      <PageHeader
         eyebrow="Min boendeservice"
         title="Mina bokningar"
         description="Boka gemensamma resurser kopplade till ditt hyresavtal, till exempel tvättstuga."

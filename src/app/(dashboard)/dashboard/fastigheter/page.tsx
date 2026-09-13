@@ -16,7 +16,6 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { PageHeader, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -268,18 +267,18 @@ export default function PropertiesPage() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <PageHeader
-        catalog="fastigheter"
-        eyebrow="Portfölj · Fastigheter"
-        title="Fastigheter"
-        description="Sök, filtrera och följ upp fastighetsbeståndet utan att ladda hela portföljen i webbläsaren. Serversökning, paginering och tenant-isolering ingår."
-        records={loading ? "Hämtar…" : pagination.total.toLocaleString("sv-SE")}
-        action={canCreate ? (
-          <Link href="/dashboard/fastigheter/ny" className={premiumPrimaryButtonClass}>
-            <Plus className="mr-2 h-4 w-4" /> Ny fastighet
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portfölj / Fastigheter</p>
+          <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Fastigheter</h1>
+          <p className="mt-1 text-sm text-ink-500">Sök, filtrera och följ upp fastighetsbeståndet utan att ladda hela portföljen i webbläsaren.</p>
+        </div>
+        {canCreate ? (
+          <Link href="/dashboard/fastigheter/ny" className="inline-flex h-10 w-fit items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-[12px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2">
+            <Plus className="h-4 w-4" /> Ny fastighet
           </Link>
-        ) : undefined}
-      />
+        ) : null}
+      </div>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Nyckeltal för fastigheter">
         <KpiCard icon={Building2} label={hasFilters ? "Matchande fastigheter" : "Fastigheter"} value={pagination.total.toLocaleString("sv-SE")} helper={hasFilters ? "Efter aktuell sökning och filter" : "Tenant-avgränsat aktivt bestånd"} />
@@ -348,7 +347,7 @@ export default function PropertiesPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[920px] text-left">
                 <thead>
-                  <tr className="border-b border-sand-100 bg-surface-subtle text-[13px] font-semibold uppercase tracking-[0.06em] text-ink-400">
+                  <tr className="border-b border-sand-100 bg-surface-subtle text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-400">
                     <th className="px-5 py-3">Fastighet</th>
                     <th className="px-3 py-3">Adress</th>
                     <th className="px-3 py-3">Ort</th>
@@ -383,7 +382,7 @@ export default function PropertiesPage() {
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sand-200 bg-sand-50 text-petroleum-700"><Building2 className="h-4 w-4" /></span>
                             <div className="min-w-0">
                               <p className="truncate text-[12px] font-semibold text-ink-900">{property.name}</p>
-                              {property.property_identifier ? <p className="mt-0.5 truncate text-[13px] text-ink-400">{property.property_identifier}</p> : null}
+                              {property.property_identifier ? <p className="mt-0.5 truncate text-[10px] text-ink-400">{property.property_identifier}</p> : null}
                             </div>
                           </div>
                         </td>
@@ -396,7 +395,7 @@ export default function PropertiesPage() {
                           {nextMaintenance ? (
                             <>
                               <span className="block truncate font-medium text-ink-700">{nextMaintenance.measure || nextMaintenance.component || "Planerad åtgärd"}</span>
-                              <span className="mt-0.5 block text-[13px] text-ink-400">{nextMaintenance.planned_year || "Planerad"}</span>
+                              <span className="mt-0.5 block text-[10px] text-ink-400">{nextMaintenance.planned_year || "Planerad"}</span>
                             </>
                           ) : <span className="text-ink-400">Ingen planerad åtgärd</span>}
                         </td>
@@ -411,13 +410,13 @@ export default function PropertiesPage() {
           )}
 
           <div className="flex flex-col gap-3 border-t border-sand-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[13px] text-ink-500">Visar {firstVisible}–{lastVisible} av {pagination.total.toLocaleString("sv-SE")} fastigheter</p>
+            <p className="text-[10px] text-ink-500">Visar {firstVisible}–{lastVisible} av {pagination.total.toLocaleString("sv-SE")} fastigheter</p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" disabled={!pagination.hasPrevious || loading} onClick={() => setPage((value) => Math.max(1, value - 1))} aria-label="Föregående sida" className="flex h-8 w-8 items-center justify-center rounded-lg border border-sand-200 bg-white text-ink-500 transition hover:bg-sand-50 disabled:opacity-35"><ChevronLeft className="h-3.5 w-3.5" /></button>
               <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-petroleum-900 px-2 text-[11px] font-semibold text-white">{pagination.page}</span>
-              <span className="text-[13px] text-ink-400">av {pagination.totalPages}</span>
+              <span className="text-[10px] text-ink-400">av {pagination.totalPages}</span>
               <button type="button" disabled={!pagination.hasNext || loading} onClick={() => setPage((value) => value + 1)} aria-label="Nästa sida" className="flex h-8 w-8 items-center justify-center rounded-lg border border-sand-200 bg-white text-ink-500 transition hover:bg-sand-50 disabled:opacity-35"><ChevronRight className="h-3.5 w-3.5" /></button>
-              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="Antal fastigheter per sida" className="h-8 rounded-lg border border-sand-200 bg-white px-2 text-[13px] font-medium text-ink-600 outline-none focus:ring-2 focus:ring-petroleum-100">
+              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="Antal fastigheter per sida" className="h-8 rounded-lg border border-sand-200 bg-white px-2 text-[10px] font-medium text-ink-600 outline-none focus:ring-2 focus:ring-petroleum-100">
                 {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>Visa {size}</option>)}
               </select>
             </div>
@@ -430,10 +429,10 @@ export default function PropertiesPage() {
               <div className="space-y-1.5">
                 {upcomingMaintenance.map((item) => (
                   <Link key={item.id} href={item.property_id ? `/dashboard/fastigheter/${item.property_id}` : "/dashboard/drift"} className="group flex items-start gap-2.5 rounded-lg px-1 py-2 transition hover:bg-sand-50">
-                    <span className="mt-0.5 rounded-md border border-sand-200 bg-sand-50 px-1.5 py-1 text-[12px] font-semibold text-ink-500">{item.planned_year || "—"}</span>
+                    <span className="mt-0.5 rounded-md border border-sand-200 bg-sand-50 px-1.5 py-1 text-[9px] font-semibold text-ink-500">{item.planned_year || "—"}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[11px] font-medium text-ink-750">{item.measure || item.component || "Planerad åtgärd"}</span>
-                      <span className="mt-0.5 block truncate text-[12px] text-ink-400">{item.property_name || "Fastighet"}</span>
+                      <span className="mt-0.5 block truncate text-[9px] text-ink-400">{item.property_name || "Fastighet"}</span>
                     </span>
                     <ChevronRight className="mt-1 h-3 w-3 shrink-0 text-ink-300 group-hover:text-petroleum-700" />
                   </Link>
@@ -459,12 +458,12 @@ function KpiCard({ icon: Icon, label, value, helper }: { icon: LucideIcon; label
     <article className="rounded-2xl border border-sand-200 bg-white p-4 shadow-premium-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[13px] font-semibold uppercase tracking-[0.08em] text-ink-400">{label}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">{label}</p>
           <p className="mt-2 font-display text-[27px] font-semibold tracking-[-0.04em] text-ink-950">{value}</p>
         </div>
         <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sand-200 bg-sand-50 text-petroleum-700"><Icon className="h-4 w-4" /></span>
       </div>
-      <p className="mt-2 text-[13px] leading-4 text-ink-400">{helper}</p>
+      <p className="mt-2 text-[10px] leading-4 text-ink-400">{helper}</p>
     </article>
   );
 }
@@ -489,7 +488,7 @@ function StatusBadge({ status }: { status: string }) {
     : attention
       ? "border-warning-200 bg-warning-50 text-warning-700"
       : "border-sand-200 bg-sand-50 text-ink-500";
-  return <span className={`inline-flex rounded-full border px-2 py-1 text-[12px] font-semibold ${classes}`}>{statusLabel(status)}</span>;
+  return <span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold ${classes}`}>{statusLabel(status)}</span>;
 }
 
 function statusLabel(status: string) {

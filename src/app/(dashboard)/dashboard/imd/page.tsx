@@ -257,7 +257,7 @@ export default function ImdPage() {
   const hasFilters = Boolean(query || propertyFilter !== "all" || typeFilter !== "all" || debitFilter !== "all");
 
   return <div className="space-y-8">
-    <PageHeader catalog="imd"
+    <PageHeader
       eyebrow="Förbrukning och debitering"
       title="Mätare och IMD"
       description="Individuell mätning och debitering med tydlig kedja från avläsning till debiteringsunderlag och hyresavi."

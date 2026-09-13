@@ -4,7 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarRange, CircleDollarSign, Filter, Landmark, RotateCcw } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 
 type Row = {
   property_id: string;
@@ -30,14 +30,14 @@ const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK
 
 function PortfolioHeading({ children }: { children?: React.ReactNode }) {
   return (
-    <PageHeader
-      catalog="underhall-portfolj"
-      titleId="portfolio-maintenance-heading"
-      eyebrow="Drift · Portföljstyrning"
-      title="Underhållsbudget för hela beståndet"
-      description="Jämför investeringsbehov, finansiering, risker och underhållsskuld mellan organisationens fastigheter."
-      action={children}
-    />
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Portföljstyrning</p>
+        <h1 id="portfolio-maintenance-heading" className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-ink-950">Underhållsbudget för hela beståndet</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Jämför investeringsbehov, finansiering, risker och underhållsskuld mellan organisationens fastigheter.</p>
+      </div>
+      {children}
+    </div>
   );
 }
 

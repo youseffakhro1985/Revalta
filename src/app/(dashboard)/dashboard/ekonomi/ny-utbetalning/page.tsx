@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowLeft, CircleDollarSign, Save } from "lucide-react";
-import { PageHeader } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type BudgetResponse = {
@@ -96,13 +95,13 @@ export default function NewPayoutPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader
-        catalog="ny-utbetalning"
-        eyebrow="Ekonomi · Utbetalning"
-        title="Ny utbetalning"
-        description="Registrera ett verkligt ekonomiskt utfall på rätt fastighet och kostnadsslag. Posten går direkt in i Revaltas befintliga budget- och utfallsdata."
-        action={<Link href="/dashboard/ekonomi" className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><ArrowLeft className="h-3.5 w-3.5" /> Tillbaka till Ekonomi</Link>}
-      />
+      <Link href="/dashboard/ekonomi" className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-petroleum-700 hover:text-petroleum-900"><ArrowLeft className="h-3.5 w-3.5" /> Tillbaka till Ekonomi</Link>
+
+      <header>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Ekonomi / Utbetalning</p>
+        <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950">Ny utbetalning</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-500">Registrera ett verkligt ekonomiskt utfall på rätt fastighet och kostnadsslag. Posten går direkt in i Revaltas befintliga budget- och utfallsdata.</p>
+      </header>
 
       {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">{error}</div> : null}
       {!loading && !canManage ? <div className="rounded-xl border border-sand-200 bg-sand-50 px-4 py-3 text-sm text-ink-600">Du har läsbehörighet men saknar behörighet att registrera ekonomiskt utfall.</div> : null}

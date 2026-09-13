@@ -236,7 +236,7 @@ export default function BudgetPage() {
   const hasFilters = Boolean(query || yearFilter !== "all" || propertyFilter !== "all" || categoryFilter !== "all");
 
   return <div className="space-y-8">
-    <PageHeader catalog="budget"
+    <PageHeader
       eyebrow="Ekonomisk styrning"
       title="Budget, prognos och utfall"
       description="En lugn portföljvy för budgetansvar: filtrera beståndet, hitta avvikelser och följ prognosen utan att tappa underliggande konton."

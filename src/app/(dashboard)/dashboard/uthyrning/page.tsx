@@ -22,11 +22,9 @@ import {
 import {
   EmptyState,
   InlineAlert,
-  PageHeader,
   Panel,
   premiumFieldClass,
   premiumPrimaryButtonClass,
-  premiumSecondaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
@@ -396,32 +394,37 @@ export default function LeasingPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <PageHeader
-        catalog="uthyrning"
-        eyebrow="Boende & uthyrning"
-        title="Uthyrningsöversikt"
-        description="Vakans, hyresparter och avtal samlat i en lugn arbetsyta med tydliga vägar från bestånd till kontrakt och överlämning."
-        records={summary.objects.toLocaleString("sv-SE")}
-        action={(
+      <header className="rounded-[22px] border border-sand-200/90 bg-[#FCFBF7] px-5 py-5 shadow-premium-sm sm:px-6 sm:py-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Uthyrning</p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success-100 bg-success-50 px-2.5 py-1 text-[10px] font-semibold text-success-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-success-500" /> Live-data
+              </span>
+            </div>
+            <h1 className="mt-2 font-display text-[30px] font-semibold tracking-[-0.04em] text-ink-950 sm:text-[34px]">Uthyrningsöversikt</h1>
+            <p className="mt-1.5 max-w-xl text-sm leading-6 text-ink-500">Vakans, hyresparter och avtal samlat i en lugn arbetsyta med tydliga vägar från bestånd till kontrakt och överlämning.</p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/dashboard/uthyrning/overlamning" className={premiumSecondaryButtonClass}>
-              <ClipboardSignature className="mr-2 h-4 w-4" strokeWidth={1.7} /> Överlämning & besiktning
+            <Link href="/dashboard/uthyrning/overlamning" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[12px] font-semibold text-ink-700 shadow-premium-sm transition hover:border-petroleum-200 hover:text-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
+              <ClipboardSignature className="h-4 w-4" strokeWidth={1.7} /> Överlämning & besiktning
             </Link>
             {canManage ? (
-              <button type="button" onClick={openNewForm} className={premiumPrimaryButtonClass}>
+              <button type="button" onClick={openNewForm} className={`${premiumPrimaryButtonClass} h-10 px-4 text-[12px]`}>
                 <Plus className="mr-2 h-4 w-4" /> Nytt avtal
               </button>
             ) : null}
           </div>
-        )}
-      />
+        </div>
 
-      <nav className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Snabbvägar från uthyrning">
-        <QuickLink href="/dashboard/fastigheter" icon={Building2} label="Fastigheter" hint="Bestånd & objekt" />
-        <QuickLink href="/dashboard/hyresavisering" icon={CircleDollarSign} label="Hyresavisering" hint="Avi & betalning" />
-        <QuickLink href="/dashboard/dokument" icon={FileSignature} label="Dokument" hint="Avtal & bilagor" />
-        <QuickLink href="/dashboard/rapporter" icon={CalendarClock} label="Rapporter" hint="Uthyrning & ekonomi" />
-      </nav>
+        <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <QuickLink href="/dashboard/fastigheter" icon={Building2} label="Fastigheter" hint="Bestånd & objekt" />
+          <QuickLink href="/dashboard/hyresavisering" icon={CircleDollarSign} label="Hyresavisering" hint="Avi & betalning" />
+          <QuickLink href="/dashboard/dokument" icon={FileSignature} label="Dokument" hint="Avtal & bilagor" />
+          <QuickLink href="/dashboard/rapporter" icon={CalendarClock} label="Rapporter" hint="Uthyrning & ekonomi" />
+        </div>
+      </header>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Nyckeltal för uthyrning">
         <LeasingMetric icon={DoorOpen} label="Uthyrningsgrad" value={`${summary.occupancy.toLocaleString("sv-SE")} %`} hint={`${summary.occupied} av ${summary.objects} objekt belagda`} tone="petroleum" />

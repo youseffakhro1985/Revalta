@@ -135,7 +135,7 @@ export default function ResidentPortalPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader catalog="boendeportal"
+      <PageHeader
         eyebrow={data?.isResident ? "Min boendeservice" : "Boende och kundservice"}
         title={data?.isResident ? "Mina ärenden" : "Boendeportal"}
         description={data?.isResident

@@ -225,7 +225,7 @@ export default function InspectionsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in-soft">
-      <PageHeader catalog="besiktningar"
+      <PageHeader
         eyebrow="Drift · Efterlevnad"
         title="Besiktningar och myndighetskrav"
         description="Samla OVK, SBA, hisskontroller, energideklarationer, radon och andra återkommande krav i en trygg och tydlig kontrollplan."

@@ -4,7 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, RefreshCw, RotateCcw, Search, Send, XCircle } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
 type Provider = { id: string; name: string; configured: boolean };
 type WorkOrder = { id: string; title: string; status: string; property: { name: string; address: string; city: string } };
@@ -94,21 +94,19 @@ export default function InvoiceExportOperationsPage() {
   const failed = data?.counts.failed ?? 0;
 
   return <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
-    <PageHeader
-      catalog="fakturaexporter"
-      eyebrow="Administration · Ekonomidrift"
-      title="Driftcenter för fakturaexporter"
-      description="Samlad kontroll över Fortnox-, Visma- och webhookexporter för hela organisationen. Följ köer, fel, kvittenser och återförsök från en plats."
-      records={data ? String(data.total) : undefined}
-      action={(
-        <div className="flex flex-wrap gap-2">
-          <Link href="/dashboard/integrationer" className={premiumSecondaryButtonClass}>Integrationer</Link>
-          <button type="button" onClick={() => void load()} disabled={loading} className={premiumSecondaryButtonClass}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Uppdatera
-          </button>
+    <header className="rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
+      <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+        <div>
+          <Link href="/dashboard/integrationer" className="text-sm font-semibold text-petroleum-700">Integrationer</Link>
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[.16em] text-petroleum-600">Ekonomi · integrationer</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink-950">Driftcenter för fakturaexporter</h1>
+          <p className="mt-2 max-w-3xl text-ink-600">Samlad kontroll över Fortnox-, Visma- och webhookexporter för hela organisationen. Följ köer, fel, kvittenser och återförsök från en plats.</p>
         </div>
-      )}
-    />
+        <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Uppdatera
+        </button>
+      </div>
+    </header>
 
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     {message ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-medium text-success-800">{message}</div> : null}

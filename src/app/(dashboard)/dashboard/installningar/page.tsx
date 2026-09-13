@@ -26,14 +26,11 @@ import {
 import {
   InlineAlert,
   MetricCard,
-  PageHeader,
   Panel,
   premiumFieldClass,
   premiumPrimaryButtonClass,
-  premiumSecondaryButtonClass,
 } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
-import { categorySpec } from "@/lib/dashboard/category-spec";
 import {
   canManageBilling,
   canManageCompany,
@@ -284,25 +281,43 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-7xl animate-fade-in-soft space-y-6">
-      <PageHeader
-        catalog="installningar"
-        eyebrow="Administration"
-        title="Inställningar"
-        description="Ett samlat nav för konto, organisation, säkerhet, aviseringar och de administrationsområden din roll har tillgång till."
-        spec={categorySpec("installningar", {
-          extras: [
-            { label: "Inloggad som", value: profile?.email || (initialLoading ? "Laddar…" : "–") },
-            { label: "Organisation", value: company?.name || (initialLoading ? "Laddar…" : "–") },
-            { label: "Åtkomst", value: role ? roleLabels[role] || role : initialLoading ? "Laddar…" : "–" },
-          ],
-        })}
-        action={(
-          <button type="button" onClick={() => void loadSettings()} disabled={initialLoading || Boolean(saving)} className={premiumSecondaryButtonClass}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${initialLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+      <header className="overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-premium-sm">
+        <div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Administration</p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success-200 bg-success-50 px-2.5 py-1 text-[10px] font-semibold text-success-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-success-500" aria-hidden="true" /> Live-data
+              </span>
+            </div>
+            <h1 className="mt-3 text-[32px] font-semibold leading-tight tracking-[-0.04em] text-ink-950 sm:text-[38px]">Inställningar</h1>
+            <p className="mt-3 max-w-3xl text-[15px] leading-6 text-ink-600">Ett samlat nav för konto, organisation, säkerhet, aviseringar och de administrationsområden din roll har tillgång till.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadSettings()}
+            disabled={initialLoading || Boolean(saving)}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 shadow-sm outline-none transition-colors hover:bg-sand-50 focus-visible:ring-2 focus-visible:ring-petroleum-300 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${initialLoading ? "animate-spin" : ""}`} aria-hidden="true" />
             Uppdatera
           </button>
-        )}
-      />
+        </div>
+        <div className="grid border-t border-sand-100 sm:grid-cols-3">
+          <div className="px-6 py-4 sm:px-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Inloggad som</p>
+            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{profile?.email || (initialLoading ? "Laddar…" : "–")}</p>
+          </div>
+          <div className="border-t border-sand-100 px-6 py-4 sm:border-l sm:border-t-0 sm:px-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Organisation</p>
+            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{company?.name || (initialLoading ? "Laddar…" : "–")}</p>
+          </div>
+          <div className="border-t border-sand-100 px-6 py-4 sm:border-l sm:border-t-0 sm:px-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Åtkomstnivå</p>
+            <p className="mt-1 text-sm font-semibold text-ink-800">{role ? roleLabels[role] || role : initialLoading ? "Laddar…" : "–"}</p>
+          </div>
+        </div>
+      </header>
 
       <div aria-live="polite" aria-atomic="true" className="space-y-2">
         {error ? <InlineAlert>{error}</InlineAlert> : null}

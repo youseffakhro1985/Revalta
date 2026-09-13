@@ -162,7 +162,7 @@ export default function RentNoticesPage() {
   }
 
   return <div className="space-y-8">
-    <PageHeader catalog="hyresavisering" eyebrow="Hyresadministration" title="Hyresavisering och index" description="Skapa hyresavier, hantera indexuppräkning och följ betalningsstatus per objekt och period." />
+    <PageHeader eyebrow="Hyresadministration" title="Hyresavisering och index" description="Skapa hyresavier, hantera indexuppräkning och följ betalningsstatus per objekt och period." />
     <section className="grid gap-4 md:grid-cols-3">
       <MetricCard icon={CircleDollarSign} label="Aviserat totalt" value={money.format(summary.total)} />
       <MetricCard icon={BadgeCheck} label="Betalt" value={money.format(summary.paid)} />

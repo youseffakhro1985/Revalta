@@ -4,7 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, ClipboardList, Play, RefreshCw, Settings2, Wrench } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/domain-labels";
 
 type Row = {
@@ -101,18 +101,17 @@ export function PreventiveMaintenanceOverview() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        catalog="underhall-service"
-        eyebrow="Drift · Förebyggande underhåll"
-        title="Serviceplan och automatik"
-        description="Följ servicebehov, automatiskt skapade arbetsordrar och komponenternas aktuella underhållsstatus."
-        action={(
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void load()} className={premiumSecondaryButtonClass}><RefreshCw className="mr-2 h-4 w-4" /> Uppdatera</button>
-            {data.canRun ? <button type="button" onClick={() => void runEngine()} disabled={running} className={premiumPrimaryButtonClass}><Play className="mr-2 h-4 w-4" /> {running ? "Kör..." : "Kör underhållsmotorn"}</button> : null}
-          </div>
-        )}
-      />
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Förebyggande underhåll</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-ink-950">Serviceplan och automatik</h1>
+          <p className="mt-2 max-w-3xl text-sm text-ink-500">Följ servicebehov, automatiskt skapade arbetsordrar och komponenternas aktuella underhållsstatus.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50"><RefreshCw className="h-4 w-4" /> Uppdatera</button>
+          {data.canRun ? <button type="button" onClick={() => void runEngine()} disabled={running} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-petroleum-900 disabled:opacity-50"><Play className="h-4 w-4" /> {running ? "Kör..." : "Kör underhållsmotorn"}</button> : null}
+        </div>
+      </div>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {message ? <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm font-medium text-success-900">{message}</div> : null}

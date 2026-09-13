@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/dashboard/premium-ui";
 export default function HandoverPage() {
   return <div className="space-y-6">
     <Link href="/dashboard/uthyrning" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 transition hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till uthyrningen</Link>
-    <PageHeader catalog="uthyrning-overlamning" eyebrow="Uthyrning" title="Överlämning och besiktning" description="Styr in- och avflyttning, besiktningspunkter, nycklar, arbetsorder och slutrapport i ett sammanhållet flöde." />
+    <PageHeader eyebrow="Uthyrning" title="Överlämning och besiktning" description="Styr in- och avflyttning, besiktningspunkter, nycklar, arbetsorder och slutrapport i ett sammanhållet flöde." />
     <LeaseHandoverCenter />
     <LeaseInspectionItemsCenter />
     <InspectionWorkOrderCenter />

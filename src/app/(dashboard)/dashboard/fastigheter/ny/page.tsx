@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, Building2, CheckCircle2, MapPin } from "lucide-react";
-import { PageHeader, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 const fieldClass = "h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle px-3.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100";
@@ -47,13 +46,17 @@ export default function NewPropertyPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <PageHeader
-        catalog="ny-fastighet"
-        eyebrow="Portfölj · Fastigheter"
-        title="Ny fastighet"
-        description="Registrera grunduppgifterna. När fastigheten är skapad öppnas fastighetskortet direkt."
-        action={<Link href="/dashboard/fastigheter" className={premiumSecondaryButtonClass}><ArrowLeft className="mr-2 h-3.5 w-3.5" /> Fastigheter</Link>}
-      />
+      <div className="flex items-center gap-2 text-[11px] font-medium text-ink-500">
+        <Link href="/dashboard/fastigheter" className="inline-flex items-center gap-1.5 transition hover:text-petroleum-800"><ArrowLeft className="h-3.5 w-3.5" /> Fastigheter</Link>
+        <span>/</span>
+        <span>Ny fastighet</span>
+      </div>
+
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portfölj / Fastigheter</p>
+        <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Ny fastighet</h1>
+        <p className="mt-1 text-sm text-ink-500">Registrera grunduppgifterna. När fastigheten är skapad öppnas fastighetskortet direkt.</p>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px]">
         <section className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm sm:p-6">
