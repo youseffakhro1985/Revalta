@@ -30,6 +30,7 @@ vi.mock("@/lib/integrations", () => ({ recordPaymentEvent: recordPaymentEventMoc
 vi.mock("@/lib/stripe", () => ({
   isStripeReady: isStripeReadyMock,
   createCustomerPortalSession: createCustomerPortalSessionMock,
+  portalIdempotencyKey: (companyId: string) => `revalta-portal:${companyId}`,
 }));
 vi.mock("@/lib/db", () => ({
   default: { company: { findUnique: dbFindUniqueMock } },
@@ -167,6 +168,7 @@ describe("billing portal", () => {
     expect(createCustomerPortalSessionMock).toHaveBeenCalledWith({
       customerId: "cus_verified_internal_123",
       returnUrl: "https://www.revalta.se/dashboard/billing",
+      idempotencyKey: "revalta-portal:company-1",
     });
   });
 

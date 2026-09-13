@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { BILLING_PLAN_KEYS, type BillingPlanKey, isBillingPlanKey } from "@/lib/billing-plans";
+import { BILLING_PLAN_KEYS, BILLING_PLANS, type BillingPlanKey, isBillingPlanKey } from "@/lib/billing-plans";
 
 const stripeApi = "https://api.stripe.com/v1";
 
@@ -24,6 +24,44 @@ export function isStripeReady(plan?: unknown) {
 
 export function isStripeBillingReady() {
   return hasStripeSecrets() && BILLING_PLAN_KEYS.every((plan) => Boolean(stripePriceEnv[plan]));
+}
+
+export class StripeCatalogError extends Error {
+  constructor() {
+    super("Stripe-priset matchar inte Revaltas plan");
+    this.name = "StripeCatalogError";
+  }
+}
+
+export function checkoutIdempotencyKey(companyId: string, plan: BillingPlanKey) {
+  return `revalta-checkout:${companyId}:${plan}`;
+}
+
+export function portalIdempotencyKey(companyId: string) {
+  return `revalta-portal:${companyId}`;
+}
+
+async function stripeGet(path: string) {
+  const response = await fetch(`${stripeApi}${path}`, {
+    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof data.error?.message === "string" ? data.error.message : "Stripe-anrop misslyckades");
+  }
+  return data;
+}
+
+export async function assertConfiguredStripePrice(plan: BillingPlanKey) {
+  const priceId = stripePriceEnv[plan];
+  if (!priceId) throw new StripeCatalogError();
+
+  const price = await stripeGet(`/prices/${encodeURIComponent(priceId)}`);
+  const expectedAmount = BILLING_PLANS[plan].price * 100;
+  const currency = String(price.currency || "").toLowerCase();
+  if (price.active !== true || price.unit_amount !== expectedAmount || currency !== "sek") {
+    throw new StripeCatalogError();
+  }
 }
 
 async function stripePost(

@@ -6,6 +6,7 @@ const {
   recordPaymentEventMock,
   isStripeReadyMock,
   createCheckoutSessionMock,
+  assertConfiguredStripePriceMock,
   writeAuditLogMock,
   loggerInfoMock,
   loggerWarnMock,
@@ -16,6 +17,7 @@ const {
   recordPaymentEventMock: vi.fn(),
   isStripeReadyMock: vi.fn(),
   createCheckoutSessionMock: vi.fn(),
+  assertConfiguredStripePriceMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
   loggerInfoMock: vi.fn(),
   loggerWarnMock: vi.fn(),
@@ -30,6 +32,14 @@ vi.mock("@/lib/integrations", () => ({ recordPaymentEvent: recordPaymentEventMoc
 vi.mock("@/lib/stripe", () => ({
   isStripeReady: isStripeReadyMock,
   createCheckoutSession: createCheckoutSessionMock,
+  assertConfiguredStripePrice: assertConfiguredStripePriceMock,
+  checkoutIdempotencyKey: (companyId: string, plan: string) => `revalta-checkout:${companyId}:${plan}`,
+  StripeCatalogError: class StripeCatalogError extends Error {
+    constructor() {
+      super("Stripe-priset matchar inte Revaltas plan");
+      this.name = "StripeCatalogError";
+    }
+  },
 }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
@@ -71,6 +81,7 @@ describe("billing checkout", () => {
     });
     recordPaymentEventMock.mockResolvedValue({});
     writeAuditLogMock.mockResolvedValue(undefined);
+    assertConfiguredStripePriceMock.mockResolvedValue(undefined);
     createCheckoutSessionMock.mockResolvedValue({
       id: "cs_secret_internal_123",
       url: "https://checkout.stripe.com/c/pay/cs_live_public_redirect",
@@ -173,7 +184,7 @@ describe("billing checkout", () => {
       companyId: "company-1",
       successUrl: "https://www.revalta.se/dashboard/billing?checkout=success&plan=enterprise",
       cancelUrl: "https://www.revalta.se/dashboard/billing?checkout=cancelled",
-      idempotencyKey: `revalta-checkout:company-1:enterprise:${requestId}`,
+      idempotencyKey: "revalta-checkout:company-1:enterprise",
     });
   });
 
@@ -186,11 +197,23 @@ describe("billing checkout", () => {
 
     expect(createCheckoutSessionMock).toHaveBeenCalledTimes(2);
     expect(createCheckoutSessionMock.mock.calls[0]?.[0]?.idempotencyKey).toBe(
-      `revalta-checkout:company-1:professional:${requestId}`,
+      "revalta-checkout:company-1:professional",
     );
     expect(createCheckoutSessionMock.mock.calls[1]?.[0]?.idempotencyKey).toBe(
-      `revalta-checkout:company-1:professional:${requestId}`,
+      "revalta-checkout:company-1:professional",
     );
+  });
+
+  it("reuses the company-and-plan Stripe idempotency key across different request ids", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    isStripeReadyMock.mockReturnValue(true);
+
+    await POST(request({ plan: "professional" }, "https://www.revalta.se/api/billing/checkout", { "x-request-id": "11111111-1111-4111-8111-111111111111" }));
+    await POST(request({ plan: "professional" }, "https://www.revalta.se/api/billing/checkout", { "x-request-id": "22222222-2222-4222-8222-222222222222" }));
+
+    expect(assertConfiguredStripePriceMock).toHaveBeenCalledTimes(2);
+    expect(createCheckoutSessionMock.mock.calls[0]?.[0]?.idempotencyKey).toBe("revalta-checkout:company-1:professional");
+    expect(createCheckoutSessionMock.mock.calls[1]?.[0]?.idempotencyKey).toBe("revalta-checkout:company-1:professional");
   });
 
   it("minimizes post-session audit and telemetry and does not persist the Stripe session id", async () => {
@@ -247,6 +270,20 @@ describe("billing checkout", () => {
     expect(logs).not.toContain("cs_secret_internal_123");
     expect(logs).not.toContain("audit-secret");
     expect(logs).not.toContain("telemetry-secret");
+  });
+
+  it("returns 503 when the configured Stripe price does not match the server catalog", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    isStripeReadyMock.mockReturnValue(true);
+    const { StripeCatalogError } = await import("@/lib/stripe");
+    assertConfiguredStripePriceMock.mockRejectedValue(new StripeCatalogError());
+
+    const response = await POST(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
   it("returns a safe correlated 500 if Stripe session creation fails", async () => {
