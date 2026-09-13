@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
 import { hasStorageConfig } from "@/lib/storage";
 import { isStripeBillingReady } from "@/lib/stripe";
+import { isAiConfigured, isSmsConfigured } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -10,7 +11,7 @@ const logger = createLogger({ route: "/api/integrations" });
 const requiredEnv: Record<string, string[]> = {
   email: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM"],
   demo_leads: ["EMAIL_PROVIDER_API_KEY", "EMAIL_FROM", "DEMO_REQUEST_TO"],
-  sms: ["SMS_PROVIDER_API_KEY", "SMS_PROVIDER_WEBHOOK_URL"],
+  sms: ["SMS_PROVIDER_API_KEY"],
   stripe: [
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
@@ -34,6 +35,8 @@ function hasEnv(key: string) {
 function isIntegrationConfigured(type: string, envKeys: string[]) {
   if (type === "storage") return hasStorageConfig();
   if (type === "stripe") return isStripeBillingReady();
+  if (type === "sms") return isSmsConfigured();
+  if (type === "ai") return isAiConfigured();
   return envKeys.every(hasEnv);
 }
 

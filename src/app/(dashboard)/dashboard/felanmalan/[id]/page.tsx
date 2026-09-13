@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Clock3, FileSearch, FileText, Paperclip, Send, UserRound } from "lucide-react";
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Clock3, FileSearch, FileText, MessageSquare, Paperclip, Send, UserRound } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
@@ -107,6 +107,7 @@ export default function TicketDetailPage() {
   const [saving, setSaving] = useState(false);
   const [creatingWorkOrder, setCreatingWorkOrder] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [sendingSms, setSendingSms] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [operations, setOperations] = useState<TicketOperation[]>([]);
@@ -275,6 +276,25 @@ export default function TicketDetailPage() {
     } finally { setAnalyzing(false); }
   }
 
+  async function sendReporterSms() {
+    if (!ticket?.reporter_phone) return;
+    setError(""); setSuccess(""); setSendingSms(true);
+    try {
+      const response = await fetch(`/api/tickets/${params.id}/sms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte skicka SMS");
+      if (data.status === "sent") setSuccess("SMS skickades till rapportören.");
+      else if (data.status === "mocked") setSuccess("SMS simulerades i utvecklingsmiljön.");
+      else throw new Error("SMS kunde inte levereras. Kontrollera SMS-integrationen.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Kunde inte kontakta servern");
+    } finally { setSendingSms(false); }
+  }
+
   async function addOperation(event: React.FormEvent) {
     event.preventDefault();
     setError(""); setSuccess(""); setSavingOperation(true);
@@ -421,7 +441,7 @@ export default function TicketDetailPage() {
           </div>
           {ticket.property ? <div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Fastighet</p><p className="mt-2 text-lg font-semibold text-ink-950">{ticket.property.name}</p><p className="mt-1 text-sm text-ink-600">{ticket.property.address}, {ticket.property.city}</p></div> : <InlineAlert>Ärendet saknar fastighetskoppling. Koppla en fastighet innan arbetsorder kan skapas.</InlineAlert>}
           <div><h2 className="text-lg font-semibold text-ink-950">Beskrivning</h2><p className="mt-3 whitespace-pre-wrap rounded-2xl bg-sand-50 p-5 text-sm leading-7 text-ink-700">{ticket.description}</p></div>
-          {ticket.source === "public_portal" ? <div className="grid gap-4 rounded-2xl border border-sand-200 p-5 sm:grid-cols-2"><Info label="Rapportör" value={ticket.reporter_name || "Ej angivet"} /><Info label="Referens" value={ticket.public_reference || "Ej angivet"} /><Info label="E-post" value={ticket.reporter_email || "Ej angivet"} /><Info label="Telefon / lägenhet" value={`${ticket.reporter_phone || "Ej angivet"} · ${ticket.reporter_unit || "Ej angivet"}`} /></div> : null}
+          {ticket.source === "public_portal" ? <div className="grid gap-4 rounded-2xl border border-sand-200 p-5 sm:grid-cols-2"><Info label="Rapportör" value={ticket.reporter_name || "Ej angivet"} /><Info label="Referens" value={ticket.public_reference || "Ej angivet"} /><Info label="E-post" value={ticket.reporter_email || "Ej angivet"} /><Info label="Telefon / lägenhet" value={`${ticket.reporter_phone || "Ej angivet"} · ${ticket.reporter_unit || "Ej angivet"}`} />{ticket.reporter_phone && permissions.canManage ? <div className="sm:col-span-2"><button type="button" onClick={() => void sendReporterSms()} disabled={sendingSms} className={premiumPrimaryButtonClass}><MessageSquare className="h-4 w-4" />{sendingSms ? "Skickar SMS…" : "Skicka SMS till rapportören"}</button></div> : null}</div> : null}
         </Panel>
 
         <Panel title="AI-insikt" description="Prioritering och rekommenderad åtgärd baserad på ärendets innehåll." bodyClassName="p-6 sm:p-8">
