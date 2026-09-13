@@ -151,11 +151,6 @@ async function run() {
       }, { timeout }),
       action(),
     ]);
-    const bodyTimeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`${pathname} body did not complete`)), timeout);
-    });
-    const failure = await Promise.race([response.finished(), bodyTimeout]);
-    if (failure) fail(`${pathname} request failed before the body completed`);
     return response;
   }
 

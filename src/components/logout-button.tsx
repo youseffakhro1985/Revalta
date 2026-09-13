@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { readResponseJson } from "@/lib/fetch-json";
 
 export function LogoutButton({ className = "" }: { className?: string }) {
   const [loading, setLoading] = useState(false);
@@ -9,10 +10,16 @@ export function LogoutButton({ className = "" }: { className?: string }) {
 
   async function handleLogout() {
     setLoading(true);
-    await fetch("/api/auth/logout", { method: "POST" });
-    navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_AUTH_CACHE" });
-    router.push("/login");
-    router.refresh();
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST", cache: "no-store" });
+      const body = await readResponseJson<{ success?: boolean }>(response);
+      if (!response.ok || body.success !== true) return;
+      navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_AUTH_CACHE" });
+      router.push("/login");
+      router.refresh();
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
