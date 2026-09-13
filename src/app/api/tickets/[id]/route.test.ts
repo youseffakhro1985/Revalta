@@ -32,6 +32,10 @@ vi.mock("@/lib/audit", () => ({
 vi.mock("@/lib/integrations", () => ({
   queueTicketNotification: queueTicketNotificationMock,
 }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasTicketAiSourceColumn: vi.fn(async () => true),
+}));
 
 vi.mock("@/lib/db", () => {
   const dbMock = {

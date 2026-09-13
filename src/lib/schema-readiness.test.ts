@@ -7,6 +7,8 @@ import {
   isMissingTableError,
   schemaCompatibilityBannerMessage,
   schemaMismatchUserMessage,
+  ticketAiSourceSelect,
+  ticketAiSourceWrite,
 } from "@/lib/schema-readiness";
 
 describe("schema-readiness", () => {
@@ -71,5 +73,12 @@ describe("schema-readiness", () => {
         "AuditLog.module",
       ]),
     ).toBe("Ticket.deleted_at, InspectionChecklistTemplate, AuditLog.module");
+  });
+
+  it("omits Ticket.ai_source writes and selects until Database Release", () => {
+    expect(ticketAiSourceWrite(false, "fallback")).toEqual({});
+    expect(ticketAiSourceWrite(true, "provider")).toEqual({ ai_source: "provider" });
+    expect(ticketAiSourceSelect(false)).toEqual({});
+    expect(ticketAiSourceSelect(true)).toEqual({ ai_source: true });
   });
 });

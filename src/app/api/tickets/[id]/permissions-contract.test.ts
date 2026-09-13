@@ -15,6 +15,10 @@ vi.mock("@/lib/db", () => ({
     ticket: { findFirst: ticketFindFirstMock },
   },
 }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasTicketAiSourceColumn: vi.fn(async () => true),
+}));
 
 import { GET } from "./route";
 

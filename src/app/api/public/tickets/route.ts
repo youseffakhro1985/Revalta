@@ -8,6 +8,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { calculateDueDate } from "@/lib/sla";
 import { isValidEmail } from "@/lib/security";
 import { createRouteObservability } from "@/lib/route-observability";
+import { hasTicketAiSourceColumn, ticketAiSourceWrite } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
     }
 
     const analysis = await analyzeTicket(normalizedDescription);
+    const persistAiSource = await hasTicketAiSourceColumn();
     let publicReference = generatePublicReference();
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const existing = await db.ticket.findUnique({ where: { public_reference: publicReference }, select: { id: true } });
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
           ai_recommended_action: analysis.recommendedAction,
           ai_confidence: analysis.confidence,
           ai_processed_at: new Date(),
-          ai_source: analysis.source,
+          ...ticketAiSourceWrite(persistAiSource, analysis.source),
         },
         select: {
           id: true,

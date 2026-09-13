@@ -6,9 +6,11 @@ import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
 import { analyzeTicket } from "@/lib/ai";
 import { calculateDueDate } from "@/lib/sla";
 import {
+  hasTicketAiSourceColumn,
   isMissingSchemaColumnError,
   notDeletedFilter,
   schemaMismatchUserMessage,
+  ticketAiSourceWrite,
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -359,6 +361,7 @@ export async function POST(request: Request) {
     const resolvedPriority = normalizedPriority === "normal" && !priority
       ? analysis.priority
       : normalizedPriority;
+    const persistAiSource = await hasTicketAiSourceColumn();
 
     const ticket = await db.$transaction(async (tx) => {
       const created = await tx.ticket.create({
@@ -376,7 +379,7 @@ export async function POST(request: Request) {
           ai_recommended_action: analysis.recommendedAction,
           ai_confidence: analysis.confidence,
           ai_processed_at: new Date(),
-          ai_source: analysis.source,
+          ...ticketAiSourceWrite(persistAiSource, analysis.source),
         },
         select: {
           id: true,

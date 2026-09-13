@@ -17,6 +17,7 @@ import {
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 import { createLogger } from "@/lib/structured-logger";
 import { analyzeTicket } from "@/lib/ai";
+import { hasTicketAiSourceColumn, ticketAiSourceWrite } from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
 
@@ -244,7 +245,7 @@ export async function POST(
                 ai_recommended_action: analysis.recommendedAction,
                 ai_confidence: analysis.confidence,
                 ai_processed_at: new Date(),
-                ai_source: analysis.source,
+                ...ticketAiSourceWrite(await hasTicketAiSourceColumn(), analysis.source),
               }
             : {}),
         },
