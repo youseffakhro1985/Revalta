@@ -136,6 +136,32 @@ describe("integrations summary", () => {
     expect(demoLeads.configured).toBe(true);
   });
 
+  it("reports SMS configured for 46elks credentials without a webhook URL", async () => {
+    vi.stubEnv("SMS_PROVIDER_API_KEY", "46elks:user:pass:Revalta");
+    vi.stubEnv("SMS_PROVIDER_WEBHOOK_URL", "");
+
+    const response = await GET();
+    const body = await response.json();
+    const sms = body.integrations.find((integration: { type: string }) => integration.type === "sms");
+
+    expect(sms).toEqual({
+      type: "sms",
+      configured: true,
+      requiredEnv: ["SMS_PROVIDER_API_KEY"],
+    });
+  });
+
+  it("reports SMS unconfigured when only a generic API key is present", async () => {
+    vi.stubEnv("SMS_PROVIDER_API_KEY", "generic-key");
+    vi.stubEnv("SMS_PROVIDER_WEBHOOK_URL", "");
+
+    const response = await GET();
+    const body = await response.json();
+    const sms = body.integrations.find((integration: { type: string }) => integration.type === "sms");
+
+    expect(sms.configured).toBe(false);
+  });
+
   it("shows both modern and legacy storage tokens while using the canonical storage readiness", async () => {
     hasStorageConfigMock.mockReturnValue(true);
 

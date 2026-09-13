@@ -20,17 +20,17 @@ function isEmailConfigured() {
   return Boolean(process.env.EMAIL_PROVIDER_API_KEY && process.env.EMAIL_FROM);
 }
 
-function isSmsConfigured() {
-  const apiKey = process.env.SMS_PROVIDER_API_KEY;
-  return Boolean(apiKey && (process.env.SMS_PROVIDER_WEBHOOK_URL || apiKey.startsWith("46elks:")));
+export function isSmsConfigured(env: NodeJS.ProcessEnv = process.env) {
+  const apiKey = env.SMS_PROVIDER_API_KEY;
+  return Boolean(apiKey && (env.SMS_PROVIDER_WEBHOOK_URL || apiKey.startsWith("46elks:")));
 }
 
 function isStripeConfigured() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
 }
 
-function isAiConfigured() {
-  return Boolean(process.env.AI_PROVIDER_API_KEY);
+export function isAiConfigured(env: NodeJS.ProcessEnv = process.env) {
+  return Boolean(env.AI_PROVIDER_API_KEY);
 }
 
 function isIntegrationConfigured(type: string) {

@@ -197,3 +197,90 @@ describe("completed integration telemetry", () => {
     });
   });
 });
+
+describe("queueSmsNotification", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubEnv("NODE_ENV", "production");
+    integrationEventCreateMock.mockResolvedValue({ id: "event-1" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("sends via 46elks without requiring a separate webhook URL", async () => {
+    vi.stubEnv("SMS_PROVIDER_API_KEY", "46elks:user:pass:Revalta");
+    vi.stubEnv("SMS_PROVIDER_WEBHOOK_URL", "");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "sms-1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { queueSmsNotification } = await loadIntegrations();
+
+    await queueSmsNotification(
+      { company_id: "company-1" },
+      { ticketId: "ticket-1", recipient: "+46701111111", message: "Ärende mottaget" },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.46elks.com/a1/sms");
+    expect(String(init.body)).toContain("to=%2B46701111111");
+    expect(integrationEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: "sms", status: "sent", recipient: "+46701111111" }),
+    });
+  });
+
+  it("sends via generic webhook when both key and URL are set", async () => {
+    vi.stubEnv("SMS_PROVIDER_API_KEY", "webhook-key");
+    vi.stubEnv("SMS_PROVIDER_WEBHOOK_URL", "https://sms.example.test/send");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "sms-2" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { queueSmsNotification } = await loadIntegrations();
+
+    await queueSmsNotification(
+      { company_id: "company-1" },
+      { ticketId: "ticket-1", recipient: "+46702222222", message: "Påminnelse" },
+    );
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://sms.example.test/send");
+    expect(integrationEventCreateMock.mock.calls[0][0].data.status).toBe("sent");
+  });
+
+  it("records a hard failure in production when SMS is not configured", async () => {
+    vi.stubEnv("SMS_PROVIDER_API_KEY", "");
+    vi.stubEnv("SMS_PROVIDER_WEBHOOK_URL", "");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { queueSmsNotification } = await loadIntegrations();
+
+    await queueSmsNotification(
+      { company_id: "company-1" },
+      { ticketId: "ticket-1", recipient: "+46703333333", message: "Tack" },
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(integrationEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: "sms",
+        status: "failed",
+        payload: expect.objectContaining({
+          delivery: expect.objectContaining({ reason: "not_configured" }),
+        }),
+      }),
+    });
+  });
+});

@@ -31,12 +31,15 @@ const statusLabels: Record<string, string> = {
   completed: "Slutförd",
   failed: "Misslyckad",
   mocked: "Mockad",
+  fallback: "Regelbaserad",
+  received: "Mottagen",
+  unmatched: "Ej matchad",
   cancelled: "Avbruten",
 };
 const descriptions: Record<string, string> = {
   email: "Utskick av inbjudningar, notiser och bekräftelser.",
   demo_leads: "Mottagning och e-postleverans av sparade demoförfrågningar från den publika webbplatsen.",
-  sms: "Snabba driftmeddelanden och kritiska aviseringar.",
+  sms: "Bekräftelser och driftmeddelanden via 46elks (SMS_PROVIDER_API_KEY med prefix 46elks:användare:lösen:avsändare) eller generisk webhook.",
   stripe: "Checkout, abonnemang och webhookar med pris-ID för samtliga köpbara planer.",
   storage: "Dokument, bilder och bilagor i extern fillagring. BLOB_READ_WRITE_TOKEN föredras; STORAGE_PROVIDER_KEY stöds som legacy-reserv.",
   ai: "Diskret klassificering och prioritering bakom gränssnittet.",

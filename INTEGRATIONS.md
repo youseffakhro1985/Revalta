@@ -45,7 +45,10 @@ SMS kan skickas via en konfigurerbar webhook eller direkt via 46elks.
 Miljövariabler:
 
 - `SMS_PROVIDER_API_KEY`
-- `SMS_PROVIDER_WEBHOOK_URL`
+- `SMS_PROVIDER_WEBHOOK_URL` (krävs för generisk webhook; valfri för 46elks)
+- `SMS_PROVIDER_WEBHOOK_SECRET` (krävs för inkommande SMS)
+
+Utgående SMS går när nyckeln finns tillsammans med webhook-URL, eller när nyckeln har 46elks-prefix. Inkommande SMS tar emot 46elks/formulär-POST mot `/api/integrations/sms/inbound?token=…` och kopplar meddelandet till ärendet om texten innehåller en publik referens (`RV-ÅÅÅÅ-…`).
 
 Revalta skickar JSON:
 
