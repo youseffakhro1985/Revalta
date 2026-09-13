@@ -29,8 +29,13 @@ export default function LoginPage() {
     }
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const submittedEmail = String(form.get("email") || "");
+    const submittedPassword = String(form.get("password") || "");
+    setEmail(submittedEmail);
+    setPassword(submittedPassword);
     setError("");
     setResendStatus("");
     setVerificationRequired(false);
@@ -39,7 +44,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: submittedEmail, password: submittedPassword }),
       });
       if (res.ok) {
         const data = await readResponseJson<{ user?: { role?: string } }>(res);
@@ -122,6 +127,7 @@ export default function LoginPage() {
           </label>
           <input
             id="login-email"
+            name="email"
             type="email"
             required
             autoComplete="email"
@@ -143,6 +149,7 @@ export default function LoginPage() {
           </div>
           <input
             id="login-password"
+            name="password"
             type="password"
             required
             autoComplete="current-password"

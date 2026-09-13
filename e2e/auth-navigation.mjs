@@ -25,7 +25,7 @@ async function run() {
 
   const runId = `${Date.now()}-${randomBytes(12).toString("hex")}`;
   const email = isAllowedLocalOrigin ? `e2e-owner-${runId}@example.com` : process.env.E2E_VERIFIED_EMAIL.trim().toLowerCase();
-  const password = isAllowedLocalOrigin ? `RevaltaE2E!${randomBytes(24).toString("base64url")}9` : process.env.E2E_VERIFIED_PASSWORD;
+  const password = isAllowedLocalOrigin ? `RevaltaE2E!${randomBytes(24).toString("base64url")}9` : String(process.env.E2E_VERIFIED_PASSWORD || "").trim();
   const companyName = `E2E Organisation ${runId.slice(-6)}`;
   let companyId = String(process.env.E2E_VERIFIED_COMPANY_ID || "").trim();
 
@@ -287,6 +287,10 @@ async function run() {
       await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "Preview login heading");
       await page.getByLabel("E-post").fill(email);
       await page.getByLabel("Lösenord").fill(password);
+      if ((await page.getByLabel("E-post").inputValue()).trim().toLowerCase() !== email) {
+        fail("Preview login email field did not keep the fixture value");
+      }
+      if (!(await page.getByLabel("Lösenord").inputValue())) fail("Preview login password field was empty");
     }
     if (isAllowedLocalOrigin) {
       // The isolated local fallback owns its Postgres fixture, so it can mark the

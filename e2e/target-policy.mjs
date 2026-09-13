@@ -34,8 +34,8 @@ export function validateTarget(env) {
   } else {
     validatePinnedDataPlanes();
     fixtureReady = env.E2E_PREVIEW_DATA_ISOLATED === "1"
-      && Boolean(env.E2E_VERIFIED_EMAIL)
-      && Boolean(env.E2E_VERIFIED_PASSWORD)
+      && Boolean(String(env.E2E_VERIFIED_EMAIL || "").trim())
+      && Boolean(String(env.E2E_VERIFIED_PASSWORD || "").trim())
       && Boolean(String(env.E2E_VERIFIED_COMPANY_ID || "").trim());
 
     // Data-plane identities are version-controlled reviewed attestations. Optional

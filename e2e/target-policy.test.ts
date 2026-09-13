@@ -49,6 +49,15 @@ describe("browser target safety and release evidence", () => {
     expect(target).toMatchObject({ expectedDataPlaneId: PREVIEW_DATA_PLANE_ID, fixtureReady: false });
   });
 
+  it("treats whitespace-only verified credentials as missing fixtures", () => {
+    const target = validateTarget({
+      ...env,
+      E2E_VERIFIED_EMAIL: "  ",
+      E2E_VERIFIED_PASSWORD: " \n",
+    });
+    expect(target.fixtureReady).toBe(false);
+  });
+
   it("accepts optional operations copies only when they confirm the reviewed attestations", () => {
     expect(() => validateTarget({
       ...env,
