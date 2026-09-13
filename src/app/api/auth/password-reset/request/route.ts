@@ -23,6 +23,22 @@ function phaseLatency(startedAt: number) {
   return Math.max(0, Date.now() - startedAt);
 }
 
+function deliveryFailureMeta(error: unknown) {
+  if (!error || typeof error !== "object") return {};
+  const candidate = error as {
+    name?: unknown;
+    reason?: unknown;
+    providerStatus?: unknown;
+    providerCode?: unknown;
+  };
+  if (candidate.name !== "PasswordResetDeliveryError") return {};
+  return {
+    reason: typeof candidate.reason === "string" ? candidate.reason : undefined,
+    providerStatus: typeof candidate.providerStatus === "number" ? candidate.providerStatus : undefined,
+    providerCode: typeof candidate.providerCode === "string" ? candidate.providerCode : undefined,
+  };
+}
+
 async function processResetRequest(input: {
   email: string;
   ip: string;
@@ -114,6 +130,7 @@ async function processResetRequest(input: {
         event: "auth.password_reset.delivery_failed",
         userId: user.id,
         errorName: error instanceof Error ? error.name : "UnknownError",
+        ...deliveryFailureMeta(error),
         deliveryLatencyMs: phaseLatency(deliveryStartedAt),
       }));
     }
