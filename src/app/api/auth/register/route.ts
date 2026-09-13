@@ -149,31 +149,12 @@ export async function POST(request: Request) {
     const verifyUrl = `${getPublicAppUrl(request.url)}/verify-email?token=${encodeURIComponent(verifyToken)}`;
     after(async () => {
       const deliveryStartedAt = Date.now();
-      const consumeOutstandingTokens = async () => {
-        try {
-          await db.emailVerificationToken.updateMany({
-            where: { user_id: owner.id, used_at: null },
-            data: { used_at: new Date() },
-          });
-        } catch (cleanupError) {
-          observability.logger.error(
-            "auth registration verification token cleanup failed",
-            cleanupError,
-            {
-              event: "auth.registration.verification_token_cleanup_failed",
-              companyId: company.id,
-              userId: owner.id,
-            },
-          );
-        }
-      };
       try {
         const delivery = await queueEmailVerification(owner, {
           recipient: owner.email,
           verificationUrl: verifyUrl,
         });
         if (delivery.status === "failed") {
-          await consumeOutstandingTokens();
           observability.logger.warn("auth registration verification delivery failed", {
             event: "auth.registration.verification_delivery_failed",
             companyId: company.id,
@@ -189,7 +170,6 @@ export async function POST(request: Request) {
           phaseLatencyMs: phaseLatency(deliveryStartedAt),
         });
       } catch (error) {
-        await consumeOutstandingTokens();
         observability.logger.error(
           "auth registration verification delivery failed",
           error,

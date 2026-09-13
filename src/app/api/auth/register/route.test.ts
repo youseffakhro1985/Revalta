@@ -6,7 +6,6 @@ const {
   companyCreateMock,
   createLoggerMock,
   emailVerificationTokenCreateMock,
-  emailVerificationTokenUpdateManyMock,
   hashPasswordMock,
   loggerErrorMock,
   loggerInfoMock,
@@ -21,7 +20,6 @@ const {
   companyCreateMock: vi.fn(),
   createLoggerMock: vi.fn(),
   emailVerificationTokenCreateMock: vi.fn(),
-  emailVerificationTokenUpdateManyMock: vi.fn(),
   hashPasswordMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerInfoMock: vi.fn(),
@@ -39,10 +37,7 @@ vi.mock("next/server", async (importOriginal) => {
 vi.mock("@/lib/db", () => ({
   default: {
     company: { create: companyCreateMock },
-    emailVerificationToken: {
-      create: emailVerificationTokenCreateMock,
-      updateMany: emailVerificationTokenUpdateManyMock,
-    },
+    emailVerificationToken: { create: emailVerificationTokenCreateMock },
     $transaction: transactionMock,
   },
 }));
@@ -105,7 +100,6 @@ describe("POST /api/auth/register", () => {
       users: [{ id: "user-1", email: "owner@example.se", company_id: "company-1" }],
     });
     emailVerificationTokenCreateMock.mockResolvedValue({ id: "verification-1" });
-    emailVerificationTokenUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
     queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1", status: "sent" });
     transactionMock.mockImplementation(async (callback) => callback({
@@ -254,7 +248,6 @@ describe("POST /api/auth/register", () => {
         verificationUrl: `https://www.revalta.se/verify-email?token=${"a".repeat(64)}`,
       },
     );
-    expect(emailVerificationTokenUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("returns 201 without waiting for a slow verification provider", async () => {
@@ -301,10 +294,6 @@ describe("POST /api/auth/register", () => {
 
     expect(response.status).toBe(201);
     await runScheduledAfterCallbacks();
-    expect(emailVerificationTokenUpdateManyMock).toHaveBeenCalledWith({
-      where: { user_id: "user-1", used_at: null },
-      data: { used_at: expect.any(Date) },
-    });
     expect(loggerErrorMock).toHaveBeenCalledWith(
       "auth registration verification delivery failed",
       expect.any(Error),
@@ -316,7 +305,7 @@ describe("POST /api/auth/register", () => {
     );
   });
 
-  it("consumes the unused verification token when the provider records a failed delivery", async () => {
+  it("keeps the unused verification token outstanding when delivery is recorded as failed", async () => {
     queueEmailVerificationMock.mockResolvedValue({ id: "integration-event-1", status: "failed" });
 
     const response = await POST(registrationRequest({
@@ -327,10 +316,6 @@ describe("POST /api/auth/register", () => {
 
     expect(response.status).toBe(201);
     await runScheduledAfterCallbacks();
-    expect(emailVerificationTokenUpdateManyMock).toHaveBeenCalledWith({
-      where: { user_id: "user-1", used_at: null },
-      data: { used_at: expect.any(Date) },
-    });
     expect(loggerWarnMock).toHaveBeenCalledWith(
       "auth registration verification delivery failed",
       expect.objectContaining({
