@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractPortalCompanySlug, toPortalSlug } from "./public-portal";
+import { extractPortalCompanySlug, generatePublicReference, toPortalSlug } from "./public-portal";
 
 describe("public-portal helpers", () => {
   it("skapar stabila sluggar från bolagsnamn", () => {
@@ -14,5 +14,13 @@ describe("public-portal helpers", () => {
     expect(extractPortalCompanySlug(request)).toBe("header-bolag");
     expect(extractPortalCompanySlug(new Request("https://www.revalta.se/api/public/properties?companySlug=demo-bolag"))).toBe("demo-bolag");
     expect(extractPortalCompanySlug(new Request("https://www.revalta.se/api/public/properties"), "body-bolag")).toBe("body-bolag");
+  });
+
+  it("generates unique RV-year references without Math.random", () => {
+    const refs = new Set(Array.from({ length: 20 }, () => generatePublicReference()));
+    expect(refs.size).toBe(20);
+    for (const value of refs) {
+      expect(value).toMatch(/^RV-\d{4}-[A-F0-9]{6}$/);
+    }
   });
 });
