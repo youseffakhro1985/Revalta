@@ -114,6 +114,12 @@ it("required workflow does not replace Preview with localhost or report success 
   expect(workflow).toContain('if [[ "$BROWSER_OUTCOME" == "success" ]]');
 });
 
+it("required browser flow uses the live Fastigheter dashboard route", () => {
+  const source = readFileSync(new URL("./auth-navigation.mjs", import.meta.url), "utf8");
+  expect(source).toContain('expectPath(page, "/dashboard/fastigheter")');
+  expect(source).not.toContain("/dashboard/properties");
+});
+
 it("actual runner intercepts POST before forwarding and aborts when the datastore changes", async () => {
   let handler: (route: unknown) => Promise<void> = async () => { throw new Error("not installed"); };
   let calls = 0;

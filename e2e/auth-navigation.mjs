@@ -148,7 +148,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         { timeout: 15_000 },
       );
       await desktopNavigation.getByRole("link", { name: "Fastigheter", exact: true }).click();
-      await expectPath(page, "/dashboard/properties");
+      await expectPath(page, "/dashboard/fastigheter");
       const properties = await propertiesPromise;
       validatePropertiesResponse(properties.status(), await properties.json());
       complete("properties-api");
