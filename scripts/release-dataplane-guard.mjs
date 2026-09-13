@@ -41,12 +41,6 @@ export function assertPreviewDataPlane({
   const pooled = databaseTargetIdentity(databaseUrl);
   const direct = databaseTargetIdentity(directUrl);
 
-  // Temporary release diagnostic: identities are SHA-256 hashes of host/port/database only.
-  // No credentials, usernames, URLs, query strings or passwords are logged.
-  console.error(
-    `Preview data-plane diagnostic DATABASE_URL=${pooled ?? "invalid"} DIRECT_URL=${direct ?? "invalid"} expected=${reviewedPreviewDataPlaneId} production=${productionDataPlaneId}`,
-  );
-
   if (!pooled || !direct) {
     throw new Error("Preview build requires valid PostgreSQL DATABASE_URL and DIRECT_URL targets");
   }
