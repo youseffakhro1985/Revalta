@@ -63,7 +63,8 @@ vi.mock("@/lib/work-order-enterprise-core", () => ({
   addWorkOrderStatusEvent: addWorkOrderStatusEventMock,
 }));
 
-vi.mock("@/lib/work-order-workflow", () => ({
+vi.mock("@/lib/work-order-workflow", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/work-order-workflow")>()),
   WORK_ORDER_PRIORITIES: ["low", "normal", "high", "urgent"],
   WORK_ORDER_STATUSES: ["planned", "assigned", "in_progress", "completed", "invoiced", "cancelled"],
   normalizeWorkOrderPriority: (value: string) => value,

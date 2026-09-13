@@ -44,7 +44,8 @@ vi.mock("@/lib/work-order-enterprise-core", () => ({
   setWorkOrderEnterpriseFields: vi.fn(),
 }));
 
-vi.mock("@/lib/work-order-workflow", () => ({
+vi.mock("@/lib/work-order-workflow", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/work-order-workflow")>()),
   normalizeWorkOrderPriority: vi.fn((value: string) => value || "normal"),
 }));
 
