@@ -4,7 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Clock3, RefreshCw, UserRoundX, Wrench } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Item = { id:string; title:string; statusLabel:string; priorityLabel:string; risk:string; slaDeadline:string; scheduledStart:string|null; property:{id:string;name:string;address:string;city:string}; unit:{id:string;designation:string}|null; assignee:{id:string;name:string|null;email:string}|null; href:string };
 type Data = { summary:{total:number;open:number;overdue:number;critical:number;dueSoon:number;unassigned:number}; workOrders:Item[] };
@@ -17,7 +17,7 @@ export default function WorkOrderOperationsPage() {
   useEffect(()=>{void load();},[]);
   const items=useMemo(()=>{const rows=data?.workOrders??[]; if(filter==="risk") return rows.filter(x=>["critical","overdue","high"].includes(x.risk)); if(filter==="unassigned") return rows.filter(x=>!x.assignee && x.risk!=="closed"); if(filter==="all") return rows; return rows.filter(x=>x.risk!=="closed");},[data,filter]);
   return <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
-    <header className="flex flex-col justify-between gap-4 rounded-2xl border border-sand-200/80 bg-white p-7 shadow-premium-sm sm:flex-row sm:items-end sm:p-8"><div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Driftledning</p><h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Arbetsorderöversikt</h1><p className="mt-3 max-w-3xl text-ink-600">Prioritera arbetsorder efter SLA, risk, ansvar och planerad leverans.</p></div><button onClick={()=>void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading?"animate-spin":""}`}/>Uppdatera</button></header>
+    <PageHeader catalog="operationsoversikt" eyebrow="Drift · Driftledning" title="Arbetsorderöversikt" description="Prioritera arbetsorder efter SLA, risk, ansvar och planerad leverans." records={data ? String(data.summary.total) : undefined} action={<button type="button" onClick={()=>void load()} disabled={loading} className={premiumSecondaryButtonClass}><RefreshCw className={`mr-2 h-4 w-4 ${loading?"animate-spin":""}`}/>Uppdatera</button>} />
     {error?<InlineAlert>{error}</InlineAlert>:null}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6"><MetricCard icon={Wrench} label="Totalt" value={data?.summary.total??"–"}/><MetricCard icon={Clock3} label="Öppna" value={data?.summary.open??"–"}/><MetricCard icon={AlertTriangle} label="Försenade" value={data?.summary.overdue??"–"}/><MetricCard icon={AlertTriangle} label="Kritiska" value={data?.summary.critical??"–"}/><MetricCard icon={Clock3} label="SLA snart" value={data?.summary.dueSoon??"–"}/><MetricCard icon={UserRoundX} label="Ej tilldelade" value={data?.summary.unassigned??"–"}/></div>
     <Panel title="Operativ kö" description="SLA räknas från planerat slutdatum eller från prioritetens standardtid: akut 4 h, hög 24 h, normal 72 h och låg 7 dagar.">

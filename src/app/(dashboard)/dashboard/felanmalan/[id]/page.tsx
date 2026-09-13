@@ -407,7 +407,7 @@ export default function TicketDetailPage() {
 
   return <div className="mx-auto max-w-7xl space-y-7">
     <Link href="/dashboard/felanmalan" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900"><ArrowLeft className="h-4 w-4" />Tillbaka till alla ärenden</Link>
-    <PageHeader eyebrow="Felanmälan och service" title={ticket.title} description={`Ärende #${ticket.id.slice(0, 8)} · Skapat ${dateFormatter.format(new Date(ticket.created_at))}`} />
+    <PageHeader catalog="arende-detalj" eyebrow="Felanmälan och service" title={ticket.title} description={`Ärende #${ticket.id.slice(0, 8)} · Skapat ${dateFormatter.format(new Date(ticket.created_at))}`} />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 

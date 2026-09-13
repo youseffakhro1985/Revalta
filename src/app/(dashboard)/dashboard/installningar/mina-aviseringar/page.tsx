@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BellOff, BellRing, CheckCircle2, Clock3, Mail } from "lucide-react";
-import { InlineAlert, Panel } from "@/components/dashboard/premium-ui";
+import { InlineAlert, PageHeader, Panel, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Preferences = { enabled: boolean; overdueOnly: boolean };
@@ -64,12 +64,13 @@ export default function MyServiceNotificationsPage() {
 
   return (
     <div className="mx-auto max-w-5xl animate-fade-in-soft space-y-6">
-      <header>
-        <Link href="/dashboard/installningar" className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">← Till inställningar</Link>
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Personliga inställningar</p>
-        <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Mina serviceaviseringar</h1>
-        <p className="mt-3 max-w-3xl text-ink-600">Välj hur du själv vill ta emot organisationens serviceöversikt. Dina val påverkar endast ditt konto.</p>
-      </header>
+      <PageHeader
+        catalog="mina-aviseringar"
+        eyebrow="Administration · Personliga val"
+        title="Mina serviceaviseringar"
+        description="Välj hur du själv vill ta emot organisationens serviceöversikt. Dina val påverkar endast ditt konto."
+        action={<Link href="/dashboard/installningar" className={premiumSecondaryButtonClass}>Till inställningar</Link>}
+      />
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {success ? <div className="flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800"><CheckCircle2 className="h-4 w-4" />{success}</div> : null}

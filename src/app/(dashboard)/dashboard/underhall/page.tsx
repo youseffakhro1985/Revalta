@@ -212,7 +212,7 @@ export default function MaintenancePage() {
 
   return (
     <div className="space-y-8 animate-fade-in-soft">
-      <PageHeader
+      <PageHeader catalog="underhall"
         eyebrow="Drift · Teknisk förvaltning"
         title="Underhållsplan"
         description="Planera, prioritera och genomför förebyggande underhåll med flerårig kostnadsbild och direkt koppling till arbetsorder."

@@ -122,7 +122,7 @@ export default function ResidentTicketDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader catalog="boende-arende"
         eyebrow="Min boendeservice"
         title={ticket?.title || "Ärende"}
         description="Följ status och läs delade uppdateringar från förvaltningen."

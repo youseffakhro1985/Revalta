@@ -45,7 +45,7 @@ export default async function PermissionsPage() {
 
   return (
     <div className="space-y-8 animate-fade-in-soft">
-      <PageHeader eyebrow="Organisation" title="Roller och behörigheter" description="Tydlig ansvarsfördelning för säker och professionell fastighetsförvaltning." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Säker rollstyrning</div>} />
+      <PageHeader catalog="behorigheter" eyebrow="Organisation" title="Roller och behörigheter" description="Tydlig ansvarsfördelning för säker och professionell fastighetsförvaltning." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Säker rollstyrning</div>} />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={Users} label="Aktiva användare" value={members.length} />

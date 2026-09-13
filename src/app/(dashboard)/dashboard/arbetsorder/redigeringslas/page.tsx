@@ -148,7 +148,7 @@ export default function WorkOrderEditLocksPage() {
   const editors = new Set(locks.map((lock) => lock.holder.id)).size;
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Work Orders 2.0" title="Aktiva redigeringslås" description="Operativ överblick över exklusiva arbetsorderlås, aktiva redigerare och återstående leasetid." />
+    <PageHeader catalog="redigeringslas" eyebrow="Work Orders 2.0" title="Aktiva redigeringslås" description="Operativ överblick över exklusiva arbetsorderlås, aktiva redigerare och återstående leasetid." />
     {error ? <InlineAlert tone="error">{error}</InlineAlert> : null}
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 

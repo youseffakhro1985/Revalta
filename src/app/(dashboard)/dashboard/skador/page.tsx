@@ -209,7 +209,7 @@ export default function InsuranceClaimsPage() {
   }
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Risk och försäkring" title="Skador och försäkringsärenden" description="Följ händelser, försäkringsdialog, ekonomiska konsekvenser och nästa steg i en samlad riskvy." action={canManage ? <button type="button" onClick={() => setCreateOpen((value) => !value)} className={`${premiumPrimaryButtonClass} w-full sm:w-auto`}>{createOpen ? "Stäng registrering" : "Nytt skadeärende"}</button> : undefined} />
+    <PageHeader catalog="skador" eyebrow="Risk och försäkring" title="Skador och försäkringsärenden" description="Följ händelser, försäkringsdialog, ekonomiska konsekvenser och nästa steg i en samlad riskvy." action={canManage ? <button type="button" onClick={() => setCreateOpen((value) => !value)} className={`${premiumPrimaryButtonClass} w-full sm:w-auto`}>{createOpen ? "Stäng registrering" : "Nytt skadeärende"}</button> : undefined} />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={ShieldAlert} label="Öppna ärenden" value={openClaims} hint="Pågående försäkrings- eller åtgärdsflöden" />

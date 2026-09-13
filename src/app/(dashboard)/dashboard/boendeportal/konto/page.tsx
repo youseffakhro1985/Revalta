@@ -112,7 +112,7 @@ export default function ResidentAccountPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader catalog="boende-konto"
         eyebrow="Min boendeservice"
         title="Mitt konto"
         description="Uppdatera ditt namn och byt lösenord. Lösenordsbyte avslutar tidigare inloggningar."
