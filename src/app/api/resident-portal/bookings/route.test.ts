@@ -153,6 +153,20 @@ describe("resident-portal bookings route", () => {
     expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("boende@exempel.se");
   });
 
+  it("does not infer booking ownership from units, multiple properties or another resident of the same unit", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    listResidentMatchedLeasesMock.mockResolvedValue([
+      lease,
+      { ...lease, id: "lease-2", property_id: "property-2", unit: { id: "unit-2", designation: "1302" } },
+    ]);
+    await GET(request());
+    expect(bookingFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      company_id: "company-1",
+      property: { deleted_at: null },
+      created_by_id: "user-resident",
+    } }));
+  });
+
   it("creates a booking on a matched lease with lock, write and audit in one transaction", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
     bookingCreateMock.mockResolvedValue({
@@ -179,7 +193,7 @@ describe("resident-portal bookings route", () => {
       where: expect.objectContaining({
         company_id: "company-1",
         property_id: "property-1",
-        resource: "Tvättstuga",
+        resource: { equals: "Tvättstuga", mode: "insensitive" },
       }),
     }));
     expect(bookingCreateMock).toHaveBeenCalledWith(expect.objectContaining({

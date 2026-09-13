@@ -78,7 +78,6 @@ export async function GET(request: Request) {
 
     const leases = await listResidentMatchedLeases(user.company_id, user.email);
     const leaseIds = leases.map((lease) => lease.id);
-    const propertyIds = [...new Set(leases.map((lease) => lease.property_id))];
 
     const notices = leaseIds.length === 0
       ? []
@@ -87,16 +86,11 @@ export async function GET(request: Request) {
             company_id: user.company_id,
             property: { deleted_at: null },
             status: { not: "draft" },
-            OR: [
-              { lease_id: { in: leaseIds } },
-              {
-                lease_id: null,
-                property_id: { in: propertyIds },
-                unit: { in: leases.map((lease) => lease.unit.designation).filter(Boolean) },
-              },
-            ],
+            // Never infer the recipient from a property/unit label. An unlinked
+            // notice can belong to another or a former resident of that unit.
+            lease_id: { in: leaseIds },
           },
-          orderBy: { due_date: "desc" },
+          orderBy: [{ due_date: "desc" }, { id: "desc" }],
           take: 200,
           include: { property: { select: { id: true, name: true, address: true, city: true } } },
         });

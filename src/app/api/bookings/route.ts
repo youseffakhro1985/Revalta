@@ -1,4 +1,7 @@
 import db from "@/lib/db";
+import { lockBookingResources } from "@/lib/booking-lock";
+
+class BookingConflict extends Error {}
 import {
   auditScopedWhere,
   canManageLeases,
@@ -101,6 +104,7 @@ export async function POST(request: Request) {
     if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
+    const companyId = user.company_id;
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();
     const resource = String(body.resource || "").trim();
@@ -123,75 +127,80 @@ export async function POST(request: Request) {
     });
     if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
 
-    const [tableConflicts, legacyRows] = await Promise.all([
-      db.booking.findFirst({
-        where: {
-          company_id: user.company_id,
+    const booking = await db.$transaction(async (tx) => {
+      await lockBookingResources(tx, companyId, property.id, [resource]);
+      const [tableConflicts, legacyRows] = await Promise.all([
+        tx.booking.findFirst({
+          where: {
+            company_id: companyId,
+            property_id: property.id,
+            property: { deleted_at: null },
+            resource: { equals: resource, mode: "insensitive" },
+            status: { not: "cancelled" },
+            start_at: { lt: end },
+            end_at: { gt: start },
+          },
+          select: { id: true },
+        }),
+        loadLegacyRows(() => tx.auditLog.findMany({
+          where: { ...auditScopedWhere(user), action, entity_id: propertyId },
+          select: { metadata: true },
+          take: 250,
+        })),
+      ]);
+
+      if (tableConflicts) {
+        throw new BookingConflict("Tiden är redan bokad för denna resurs");
+      }
+
+      const legacyConflict = legacyRows.some((row) => {
+        const metadata = row.metadata as Record<string, unknown> | null;
+        if (!metadata || metadata.resource !== resource || metadata.status === "cancelled") return false;
+        const bookedStart = new Date(String(metadata.start || ""));
+        const bookedEnd = new Date(String(metadata.end || ""));
+        return start < bookedEnd && end > bookedStart;
+      });
+      if (legacyConflict) throw new BookingConflict("Tiden är redan bokad för denna resurs");
+
+      const booking = await tx.booking.create({
+        data: {
+          company_id: companyId,
           property_id: property.id,
-          property: { deleted_at: null },
           resource,
-          status: { not: "cancelled" },
-          start_at: { lt: end },
-          end_at: { gt: start },
+          resident_name: residentName,
+          unit: unit || null,
+          start_at: start,
+          end_at: end,
+          note: note || null,
+          status: "confirmed",
+          created_by_id: user.id,
         },
-        select: { id: true },
-      }),
-      loadLegacyRows(() => db.auditLog.findMany({
-        where: { ...auditScopedWhere(user), action, entity_id: propertyId },
-        select: { metadata: true },
-        take: 250,
-      })),
-    ]);
+        select: { id: true, created_at: true },
+      });
 
-    if (tableConflicts) {
-      return NextResponse.json({ error: "Tiden är redan bokad för denna resurs" }, { status: 409 });
-    }
-
-    const legacyConflict = legacyRows.some((row) => {
-      const metadata = row.metadata as Record<string, unknown> | null;
-      if (!metadata || metadata.resource !== resource || metadata.status === "cancelled") return false;
-      const bookedStart = new Date(String(metadata.start || ""));
-      const bookedEnd = new Date(String(metadata.end || ""));
-      return start < bookedEnd && end > bookedStart;
-    });
-    if (legacyConflict) return NextResponse.json({ error: "Tiden är redan bokad för denna resurs" }, { status: 409 });
-
-    const booking = await db.booking.create({
-      data: {
-        company_id: user.company_id,
-        property_id: property.id,
-        resource,
-        resident_name: residentName,
-        unit: unit || null,
-        start_at: start,
-        end_at: end,
-        note: note || null,
-        status: "confirmed",
-        created_by_id: user.id,
-      },
-      select: { id: true, created_at: true },
-    });
-
-    await writeAuditLog(user, {
-      entityType: "booking",
-      entityId: booking.id,
-      action,
-      metadata: {
-        property_id: property.id,
-        property_name: property.name,
-        resource,
-        resident_name: residentName,
-        unit,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        note,
-        status: "confirmed",
-        storage: "Booking",
-      },
+      await writeAuditLog(user, {
+        entityType: "booking",
+        entityId: booking.id,
+        action,
+        metadata: {
+          property_id: property.id,
+          property_name: property.name,
+          resource,
+          resident_name: residentName,
+          unit,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          note,
+          status: "confirmed",
+          storage: "Booking",
+        },
+      }, tx);
+      return booking;
     });
 
     return NextResponse.json({ success: true, booking }, { status: 201 });
   } catch (error) {
+    if (error instanceof BookingConflict) return NextResponse.json({ error: error.message }, { status: 409 });
     logger.error("Create booking error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
@@ -204,6 +213,7 @@ export async function PATCH(request: Request) {
     if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
+    const companyId = user.company_id;
     const body = await request.json();
     const bookingId = String(body.bookingId || body.id || "").trim();
     if (!bookingId) return NextResponse.json({ error: "Boknings-id krävs" }, { status: 400 });
@@ -231,6 +241,7 @@ export async function PATCH(request: Request) {
         start_at: true,
         end_at: true,
         note: true,
+        updated_at: true,
       },
     });
 
@@ -256,23 +267,26 @@ export async function PATCH(request: Request) {
 
     if (hasStatus && status === "cancelled") {
       if (modern.status === "cancelled") return NextResponse.json({ success: true, alreadyCancelled: true });
-      const updateResult = await db.booking.updateMany({
-        where: { id: modern.id, company_id: user.company_id },
-        data: { status: "cancelled" },
-      });
-      if (updateResult.count === 0) return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+      await db.$transaction(async (tx) => {
+        await lockBookingResources(tx, companyId, modern.property_id, [modern.resource]);
+        const updateResult = await tx.booking.updateMany({
+          where: { id: modern.id, company_id: companyId, status: modern.status, updated_at: modern.updated_at },
+          data: { status: "cancelled" },
+        });
+        if (updateResult.count !== 1) throw new BookingConflict("Bokningen har ändrats. Ladda om och försök igen.");
 
-      await writeAuditLog(user, {
-        entityType: "booking",
-        entityId: modern.id,
-        action: "booking.cancelled",
-        metadata: {
-          previousStatus: modern.status,
-          status: "cancelled",
-          resource: modern.resource,
-          resident_name: modern.resident_name,
-          storage: "Booking",
-        },
+        await writeAuditLog(user, {
+          entityType: "booking",
+          entityId: modern.id,
+          action: "booking.cancelled",
+          metadata: {
+            previousStatus: modern.status,
+            status: "cancelled",
+            resource: modern.resource,
+            resident_name: modern.resident_name,
+            storage: "Booking",
+          },
+        }, tx);
       });
       return NextResponse.json({ success: true });
     }
@@ -302,50 +316,54 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
     }
 
-    const conflict = await db.booking.findFirst({
-      where: {
-        company_id: user.company_id,
-        property_id: modern.property_id,
-        property: { deleted_at: null },
-        resource,
-        status: { not: "cancelled" },
-        id: { not: modern.id },
-        start_at: { lt: end },
-        end_at: { gt: start },
-      },
-      select: { id: true },
-    });
-    if (conflict) return NextResponse.json({ error: "Tiden är redan bokad för denna resurs" }, { status: 409 });
+    await db.$transaction(async (tx) => {
+      await lockBookingResources(tx, companyId, modern.property_id, [modern.resource, resource]);
+      const conflict = await tx.booking.findFirst({
+        where: {
+          company_id: companyId,
+          property_id: modern.property_id,
+          property: { deleted_at: null },
+          resource: { equals: resource, mode: "insensitive" },
+          status: { not: "cancelled" },
+          id: { not: modern.id },
+          start_at: { lt: end },
+          end_at: { gt: start },
+        },
+        select: { id: true },
+      });
+      if (conflict) throw new BookingConflict("Tiden är redan bokad för denna resurs");
 
-    const updateResult = await db.booking.updateMany({
-      where: { id: modern.id, company_id: user.company_id },
-      data: {
-        resource,
-        resident_name: residentName,
-        unit: unit || null,
-        start_at: start,
-        end_at: end,
-        note: note || null,
-      },
-    });
-    if (updateResult.count === 0) return NextResponse.json({ error: "Bokningen hittades inte" }, { status: 404 });
+      const updateResult = await tx.booking.updateMany({
+        where: { id: modern.id, company_id: companyId, status: modern.status, updated_at: modern.updated_at },
+        data: {
+          resource,
+          resident_name: residentName,
+          unit: unit || null,
+          start_at: start,
+          end_at: end,
+          note: note || null,
+        },
+      });
+      if (updateResult.count !== 1) throw new BookingConflict("Bokningen har ändrats. Ladda om och försök igen.");
 
-    await writeAuditLog(user, {
-      entityType: "booking",
-      entityId: modern.id,
-      action: "booking.updated",
-      metadata: {
-        resource,
-        resident_name: residentName,
-        unit,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        note,
-        storage: "Booking",
-      },
+      await writeAuditLog(user, {
+        entityType: "booking",
+        entityId: modern.id,
+        action: "booking.updated",
+        metadata: {
+          resource,
+          resident_name: residentName,
+          unit,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          note,
+          storage: "Booking",
+        },
+      }, tx);
     });
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof BookingConflict) return NextResponse.json({ error: error.message }, { status: 409 });
     logger.error("Update booking error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

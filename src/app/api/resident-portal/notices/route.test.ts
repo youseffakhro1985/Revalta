@@ -146,6 +146,21 @@ describe("resident-portal notices route", () => {
     );
   });
 
+  it("only uses verified lease IDs, excluding unlinked notices for other or former residents", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "resident", email: "qa@example.invalid" });
+    listResidentMatchedLeasesMock.mockResolvedValue([
+      { id: "lease-1", property_id: "property-1", unit: { designation: "1201" } },
+      { id: "lease-2", property_id: "property-2", unit: { designation: "1302" } },
+    ]);
+    await GET(request());
+    expect(rentNoticeFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      company_id: "company-1",
+      property: { deleted_at: null },
+      status: { not: "draft" },
+      lease_id: { in: ["lease-1", "lease-2"] },
+    } }));
+  });
+
   it("denies staff from the resident-only notices API with a stable correlated 403", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "manager-1",

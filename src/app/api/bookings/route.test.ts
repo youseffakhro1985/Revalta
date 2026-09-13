@@ -9,6 +9,10 @@ const {
   auditFindFirstMock,
   propertyFindManyMock,
   writeAuditLogMock,
+  transactionMock,
+  executeRawMock,
+  bookingCreateMock,
+  propertyFindFirstMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   bookingFindManyMock: vi.fn(),
@@ -18,6 +22,10 @@ const {
   auditFindFirstMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  transactionMock: vi.fn(),
+  executeRawMock: vi.fn(),
+  bookingCreateMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -31,22 +39,31 @@ vi.mock("@/lib/audit", () => ({
 
 vi.mock("@/lib/db", () => ({
   default: {
+    $transaction: transactionMock,
     booking: {
       findMany: bookingFindManyMock,
       findFirst: bookingFindFirstMock,
       updateMany: bookingUpdateManyMock,
-      create: vi.fn(),
+      create: bookingCreateMock,
     },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
-    property: { findMany: propertyFindManyMock, findFirst: vi.fn() },
+    property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
   },
 }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, POST } from "./route";
 
 describe("bookings route", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    transactionMock.mockImplementation(async (callback) => callback({
+      $executeRaw: executeRawMock,
+      booking: { findFirst: bookingFindFirstMock, create: bookingCreateMock, updateMany: bookingUpdateManyMock },
+      auditLog: { findMany: auditFindManyMock },
+    }));
+    executeRawMock.mockResolvedValue(1);
+    propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Test" });
+    bookingCreateMock.mockResolvedValue({ id: "booking-new", created_at: new Date() });
     bookingFindManyMock.mockResolvedValue([]);
     auditFindManyMock.mockResolvedValue([]);
     propertyFindManyMock.mockResolvedValue([]);
@@ -138,7 +155,7 @@ describe("bookings route", () => {
     expect(bookingUpdateManyMock).toHaveBeenCalled();
     expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       action: "booking.updated",
-    }));
+    }), expect.objectContaining({ booking: expect.anything() }));
   });
 
   it("returns 404 when booking belongs to a soft-deleted property", async () => {
@@ -172,4 +189,48 @@ describe("bookings route", () => {
     expect(response.status).toBe(409);
     expect(body.error).toMatch(/backfill/i);
   });
+  const createBody = { propertyId: "property-1", resource: "Tvättstuga", residentName: "Test", start: "2026-09-08T08:00:00Z", end: "2026-09-08T09:00:00Z" };
+  const createRequest = (body = createBody) => new Request("http://localhost/api/bookings", { method: "POST", body: JSON.stringify(body) });
+  it("locks before testing availability and persists creation with its audit", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    const response = await POST(createRequest());
+    expect(response.status).toBe(201);
+    expect(executeRawMock.mock.invocationCallOrder[0]).toBeLessThan(bookingFindFirstMock.mock.invocationCallOrder[0]);
+    expect(executeRawMock.mock.calls[0][1]).toBe("resident-booking:company-1:property-1:tvättstuga");
+    expect(bookingFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ company_id: "company-1", resource: { equals: "Tvättstuga", mode: "insensitive" } }) }));
+    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: "booking.created" }), expect.objectContaining({ booking: expect.anything() }));
+  });
+  it("does not create when another writer won the slot", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    bookingFindFirstMock.mockResolvedValue({ id: "competing-booking" });
+    expect((await POST(createRequest())).status).toBe(409);
+    expect(bookingCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+  it("fails creation if its audit fails", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    writeAuditLogMock.mockRejectedValue(new Error("audit unavailable"));
+    expect((await POST(createRequest())).status).toBe(500);
+  });
+  it("does not enter the transaction for a foreign property", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+    expect((await POST(createRequest())).status).toBe(404);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+  it.each(["resident", "viewer", "technician", "vendor", "unknown"])("denies %s creation", async (role) => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role });
+    expect((await POST(createRequest())).status).toBe(403);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+  it.each([{ status: "cancelled" }, { resource: "Bastu" }])("rejects a stale edit/cancellation %j", async (change) => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    bookingFindFirstMock.mockResolvedValueOnce({ id: "booking-1", property_id: "property-1", status: "confirmed", resource: "Tvättstuga", resident_name: "Test", start_at: new Date(createBody.start), end_at: new Date(createBody.end), updated_at: new Date("2026-09-07") }).mockResolvedValueOnce(null);
+    bookingUpdateManyMock.mockResolvedValue({ count: 0 });
+    const response = await PATCH(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ bookingId: "booking-1", ...change }) }));
+    expect(response.status).toBe(409);
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(bookingUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ company_id: "company-1", status: "confirmed", updated_at: new Date("2026-09-07") }) }));
+  });
+
 });
