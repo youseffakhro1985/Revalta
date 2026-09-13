@@ -17,8 +17,13 @@ function itemLabels(role: string, sectionId: string) {
 }
 
 describe("dashboard navigation v2", () => {
-  it("håller de två primära destinationerna stabila", () => {
-    expect(staffPrimaryNavigation.map((item) => item.label)).toEqual(["Översikt", "Fastigheter"]);
+  it("håller de fyra primära destinationerna stabila", () => {
+    expect(staffPrimaryNavigation.map((item) => item.label)).toEqual([
+      "Översikt",
+      "Fastigheter",
+      "Ärenden",
+      "Arbetsordrar",
+    ]);
   });
 
   it("ger owner de fem beslutade modulområdena i rätt ordning", () => {

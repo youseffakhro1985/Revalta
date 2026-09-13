@@ -62,6 +62,8 @@ export const residentNavigation: DashboardNavItem[] = [
 export const staffPrimaryNavigation: DashboardNavItem[] = [
   { href: "/dashboard", label: "Översikt", icon: CircleGauge },
   { href: "/dashboard/fastigheter", label: "Fastigheter", icon: Building2 },
+  { href: "/dashboard/felanmalan", label: "Ärenden", icon: ClipboardList },
+  { href: "/dashboard/arbetsorder", label: "Arbetsordrar", icon: Wrench },
 ];
 
 export const staffNavigationSections: DashboardNavSection[] = [
