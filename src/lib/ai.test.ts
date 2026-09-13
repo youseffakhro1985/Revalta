@@ -99,3 +99,37 @@ describe("documentTextSnippet", () => {
     expect(documentTextSnippet(Buffer.from([0x25, 0x50, 0x44, 0x46, 0x00, 0x01]), "application/pdf")).toBe("");
   });
 });
+
+describe("untrusted provider response validation", () => {
+  beforeEach(() => vi.stubEnv("AI_PROVIDER_API_KEY", "synthetic-test-key"));
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+  function provider(content: string) {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content } }] }))));
+  }
+  it.each(["null", "[]", "42", '"text"', "invalid-json"])("uses deterministic fallback for malformed %s", async (content) => {
+    provider(content);
+    expect(await analyzeTicket("Akut vattenläcka")).toMatchObject({ category: "vvs", priority: "urgent" });
+  });
+  it.each([-1, 2, "0.9", null, {}, []])("rejects invalid confidence %j without persisting invalid enums or objects", async (confidence) => {
+    provider(JSON.stringify({ category: "injected-category", priority: "injected-priority", confidence, summary: {}, recommendedAction: ["invalid"] }));
+    const result = await analyzeTicket("Akut vattenläcka");
+    expect(result).toMatchObject({ category: "vvs", priority: "urgent", confidence: 0.86, summary: "Akut vattenläcka" });
+    expect(typeof result.recommendedAction).toBe("string");
+  });
+  it("rejects JSON numeric overflow", async () => {
+    provider('{"confidence":1e999,"priority":"urgent"}');
+    expect((await analyzeTicket("Akut vattenläcka")).confidence).toBe(0.86);
+  });
+  it("preserves valid classifications and bounds provider text", async () => {
+    provider(JSON.stringify({ category: "cleaning", priority: "low", confidence: 0, summary: "s".repeat(5000), recommendedAction: "a".repeat(5000) }));
+    const result = await analyzeTicket("Städning");
+    expect(result).toMatchObject({ category: "cleaning", priority: "low", confidence: 0 });
+    expect(result.summary).toHaveLength(500);
+    expect(result.recommendedAction).toHaveLength(1000);
+  });
+  it("also validates document confidence, category type and summary", async () => {
+    provider(JSON.stringify({ category: { value: "invoice" }, confidence: 9, summary: {} }));
+    const result = await analyzeDocument({ fileName: "faktura.pdf", allowedCategories: LIBRARY_DOCUMENT_CATEGORIES });
+    expect(result).toEqual({ category: "invoice", confidence: 0.84, summary: "faktura.pdf" });
+  });
+});

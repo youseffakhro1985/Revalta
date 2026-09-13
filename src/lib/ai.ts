@@ -1,3 +1,7 @@
+import { PRIORITIES } from "@/lib/domain-labels";
+
+const TICKET_CATEGORY_OPTIONS = ["vvs", "electricity", "elevator", "security", "cleaning", "other"] as const;
+
 type TicketAnalysis = {
   category: string;
   priority: string;
@@ -69,9 +73,22 @@ function deterministicAnalysis(description: string): TicketAnalysis {
   };
 }
 
-function pickAllowed(value: string | undefined, allowed: readonly string[], fallback: string) {
-  const normalized = String(value || "").trim().toLowerCase();
+function pickAllowed(value: unknown, allowed: readonly string[], fallback: string) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
   return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function providerRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : null;
+}
+
+function boundedConfidence(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1 ? value : fallback;
+}
+
+function boundedText(value: unknown, fallback: string, maxLength: number) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, maxLength) : fallback;
 }
 
 function mapToAllowed(category: string, allowed: readonly string[]): string | null {
@@ -138,8 +155,9 @@ function deterministicDocumentAnalysis(
 // Denna fil hanterar AI-logik för felanmälningar. Om AI_PROVIDER_API_KEY finns
 // används en OpenAI-kompatibel API-endpoint, annars används en deterministisk svensk fallback.
 export async function analyzeTicket(description: string): Promise<TicketAnalysis> {
+  const fallback = deterministicAnalysis(description);
   if (!process.env.AI_PROVIDER_API_KEY) {
-    return deterministicAnalysis(description);
+    return fallback;
   }
 
   try {
@@ -156,7 +174,7 @@ export async function analyzeTicket(description: string): Promise<TicketAnalysis
           {
             role: "system",
             content:
-              "Du är en svensk fastighetsförvaltningsassistent. Svara endast med JSON: category, priority, confidence, summary, recommendedAction. category ska vara one of vvs,electricity,elevator,security,cleaning,other. priority ska vara low,normal,high,urgent.",
+              `Du är en svensk fastighetsförvaltningsassistent. Svara endast med JSON: category, priority, confidence, summary, recommendedAction. category ska vara one of ${TICKET_CATEGORY_OPTIONS.join(",")}. priority ska vara ${PRIORITIES.join(",")}.`,
           },
           { role: "user", content: description },
         ],
@@ -170,19 +188,20 @@ export async function analyzeTicket(description: string): Promise<TicketAnalysis
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
     if (!response.ok || typeof content !== "string") {
-      return deterministicAnalysis(description);
+      return fallback;
     }
 
-    const parsed = JSON.parse(content) as Partial<TicketAnalysis>;
+    const parsed = providerRecord(JSON.parse(content));
+    if (!parsed) return fallback;
     return {
-      category: parsed.category || deterministicAnalysis(description).category,
-      priority: parsed.priority || deterministicAnalysis(description).priority,
-      confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.72,
-      summary: parsed.summary || deterministicAnalysis(description).summary,
-      recommendedAction: parsed.recommendedAction || deterministicAnalysis(description).recommendedAction,
+      category: pickAllowed(parsed.category, TICKET_CATEGORY_OPTIONS, fallback.category),
+      priority: pickAllowed(parsed.priority, PRIORITIES, fallback.priority),
+      confidence: boundedConfidence(parsed.confidence, fallback.confidence),
+      summary: boundedText(parsed.summary, fallback.summary, 500),
+      recommendedAction: boundedText(parsed.recommendedAction, fallback.recommendedAction, 1_000),
     };
   } catch {
-    return deterministicAnalysis(description);
+    return fallback;
   }
 }
 
@@ -235,11 +254,12 @@ export async function analyzeDocument(input: {
     if (!response.ok || typeof content !== "string") {
       return fallback;
     }
-    const parsed = JSON.parse(content) as Partial<DocumentAnalysis>;
+    const parsed = providerRecord(JSON.parse(content));
+    if (!parsed) return fallback;
     return {
       category: pickAllowed(parsed.category, allowed, fallback.category),
-      confidence: typeof parsed.confidence === "number" ? parsed.confidence : fallback.confidence,
-      summary: parsed.summary || fallback.summary,
+      confidence: boundedConfidence(parsed.confidence, fallback.confidence),
+      summary: boundedText(parsed.summary, fallback.summary, 500),
     };
   } catch {
     return fallback;
