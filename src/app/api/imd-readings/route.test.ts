@@ -58,6 +58,13 @@ describe("imd-readings route", () => {
     propertyFindManyMock.mockResolvedValue([]);
     leaseFindManyMock.mockResolvedValue([]);
     auditFindManyMock.mockResolvedValue([]);
+    imdUpdateManyMock.mockResolvedValue({ count: 1 });
+    debitUpdateManyMock.mockResolvedValue({ count: 1 });
+    writeAuditLogMock.mockResolvedValue(undefined);
+    transactionMock.mockImplementation(async (callback) => callback({
+      imdReading: { updateMany: imdUpdateManyMock },
+      imdDebitLine: { updateMany: debitUpdateManyMock },
+    }));
   });
 
   it("returns modern IMD readings with debit status and scopes by company", async () => {
@@ -155,4 +162,29 @@ describe("imd-readings route", () => {
     expect(legacy.status).toBe(409);
     expect((await legacy.json()).error).toMatch(/backfill/i);
   });
+  it.each([{ action: "void" }, { currentReading: 30 }])("rejects a concurrent debit attachment for %j", async (change) => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    imdFindFirstMock.mockResolvedValue({
+      id: "reading-1", property_id: "property-1", unit: "1101", meter_id: "EL-1", period: "2026-09",
+      previous_reading: 10, current_reading: 20, unit_price: 2,
+      debit_line: { id: "debit-1", rent_notice_id: null, status: "open", updated_at: new Date("2026-09-07T12:00:00Z") },
+    });
+    debitUpdateManyMock.mockResolvedValue({ count: 0 });
+    const response = await PATCH(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ readingId: "reading-1", ...change }) }));
+    expect(response.status).toBe(409);
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(debitUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      company_id: "company-1", rent_notice_id: null, status: "open", updated_at: new Date("2026-09-07T12:00:00Z"),
+    }) }));
+  });
+
+  it("keeps the mutation and audit in the same transaction", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    imdFindFirstMock.mockResolvedValue({ id: "reading-1", property_id: "property-1", debit_line: { id: "debit-1", status: "open", rent_notice_id: null } });
+    writeAuditLogMock.mockRejectedValue(new Error("audit failed"));
+    const response = await PATCH(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ readingId: "reading-1", action: "void" }) }));
+    expect(response.status).toBe(500);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: "imd.reading.voided" }), expect.objectContaining({ imdReading: expect.anything() }));
+  });
+
 });

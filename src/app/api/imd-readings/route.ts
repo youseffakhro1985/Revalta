@@ -283,7 +283,7 @@ export async function PATCH(request: Request) {
         current_reading: true,
         unit_price: true,
         note: true,
-        debit_line: { select: { id: true, rent_notice_id: true, status: true } },
+        debit_line: { select: { id: true, rent_notice_id: true, status: true, updated_at: true } },
       },
     });
     if (!existing) {
@@ -370,11 +370,13 @@ export async function PATCH(request: Request) {
         });
         if (updated.count !== 1) throw new Error("IMD_UPDATE_CONFLICT");
         if (existing.debit_line) {
-          await tx.imdDebitLine.updateMany({
+          const debitUpdated = await tx.imdDebitLine.updateMany({
             where: {
               id: existing.debit_line.id,
               company_id: companyId,
               rent_notice_id: null,
+              status: "open",
+              updated_at: existing.debit_line.updated_at,
             },
             data: {
               unit,
@@ -385,25 +387,25 @@ export async function PATCH(request: Request) {
               charge,
             },
           });
+          if (debitUpdated.count !== 1) throw new Error("IMD_UPDATE_CONFLICT");
         }
-      });
-
-      await writeAuditLog(user, {
-        entityType: "property",
-        entityId: existing.property_id,
-        action: "imd.reading.updated",
-        metadata: {
-          readingId: existing.id,
-          debitLineId: existing.debit_line?.id ?? null,
-          meter_id: meterId,
-          period,
-          previous_reading: previousReading,
-          current_reading: currentReading,
-          consumption,
-          unit_price: unitPrice,
-          charge,
-          storage: "ImdReading",
-        },
+        await writeAuditLog(user, {
+          entityType: "property",
+          entityId: existing.property_id,
+          action: "imd.reading.updated",
+          metadata: {
+            readingId: existing.id,
+            debitLineId: existing.debit_line?.id ?? null,
+            meter_id: meterId,
+            period,
+            previous_reading: previousReading,
+            current_reading: currentReading,
+            consumption,
+            unit_price: unitPrice,
+            charge,
+            storage: "ImdReading",
+          },
+        }, tx);
       });
 
       return NextResponse.json({
@@ -424,28 +426,30 @@ export async function PATCH(request: Request) {
         throw new Error("IMD_VOID_CONFLICT");
       }
       if (existing.debit_line) {
-        await tx.imdDebitLine.updateMany({
+        const debitUpdated = await tx.imdDebitLine.updateMany({
           where: {
             id: existing.debit_line.id,
             company_id: companyId,
             rent_notice_id: null,
+            status: "open",
+            updated_at: existing.debit_line.updated_at,
           },
           data: { status: "voided" },
         });
+        if (debitUpdated.count !== 1) throw new Error("IMD_VOID_CONFLICT");
       }
-    });
-
-    await writeAuditLog(user, {
-      entityType: "property",
-      entityId: existing.property_id,
-      action: "imd.reading.voided",
-      metadata: {
-        readingId: existing.id,
-        debitLineId: existing.debit_line?.id ?? null,
-        meter_id: existing.meter_id,
-        period: existing.period,
-        storage: "ImdReading",
-      },
+      await writeAuditLog(user, {
+        entityType: "property",
+        entityId: existing.property_id,
+        action: "imd.reading.voided",
+        metadata: {
+          readingId: existing.id,
+          debitLineId: existing.debit_line?.id ?? null,
+          meter_id: existing.meter_id,
+          period: existing.period,
+          storage: "ImdReading",
+        },
+      }, tx);
     });
 
     return NextResponse.json({ success: true, id: existing.id, voided_at: now.toISOString() });
