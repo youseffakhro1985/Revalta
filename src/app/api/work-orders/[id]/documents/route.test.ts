@@ -7,6 +7,20 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@vercel/blob", () => ({ put: mocks.put, del: mocks.del }));
+vi.mock("@/lib/integrations", () => ({ recordAiEvent: vi.fn() }));
+vi.mock("@/lib/ai", () => ({
+  analyzeDocument: vi.fn(async ({ existingCategory, fileName }: { existingCategory?: string; fileName?: string }) => ({
+    category: existingCategory && existingCategory !== "other"
+      ? existingCategory
+      : /faktura|invoice/i.test(fileName || "")
+        ? "invoice"
+        : "other",
+    confidence: 0.9,
+    summary: "test",
+  })),
+  documentTextSnippet: vi.fn(() => ""),
+  WORK_ORDER_DOCUMENT_CATEGORIES: ["before", "after", "invoice", "warranty", "manual", "report", "other"],
+}));
 vi.mock("@/lib/current-user", async () => ({
   ...await import("@/lib/permissions"),
   getCurrentUser: mocks.currentUser,
@@ -157,6 +171,22 @@ describe("work-order document persistence and audit", () => {
     expect(mocks.unsafeAudit).not.toHaveBeenCalled();
     expect(mocks.del).not.toHaveBeenCalled();
     expect((await response.json()).document.storage_url).toBe("/api/work-orders/wo-a/documents/doc-a");
+  });
+
+  it("classifies unspecified invoices from the filename before persist", async () => {
+    const form = new FormData();
+    form.set("file", new File(["%PDF-1.4\n"], "Faktura-2026.pdf", { type: "application/pdf" }));
+    form.set("category", "other");
+    form.set("visibility", "internal");
+    const response = await POST(new Request(url, {
+      method: "POST",
+      body: form,
+      headers: { "x-request-id": "document-test-request" },
+    }), params);
+    expect(response.status).toBe(201);
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ category: "invoice" }),
+    }));
   });
 
   it.each(["create", "audit"])("compensates the blob when the %s step aborts the transaction", async (step) => {

@@ -3,6 +3,7 @@ import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { canAssignWorkOrders, canExportTickets, canManageTickets, getCurrentUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
+import { analyzeTicket } from "@/lib/ai";
 import { calculateDueDate } from "@/lib/sla";
 import {
   isMissingSchemaColumnError,
@@ -337,18 +338,28 @@ export async function POST(request: Request) {
       }
     }
 
+    const analysis = await analyzeTicket(`${normalizedTitle}. ${normalizedDescription}`);
+    const resolvedCategory = normalizedCategory === "other" ? analysis.category : normalizedCategory;
+    const resolvedPriority = normalizedPriority === "normal" && !priority
+      ? analysis.priority
+      : normalizedPriority;
+
     const ticket = await db.$transaction(async (tx) => {
       const created = await tx.ticket.create({
         data: {
           title: normalizedTitle,
           description: normalizedDescription,
-          category: normalizedCategory,
-          priority: normalizedPriority,
-          due_date: calculateDueDate(normalizedPriority),
+          category: resolvedCategory,
+          priority: resolvedPriority,
+          due_date: calculateDueDate(resolvedPriority),
           property_id: normalizedPropertyId,
           assigned_to_id: normalizedAssignedToId,
           company_id: user.company_id,
           user_id: user.id,
+          ai_summary: analysis.summary,
+          ai_recommended_action: analysis.recommendedAction,
+          ai_confidence: analysis.confidence,
+          ai_processed_at: new Date(),
         },
         select: {
           id: true,
@@ -417,9 +428,11 @@ export async function POST(request: Request) {
     try {
       await recordAiEvent(user, {
         ticketId: ticket.id,
-        action: "classification.requested",
-        category: ticket.category,
-        priority: ticket.priority,
+        action: "classification.completed",
+        category: analysis.category,
+        priority: analysis.priority,
+        confidence: analysis.confidence,
+        summary: analysis.summary,
       });
     } catch {
       observability.logger.warn("ticket create ai telemetry failed", observability.elapsed({

@@ -71,6 +71,7 @@ function getRequest(path = "") {
 }
 
 beforeEach(() => {
+  vi.stubEnv("AI_PROVIDER_API_KEY", "");
   createLoggerMock.mockReturnValue({
     debug: vi.fn(),
     info: loggerInfoMock,
@@ -149,6 +150,14 @@ describe("POST /api/tickets", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(ticketCreateMock).toHaveBeenCalledTimes(1);
+    expect(ticketCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        ai_summary: expect.any(String),
+        ai_recommended_action: expect.any(String),
+        ai_confidence: expect.any(Number),
+        ai_processed_at: expect.any(Date),
+      }),
+    }));
     expect(loggerInfoMock).toHaveBeenCalledWith(
       "ticket create completed",
       expect.objectContaining({

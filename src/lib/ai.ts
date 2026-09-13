@@ -6,6 +6,38 @@ type TicketAnalysis = {
   recommendedAction: string;
 };
 
+export type DocumentAnalysis = {
+  category: string;
+  confidence: number;
+  summary: string;
+};
+
+export const WORK_ORDER_DOCUMENT_CATEGORIES = [
+  "before",
+  "after",
+  "invoice",
+  "warranty",
+  "manual",
+  "report",
+  "other",
+] as const;
+
+export const LIBRARY_DOCUMENT_CATEGORIES = [
+  "contract",
+  "invoice",
+  "protocol",
+  "drawing",
+  "insurance",
+  "energy",
+  "inspection",
+  "other",
+] as const;
+
+export type WorkOrderDocumentCategory = (typeof WORK_ORDER_DOCUMENT_CATEGORIES)[number];
+export type LibraryDocumentCategory = (typeof LIBRARY_DOCUMENT_CATEGORIES)[number];
+
+const TEXT_SNIPPET_MAX = 2_000;
+
 function deterministicAnalysis(description: string): TicketAnalysis {
   const text = description.toLowerCase();
   const isUrgent = /(akut|läcka|vatten|brand|hiss|el|ström|inbrott|risk)/.test(text);
@@ -34,6 +66,72 @@ function deterministicAnalysis(description: string): TicketAnalysis {
       priority === "urgent"
         ? "Prioritera ärendet omgående och tilldela ansvarig tekniker."
         : "Planera åtgärd och återkoppla till kund med nästa steg.",
+  };
+}
+
+function pickAllowed(value: string | undefined, allowed: readonly string[], fallback: string) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function mapToAllowed(category: string, allowed: readonly string[]): string | null {
+  if (allowed.includes(category)) return category;
+  if (category === "protocol" && allowed.includes("report")) return "report";
+  if (category === "contract" && allowed.includes("manual")) return "manual";
+  if (category === "inspection" && allowed.includes("report")) return "report";
+  return null;
+}
+
+function deterministicDocumentCategory(haystack: string, allowed: readonly string[]): string {
+  const text = haystack.toLowerCase();
+  const candidates = [
+    [/(faktura|invoice|kvitto)/, "invoice"],
+    [/(garanti|warranty)/, "warranty"],
+    [/(manual|instruktion|skötsel|skotsel)/, "manual"],
+    [/(före|fore|before|innan\s*åtgärd|innan\s*atgard)/, "before"],
+    [/(efter|after|slutbesikt)/, "after"],
+    [/(protokoll|protocol)/, "protocol"],
+    [/(rapport|report)/, "report"],
+    [/(avtal|contract|hyreskontrakt)/, "contract"],
+    [/(ritning|drawing|planritning)/, "drawing"],
+    [/(försäkring|forsakring|insurance)/, "insurance"],
+    [/(energi|oib|energideklaration)/, "energy"],
+    [/(besiktning|inspection)/, "inspection"],
+  ] as const;
+
+  for (const [pattern, category] of candidates) {
+    if (!pattern.test(text)) continue;
+    const mapped = mapToAllowed(category, allowed);
+    if (mapped) return mapped;
+  }
+  return "other";
+}
+
+/** Extract a short UTF-8 snippet from text-like files. Never returns raw binary. */
+export function documentTextSnippet(bytes: Buffer, contentType: string): string {
+  const type = contentType.toLowerCase();
+  const isText =
+    type.startsWith("text/")
+    || type.includes("json")
+    || type.includes("xml")
+    || type.includes("csv")
+    || type === "application/rtf";
+  if (!isText) return "";
+  const sample = bytes.subarray(0, TEXT_SNIPPET_MAX);
+  if (sample.includes(0)) return "";
+  return sample.toString("utf8").replace(/\u0000/g, "").slice(0, TEXT_SNIPPET_MAX);
+}
+
+function deterministicDocumentAnalysis(
+  fileName: string,
+  textSnippet: string,
+  allowed: readonly string[],
+): DocumentAnalysis {
+  const category = deterministicDocumentCategory(`${fileName}\n${textSnippet}`, allowed);
+  return {
+    category,
+    confidence: category === "other" ? 0.52 : 0.84,
+    summary: fileName.slice(0, 180),
   };
 }
 
@@ -85,5 +183,65 @@ export async function analyzeTicket(description: string): Promise<TicketAnalysis
     };
   } catch {
     return deterministicAnalysis(description);
+  }
+}
+
+export async function analyzeDocument(input: {
+  fileName: string;
+  textSnippet?: string;
+  allowedCategories: readonly string[];
+  existingCategory?: string;
+}): Promise<DocumentAnalysis> {
+  const allowed = input.allowedCategories.length > 0 ? input.allowedCategories : ["other"];
+  const existing = pickAllowed(input.existingCategory, allowed, "");
+  if (existing && existing !== "other") {
+    return { category: existing, confidence: 1, summary: input.fileName.slice(0, 180) };
+  }
+
+  const fallback = deterministicDocumentAnalysis(input.fileName, input.textSnippet || "", allowed);
+  if (!process.env.AI_PROVIDER_API_KEY) {
+    return fallback;
+  }
+
+  try {
+    const response = await fetch(process.env.AI_PROVIDER_API_URL || "https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.AI_PROVIDER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.AI_PROVIDER_MODEL || "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              `Du klassificerar fastighetsdokument. Svara endast med JSON: category, confidence, summary. category ska vara one of ${allowed.join(",")}. Använd endast filnamn och eventuell textsnutt — aldrig binärt innehåll.`,
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              fileName: input.fileName,
+              textSnippet: (input.textSnippet || "").slice(0, TEXT_SNIPPET_MAX),
+            }),
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!response.ok || typeof content !== "string") {
+      return fallback;
+    }
+    const parsed = JSON.parse(content) as Partial<DocumentAnalysis>;
+    return {
+      category: pickAllowed(parsed.category, allowed, fallback.category),
+      confidence: typeof parsed.confidence === "number" ? parsed.confidence : fallback.confidence,
+      summary: parsed.summary || fallback.summary,
+    };
+  } catch {
+    return fallback;
   }
 }

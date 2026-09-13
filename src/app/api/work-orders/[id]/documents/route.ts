@@ -8,6 +8,8 @@ import { validateUploadFile } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
 import { findAccessibleWorkOrder } from "@/lib/assigned-work-access";
 import { createRouteObservability } from "@/lib/route-observability";
+import { analyzeDocument, documentTextSnippet, WORK_ORDER_DOCUMENT_CATEGORIES } from "@/lib/ai";
+import { recordAiEvent } from "@/lib/integrations";
 
 export const dynamic = "force-dynamic";
 const ROUTE = "/api/work-orders/[id]/documents";
@@ -89,7 +91,7 @@ export async function POST(request: Request, { params }: Params) {
     const form = await request.formData().catch(() => null);
     if (!form) return reject(observability, 400, API_ERROR_CODES.validationFailed, "Ogiltig filuppladdning");
     const file = form.get("file");
-    const category = String(form.get("category") || "other");
+    let category = String(form.get("category") || "other");
     const visibility = String(form.get("visibility") || "internal");
     if (!(file instanceof File)) return reject(observability, 400, API_ERROR_CODES.validationFailed, "Välj en fil");
     if (!categories.has(category) || !visibilities.has(visibility)) return reject(observability, 400, API_ERROR_CODES.validationFailed, "Ogiltig dokumentkategori eller synlighet");
@@ -104,6 +106,16 @@ export async function POST(request: Request, { params }: Params) {
       maxBytes: MAX_SIZE,
     });
     if (!validation.ok) return reject(observability, 400, API_ERROR_CODES.validationFailed, validation.error);
+
+    if (!category || category === "other") {
+      const classified = await analyzeDocument({
+        fileName: validation.fileName,
+        textSnippet: documentTextSnippet(bytes, validation.contentType),
+        allowedCategories: WORK_ORDER_DOCUMENT_CATEGORIES,
+        existingCategory: category || "other",
+      });
+      category = classified.category;
+    }
 
     const safeName = validation.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
     const documentId = crypto.randomUUID();
@@ -162,6 +174,19 @@ export async function POST(request: Request, { params }: Params) {
         }));
       }
       return failure(observability, "upload");
+    }
+    try {
+      await recordAiEvent(ctx.user, {
+        documentId: document.id,
+        action: "document.classified",
+        category,
+        workOrderId: id,
+      });
+    } catch {
+      observability.logger.warn("work-order document ai telemetry failed", observability.elapsed({
+        event: "work_order.documents.ai_telemetry_failed",
+        documentId: document.id,
+      }));
     }
     return success(observability, {
       document: { ...document, storage_url: `/api/work-orders/${id}/documents/${document.id}` },

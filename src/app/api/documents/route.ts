@@ -9,6 +9,8 @@ import { isProductionRuntime } from "@/lib/runtime-env";
 import { hasStorageConfig, storeAttachment, StorageConfigurationError } from "@/lib/storage";
 import { writeAuditLog } from "@/lib/audit";
 import { createRouteObservability } from "@/lib/route-observability";
+import { analyzeDocument, documentTextSnippet, LIBRARY_DOCUMENT_CATEGORIES } from "@/lib/ai";
+import { recordAiEvent } from "@/lib/integrations";
 
 const ROUTE = "/api/documents";
 const SUCCESS_HEADERS = {
@@ -277,7 +279,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const file = formData.get("file");
     const name = String(formData.get("name") || "").trim();
-    const category = String(formData.get("category") || "other").trim();
+    let category = String(formData.get("category") || "other").trim();
     const visibility = String(formData.get("visibility") || "internal").trim();
     const propertyId = String(formData.get("propertyId") || "").trim();
     const unitId = String(formData.get("unitId") || "").trim();
@@ -299,6 +301,16 @@ export async function POST(request: Request) {
     const bytes = Buffer.from(await file.arrayBuffer());
     const validation = validateDocumentFile({ bytes, contentType: file.type, fileName: file.name, maxBytes: 2_000_000 });
     if (!validation.ok) return validationFailure(validation.error, "invalid_file");
+
+    if (!category || category === "other") {
+      const classified = await analyzeDocument({
+        fileName: validation.fileName,
+        textSnippet: documentTextSnippet(bytes, validation.contentType),
+        allowedCategories: LIBRARY_DOCUMENT_CATEGORIES,
+        existingCategory: category || "other",
+      });
+      category = classified.category;
+    }
 
     let resolvedPropertyId = propertyId || null;
     let resolvedUnitId = unitId || null;
@@ -423,7 +435,20 @@ export async function POST(request: Request) {
       userId: user.id,
       companyId,
       documentId: document.id,
+      category,
     }));
+    try {
+      await recordAiEvent(user, {
+        documentId: document.id,
+        action: "document.classified",
+        category,
+      });
+    } catch {
+      observability.logger.warn("document create ai telemetry failed", observability.elapsed({
+        event: "documents.create.ai_telemetry_failed",
+        documentId: document.id,
+      }));
+    }
     return successResponse(observability, { success: true, document }, { status: 201 });
   } catch (error) {
     if (error instanceof StorageConfigurationError) {
