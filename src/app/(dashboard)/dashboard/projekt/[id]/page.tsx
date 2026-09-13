@@ -97,7 +97,7 @@ export default function ProjectDetailPage() {
 
   return <div className="space-y-8">
     <Link href="/dashboard/projekt" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till projektportföljen</Link>
-    <PageHeader eyebrow="Projektstyrning" title={project.name} description={project.description || "Samlad projektstyrning för tidsplan, risk, ekonomi, dokument och beslut."} />
+    <PageHeader catalog="projekt-detalj" eyebrow="Projektstyrning" title={project.name} description={project.description || "Samlad projektstyrning för tidsplan, risk, ekonomi, dokument och beslut."} />
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

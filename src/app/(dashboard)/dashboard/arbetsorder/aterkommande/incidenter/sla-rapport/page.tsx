@@ -72,7 +72,7 @@ export default function RecurringIncidentSlaReportPage() {
   useEffect(() => { void load("30"); }, [load]);
 
   return <div className="space-y-8">
-    <PageHeader
+    <PageHeader catalog="sla-rapport"
       eyebrow="Driftuppföljning"
       title="SLA-rapport för schemaincidenter"
       description="Följ svarstider, lösningstider, måluppfyllelse och aktiva avvikelser för återkommande arbetsordrar."

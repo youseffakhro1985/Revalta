@@ -3,7 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import { Activity, AlertTriangle, CheckCircle2, Clock3, Database, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { InlineAlert, MetricCard, PageHeader, Panel, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Schema = {
   ready?: boolean;
@@ -103,24 +103,21 @@ export default function OperationsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 animate-fade-in-soft">
-      <header className="flex flex-col justify-between gap-4 rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm sm:flex-row sm:items-end sm:p-8">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift</p>
-          <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Systemhälsa och produktion</h1>
-          <p className="mt-3 max-w-2xl text-ink-600">
-            Kontrollera databas, schema, kritiska secrets, modern storage och cron-beredskap från en plats.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => void loadHealth()}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Uppdatera
-        </button>
-      </header>
+      <PageHeader
+        catalog="drift"
+        eyebrow="Administration · Drift"
+        title="Systemhälsa och produktion"
+        description="Kontrollera databas, schema, kritiska secrets, modern storage och cron-beredskap från en plats."
+        status={health?.status === "ok" ? "Live" : loading ? "Kontrollerar" : "Kräver tillsyn"}
+        statusTone={health?.status === "ok" ? "ok" : loading ? "off" : "warn"}
+        records={health?.release?.commitSha?.slice(0, 7) || undefined}
+        action={(
+          <button type="button" onClick={() => void loadHealth()} disabled={loading} className={premiumSecondaryButtonClass}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Uppdatera
+          </button>
+        )}
+      />
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, Mail, RefreshCw, Save, Send, Settings2, Users } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type EventRow = { id: string; type: string; status: string; recipient: string | null; payload: Record<string, unknown> | null; created_at: string };
@@ -138,18 +138,19 @@ export default function ServiceNotificationsPage() {
 
   return (
     <div className="mx-auto max-w-7xl animate-fade-in-soft space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <Link href="/dashboard/installningar" className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">← Till inställningar</Link>
-          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och aviseringar</p>
-          <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Serviceaviseringar</h1>
-          <p className="mt-3 max-w-3xl text-ink-600">Styr mottagare och aviseringsperiod, övervaka den dagliga rutinen och verifiera e-postleveransen.</p>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => void load()} disabled={loading || isDirty} title={isDirty ? "Spara eller återställ ändringarna innan du uppdaterar" : undefined} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
-          <button type="button" onClick={() => void sendTest()} disabled={sending || !data?.canManage || !config.ready} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Send className="h-4 w-4" /> {sending ? "Skickar…" : "Skicka test"}</button>
-        </div>
-      </div>
+      <PageHeader
+        catalog="serviceaviseringar"
+        eyebrow="Administration · Aviseringar"
+        title="Serviceaviseringar"
+        description="Styr mottagare och aviseringsperiod, övervaka den dagliga rutinen och verifiera e-postleveransen."
+        action={(
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/installningar" className={premiumSecondaryButtonClass}>Till inställningar</Link>
+            <button type="button" onClick={() => void load()} disabled={loading || isDirty} title={isDirty ? "Spara eller återställ ändringarna innan du uppdaterar" : undefined} className={premiumSecondaryButtonClass}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+            <button type="button" onClick={() => void sendTest()} disabled={sending || !data?.canManage || !config.ready} className={premiumPrimaryButtonClass}><Send className="mr-2 h-4 w-4" /> {sending ? "Skickar…" : "Skicka test"}</button>
+          </div>
+        )}
+      />
 
       <div aria-live="polite" aria-atomic="true">
         {error ? <InlineAlert>{error}</InlineAlert> : null}

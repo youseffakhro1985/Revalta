@@ -15,6 +15,7 @@ import {
 import db from "@/lib/db";
 import { auditScopedWhere, canViewOperations, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { activePropertyRelationFilter, notDeletedFilter } from "@/lib/schema-readiness";
+import { PageHeader } from "@/components/dashboard/premium-ui";
 import { ReportsToolbar, type ReportExportRow } from "@/components/reports/reports-toolbar";
 import { redirect } from "next/navigation";
 
@@ -77,7 +78,7 @@ function Metric({ icon: Icon, label, value, detail, href, alert }: MetricProps) 
       </div>
       <p className="mt-4 text-[11px] font-medium text-ink-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-ink-950">{value}</p>
-      <p className={`mt-2 text-[10px] leading-4 ${alert ? "text-danger-700" : "text-ink-500"}`}>{detail}</p>
+      <p className={`mt-2 text-[13px] leading-4 ${alert ? "text-danger-700" : "text-ink-500"}`}>{detail}</p>
     </Link>
   );
 }
@@ -372,18 +373,13 @@ export default async function ReportsPage({
 
   return (
     <div className="space-y-5 pb-4">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Analys & beslutsstöd / Rapporter</p>
-          <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Rapporter</h1>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-ink-500">
-            Samlad uppföljning av drift, arbetsorder, uthyrning och ekonomi med verklig data från organisationens bestånd.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] text-ink-500">
-          <span className="h-2 w-2 rounded-full bg-success-500" />Live-data · uppdaterad {updatedLabel}
-        </div>
-      </header>
+      <PageHeader
+        catalog="rapporter"
+        eyebrow="Ekonomi & analys · Rapporter"
+        title="Rapporter"
+        description="Samlad uppföljning av drift, arbetsorder, uthyrning och ekonomi med verklig data från organisationens bestånd."
+        status={`Live · ${updatedLabel}`}
+      />
 
       <ReportsToolbar
         period={period}
@@ -401,7 +397,7 @@ export default async function ReportsPage({
           ["Ekonomi", "Budget, utfall och hyresintäkter", "/dashboard/ekonomi"],
         ].map(([title, description, href]) => (
           <Link key={title} href={href} className="group flex items-center justify-between rounded-2xl border border-sand-200 bg-surface-subtle px-4 py-3 transition hover:border-petroleum-200 hover:bg-white">
-            <div><p className="text-xs font-semibold text-ink-800">{title}</p><p className="mt-0.5 text-[10px] text-ink-500">{description}</p></div>
+            <div><p className="text-xs font-semibold text-ink-800">{title}</p><p className="mt-0.5 text-[13px] text-ink-500">{description}</p></div>
             <ArrowRight className="h-4 w-4 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-700" />
           </Link>
         ))}
@@ -419,36 +415,36 @@ export default async function ReportsPage({
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Operativ utveckling</p>
+              <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Operativ utveckling</p>
               <h2 className="mt-1 font-display text-[19px] font-semibold text-ink-950">Ärenden och slutförda arbetsorder</h2>
             </div>
-            <p className="text-[10px] text-ink-500">{dateLabel.format(currentStart)} – {dateLabel.format(now)}</p>
+            <p className="text-[13px] text-ink-500">{dateLabel.format(currentStart)} – {dateLabel.format(now)}</p>
           </div>
-          <div className="mt-4 flex gap-4 text-[10px] text-ink-500"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-petroleum-800" />Nya ärenden</span><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sand-500" />Slutförda arbetsorder</span></div>
+          <div className="mt-4 flex gap-4 text-[13px] text-ink-500"><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-petroleum-800" />Nya ärenden</span><span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sand-500" />Slutförda arbetsorder</span></div>
           <div className="mt-6 grid min-h-52 grid-cols-6 items-end gap-2 border-b border-sand-200 pb-3 sm:gap-4">
             {trendBuckets.map((bucket) => (
               <div key={bucket.start.toISOString()} className="flex h-full flex-col justify-end">
                 <div className="mb-2 flex min-h-6 items-end justify-center gap-1.5">
-                  <span className="text-[9px] font-semibold text-petroleum-800">{bucket.tickets || ""}</span>
-                  <span className="text-[9px] font-semibold text-ink-500">{bucket.completedOrders || ""}</span>
+                  <span className="text-[12px] font-semibold text-petroleum-800">{bucket.tickets || ""}</span>
+                  <span className="text-[12px] font-semibold text-ink-500">{bucket.completedOrders || ""}</span>
                 </div>
                 <div className="flex h-32 items-end justify-center gap-1.5">
                   <div className="w-[42%] max-w-7 rounded-t-lg bg-petroleum-800" style={{ height: `${Math.max(bucket.tickets ? 8 : 2, (bucket.tickets / trendMax) * 100)}%` }} />
                   <div className="w-[42%] max-w-7 rounded-t-lg bg-sand-500" style={{ height: `${Math.max(bucket.completedOrders ? 8 : 2, (bucket.completedOrders / trendMax) * 100)}%` }} />
                 </div>
-                <p className="mt-2 truncate text-center text-[9px] capitalize text-ink-400">{bucket.label}</p>
+                <p className="mt-2 truncate text-center text-[12px] capitalize text-ink-400">{bucket.label}</p>
               </div>
             ))}
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[10px] text-ink-500">Genomsnittlig åtgärdstid</p><p className="mt-1 text-sm font-semibold text-ink-900">{formatDays(averageResolution)}</p></div>
-            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[10px] text-ink-500">Aktiva arbetsorder</p><p className="mt-1 text-sm font-semibold text-ink-900">{activeOrders.length}</p></div>
-            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[10px] text-ink-500">Akuta öppna ärenden</p><p className={`mt-1 text-sm font-semibold ${urgentOpenTickets.length ? "text-danger-700" : "text-ink-900"}`}>{urgentOpenTickets.length}</p></div>
+            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[13px] text-ink-500">Genomsnittlig åtgärdstid</p><p className="mt-1 text-sm font-semibold text-ink-900">{formatDays(averageResolution)}</p></div>
+            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[13px] text-ink-500">Aktiva arbetsorder</p><p className="mt-1 text-sm font-semibold text-ink-900">{activeOrders.length}</p></div>
+            <div className="rounded-xl bg-surface-subtle px-3.5 py-3"><p className="text-[13px] text-ink-500">Akuta öppna ärenden</p><p className={`mt-1 text-sm font-semibold ${urgentOpenTickets.length ? "text-danger-700" : "text-ink-900"}`}>{urgentOpenTickets.length}</p></div>
           </div>
         </article>
 
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Periodjämförelse</p>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Periodjämförelse</p>
           <h2 className="mt-1 font-display text-[19px] font-semibold text-ink-950">Nu mot föregående {periodLabel}</h2>
           <div className="mt-5 divide-y divide-sand-100">
             {[
@@ -458,7 +454,7 @@ export default async function ReportsPage({
             ].map(([label, current, previous, delta]) => (
               <div key={label} className="py-4">
                 <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-ink-800">{label}</p><p className="text-sm font-semibold text-ink-950">{current}</p></div>
-                <div className="mt-1 flex items-center justify-between gap-3 text-[10px] text-ink-500"><span>Föregående: {previous}</span><span>{delta}</span></div>
+                <div className="mt-1 flex items-center justify-between gap-3 text-[13px] text-ink-500"><span>Föregående: {previous}</span><span>{delta}</span></div>
               </div>
             ))}
           </div>
@@ -468,23 +464,23 @@ export default async function ReportsPage({
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <article className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
           <div className="flex flex-col gap-2 border-b border-sand-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Beståndsprestanda</p><h2 className="mt-1 font-display text-[19px] font-semibold text-ink-950">Fastigheter i fokus</h2></div>
-            <p className="text-[10px] text-ink-500">{selectedProperty ? `Filtrerat på ${selectedProperty.name}` : `${propertyRows.length} fastigheter`}</p>
+            <div><p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Beståndsprestanda</p><h2 className="mt-1 font-display text-[19px] font-semibold text-ink-950">Fastigheter i fokus</h2></div>
+            <p className="text-[13px] text-ink-500">{selectedProperty ? `Filtrerat på ${selectedProperty.name}` : `${propertyRows.length} fastigheter`}</p>
           </div>
           {propertyRows.length === 0 ? <p className="p-6 text-sm text-ink-500">Inga fastigheter att rapportera ännu.</p> : (
             <div className="overflow-x-auto">
               <table className="min-w-[860px] w-full text-left">
-                <thead className="bg-surface-subtle text-[9px] uppercase tracking-[0.08em] text-ink-400"><tr><th className="px-5 py-3 font-semibold">Fastighet</th><th className="px-3 py-3 font-semibold">Uthyrning</th><th className="px-3 py-3 font-semibold">Ärenden</th><th className="px-3 py-3 font-semibold">Arbetsorder</th><th className="px-3 py-3 font-semibold">Hyresintäkt</th><th className="px-3 py-3 font-semibold">Kostnadsutfall</th><th className="px-5 py-3"><span className="sr-only">Öppna</span></th></tr></thead>
+                <thead className="bg-surface-subtle text-[12px] uppercase tracking-[0.08em] text-ink-400"><tr><th className="px-5 py-3 font-semibold">Fastighet</th><th className="px-3 py-3 font-semibold">Uthyrning</th><th className="px-3 py-3 font-semibold">Ärenden</th><th className="px-3 py-3 font-semibold">Arbetsorder</th><th className="px-3 py-3 font-semibold">Hyresintäkt</th><th className="px-3 py-3 font-semibold">Kostnadsutfall</th><th className="px-5 py-3"><span className="sr-only">Öppna</span></th></tr></thead>
                 <tbody className="divide-y divide-sand-100">
                   {propertyRows.map((property) => (
                     <tr key={property.id} className="transition hover:bg-sand-50/60">
-                      <td className="px-5 py-4"><p className="text-xs font-semibold text-ink-900">{property.name}</p><p className="mt-0.5 text-[10px] text-ink-500">{property.city} · {property._count.units} objekt</p></td>
+                      <td className="px-5 py-4"><p className="text-xs font-semibold text-ink-900">{property.name}</p><p className="mt-0.5 text-[13px] text-ink-500">{property.city} · {property._count.units} objekt</p></td>
                       <td className="px-3 py-4"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-sand-100"><div className="h-full rounded-full bg-petroleum-700" style={{ width: `${property.occupancy}%` }} /></div><span className="text-[11px] font-semibold text-ink-700">{property.occupancy} %</span></div></td>
                       <td className="px-3 py-4 text-xs font-semibold text-ink-800">{property.openTickets}</td>
                       <td className="px-3 py-4 text-xs font-semibold text-ink-800">{property.activeOrders}</td>
                       <td className="px-3 py-4 text-xs font-semibold text-ink-800">{compactMoney(property.rentIncome)}</td>
                       <td className="px-3 py-4 text-xs font-semibold text-ink-800">{compactMoney(property.costActual)}</td>
-                      <td className="px-5 py-4 text-right"><Link href={`/dashboard/fastigheter/${property.id}`} className="inline-flex items-center gap-1 text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Öppna <ArrowRight className="h-3 w-3" /></Link></td>
+                      <td className="px-5 py-4 text-right"><Link href={`/dashboard/fastigheter/${property.id}`} className="inline-flex items-center gap-1 text-[13px] font-semibold text-petroleum-700 hover:text-petroleum-900">Öppna <ArrowRight className="h-3 w-3" /></Link></td>
                     </tr>
                   ))}
                 </tbody>
@@ -494,7 +490,7 @@ export default async function ReportsPage({
         </article>
 
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Behöver uppmärksamhet</p>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Behöver uppmärksamhet</p>
           <h2 className="mt-1 font-display text-[19px] font-semibold text-ink-950">Operativa signaler</h2>
           <div className="mt-5 space-y-2.5">
             <Link href="/dashboard/felanmalan" className="flex items-center justify-between rounded-xl border border-sand-100 bg-surface-subtle px-3.5 py-3 transition hover:border-danger-100 hover:bg-danger-50/40"><span className="inline-flex items-center gap-2 text-xs font-medium text-ink-700"><AlertTriangle className="h-4 w-4 text-danger-600" />Akuta öppna ärenden</span><span className="text-sm font-semibold text-ink-950">{urgentOpenTickets.length}</span></Link>
@@ -507,7 +503,7 @@ export default async function ReportsPage({
 
       <section className="grid gap-4 lg:grid-cols-3">
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Ärendebild</p>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Ärendebild</p>
           <h2 className="mt-1 font-display text-[18px] font-semibold text-ink-950">Vanligaste kategorier</h2>
           <div className="mt-5 space-y-4">
             {categoryRows.length === 0 ? <p className="text-sm text-ink-500">Inga nya ärenden i vald period.</p> : categoryRows.map(([category, value]) => (
@@ -520,17 +516,17 @@ export default async function ReportsPage({
         </article>
 
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Ekonomi</p><h2 className="mt-1 font-display text-[18px] font-semibold text-ink-950">Årets registrerade utfall</h2></div><Link href="/dashboard/budget" className="print:hidden text-[10px] font-semibold text-petroleum-700 hover:text-petroleum-900">Budget</Link></div>
+          <div className="flex items-start justify-between gap-3"><div><p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Ekonomi</p><h2 className="mt-1 font-display text-[18px] font-semibold text-ink-950">Årets registrerade utfall</h2></div><Link href="/dashboard/budget" className="print:hidden text-[13px] font-semibold text-petroleum-700 hover:text-petroleum-900">Budget</Link></div>
           <div className="mt-5 divide-y divide-sand-100">
-            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Intäktsutfall</p><p className="text-[10px] text-ink-500">Budget {compactMoney(budgetIncome)}</p></div><p className="text-sm font-semibold text-ink-950">{compactMoney(actualIncome)}</p></div>
-            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Kostnadsutfall</p><p className="text-[10px] text-ink-500">Budget {compactMoney(budgetCosts)}</p></div><p className="text-sm font-semibold text-ink-950">{compactMoney(actualCosts)}</p></div>
-            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Registrerat driftnetto</p><p className="text-[10px] text-ink-500">Budgeterat netto {compactMoney(budgetNet)}</p></div><p className={`text-sm font-semibold ${registeredNet < 0 ? "text-danger-700" : "text-ink-950"}`}>{compactMoney(registeredNet)}</p></div>
+            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Intäktsutfall</p><p className="text-[13px] text-ink-500">Budget {compactMoney(budgetIncome)}</p></div><p className="text-sm font-semibold text-ink-950">{compactMoney(actualIncome)}</p></div>
+            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Kostnadsutfall</p><p className="text-[13px] text-ink-500">Budget {compactMoney(budgetCosts)}</p></div><p className="text-sm font-semibold text-ink-950">{compactMoney(actualCosts)}</p></div>
+            <div className="flex items-center justify-between py-3"><div><p className="text-xs font-medium text-ink-700">Registrerat driftnetto</p><p className="text-[13px] text-ink-500">Budgeterat netto {compactMoney(budgetNet)}</p></div><p className={`text-sm font-semibold ${registeredNet < 0 ? "text-danger-700" : "text-ink-950"}`}>{compactMoney(registeredNet)}</p></div>
             <div className="flex items-center justify-between py-3"><p className="text-xs font-medium text-ink-700">Budgetutnyttjande kostnader</p><p className="text-sm font-semibold text-ink-950">{budgetUtilization === null ? "—" : `${budgetUtilization} %`}</p></div>
           </div>
         </article>
 
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Förvaltningsaktivitet</p>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">Förvaltningsaktivitet</p>
           <h2 className="mt-1 font-display text-[18px] font-semibold text-ink-950">Registrerat i vald period</h2>
           <div className="mt-5 grid grid-cols-2 gap-2.5">
             {[
@@ -540,17 +536,17 @@ export default async function ReportsPage({
               ["Alla aktiviteter", recentAudit.length, Clock3],
             ].map(([label, value, Icon]) => {
               const ActivityIcon = Icon as LucideIcon;
-              return <div key={String(label)} className="rounded-xl border border-sand-100 bg-surface-subtle p-3"><ActivityIcon className="h-4 w-4 text-petroleum-700" /><p className="mt-3 text-lg font-semibold text-ink-950">{String(value)}</p><p className="mt-0.5 text-[10px] text-ink-500">{String(label)}</p></div>;
+              return <div key={String(label)} className="rounded-xl border border-sand-100 bg-surface-subtle p-3"><ActivityIcon className="h-4 w-4 text-petroleum-700" /><p className="mt-3 text-lg font-semibold text-ink-950">{String(value)}</p><p className="mt-0.5 text-[13px] text-ink-500">{String(label)}</p></div>;
             })}
           </div>
         </article>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[10px] text-ink-500">Samlad registrerad area</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{Math.round(portfolioArea).toLocaleString("sv-SE")} m²</p></div>
-        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[10px] text-ink-500">Byggnader i urvalet</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{buildingCount}</p></div>
-        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[10px] text-ink-500">Kontrakterad årshyra</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{compactMoney(contractedAnnualRent)}</p></div>
-        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[10px] text-ink-500">Uppsagda avtal</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{noticeLeases}</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[13px] text-ink-500">Samlad registrerad area</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{Math.round(portfolioArea).toLocaleString("sv-SE")} m²</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[13px] text-ink-500">Byggnader i urvalet</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{buildingCount}</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[13px] text-ink-500">Kontrakterad årshyra</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{compactMoney(contractedAnnualRent)}</p></div>
+        <div className="rounded-2xl border border-sand-200 bg-[#F4F2EC] p-4"><p className="text-[13px] text-ink-500">Uppsagda avtal</p><p className="mt-1.5 text-lg font-semibold text-ink-950">{noticeLeases}</p></div>
       </section>
     </div>
   );

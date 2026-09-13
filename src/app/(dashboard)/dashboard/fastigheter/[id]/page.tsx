@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Building2, ClipboardList, DoorOpen, MapPin, Ruler, UserRound } from "lucide-react";
+import { Building2, ClipboardList, DoorOpen, Ruler, UserRound } from "lucide-react";
 import db from "@/lib/db";
 import { getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { isResident } from "@/lib/permissions";
 import { residentHomePath } from "@/lib/resident-access";
 import { notDeletedFilter } from "@/lib/schema-readiness";
 import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
+import { MetricCard, PageHeader, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { categorySpec } from "@/lib/dashboard/category-spec";
 import { PropertyRegistryManager } from "@/components/properties/property-registry-manager";
 import {
   propertyWorkspaceCapabilities,
@@ -123,48 +125,29 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       <PropertyWorkspaceNavigation items={workspaceItems} />
 
       <section id="oversikt" className="scroll-mt-36 space-y-6" aria-labelledby="property-title">
-        <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
-          <div className="relative p-7 sm:p-8">
-            <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-sand-50/70 lg:block" />
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Digital fastighetspärm</p>
-                  <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                    {property.status === "active" ? "Aktiv" : property.status}
-                  </span>
-                </div>
-                <h1 id="property-title" className="text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">{property.name}</h1>
-                <p className="mt-3 flex items-center gap-2 text-base text-ink-600">
-                  <MapPin className="h-4 w-4 text-petroleum-700" aria-hidden="true" />
-                  {property.address}{property.postal_code ? `, ${property.postal_code}` : ""} {property.city}
-                </p>
-                {property.property_identifier ? <p className="mt-2 text-sm font-medium text-ink-500">Fastighetsbeteckning: {property.property_identifier}</p> : null}
-              </div>
-              {capabilities.canOperate ? (
-                <Link href={`/dashboard/felanmalan?property=${property.id}`} className="relative rounded-lg bg-petroleum-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
-                  Skapa ärende
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        </header>
+      <PageHeader
+        catalog="fastighet-detalj"
+        titleId="property-title"
+        eyebrow="Portfölj · Digital fastighetspärm"
+        title={property.name}
+        description={`${property.address}${property.postal_code ? `, ${property.postal_code}` : ""} ${property.city}${property.property_identifier ? ` · Beteckning ${property.property_identifier}` : ""}`}
+        status={property.status === "active" ? "Aktiv" : property.status}
+        statusTone={property.status === "active" ? "ok" : "warn"}
+        spec={categorySpec("fastighet-detalj", {
+          extras: [
+            { label: "Adress", value: [property.address, property.city].filter(Boolean).join(", ") },
+            { label: "Beteckning", value: property.property_identifier || "Ej angiven" },
+          ],
+        })}
+        action={capabilities.canOperate ? (
+          <Link href={`/dashboard/felanmalan?property=${property.id}`} className={premiumPrimaryButtonClass}>Skapa ärende</Link>
+        ) : undefined}
+      />
 
         <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${metrics.length >= 5 ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
-          {metrics.map((item) => {
-            const Icon = item.icon;
-            return (
-              <article key={item.label} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-ink-500">{item.label}</p>
-                    <p className="mt-2 text-[26px] font-semibold tracking-[-0.04em] text-ink-950">{item.value}</p>
-                  </div>
-                  <div className="rounded-xl bg-sand-50 p-3 text-petroleum-700"><Icon className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" /></div>
-                </div>
-              </article>
-            );
-          })}
+          {metrics.map((item) => (
+            <MetricCard key={item.label} icon={item.icon} label={item.label} value={item.value} />
+          ))}
         </div>
 
         <div className={`grid grid-cols-1 gap-6 ${capabilities.canOperate ? "xl:grid-cols-[0.8fr_1.2fr]" : ""}`}>

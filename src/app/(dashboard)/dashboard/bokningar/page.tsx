@@ -189,7 +189,7 @@ export default function BookingsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Boendeservice" title="Bokningar och resurser" description="Planera gemensamma resurser med tydliga tider, boendekoppling och kontroll över kommande bokningar." />
+      <PageHeader catalog="bokningar" eyebrow="Boendeservice" title="Bokningar och resurser" description="Planera gemensamma resurser med tydliga tider, boendekoppling och kontroll över kommande bokningar." />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={CalendarDays} label="Kommande" value={upcoming.length} hint="Aktiva bokningar framåt" />

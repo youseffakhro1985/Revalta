@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { MetricCard, PageHeader } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type NotificationItem = {
@@ -118,27 +119,26 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Kommunikation och uppföljning</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-ink-950">Notiscenter</h1>
-          <p className="mt-2 max-w-2xl text-sm text-ink-500">Samla intern information, viktiga besked och senaste händelser i en tydlig arbetsyta.</p>
-        </div>
-        <div className="flex gap-2 rounded-xl border border-sand-200 bg-white p-1 shadow-premium-sm">
-          {([['all', 'Alla'], ['unread', 'Olästa'], ['urgent', 'Brådskande']] as const).map(([value, label]) => (
-            <button key={value} onClick={() => setFilter(value)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === value ? "bg-petroleum-800 text-white" : "text-ink-500 hover:bg-sand-50"}`}>{label}</button>
-          ))}
-        </div>
-      </header>
+      <PageHeader
+        catalog="notiser"
+        eyebrow="Organisation · Kommunikation"
+        title="Notiscenter"
+        description="Samla intern information, viktiga besked och senaste händelser i en tydlig arbetsyta med prioritet och läskvittens."
+        records={String(notifications.length)}
+        action={(
+          <div className="flex gap-2 rounded-xl border border-white/16 bg-white/[0.06] p-1">
+            {([['all', 'Alla'], ['unread', 'Olästa'], ['urgent', 'Brådskande']] as const).map(([value, label]) => (
+              <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === value ? "bg-[#e8d7a8] text-petroleum-950" : "text-white/75 hover:bg-white/10"}`}>{label}</button>
+            ))}
+          </div>
+        )}
+      />
 
       {error ? <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">{error}</p> : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         {[['Olästa notiser', unread], ['Brådskande', urgent], ['Senaste händelser', events.length]].map(([label, value]) => (
-          <div key={String(label)} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-            <p className="text-xs font-medium text-ink-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-ink-950">{value}</p>
-          </div>
+          <MetricCard key={String(label)} label={String(label)} value={value} />
         ))}
       </section>
 

@@ -169,7 +169,7 @@ export default function ProjectsPage() {
   const hasFilters = Boolean(query || statusFilter !== "all" || riskFilter !== "all");
 
   return <div className="space-y-8">
-    <PageHeader
+    <PageHeader catalog="projekt"
       eyebrow="Projektstyrning"
       title="Projekt och entreprenader"
       description="En samlad portfölj för investeringar, renoveringar och entreprenader – med ansvar, tidslinje, risk och ekonomi i samma beslutsbild."

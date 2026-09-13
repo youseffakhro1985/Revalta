@@ -259,7 +259,7 @@ export default function QuotesPage() {
   const hasFilters = Boolean(query || statusFilter !== "all" || propertyFilter !== "all");
 
   return <div className="space-y-8">
-    <PageHeader
+    <PageHeader catalog="offerter"
       eyebrow="Ekonomisk uppföljning"
       title="Offerter och kostnadsbeslut"
       description="Samla kalkyl, giltighet, beslut, historik och export i ett tydligt ekonomiskt arbetsflöde per fastighet."

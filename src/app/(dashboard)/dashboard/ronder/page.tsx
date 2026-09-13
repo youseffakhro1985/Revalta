@@ -574,7 +574,7 @@ export default function RoundsPage() {
 
   return (
     <div className="space-y-7 animate-fade-in-soft">
-      <PageHeader
+      <PageHeader catalog="ronder"
         eyebrow="Drift · Tillsyn"
         title="Ronder & checklistor"
         description="Planera, genomför och följ upp återkommande ronder och checklistkontroller i hela beståndet."
@@ -651,7 +651,7 @@ export default function RoundsPage() {
             <div className="overflow-x-auto">
               <table className="min-w-[960px] w-full text-left">
                 <thead>
-                  <tr className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-500">
+                  <tr className="text-[13px] font-semibold uppercase tracking-[0.11em] text-ink-500">
                     <th className="px-5 py-3">Rond</th>
                     <th className="px-4 py-3">Fastighet</th>
                     <th className="px-4 py-3">Rondtyp</th>
@@ -685,8 +685,8 @@ export default function RoundsPage() {
                           <p className={`text-xs font-semibold ${isOverdue(round, nowMs) ? "text-danger-700" : "text-ink-800"}`}>{round.nextDue ? dateTimeFormat.format(new Date(round.nextDue)) : "Ej satt"}</p>
                           <p className="mt-1 text-[11px] text-ink-500">{intervalLongLabels[round.interval || "monthly"]}</p>
                         </td>
-                        <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${pill.className}`}>{pill.label}</span></td>
-                        <td className="px-4 py-4">{round.status === "completed" && result !== null ? <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${result >= 90 ? "bg-success-50 text-success-700" : result >= 60 ? "bg-warning-50 text-warning-800" : "bg-danger-50 text-danger-700"}`}>{result}%</span> : <span className="text-xs text-ink-400">—</span>}</td>
+                        <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[13px] font-semibold ${pill.className}`}>{pill.label}</span></td>
+                        <td className="px-4 py-4">{round.status === "completed" && result !== null ? <span className={`rounded-full px-2.5 py-1 text-[13px] font-bold ${result >= 90 ? "bg-success-50 text-success-700" : result >= 60 ? "bg-warning-50 text-warning-800" : "bg-danger-50 text-danger-700"}`}>{result}%</span> : <span className="text-xs text-ink-400">—</span>}</td>
                         <td className="px-4 py-4">
                           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-700">
                             {addressed === total && total > 0 ? <CheckCircle2 className="h-3.5 w-3.5 text-success-600" /> : <Circle className="h-3.5 w-3.5 text-ink-300" />}
@@ -739,7 +739,7 @@ export default function RoundsPage() {
                     const round = rounds.find((item) => item.id === deviation.roundId);
                     if (round) openRound(round);
                   }} className="w-full p-4 text-left transition hover:bg-sand-50">
-                    <div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-ink-900">{deviation.item.label}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${deviation.item.workOrderId ? "bg-success-50 text-success-700" : deviation.overdue ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{deviation.item.workOrderId ? "Arbetsorder" : deviation.overdue ? "Hög" : "Öppen"}</span></div>
+                    <div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-ink-900">{deviation.item.label}</p><span className={`rounded-full px-2 py-0.5 text-[13px] font-semibold ${deviation.item.workOrderId ? "bg-success-50 text-success-700" : deviation.overdue ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{deviation.item.workOrderId ? "Arbetsorder" : deviation.overdue ? "Hög" : "Öppen"}</span></div>
                     <p className="mt-1 text-[11px] text-ink-500">{deviation.propertyName} · {deviation.roundTitle}</p>
                   </button>
                 ))}
@@ -779,7 +779,7 @@ export default function RoundsPage() {
                     {attentionPct ? <div className="bg-warning-400" style={{ height: `${attentionPct}%` }} /> : null}
                     {failedPct ? <div className="bg-danger-400" style={{ height: `${failedPct}%` }} /> : null}
                   </div>
-                  <span className="text-[9px] font-medium capitalize text-ink-400">{month.label}</span>
+                  <span className="text-[12px] font-medium capitalize text-ink-400">{month.label}</span>
                 </div>
               );
             })}
@@ -796,7 +796,7 @@ export default function RoundsPage() {
                 <div key={template.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0"><p className="truncate text-xs font-semibold text-ink-900">{template.name}</p><p className="mt-1 text-[11px] text-ink-500">{INSPECTION_CHECKLIST_CATEGORY_LABELS[template.category] || template.category}</p></div>
-                    <span className="shrink-0 rounded-full bg-petroleum-50 px-2 py-1 text-[10px] font-semibold text-petroleum-800">{template.itemCount} punkter</span>
+                    <span className="shrink-0 rounded-full bg-petroleum-50 px-2 py-1 text-[13px] font-semibold text-petroleum-800">{template.itemCount} punkter</span>
                   </div>
                   {canManage ? <div className="mt-3 flex gap-2"><button type="button" onClick={() => openNewRound(template)} className={premiumCompactButtonClass}>Använd i rond</button><button type="button" onClick={() => openEditTemplate(template)} className={premiumCompactButtonClass}>Ändra</button></div> : null}
                 </div>
@@ -851,7 +851,7 @@ export default function RoundsPage() {
           <aside className="absolute right-0 top-0 flex h-full w-full max-w-[620px] flex-col border-l border-sand-200 bg-surface-subtle shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-sand-200 bg-white px-5 py-5 sm:px-6">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">{selectedRound.propertyName || "Fastighet"}</p>
+                <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">{selectedRound.propertyName || "Fastighet"}</p>
                 <h2 className="mt-1 truncate font-display text-2xl font-semibold tracking-[-0.03em] text-ink-950">{selectedRound.title}</h2>
                 <p className="mt-1 text-xs text-ink-500">{intervalLongLabels[selectedRound.interval || "monthly"]} · {selectedRound.nextDue ? `nästa ${dateFormat.format(new Date(selectedRound.nextDue))}` : "datum saknas"}</p>
               </div>
@@ -879,7 +879,7 @@ export default function RoundsPage() {
                   {(selectedRound.checklist || []).map((item, index) => (
                     <div key={item.id} className={`rounded-2xl border p-4 ${item.hasDeviation ? "border-warning-200 bg-warning-50/40" : "border-sand-200 bg-white"}`}>
                       <div className="flex items-start gap-3">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sand-100 text-[10px] font-bold text-ink-500">{index + 1}</span>
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sand-100 text-[13px] font-bold text-ink-500">{index + 1}</span>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-ink-900">{item.label}</p>
                           {canManage && selectedRound.source !== "legacy" ? (
@@ -887,7 +887,7 @@ export default function RoundsPage() {
                               <label className="inline-flex items-center gap-2 text-xs font-semibold text-success-700"><input type="checkbox" checked={item.completed} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { completed: event.target.checked })} /> Utförd</label>
                               <label className="inline-flex items-center gap-2 text-xs font-semibold text-warning-800"><input type="checkbox" checked={item.hasDeviation} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { hasDeviation: event.target.checked, note: event.target.checked ? item.note : "" })} /> Avvikelse</label>
                             </div>
-                          ) : <div className="mt-2 flex gap-2">{item.completed ? <span className="rounded-full bg-success-50 px-2 py-1 text-[10px] font-semibold text-success-700">Utförd</span> : null}{item.hasDeviation ? <span className="rounded-full bg-warning-50 px-2 py-1 text-[10px] font-semibold text-warning-800">Avvikelse</span> : null}</div>}
+                          ) : <div className="mt-2 flex gap-2">{item.completed ? <span className="rounded-full bg-success-50 px-2 py-1 text-[13px] font-semibold text-success-700">Utförd</span> : null}{item.hasDeviation ? <span className="rounded-full bg-warning-50 px-2 py-1 text-[13px] font-semibold text-warning-800">Avvikelse</span> : null}</div>}
                           {item.hasDeviation && canManage && selectedRound.source !== "legacy" ? <textarea value={item.note} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { note: event.target.value })} className={`${premiumTextareaClass} mt-3 min-h-20`} placeholder="Beskriv avvikelsen, plats och nästa steg" aria-label={`Avvikelse för ${item.label}`} /> : item.hasDeviation && item.note ? <p className="mt-3 text-xs leading-5 text-ink-600">{item.note}</p> : null}
                           {item.workOrderId ? <Link href={`/dashboard/arbetsorder/${item.workOrderId}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-petroleum-800 hover:text-petroleum-950"><Wrench className="h-3.5 w-3.5" /> Öppna arbetsorder</Link> : null}
                         </div>
@@ -933,7 +933,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-sand-200 bg-white px-3.5 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-500">{label}</p><p className="mt-1.5 text-sm font-semibold text-ink-800">{value}</p></div>;
+  return <div className="rounded-xl border border-sand-200 bg-white px-3.5 py-3"><p className="text-[13px] font-semibold uppercase tracking-[0.11em] text-ink-500">{label}</p><p className="mt-1.5 text-sm font-semibold text-ink-800">{value}</p></div>;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {

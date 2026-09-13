@@ -271,7 +271,7 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-8 animate-fade-in-soft">
-      <PageHeader
+      <PageHeader catalog="kalender"
         eyebrow="Drift · Planering"
         title="Kalender och aktiviteter"
         description="Samla planerade arbeten, besök, ronder, underhåll och avtalsbevakning i en tydlig operativ tidslinje."

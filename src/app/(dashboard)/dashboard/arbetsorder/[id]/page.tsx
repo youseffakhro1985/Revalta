@@ -210,7 +210,7 @@ export default function WorkOrderDetailPage() {
 
   return <div className="space-y-8">
     <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordrar</Link>
-    <PageHeader eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder.title} description={workOrder.description} />
+    <PageHeader catalog="arbetsorder-detalj" eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder.title} description={workOrder.description} />
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
     {transitions.canManage ? <div className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${editable ? "border-success-200 bg-success-50" : editLock.state.status === "locked" ? "border-warning-200 bg-warning-50" : "border-sand-200 bg-white"}`}>

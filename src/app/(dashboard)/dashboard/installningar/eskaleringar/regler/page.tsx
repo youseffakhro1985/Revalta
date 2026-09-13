@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { PageHeader, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Rules = {
@@ -64,16 +65,24 @@ export default function EscalationRulesPage() {
     } finally { setSaving(false); }
   }
 
-  if (loading || !rules) return <div className="mx-auto max-w-5xl rounded-2xl border border-sand-200 bg-white p-8">Laddar eskaleringsregler…</div>;
+  if (loading || !rules) return <div className="mx-auto max-w-5xl"><PageHeader catalog="eskaleringsregler" eyebrow="Administration · Eskaleringar" title="Eskaleringsregler" description="Hämtar organisationens eskaleringsmotor och mottagarregler." status="Kontrollerar" statusTone="off" /><div className="mt-6 h-40 animate-pulse rounded-[24px] border border-sand-200 bg-sand-50" /></div>;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <header className="rounded-2xl border border-sand-200 bg-white p-8 shadow-premium-sm">
-        <Link href="/dashboard/installningar/eskaleringar" className="text-sm font-semibold text-petroleum-700">← Serviceeskaleringar</Link>
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-600">Organisationens regler</p>
-        <h1 className="mt-2 text-3xl font-semibold text-ink-950">Eskaleringsregler</h1>
-        <p className="mt-3 max-w-3xl text-ink-600">Styr när eskaleringar ska skickas, hur ofta de upprepas och vilka roller som ska informeras.</p>
-      </header>
+      <PageHeader
+        catalog="eskaleringsregler"
+        eyebrow="Administration · Eskaleringar"
+        title="Eskaleringsregler"
+        description="Styr när eskaleringar ska skickas, hur ofta de upprepas och vilka roller som ska informeras."
+        status={rules.enabled ? "Motor aktiv" : "Motor pausad"}
+        statusTone={rules.enabled ? "ok" : "warn"}
+        action={(
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/installningar/eskaleringar" className={premiumSecondaryButtonClass}>Serviceeskaleringar</Link>
+            <button type="button" onClick={() => void save()} disabled={saving || !data?.canManage} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Spara regler"}</button>
+          </div>
+        )}
+      />
 
       {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm font-semibold text-danger-700">{error}</div> : null}
       {message ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800">{message}</div> : null}

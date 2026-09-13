@@ -114,7 +114,7 @@ export default function ResidentDocumentsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
+      <PageHeader catalog="boende-dokument"
         eyebrow={data?.isResident ? "Min boendeservice" : "Boende och kundservice"}
         title={data?.isResident ? "Mina dokument" : "Boendedokument"}
         description={data?.isResident
