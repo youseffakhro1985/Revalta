@@ -139,7 +139,7 @@ export async function DashboardSlaOperations() {
   const healthy = summary.overdue === 0 && summary.critical === 0;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+    <section className="overflow-hidden rounded-[24px] border border-sand-200/90 bg-[#FFFEFB] shadow-premium-sm">
       <div className="flex flex-col gap-4 border-b border-sand-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
         <div>
           <div className="flex items-center gap-2">
