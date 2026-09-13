@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -234,12 +234,11 @@ export function GlobalSearch() {
           role="dialog"
           aria-modal="true"
           aria-label="Revalta Command Center"
-          onMouseDown={close}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
         >
-          <div
-            className="w-full max-w-3xl overflow-hidden rounded-2xl border border-sand-200 bg-[#FAFAF8] shadow-[0_24px_80px_rgba(17,34,31,0.18)]"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-sand-200 bg-[#FAFAF8] shadow-[0_24px_80px_rgba(17,34,31,0.18)]">
             <div className="flex items-center gap-3 border-b border-sand-200 px-4 sm:px-5">
               <Search className="h-5 w-5 shrink-0 text-petroleum-700" strokeWidth={1.7} aria-hidden="true" />
               <input
@@ -468,13 +467,13 @@ function CommandLink({
   children: ReactNode;
 }) {
   const router = useRouter();
-  function onClick(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-    event.preventDefault();
+  // Buttons have no href. App Router still prefetches in-app anchors that enter
+  // the viewport, which starved /api/search on Preview.
+  function onClick() {
     onNavigate();
     router.push(href);
   }
-  return <a href={href} className={className} onClick={onClick}>{children}</a>;
+  return <button type="button" className={`cursor-pointer text-left ${className}`} onClick={onClick}>{children}</button>;
 }
 
 function SectionHeading({ id, icon: Icon, children }: { id?: string; icon: typeof Plus; children: React.ReactNode }) {

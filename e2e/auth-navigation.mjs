@@ -166,6 +166,10 @@ async function run() {
     await expectVisible(page.getByRole("heading", { name: "Fastigheter", exact: true, level: 1 }), "property page heading");
   }
 
+  function commandCenterDestination(dialog, name) {
+    return dialog.getByRole("button", { name, exact: true }).or(dialog.getByRole("link", { name, exact: true }));
+  }
+
   async function waitForHydratedLoginForm() {
     await expectVisible(page.locator("form#login-form[data-ready='1']"), "hydrated login form");
   }
@@ -254,6 +258,7 @@ async function run() {
       // A freshly registered account must not receive a session before proving
       // email ownership. This is intentionally the opposite of the pre-hardening
       // browser contract and protects against bypassing email verification.
+      await waitForHydratedLoginForm();
       await page.getByLabel("E-post").fill(email);
       await page.getByLabel("Lösenord").fill(password);
       const blockedLoginResponse = await observeResponse("/api/auth/login", () => page.locator("#login-form").getByRole("button", { name: "Logga in" }).click(), { method: "POST", timeout: 10_000 });
@@ -349,8 +354,8 @@ async function run() {
     validateEmptySearchResponse(searchResponse.status(), await searchResponse.json());
     await expectVisible(commandCenter.getByText(/Inga träffar för/i), "Command Center empty search state");
     await commandInput.fill("");
-    await expectVisible(commandCenter.getByRole("link", { name: "Fastigheter", exact: true }), "Command Center Fastigheter");
-    await visitProperties(commandCenter.getByRole("link", { name: "Fastigheter", exact: true }));
+    await expectVisible(commandCenterDestination(commandCenter, "Fastigheter"), "Command Center Fastigheter");
+    await visitProperties(commandCenterDestination(commandCenter, "Fastigheter"));
     await commandCenter.waitFor({ state: "hidden" });
     console.log("Command Center search API + empty state + navigation: passed");
 
@@ -373,7 +378,7 @@ async function run() {
     await mobileCommandButton.click();
     const mobileCommandCenter = page.getByRole("dialog", { name: "Revalta Command Center" });
     await expectVisible(mobileCommandCenter, "mobile Command Center dialog");
-    await visitProperties(mobileCommandCenter.getByRole("link", { name: "Fastigheter", exact: true }));
+    await visitProperties(commandCenterDestination(mobileCommandCenter, "Fastigheter"));
     await mobileCommandCenter.waitFor({ state: "hidden" });
     await mobileMenuButton.click();
     await mobileMenu.getByRole("link", { name: "Översikt", exact: true }).click();
