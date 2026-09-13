@@ -41,6 +41,16 @@ coordination:
     - "parallel auth, tenant, dashboard or design-system architecture"
 
 tasks:
+  - task_id: "REV-RELEASE-TRUTH-001"
+    title: "Fail-closed exact-SHA Preview browser acceptance"
+    owner: "ChatGPT Work"
+    status: "LOCAL_VERIFIED_PENDING_PUBLICATION_AND_PREVIEW"
+    baseline_sha: "af995a8ab520cabb3f7d0613bb8d1fa4b02f1ca3"
+    branch: "agent/rev-release-truth-001"
+    evidence_document: "docs/REV-RELEASE-TRUTH-001.md"
+    note: "Scoped implementation handoff requested by repository owner; no parallel Cursor implementation. Runtime, Preview DB and migration evidence remain BLOCKED / NOT VERIFIED."
+    updated_at: "2026-09-13"
+
   - task_id: "REV-COORD-005"
     title: "Current-main reconciliation and stabilization baseline"
     owner: "ChatGPT Work"

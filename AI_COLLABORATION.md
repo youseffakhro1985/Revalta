@@ -140,3 +140,13 @@ PR #269 var docs-only men stängdes **superseded** efter att dess browsergate ko
 En task är inte DONE bara för att kod är skriven. Redovisa baseline SHA, branch, changed files, implementation, tester, lint/typecheck/full quality gate, security/tenant/accessibility/database impact, CI, CodeQL, exact-SHA Preview, relevant browser/smoke, PR/review, compare mot current main, merge med expected HEAD, Production deploy/smoke, runtime-loggkontroll där åtkomst finns, kvarvarande risker och uppdaterad ledger/task-register.
 
 Om en kontroll inte kan utföras ska status vara **BLOCKED** eller **NOT RUN**. Gissa aldrig att den är grön.
+
+## Scoped handoff — REV-RELEASE-TRUTH-001 (2026-09-13)
+
+Repository owner requested ChatGPT Work to implement the audit's next single task.
+Baseline: `af995a8ab520cabb3f7d0613bb8d1fa4b02f1ca3`.
+Branch: `agent/rev-release-truth-001`.
+Scope: Preview browser runner, its orchestration/regression tests, the required E2E workflow and this task's evidence/registry.
+Owner for this task: ChatGPT Work. Cursor must not modify this scope in parallel; independent review and subsequent handoff remain required.
+Status: LOCAL_VERIFIED_PENDING_PUBLICATION_AND_PREVIEW; no main merge or Production changes authorized by this task.
+Evidence: `docs/REV-RELEASE-TRUTH-001.md`. Earlier snapshots above remain historical, not current runtime evidence.
