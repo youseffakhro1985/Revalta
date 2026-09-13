@@ -9,5 +9,9 @@ describe("login form", () => {
     expect(source).toContain('name="password"');
     expect(source).toContain("submittedEmail");
     expect(source).toContain("submittedPassword");
+    expect(source).toContain('id="login-form"');
+    expect(source).toContain('method="post"');
+    expect(source).toContain('action="/api/auth/login"');
+    expect(source).toContain("data-ready");
   });
 });

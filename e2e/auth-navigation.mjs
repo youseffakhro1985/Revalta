@@ -166,6 +166,10 @@ async function run() {
     await expectVisible(page.getByRole("heading", { name: "Fastigheter", exact: true, level: 1 }), "property page heading");
   }
 
+  async function waitForHydratedLoginForm() {
+    await expectVisible(page.locator("form#login-form[data-ready='1']"), "hydrated login form");
+  }
+
   async function expectDashboard() {
     await expectPath(page, "/dashboard");
     await expectVisible(page.getByRole("heading", { name: "Översikt", exact: true, level: 1 }), "working owner dashboard");
@@ -252,7 +256,7 @@ async function run() {
       // browser contract and protects against bypassing email verification.
       await page.getByLabel("E-post").fill(email);
       await page.getByLabel("Lösenord").fill(password);
-      const blockedLoginResponse = await observeResponse("/api/auth/login", () => page.getByRole("button", { name: "Logga in" }).click(), { method: "POST", timeout: 10_000 });
+      const blockedLoginResponse = await observeResponse("/api/auth/login", () => page.locator("#login-form").getByRole("button", { name: "Logga in" }).click(), { method: "POST", timeout: 10_000 });
       if (blockedLoginResponse.status() !== 403) {
         fail(`fresh account login returned HTTP ${blockedLoginResponse.status()} instead of 403`);
       }
@@ -286,6 +290,7 @@ async function run() {
       await page.goto("/login", { waitUntil: "domcontentloaded" });
       await expectPath(page, "/login");
       await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "Preview login heading");
+      await waitForHydratedLoginForm();
       await page.getByLabel("E-post").fill(email);
       await page.getByLabel("Lösenord").fill(password);
       if ((await page.getByLabel("E-post").inputValue()).trim().toLowerCase() !== email) {
@@ -301,7 +306,7 @@ async function run() {
       companyId = await markLocalAccountVerified();
     }
     stage = "verified login, company relation and dashboard";
-    const loginResponse = await observeResponse("/api/auth/login", () => page.getByRole("button", { name: "Logga in" }).click(), { method: "POST" });
+    const loginResponse = await observeResponse("/api/auth/login", () => page.locator("#login-form").getByRole("button", { name: "Logga in" }).click(), { method: "POST" });
     validateLoginResponse(loginResponse.status(), await loginResponse.json(), email);
     await expectDashboard();
     const profileResponse = await context.request.get(`${baseUrl}/api/settings/profile`, { maxRedirects: 0, timeout: 15_000 });

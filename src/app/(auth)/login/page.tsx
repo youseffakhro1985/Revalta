@@ -20,9 +20,11 @@ export default function LoginPage() {
   const [resendStatus, setResendStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setHydrated(true);
     const params = new URLSearchParams(window.location.search);
     if (params.get("registered") === "1") {
       setNotice("Kontot är skapat. Kontrollera din e-post och verifiera adressen innan du loggar in.");
@@ -120,7 +122,15 @@ export default function LoginPage() {
           {resendStatus ? <p className="mt-2 text-xs leading-5 text-ink-500">{resendStatus}</p> : null}
         </div>
       ) : null}
-      <form onSubmit={handleLogin} className="mt-7 space-y-5">
+      <form
+        id="login-form"
+        method="post"
+        action="/api/auth/login"
+        noValidate
+        data-ready={hydrated ? "1" : "0"}
+        onSubmit={handleLogin}
+        className="mt-7 space-y-5"
+      >
         <div>
           <label htmlFor="login-email" className="block text-sm font-medium text-ink-700">
             E-post
