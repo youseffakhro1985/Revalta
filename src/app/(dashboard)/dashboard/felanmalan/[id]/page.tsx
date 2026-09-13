@@ -419,7 +419,7 @@ export default function TicketDetailPage() {
             <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{priorityLabels[ticket.priority] || ticket.priority}</span>
             <span className="rounded-full border border-sand-200 bg-white px-3 py-1 text-xs font-semibold text-ink-500">{ticket.assigned_to ? ticket.assigned_to.name || ticket.assigned_to.email : "Ej tilldelad"}</span>
           </div>
-          {ticket.property ? <div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Fastighet</p><p className="mt-2 text-lg font-semibold text-ink-950">{ticket.property.name}</p><p className="mt-1 text-sm text-ink-600">{ticket.property.address}, {ticket.property.city}</p></div> : <InlineAlert>Ärendet saknar fastighetskoppling. Koppla en fastighet innan arbetsorder kan skapas.</InlineAlert>}
+          {ticket.property ? <div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-700">Fastighet</p><p className="mt-2 text-lg font-semibold text-ink-950">{ticket.property.name}</p><p className="mt-1 text-sm text-ink-600">{ticket.property.address}, {ticket.property.city}</p></div> : <InlineAlert>Ärendet saknar fastighetskoppling. Koppla en fastighet innan arbetsorder kan skapas.</InlineAlert>}
           <div><h2 className="text-lg font-semibold text-ink-950">Beskrivning</h2><p className="mt-3 whitespace-pre-wrap rounded-2xl bg-sand-50 p-5 text-sm leading-7 text-ink-700">{ticket.description}</p></div>
           {ticket.source === "public_portal" ? <div className="grid gap-4 rounded-2xl border border-sand-200 p-5 sm:grid-cols-2"><Info label="Rapportör" value={ticket.reporter_name || "Ej angivet"} /><Info label="Referens" value={ticket.public_reference || "Ej angivet"} /><Info label="E-post" value={ticket.reporter_email || "Ej angivet"} /><Info label="Telefon / lägenhet" value={`${ticket.reporter_phone || "Ej angivet"} · ${ticket.reporter_unit || "Ej angivet"}`} /></div> : null}
         </Panel>
@@ -502,8 +502,8 @@ export default function TicketDetailPage() {
                     <div className="min-w-0">
                       <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{operationTypeLabels[type] || type || "Registrering"}</p>
                       <p className="mt-1 text-sm text-ink-700">{detail}</p>
-                      <p className="mt-1 text-[11px] text-ink-500">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p>
-                      {item.source === "legacy" ? <p className="mt-1 text-[11px] font-medium text-warning-800">Äldre registrering – kan inte ändras eller tas bort här. Kontakta support vid behov.</p> : null}
+                      <p className="mt-1 text-xs text-ink-500">{item.actor?.name || item.actor?.email || "Okänd"} · {dateFormatter.format(new Date(item.created_at))}</p>
+                      {item.source === "legacy" ? <p className="mt-1 text-xs font-medium text-warning-800">Äldre registrering – kan inte ändras eller tas bort här. Kontakta support vid behov.</p> : null}
                     </div>
                     {item.source === "table" ? (
                       <div className="flex shrink-0 flex-col items-end gap-2">
@@ -592,10 +592,10 @@ export default function TicketDetailPage() {
 }
 
 function Info({ label, value }: { label: string; value: string }) {
-  return <div><p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">{label}</p><p className="mt-1 text-sm font-semibold text-ink-800">{value}</p></div>;
+  return <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</p><p className="mt-1 text-sm font-semibold text-ink-800">{value}</p></div>;
 }
 function Insight({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl bg-sand-50 p-4"><p className="text-[11px] font-semibold uppercase tracking-wide text-petroleum-700">{label}</p><p className="mt-2 text-sm leading-6 text-ink-700">{value}</p></div>;
+  return <div className="rounded-2xl bg-sand-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{label}</p><p className="mt-2 text-sm leading-6 text-ink-700">{value}</p></div>;
 }
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]> }) {
   return <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>;

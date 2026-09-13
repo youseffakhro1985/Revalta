@@ -91,7 +91,7 @@ function NavigationContent({
   if (resident) {
     return (
       <div>
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Min portal</p>
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/38">Min portal</p>
         <div className="space-y-1">
           {residentItems.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />)}
         </div>
@@ -102,7 +102,7 @@ function NavigationContent({
   return (
     <>
       <div>
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Arbetsyta</p>
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/38">Arbetsyta</p>
         <div className="space-y-1">
           {primaryItems.map((item) => <NavigationLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />)}
         </div>
@@ -140,7 +140,7 @@ function NavigationContent({
       </div>
 
       <div className="mt-5 border-t border-white/10 pt-4">
-        <p className="mb-2 px-3 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Administration</p>
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/38">Administration</p>
         <NavigationLink item={staffSettingsNavigation} pathname={pathname} onNavigate={onNavigate} activeOverride={isSettingsAreaActive(pathname)} />
       </div>
     </>
@@ -209,7 +209,7 @@ export function DashboardShell({
         <div className="relative flex h-[88px] items-center border-b border-white/10 px-7">
           <Link href={homeHref} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-white/60" aria-label="Revalta dashboard">
             <span className="font-display text-[26px] font-semibold tracking-[-0.045em] text-white">REVALTA</span>
-            <span className="mt-1 block text-[8px] font-semibold uppercase tracking-[0.22em] text-white/42">Fastighetsförvaltning</span>
+            <span className="mt-1 block text-xs font-semibold uppercase tracking-[0.22em] text-white/42">Fastighetsförvaltning</span>
           </Link>
         </div>
         <nav aria-label="Dashboardmeny" className="relative flex-1 overflow-y-auto px-3.5 py-6"><NavigationContent pathname={pathname} role={role} /></nav>
@@ -218,7 +218,7 @@ export function DashboardShell({
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/90 text-[10px] font-bold text-petroleum-950">{initials(userName, userEmail)}</div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-semibold text-white">{displayName}</p>
-              <p className="mt-0.5 truncate text-[10px] text-white/48">{roleLabel}</p>
+              <p className="mt-0.5 truncate text-xs text-white/48">{roleLabel}</p>
             </div>
           </div>
           <LogoutButton className="w-full justify-start !border-white/10 !bg-transparent !text-white/66 hover:!bg-white/[0.07] hover:!text-white" />
