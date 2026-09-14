@@ -25,7 +25,7 @@ export function findAssignableVendorContract(
       status: "active",
       OR: [{ property_id: null }, { property_id: input.propertyId }],
     },
-    select: { id: true, name: true, category: true },
+    select: { id: true, name: true, category: true, email: true },
   });
 }
 

@@ -8,6 +8,7 @@ import { setWorkOrderAssetLinks } from "@/lib/work-order-asset-links";
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 import { hasWorkOrderVendorContractColumn, isMissingTableError, schemaMismatchUserMessage, workOrderVendorWrite } from "@/lib/schema-readiness";
 import { createLogger } from "@/lib/structured-logger";
+import { notifyVendor } from "@/lib/vendor-notify";
 
 const logger = createLogger({ route: "/api/quotes/[id]/work-order" });
 const QUOTE_WORK_ORDER_ACTION = "quote.work_order_created";
@@ -94,6 +95,7 @@ export async function POST(
     const persistVendor = await hasWorkOrderVendorContractColumn();
     const supplierName = quote.supplier?.trim() || "";
     let vendorContractId: string | null = null;
+    let vendorEmail: string | null = null;
     if (persistVendor && supplierName) {
       const vendor = await db.vendorContract.findFirst({
         where: {
@@ -102,9 +104,10 @@ export async function POST(
           name: { equals: supplierName, mode: "insensitive" },
           OR: [{ property_id: null }, { property_id: quote.property_id }],
         },
-        select: { id: true },
+        select: { id: true, email: true },
       });
       vendorContractId = vendor?.id ?? null;
+      vendorEmail = vendor?.email ?? null;
     }
 
     const created = await db.$transaction(async (tx) => {
@@ -191,6 +194,21 @@ export async function POST(
     }
     if (created.conflict === "already_linked") {
       return NextResponse.json({ error: "Offerten har redan en arbetsorder", workOrderId: created.workOrderId }, { status: 409 });
+    }
+
+    if (vendorContractId && created.workOrderId) {
+      try {
+        await notifyVendor(user, {
+          workOrderId: created.workOrderId,
+          title: `${quote.title} · ${quote.property.name}`,
+          workOrderNumber: created.workOrderNumber,
+          propertyName: quote.property.name,
+          vendorContractId,
+          vendorEmail,
+        });
+      } catch (error) {
+        logger.error("Quote work-order vendor notification failed", error);
+      }
     }
 
     return NextResponse.json({ success: true, workOrderId: created.workOrderId, workOrderNumber: created.workOrderNumber }, { status: 201 });

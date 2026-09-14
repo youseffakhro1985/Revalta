@@ -38,6 +38,7 @@ import { createRouteObservability } from "@/lib/route-observability";
 import { analyzeTicket } from "@/lib/ai";
 import { recordAiEvent } from "@/lib/integrations";
 import { notifyAssignee } from "@/lib/assignee-notify";
+import { notifyVendor } from "@/lib/vendor-notify";
 import { findAssignableVendorContract } from "@/lib/work-order-vendor";
 
 const ROUTE = "/api/work-orders";
@@ -437,7 +438,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true } });
+    const property = await db.property.findFirst({ where: { id: propertyId, company_id: user.company_id, deleted_at: null }, select: { id: true, name: true } });
     if (!property) {
       return reject(observability, {
         status: 404,
@@ -471,6 +472,7 @@ export async function POST(request: Request) {
         context: { userId: user.id, companyId: user.company_id },
       });
     }
+    let vendorEmail: string | null = null;
     if (vendorContractId) {
       const vendor = await findAssignableVendorContract(db, {
         companyId: user.company_id,
@@ -478,6 +480,7 @@ export async function POST(request: Request) {
         propertyId,
       });
       if (!vendor) return validationFailure("Leverantören hittades inte", "vendor_not_found");
+      vendorEmail = vendor.email;
     }
     if (ticketId) {
       const ticket = await findAccessibleTicket(user, ticketId);
@@ -564,6 +567,25 @@ export async function POST(request: Request) {
       } catch {
         observability.logger.warn("work-order create assignee notification failed", observability.elapsed({
           event: "work_orders.create.assignee_notification_failed",
+          userId: user.id,
+          companyId: user.company_id,
+          workOrderId: workOrder.id,
+        }));
+      }
+    }
+    if (vendorContractId) {
+      try {
+        await notifyVendor(user, {
+          workOrderId: workOrder.id,
+          title: workOrder.title,
+          workOrderNumber: workOrder.enterprise?.work_order_number,
+          propertyName: property.name,
+          vendorContractId,
+          vendorEmail,
+        });
+      } catch {
+        observability.logger.warn("work-order create vendor notification failed", observability.elapsed({
+          event: "work_orders.create.vendor_notification_failed",
           userId: user.id,
           companyId: user.company_id,
           workOrderId: workOrder.id,

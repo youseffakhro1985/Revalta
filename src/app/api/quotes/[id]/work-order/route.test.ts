@@ -56,7 +56,12 @@ vi.mock("@prisma/client", () => ({
   Prisma: { sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) },
 }));
 
+vi.mock("@/lib/vendor-notify", () => ({
+  notifyVendor: vi.fn().mockResolvedValue({ emailed: true }),
+}));
+
 import { POST } from "./route";
+import { notifyVendor } from "@/lib/vendor-notify";
 
 const validQuote = {
   id: "quote-1",
@@ -138,7 +143,7 @@ describe("quotes/[id]/work-order route", () => {
   it("creates a work order from an approved quote and writes the quote link as audit metadata", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     quoteFindFirstMock.mockResolvedValue(validQuote);
-    vendorFindFirstMock.mockResolvedValue({ id: "vendor-1" });
+    vendorFindFirstMock.mockResolvedValue({ id: "vendor-1", email: "kontakt@stad.se" });
     const workOrderCreateMock = vi.fn().mockResolvedValue({ id: "work-order-new" });
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([{ locked: true }]),
@@ -170,6 +175,16 @@ describe("quotes/[id]/work-order route", () => {
         metadata: expect.objectContaining({ workOrderId: "work-order-new", vendorContractId: "vendor-1", source: "supplier" }),
       }),
       tx,
+    );
+    expect(notifyVendor).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", company_id: "company-1" }),
+      expect.objectContaining({
+        workOrderId: "work-order-new",
+        workOrderNumber: "AO-0012",
+        propertyName: "Storgatan 1",
+        vendorContractId: "vendor-1",
+        vendorEmail: "kontakt@stad.se",
+      }),
     );
   });
 
