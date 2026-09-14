@@ -10,8 +10,10 @@ vi.mock("@/lib/integrations", () => ({
 
 import {
   assigneeAssignedEmailCopy,
+  assigneeCancelledEmailCopy,
   assigneeCompletedEmailCopy,
   assigneePausedEmailCopy,
+  assigneeResumedEmailCopy,
   notifyAssignee,
 } from "./assignee-notify";
 
@@ -65,6 +67,32 @@ describe("assignee-notify", () => {
     expect(copy.text).toContain("slutförd");
     expect(copy.text).toContain("https://www.revalta.se/dashboard/arbetsorder/wo-1");
     expect(copy.text).not.toMatch(/\d+\s*kr/i);
+  });
+
+  it("names a cancelled work order with a staff deep link and no free-text reasons", () => {
+    const copy = assigneeCancelledEmailCopy({
+      id: "wo-1",
+      title: "Filterbyte",
+      kind: "work_order",
+      notifyKind: "cancelled",
+    });
+    expect(copy.subject).toBe("Avbruten: Filterbyte");
+    expect(copy.text).toContain("avbruten");
+    expect(copy.text).toContain("https://www.revalta.se/dashboard/arbetsorder/wo-1");
+    expect(copy.text).not.toContain("statusReason");
+  });
+
+  it("names a resumed work order with a status label and staff deep link", () => {
+    const copy = assigneeResumedEmailCopy({
+      id: "wo-1",
+      title: "Filterbyte",
+      kind: "work_order",
+      notifyKind: "resumed",
+      resumeLabel: "Påbörjad",
+    });
+    expect(copy.subject).toBe("Återupptagen: Filterbyte");
+    expect(copy.text).toContain("Påbörjad");
+    expect(copy.text).toContain("https://www.revalta.se/dashboard/arbetsorder/wo-1");
   });
 
   it("emails a new assignee and skips self-assignment", async () => {
@@ -134,9 +162,35 @@ describe("assignee-notify", () => {
     );
 
     queueTicketNotificationMock.mockClear();
+    await expect(notifyAssignee(actor, { ...target, notifyKind: "cancelled" })).resolves.toEqual({ emailed: true });
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      actor,
+      expect.objectContaining({
+        emailContent: expect.objectContaining({
+          subject: "Avbruten: Filterbyte",
+        }),
+      }),
+    );
+
+    queueTicketNotificationMock.mockClear();
+    await expect(notifyAssignee(actor, {
+      ...target,
+      notifyKind: "resumed",
+      resumeLabel: "Påbörjad",
+    })).resolves.toEqual({ emailed: true });
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      actor,
+      expect.objectContaining({
+        emailContent: expect.objectContaining({
+          subject: "Återupptagen: Filterbyte",
+        }),
+      }),
+    );
+
+    queueTicketNotificationMock.mockClear();
     await expect(notifyAssignee({ id: "tech-1", company_id: "company-1" }, {
       ...target,
-      notifyKind: "completed",
+      notifyKind: "cancelled",
     })).resolves.toEqual({ emailed: false });
     expect(queueTicketNotificationMock).not.toHaveBeenCalled();
   });

@@ -74,6 +74,7 @@ vi.mock("@/lib/db", () => ({
 
 import { DELETE, PATCH } from "./route";
 import { notifyAssignee } from "@/lib/assignee-notify";
+import { notifyVendor } from "@/lib/vendor-notify";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 
@@ -259,6 +260,83 @@ describe("core work-order mutation atomicity", () => {
         pauseLabel: "Väntar material",
         assigneeId: "tech-1",
         assigneeEmail: "tech@example.se",
+      }),
+    );
+  });
+
+  it("emails the assignee when a work order is cancelled", async () => {
+    txWorkOrderFindFirstMock.mockResolvedValue({
+      ...updated,
+      status: "cancelled",
+      assigned_to: { id: "tech-1", name: "Tekniker", email: "tech@example.se" },
+    });
+
+    const response = await PATCH(patchRequest({
+      status: "cancelled",
+      statusReason: "Hyresgästen avbokade tillträdet",
+    }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyAssignee).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "owner-1" }),
+      expect.objectContaining({
+        kind: "work_order",
+        notifyKind: "cancelled",
+        assigneeEmail: "tech@example.se",
+      }),
+    );
+  });
+
+  it("emails the assignee when a paused work order is resumed", async () => {
+    workOrderFindFirstMock.mockResolvedValue({ ...existing, status: "waiting_material" });
+    txWorkOrderFindFirstMock.mockResolvedValue({
+      ...updated,
+      status: "in_progress",
+      assigned_to: { id: "tech-1", name: "Tekniker", email: "tech@example.se" },
+    });
+
+    const response = await PATCH(patchRequest({ status: "in_progress" }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyAssignee).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "owner-1" }),
+      expect.objectContaining({
+        kind: "work_order",
+        notifyKind: "resumed",
+        resumeLabel: "Påbörjad",
+        assigneeEmail: "tech@example.se",
+      }),
+    );
+  });
+
+  it("emails the vendor register contact when a work order is cancelled", async () => {
+    hasVendorColumnMock.mockResolvedValue(true);
+    workOrderFindFirstMock.mockResolvedValue({
+      ...existing,
+      vendor_contract_id: "vendor-1",
+      property: { name: "Fastigheten" },
+    });
+    txWorkOrderFindFirstMock.mockResolvedValue({
+      ...updated,
+      status: "cancelled",
+      vendor_contract_id: "vendor-1",
+      assigned_to: { id: "tech-1", name: "Tekniker", email: "tech@example.se" },
+    });
+    vendorFindFirstMock.mockResolvedValue({ email: "kontakt@stad.se" });
+
+    const response = await PATCH(patchRequest({
+      status: "cancelled",
+      statusReason: "Hyresgästen avbokade tillträdet",
+    }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyVendor).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "owner-1" }),
+      expect.objectContaining({
+        workOrderId: "wo-1",
+        vendorContractId: "vendor-1",
+        vendorEmail: "kontakt@stad.se",
+        kind: "cancelled",
       }),
     );
   });

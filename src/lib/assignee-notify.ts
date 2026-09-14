@@ -3,7 +3,7 @@ import { queueTicketNotification } from "@/lib/integrations";
 
 type Actor = { id: string; company_id: string | null };
 
-export type AssigneeNotifyKind = "assigned" | "paused" | "completed";
+export type AssigneeNotifyKind = "assigned" | "paused" | "completed" | "cancelled" | "resumed";
 
 export type AssigneeNotifyTarget = {
   id: string;
@@ -13,6 +13,7 @@ export type AssigneeNotifyTarget = {
   assigneeEmail?: string | null;
   notifyKind?: AssigneeNotifyKind;
   pauseLabel?: string | null;
+  resumeLabel?: string | null;
 };
 
 function staffPath(target: AssigneeNotifyTarget) {
@@ -77,9 +78,46 @@ export function assigneeCompletedEmailCopy(target: AssigneeNotifyTarget) {
   };
 }
 
+export function assigneeCancelledEmailCopy(target: AssigneeNotifyTarget) {
+  const kindLabel = target.kind === "work_order" ? "Arbetsordern" : "Ärendet";
+  return {
+    subject: `Avbruten: ${target.title}`,
+    text: [
+      "Hej!",
+      "",
+      `${kindLabel} "${target.title}" är avbruten i Revalta.`,
+      "",
+      `Öppna i Revalta: ${staffUrl(target)}`,
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  };
+}
+
+export function assigneeResumedEmailCopy(target: AssigneeNotifyTarget) {
+  const kindLabel = target.kind === "work_order" ? "Arbetsordern" : "Ärendet";
+  const resumeLabel = target.resumeLabel?.trim() || "Återupptagen";
+  return {
+    subject: `Återupptagen: ${target.title}`,
+    text: [
+      "Hej!",
+      "",
+      `${kindLabel} "${target.title}" kan återupptas i Revalta: ${resumeLabel}.`,
+      "",
+      `Öppna i Revalta: ${staffUrl(target)}`,
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  };
+}
+
 export function assigneeNotifyEmailCopy(target: AssigneeNotifyTarget) {
   if (target.notifyKind === "completed") return assigneeCompletedEmailCopy(target);
   if (target.notifyKind === "paused") return assigneePausedEmailCopy(target);
+  if (target.notifyKind === "cancelled") return assigneeCancelledEmailCopy(target);
+  if (target.notifyKind === "resumed") return assigneeResumedEmailCopy(target);
   return assigneeAssignedEmailCopy(target);
 }
 

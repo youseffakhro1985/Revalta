@@ -649,6 +649,69 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       logger.error("Work-order assignee pause notification failed", notificationError);
     }
   }
+  const cancelledNow = assignedWorkOrder.status === "cancelled" && existing.status !== "cancelled";
+  const resumedNow = ["waiting_material", "blocked"].includes(existing.status)
+    && ["new", "planned", "in_progress"].includes(assignedWorkOrder.status);
+  const lifecycleVendorId = persistVendor
+    ? assignedVendorId || (existing as { vendor_contract_id?: string | null }).vendor_contract_id || null
+    : null;
+  if (cancelledNow && lifecycleVendorId) {
+    try {
+      const vendorEmail = assignedVendorEmail || (await db.vendorContract.findFirst({
+        where: { id: lifecycleVendorId, company_id: companyId },
+        select: { email: true },
+      }))?.email || null;
+      await notifyVendor(user, {
+        workOrderId: assignedWorkOrder.id,
+        title: assignedWorkOrder.title,
+        workOrderNumber: enterpriseBefore?.work_order_number,
+        propertyName: existing.property?.name,
+        vendorContractId: lifecycleVendorId,
+        vendorEmail,
+        kind: "cancelled",
+      });
+    } catch (notificationError) {
+      logger.error("Work-order vendor cancellation notification failed", notificationError);
+    }
+  }
+  if (resumedNow && lifecycleVendorId) {
+    try {
+      const vendorEmail = assignedVendorEmail || (await db.vendorContract.findFirst({
+        where: { id: lifecycleVendorId, company_id: companyId },
+        select: { email: true },
+      }))?.email || null;
+      await notifyVendor(user, {
+        workOrderId: assignedWorkOrder.id,
+        title: assignedWorkOrder.title,
+        workOrderNumber: enterpriseBefore?.work_order_number,
+        propertyName: existing.property?.name,
+        vendorContractId: lifecycleVendorId,
+        vendorEmail,
+        kind: "resumed",
+        resumeLabel: WORK_ORDER_STATUS_LABELS[normalizeWorkOrderStatus(assignedWorkOrder.status)],
+      });
+    } catch (notificationError) {
+      logger.error("Work-order vendor resume notification failed", notificationError);
+    }
+  }
+  if (cancelledNow) {
+    try {
+      await notifyAssignee(user, { ...assigneeTarget, notifyKind: "cancelled" });
+    } catch (notificationError) {
+      logger.error("Work-order assignee cancellation notification failed", notificationError);
+    }
+  }
+  if (resumedNow) {
+    try {
+      await notifyAssignee(user, {
+        ...assigneeTarget,
+        notifyKind: "resumed",
+        resumeLabel: WORK_ORDER_STATUS_LABELS[normalizeWorkOrderStatus(assignedWorkOrder.status)],
+      });
+    } catch (notificationError) {
+      logger.error("Work-order assignee resume notification failed", notificationError);
+    }
+  }
 
   const { workOrder, enterprise, statusEvents, assetLink } = transactionResult;
   return NextResponse.json({

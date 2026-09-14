@@ -2,7 +2,7 @@ import { queueTicketNotification } from "@/lib/integrations";
 
 type Actor = { id: string; company_id: string | null };
 
-export type VendorNotifyKind = "assigned" | "completed" | "paused";
+export type VendorNotifyKind = "assigned" | "completed" | "paused" | "cancelled" | "resumed";
 
 export type VendorNotifyTarget = {
   workOrderId: string;
@@ -13,6 +13,7 @@ export type VendorNotifyTarget = {
   vendorEmail?: string | null;
   kind?: VendorNotifyKind;
   pauseLabel?: string | null;
+  resumeLabel?: string | null;
 };
 
 function headingLines(target: VendorNotifyTarget) {
@@ -90,9 +91,52 @@ export function vendorPausedEmailCopy(target: VendorNotifyTarget) {
   };
 }
 
+export function vendorCancelledEmailCopy(target: VendorNotifyTarget) {
+  const { number, details } = headingLines(target);
+  const heading = number ? `Arbetsorder avbruten ${number}` : "Arbetsorder avbruten";
+  return {
+    subject: `${heading}: ${target.title}`,
+    text: [
+      "Hej!",
+      "",
+      "Arbetsordern är avbruten i Revalta. Utför inget mer arbete på uppdraget.",
+      "",
+      ...details,
+      "",
+      "Kontakta beställaren om ni redan är på plats. Mejlet innehåller ingen inloggning.",
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  };
+}
+
+export function vendorResumedEmailCopy(target: VendorNotifyTarget) {
+  const { number, details } = headingLines(target);
+  const resumeLabel = target.resumeLabel?.trim() || "Återupptagen";
+  const heading = number ? `Arbetsorder återupptagen ${number}` : "Arbetsorder återupptagen";
+  return {
+    subject: `${heading}: ${target.title}`,
+    text: [
+      "Hej!",
+      "",
+      `Arbetsordern kan återupptas i Revalta: ${resumeLabel}.`,
+      "",
+      ...details,
+      "",
+      "Kontakta beställaren för tid och åtkomst. Mejlet innehåller ingen inloggning.",
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  };
+}
+
 export function vendorNotifyEmailCopy(target: VendorNotifyTarget) {
   if (target.kind === "completed") return vendorCompletedEmailCopy(target);
   if (target.kind === "paused") return vendorPausedEmailCopy(target);
+  if (target.kind === "cancelled") return vendorCancelledEmailCopy(target);
+  if (target.kind === "resumed") return vendorResumedEmailCopy(target);
   return vendorAssignedEmailCopy(target);
 }
 
