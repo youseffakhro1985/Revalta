@@ -271,7 +271,7 @@ export async function POST(request: Request) {
     if (nativeForm) {
       const url = new URL(portalLandingPath(companySlug), getPublicAppUrl(request.url));
       url.searchParams.set("created", "1");
-      url.searchParams.set("ref", ticket.public_reference);
+      url.searchParams.set("ref", ticket.public_reference || publicReference);
       url.searchParams.set("token", trackingToken);
       const response = NextResponse.redirect(url, 303);
       response.headers.set("Cache-Control", "no-store");
