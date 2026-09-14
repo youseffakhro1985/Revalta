@@ -352,6 +352,31 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         </article>
       </section>
 
+      {canManage && (times.some((entry) => entry.status === "submitted" && entry.source !== "legacy") || materials.some((entry) => entry.status === "submitted" && entry.source !== "legacy")) ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-petroleum-100 bg-petroleum-50/60 p-4">
+          <p className="mr-auto text-sm text-ink-600">Inskickade moderna rader kan attesteras i ett steg innan fakturaunderlaget byggs.</p>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void post(`/api/work-orders/${workOrderId}/attestation`, { action: "approveSubmitted" }, "Inskickad tid och material har godkänts.")}
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-petroleum-800 px-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Godkänn alla inskickade
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => {
+              if (!window.confirm("Avvisa alla inskickade tid- och materialrader på den här arbetsordern?")) return;
+              void post(`/api/work-orders/${workOrderId}/attestation`, { action: "rejectSubmitted" }, "Inskickad tid och material har avvisats.");
+            }}
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-danger-200 bg-white px-3 text-sm font-semibold text-danger-700 hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Avvisa alla inskickade
+          </button>
+        </div>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel title="Attesterbar tid" description="Tid som ska godkännas innan den ingår i lönsamhet och faktura.">
           <div className="mb-4 flex flex-wrap gap-2">

@@ -9,5 +9,9 @@ describe("work-order economics invoice copy", () => {
     expect(source).not.toContain("spara underlaget för att generera rader");
     expect(source).toContain("spara utkast skapar inte rader av sig själv");
     expect(source).toContain("Arbetsordern kan inte sättas som fakturerad förrän underlaget är markerat som klart.");
+    expect(source).toContain("Godkänn alla inskickade");
+    expect(source).toContain("Avvisa alla inskickade");
+    expect(source).toContain("/api/work-orders/${workOrderId}/attestation");
+    expect(source).toContain("approveSubmitted");
   });
 });
