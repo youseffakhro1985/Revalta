@@ -302,6 +302,7 @@ export async function POST(request: Request) {
     const validation = validateDocumentFile({ bytes, contentType: file.type, fileName: file.name, maxBytes: 2_000_000 });
     if (!validation.ok) return validationFailure(validation.error, "invalid_file");
 
+    let classificationSource: "provider" | "fallback" | "staff" = "staff";
     if (!category || category === "other") {
       const classified = await analyzeDocument({
         fileName: validation.fileName,
@@ -310,6 +311,7 @@ export async function POST(request: Request) {
         existingCategory: category || "other",
       });
       category = classified.category;
+      classificationSource = classified.source;
     }
 
     let resolvedPropertyId = propertyId || null;
@@ -442,6 +444,7 @@ export async function POST(request: Request) {
         documentId: document.id,
         action: "document.classified",
         category,
+        source: classificationSource,
       });
     } catch {
       observability.logger.warn("document create ai telemetry failed", observability.elapsed({

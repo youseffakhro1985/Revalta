@@ -24,6 +24,7 @@ import {
 } from "@/lib/work-order-lifecycle";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
+import { hasTicketAiSourceColumn, ticketAiSourceSelect } from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]" });
 
@@ -37,6 +38,7 @@ export async function GET(
     const user = requireCompanyUser(rawUser);
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 403 });
     const { id } = await params;
+    const persistAiSource = await hasTicketAiSourceColumn();
 
     const ticket = await db.ticket.findFirst({
       where: {
@@ -67,6 +69,7 @@ export async function GET(
         ai_recommended_action: true,
         ai_confidence: true,
         ai_processed_at: true,
+        ...ticketAiSourceSelect(persistAiSource),
         property: {
           select: {
             id: true,

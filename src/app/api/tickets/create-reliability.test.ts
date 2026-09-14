@@ -39,6 +39,7 @@ vi.mock("@/lib/integrations", () => ({
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   notDeletedFilter: vi.fn(async () => ({ deleted_at: null })),
+  hasTicketAiSourceColumn: vi.fn(async () => true),
 }));
 vi.mock("@/lib/structured-logger", () => ({
   createLogger: () => ({

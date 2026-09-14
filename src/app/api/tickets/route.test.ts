@@ -40,6 +40,7 @@ vi.mock("@/lib/integrations", () => ({ queueTicketNotification: vi.fn(), recordA
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   notDeletedFilter: vi.fn(async () => ({ deleted_at: null })),
+  hasTicketAiSourceColumn: vi.fn(async () => true),
 }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
@@ -156,6 +157,7 @@ describe("POST /api/tickets", () => {
         ai_recommended_action: expect.any(String),
         ai_confidence: expect.any(Number),
         ai_processed_at: expect.any(Date),
+        ai_source: "fallback",
       }),
     }));
     expect(loggerInfoMock).toHaveBeenCalledWith(

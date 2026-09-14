@@ -196,6 +196,19 @@ describe("completed integration telemetry", () => {
       data: expect.objectContaining({ type: "stripe", status: "failed" }),
     });
   });
+
+  it("records fallback AI classification instead of marking it completed", async () => {
+    const { recordAiEvent } = await loadIntegrations();
+
+    await recordAiEvent(
+      { company_id: "company-1" },
+      { action: "classification.completed", source: "fallback" },
+    );
+
+    expect(integrationEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: "ai", status: "fallback" }),
+    });
+  });
 });
 
 describe("queueSmsNotification", () => {

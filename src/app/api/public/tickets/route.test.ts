@@ -56,6 +56,10 @@ vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn(async () => ({ allowed: true })),
   getClientIp: vi.fn(() => "127.0.0.1"),
 }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasTicketAiSourceColumn: vi.fn(async () => true),
+}));
 
 import { POST } from "./route";
 

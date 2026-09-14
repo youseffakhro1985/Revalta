@@ -4,6 +4,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { recordAiEvent } from "@/lib/integrations";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
+import { hasTicketAiSourceColumn, ticketAiSourceSelect, ticketAiSourceWrite } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -33,6 +34,7 @@ export async function POST(
     if (!user.company_id) {
       return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
+    const persistAiSource = await hasTicketAiSourceColumn();
 
     const updateResult = await db.ticket.updateMany({
       where: { id: existing.id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
@@ -43,6 +45,7 @@ export async function POST(
         ai_recommended_action: analysis.recommendedAction,
         ai_confidence: analysis.confidence,
         ai_processed_at: new Date(),
+        ...ticketAiSourceWrite(persistAiSource, analysis.source),
       },
     });
     if (updateResult.count === 0) {
@@ -59,6 +62,7 @@ export async function POST(
         ai_recommended_action: true,
         ai_confidence: true,
         ai_processed_at: true,
+        ...ticketAiSourceSelect(persistAiSource),
       },
     });
     if (!ticket) {

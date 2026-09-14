@@ -32,6 +32,10 @@ vi.mock("@/lib/audit", () => ({
 vi.mock("@/lib/integrations", () => ({
   queueTicketNotification: queueTicketNotificationMock,
 }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasTicketAiSourceColumn: vi.fn(async () => true),
+}));
 
 vi.mock("@/lib/db", () => {
   const dbMock = {
@@ -77,6 +81,7 @@ const baseTicketRow = {
   ai_recommended_action: null,
   ai_confidence: null,
   ai_processed_at: null,
+  ai_source: null,
   property: { id: "property-1", name: "Storgatan 1", address: "Storgatan 1", city: "Stockholm" },
   assigned_to: null,
   comments: [],

@@ -36,6 +36,10 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasTicketAiSourceColumn: vi.fn(async () => true),
+}));
 
 vi.mock("@/lib/work-order-enterprise-core", () => ({
   addWorkOrderStatusEvent: vi.fn(),

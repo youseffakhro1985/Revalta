@@ -47,6 +47,7 @@ type Ticket = {
   ai_recommended_action: string | null;
   ai_confidence: number | null;
   ai_processed_at: string | null;
+  ai_source: string | null;
   due_date: string | null;
   created_at: string;
   updated_at: string;
@@ -270,7 +271,11 @@ export default function TicketDetailPage() {
       if (!response.ok) throw new Error(data.error || "Kunde inte AI-analysera ärendet");
       setTicket((current) => current ? { ...current, ...data.ticket } : current);
       setPriority(data.ticket.priority);
-      setSuccess("AI-analysen är klar och ärendet är uppdaterat.");
+      setSuccess(
+        data.ticket.ai_source === "provider"
+          ? "AI-analysen är klar och ärendet är uppdaterat."
+          : "Regelbaserad analys användes. Koppla AI_PROVIDER_API_KEY för leverantörsklassificering.",
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Kunde inte kontakta servern");
     } finally { setAnalyzing(false); }
@@ -446,7 +451,7 @@ export default function TicketDetailPage() {
 
         <Panel title="AI-insikt" description="Prioritering och rekommenderad åtgärd baserad på ärendets innehåll." bodyClassName="p-6 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><FileSearch aria-hidden="true" className="h-5 w-5 text-petroleum-700" /><p className="text-sm text-ink-600">Analysera ärendet och uppdatera rekommendationen.</p></div><button type="button" onClick={runAiAnalysis} disabled={analyzing} className={premiumPrimaryButtonClass}>{analyzing ? "Analyserar…" : "AI-analysera"}</button></div>
-          {ticket.ai_summary ? <div className="mt-5 grid gap-4 md:grid-cols-3"><Insight label="Sammanfattning" value={ticket.ai_summary} /><Insight label="Rekommenderad åtgärd" value={ticket.ai_recommended_action || "Saknas"} /><Insight label="Konfidens" value={`${Math.round((ticket.ai_confidence || 0) * 100)} %`} /></div> : null}
+          {ticket.ai_summary ? <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Insight label="Sammanfattning" value={ticket.ai_summary} /><Insight label="Rekommenderad åtgärd" value={ticket.ai_recommended_action || "Saknas"} /><Insight label="Konfidens" value={`${Math.round((ticket.ai_confidence || 0) * 100)} %`} /><Insight label="Källa" value={ticket.ai_source === "provider" ? "AI-leverantör" : ticket.ai_source === "staff" ? "Manuell" : "Regelbaserad"} /></div> : null}
         </Panel>
 
         <Panel title="Bilagor" description="Foton, dokument och underlag kopplade till ärendet." bodyClassName="p-6 sm:p-8">

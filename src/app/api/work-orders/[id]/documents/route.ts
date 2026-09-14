@@ -107,6 +107,7 @@ export async function POST(request: Request, { params }: Params) {
     });
     if (!validation.ok) return reject(observability, 400, API_ERROR_CODES.validationFailed, validation.error);
 
+    let classificationSource: "provider" | "fallback" | "staff" = "staff";
     if (!category || category === "other") {
       const classified = await analyzeDocument({
         fileName: validation.fileName,
@@ -115,6 +116,7 @@ export async function POST(request: Request, { params }: Params) {
         existingCategory: category || "other",
       });
       category = classified.category;
+      classificationSource = classified.source;
     }
 
     const safeName = validation.fileName.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-120);
@@ -181,6 +183,7 @@ export async function POST(request: Request, { params }: Params) {
         action: "document.classified",
         category,
         workOrderId: id,
+        source: classificationSource,
       });
     } catch {
       observability.logger.warn("work-order document ai telemetry failed", observability.elapsed({

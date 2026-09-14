@@ -104,8 +104,37 @@ export async function getSchemaReadiness(): Promise<SchemaReadiness> {
   };
 }
 
+const FEATURE_COLUMN_TTL_MS = 15_000;
+let featureColumnCache: { aiSource: boolean; expiresAt: number } | null = null;
+
+export function ticketAiSourceWrite(hasColumn: boolean, source: string) {
+  return hasColumn ? { ai_source: source } : {};
+}
+
+export function ticketAiSourceSelect(hasColumn: boolean) {
+  return hasColumn ? { ai_source: true as const } : {};
+}
+
+export async function hasTicketAiSourceColumn(): Promise<boolean> {
+  if (featureColumnCache && featureColumnCache.expiresAt > Date.now()) {
+    return featureColumnCache.aiSource;
+  }
+  const rows = await getPrismaBaseClient().$queryRaw<Array<{ column_name: string }>>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'Ticket'
+      AND column_name = 'ai_source'
+    LIMIT 1
+  `;
+  const aiSource = rows.length > 0;
+  featureColumnCache = { aiSource, expiresAt: Date.now() + FEATURE_COLUMN_TTL_MS };
+  return aiSource;
+}
+
 export function resetSchemaReadinessCache() {
   resetSoftDeleteCompatCache();
+  featureColumnCache = null;
 }
 
 export async function getCachedSchemaReadiness(): Promise<SchemaReadiness> {
