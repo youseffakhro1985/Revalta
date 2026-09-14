@@ -10,13 +10,15 @@ import {
   listMaterialEntries,
   listTimeEntries,
   type InvoiceDraftPayload,
+  type MaterialEntryPayload,
+  type TimeEntryPayload,
 } from "@/lib/work-order-ops-storage";
 
 const signerRoles = new Set(["executor", "contractor", "customer"]);
 
 function hasInvoiceBasisLines(
-  times: Array<{ status?: string; billable?: boolean; kind?: string; minutes?: number }>,
-  materials: Array<{ status?: string; billable?: boolean; total?: number }>,
+  times: TimeEntryPayload[],
+  materials: MaterialEntryPayload[],
   fixedRevenue = 0,
 ) {
   const hasApprovedTime = times.some((row) => row.status === "approved" && row.billable === true && row.kind !== "break" && Number(row.minutes || 0) > 0);
