@@ -95,10 +95,10 @@ export default function NewPayoutPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <Link href="/dashboard/ekonomi" className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-petroleum-700 hover:text-petroleum-900"><ArrowLeft className="h-3.5 w-3.5" /> Tillbaka till Ekonomi</Link>
+      <Link href="/dashboard/ekonomi" className="inline-flex items-center gap-1.5 text-xs font-semibold text-petroleum-700 hover:text-petroleum-900"><ArrowLeft className="h-3.5 w-3.5" /> Tillbaka till Ekonomi</Link>
 
       <header>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Ekonomi / Utbetalning</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-petroleum-700">Ekonomi / Utbetalning</p>
         <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950">Ny utbetalning</h1>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-500">Registrera ett verkligt ekonomiskt utfall på rätt fastighet och kostnadsslag. Posten går direkt in i Revaltas befintliga budget- och utfallsdata.</p>
       </header>
@@ -109,7 +109,7 @@ export default function NewPayoutPage() {
       <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
         <div className="flex items-center gap-3 border-b border-sand-100 px-5 py-4 sm:px-6">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sand-50 text-petroleum-800"><CircleDollarSign className="h-[18px] w-[18px]" /></span>
-          <div><h2 className="text-sm font-semibold text-ink-900">Utbetalningsuppgifter</h2><p className="mt-0.5 text-[10px] text-ink-450">Belopp lagras som registrerat utfall för innevarande år.</p></div>
+          <div><h2 className="text-sm font-semibold text-ink-900">Utbetalningsuppgifter</h2><p className="mt-0.5 text-xs text-ink-450">Belopp lagras som registrerat utfall för innevarande år.</p></div>
         </div>
 
         <form onSubmit={submit} className="space-y-5 p-5 sm:p-6">
@@ -140,8 +140,8 @@ export default function NewPayoutPage() {
           </Field>
 
           <div className="flex flex-col-reverse gap-2 border-t border-sand-100 pt-5 sm:flex-row sm:justify-end">
-            <Link href="/dashboard/ekonomi" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-4 text-[11px] font-semibold text-ink-600 transition hover:bg-sand-50">Avbryt</Link>
-            <button type="submit" disabled={saving || loading || !canManage} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-petroleum-900 px-5 text-[11px] font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" /> {saving ? "Registrerar…" : "Registrera utbetalning"}</button>
+            <Link href="/dashboard/ekonomi" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-4 text-xs font-semibold text-ink-600 transition hover:bg-sand-50">Avbryt</Link>
+            <button type="submit" disabled={saving || loading || !canManage} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-petroleum-900 px-5 text-xs font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" /> {saving ? "Registrerar…" : "Registrera utbetalning"}</button>
           </div>
         </form>
       </section>
@@ -152,5 +152,5 @@ export default function NewPayoutPage() {
 const fieldClass = "h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle px-3.5 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100 disabled:cursor-not-allowed disabled:opacity-55";
 
 function Field({ label, optional = false, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-ink-650">{label}{optional ? <span className="font-normal text-ink-400">(valfritt)</span> : null}</span>{children}</label>;
+  return <label className="block"><span className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-ink-650">{label}{optional ? <span className="font-normal text-ink-400">(valfritt)</span> : null}</span>{children}</label>;
 }
