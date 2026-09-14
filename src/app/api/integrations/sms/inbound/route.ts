@@ -87,11 +87,12 @@ type PhoneTicket = {
   status: string;
 };
 
-function pickTenantSafeTicket(tickets: PhoneTicket[]) {
-  const companyIds = new Set(tickets.map((ticket) => ticket.company_id));
-  if (tickets.length === 0 || companyIds.size !== 1) return null;
-  const open = tickets.filter((ticket) => OPEN_TICKET_STATUSES.has(ticket.status));
-  return open[0] || tickets[0] || null;
+function pickTenantSafeTicket(tickets: Array<{ id: string; company_id: string | null; user_id: string; status: string }>) {
+  const scoped = tickets.filter((ticket): ticket is PhoneTicket => Boolean(ticket.company_id));
+  const companyIds = new Set(scoped.map((ticket) => ticket.company_id));
+  if (scoped.length === 0 || companyIds.size !== 1) return null;
+  const open = scoped.filter((ticket) => OPEN_TICKET_STATUSES.has(ticket.status));
+  return open[0] || scoped[0] || null;
 }
 
 async function attachResidentComment(ticket: { id: string; user_id: string }, from: string, message: string) {
