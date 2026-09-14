@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { buildChecklistFromLabels, normalizeChecklist } from "@/lib/inspection-round-checklist";
 import { normalizeInspectionTemplateItems } from "@/lib/inspection-checklist-template";
 import { loadLegacyRows } from "@/lib/dual-list";
+import { isMissingTableError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/rounds" });
@@ -90,6 +91,9 @@ export async function GET() {
       permissions: { canManage: canManageTickets(user.role) },
     }, { headers: noStoreHeaders });
   } catch (error) {
+    if (isMissingTableError(error, "InspectionRound") || isMissingTableError(error, "InspectionChecklistTemplate")) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503, headers: noStoreHeaders });
+    }
     logger.error("Get rounds error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500, headers: noStoreHeaders });
   }
@@ -193,6 +197,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, round }, { status: 201, headers: noStoreHeaders });
   } catch (error) {
+    if (isMissingTableError(error, "InspectionRound") || isMissingTableError(error, "InspectionChecklistTemplate")) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503, headers: noStoreHeaders });
+    }
     logger.error("Create round error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500, headers: noStoreHeaders });
   }

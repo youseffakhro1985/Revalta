@@ -9,6 +9,7 @@ import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { findAccessibleWorkOrder } from "@/lib/assigned-work-access";
 import { createRouteObservability } from "@/lib/route-observability";
+import { isMissingTableError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const ROUTE = "/api/operational-documents";
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
@@ -173,6 +174,14 @@ export async function GET(request: Request) {
       documents: documents.map((document) => toClientDocument(document, entityType, entityId)),
     });
   } catch (error) {
+    if (isMissingTableError(error, "OperationalDocument")) {
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        requestId: observability.requestId,
+      });
+    }
     observability.logger.error("operational document list failed", error, observability.elapsed({
       event: "operational_documents.list.failed",
     }));
@@ -327,6 +336,14 @@ export async function POST(request: Request) {
         status: 503,
         code: API_ERROR_CODES.serviceUnavailable,
         message: "Fillagringen är inte konfigurerad",
+        requestId: observability.requestId,
+      });
+    }
+    if (isMissingTableError(error, "OperationalDocument")) {
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
         requestId: observability.requestId,
       });
     }
