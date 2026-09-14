@@ -29,6 +29,15 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/ny", "manager")).toBeNull();
   });
 
+  it("visar nytt ärende i ärendemodulen för roller som hanterar felanmälan", () => {
+    expect(dashboardPrimaryCreateAction("/dashboard/felanmalan", "owner")).toEqual({
+      href: "/dashboard/felanmalan?create=1",
+      label: "Nytt ärende",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/felanmalan/ticket-1", "technician")?.label).toBe("Nytt ärende");
+    expect(dashboardPrimaryCreateAction("/dashboard/felanmalan", "viewer")).toBeNull();
+  });
+
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "owner")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/dokument", "owner")).toBeNull();

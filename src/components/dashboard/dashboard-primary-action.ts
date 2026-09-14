@@ -1,4 +1,4 @@
-import { canAssignWorkOrders, canCreateProperties } from "@/lib/permissions";
+import { canAssignWorkOrders, canCreateProperties, canManageTickets } from "@/lib/permissions";
 
 export type DashboardPrimaryCreateAction = {
   href: string;
@@ -26,6 +26,12 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   const editLockAdmin = current === `${workOrdersRoot}/redigeringslas` || current.startsWith(`${workOrdersRoot}/redigeringslas/`);
   if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin))) {
     return { href: `${workOrdersRoot}/ny`, label: "Ny arbetsorder" };
+  }
+
+  const ticketsRoot = "/dashboard/felanmalan";
+  const inTickets = current === ticketsRoot || current.startsWith(`${ticketsRoot}/`);
+  if (canManageTickets(role) && inTickets) {
+    return { href: `${ticketsRoot}?create=1`, label: "Nytt ärende" };
   }
 
   return null;
