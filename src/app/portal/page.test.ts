@@ -13,6 +13,7 @@ describe("public portal pages", () => {
       expect(source).toContain("initialToken={");
       expect(source).toContain("initialTrackedTicket={");
       expect(source).toContain("initialCommented={");
+      expect(source).toContain("initialAttached={");
       expect(source).toContain("loadPortalTrackedTicket");
       expect(source).not.toContain("initialEmail");
     }

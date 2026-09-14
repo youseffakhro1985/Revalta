@@ -18,6 +18,7 @@ export default async function PortalPage({
       initialTrackedTicket={tracked.ticket}
       initialTrackError={tracked.error}
       initialCommented={params.commented === "1"}
+      initialAttached={params.attached === "1"}
     />
   );
 }

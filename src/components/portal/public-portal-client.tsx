@@ -69,6 +69,7 @@ function portalReasonCopy(reason?: string | null) {
 
 const createdTicketCopy = "Tack! Ärendet är mottaget och skickat till förvaltningen.";
 const commentedTicketCopy = "Kommentaren är skickad till förvaltningen.";
+const attachedTicketCopy = "Bilagan är mottagen och kopplad till ärendet.";
 
 type PublicPortalClientProps = {
   companySlug?: string;
@@ -80,6 +81,7 @@ type PublicPortalClientProps = {
   initialTrackedTicket?: PublicTrackedTicket | null;
   initialTrackError?: string;
   initialCommented?: boolean;
+  initialAttached?: boolean;
 };
 
 function asPublicTicket(ticket: PublicTrackedTicket): PublicTicket {
@@ -99,6 +101,7 @@ export function PublicPortalClient({
   initialTrackedTicket = null,
   initialTrackError = "",
   initialCommented = false,
+  initialAttached = false,
 }: PublicPortalClientProps) {
   const normalizedInitialReference = initialReference.trim().toUpperCase();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -129,9 +132,11 @@ export function PublicPortalClient({
       ? createdTicketCopy
       : initialCommented
         ? commentedTicketCopy
-        : initialTrackedTicket
-          ? "Ärendet hittades."
-          : "",
+        : initialAttached
+          ? attachedTicketCopy
+          : initialTrackedTicket
+            ? "Ärendet hittades."
+            : "",
   );
   const [loading, setLoading] = useState(false);
 
@@ -175,6 +180,7 @@ export function PublicPortalClient({
 
     const created = params.get("created") === "1";
     const commented = params.get("commented") === "1";
+    const attached = params.get("attached") === "1";
     const ref = params.get("ref")?.trim();
     const token = params.get("token")?.trim() || "";
     const email = params.get("email")?.trim() || "";
@@ -183,6 +189,8 @@ export function PublicPortalClient({
       setSuccess(createdTicketCopy);
     } else if (commented) {
       setSuccess(commentedTicketCopy);
+    } else if (attached) {
+      setSuccess(attachedTicketCopy);
     }
     if (!ref) return;
     setReference(ref.toUpperCase());
@@ -190,14 +198,14 @@ export function PublicPortalClient({
     if (email) setTrackEmail(email);
     if (initialTrackedTicket) return;
     void (async () => {
-      if (!created && !commented) {
+      if (!created && !commented && !attached) {
         setError("");
         setSuccess("");
       }
       setLoading(true);
       try {
         await loadTrackedTicket(ref, email, token);
-        if (!created && !commented) setSuccess("Ärendet hittades.");
+        if (!created && !commented && !attached) setSuccess("Ärendet hittades.");
         if (params.get("feedback") === "1") {
           document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }
@@ -282,6 +290,7 @@ export function PublicPortalClient({
       if (trackingToken) formData.append("token", trackingToken);
       const response = await fetch(`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/attachments`, {
         method: "POST",
+        headers: { Accept: "application/json" },
         body: formData,
       });
       const data = await readResponseJson(response);
@@ -594,11 +603,24 @@ export function PublicPortalClient({
                     </button>
                   </form>
 
-                  <form onSubmit={uploadAttachment} className="mt-6 border-t border-sand-100 pt-5">
+                  <form
+                    id="public-attachment-form"
+                    method="post"
+                    action={`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/attachments`}
+                    encType="multipart/form-data"
+                    onSubmit={uploadAttachment}
+                    className="mt-6 border-t border-sand-100 pt-5"
+                  >
+                    <input type="hidden" name="native" value="1" />
+                    {companySlug ? <input type="hidden" name="companySlug" value={companySlug} /> : null}
+                    {trackingToken ? <input type="hidden" name="token" value={trackingToken} /> : null}
+                    {trackEmail ? <input type="hidden" name="email" value={trackEmail} /> : null}
                     <p className="text-sm font-semibold text-ink-900">Lägg till bilaga</p>
                     <p className="mt-1 text-xs text-ink-500">Bifoga bild eller dokument (PNG, JPG, PDF) upp till 1 MB.</p>
                     <input
                       type="file"
+                      name="file"
+                      required
                       aria-label="Lägg till bilaga"
                       accept="image/png,image/jpeg,image/webp,application/pdf,text/plain"
                       onChange={(event) => setAttachmentFile(event.target.files?.[0] || null)}
