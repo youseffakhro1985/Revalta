@@ -86,6 +86,17 @@ vi.mock("@/lib/schema-readiness", () => ({
 vi.mock("@/lib/soft-delete-compat", () => ({ sqlSoftDeleteGuard: vi.fn().mockResolvedValue("") }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/work-order-sla", () => ({ evaluateWorkOrderSla: vi.fn() }));
+vi.mock("@/lib/integrations", () => ({ recordAiEvent: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/ai", () => ({
+  analyzeTicket: vi.fn().mockResolvedValue({
+    category: "other",
+    priority: "normal",
+    confidence: 0.5,
+    summary: "Regelbaserad analys",
+    recommendedAction: "Dokumentera och följ upp",
+    source: "fallback",
+  }),
+}));
 
 import { POST } from "./route";
 

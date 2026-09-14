@@ -17,6 +17,7 @@ import {
 import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 import { createLogger } from "@/lib/structured-logger";
 import { analyzeTicket } from "@/lib/ai";
+import { recordAiEvent } from "@/lib/integrations";
 import { hasTicketAiSourceColumn, ticketAiSourceWrite } from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
@@ -267,6 +268,23 @@ export async function POST(
         workOrderNumber: result.workOrderNumber,
       },
     });
+
+    if (result.created && analysis) {
+      try {
+        await recordAiEvent(user, {
+          workOrderId: result.id,
+          ticketId: ticket.id,
+          action: "classification.completed",
+          category: analysis.category,
+          priority: analysis.priority,
+          confidence: analysis.confidence,
+          summary: analysis.summary,
+          source: analysis.source,
+        });
+      } catch {
+        logger.warn("work-order from ticket ai telemetry failed", { workOrderId: result.id, ticketId: ticket.id });
+      }
+    }
 
     return NextResponse.json(
       { workOrderId: result.id, created: result.created },
