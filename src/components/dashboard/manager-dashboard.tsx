@@ -1,11 +1,21 @@
 import Link from "next/link";
-import { AlertTriangle, BriefcaseBusiness, Building2, CalendarDays, ClipboardList, Wrench } from "lucide-react";
+import { AlertTriangle, BriefcaseBusiness, Building2, CalendarDays, ClipboardList, UserRoundX, Wrench } from "lucide-react";
 import db from "@/lib/db";
 import { tenantWhere, type CurrentUser } from "@/lib/current-user";
+import { isMissingTableError } from "@/lib/schema-readiness";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 import { OverviewEmpty, OverviewHero, OverviewMetricLink, OverviewPanel } from "@/components/dashboard/overview-chrome";
 
 const date = new Intl.DateTimeFormat("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+
+async function optionalFindMany<T>(table: string, query: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await query();
+  } catch (error) {
+    if (isMissingTableError(error, table)) return [];
+    throw error;
+  }
+}
 
 export async function ManagerDashboard({ user }: { user: CurrentUser }) {
   const now = new Date();
@@ -14,8 +24,9 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
   const horizon = new Date(today.getTime() + 30 * 86400000);
   const activeWorkStatuses = { notIn: ["completed", "invoiced", "cancelled"] };
   const propertyScope = { deleted_at: null, ...tenantWhere(user) };
+  const companyId = user.company_id;
 
-  const [totalProperties, properties, unassignedTickets, overdueWorkOrders, upcomingActivities, activeVendors, expiringVendors, ticketQueue] = await Promise.all([
+  const [totalProperties, properties, unassignedTickets, unassignedWorkOrders, overdueWorkOrders, upcomingActivities, upcomingRounds, upcomingInspections, activeVendors, expiringVendors, ticketQueue] = await Promise.all([
     db.property.count({ where: propertyScope }),
     db.property.findMany({
       where: propertyScope,
@@ -37,10 +48,21 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
         OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
     }),
-    user.company_id
+    companyId
       ? db.workOrder.count({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
+            deleted_at: null,
+            assigned_to_id: null,
+            property: { deleted_at: null },
+            status: activeWorkStatuses,
+          },
+        })
+      : Promise.resolve(0),
+    companyId
+      ? db.workOrder.count({
+          where: {
+            company_id: companyId,
             deleted_at: null,
             property: { deleted_at: null },
             status: activeWorkStatuses,
@@ -48,23 +70,49 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           },
         })
       : Promise.resolve(0),
-    user.company_id
+    companyId
       ? db.calendarEvent.findMany({
-          where: { company_id: user.company_id, status: "planned", date: { gte: today, lte: horizon } },
+          where: { company_id: companyId, status: "planned", date: { gte: today, lte: horizon } },
           orderBy: [{ date: "asc" }, { time: "asc" }],
           take: 6,
           select: { id: true, title: true, date: true, time: true, type: true, property_name: true, responsible: true },
         })
       : Promise.resolve([]),
-    user.company_id
+    companyId
+      ? optionalFindMany("InspectionRound", () => db.inspectionRound.findMany({
+          where: {
+            company_id: companyId,
+            status: { not: "completed" },
+            next_due: { gte: today, lte: horizon },
+            property: { deleted_at: null },
+          },
+          orderBy: { next_due: "asc" },
+          take: 6,
+          select: { id: true, title: true, next_due: true, property: { select: { name: true } } },
+        }))
+      : Promise.resolve([]),
+    companyId
+      ? optionalFindMany("ComplianceInspection", () => db.complianceInspection.findMany({
+          where: {
+            company_id: companyId,
+            status: { notIn: ["completed", "cancelled"] },
+            due_date: { gte: today, lte: horizon },
+            property: { deleted_at: null },
+          },
+          orderBy: { due_date: "asc" },
+          take: 6,
+          select: { id: true, title: true, type: true, due_date: true, responsible: true, property: { select: { name: true } } },
+        }))
+      : Promise.resolve([]),
+    companyId
       ? db.vendorContract.count({
-          where: { company_id: user.company_id, status: "active", OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+          where: { company_id: companyId, status: "active", OR: [{ property_id: null }, { property: { deleted_at: null } }] },
         })
       : Promise.resolve(0),
-    user.company_id
+    companyId
       ? db.vendorContract.count({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             status: "active",
             end_date: { gte: now, lte: new Date(now.getTime() + 120 * 86400000) },
             OR: [{ property_id: null }, { property: { deleted_at: null } }],
@@ -90,22 +138,23 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
       <OverviewHero
         eyebrow="Förvaltarvy"
         title="Dagens förvaltning"
-        description="Fastigheter, otilldelade ärenden, försenade arbetsordrar och kommande aktiviteter i en operativ vy."
+        description="Fastigheter, otilldelade ärenden och arbetsordrar, försenade AO och kommande ronder i en operativ vy."
         userName={user.name}
         userEmail={user.email}
         role={user.role}
         companyName={user.company?.name}
-        statusLabel={unassignedTickets || overdueWorkOrders ? "Kräver åtgärd" : "Stabilt läge"}
-        statusTone={unassignedTickets || overdueWorkOrders ? "attention" : "good"}
+        statusLabel={unassignedTickets || unassignedWorkOrders || overdueWorkOrders ? "Kräver åtgärd" : "Stabilt läge"}
+        statusTone={unassignedTickets || unassignedWorkOrders || overdueWorkOrders ? "attention" : "good"}
         actions={[
           { href: "/dashboard/arbetsorder/planering", label: "Öppna planering", primary: true },
           { href: "/dashboard/felanmalan", label: "Ärenden" },
         ]}
       />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Nyckeltal">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Nyckeltal">
         <OverviewMetricLink href="/dashboard/fastigheter" icon={Building2} label="Fastigheter i arbetsytan" value={totalProperties} hint="Tenant-scopat bestånd" />
         <OverviewMetricLink href="/dashboard/felanmalan" icon={ClipboardList} label="Otilldelade ärenden" value={unassignedTickets} hint="Behöver ansvarig" tone={unassignedTickets ? "warning" : "default"} />
+        <OverviewMetricLink href="/dashboard/arbetsorder/planering" icon={UserRoundX} label="Otilldelade arbetsordrar" value={unassignedWorkOrders} hint="Aktiva AO utan tekniker" tone={unassignedWorkOrders ? "warning" : "default"} />
         <OverviewMetricLink href="/dashboard/arbetsorder" icon={Wrench} label="Försenade arbetsordrar" value={overdueWorkOrders} hint="Aktiva AO efter deadline" tone={overdueWorkOrders ? "warning" : "default"} />
         <OverviewMetricLink href="/dashboard/leverantorer" icon={BriefcaseBusiness} label="Aktiva leverantörer" value={activeVendors} hint={`${expiringVendors} avtal löper inom 120 dagar`} />
       </section>
@@ -133,13 +182,48 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
       <DashboardSlaOperations />
 
       <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <OverviewPanel title="Kommande aktiviteter" description="Planerade aktiviteter från idag och 30 dagar framåt." bodyClassName="p-0">
-          {upcomingActivities.length ? <div className="divide-y divide-sand-100">{upcomingActivities.map((event) => (
-            <div key={event.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[110px_minmax(0,1fr)] sm:items-center">
-              <div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-petroleum-700">{date.format(event.date)}</p><p className="mt-1 text-xs text-ink-500">{event.time || "Heldag"}</p></div>
-              <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-900">{event.title}</p><p className="mt-1 truncate text-xs text-ink-500">{[event.type, event.property_name, event.responsible].filter(Boolean).join(" · ")}</p></div>
-            </div>
-          ))}</div> : <OverviewEmpty icon={CalendarDays} title="Inga planerade aktiviteter" description="Kalendern är tom de närmaste 30 dagarna." />}
+        <OverviewPanel title="Kommande aktiviteter" description="Kalender, ronder och besiktningar från idag och 30 dagar framåt." bodyClassName="p-0">
+          {(() => {
+            const upcoming = [
+              ...upcomingActivities.map((event) => ({
+                id: event.id,
+                title: event.title,
+                date: event.date,
+                time: event.time,
+                type: event.type,
+                property_name: event.property_name,
+                responsible: event.responsible,
+                href: "/dashboard/kalender",
+              })),
+              ...upcomingRounds.map((round) => ({
+                id: `round:${round.id}`,
+                title: round.title,
+                date: round.next_due,
+                time: null as string | null,
+                type: "Rond",
+                property_name: round.property.name,
+                responsible: null as string | null,
+                href: "/dashboard/ronder",
+              })),
+              ...upcomingInspections.map((inspection) => ({
+                id: `inspection:${inspection.id}`,
+                title: inspection.title,
+                date: inspection.due_date,
+                time: null as string | null,
+                type: "Besiktning",
+                property_name: inspection.property.name,
+                responsible: inspection.responsible,
+                href: "/dashboard/besiktningar",
+              })),
+            ].sort((left, right) => left.date.getTime() - right.date.getTime() || String(left.time || "").localeCompare(String(right.time || ""))).slice(0, 6);
+
+            return upcoming.length ? <div className="divide-y divide-sand-100">{upcoming.map((event) => (
+              <Link key={event.id} href={event.href} className="grid gap-3 px-5 py-4 transition hover:bg-sand-50/70 sm:grid-cols-[110px_minmax(0,1fr)] sm:items-center">
+                <div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-petroleum-700">{date.format(event.date)}</p><p className="mt-1 text-xs text-ink-500">{event.time || "Heldag"}</p></div>
+                <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-900">{event.title}</p><p className="mt-1 truncate text-xs text-ink-500">{[event.type, event.property_name, event.responsible].filter(Boolean).join(" · ")}</p></div>
+              </Link>
+            ))}</div> : <OverviewEmpty icon={CalendarDays} title="Inga planerade aktiviteter" description="Kalendern, ronder och besiktningar är tomma de närmaste 30 dagarna." />;
+          })()}
           <div className="border-t border-sand-100 p-4"><Link href="/dashboard/kalender" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700">Öppna kalender <CalendarDays className="h-4 w-4" /></Link></div>
         </OverviewPanel>
 
