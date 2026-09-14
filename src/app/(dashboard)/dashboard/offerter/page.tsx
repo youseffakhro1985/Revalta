@@ -48,6 +48,7 @@ type Quote = {
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
 const date = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" });
 const labels: Record<string, string> = { draft: "Utkast", sent: "Skickad", approved: "Godkänd", rejected: "Avslagen", invoiced: "Fakturerad", cancelled: "Makulerad" };
+const initialStatusLabels: Record<string, string> = { draft: "Utkast", sent: "Skickad" };
 const statusClass: Record<string, string> = {
   draft: "border-sand-200 bg-sand-50 text-ink-600",
   sent: "border-blue-100 bg-blue-50 text-blue-800",
@@ -298,12 +299,12 @@ export default function QuotesPage() {
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra offerter.</InlineAlert> : null}
 
-    {showCreate && canManage ? <Panel title="Ny offert" description="Registrera kostnadsdelar, moms, giltighet och initial status. Belopp anges exklusive moms.">
+    {showCreate && canManage ? <Panel title="Ny offert" description="Registrera kostnadsdelar, moms och giltighet. Belopp anges exklusive moms. Nya offerter skapas som utkast eller skickade. Skickad betyder att offerten är lämnad via utskrift eller PDF — Revalta skickar inget mejl.">
       <form onSubmit={submit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
         <input className={premiumFieldClass} placeholder="Offertnamn" aria-label="Offertnamn" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
         <input className={premiumFieldClass} placeholder="Leverantör" aria-label="Leverantör" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
-        <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} aria-label="Status">{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} aria-label="Status">{Object.entries(initialStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <input className={premiumFieldClass} type="date" aria-label="Giltigt till" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} />
         {[["labor", "Arbete"], ["material", "Material"], ["supplierCost", "Leverantörskostnad"], ["other", "Övrigt"]].map(([key, placeholder]) => <input key={key} className={premiumFieldClass} type="number" min="0" step="1" placeholder={placeholder} aria-label={placeholder} value={form[key as keyof typeof form]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />)}
         <input className={premiumFieldClass} type="number" min="0" max="100" placeholder="Moms %" aria-label="Moms %" value={form.vatRate} onChange={(e) => setForm({ ...form, vatRate: e.target.value })} />
@@ -349,6 +350,7 @@ export default function QuotesPage() {
           <div className="mt-5 grid grid-cols-2 gap-3 rounded-2xl border border-sand-100 bg-sand-50/60 p-4 text-xs text-ink-500 md:grid-cols-4"><span>Arbete<strong className="mt-1 block text-ink-800">{money.format(Number(quote.labor || 0))}</strong></span><span>Material<strong className="mt-1 block text-ink-800">{money.format(Number(quote.material || 0))}</strong></span><span>Leverantör<strong className="mt-1 block text-ink-800">{money.format(Number(quote.supplier_cost || 0))}</strong></span><span>Övrigt<strong className="mt-1 block text-ink-800">{money.format(Number(quote.other || 0))}</strong></span></div>
 
           <div className="mt-5 flex flex-wrap gap-2">
+            {canManage && quote.source !== "legacy" && quote.status === "draft" ? <button type="button" disabled={updatingId === quote.id} onClick={() => void updateStatus(quote, "sent")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><Send className="h-4 w-4" />Markera som skickad</button> : null}
             {canManage && quote.source !== "legacy" && !["approved", "invoiced", "cancelled", "rejected"].includes(quote.status || "draft") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "approved")} className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-700 px-3.5 text-xs font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />Godkänn</button> : null}
             {canManage && quote.source !== "legacy" && !["rejected", "invoiced", "cancelled"].includes(quote.status || "draft") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "rejected")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><XCircle className="h-4 w-4" />Avslå</button> : null}
             {canManage && quote.source !== "legacy" && (quote.status === "draft" || quote.status === "sent") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "cancelled")} className="inline-flex h-10 items-center rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-danger-700 transition hover:bg-danger-50 disabled:opacity-50">Makulera</button> : null}
