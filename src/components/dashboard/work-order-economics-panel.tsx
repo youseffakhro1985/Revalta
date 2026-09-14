@@ -134,6 +134,8 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
   const [exportJobs, setExportJobs] = useState<IntegrationJob[]>([]);
   const [selectedProvider, setSelectedProvider] = useState("fortnox");
   const [canManage, setCanManage] = useState(false);
+  const [canBuildFromApproved, setCanBuildFromApproved] = useState(false);
+  const [hasPersistedDraft, setHasPersistedDraft] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -237,6 +239,8 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
       const configured = (integrationData.providers || []).find((provider: IntegrationProvider) => provider.configured);
       if (configured?.id) setSelectedProvider(configured.id);
       setCanManage(Boolean(timeData.canManage || materialData.canManage || profitData.canManage || invoiceData.canManage || integrationData.canManage));
+      setCanBuildFromApproved(Boolean(invoiceData.canBuildFromApproved));
+      setHasPersistedDraft(Boolean(invoiceData.hasPersistedDraft));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta ekonomi");
     } finally {
@@ -291,6 +295,12 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
       status,
       lines: draft.lines,
     }, status === "ready" ? "Fakturaunderlaget är klart." : "Fakturaunderlaget har sparats.");
+  }
+
+  async function rebuildInvoice() {
+    await post(`/api/work-orders/${workOrderId}/invoice-basis`, {
+      action: "rebuild",
+    }, "Fakturaunderlaget har byggts från attesterade rader.");
   }
 
   if (loading) return <div className="h-80 animate-pulse rounded-2xl bg-sand-100" aria-label="Laddar arbetsorderekonomi" />;
@@ -584,11 +594,25 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
 
       <Panel title="Fakturaunderlag" description="Byggs från godkänd tid och debiterbart material. Separat från fältregistreringen ovan.">
         {!draft ? (
-          <EmptyState title="Inget underlag" description="Spara tid och material för att skapa fakturarader." />
+          <EmptyState title="Inget underlag" description="Godkänn tid och material ovan, bygg sedan underlaget från de attesterade raderna." />
         ) : (
           <div className="space-y-4">
             {draft.source === "legacy" ? (
               <p className="text-xs font-medium text-warning-800">Äldre underlag – spara ett nytt utkast (modern tabell) innan export. Kör backfill för att behålla samma version-ID.</p>
+            ) : null}
+            {canManage && canBuildFromApproved && hasPersistedDraft && draft.lines.length === 0 && !["ready", "exported"].includes(draft.status) ? (
+              <div className="rounded-xl border border-petroleum-200 bg-petroleum-50 p-4">
+                <p className="text-sm text-petroleum-900">Ett tomt utkast finns, men attesterade rader saknas på underlaget. Bygg raderna från attesteringen — spara utkast skapar inte rader av sig själv.</p>
+                <button type="button" disabled={saving} onClick={() => void rebuildInvoice()} className={`${premiumPrimaryButtonClass} mt-3`}>
+                  {saving ? "Bygger…" : "Bygg fakturaunderlag från attesterade rader"}
+                </button>
+              </div>
+            ) : null}
+            {!hasPersistedDraft && draft.lines.length > 0 ? (
+              <p className="text-sm text-ink-600">Förhandsvisning från attesterade rader. Spara utkast för att lagra underlaget.</p>
+            ) : null}
+            {draft.lines.length === 0 && !canBuildFromApproved ? (
+              <p className="text-sm text-ink-500">Inga fakturarader ännu. Godkänn debiterbar tid eller material ovan först.</p>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <input
@@ -626,7 +650,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             </div>
             <div className="divide-y divide-sand-100 rounded-xl border border-sand-200">
               {draft.lines.length === 0 ? (
-                <div className="p-5 text-sm text-ink-500">Inga fakturarader ännu. Godkänn tid/material eller spara underlaget för att generera rader.</div>
+                <div className="p-5 text-sm text-ink-500">Inga lagrade fakturarader. Godkänn tid/material och bygg underlaget från attesteringen.</div>
               ) : draft.lines.map((line) => (
                 <div key={line.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>

@@ -165,9 +165,12 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
       {canMutate ? <button type="button" disabled={!canFinalize || saving} onClick={() => void post({ action: "completion.finalize" }, "Arbetsordern är slutförd. Tid och material väntar på attestering.")} className={`${premiumPrimaryButtonClass} mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50`} aria-describedby="completion-help">{saving ? "Slutför…" : "Godkänn och slutför arbetsorder"}</button> : null}
       <p id="completion-help" className="mt-2 text-xs text-ink-500">{lifecycleLocked ? `${completionLabel}. Fältregistreringarna är låsta.` : !canManage ? "Du har läsbehörighet men kan inte ändra utförandet." : !canFinalizeWorkOrderExecution(completion.status) ? "Arbetsordern måste vara påbörjad innan den kan slutföras." : canFinalize ? "Vid avslut uppdateras driftkostnad och tid/material skapas som attesterbara rader. Finns en leverantör med kontaktadress i registret skickas ett avslutmejl. Kopplat ärende meddelar anmälaren." : "Slutför checklistan och ladda upp minst en efterbild i dokumentpanelen."}</p>
       {(completion.status === "completed" || completion.status === "invoiced") && canViewFinance ? (
-        <Link href="#ekonomi" className="mt-3 inline-flex text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">
-          Öppna Ekonomi och fakturering
-        </Link>
+        <div className="mt-3">
+          <p className="text-sm text-ink-600">Attestera tid och material under Ekonomi. När raderna är godkända kan du bygga fakturaunderlag där — spara utkast skapar inte rader av sig själv.</p>
+          <Link href="#ekonomi" className="mt-2 inline-flex text-xs font-semibold text-petroleum-800 hover:text-petroleum-950">
+            Öppna Ekonomi och fakturering
+          </Link>
+        </div>
       ) : null}
     </Panel>
 

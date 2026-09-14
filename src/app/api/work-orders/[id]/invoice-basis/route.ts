@@ -93,18 +93,7 @@ async function sourceData(id: string, companyId: string) {
   };
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-  if (!canViewFinanceData(user.role)) {
-    return NextResponse.json({ error: "Du saknar behörighet att visa faktureringsunderlag" }, { status: 403 });
-  }
-  const { id } = await params;
-  const workOrder = await order(id, user.company_id);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-
-  const source = await sourceData(id, user.company_id);
+function linesFromApproved(source: Awaited<ReturnType<typeof sourceData>>): Line[] {
   const generated: Line[] = [];
   if (source.billableMinutes > 0) {
     generated.push({
@@ -140,11 +129,37 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       total: source.fixedRevenue,
     });
   }
+  return generated;
+}
+
+function totalsFor(lines: Line[], discountPercent: number, vatPercent: number) {
+  const subtotal = round(lines.reduce((sum, line) => sum + line.total, 0));
+  const discount = round(subtotal * discountPercent / 100);
+  const net = round(subtotal - discount);
+  const vat = round(net * vatPercent / 100);
+  const total = round(net + vat);
+  return { subtotal, discount, net, vat, total };
+}
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  if (!canViewFinanceData(user.role)) {
+    return NextResponse.json({ error: "Du saknar behörighet att visa faktureringsunderlag" }, { status: 403 });
+  }
+  const { id } = await params;
+  const workOrder = await order(id, user.company_id);
+  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+
+  const source = await sourceData(id, user.company_id);
+  const generated = linesFromApproved(source);
+  const persistedLines = Array.isArray(source.saved?.lines) ? source.saved.lines : [];
 
   const draft = source.saved
     ? {
       ...source.saved,
-      lines: Array.isArray(source.saved.lines) ? source.saved.lines : [],
+      lines: persistedLines,
       ...(source.saved.source ? { source: source.saved.source } : {}),
     }
     : {
@@ -164,6 +179,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     workOrder,
     draft,
     source: { billableMinutes: source.billableMinutes, billableMaterial: source.billableMaterial },
+    canBuildFromApproved: generated.length > 0,
+    hasPersistedDraft: Boolean(source.saved),
     canManage: canManageWorkOrderFinance(user.role),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -181,6 +198,59 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
   }
+
+  if (String(body.action ?? "") === "rebuild") {
+    const source = await sourceData(id, companyId);
+    const locked = String(source.saved?.status ?? "");
+    if (locked === "ready" || locked === "exported") {
+      return NextResponse.json({
+        error: "Ett klart eller exporterat underlag kan inte byggas om. Spara det som utkast först om raderna ska räknas om från attestering.",
+      }, { status: 409 });
+    }
+    const validLines = linesFromApproved(source);
+    if (validLines.length === 0) {
+      return NextResponse.json({
+        error: "Inga attesterade tid- eller materialrader finns. Godkänn rader under Ekonomi och fakturering först.",
+      }, { status: 409 });
+    }
+    const discountPercent = num(source.saved?.discountPercent);
+    const vatPercent = num(source.saved?.vatPercent, 25);
+    const dueDays = Math.round(num(source.saved?.dueDays, 30));
+    const { subtotal, discount, net, vat, total } = totalsFor(validLines, discountPercent, vatPercent);
+    const payload: InvoiceDraftPayload = {
+      versionId: crypto.randomUUID(),
+      workOrderId: id,
+      status: "draft",
+      customerName: String(source.saved?.customerName ?? "").trim().slice(0, 200),
+      customerOrgNumber: String(source.saved?.customerOrgNumber ?? "").trim().slice(0, 50),
+      customerReference: String(source.saved?.customerReference ?? "").trim().slice(0, 200),
+      invoiceDate: String(source.saved?.invoiceDate ?? new Date().toISOString().slice(0, 10)),
+      dueDays,
+      discountPercent,
+      vatPercent,
+      note: String(source.saved?.note ?? "").trim().slice(0, 2000),
+      lines: validLines,
+      subtotal,
+      discount,
+      net,
+      vat,
+      total,
+      updatedById: user.id,
+      updatedAt: new Date().toISOString(),
+    };
+    const draft = await db.$transaction(async (tx) => {
+      const persistedDraft = await createInvoiceDraft(companyId, payload, tx);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.invoice_basis_rebuilt",
+        metadata: { versionId: payload.versionId, subtotal, vat, total, lineCount: validLines.length, storage: "WorkOrderInvoiceDraft" },
+      }, tx);
+      return persistedDraft;
+    });
+    return NextResponse.json({ draft }, { status: 201 });
+  }
+
   const status = String(body.status ?? "draft");
   if (status === "exported") {
     return NextResponse.json({

@@ -217,4 +217,88 @@ describe("work-order invoice basis material approval", () => {
     expect(createInvoiceDraftMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
+
+  it("tells the UI when approved rows can rebuild an empty persisted draft", async () => {
+    listTimeEntriesMock.mockResolvedValue([{ status: "approved", billable: true, kind: "work", minutes: 60 }]);
+    getLatestInvoiceDraftMock.mockResolvedValue({
+      status: "draft",
+      customerName: "Kund AB",
+      lines: [],
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.canBuildFromApproved).toBe(true);
+    expect(body.hasPersistedDraft).toBe(true);
+    expect(body.draft.lines).toEqual([]);
+  });
+
+  it("rebuilds draft lines from approved time without using client-supplied rows", async () => {
+    listTimeEntriesMock.mockResolvedValue([{ status: "approved", billable: true, kind: "work", minutes: 90 }]);
+    getLatestInvoiceDraftMock.mockResolvedValue({
+      status: "draft",
+      customerName: "Kund AB",
+      customerOrgNumber: "556000-0000",
+      vatPercent: 25,
+      dueDays: 30,
+      discountPercent: 0,
+      lines: [],
+    });
+
+    const response = await POST(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "rebuild", lines: [] }),
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(createInvoiceDraftMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({
+        workOrderId: "wo-1",
+        status: "draft",
+        customerName: "Kund AB",
+        lines: [expect.objectContaining({ type: "labor", unit: "tim", quantity: 1.5, unitPrice: 650 })],
+      }),
+      tx,
+    );
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "work_order.invoice_basis_rebuilt" }),
+      tx,
+    );
+    expect(body.draft.status).toBe("draft");
+  });
+
+  it("does not rebuild a ready invoice draft", async () => {
+    listTimeEntriesMock.mockResolvedValue([{ status: "approved", billable: true, kind: "work", minutes: 60 }]);
+    getLatestInvoiceDraftMock.mockResolvedValue({ status: "ready", customerName: "Kund AB", lines: [] });
+
+    const response = await POST(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "rebuild" }),
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("klart");
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("does not rebuild when nothing is attested", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "rebuild" }),
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("attesterade");
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+  });
 });
