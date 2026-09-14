@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -138,7 +139,13 @@ export function DemoRequestForm() {
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="max-w-md text-[11px] leading-5 text-ink-500">Genom att skicka formuläret godkänner du att uppgifterna behandlas för att hantera din förfrågan. Läs mer i Revaltas integritetspolicy.</p>
+        <p className="max-w-md text-[11px] leading-5 text-ink-500">
+          Genom att skicka formuläret godkänner du att uppgifterna behandlas för att hantera din förfrågan. Läs mer i{" "}
+          <Link href="/juridik/integritet" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+            Revaltas integritetspolicy
+          </Link>
+          .
+        </p>
         <button type="submit" disabled={submitting} className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 disabled:cursor-not-allowed disabled:opacity-60">
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
           {submitting ? "Skickar…" : "Skicka demoförfrågan"}
