@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   activeDashboardSectionId,
   isDashboardNavItemActive,
+  rememberedExpandedSectionId,
   staffAdministrationNavigation,
   staffPrimaryNavigation,
   visibleDashboardItems,
@@ -95,5 +96,12 @@ describe("dashboard navigation v2", () => {
     expect(activeDashboardSectionId("/dashboard/energi", sections)).toBe("ekonomi-analys");
     expect(activeDashboardSectionId("/dashboard/dokument", sections)).toBe("dokument-projekt");
     expect(activeDashboardSectionId("/dashboard/integrationer", sections)).toBeNull();
+  });
+
+  it("behåller senast öppna modul när användaren går till primära ytor", () => {
+    expect(rememberedExpandedSectionId("drift", null)).toBe("drift");
+    expect(rememberedExpandedSectionId("drift", "ekonomi-analys")).toBe("ekonomi-analys");
+    expect(rememberedExpandedSectionId(null, "boende-uthyrning")).toBe("boende-uthyrning");
+    expect(rememberedExpandedSectionId(null, null)).toBeNull();
   });
 });
