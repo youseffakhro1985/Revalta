@@ -62,6 +62,9 @@ vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
 vi.mock("@/lib/vendor-notify", () => ({
   notifyVendor: vi.fn().mockResolvedValue({ emailed: false }),
 }));
+vi.mock("@/lib/assignee-notify", () => ({
+  notifyAssignee: vi.fn().mockResolvedValue({ emailed: false }),
+}));
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },

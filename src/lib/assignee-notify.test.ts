@@ -8,7 +8,12 @@ vi.mock("@/lib/integrations", () => ({
   queueTicketNotification: queueTicketNotificationMock,
 }));
 
-import { assigneeAssignedEmailCopy, notifyAssignee } from "./assignee-notify";
+import {
+  assigneeAssignedEmailCopy,
+  assigneeCompletedEmailCopy,
+  assigneePausedEmailCopy,
+  notifyAssignee,
+} from "./assignee-notify";
 
 describe("assignee-notify", () => {
   beforeEach(() => {
@@ -32,6 +37,34 @@ describe("assignee-notify", () => {
     expect(copy.subject).toBe("Tilldelad: Läckande kran");
     expect(copy.text).toContain("https://www.revalta.se/dashboard/felanmalan/ticket-1");
     expect(copy.text).not.toContain("token=");
+  });
+
+  it("names a paused work order with a status label and staff deep link", () => {
+    const copy = assigneePausedEmailCopy({
+      id: "wo-1",
+      title: "Filterbyte",
+      kind: "work_order",
+      notifyKind: "paused",
+      pauseLabel: "Väntar material",
+    });
+    expect(copy.subject).toBe("Pausad: Filterbyte");
+    expect(copy.text).toContain("Väntar material");
+    expect(copy.text).toContain("https://www.revalta.se/dashboard/arbetsorder/wo-1");
+    expect(copy.text).not.toContain("token=");
+    expect(copy.text).not.toContain("statusReason");
+  });
+
+  it("names a completed work order with a staff deep link and no amounts", () => {
+    const copy = assigneeCompletedEmailCopy({
+      id: "wo-1",
+      title: "Filterbyte",
+      kind: "work_order",
+      notifyKind: "completed",
+    });
+    expect(copy.subject).toBe("Slutförd: Filterbyte");
+    expect(copy.text).toContain("slutförd");
+    expect(copy.text).toContain("https://www.revalta.se/dashboard/arbetsorder/wo-1");
+    expect(copy.text).not.toMatch(/\d+\s*kr/i);
   });
 
   it("emails a new assignee and skips self-assignment", async () => {
@@ -61,6 +94,49 @@ describe("assignee-notify", () => {
       kind: "work_order",
       assigneeId: "tech-1",
       assigneeEmail: "tech@example.se",
+    })).resolves.toEqual({ emailed: false });
+    expect(queueTicketNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("emails pause and complete notices and still skips self-actions", async () => {
+    const actor = { id: "manager-1", company_id: "company-1" };
+    const target = {
+      id: "wo-1",
+      title: "Filterbyte",
+      kind: "work_order" as const,
+      assigneeId: "tech-1",
+      assigneeEmail: "tech@example.se",
+    };
+
+    await expect(notifyAssignee(actor, {
+      ...target,
+      notifyKind: "paused",
+      pauseLabel: "Blockerad",
+    })).resolves.toEqual({ emailed: true });
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      actor,
+      expect.objectContaining({
+        emailContent: expect.objectContaining({
+          subject: "Pausad: Filterbyte",
+        }),
+      }),
+    );
+
+    queueTicketNotificationMock.mockClear();
+    await expect(notifyAssignee(actor, { ...target, notifyKind: "completed" })).resolves.toEqual({ emailed: true });
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      actor,
+      expect.objectContaining({
+        emailContent: expect.objectContaining({
+          subject: "Slutförd: Filterbyte",
+        }),
+      }),
+    );
+
+    queueTicketNotificationMock.mockClear();
+    await expect(notifyAssignee({ id: "tech-1", company_id: "company-1" }, {
+      ...target,
+      notifyKind: "completed",
     })).resolves.toEqual({ emailed: false });
     expect(queueTicketNotificationMock).not.toHaveBeenCalled();
   });

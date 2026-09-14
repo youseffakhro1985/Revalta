@@ -19,6 +19,7 @@ const {
   vendorFindFirstMock,
   ticketFindFirstMock,
   notifyTicketReporterMock,
+  notifyAssigneeMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
@@ -36,6 +37,7 @@ const {
   vendorFindFirstMock: vi.fn(),
   ticketFindFirstMock: vi.fn(),
   notifyTicketReporterMock: vi.fn(),
+  notifyAssigneeMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", () => ({
@@ -69,6 +71,9 @@ vi.mock("@/lib/vendor-notify", () => ({
 vi.mock("@/lib/ticket-reporter-notify", () => ({
   notifyTicketReporter: (...args: unknown[]) => notifyTicketReporterMock(...args),
 }));
+vi.mock("@/lib/assignee-notify", () => ({
+  notifyAssignee: (...args: unknown[]) => notifyAssigneeMock(...args),
+}));
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },
@@ -97,7 +102,13 @@ function user(role = "manager") {
 }
 
 function workOrder(status: string) {
-  return { id: "wo-1", title: "Test", status, assigned_to_id: status === "assigned_elsewhere" ? "other" : "tech-1" };
+  return {
+    id: "wo-1",
+    title: "Test",
+    status,
+    assigned_to_id: status === "assigned_elsewhere" ? "other" : "tech-1",
+    assigned_to: { email: "tech@example.se" },
+  };
 }
 
 function sqlText(query: unknown) {
@@ -122,6 +133,7 @@ describe("work-order execution lifecycle boundaries", () => {
     vendorFindFirstMock.mockResolvedValue(null);
     ticketFindFirstMock.mockResolvedValue(null);
     notifyTicketReporterMock.mockResolvedValue({ emailed: false, sms: false });
+    notifyAssigneeMock.mockResolvedValue({ emailed: false });
   });
 
   it.each([
@@ -326,6 +338,37 @@ describe("work-order execution lifecycle boundaries", () => {
         reporter_email: "boende@example.se",
       }),
       "updated",
+    );
+  });
+
+  it("emails the assigned technician after a successful finalize", async () => {
+    workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
+    queryRawMock.mockResolvedValue([{ required_incomplete: 0, before_photos: 1, after_photos: 1 }]);
+    const tx = {
+      $queryRaw: vi.fn().mockImplementation(async (query: unknown) => {
+        const text = sqlText(query);
+        if (text.includes("total_cost")) return [{ total_cost: 80 }];
+        if (text.includes("completion_due_at")) return [{ completion_due_at: null }];
+        if (text.includes("WorkOrderExecutionEntry")) return [];
+        return [];
+      }),
+    };
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
+    notifyAssigneeMock.mockResolvedValue({ emailed: true });
+
+    const response = await POST(request({ action: "completion.finalize" }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyAssigneeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", company_id: "company-1" }),
+      expect.objectContaining({
+        id: "wo-1",
+        title: "Test",
+        kind: "work_order",
+        assigneeId: "tech-1",
+        assigneeEmail: "tech@example.se",
+        notifyKind: "completed",
+      }),
     );
   });
 });
