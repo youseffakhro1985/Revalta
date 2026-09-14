@@ -182,4 +182,42 @@ describe("POST /api/demo-request", () => {
     expect(mocks.integrationEventCreate).toHaveBeenCalledTimes(1);
     expect(mocks.deliverDemoRequest).toHaveBeenCalledTimes(1);
   });
+
+  it("accepts a native form post and redirects to demo without putting the email in the URL", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/demo-request", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: "https://www.revalta.se",
+        "sec-fetch-site": "same-origin",
+      },
+      body: "name=Anna+Andersson&email=ANNA%40example.se&company=Exempel+Fastigheter+AB&phone=0701234567&role=F%C3%B6rvaltare&portfolio=12+fastigheter&message=Vi+vill+se+arbetsorder.&website=",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/demo?sent=1");
+    expect(response.headers.get("location")).not.toContain("ANNA");
+    expect(response.headers.get("location")).not.toContain("example.se");
+    expect(mocks.integrationEventCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        recipient: "anna@example.se",
+      }),
+    }));
+  });
+
+  it("returns the native form to demo with a generic reason when contact data is invalid", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/demo-request", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        origin: "https://www.revalta.se",
+        "sec-fetch-site": "same-origin",
+      },
+      body: "name=A&email=inte-en-email&company=AB&website=",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/demo?reason=invalid");
+    expect(mocks.integrationEventCreate).not.toHaveBeenCalled();
+  });
 });

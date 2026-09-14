@@ -23,7 +23,12 @@ const points = [
   "Rollstyrda vyer för förvaltning och boendeportal",
 ];
 
-export default function DemoPage() {
+export default async function DemoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sent?: string; reason?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <div className="min-h-screen bg-[#FAFAF8] text-ink-950">
       <MarketingHeader />
@@ -69,7 +74,7 @@ export default function DemoPage() {
               </p>
             </div>
 
-            <DemoRequestForm />
+            <DemoRequestForm initialSent={params.sent === "1"} initialReason={params.reason} />
           </div>
         </section>
       </main>
