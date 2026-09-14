@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { pickTenantSafeTicket, swedishPhoneVariants } from "@/lib/sms-inbound-phone";
 import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/integrations/sms/inbound" });
@@ -53,6 +54,19 @@ async function parsePayload(request: Request) {
   return Object.fromEntries(params.entries()) as Record<string, unknown>;
 }
 
+async function attachResidentComment(ticket: { id: string; user_id: string }, from: string, message: string) {
+  await db.ticketComment.create({
+    data: {
+      ticket_id: ticket.id,
+      user_id: ticket.user_id,
+      body: message || `Inkommande SMS från ${from || "okänt nummer"}`,
+      is_internal: false,
+      author_type: "resident",
+      author_name: from || "SMS",
+    },
+  });
+}
+
 export async function POST(request: Request) {
   try {
     if (!inboundSecret()) {
@@ -70,6 +84,8 @@ export async function POST(request: Request) {
 
     let ticketId: string | null = null;
     let companyId: string | null = null;
+    let matchMethod: "reference" | "phone" | null = null;
+
     if (reference) {
       const ticket = await db.ticket.findFirst({
         where: { public_reference: reference, deleted_at: null },
@@ -78,16 +94,24 @@ export async function POST(request: Request) {
       if (ticket) {
         ticketId = ticket.id;
         companyId = ticket.company_id;
-        await db.ticketComment.create({
-          data: {
-            ticket_id: ticket.id,
-            user_id: ticket.user_id,
-            body: message || `Inkommande SMS från ${from || "okänt nummer"}`,
-            is_internal: false,
-            author_type: "resident",
-            author_name: from || "SMS",
-          },
-        });
+        matchMethod = "reference";
+        await attachResidentComment(ticket, from, message);
+      }
+    }
+
+    if (!ticketId && from) {
+      const tickets = await db.ticket.findMany({
+        where: { deleted_at: null, reporter_phone: { in: swedishPhoneVariants(from) } },
+        select: { id: true, company_id: true, user_id: true, status: true },
+        orderBy: { created_at: "desc" },
+        take: 40,
+      });
+      const ticket = pickTenantSafeTicket(tickets);
+      if (ticket) {
+        ticketId = ticket.id;
+        companyId = ticket.company_id;
+        matchMethod = "phone";
+        await attachResidentComment(ticket, from, message);
       }
     }
 
@@ -102,6 +126,7 @@ export async function POST(request: Request) {
           providerId: providerId || null,
           ticketId,
           reference: reference || null,
+          matchMethod,
           messagePreview: message.slice(0, 140),
         },
       },
