@@ -228,6 +228,7 @@ export async function GET(request: Request) {
       : [];
     const classificationById = new Map<string, "provider" | "fallback" | "staff">();
     for (const audit of classificationAudits) {
+      if (!audit.entity_id) continue;
       const metadata = (audit.metadata || {}) as Record<string, unknown>;
       const source = metadata.classificationSource;
       if (source === "provider" || source === "fallback" || source === "staff") {
