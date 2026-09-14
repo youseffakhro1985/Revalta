@@ -38,6 +38,16 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/felanmalan", "viewer")).toBeNull();
   });
 
+  it("visar nytt skadeärende i skademodulen för roller som hanterar försäkring", () => {
+    expect(dashboardPrimaryCreateAction("/dashboard/skador", "owner")).toEqual({
+      href: "/dashboard/skador?create=1",
+      label: "Nytt skadeärende",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/skador", "manager")?.label).toBe("Nytt skadeärende");
+    expect(dashboardPrimaryCreateAction("/dashboard/skador", "viewer")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/skador", "technician")).toBeNull();
+  });
+
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "owner")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/dokument", "owner")).toBeNull();

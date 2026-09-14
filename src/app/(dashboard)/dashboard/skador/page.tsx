@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CircleDollarSign, Download, FileWarning, Search, ShieldAlert, WalletCards } from "lucide-react";
 import {
   EmptyState,
@@ -57,6 +58,7 @@ function csvCell(value: unknown) {
 }
 
 export default function InsuranceClaimsPage() {
+  const router = useRouter();
   const [claims, setClaims] = useState<Claim[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -91,6 +93,20 @@ export default function InsuranceClaimsPage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  function closeCreate() {
+    setCreateOpen(false);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    params.delete("create");
+    const query = params.toString();
+    router.replace(query ? `${window.location.pathname}?${query}` : window.location.pathname);
+  }
+
+  useEffect(() => {
+    if (!canManage) return;
+    if (new URLSearchParams(window.location.search).get("create") === "1") setCreateOpen(true);
+  }, [canManage]);
 
   const openClaims = claims.filter((claim) => !closedStatuses.has(claim.status || "")).length;
   const totalEstimated = useMemo(() => claims.reduce((sum, claim) => sum + Number(claim.estimated_cost || 0), 0), [claims]);
@@ -136,7 +152,7 @@ export default function InsuranceClaimsPage() {
       const data = await readResponseJson(response);
       if (!response.ok) throw new Error(data.error || "Kunde inte registrera skadeärendet");
       event.currentTarget.reset();
-      setCreateOpen(false);
+      closeCreate();
       setSuccess("Skadeärendet har registrerats.");
       await load();
     } catch (value) {
@@ -209,7 +225,7 @@ export default function InsuranceClaimsPage() {
   }
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Risk och försäkring" title="Skador och försäkringsärenden" description="Följ händelser, försäkringsdialog, ekonomiska konsekvenser och nästa steg i en samlad riskvy." action={canManage ? <button type="button" onClick={() => setCreateOpen((value) => !value)} className={`${premiumPrimaryButtonClass} w-full sm:w-auto`}>{createOpen ? "Stäng registrering" : "Nytt skadeärende"}</button> : undefined} />
+    <PageHeader eyebrow="Risk och försäkring" title="Skador och försäkringsärenden" description="Följ händelser, försäkringsdialog, ekonomiska konsekvenser och nästa steg i en samlad riskvy." action={canManage ? <button type="button" onClick={() => (createOpen ? closeCreate() : setCreateOpen(true))} className={`${premiumPrimaryButtonClass} w-full sm:w-auto`}>{createOpen ? "Stäng registrering" : "Nytt skadeärende"}</button> : undefined} />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={ShieldAlert} label="Öppna ärenden" value={openClaims} hint="Pågående försäkrings- eller åtgärdsflöden" />
@@ -240,7 +256,7 @@ export default function InsuranceClaimsPage() {
             <input name="compensation" type="number" min="0" placeholder="Ersättning" className={premiumFieldClass} aria-label="Ersättning" />
           </div>
           <textarea name="note" placeholder="Anteckning, försäkringsdialog och nästa steg" className={premiumTextareaClass} aria-label="Anteckning och nästa steg" />
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => setCreateOpen(false)} className={premiumSecondaryButtonClass}>Avbryt</button><button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Registrera skadeärende"}</button></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => closeCreate()} className={premiumSecondaryButtonClass}>Avbryt</button><button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Registrera skadeärende"}</button></div>
         </form>
       </Panel>
     ) : null}
