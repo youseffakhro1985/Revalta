@@ -21,6 +21,8 @@ describe("login form", () => {
     expect(source).toContain("Ange både e-post och lösenord.");
     expect(source).toContain("Ange en giltig e-postadress.");
     expect(source).toContain("isValidEmail");
+    expect(source).toContain('get("reset") === "1"');
+    expect(source).toContain("Lösenordet är återställt. Logga in med det nya lösenordet.");
     expect(source).not.toContain("••••");
   });
 });

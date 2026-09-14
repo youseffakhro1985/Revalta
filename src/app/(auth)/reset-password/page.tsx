@@ -2,20 +2,36 @@
 
 import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 import { readResponseJson } from "@/lib/fetch-json";
+import { passwordPolicyMessage } from "@/lib/security";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 function ResetPasswordForm() {
-  const token = useSearchParams().get("token") || "";
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") || "";
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  async function submit(event: React.FormEvent) {
+  useEffect(() => {
+    setHydrated(true);
+    const reason = searchParams.get("reason");
+    if (reason === "invalid") setError("Länken är ogiltig eller har gått ut");
+    if (reason === "mismatch") setError("Lösenorden matchar inte");
+    if (reason === "policy") setError(passwordPolicyMessage);
+    if (reason === "rate") setError("För många försök. Vänta en stund och prova igen.");
+    if (reason === "error") setError("Kunde inte återställa lösenordet");
+  }, [searchParams]);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hydrated || loading) return;
+    const form = new FormData(event.currentTarget);
+    const submittedToken = String(form.get("token") || "");
+    const password = String(form.get("password") || "");
+    const confirmPassword = String(form.get("confirmPassword") || "");
     setError("");
     setMessage("");
     if (password !== confirmPassword) {
@@ -27,15 +43,13 @@ function ResetPasswordForm() {
       const response = await fetch("/api/auth/password-reset/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password, confirmPassword }),
+        body: JSON.stringify({ token: submittedToken, password, confirmPassword }),
       });
       const data = await readResponseJson(response);
       if (!response.ok) {
         setError(data.error || "Kunde inte återställa lösenordet");
       } else {
         setMessage(data.message || "Lösenordet är återställt.");
-        setPassword("");
-        setConfirmPassword("");
       }
     } catch {
       setError("Kunde inte kontakta servern");
@@ -58,20 +72,30 @@ function ResetPasswordForm() {
       {error ? <AuthAlert>{error}</AuthAlert> : null}
       {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
       {!token ? <AuthAlert tone="neutral">Återställningslänken saknar en giltig token. Begär en ny länk från inloggningssidan.</AuthAlert> : null}
-      <form onSubmit={submit} className="mt-7 space-y-5">
+      <form
+        id="reset-password-form"
+        method="post"
+        action="/api/auth/password-reset/confirm"
+        noValidate
+        data-ready={hydrated ? "1" : "0"}
+        onSubmit={submit}
+        aria-busy={loading}
+        className="mt-7 space-y-5"
+      >
+        <input type="hidden" name="token" value={token} />
         <div>
           <label htmlFor="reset-password" className="block text-sm font-medium text-ink-700">
             Nytt lösenord
           </label>
           <input
             id="reset-password"
+            name="password"
             type="password"
             required
             minLength={10}
             maxLength={128}
             autoComplete="new-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            defaultValue=""
             className={authInputClass}
           />
         </div>
@@ -81,18 +105,18 @@ function ResetPasswordForm() {
           </label>
           <input
             id="reset-password-confirmation"
+            name="confirmPassword"
             type="password"
             required
             minLength={10}
             maxLength={128}
             autoComplete="new-password"
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
+            defaultValue=""
             className={authInputClass}
           />
         </div>
         <p className="text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
-        <button type="submit" disabled={loading || !token || Boolean(message)} className={authButtonClass}>
+        <button type="submit" disabled={!hydrated || loading || !token || Boolean(message)} className={authButtonClass}>
           {loading ? "Sparar..." : message ? "Lösenord sparat" : "Spara nytt lösenord"}
         </button>
       </form>
