@@ -7,5 +7,7 @@ describe("work-order execution completion copy", () => {
     expect(source).toContain("avslutmejl");
     expect(source).toContain("Kopplat ärende meddelar anmälaren");
     expect(source).toContain("completion.finalize");
+    expect(source).toContain("bygga fakturaunderlag");
+    expect(source).toContain("spara utkast skapar inte rader");
   });
 });
