@@ -204,4 +204,55 @@ describe("POST /api/public/tickets", () => {
     expect(response.status).toBe(503);
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("accepts a native form post and redirects to the portal without putting the reporter email in the URL", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/public/tickets?companySlug=demo", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "reporterName=Anna+Boende&reporterEmail=anna%40example.com&title=L%C3%A4ckage+i+k%C3%B6k&description=Det+droppar+under+diskb%C3%A4nken+sedan+i+morse.&companySlug=demo",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "https://www.revalta.se/portal/demo?created=1&ref=RV-2026-ABC123&token=token-1",
+    );
+    expect(response.headers.get("location")).not.toContain("anna");
+    expect(response.headers.get("location")).not.toContain("example.com");
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(ticketCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        company_id: "company-1",
+        reporter_email: "anna@example.com",
+        title: "Läckage i kök",
+      }),
+    }));
+  });
+
+  it("returns the native form to the portal with a generic reason when the description is too short", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/public/tickets?companySlug=demo", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "reporterName=Anna+Boende&reporterEmail=anna%40example.com&title=L%C3%A4ckage&description=kort&companySlug=demo",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/portal/demo?reason=invalid");
+    expect(response.headers.get("location")).not.toContain("anna");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the native form to the portal when tracking is unavailable", async () => {
+    hasPortalTrackingConfigMock.mockReturnValue(false);
+
+    const response = await POST(new Request("https://www.revalta.se/api/public/tickets?companySlug=demo", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "reporterName=Anna+Boende&reporterEmail=anna%40example.com&title=L%C3%A4ckage+i+k%C3%B6k&description=Det+droppar+under+diskb%C3%A4nken+sedan+i+morse.&companySlug=demo",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/portal/demo?reason=unavailable");
+    expect(analyzeTicketMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

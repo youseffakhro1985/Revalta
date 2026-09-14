@@ -115,25 +115,40 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const reason = params.get("reason");
+    if (reason === "invalid") setError("Kontrollera namn, e-post, fastighet, rubrik och beskrivning.");
+    if (reason === "rate") setError("För många försök. Vänta en stund och prova igen.");
+    if (reason === "unavailable") setError("Boendeportalen är inte tillgänglig just nu.");
+    if (reason === "error") setError("Något gick fel. Försök igen.");
+
+    const created = params.get("created") === "1";
     const ref = params.get("ref")?.trim();
     const token = params.get("token")?.trim() || "";
     const email = params.get("email")?.trim() || "";
+    if (created && ref) {
+      setCreatedReference(ref.toUpperCase());
+      setSuccess("Tack! Ärendet är mottaget och skickat till förvaltningen.");
+    }
     if (!ref) return;
     setReference(ref.toUpperCase());
     if (token) setTrackingToken(token);
     if (email) setTrackEmail(email);
     void (async () => {
-      setError("");
-      setSuccess("");
+      if (!created) {
+        setError("");
+        setSuccess("");
+      }
       setLoading(true);
       try {
         await loadTrackedTicket(ref, email, token);
-        setSuccess("Ärendet hittades.");
+        if (!created) setSuccess("Ärendet hittades.");
         if (params.get("feedback") === "1") {
           document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Kunde inte hitta ärendet");
+        if (!created) {
+          setError(loadError instanceof Error ? loadError.message : "Kunde inte hitta ärendet");
+        }
       } finally {
         setLoading(false);
       }
@@ -352,14 +367,21 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
 
             <div className="rounded-2xl border border-sand-200 bg-white p-6 sm:p-8 shadow-premium-lg">
               <h2 className="text-2xl font-semibold text-ink-950">Skapa felanmälan</h2>
-              <form onSubmit={createTicket} className="mt-6 space-y-4">
+              <form
+                id="public-ticket-form"
+                method="post"
+                action={withCompanySlug("/api/public/tickets", companySlug)}
+                onSubmit={createTicket}
+                className="mt-6 space-y-4"
+              >
+                {companySlug ? <input type="hidden" name="companySlug" value={companySlug} /> : null}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <label><span className="sr-only">Ditt namn</span><input required autoComplete="name" maxLength={120} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Ditt namn" /></label>
-                  <label><span className="sr-only">E-post</span><input required type="email" autoComplete="email" maxLength={254} value={reporterEmail} onChange={(event) => setReporterEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="E-post" /></label>
-                  <label><span className="sr-only">Telefon</span><input type="tel" autoComplete="tel" maxLength={40} value={reporterPhone} onChange={(event) => setReporterPhone(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Telefon" /></label>
-                  <label><span className="sr-only">Lägenhet eller lokal</span><input autoComplete="address-line2" maxLength={80} value={reporterUnit} onChange={(event) => setReporterUnit(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Lägenhet/lokal" /></label>
+                  <label><span className="sr-only">Ditt namn</span><input required name="reporterName" autoComplete="name" maxLength={120} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Ditt namn" /></label>
+                  <label><span className="sr-only">E-post</span><input required name="reporterEmail" type="email" autoComplete="email" maxLength={254} value={reporterEmail} onChange={(event) => setReporterEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="E-post" /></label>
+                  <label><span className="sr-only">Telefon</span><input name="reporterPhone" type="tel" autoComplete="tel" maxLength={40} value={reporterPhone} onChange={(event) => setReporterPhone(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Telefon" /></label>
+                  <label><span className="sr-only">Lägenhet eller lokal</span><input name="reporterUnit" autoComplete="address-line2" maxLength={80} value={reporterUnit} onChange={(event) => setReporterUnit(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Lägenhet/lokal" /></label>
                 </div>
-                <label className="block"><span className="sr-only">Fastighet</span><select value={propertyId} onChange={(event) => setPropertyId(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all text-ink-900">
+                <label className="block"><span className="sr-only">Fastighet</span><select name="propertyId" value={propertyId} onChange={(event) => setPropertyId(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all text-ink-900">
                   <option value="">Välj fastighet om den finns i listan</option>
                   {properties.map((property) => (
                     <option key={property.id} value={property.id}>
@@ -368,8 +390,8 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                     </option>
                   ))}
                 </select></label>
-                <label className="block"><span className="sr-only">Ärendets rubrik</span><input required minLength={3} maxLength={180} value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Rubrik, t.ex. Trasig portlampa" /></label>
-                <label className="block"><span className="sr-only">Beskriv felet</span><textarea required minLength={10} maxLength={5_000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Beskriv felet tydligt..." /></label>
+                <label className="block"><span className="sr-only">Ärendets rubrik</span><input required name="title" minLength={3} maxLength={180} value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Rubrik, t.ex. Trasig portlampa" /></label>
+                <label className="block"><span className="sr-only">Beskriv felet</span><textarea required name="description" minLength={10} maxLength={5_000} rows={5} value={description} onChange={(event) => setDescription(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Beskriv felet tydligt..." /></label>
                 <button type="submit" disabled={loading} className="w-full rounded-xl bg-petroleum-600 px-6 py-3.5 text-sm font-semibold text-white shadow-premium-sm transition-all hover:bg-petroleum-700 disabled:opacity-70 mt-2">
                   {loading ? "Skickar..." : "Skicka felanmälan"}
                 </button>
