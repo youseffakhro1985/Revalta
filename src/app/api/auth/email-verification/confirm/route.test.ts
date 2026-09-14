@@ -150,6 +150,39 @@ describe("POST /api/auth/email-verification/confirm", () => {
     );
   });
 
+  it("accepts a native form post and redirects to login without putting the token in the URL", async () => {
+    tokenFindUniqueMock.mockResolvedValue(validVerification());
+
+    const response = await POST(new Request("https://www.revalta.se/api/auth/email-verification/confirm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: `token=${token}`,
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/login?verified=1");
+    expect(response.headers.get("location")).not.toContain(token);
+    expect(userUpdateMock).toHaveBeenCalled();
+  });
+
+  it("returns the native form to verify-email when the token is malformed", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/auth/email-verification/confirm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "token=short",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/verify-email?reason=invalid");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("returns a safe correlated failure when persistence fails", async () => {
     transactionMock.mockRejectedValue(new Error("database details"));
 

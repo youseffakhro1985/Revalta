@@ -1,22 +1,62 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { writeAuditLog } from "@/lib/audit";
 import { hashResetToken } from "@/lib/auth";
 import db from "@/lib/db";
 import { createRouteObservability } from "@/lib/route-observability";
 
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readVerificationToken(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return String(form?.get("token") || "");
+  }
+  const body = await request.json().catch(() => ({})) as { token?: unknown };
+  return typeof body.token === "string" ? body.token : "";
+}
+
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, "/api/auth/email-verification/confirm");
-  const invalidTokenResponse = () => apiErrorResponse({
-    status: 400,
-    code: API_ERROR_CODES.validationFailed,
-    message: "Verifieringslänken är ogiltig eller har gått ut",
-    requestId: observability.requestId,
-  });
+  const nativeForm = isNativeFormPost(request);
+  const fail = (
+    status: number,
+    code: (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES],
+    message: string,
+    reason: "invalid" | "error",
+    token?: string,
+  ) => {
+    if (!nativeForm) {
+      return apiErrorResponse({
+        status,
+        code,
+        message,
+        requestId: observability.requestId,
+      });
+    }
+    const url = new URL("/verify-email", getPublicAppUrl(request.url));
+    url.searchParams.set("reason", reason);
+    if (token && token.length === 64) url.searchParams.set("token", token);
+    const response = NextResponse.redirect(url, 303);
+    response.headers.set("Cache-Control", "no-store");
+    return observability.correlate(response);
+  };
+  const invalidTokenResponse = (token?: string) => fail(
+    400,
+    API_ERROR_CODES.validationFailed,
+    "Verifieringslänken är ogiltig eller har gått ut",
+    "invalid",
+    token,
+  );
 
+  let token = "";
   try {
-    const body = await request.json().catch(() => ({})) as { token?: unknown };
-    const token = typeof body.token === "string" ? body.token : "";
+    token = await readVerificationToken(request);
     if (token.length !== 64) return invalidTokenResponse();
 
     const tokenHash = hashResetToken(token);
@@ -73,26 +113,29 @@ export async function POST(request: Request) {
       return verification.user;
     });
 
-    if (!verifiedUser) return invalidTokenResponse();
+    if (!verifiedUser) return invalidTokenResponse(token);
 
-    const response = NextResponse.json(
-      { success: true },
-      { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
-    );
     observability.logger.info("auth email verification completed", observability.elapsed({
       event: "auth.email_verification.completed",
       userId: verifiedUser.id,
     }));
+    if (nativeForm) {
+      const url = new URL("/login", getPublicAppUrl(request.url));
+      url.searchParams.set("verified", "1");
+      const response = NextResponse.redirect(url, 303);
+      response.headers.set("Cache-Control", "no-store");
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      return observability.correlate(response);
+    }
+    const response = NextResponse.json(
+      { success: true },
+      { headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } },
+    );
     return observability.correlate(response);
   } catch (error) {
     observability.logger.error("auth email verification failed", error, observability.elapsed({
       event: "auth.email_verification.failed",
     }));
-    return apiErrorResponse({
-      status: 500,
-      code: API_ERROR_CODES.internalError,
-      message: "Internt serverfel",
-      requestId: observability.requestId,
-    });
+    return fail(500, API_ERROR_CODES.internalError, "Internt serverfel", "error", token);
   }
 }

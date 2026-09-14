@@ -3,7 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { AuthAlert, AuthShell, authButtonClass } from "@/components/auth/auth-shell";
 
 function VerifyEmailForm() {
@@ -12,8 +12,19 @@ function VerifyEmailForm() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
-  async function verify() {
+  useEffect(() => {
+    setHydrated(true);
+    const reason = searchParams.get("reason");
+    if (reason === "invalid") setError("Verifieringslänken är ogiltig eller har gått ut");
+    if (reason === "error") setError("Något gick fel");
+  }, [searchParams]);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!hydrated || loading) return;
+    const submittedToken = String(new FormData(event.currentTarget).get("token") || "");
     setMessage("");
     setError("");
     setLoading(true);
@@ -22,7 +33,7 @@ function VerifyEmailForm() {
       const response = await fetch("/api/auth/email-verification/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ token: submittedToken }),
       });
       const data = await readResponseJson(response);
       if (!response.ok) {
@@ -51,9 +62,21 @@ function VerifyEmailForm() {
       {error ? <AuthAlert>{error}</AuthAlert> : null}
       {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
       {!token ? <AuthAlert tone="neutral">Verifieringslänken saknar en giltig token. Öppna länken från e-postmeddelandet igen.</AuthAlert> : null}
-      <button type="button" disabled={loading || !token || Boolean(message)} onClick={verify} className={`${authButtonClass} mt-7`}>
-        {loading ? "Verifierar..." : message ? "Verifierad" : "Verifiera e-post"}
-      </button>
+      <form
+        id="verify-email-form"
+        method="post"
+        action="/api/auth/email-verification/confirm"
+        noValidate
+        data-ready={hydrated ? "1" : "0"}
+        onSubmit={submit}
+        aria-busy={loading}
+        className="mt-7"
+      >
+        <input type="hidden" name="token" value={token} />
+        <button type="submit" disabled={!hydrated || loading || !token || Boolean(message)} className={authButtonClass}>
+          {loading ? "Verifierar..." : message ? "Verifierad" : "Verifiera e-post"}
+        </button>
+      </form>
     </AuthShell>
   );
 }
