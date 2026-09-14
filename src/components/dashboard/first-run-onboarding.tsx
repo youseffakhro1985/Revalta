@@ -37,21 +37,21 @@ function StepRow({
       </span>
 
       <div className="min-w-0 md:flex md:items-baseline md:gap-2.5">
-        <p className={`shrink-0 text-[12px] font-semibold leading-4 ${step.completed ? "text-ink-600" : "text-ink-900"}`}>{step.title}</p>
-        <p className="mt-0.5 truncate text-[11px] leading-4 text-ink-400 md:mt-0">{step.description}</p>
+        <p className={`shrink-0 text-sm font-semibold leading-4 ${step.completed ? "text-ink-600" : "text-ink-900"}`}>{step.title}</p>
+        <p className="mt-0.5 truncate text-xs leading-4 text-ink-400 md:mt-0">{step.description}</p>
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
         {!step.completed ? (
           <Link
             href={step.href}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-sand-200 bg-white px-2 text-[10px] font-semibold text-petroleum-800 shadow-premium-sm transition hover:border-petroleum-200 hover:bg-petroleum-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300"
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-sand-200 bg-white px-2 text-xs font-semibold text-petroleum-800 shadow-premium-sm transition hover:border-petroleum-200 hover:bg-petroleum-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300"
           >
             <span className="hidden sm:inline">{step.actionLabel}</span>
             <ChevronRight className="h-3 w-3" aria-hidden="true" />
           </Link>
         ) : (
-          <span className="rounded-full border border-sand-200/80 bg-sand-50 px-2 py-0.5 text-[9px] font-semibold text-ink-500">Klar</span>
+          <span className="rounded-full border border-sand-200/80 bg-sand-50 px-2 py-0.5 text-[11px] font-semibold text-ink-500">Klar</span>
         )}
 
         {isTicketIntake && !step.completed ? (
@@ -59,7 +59,7 @@ function StepRow({
             type="button"
             onClick={onVerifyTicketIntake}
             disabled={verifying}
-            className="inline-flex h-7 items-center gap-1 rounded-md bg-petroleum-800 px-2 text-[10px] font-semibold text-white transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1 rounded-md bg-petroleum-800 px-2 text-xs font-semibold text-white transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {verifying ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : null}
             <span className="hidden lg:inline">Markera verifierad</span>
@@ -133,14 +133,14 @@ export function FirstRunOnboarding() {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-petroleum-600">Kom igång med Revalta</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-petroleum-600">Kom igång med Revalta</p>
               <span className="hidden h-1 w-1 rounded-full bg-sand-300 sm:block" aria-hidden="true" />
-              <p className="hidden text-[10px] text-ink-400 sm:block">Fem steg till en komplett arbetsyta</p>
+              <p className="hidden text-xs text-ink-400 sm:block">Fem steg till en komplett arbetsyta</p>
             </div>
             <h2 id="first-run-title" className="mt-0.5 text-[16px] font-semibold tracking-[-0.02em] text-ink-950 sm:text-[17px]">Gör organisationen redo för drift</h2>
           </div>
 
-          <span className="inline-flex shrink-0 items-center rounded-full border border-petroleum-100 bg-petroleum-50 px-2 py-0.5 text-[9px] font-semibold text-petroleum-800">
+          <span className="inline-flex shrink-0 items-center rounded-full border border-petroleum-100 bg-petroleum-50 px-2 py-0.5 text-[11px] font-semibold text-petroleum-800">
             {progress.completedCount}/{progress.totalCount} klara
           </span>
         </div>
@@ -151,7 +151,7 @@ export function FirstRunOnboarding() {
       </div>
 
       {error ? (
-        <div className="mx-4 mt-2 rounded-lg border border-warning-200 bg-warning-50 px-3 py-1.5 text-[11px] text-warning-700 sm:mx-5" role="status">
+        <div className="mx-4 mt-2 rounded-lg border border-warning-200 bg-warning-50 px-3 py-1.5 text-sm text-warning-700 sm:mx-5" role="status">
           {error}
         </div>
       ) : null}
