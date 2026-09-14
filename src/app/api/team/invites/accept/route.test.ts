@@ -238,6 +238,35 @@ describe("team invite accept route", () => {
     expect(signTokenMock).not.toHaveBeenCalled();
   });
 
+  it("accepts a native form post, sets the session cookie and redirects without putting the password in the URL", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/team/invites/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "token=raw-token&name=Boende+Test&password=Password123",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal");
+    expect(response.headers.get("location")).not.toContain("Password");
+    expect(cookieSetMock).toHaveBeenCalledWith(
+      SESSION_COOKIE_NAME,
+      "session-token",
+      expect.any(Object),
+    );
+  });
+
+  it("returns the native form to accept-invite when the password is too weak", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/team/invites/accept", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "token=raw-token&name=Boende+Test&password=short",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/accept-invite?reason=policy&token=raw-token");
+    expect(userCreateMock).not.toHaveBeenCalled();
+  });
+
   it("redirects staff invites to the dashboard", async () => {
     teamInviteFindUniqueMock.mockResolvedValue({
       ...invite,
