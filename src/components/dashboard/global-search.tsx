@@ -29,10 +29,7 @@ import {
   type CommandCenterState,
 } from "@/components/dashboard/command-center-state";
 import {
-  staffPrimaryNavigation,
-  staffSettingsNavigation,
-  visibleDashboardItems,
-  visibleDashboardSections,
+  commandCenterNavigationGroups,
   type DashboardNavItem,
 } from "@/components/dashboard/dashboard-navigation";
 import { readResponseJson } from "@/lib/fetch-json";
@@ -162,14 +159,10 @@ export function GlobalSearch() {
     };
   }, [query]);
 
-  const navigationGroups = useMemo<NavigationGroup[]>(() => {
-    if (!context) return [];
-    return [
-      { label: "Arbetsyta", items: visibleDashboardItems(staffPrimaryNavigation, context.role) },
-      ...visibleDashboardSections(context.role).map((section) => ({ label: section.label, items: section.items })),
-      { label: "Administration", items: [staffSettingsNavigation] },
-    ].filter((group) => group.items.length > 0);
-  }, [context]);
+  const navigationGroups = useMemo<NavigationGroup[]>(
+    () => (context ? commandCenterNavigationGroups(context.role) : []),
+    [context],
+  );
 
   const quickActions = useMemo(() => context ? commandCenterQuickActions(context.role) : [], [context]);
   const normalizedQuery = query.trim();

@@ -170,3 +170,11 @@ export function activeDashboardSectionId(pathname: string, sections: DashboardNa
 export function rememberedExpandedSectionId(current: string | null, detected: string | null) {
   return detected ?? current;
 }
+
+export function commandCenterNavigationGroups(role: string) {
+  return [
+    { label: "Arbetsyta", items: visibleDashboardItems(staffPrimaryNavigation, role) },
+    ...visibleDashboardSections(role).map((section) => ({ label: section.label, items: section.items })),
+    { label: "Administration", items: visibleDashboardItems(staffAdministrationNavigation, role) },
+  ].filter((group) => group.items.length > 0);
+}
