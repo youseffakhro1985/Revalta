@@ -10,6 +10,7 @@ import { dashboardPrimaryCreateAction } from "@/components/dashboard/dashboard-p
 import {
   activeDashboardSectionId,
   isDashboardNavItemActive,
+  rememberedExpandedSectionId,
   residentNavigation,
   staffPrimaryNavigation,
   staffSettingsNavigation,
@@ -85,8 +86,8 @@ function NavigationContent({
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>(detectedSectionId);
 
   useEffect(() => {
-    setExpandedSectionId(detectedSectionId);
-  }, [detectedSectionId, pathname]);
+    setExpandedSectionId((current) => rememberedExpandedSectionId(current, detectedSectionId));
+  }, [detectedSectionId]);
 
   if (resident) {
     return (

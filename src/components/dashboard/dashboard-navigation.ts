@@ -165,3 +165,8 @@ export function visibleDashboardSections(role: string) {
 export function activeDashboardSectionId(pathname: string, sections: DashboardNavSection[]) {
   return sections.find((section) => section.items.some((item) => isDashboardNavItemActive(pathname, item.href)))?.id ?? null;
 }
+
+/** Keep the last open module when the user lands on Översikt, Fastigheter or Inställningar. */
+export function rememberedExpandedSectionId(current: string | null, detected: string | null) {
+  return detected ?? current;
+}
