@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, workOrderFindFirstMock, userFindManyMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, workOrderFindFirstMock, userFindManyMock, getLatestInvoiceDraftMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
   userFindManyMock: vi.fn(),
+  getLatestInvoiceDraftMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -18,6 +19,10 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/work-order-ops-storage", () => ({
+  getLatestInvoiceDraft: getLatestInvoiceDraftMock,
+}));
+
 import { GET } from "./route";
 
 const params = Promise.resolve({ id: "wo-1" });
@@ -27,6 +32,7 @@ describe("work order transition finance visibility", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     userFindManyMock.mockResolvedValue([]);
+    getLatestInvoiceDraftMock.mockResolvedValue(null);
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", role: "technician", company_id: "company-1" });
   });
 

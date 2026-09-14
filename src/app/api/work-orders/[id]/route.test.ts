@@ -8,6 +8,7 @@ const {
   getWorkOrderEnterpriseStateMock,
   getWorkOrderStatusEventsMock,
   getWorkOrderAssetLinkMock,
+  getLatestInvoiceDraftMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
@@ -16,6 +17,7 @@ const {
   getWorkOrderEnterpriseStateMock: vi.fn(),
   getWorkOrderStatusEventsMock: vi.fn(),
   getWorkOrderAssetLinkMock: vi.fn(),
+  getLatestInvoiceDraftMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -37,6 +39,10 @@ vi.mock("@/lib/work-order-asset-links", async (importOriginal) => ({
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   hasWorkOrderVendorContractColumn: vi.fn(async () => false),
+}));
+
+vi.mock("@/lib/work-order-ops-storage", () => ({
+  getLatestInvoiceDraft: getLatestInvoiceDraftMock,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -76,6 +82,7 @@ describe("work-orders/[id] finance gates", () => {
     getWorkOrderEnterpriseStateMock.mockResolvedValue(null);
     getWorkOrderStatusEventsMock.mockResolvedValue([]);
     getWorkOrderAssetLinkMock.mockResolvedValue({});
+    getLatestInvoiceDraftMock.mockResolvedValue(null);
   });
 
   it("redacts costs for technicians on GET", async () => {
@@ -136,6 +143,7 @@ describe("work-orders/[id] finance gates", () => {
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/faktureringsstatus/i);
     expect(transactionMock).not.toHaveBeenCalled();
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
   });
 
   it("denies an assigned technician from reverting an invoiced work order to completed", async () => {
@@ -155,6 +163,49 @@ describe("work-orders/[id] finance gates", () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/faktureringsstatus/i);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invoicing a completed work order without a ready invoice draft", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    workOrderFindFirstMock.mockResolvedValue(workOrderForPatch("completed"));
+    getLatestInvoiceDraftMock.mockResolvedValue({ status: "draft", customerName: "Kund AB" });
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "invoiced" }),
+    }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("invoice_draft_not_ready");
+    expect(body.error).toMatch(/fakturaunderlaget som klart/i);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invoicing when no invoice draft exists", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    workOrderFindFirstMock.mockResolvedValue(workOrderForPatch("completed"));
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "invoiced" }),
+    }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("invoice_draft_not_ready");
+    expect(getLatestInvoiceDraftMock).toHaveBeenCalledWith("company-1", "wo-1");
     expect(transactionMock).not.toHaveBeenCalled();
   });
 });

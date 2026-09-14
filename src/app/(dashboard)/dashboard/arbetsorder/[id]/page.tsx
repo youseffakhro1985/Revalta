@@ -47,6 +47,9 @@ type TransitionData = {
   users: Person[];
   canManage: boolean;
   canAssign?: boolean;
+  canMarkInvoiced?: boolean;
+  invoiceDraftReady?: boolean;
+  invoiceBlockReason?: string | null;
 };
 type WorkOrderCapabilities = { canAssign: boolean; canManageFinance: boolean; canViewFinance: boolean };
 type BuildingOption = { id: string; name: string; address: string | null };
@@ -264,6 +267,14 @@ export default function WorkOrderDetailPage() {
 
     <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
       <Panel title="Styrning" description="Endast giltiga statusövergångar visas. Alla ändringar kräver ett aktivt redigeringslås och registreras i revisionshistoriken.">
+        {transitions.invoiceBlockReason ? (
+          <div className="mb-4">
+            <InlineAlert tone="warning">
+              {transitions.invoiceBlockReason}{" "}
+              <a href="#ekonomi" className="font-semibold text-petroleum-800 underline-offset-2 hover:underline">Öppna fakturaunderlaget</a>
+            </InlineAlert>
+          </div>
+        ) : null}
         <form action={save} className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select disabled={!editable} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!["blocked", "cancelled"].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass}>{transitions.allowedStatuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
           <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={!editable} defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>

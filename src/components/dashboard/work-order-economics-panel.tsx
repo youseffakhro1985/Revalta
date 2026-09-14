@@ -675,6 +675,11 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 </button>
               </div>
             ) : null}
+            {["ready", "exported"].includes(draft.status) ? (
+              <p className="text-sm text-ink-600">Underlaget är klart. Sätt arbetsordern till Fakturerad under Styrning när ni vill stänga den ekonomiskt.</p>
+            ) : canManage ? (
+              <p className="text-sm text-ink-500">Arbetsordern kan inte sättas som fakturerad förrän underlaget är markerat som klart.</p>
+            ) : null}
           </div>
         )}
       </Panel>

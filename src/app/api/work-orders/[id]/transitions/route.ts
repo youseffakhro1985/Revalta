@@ -5,6 +5,11 @@ import { getAllowedWorkOrderTransitions } from "@/lib/work-order-enterprise-core
 import { normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import { createLogger } from "@/lib/structured-logger";
+import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
+import {
+  INVOICE_DRAFT_NOT_READY_FOR_INVOICING,
+  invoiceDraftAllowsWorkOrderInvoicing,
+} from "@/lib/invoice-draft-invoicing";
 
 const logger = createLogger({ route: "/api/work-orders/[id]/transitions" });
 
@@ -35,9 +40,20 @@ export async function GET(
 
     const currentStatus = normalizeWorkOrderStatus(workOrder.status);
     const canManageFinance = canManageWorkOrderFinance(user.role);
-    const allowedStatuses = getAllowedWorkOrderTransitions(currentStatus).filter((status) =>
-      canManageFinance || status === currentStatus || (currentStatus !== "invoiced" && status !== "invoiced")
-    );
+    const invoiceDraft = currentStatus === "completed" && canManageFinance
+      ? await getLatestInvoiceDraft(user.company_id, id)
+      : null;
+    const canMarkInvoiced = currentStatus !== "completed"
+      || invoiceDraftAllowsWorkOrderInvoicing(invoiceDraft);
+    const allowedStatuses = getAllowedWorkOrderTransitions(currentStatus).filter((status) => {
+      if (!canManageFinance && status !== currentStatus && (currentStatus === "invoiced" || status === "invoiced")) {
+        return false;
+      }
+      if (status === "invoiced" && currentStatus === "completed" && !canMarkInvoiced) {
+        return false;
+      }
+      return true;
+    });
     return NextResponse.json(
       {
         currentStatus,
@@ -48,6 +64,11 @@ export async function GET(
           : [],
         canManage: canManageTickets(user.role),
         canAssign: canAssignWorkOrders(user.role),
+        canMarkInvoiced,
+        invoiceDraftReady: invoiceDraftAllowsWorkOrderInvoicing(invoiceDraft),
+        invoiceBlockReason: currentStatus === "completed" && canManageFinance && !canMarkInvoiced
+          ? INVOICE_DRAFT_NOT_READY_FOR_INVOICING
+          : null,
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
