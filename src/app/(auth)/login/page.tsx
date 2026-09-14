@@ -20,14 +20,24 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [nextPath, setNextPath] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     setHydrated(true);
     const params = new URLSearchParams(window.location.search);
+    setNextPath(params.get("next") || "");
     if (params.get("registered") === "1") {
       setNotice("Kontot är skapat. Kontrollera din e-post och verifiera adressen innan du loggar in.");
     }
+    const reason = params.get("reason");
+    if (reason === "invalid") setError("Ogiltiga uppgifter");
+    if (reason === "verify") {
+      setError("Verifiera din e-postadress innan du loggar in.");
+      setVerificationRequired(true);
+    }
+    if (reason === "rate") setError("För många inloggningsförsök. Vänta en stund och prova igen.");
+    if (reason === "error") setError("Något gick fel");
   }, []);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -137,6 +147,7 @@ export default function LoginPage() {
         onSubmit={handleLogin}
         className="mt-7 space-y-5"
       >
+        {nextPath ? <input type="hidden" name="next" value={nextPath} /> : null}
         <div>
           <label htmlFor="login-email" className="block text-sm font-medium text-ink-700">
             E-post
@@ -172,7 +183,7 @@ export default function LoginPage() {
             defaultValue=""
           />
         </div>
-        <button type="submit" disabled={loading} className={authButtonClass}>
+        <button type="submit" disabled={!hydrated || loading} aria-busy={loading} className={authButtonClass}>
           {loading ? "Loggar in..." : "Logga in"}
         </button>
       </form>
