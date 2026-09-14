@@ -170,7 +170,6 @@ export default function LoginPage() {
             autoComplete="current-password"
             className={authInputClass}
             defaultValue=""
-            placeholder="••••••••"
           />
         </div>
         <button type="submit" disabled={loading} className={authButtonClass}>

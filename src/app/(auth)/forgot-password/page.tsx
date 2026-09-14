@@ -2,12 +2,14 @@
 
 import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 import { readResponseJson } from "@/lib/fetch-json";
+import { isValidEmail } from "@/lib/security";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function ForgotPasswordPage() {
   const [hydrated, setHydrated] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -16,9 +18,18 @@ export default function ForgotPasswordPage() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const submittedEmail = String(new FormData(event.currentTarget).get("email") || "");
-    setLoading(true);
+    const submittedEmail = String(new FormData(event.currentTarget).get("email") || "").trim();
     setMessage("");
+    setError("");
+    if (!submittedEmail) {
+      setError("Ange e-postadressen till kontot.");
+      return;
+    }
+    if (!isValidEmail(submittedEmail)) {
+      setError("Ange en giltig e-postadress.");
+      return;
+    }
+    setLoading(true);
     try {
       const response = await fetch("/api/auth/password-reset/request", {
         method: "POST",
@@ -45,6 +56,7 @@ export default function ForgotPasswordPage() {
         </Link>
       }
     >
+      {error ? <AuthAlert>{error}</AuthAlert> : null}
       {message ? <AuthAlert tone="neutral">{message}</AuthAlert> : null}
       <form
         id="forgot-password-form"

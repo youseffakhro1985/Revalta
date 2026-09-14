@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
+import { isStrongPassword, isValidEmail, passwordPolicyMessage } from "@/lib/security";
 
 export default function RegisterPage() {
   const [error, setError] = useState("");
@@ -22,13 +23,25 @@ export default function RegisterPage() {
 
     const formData = new FormData(e.currentTarget);
     const payload = {
-      name: String(formData.get("name") ?? ""),
-      companyName: String(formData.get("companyName") ?? ""),
-      email: String(formData.get("email") ?? ""),
+      name: String(formData.get("name") ?? "").trim(),
+      companyName: String(formData.get("companyName") ?? "").trim(),
+      email: String(formData.get("email") ?? "").trim(),
       password: String(formData.get("password") ?? ""),
     };
 
     setError("");
+    if (!payload.name || !payload.companyName || !payload.email || !payload.password) {
+      setError("Fyll i namn, organisation, e-post och lösenord.");
+      return;
+    }
+    if (!isValidEmail(payload.email)) {
+      setError("Ange en giltig e-postadress.");
+      return;
+    }
+    if (!isStrongPassword(payload.password)) {
+      setError(passwordPolicyMessage);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
@@ -128,7 +141,6 @@ export default function RegisterPage() {
             autoComplete="new-password"
             className={authInputClass}
             defaultValue=""
-            placeholder="••••••••••"
           />
           <p className="mt-2 text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
         </div>
