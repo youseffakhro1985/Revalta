@@ -171,6 +171,7 @@ function AcceptInviteForm() {
             <label htmlFor="invite-name" className="block text-sm font-medium text-ink-700">Namn</label>
             <input
               id="invite-name"
+              key={preview?.email || "invite-name"}
               name="name"
               type="text"
               maxLength={120}
