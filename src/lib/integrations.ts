@@ -25,6 +25,10 @@ export function isSmsConfigured(env: NodeJS.ProcessEnv = process.env) {
   return Boolean(apiKey && (env.SMS_PROVIDER_WEBHOOK_URL || apiKey.startsWith("46elks:")));
 }
 
+export function isSmsInboundConfigured(env: NodeJS.ProcessEnv = process.env) {
+  return Boolean(env.SMS_PROVIDER_WEBHOOK_SECRET?.trim());
+}
+
 function isStripeConfigured() {
   return Boolean(process.env.STRIPE_SECRET_KEY);
 }

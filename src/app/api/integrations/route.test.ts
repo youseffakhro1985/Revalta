@@ -147,8 +147,23 @@ describe("integrations summary", () => {
     expect(sms).toEqual({
       type: "sms",
       configured: true,
+      inboundConfigured: false,
       requiredEnv: ["SMS_PROVIDER_API_KEY"],
+      inboundRequiredEnv: ["SMS_PROVIDER_WEBHOOK_SECRET"],
     });
+  });
+
+  it("reports SMS inbound separately from outgoing send configuration", async () => {
+    vi.stubEnv("SMS_PROVIDER_API_KEY", "46elks:user:pass:Revalta");
+    vi.stubEnv("SMS_PROVIDER_WEBHOOK_SECRET", "inbound-secret");
+
+    const response = await GET();
+    const body = await response.json();
+    const sms = body.integrations.find((integration: { type: string }) => integration.type === "sms");
+
+    expect(sms.configured).toBe(true);
+    expect(sms.inboundConfigured).toBe(true);
+    expect(JSON.stringify(sms)).not.toMatch(/inbound-secret/);
   });
 
   it("reports SMS unconfigured when only a generic API key is present", async () => {

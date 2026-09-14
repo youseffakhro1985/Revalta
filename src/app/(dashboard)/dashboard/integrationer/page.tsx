@@ -7,7 +7,13 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, CircleDashed, Plug, ReceiptText, Send, ShieldCheck } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
 
-type Integration = { type: string; configured: boolean; requiredEnv: string[] };
+type Integration = {
+  type: string;
+  configured: boolean;
+  requiredEnv: string[];
+  inboundConfigured?: boolean;
+  inboundRequiredEnv?: string[];
+};
 type IntegrationEvent = { id: string; type: string; status: string; recipient: string | null; created_at: string };
 type InvoiceExportSummary = { total: number; active: number; failed: number; sent: number };
 
@@ -39,7 +45,7 @@ const statusLabels: Record<string, string> = {
 const descriptions: Record<string, string> = {
   email: "Utskick av inbjudningar, notiser och bekräftelser.",
   demo_leads: "Mottagning och e-postleverans av sparade demoförfrågningar från den publika webbplatsen.",
-  sms: "Bekräftelser och driftmeddelanden via 46elks (SMS_PROVIDER_API_KEY med prefix 46elks:användare:lösen:avsändare) eller generisk webhook.",
+  sms: "Utgående bekräftelser via 46elks (SMS_PROVIDER_API_KEY med prefix 46elks:användare:lösen:avsändare) eller generisk webhook. Inkommande svar kräver SMS_PROVIDER_WEBHOOK_SECRET.",
   stripe: "Checkout, abonnemang och webhookar med pris-ID för samtliga köpbara planer.",
   storage: "Dokument, bilder och bilagor i extern fillagring. BLOB_READ_WRITE_TOKEN föredras; STORAGE_PROVIDER_KEY stöds som legacy-reserv.",
   ai: "Diskret klassificering och prioritering bakom gränssnittet.",
@@ -118,9 +124,20 @@ export default function IntegrationsPage() {
         {integrations.map((integration) => (
           <article key={integration.type} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-500">{labels[integration.type] || integration.type}</p>
-            <div className={`mt-4 w-fit rounded-full px-3 py-1 text-xs font-semibold ${integration.configured ? "bg-success-50 text-success-700" : "bg-warning-50 text-warning-700"}`}>{integration.configured ? "Konfigurerad" : "Konfiguration saknas"}</div>
+            {integration.type === "sms" ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${integration.configured ? "bg-success-50 text-success-700" : "bg-warning-50 text-warning-700"}`}>
+                  Utgående: {integration.configured ? "konfigurerad" : "saknas"}
+                </span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${integration.inboundConfigured ? "bg-success-50 text-success-700" : "bg-warning-50 text-warning-700"}`}>
+                  Inkommande: {integration.inboundConfigured ? "redo" : "saknas"}
+                </span>
+              </div>
+            ) : (
+              <div className={`mt-4 w-fit rounded-full px-3 py-1 text-xs font-semibold ${integration.configured ? "bg-success-50 text-success-700" : "bg-warning-50 text-warning-700"}`}>{integration.configured ? "Konfigurerad" : "Konfiguration saknas"}</div>
+            )}
             <p className="mt-4 text-sm leading-6 text-ink-500">{descriptions[integration.type] || "Extern systemanslutning."}</p>
-            <div className="mt-5 rounded-xl bg-sand-50 p-3"><p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Miljövariabler</p><p className="mt-1 break-words text-xs leading-5 text-ink-600">{integration.requiredEnv.length ? integration.requiredEnv.join(", ") : "Inga externa nycklar krävs"}</p></div>
+            <div className="mt-5 rounded-xl bg-sand-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Miljövariabler</p><p className="mt-1 break-words text-xs leading-5 text-ink-600">{[...integration.requiredEnv, ...(integration.inboundRequiredEnv || [])].length ? [...integration.requiredEnv, ...(integration.inboundRequiredEnv || [])].join(", ") : "Inga externa nycklar krävs"}</p></div>
           </article>
         ))}
       </section>
