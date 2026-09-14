@@ -15,6 +15,11 @@ export default function RegisterPage() {
 
   useEffect(() => {
     setHydrated(true);
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "invalid") setError("Kontrollera namn, organisation, e-post och lösenord.");
+    if (reason === "exists") setError("E-postadressen används redan");
+    if (reason === "rate") setError("För många registreringar. Vänta en stund och prova igen.");
+    if (reason === "error") setError("Något gick fel");
   }, []);
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {

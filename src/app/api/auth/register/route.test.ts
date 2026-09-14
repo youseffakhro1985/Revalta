@@ -326,6 +326,64 @@ describe("POST /api/auth/register", () => {
     );
   });
 
+  it("accepts a native form post and redirects to login without putting the email in the URL", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "name=Test+Owner&companyName=Exempel+AB&email=OWNER%40example.se&password=securepass1",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/login?registered=1");
+    expect(response.headers.get("location")).not.toContain("OWNER");
+    expect(response.headers.get("location")).not.toContain("example.se");
+    expect(companyCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        name: "Exempel AB",
+        users: { create: expect.objectContaining({ email: "owner@example.se", name: "Test Owner", role: "owner" }) },
+      }),
+    }));
+    expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("securepass1");
+  });
+
+  it("returns the native form to register with a generic reason when the email is invalid", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "name=Test+Owner&companyName=Exempel+AB&email=not-an-email&password=securepass1",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/register?reason=invalid");
+    expect(companyCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns the native form to register when the email is already used", async () => {
+    companyCreateMock.mockRejectedValueOnce({
+      code: "P2002",
+      meta: { target: ["email"] },
+    });
+
+    const response = await POST(new Request("https://www.revalta.se/api/auth/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "name=Test+Owner&companyName=Exempel+AB&email=owner%40example.se&password=securepass1",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/register?reason=exists");
+    expect(afterMock).not.toHaveBeenCalled();
+  });
+
   it("returns a safe correlated error when account persistence fails", async () => {
     companyCreateMock.mockRejectedValue(new Error("database connection contains sensitive detail"));
 
