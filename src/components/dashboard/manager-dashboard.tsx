@@ -24,6 +24,7 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
   const horizon = new Date(today.getTime() + 30 * 86400000);
   const activeWorkStatuses = { notIn: ["completed", "invoiced", "cancelled"] };
   const propertyScope = { deleted_at: null, ...tenantWhere(user) };
+  const companyId = user.company_id;
 
   const [totalProperties, properties, unassignedTickets, unassignedWorkOrders, overdueWorkOrders, upcomingActivities, upcomingRounds, upcomingInspections, activeVendors, expiringVendors, ticketQueue] = await Promise.all([
     db.property.count({ where: propertyScope }),
@@ -47,10 +48,10 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
         OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
     }),
-    user.company_id
+    companyId
       ? db.workOrder.count({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             deleted_at: null,
             assigned_to_id: null,
             property: { deleted_at: null },
@@ -58,10 +59,10 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           },
         })
       : Promise.resolve(0),
-    user.company_id
+    companyId
       ? db.workOrder.count({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             deleted_at: null,
             property: { deleted_at: null },
             status: activeWorkStatuses,
@@ -69,18 +70,18 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           },
         })
       : Promise.resolve(0),
-    user.company_id
+    companyId
       ? db.calendarEvent.findMany({
-          where: { company_id: user.company_id, status: "planned", date: { gte: today, lte: horizon } },
+          where: { company_id: companyId, status: "planned", date: { gte: today, lte: horizon } },
           orderBy: [{ date: "asc" }, { time: "asc" }],
           take: 6,
           select: { id: true, title: true, date: true, time: true, type: true, property_name: true, responsible: true },
         })
       : Promise.resolve([]),
-    user.company_id
+    companyId
       ? optionalFindMany("InspectionRound", () => db.inspectionRound.findMany({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             status: { not: "completed" },
             next_due: { gte: today, lte: horizon },
             property: { deleted_at: null },
@@ -90,10 +91,10 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           select: { id: true, title: true, next_due: true, property: { select: { name: true } } },
         }))
       : Promise.resolve([]),
-    user.company_id
+    companyId
       ? optionalFindMany("ComplianceInspection", () => db.complianceInspection.findMany({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             status: { notIn: ["completed", "cancelled"] },
             due_date: { gte: today, lte: horizon },
             property: { deleted_at: null },
@@ -103,15 +104,15 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           select: { id: true, title: true, type: true, due_date: true, responsible: true, property: { select: { name: true } } },
         }))
       : Promise.resolve([]),
-    user.company_id
+    companyId
       ? db.vendorContract.count({
-          where: { company_id: user.company_id, status: "active", OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+          where: { company_id: companyId, status: "active", OR: [{ property_id: null }, { property: { deleted_at: null } }] },
         })
       : Promise.resolve(0),
-    user.company_id
+    companyId
       ? db.vendorContract.count({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             status: "active",
             end_date: { gte: now, lte: new Date(now.getTime() + 120 * 86400000) },
             OR: [{ property_id: null }, { property: { deleted_at: null } }],
