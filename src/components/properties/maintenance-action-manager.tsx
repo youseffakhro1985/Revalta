@@ -2,8 +2,9 @@
 
 import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, PencilLine, RefreshCw } from "lucide-react";
-import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { CheckCircle2, PencilLine, RefreshCw, Wrench } from "lucide-react";
+import Link from "next/link";
+import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Action = {
   id: string;
@@ -16,6 +17,8 @@ type Action = {
   category: string;
   building_name: string | null;
   technical_asset_name: string | null;
+  source_work_order_id: string | null;
+  source_work_order_number: string | null;
 };
 
 type Data = {
@@ -40,6 +43,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creatingWorkOrder, setCreatingWorkOrder] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -93,6 +97,31 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
     }
   }
 
+  async function createWorkOrder() {
+    if (!selected) return;
+    setCreatingWorkOrder(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/properties/${propertyId}/maintenance-plan/action/work-order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionId: selected.id }),
+      });
+      const payload = await readResponseJson(response);
+      if (!response.ok) throw new Error(payload.error || "Kunde inte skapa arbetsordern");
+      const number = typeof payload.workOrderNumber === "string" ? payload.workOrderNumber : "";
+      setSuccess(number ? `Arbetsorder ${number} skapades från underhållsåtgärden.` : "Arbetsorder skapad och kopplad till underhållsåtgärden.");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Kunde inte skapa arbetsordern");
+    } finally {
+      setCreatingWorkOrder(false);
+    }
+  }
+
+  const closedStatuses = new Set(["completed", "cancelled"]);
+
   if (loading) return <div className="h-72 animate-pulse rounded-2xl bg-sand-100" />;
   if (!data) return <InlineAlert>{error || "Åtgärderna kunde inte laddas."}</InlineAlert>;
 
@@ -133,6 +162,21 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
                   <div className="flex justify-between gap-4"><dt className="text-ink-500">Prioritet</dt><dd className="font-semibold text-ink-900">{priorityLabels[selected.priority] || selected.priority}</dd></div>
                   <div className="flex justify-between gap-4"><dt className="text-ink-500">Risk</dt><dd className="font-semibold text-ink-900">{riskLabels[selected.risk] || selected.risk}</dd></div>
                   <div className="flex justify-between gap-4"><dt className="text-ink-500">Status</dt><dd className="font-semibold text-ink-900">{statusLabels[selected.status] || selected.status}</dd></div>
+                  {selected.source_work_order_id ? (
+                    <div className="pt-2">
+                      <Link href={`/dashboard/arbetsorder/${selected.source_work_order_id}`} className={`${premiumSecondaryButtonClass} h-9 px-3 text-xs`}>
+                        <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
+                        {selected.source_work_order_number || "Öppna arbetsorder"}
+                      </Link>
+                    </div>
+                  ) : !closedStatuses.has(selected.status) ? (
+                    <div className="pt-2">
+                      <button type="button" disabled={creatingWorkOrder} onClick={() => void createWorkOrder()} className={`${premiumPrimaryButtonClass} h-9 px-3 text-xs`}>
+                        <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
+                        {creatingWorkOrder ? "Skapar…" : "Skapa arbetsorder"}
+                      </button>
+                    </div>
+                  ) : null}
                 </dl>
               </div>
             ) : null}

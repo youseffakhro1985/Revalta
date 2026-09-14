@@ -38,6 +38,8 @@ type ActionRow = {
   contractor: string | null;
   building_name: string | null;
   technical_asset_name: string | null;
+  source_work_order_id: string | null;
+  source_work_order_number: string | null;
 };
 
 const ROUTE = "/api/properties/[id]/maintenance-plan";
@@ -180,10 +182,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
                a."planned_year", a."recurrence_years", a."technical_lifetime_years",
                a."estimated_cost"::double precision AS "estimated_cost",
                a."annual_index_rate"::double precision AS "annual_index_rate", a."priority", a."risk",
-               a."status", a."contractor", b."name" AS "building_name", t."name" AS "technical_asset_name"
+               a."status", a."contractor", b."name" AS "building_name", t."name" AS "technical_asset_name",
+               a."source_work_order_id", w."work_order_number" AS "source_work_order_number"
         FROM "MaintenanceAction" a
         LEFT JOIN "Building" b ON b."id" = a."building_id"
         LEFT JOIN "PropertyTechnicalAsset" t ON t."id" = a."technical_asset_id"
+        LEFT JOIN "WorkOrder" w ON w."id" = a."source_work_order_id" AND w."company_id" = a."company_id"
         WHERE a."company_id" = ${user.company_id} AND a."property_id" = ${property.id}
           AND a."maintenance_plan_id" = ${activePlan.id}
         ORDER BY a."planned_year" ASC,
