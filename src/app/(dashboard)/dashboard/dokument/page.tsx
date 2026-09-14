@@ -64,6 +64,7 @@ type DocumentItem = {
   uploadedBy: string;
   createdAt: string;
   source?: "table" | "legacy";
+  classificationSource?: "provider" | "fallback" | "staff" | null;
 };
 
 type Summary = {
@@ -95,6 +96,12 @@ type LegacyPayload = {
   leases?: Lease[];
   canManageLifecycle?: boolean;
   error?: string;
+};
+
+const classificationLabels: Record<string, string> = {
+  provider: "AI-leverantör",
+  fallback: "Regelbaserad",
+  staff: "Manuell",
 };
 
 const categoryLabels: Record<string, string> = {
@@ -450,11 +457,14 @@ export default function DocumentsPage() {
       formData.append("leaseId", leaseId);
       formData.append("validUntil", validUntil);
       const response = await fetch("/api/documents", { method: "POST", body: formData });
-      const payload = await readResponseJson<{ error?: string }>(response);
+      const payload = await readResponseJson<{ error?: string; classificationSource?: string }>(response);
       if (!response.ok) throw new Error(payload.error || "Kunde inte ladda upp dokumentet");
       resetForm();
       setShowUpload(false);
-      setMessage("Dokumentet har sparats och är tillgängligt enligt vald åtkomstnivå.");
+      const sourceLabel = payload.classificationSource ? classificationLabels[payload.classificationSource] : "";
+      setMessage(sourceLabel
+        ? `Dokumentet har sparats. Kategori satt av ${sourceLabel.toLowerCase()}.`
+        : "Dokumentet har sparats och är tillgängligt enligt vald åtkomstnivå.");
       setPage(1);
       await loadDocuments(1);
     } catch (value) {
@@ -654,6 +664,7 @@ export default function DocumentsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-semibold text-ink-950">{item.name}</h3>
                         <Badge>{categoryLabels[item.category] || item.category}</Badge>
+                        {item.classificationSource ? <Badge>{classificationLabels[item.classificationSource] || item.classificationSource}</Badge> : null}
                         <Badge>{lifecycleLabels[item.lifecycleState]}</Badge>
                         <Badge>{visibilityLabels[item.visibility as Visibility] || item.visibility}</Badge>
                       </div>
