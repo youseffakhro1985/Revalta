@@ -28,7 +28,7 @@ export async function loadPublicPortalCatalog(companySlug?: string | null): Prom
     };
   }
 
-  const properties = await db.property.findMany({
+  const properties = (await db.property.findMany({
     where: { company_id: portal.company.id, status: "active", deleted_at: null },
     orderBy: { name: "asc" },
     select: {
@@ -39,7 +39,14 @@ export async function loadPublicPortalCatalog(companySlug?: string | null): Prom
       city: true,
       company: { select: { name: true } },
     },
-  });
+  })).map((row) => ({
+    id: row.id,
+    name: row.name,
+    address: row.address,
+    postal_code: row.postal_code,
+    city: row.city,
+    ...(row.company ? { company: { name: row.company.name } } : {}),
+  }));
 
   return {
     properties,
