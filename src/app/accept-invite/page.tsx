@@ -1,8 +1,10 @@
 "use client";
 
+import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 import { readResponseJson } from "@/lib/fetch-json";
 import { isResident } from "@/lib/permissions";
 import { homePathForRole } from "@/lib/resident-access";
+import { passwordPolicyMessage } from "@/lib/security";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -20,24 +22,32 @@ function AcceptInviteForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
   const [preview, setPreview] = useState<InvitePreview | null>(null);
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loadingPreview, setLoadingPreview] = useState(Boolean(token));
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+    const reason = searchParams.get("reason");
+    if (reason === "invalid") setError("Inbjudan är ogiltig eller har gått ut");
+    if (reason === "policy") setError(passwordPolicyMessage);
+    if (reason === "exists") setError("Det finns redan ett konto med den här e-postadressen. Logga in i stället.");
+    if (reason === "rate") setError("För många försök. Vänta en stund och prova igen.");
+    if (reason === "error") setError("Något gick fel");
+  }, [searchParams]);
 
   useEffect(() => {
     if (!token) {
       setLoadingPreview(false);
-      setError("Inbjudningslänken saknas eller är ogiltig.");
+      setError((current) => current || "Inbjudningslänken saknas eller är ogiltig.");
       return;
     }
 
     let cancelled = false;
     async function loadPreview() {
       setLoadingPreview(true);
-      setError("");
       try {
         const response = await fetch(`/api/team/invites/accept?token=${encodeURIComponent(token)}`, {
           cache: "no-store",
@@ -50,9 +60,8 @@ function AcceptInviteForm() {
           return;
         }
         setPreview(data.invite);
-        setName(data.invite?.name || "");
       } catch {
-        if (!cancelled) setError("Kunde inte hämta inbjudan");
+        if (!cancelled) setError((current) => current || "Kunde inte hämta inbjudan");
       } finally {
         if (!cancelled) setLoadingPreview(false);
       }
@@ -88,8 +97,13 @@ function AcceptInviteForm() {
     };
   }, [preview, residentInvite]);
 
-  async function acceptInvite(event: React.FormEvent) {
+  async function acceptInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hydrated || loading) return;
+    const form = new FormData(event.currentTarget);
+    const submittedToken = String(form.get("token") || "").trim();
+    const submittedName = String(form.get("name") || "").trim();
+    const submittedPassword = String(form.get("password") || "");
     setMessage("");
     setError("");
     setLoading(true);
@@ -98,7 +112,7 @@ function AcceptInviteForm() {
       const response = await fetch("/api/team/invites/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, password }),
+        body: JSON.stringify({ token: submittedToken, name: submittedName, password: submittedPassword }),
       });
       const data = await readResponseJson(response);
 
@@ -121,11 +135,16 @@ function AcceptInviteForm() {
   }
 
   return (
-    <section className="w-full max-w-md rounded-3xl border border-sand-200 bg-white p-8 shadow-premium-lg">
-      <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-petroleum-600">{copy.eyebrow}</p>
-      <h1 className="text-3xl font-semibold tracking-tight text-ink-950">{copy.title}</h1>
-      <p className="mt-3 text-sm leading-6 text-ink-500">{copy.description}</p>
-
+    <AuthShell
+      eyebrow={copy.eyebrow}
+      title={copy.title}
+      description={copy.description}
+      footer={
+        <Link href="/login" className="font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline">
+          Till inloggningen
+        </Link>
+      }
+    >
       {preview ? (
         <div className="mt-5 rounded-2xl border border-sand-200 bg-sand-50 px-4 py-3 text-sm text-ink-600">
           <p className="font-medium text-ink-800">{preview.email}</p>
@@ -133,65 +152,62 @@ function AcceptInviteForm() {
           <p className="mt-1">{residentInvite ? "Roll: Boende" : `Roll: ${preview.role}`}</p>
         </div>
       ) : null}
-
-      {(error || message) && (
-        <div className={`mt-6 rounded-2xl border p-4 text-sm font-medium ${error ? "border-danger-500 bg-danger-50 text-danger-700" : "border-success-500 bg-success-50 text-success-700"}`}>
-          {error || message}
-        </div>
-      )}
-
-      {loadingPreview ? (
-        <div className="mt-6 h-40 animate-pulse rounded-2xl bg-sand-100" />
-      ) : preview ? (
-        <form onSubmit={acceptInvite} className="mt-6 space-y-5">
+      {error ? <AuthAlert>{error}</AuthAlert> : null}
+      {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
+      {loadingPreview ? <div className="mt-6 h-24 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+      {token ? (
+        <form
+          id="accept-invite-form"
+          method="post"
+          action="/api/team/invites/accept"
+          noValidate
+          data-ready={hydrated ? "1" : "0"}
+          onSubmit={acceptInvite}
+          aria-busy={loading}
+          className="mt-7 space-y-5"
+        >
+          <input type="hidden" name="token" value={token} />
           <div>
-            <label htmlFor="invite-name" className="mb-1 block text-sm font-medium text-ink-700">Namn</label>
+            <label htmlFor="invite-name" className="block text-sm font-medium text-ink-700">Namn</label>
             <input
               id="invite-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500"
-              placeholder="Förnamn Efternamn"
+              name="name"
+              type="text"
+              maxLength={120}
               autoComplete="name"
+              defaultValue={preview?.name || ""}
+              placeholder="Förnamn Efternamn"
+              className={authInputClass}
             />
           </div>
           <div>
-            <label htmlFor="invite-password" className="mb-1 block text-sm font-medium text-ink-700">Lösenord</label>
+            <label htmlFor="invite-password" className="block text-sm font-medium text-ink-700">Lösenord</label>
             <input
               id="invite-password"
+              name="password"
               type="password"
+              required
               minLength={10}
               maxLength={128}
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="block w-full rounded-xl border border-sand-200 p-3 outline-none focus:border-petroleum-500"
-              placeholder="Minst 10 tecken med bokstav och siffra"
               autoComplete="new-password"
+              defaultValue=""
+              className={authInputClass}
             />
+            <p className="mt-2 text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
           </div>
-          <button
-            disabled={loading || !token}
-            className="w-full rounded-xl bg-petroleum-600 px-5 py-3 font-semibold text-white hover:bg-petroleum-700 disabled:opacity-70"
-          >
-            {loading ? "Skapar konto…" : copy.submit}
+          <button type="submit" disabled={!hydrated || loading || Boolean(message)} className={authButtonClass}>
+            {loading ? "Skapar konto..." : copy.submit}
           </button>
         </form>
       ) : null}
-
-      <Link href="/login" className="mt-6 block text-center text-sm font-semibold text-petroleum-600">
-        Till inloggning
-      </Link>
-    </section>
+    </AuthShell>
   );
 }
 
 export default function AcceptInvitePage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sand-50 p-4">
-      <Suspense fallback={<div className="h-64 w-full max-w-md animate-pulse rounded-3xl bg-sand-100" />}>
-        <AcceptInviteForm />
-      </Suspense>
-    </main>
+    <Suspense fallback={<main className="min-h-screen bg-[#FAFAF8] p-8"><div className="mx-auto h-[620px] max-w-[1080px] animate-pulse rounded-[28px] border border-sand-200 bg-white" /></main>}>
+      <AcceptInviteForm />
+    </Suspense>
   );
 }

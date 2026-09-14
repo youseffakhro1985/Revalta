@@ -1,11 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getPublicAppUrl } from "@/lib/app-url";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { hashPassword, hashResetToken, signToken } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { homePathForRole } from "@/lib/resident-access";
-import { isStrongPassword, passwordPolicyMessage } from "@/lib/security";
+import { isStrongPassword, passwordPolicyMessage, safeInternalPath } from "@/lib/security";
 import {
   LEGACY_SESSION_COOKIE_NAME,
   SESSION_COOKIE_NAME,
@@ -32,6 +33,33 @@ function noStore(body: unknown, init?: ResponseInit) {
       ...(init?.headers || {}),
     },
   });
+}
+
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readAcceptFields(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return {
+      token: String(form?.get("token") || "").trim(),
+      password: String(form?.get("password") || ""),
+      name: String(form?.get("name") || "").trim(),
+    };
+  }
+  const body = await request.json().catch(() => ({})) as {
+    token?: unknown;
+    password?: unknown;
+    name?: unknown;
+  };
+  return {
+    token: typeof body.token === "string" ? body.token.trim() : "",
+    password: typeof body.password === "string" ? body.password : "",
+    name: typeof body.name === "string" ? body.name.trim() : "",
+  };
 }
 
 async function loadInvitePreview(token: string) {
@@ -86,29 +114,61 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const nativeForm = isNativeFormPost(request);
+  const fail = (
+    status: number,
+    message: string,
+    reason: "invalid" | "policy" | "exists" | "rate" | "error",
+    token?: string,
+    headers?: HeadersInit,
+  ) => {
+    if (!nativeForm) {
+      return noStore({ error: message }, { status, headers });
+    }
+    const url = new URL("/accept-invite", getPublicAppUrl(request.url));
+    url.searchParams.set("reason", reason);
+    if (token) url.searchParams.set("token", token);
+    const response = NextResponse.redirect(url, 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    if (headers) {
+      new Headers(headers).forEach((value, name) => {
+        if (name.toLowerCase() === "retry-after") response.headers.set(name, value);
+      });
+    }
+    return response;
+  };
+
+  let token = "";
   try {
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(`invite-accept:${ip}`, 12, 60 * 60 * 1000);
+    const fields = nativeForm || rateLimit.allowed
+      ? await readAcceptFields(request)
+      : { token: "", password: "", name: "" };
+    token = fields.token;
     if (!rateLimit.allowed) {
-      return noStore({ error: "För många försök. Vänta en stund och prova igen." }, { status: 429 });
+      return fail(
+        429,
+        "För många försök. Vänta en stund och prova igen.",
+        "rate",
+        token,
+        {
+          "Retry-After": String(Math.max(1, Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000))),
+        },
+      );
     }
 
-    const body = await request.json().catch(() => ({})) as {
-      token?: unknown;
-      password?: unknown;
-      name?: unknown;
-    };
-    const token = typeof body.token === "string" ? body.token.trim() : "";
-    const password = typeof body.password === "string" ? body.password : "";
-    const requestedName = typeof body.name === "string" ? body.name.trim() : "";
+    const password = fields.password;
+    const requestedName = fields.name;
     if (!token) {
-      return noStore({ error: "Inbjudningslänken saknas" }, { status: 400 });
+      return fail(400, "Inbjudningslänken saknas", "invalid");
     }
     if (requestedName.length > 120) {
-      return noStore({ error: "Namnet får vara högst 120 tecken" }, { status: 400 });
+      return fail(400, "Namnet får vara högst 120 tecken", "invalid", token);
     }
     if (!isStrongPassword(password)) {
-      return noStore({ error: passwordPolicyMessage }, { status: 400 });
+      return fail(400, passwordPolicyMessage, "policy", token);
     }
 
     const invite = await db.teamInvite.findUnique({
@@ -127,10 +187,10 @@ export async function POST(request: Request) {
 
     const now = new Date();
     if (!invite || invite.accepted_at || invite.expires_at < now) {
-      return noStore({ error: "Inbjudan är ogiltig eller har gått ut" }, { status: 400 });
+      return fail(400, "Inbjudan är ogiltig eller har gått ut", "invalid", token);
     }
     if (invite.company.status !== "active") {
-      return noStore({ error: "Organisationen är inte aktiv" }, { status: 400 });
+      return fail(400, "Organisationen är inte aktiv", "invalid", token);
     }
 
     const normalizedName = requestedName || invite.name;
@@ -185,7 +245,13 @@ export async function POST(request: Request) {
     cookieStore.set(SESSION_COOKIE_NAME, sessionToken, sessionCookieOptions());
     cookieStore.set(LEGACY_SESSION_COOKIE_NAME, "", expiredSessionCookieOptions());
 
-    const redirectTo = homePathForRole(user.role);
+    const redirectTo = safeInternalPath(homePathForRole(user.role), "/dashboard");
+    if (nativeForm) {
+      const response = NextResponse.redirect(new URL(redirectTo, getPublicAppUrl(request.url)), 303);
+      response.headers.set("Cache-Control", "no-store");
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      return response;
+    }
     return noStore({
       success: true,
       redirectTo,
@@ -198,12 +264,12 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof InviteClaimConflictError) {
-      return noStore({ error: "Inbjudan har redan använts eller gått ut" }, { status: 409 });
+      return fail(409, "Inbjudan har redan använts eller gått ut", "invalid", token);
     }
     if (error instanceof InviteEmailConflictError || isUniqueConstraintError(error)) {
-      return noStore({ error: "Det finns redan ett konto med den här e-postadressen. Logga in i stället." }, { status: 409 });
+      return fail(409, "Det finns redan ett konto med den här e-postadressen. Logga in i stället.", "exists", token);
     }
     logger.error("Accept team invite error", error);
-    return noStore({ error: "Internt serverfel" }, { status: 500 });
+    return fail(500, "Internt serverfel", "error", token);
   }
 }
