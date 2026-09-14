@@ -30,8 +30,61 @@ function isEmailUniqueConstraintError(error: unknown) {
   return typeof target === "string" && target.toLowerCase().includes("email");
 }
 
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readRegisterFields(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return {
+      name: String(form?.get("name") || ""),
+      email: String(form?.get("email") || ""),
+      password: String(form?.get("password") || ""),
+      companyName: String(form?.get("companyName") || ""),
+    };
+  }
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  return {
+    name: typeof body.name === "string" ? body.name : "",
+    email: typeof body.email === "string" ? body.email : "",
+    password: typeof body.password === "string" ? body.password : "",
+    companyName: typeof body.companyName === "string" ? body.companyName : "",
+  };
+}
+
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, "/api/auth/register");
+  const nativeForm = isNativeFormPost(request);
+  const fail = (
+    status: number,
+    code: (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES],
+    message: string,
+    reason: "invalid" | "exists" | "rate" | "error",
+    headers?: HeadersInit,
+  ) => {
+    if (!nativeForm) {
+      return apiErrorResponse({
+        status,
+        code,
+        message,
+        requestId: observability.requestId,
+        headers,
+      });
+    }
+    const url = new URL("/register", getPublicAppUrl(request.url));
+    url.searchParams.set("reason", reason);
+    const response = NextResponse.redirect(url, 303);
+    if (headers) {
+      new Headers(headers).forEach((value, name) => {
+        if (name.toLowerCase() === "retry-after") response.headers.set(name, value);
+      });
+    }
+    return observability.correlate(response);
+  };
+
   try {
     const ip = getClientIp(request);
     const rateLimitStartedAt = Date.now();
@@ -45,55 +98,53 @@ export async function POST(request: Request) {
       observability.logger.warn("auth registration rate limited", observability.elapsed({
         event: "auth.registration.rate_limited",
       }));
-      return apiErrorResponse({
-        status: 429,
-        code: API_ERROR_CODES.rateLimited,
-        message: "För många registreringar. Vänta en stund och prova igen.",
-        requestId: observability.requestId,
-        headers: {
+      return fail(
+        429,
+        API_ERROR_CODES.rateLimited,
+        "För många registreringar. Vänta en stund och prova igen.",
+        "rate",
+        {
           "Retry-After": String(Math.max(1, Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000))),
         },
-      });
+      );
     }
 
-    const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    const { name, email, password, companyName } = body;
-    const normalizedEmail = normalizeEmail(email);
-    const normalizedName = typeof name === "string" ? name.trim() : null;
-    const normalizedCompanyName =
-      typeof companyName === "string" && companyName.trim()
-        ? companyName.trim()
-        : normalizedName
-          ? `${normalizedName}s bolag`
-          : "Mitt företag";
+    const fields = await readRegisterFields(request);
+    const normalizedEmail = normalizeEmail(fields.email);
+    const normalizedName = fields.name.trim() || null;
+    const normalizedCompanyName = fields.companyName.trim()
+      ? fields.companyName.trim()
+      : normalizedName
+        ? `${normalizedName}s bolag`
+        : "Mitt företag";
 
     if ((normalizedName?.length ?? 0) > 120 || normalizedCompanyName.length > 160) {
-      return apiErrorResponse({
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Namn eller företagsnamn är för långt",
-        requestId: observability.requestId,
-      });
+      return fail(
+        400,
+        API_ERROR_CODES.validationFailed,
+        "Namn eller företagsnamn är för långt",
+        "invalid",
+      );
     }
     if (!isValidEmail(normalizedEmail)) {
-      return apiErrorResponse({
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "En giltig e-postadress krävs",
-        requestId: observability.requestId,
-      });
+      return fail(
+        400,
+        API_ERROR_CODES.validationFailed,
+        "En giltig e-postadress krävs",
+        "invalid",
+      );
     }
-    if (!isStrongPassword(password)) {
-      return apiErrorResponse({
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: passwordPolicyMessage,
-        requestId: observability.requestId,
-      });
+    if (!isStrongPassword(fields.password)) {
+      return fail(
+        400,
+        API_ERROR_CODES.validationFailed,
+        passwordPolicyMessage,
+        "invalid",
+      );
     }
 
     const passwordStartedAt = Date.now();
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await hashPassword(fields.password);
     observability.logger.info("auth registration password hash completed", {
       event: "auth.registration.password_hash_completed",
       phaseLatencyMs: phaseLatency(passwordStartedAt),
@@ -184,38 +235,35 @@ export async function POST(request: Request) {
     });
 
     const canExposeVerifyUrl = !process.env.EMAIL_PROVIDER_API_KEY && process.env.NODE_ENV !== "production";
-    const response = NextResponse.json({
-      success: true,
-      verifyUrl: canExposeVerifyUrl ? verifyUrl : undefined,
-    }, { status: 201, headers: { "Cache-Control": "no-store" } });
     observability.logger.info("auth registration succeeded", observability.elapsed({
       event: "auth.registration.succeeded",
       userId: owner.id,
       companyId: company.id,
       verificationDelivery: "scheduled",
     }));
+    if (nativeForm) {
+      const url = new URL("/login", getPublicAppUrl(request.url));
+      url.searchParams.set("registered", "1");
+      const response = NextResponse.redirect(url, 303);
+      response.headers.set("Cache-Control", "no-store");
+      return observability.correlate(response);
+    }
+    const response = NextResponse.json({
+      success: true,
+      verifyUrl: canExposeVerifyUrl ? verifyUrl : undefined,
+    }, { status: 201, headers: { "Cache-Control": "no-store" } });
     return observability.correlate(response);
   } catch (error) {
     if (isEmailUniqueConstraintError(error)) {
       observability.logger.info("auth registration email conflict", observability.elapsed({
         event: "auth.registration.email_conflict",
       }));
-      return apiErrorResponse({
-        status: 409,
-        code: API_ERROR_CODES.conflict,
-        message: "E-postadressen används redan",
-        requestId: observability.requestId,
-      });
+      return fail(409, API_ERROR_CODES.conflict, "E-postadressen används redan", "exists");
     }
 
     observability.logger.error("auth registration failed", error, observability.elapsed({
       event: "auth.registration.failed",
     }));
-    return apiErrorResponse({
-      status: 500,
-      code: API_ERROR_CODES.internalError,
-      message: "Internt serverfel",
-      requestId: observability.requestId,
-    });
+    return fail(500, API_ERROR_CODES.internalError, "Internt serverfel", "error");
   }
 }
