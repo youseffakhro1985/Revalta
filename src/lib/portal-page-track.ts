@@ -5,6 +5,7 @@ import { loadPublicTrackedTicket, type PublicTrackedTicket } from "@/lib/public-
 export type PortalSearchParams = {
   created?: string;
   commented?: string;
+  attached?: string;
   ref?: string;
   reason?: string;
   token?: string;

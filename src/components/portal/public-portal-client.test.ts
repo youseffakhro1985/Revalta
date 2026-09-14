@@ -29,6 +29,12 @@ describe("public portal ticket form", () => {
     expect(source).toContain('name="token"');
     expect(source).toContain("initialTrackedTicket");
     expect(source).toContain("initialCommented");
+    expect(source).toContain("initialAttached");
+    expect(source).toContain('id="public-attachment-form"');
+    expect(source).toContain('name="file"');
+    expect(source).toContain('name="native"');
+    expect(source).toContain("attachedTicketCopy");
+    expect(source).toContain('encType="multipart/form-data"');
     expect(source).toContain('id="public-comment-form"');
     expect(source).toContain('name="body"');
     expect(source).toContain("commentedTicketCopy");

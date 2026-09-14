@@ -1,8 +1,10 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { validateUploadFile } from "@/lib/document-file-security";
 import { recordStorageEvent } from "@/lib/integrations";
 import { extractPortalTrackingToken, verifyPortalTrackingToken } from "@/lib/portal-tracking";
+import { extractPortalCompanySlug } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { StorageConfigurationError, storeAttachment } from "@/lib/storage";
 import { NextResponse } from "next/server";
@@ -10,33 +12,59 @@ import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/public/tickets/[reference]/attachments" });
 
+function isNativeFormPost(form: FormData | null) {
+  return String(form?.get("native") || "") === "1";
+}
+
+function portalLandingPath(companySlug: string | null) {
+  return companySlug ? `/portal/${encodeURIComponent(companySlug)}` : "/portal";
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ reference: string }> }
 ) {
+  const { reference } = await params;
+  const formData = await request.formData().catch(() => null);
+  const nativeForm = isNativeFormPost(formData);
+  const companySlug = extractPortalCompanySlug(request, formData?.get("companySlug"));
+  const token = String(formData?.get("token") || extractPortalTrackingToken(request, formData) || "");
+
+  const fail = (status: number, message: string, reason: "invalid" | "rate" | "error" | "unavailable") => {
+    if (!nativeForm) {
+      return NextResponse.json({ error: message }, { status });
+    }
+    const url = new URL(portalLandingPath(companySlug), getPublicAppUrl(request.url));
+    url.searchParams.set("reason", reason);
+    if (reference) url.searchParams.set("ref", reference.toUpperCase());
+    if (token) url.searchParams.set("token", token);
+    const response = NextResponse.redirect(url, 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    return response;
+  };
+
   try {
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(`public-attachment:${ip}`, 10, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
-      return NextResponse.json({ error: "För många uppladdningar. Vänta en stund och prova igen." }, { status: 429 });
+      return fail(429, "För många uppladdningar. Vänta en stund och prova igen.", "rate");
     }
 
-    const { reference } = await params;
-    const formData = await request.formData();
-    const email = String(formData.get("email") || "").trim().toLowerCase();
-    const file = formData.get("file");
-    const tracking = verifyPortalTrackingToken(extractPortalTrackingToken(request, formData));
+    const email = String(formData?.get("email") || "").trim().toLowerCase();
+    const file = formData?.get("file");
+    const tracking = verifyPortalTrackingToken(token || extractPortalTrackingToken(request, formData));
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Fil krävs" }, { status: 400 });
+      return fail(400, "Fil krävs", "invalid");
     }
 
     const authorizedEmail = tracking?.email || email;
     if (!authorizedEmail.includes("@")) {
-      return NextResponse.json({ error: "E-post eller spårningstoken krävs" }, { status: 400 });
+      return fail(400, "E-post eller spårningstoken krävs", "invalid");
     }
     if (tracking && tracking.reference !== reference.toUpperCase()) {
-      return NextResponse.json({ error: "Ogiltig spårningstoken" }, { status: 403 });
+      return fail(403, "Ogiltig spårningstoken", "invalid");
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -48,7 +76,7 @@ export async function POST(
       maxBytes: 1024 * 1024,
     });
     if (!validation.ok) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+      return fail(400, validation.error, "invalid");
     }
 
     const ticket = await db.ticket.findFirst({
@@ -63,7 +91,7 @@ export async function POST(
     });
 
     if (!ticket?.company_id) {
-      return NextResponse.json({ error: "Ärendet hittades inte. Kontrollera referensnummer och e-post." }, { status: 404 });
+      return fail(404, "Ärendet hittades inte. Kontrollera referensnummer och e-post.", "invalid");
     }
 
     const storedFile = await storeAttachment({
@@ -103,12 +131,23 @@ export async function POST(
       provider: storedFile.provider,
     });
 
+    if (nativeForm) {
+      const url = new URL(portalLandingPath(companySlug), getPublicAppUrl(request.url));
+      url.searchParams.set("attached", "1");
+      url.searchParams.set("ref", reference.toUpperCase());
+      if (token) url.searchParams.set("token", token);
+      const response = NextResponse.redirect(url, 303);
+      response.headers.set("Cache-Control", "no-store");
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      return response;
+    }
+
     return NextResponse.json({ success: true, attachment }, { status: 201 });
   } catch (error) {
     if (error instanceof StorageConfigurationError) {
-      return NextResponse.json({ error: error.message }, { status: 503 });
+      return fail(503, error.message, "unavailable");
     }
     logger.error("Create public attachment error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    return fail(500, "Internt serverfel", "error");
   }
 }

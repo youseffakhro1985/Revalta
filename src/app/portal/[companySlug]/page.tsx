@@ -22,6 +22,7 @@ export default async function CompanyPortalPage({
       initialTrackedTicket={tracked.ticket}
       initialTrackError={tracked.error}
       initialCommented={query.commented === "1"}
+      initialAttached={query.attached === "1"}
     />
   );
 }
