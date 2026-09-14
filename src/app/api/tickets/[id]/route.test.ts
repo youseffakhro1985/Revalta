@@ -113,6 +113,44 @@ function makeRequest(method: string, body?: unknown) {
   });
 }
 
+function mockAssignedTicketPatch(fromStatus: string, toStatus: string) {
+  getCurrentUserMock.mockResolvedValue({
+    id: "user-1",
+    company_id: "company-1",
+    email: "user@example.se",
+    role: "owner",
+  });
+  ticketFindFirstMock.mockResolvedValue({
+    id: "ticket-1",
+    title: "Läckande kran",
+    status: fromStatus,
+    priority: "normal",
+    assigned_to_id: "tech-1",
+    due_date: null,
+    public_reference: "RV-12",
+    reporter_email: "anna@example.se",
+    reporter_phone: "0701234567",
+  });
+  transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => {
+    const tx = {
+      ticket: {
+        updateMany: ticketUpdateManyMock,
+        findFirst: vi.fn().mockResolvedValue({
+          id: "ticket-1",
+          title: "Läckande kran",
+          status: toStatus,
+          priority: "normal",
+          due_date: null,
+          closed_at: null,
+          assigned_to: { id: "tech-1", name: "Tekniker", email: "tech@example.se" },
+        }),
+      },
+      auditLog: { create: auditLogCreateMock },
+    };
+    return callback(tx);
+  });
+}
+
 describe("tickets/[id] GET", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -497,6 +535,78 @@ describe("tickets/[id] PATCH", () => {
         event: "updated",
         emailContent: expect.objectContaining({
           subject: "Tilldelad: Läckande kran",
+        }),
+      }),
+    );
+  });
+
+  it("emails the assignee when a ticket is paused", async () => {
+    mockAssignedTicketPatch("in_progress", "waiting");
+
+    const response = await PATCH(makeRequest("PATCH", { status: "waiting" }), { params });
+
+    expect(response.status).toBe(200);
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1" }),
+      expect.objectContaining({
+        recipient: "tech@example.se",
+        emailContent: expect.objectContaining({
+          subject: "Pausad: Läckande kran",
+          text: expect.stringContaining("Väntar"),
+        }),
+      }),
+    );
+    expect(queueTicketNotificationMock).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        emailContent: expect.objectContaining({ subject: "Tilldelad: Läckande kran" }),
+      }),
+    );
+  });
+
+  it("emails the assignee when a ticket is completed", async () => {
+    mockAssignedTicketPatch("in_progress", "completed");
+
+    const response = await PATCH(makeRequest("PATCH", { status: "completed" }), { params });
+
+    expect(response.status).toBe(200);
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1" }),
+      expect.objectContaining({
+        recipient: "tech@example.se",
+        emailContent: expect.objectContaining({ subject: "Slutförd: Läckande kran" }),
+      }),
+    );
+  });
+
+  it("emails the assignee when a ticket is cancelled", async () => {
+    mockAssignedTicketPatch("in_progress", "cancelled");
+
+    const response = await PATCH(makeRequest("PATCH", { status: "cancelled" }), { params });
+
+    expect(response.status).toBe(200);
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1" }),
+      expect.objectContaining({
+        recipient: "tech@example.se",
+        emailContent: expect.objectContaining({ subject: "Avbruten: Läckande kran" }),
+      }),
+    );
+  });
+
+  it("emails the assignee when a paused ticket is resumed", async () => {
+    mockAssignedTicketPatch("waiting", "in_progress");
+
+    const response = await PATCH(makeRequest("PATCH", { status: "in_progress" }), { params });
+
+    expect(response.status).toBe(200);
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1" }),
+      expect.objectContaining({
+        recipient: "tech@example.se",
+        emailContent: expect.objectContaining({
+          subject: "Återupptagen: Läckande kran",
+          text: expect.stringContaining("Pågående"),
         }),
       }),
     );
