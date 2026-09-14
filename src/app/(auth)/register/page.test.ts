@@ -13,5 +13,10 @@ describe("register form", () => {
     expect(source).toContain("data-ready");
     expect(source).not.toContain("value={email}");
     expect(source).not.toContain("disabled={controlsDisabled}");
+    expect(source).toContain("Fyll i namn, organisation, e-post och lösenord.");
+    expect(source).toContain("Ange en giltig e-postadress.");
+    expect(source).toContain("isValidEmail");
+    expect(source).toContain("isStrongPassword");
+    expect(source).not.toContain("••••");
   });
 });
