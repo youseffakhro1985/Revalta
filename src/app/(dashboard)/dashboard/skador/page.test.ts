@@ -8,5 +8,7 @@ describe("skador create query", () => {
     expect(source).toContain("closeCreate");
     expect(source).toContain("router.replace");
     expect(source).toContain("Nytt skadeärende");
+    expect(source).toContain("Skapa arbetsorder");
+    expect(source).toContain("/api/insurance-claims/${claim.id}/work-order");
   });
 });

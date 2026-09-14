@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CircleDollarSign, Download, FileWarning, Search, ShieldAlert, WalletCards } from "lucide-react";
+import { CircleDollarSign, Download, FileWarning, Search, ShieldAlert, WalletCards, Wrench } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
@@ -37,6 +37,8 @@ type Claim = {
   compensation?: number;
   net_cost?: number;
   note?: string;
+  work_order_id?: string | null;
+  work_order_number?: string | null;
   source?: "table" | "legacy";
 };
 
@@ -65,6 +67,7 @@ export default function InsuranceClaimsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [updatingId, setUpdatingId] = useState("");
+  const [creatingWorkOrderId, setCreatingWorkOrderId] = useState("");
   const [editingId, setEditingId] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -210,6 +213,23 @@ export default function InsuranceClaimsPage() {
     }
   }
 
+  async function createWorkOrder(claim: Claim) {
+    setCreatingWorkOrderId(claim.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/insurance-claims/${claim.id}/work-order`, { method: "POST" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsorder");
+      setSuccess(data.workOrderNumber ? `Arbetsorder ${data.workOrderNumber} är skapad.` : "Arbetsorder är skapad.");
+      await load();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Kunde inte skapa arbetsorder");
+    } finally {
+      setCreatingWorkOrderId("");
+    }
+  }
+
   function exportCsv() {
     const rows = [
       ["Fastighet", "Rubrik", "Skadetyp", "Skadedatum", "Status", "Försäkringsbolag", "Skadenummer", "Beräknad kostnad", "Självrisk", "Ersättning", "Nettokostnad"],
@@ -284,7 +304,7 @@ export default function InsuranceClaimsPage() {
                   </div>
                   <div className="rounded-xl bg-sand-50 px-4 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">Försäkring</p><p className="mt-1 text-sm font-semibold text-ink-800">{claim.insurer || "Ej angivet"}</p><p className="mt-1 text-xs text-ink-500">{claim.claim_number || "Skadenummer saknas"}</p></div>
                   <div className="rounded-xl bg-sand-50 px-4 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">Ekonomi</p><p className="mt-1 text-sm font-semibold text-ink-800">Netto {money.format(Number(claim.net_cost || 0))}</p><p className="mt-1 text-xs text-ink-500">Bedömt {money.format(Number(claim.estimated_cost || 0))}</p></div>
-                  {canManage && claim.source !== "legacy" ? <div className="flex flex-wrap gap-2 xl:w-[170px] xl:flex-col"><select disabled={updatingId === claim.id} value={claim.status || "reported"} onChange={(event) => void updateStatus(claim, event.target.value)} className={`${premiumFieldClass} h-9 text-xs`} aria-label={`Ändra status för ${claim.title || "skadeärende"}`}>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{canEditFields ? <button type="button" onClick={() => (editingId === claim.id ? setEditingId("") : startEdit(claim))} className={premiumCompactButtonClass}>{editingId === claim.id ? "Stäng" : "Ändra uppgifter"}</button> : null}</div> : null}
+                  {canManage && claim.source !== "legacy" ? <div className="flex flex-wrap gap-2 xl:w-[170px] xl:flex-col"><select disabled={updatingId === claim.id} value={claim.status || "reported"} onChange={(event) => void updateStatus(claim, event.target.value)} className={`${premiumFieldClass} h-9 text-xs`} aria-label={`Ändra status för ${claim.title || "skadeärende"}`}>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{claim.work_order_id ? <a href={`/dashboard/arbetsorder/${claim.work_order_id}`} className={`${premiumCompactButtonClass} justify-center`}><Wrench className="h-3.5 w-3.5" aria-hidden="true" />{claim.work_order_number ? `Öppna ${claim.work_order_number}` : "Öppna arbetsorder"}</a> : !closedStatuses.has(claim.status || "") ? <button type="button" disabled={creatingWorkOrderId === claim.id} onClick={() => void createWorkOrder(claim)} className={premiumCompactButtonClass}>{creatingWorkOrderId === claim.id ? "Skapar…" : "Skapa arbetsorder"}</button> : null}{canEditFields ? <button type="button" onClick={() => (editingId === claim.id ? setEditingId("") : startEdit(claim))} className={premiumCompactButtonClass}>{editingId === claim.id ? "Stäng" : "Ändra uppgifter"}</button> : null}</div> : null}
                 </div>
 
                 {canManage && editingId === claim.id && canEditFields ? (
