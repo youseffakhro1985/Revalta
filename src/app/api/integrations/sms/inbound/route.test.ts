@@ -20,7 +20,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { POST, swedishPhoneVariants } from "./route";
+import { POST } from "./route";
+import { swedishPhoneVariants } from "@/lib/sms-inbound-phone";
 
 function inboundRequest(body: string, token?: string) {
   const url = token
