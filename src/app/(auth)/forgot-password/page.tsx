@@ -14,6 +14,9 @@ export default function ForgotPasswordPage() {
 
   useEffect(() => {
     setHydrated(true);
+    if (new URLSearchParams(window.location.search).get("sent") === "1") {
+      setMessage("Om kontot finns skickar vi en återställningslänk.");
+    }
   }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {

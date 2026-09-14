@@ -17,5 +17,7 @@ describe("forgot-password form", () => {
     expect(source).toContain("Ange en giltig e-postadress.");
     expect(source).toContain("isValidEmail");
     expect(source).toContain("setError");
+    expect(source).toContain('get("sent") === "1"');
+    expect(source).toContain("Om kontot finns skickar vi en återställningslänk.");
   });
 });
