@@ -10,6 +10,7 @@ const logger = createLogger({ route: "/api/quotes" });
 const action = "quote.created";
 const decisionAction = "quote.status_changed";
 const updateAction = "quote.updated";
+const workOrderAction = "quote.work_order_created";
 const allowedStatuses = new Set(["draft", "sent", "approved", "rejected", "invoiced", "cancelled"]);
 const initialStatuses = new Set(["draft", "sent"]);
 const fieldEditableStatuses = new Set(["draft", "sent"]);
@@ -24,6 +25,17 @@ function parseOptionalDate(value: string) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function workOrderLinkFromMetadata(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const record = metadata as { workOrderId?: unknown; workOrderNumber?: unknown };
+  const workOrderId = typeof record.workOrderId === "string" ? record.workOrderId : "";
+  if (!workOrderId) return null;
+  return {
+    workOrderId,
+    workOrderNumber: typeof record.workOrderNumber === "string" ? record.workOrderNumber : null,
+  };
+}
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
@@ -33,7 +45,7 @@ export async function GET() {
       return NextResponse.json({ error: "Du saknar behörighet att visa offerter" }, { status: 403 });
     }
 
-    const [rows, decisions, legacyLogs, legacyDecisions, properties] = await Promise.all([
+    const [rows, decisions, legacyLogs, legacyDecisions, properties, workOrderLogs] = await Promise.all([
       db.quote.findMany({
         where: { company_id: user.company_id, property: { deleted_at: null } },
         orderBy: { created_at: "desc" },
@@ -70,10 +82,27 @@ export async function GET() {
         orderBy: { name: "asc" },
         select: { id: true, name: true, address: true, city: true },
       }),
+      db.auditLog.findMany({
+        where: { ...auditScopedWhere(user), action: workOrderAction },
+        orderBy: { created_at: "desc" },
+        take: 400,
+        select: { entity_id: true, metadata: true },
+      }),
     ]);
     void decisions;
 
-    const modern = rows.map((row) => ({
+    const workOrderByQuote = new Map<string, { workOrderId: string; workOrderNumber: string | null }>();
+    for (const log of workOrderLogs) {
+      const quoteId = log.entity_id;
+      const link = workOrderLinkFromMetadata(log.metadata);
+      if (quoteId && link && !workOrderByQuote.has(quoteId)) {
+        workOrderByQuote.set(quoteId, link);
+      }
+    }
+
+    const modern = rows.map((row) => {
+      const workOrder = workOrderByQuote.get(row.id);
+      return {
       id: row.id,
       property_id: row.property_id,
       property_name: row.property.name,
@@ -103,8 +132,11 @@ export async function GET() {
         created_at: decision.created_at,
       })),
       created_at: row.created_at,
+      work_order_id: workOrder?.workOrderId || null,
+      work_order_number: workOrder?.workOrderNumber || null,
       source: "table" as const,
-    }));
+    };
+    });
 
     const modernIds = new Set(modern.map((row) => row.id));
     const legacyDecisionMap = new Map<string, Array<Record<string, unknown>>>();

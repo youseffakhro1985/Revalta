@@ -1,13 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, CircleDollarSign, Download, FileCheck2, Plus, Printer, Search, Send, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDollarSign, Download, FileCheck2, Plus, Printer, Search, Send, Wrench, XCircle } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
   MetricCard,
   PageHeader,
   Panel,
+  premiumCompactButtonClass,
   premiumFieldClass,
   premiumPrimaryButtonClass,
   premiumSecondaryButtonClass,
@@ -38,6 +40,8 @@ type Quote = {
   decision_by?: string | null;
   history?: HistoryItem[];
   created_at: string;
+  work_order_id?: string | null;
+  work_order_number?: string | null;
   source?: "table" | "legacy";
 };
 
@@ -85,6 +89,7 @@ export default function QuotesPage() {
   const [editForm, setEditForm] = useState(emptyEdit);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [creatingWorkOrderId, setCreatingWorkOrderId] = useState("");
   const [form, setForm] = useState({ propertyId: "", title: "", supplier: "", status: "draft", validUntil: "", labor: "", material: "", supplierCost: "", other: "", vatRate: "25", note: "" });
 
   async function load() {
@@ -111,7 +116,7 @@ export default function QuotesPage() {
       if (statusFilter !== "all" && quote.status !== statusFilter) return false;
       if (propertyFilter !== "all" && quote.property_name !== propertyFilter) return false;
       if (!needle) return true;
-      return `${quote.title || ""} ${quote.property_name || ""} ${quote.supplier || ""} ${quote.note || ""}`.toLowerCase().includes(needle);
+      return `${quote.title || ""} ${quote.property_name || ""} ${quote.supplier || ""} ${quote.note || ""} ${quote.work_order_number || ""}`.toLowerCase().includes(needle);
     });
   }, [quotes, query, statusFilter, propertyFilter]);
 
@@ -197,6 +202,23 @@ export default function QuotesPage() {
       await load();
     }
     setUpdatingId("");
+  }
+
+  async function createWorkOrder(quote: Quote) {
+    setCreatingWorkOrderId(quote.id);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`/api/quotes/${quote.id}/work-order`, { method: "POST" });
+      const data = await readResponseJson(response);
+      if (!response.ok) throw new Error(data.error || "Kunde inte skapa arbetsorder");
+      setSuccess(data.workOrderNumber ? `Arbetsorder ${data.workOrderNumber} är skapad.` : "Arbetsorder är skapad.");
+      await load();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Kunde inte skapa arbetsorder");
+    } finally {
+      setCreatingWorkOrderId("");
+    }
   }
 
   async function saveEdit(quote: Quote) {
@@ -331,6 +353,8 @@ export default function QuotesPage() {
             {canManage && quote.source !== "legacy" && !["rejected", "invoiced", "cancelled"].includes(quote.status || "draft") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "rejected")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><XCircle className="h-4 w-4" />Avslå</button> : null}
             {canManage && quote.source !== "legacy" && (quote.status === "draft" || quote.status === "sent") ? <button type="button" disabled={updatingId === quote.id} onClick={() => startDecision(quote, "cancelled")} className="inline-flex h-10 items-center rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-danger-700 transition hover:bg-danger-50 disabled:opacity-50">Makulera</button> : null}
             {canManage && quote.source !== "legacy" && quote.status === "approved" ? <button type="button" disabled={updatingId === quote.id} onClick={() => void updateStatus(quote, "invoiced", "")} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><FileCheck2 className="h-4 w-4" />Fakturerad</button> : null}
+            {canManage && quote.source !== "legacy" && (quote.status === "approved" || quote.status === "invoiced") && quote.work_order_id ? <Link href={`/dashboard/arbetsorder/${quote.work_order_id}`} className={`${premiumCompactButtonClass} h-10 gap-2`}><Wrench className="h-4 w-4" aria-hidden="true" />{quote.work_order_number ? `Öppna ${quote.work_order_number}` : "Öppna arbetsorder"}</Link> : null}
+            {canManage && quote.source !== "legacy" && (quote.status === "approved" || quote.status === "invoiced") && !quote.work_order_id ? <button type="button" disabled={creatingWorkOrderId === quote.id} onClick={() => void createWorkOrder(quote)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><Wrench className="h-4 w-4" aria-hidden="true" />{creatingWorkOrderId === quote.id ? "Skapar…" : "Skapa arbetsorder"}</button> : null}
             <button type="button" onClick={() => printQuote(quote)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-700 transition hover:bg-sand-50"><Printer className="h-4 w-4" />Skriv ut / PDF</button>
           </div>
 
