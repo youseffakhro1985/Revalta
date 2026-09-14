@@ -76,7 +76,7 @@ export function ReportsToolbar({ period, propertyId, properties, rows, generated
     <div className="print:hidden flex flex-col gap-3 rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm xl:flex-row xl:items-center xl:justify-between">
       <div className="grid gap-2 sm:grid-cols-2 xl:flex xl:items-center">
         <label className="flex items-center gap-2 rounded-xl border border-sand-200 bg-surface-subtle px-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-400">Period</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-400">Period</span>
           <select
             aria-label="Välj rapportperiod"
             value={period}
@@ -90,7 +90,7 @@ export function ReportsToolbar({ period, propertyId, properties, rows, generated
         </label>
 
         <label className="flex items-center gap-2 rounded-xl border border-sand-200 bg-surface-subtle px-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-400">Fastighet</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-400">Fastighet</span>
           <select
             aria-label="Filtrera rapport på fastighet"
             value={propertyId}
