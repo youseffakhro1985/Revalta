@@ -201,7 +201,7 @@ export function PublicPortalClient({
         setLoading(false);
       }
     })();
-  }, []);
+  }, [initialTrackedTicket]);
 
   async function createTicket(event: React.FormEvent) {
     event.preventDefault();
