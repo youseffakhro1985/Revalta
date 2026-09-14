@@ -70,6 +70,8 @@ const action = {
   contractor: null,
   building_name: "Hus A",
   technical_asset_name: null,
+  source_work_order_id: null,
+  source_work_order_number: null,
 };
 const assets = [{ id: "asset-1", name: "Ventilation" }];
 

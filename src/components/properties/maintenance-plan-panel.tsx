@@ -2,11 +2,12 @@
 
 import { readResponseJson } from "@/lib/fetch-json";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarRange, CheckCircle2, CircleDollarSign, Plus, TrendingUp } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { AlertTriangle, CalendarRange, CheckCircle2, CircleDollarSign, Plus, TrendingUp, Wrench } from "lucide-react";
+import Link from "next/link";
+import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Plan = { id:string; name:string; version:number; status:string; base_year:number; horizon_years:number; annual_index_rate:number; summary:string|null; assumptions:string|null };
-type Action = { id:string; category:string; title:string; description:string|null; scope:string|null; planned_year:number; recurrence_years:number|null; technical_lifetime_years:number|null; estimated_cost:number; annual_index_rate:number|null; priority:string; risk:string; status:string; contractor:string|null; building_name:string|null; technical_asset_name:string|null };
+type Action = { id:string; category:string; title:string; description:string|null; scope:string|null; planned_year:number; recurrence_years:number|null; technical_lifetime_years:number|null; estimated_cost:number; annual_index_rate:number|null; priority:string; risk:string; status:string; contractor:string|null; building_name:string|null; technical_asset_name:string|null; source_work_order_id:string|null; source_work_order_number:string|null };
 type Data = {
   property:{ id:string; name:string; buildings:{id:string;name:string}[] };
   plans:Plan[];
@@ -32,6 +33,7 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
   const [data,setData]=useState<Data|null>(null);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
+  const [creatingId,setCreatingId]=useState("");
   const [error,setError]=useState("");
   const [success,setSuccess]=useState("");
   const [mode,setMode]=useState<"action"|"plan">("action");
@@ -56,6 +58,20 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
   async function activate(planId:string){
     setSaving(true);setError("");setSuccess("");
     try{const r=await fetch(`/api/properties/${propertyId}/maintenance-plan`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"plan.activate",planId})});const p=await readResponseJson(r);if(!r.ok)throw new Error(p.error||"Kunde inte aktivera planen");setSuccess("Planen är nu aktiv.");await load();}catch(e){setError(e instanceof Error?e.message:"Kunde inte aktivera planen");}finally{setSaving(false);}
+  }
+
+  async function createWorkOrder(item:Action){
+    if(item.source_work_order_id)return;
+    setCreatingId(item.id);setError("");setSuccess("");
+    try{
+      const r=await fetch(`/api/properties/${propertyId}/maintenance-plan/action/work-order`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({actionId:item.id})});
+      const p=await readResponseJson(r);
+      if(!r.ok)throw new Error(p.error||"Kunde inte skapa arbetsordern");
+      const number=typeof p.workOrderNumber==="string"?p.workOrderNumber:"";
+      setSuccess(number?`Arbetsorder ${number} skapades från underhållsåtgärden.`:"Arbetsorder skapad och kopplad till underhållsåtgärden.");
+      await load();
+    }catch(e){setError(e instanceof Error?e.message:"Kunde inte skapa arbetsordern");}
+    finally{setCreatingId("");}
   }
 
   if(loading)return <div className="space-y-4"><div className="h-28 animate-pulse rounded-2xl bg-sand-100"/><div className="h-96 animate-pulse rounded-2xl bg-sand-100"/></div>;
@@ -108,8 +124,8 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
         {data.plans.length>0?<div className="mt-6 border-t border-sand-100 pt-5"><p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-500">Planversioner</p><div className="space-y-2">{data.plans.map(plan=><div key={plan.id} className="flex items-center justify-between gap-3 rounded-xl bg-sand-50 p-3"><div><p className="text-sm font-semibold text-ink-800">{plan.name} · v{plan.version}</p><p className="text-xs text-ink-500">{plan.base_year} · {plan.horizon_years} år</p></div>{plan.status==="active"?<Badge value="active" type="status"/>:<button type="button" disabled={saving} onClick={()=>activate(plan.id)} className="text-xs font-semibold text-petroleum-700">Aktivera</button>}</div>)}</div></div>:null}
       </Panel>
 
-      <Panel title="Planerade åtgärder" description="Prioriterad åtgärdslista för den valda planversionen." bodyClassName="p-0">
-        {data.actions.length===0?<EmptyState title="Inga åtgärder registrerade" description="Lägg till den första åtgärden för att bygga underhållsplanen."/>:<div className="divide-y divide-sand-100">{data.actions.map(item=><article key={item.id} className="p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{item.title}</h3><Badge value={item.priority} type="priority"/><Badge value={item.risk} type="risk"/><Badge value={item.status} type="status"/></div><p className="mt-2 text-sm text-ink-500">{item.category}{item.building_name?` · ${item.building_name}`:""}{item.technical_asset_name?` · ${item.technical_asset_name}`:""}</p>{item.scope?<p className="mt-2 text-sm leading-6 text-ink-600">{item.scope}</p>:null}</div><div className="shrink-0 text-left sm:text-right"><p className="text-lg font-semibold text-ink-950">{money.format(item.estimated_cost)}</p><p className="mt-1 flex items-center gap-1 text-xs text-ink-500 sm:justify-end"><CalendarRange className="h-3.5 w-3.5"/>{item.planned_year}{item.recurrence_years?` · vart ${item.recurrence_years}:e år`:""}</p></div></div></article>)}</div>}
+      <Panel title="Planerade åtgärder" description="Prioriterad åtgärdslista för den valda planversionen. Skapa arbetsorder när åtgärden ska utföras." bodyClassName="p-0">
+        {data.actions.length===0?<EmptyState title="Inga åtgärder registrerade" description="Lägg till den första åtgärden för att bygga underhållsplanen."/>:<div className="divide-y divide-sand-100">{data.actions.map(item=><article key={item.id} className="p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{item.title}</h3><Badge value={item.priority} type="priority"/><Badge value={item.risk} type="risk"/><Badge value={item.status} type="status"/></div><p className="mt-2 text-sm text-ink-500">{item.category}{item.building_name?` · ${item.building_name}`:""}{item.technical_asset_name?` · ${item.technical_asset_name}`:""}</p>{item.scope?<p className="mt-2 text-sm leading-6 text-ink-600">{item.scope}</p>:null}{item.source_work_order_id?<Link href={`/dashboard/arbetsorder/${item.source_work_order_id}`} className={`${premiumSecondaryButtonClass} mt-3 h-9 px-3 text-xs`}><Wrench className="h-3.5 w-3.5" aria-hidden="true"/>{item.source_work_order_number||"Öppna arbetsorder"}</Link>:!["completed","cancelled"].includes(item.status)?<button type="button" disabled={creatingId===item.id} onClick={()=>void createWorkOrder(item)} className={`${premiumPrimaryButtonClass} mt-3 h-9 px-3 text-xs`}><Wrench className="h-3.5 w-3.5" aria-hidden="true"/>{creatingId===item.id?"Skapar…":"Skapa arbetsorder"}</button>:null}</div><div className="shrink-0 text-left sm:text-right"><p className="text-lg font-semibold text-ink-950">{money.format(item.estimated_cost)}</p><p className="mt-1 flex items-center gap-1 text-xs text-ink-500 sm:justify-end"><CalendarRange className="h-3.5 w-3.5"/>{item.planned_year}{item.recurrence_years?` · vart ${item.recurrence_years}:e år`:""}</p></div></div></article>)}</div>}
       </Panel>
     </div>
   </section>;
