@@ -23,6 +23,7 @@ import { completeWorkOrderLifecycle } from "@/lib/work-order-completion";
 import { syncWorkOrderToTicket } from "@/lib/work-order-ticket-sync";
 import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
 import { notifyAssignee } from "@/lib/assignee-notify";
+import { notifyVendor } from "@/lib/vendor-notify";
 import {
   normalizeWorkOrderPriority,
   normalizeWorkOrderStatus,
@@ -152,6 +153,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         created_at: true,
         updated_at: true,
         ...workOrderVendorIdSelect(persistVendor),
+        property: { select: { name: true } },
       },
     }),
     getWorkOrderEnterpriseState(db, companyId, id),
@@ -181,6 +183,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   let nextStatus: WorkOrderStatus | null = null;
   let nextPriority: WorkOrderPriority | null = null;
+  let assignedVendorEmail: string | null = null;
   const statusReason = body.statusReason === undefined ? null : String(body.statusReason || "").trim();
   const assetLinksChanged = body.buildingId !== undefined || body.technicalAssetId !== undefined;
   const buildingId = body.buildingId !== undefined ? (body.buildingId ? String(body.buildingId).trim() : null) : assetLinkBefore?.building_id ?? null;
@@ -256,6 +259,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           propertyId: existing.property_id,
         });
         if (!vendor) return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 400 });
+        assignedVendorEmail = vendor.email;
       }
       data.vendor_contract_id = vendorContractId;
     }
@@ -551,6 +555,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
     } catch (notificationError) {
       logger.error("Work-order assignee notification failed", notificationError);
+    }
+  }
+  const assignedVendorId = persistVendor
+    ? (assignedWorkOrder as { vendor_contract_id?: string | null }).vendor_contract_id ?? null
+    : null;
+  const previousVendorId = persistVendor
+    ? (existing as { vendor_contract_id?: string | null }).vendor_contract_id ?? null
+    : null;
+  if (assignedVendorId && assignedVendorId !== previousVendorId) {
+    try {
+      await notifyVendor(user, {
+        workOrderId: assignedWorkOrder.id,
+        title: assignedWorkOrder.title,
+        workOrderNumber: enterpriseBefore?.work_order_number,
+        propertyName: existing.property?.name,
+        vendorContractId: assignedVendorId,
+        vendorEmail: assignedVendorEmail,
+      });
+    } catch (notificationError) {
+      logger.error("Work-order vendor notification failed", notificationError);
     }
   }
 

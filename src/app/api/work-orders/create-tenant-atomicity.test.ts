@@ -188,7 +188,7 @@ describe("work-order create tenant and atomicity boundaries", () => {
     expect(response.status).toBe(404);
     expect(propertyFindFirstMock).toHaveBeenCalledWith({
       where: { id: "property-1", company_id: "company-1", deleted_at: null },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     expect(transactionMock).not.toHaveBeenCalled();
   });

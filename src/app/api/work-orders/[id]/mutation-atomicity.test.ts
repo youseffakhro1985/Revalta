@@ -54,6 +54,7 @@ vi.mock("@/lib/work-order-ticket-sync", () => ({ syncWorkOrderToTicket: ticketSy
 vi.mock("@/lib/component-work-order-sync", () => ({ syncCompletedWorkOrderToComponent: componentSyncMock }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/ticket-reporter-notify", () => ({ notifyTicketReporter: notifyTicketReporterMock }));
+vi.mock("@/lib/vendor-notify", () => ({ notifyVendor: vi.fn().mockResolvedValue({ emailed: false }) }));
 
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
@@ -263,7 +264,7 @@ describe("core work-order mutation atomicity", () => {
         status: "active",
         OR: [{ property_id: null }, { property_id: "property-1" }],
       },
-      select: { id: true, name: true, category: true },
+      select: { id: true, name: true, category: true, email: true },
     });
     expect(workOrderUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ vendor_contract_id: "vendor-1" }),

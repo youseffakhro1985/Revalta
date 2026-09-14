@@ -228,7 +228,7 @@ export default function NewWorkOrderPage() {
               ) : propertyVendors.length === 0 ? (
                 <span className="block text-xs text-ink-500">Inga aktiva leverantörer i registret för vald fastighet. Lägg till under Leverantörer.</span>
               ) : (
-                <span className="block text-xs text-ink-500">Valfritt. Intern tekniker och extern leverantör kan anges samtidigt.</span>
+                <span className="block text-xs text-ink-500">Valfritt. Vid koppling mejlas leverantörens kontaktadress i registret.</span>
               )}
             </label>
 

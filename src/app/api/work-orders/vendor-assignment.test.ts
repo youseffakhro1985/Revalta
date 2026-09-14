@@ -96,6 +96,7 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/work-order-sla", () => ({ evaluateWorkOrderSla: vi.fn() }));
 vi.mock("@/lib/integrations", () => ({ recordAiEvent: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/assignee-notify", () => ({ notifyAssignee: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/vendor-notify", () => ({ notifyVendor: vi.fn().mockResolvedValue({ emailed: true }) }));
 vi.mock("@/lib/ai", () => ({
   analyzeTicket: vi.fn().mockResolvedValue({
     category: "other",
@@ -108,6 +109,7 @@ vi.mock("@/lib/ai", () => ({
 }));
 
 import { POST } from "./route";
+import { notifyVendor } from "@/lib/vendor-notify";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const manager = { id: "manager-1", company_id: "company-1", role: "manager", email: "manager@example.se" };
@@ -137,7 +139,7 @@ describe("work-order vendor contract assignment", () => {
     getCurrentUserMock.mockResolvedValue(manager);
     propertyFindFirstMock.mockResolvedValue({ id: "property-1" });
     userFindFirstMock.mockResolvedValue({ id: "assignee-1", email: "tech@example.se" });
-    vendorFindFirstMock.mockResolvedValue({ id: "vendor-1", name: "Städ AB", category: "Städ" });
+    vendorFindFirstMock.mockResolvedValue({ id: "vendor-1", name: "Städ AB", category: "Städ", email: "kontakt@stad.se" });
     hasVendorColumnMock.mockResolvedValue(true);
     validateWorkOrderAssetLinksMock.mockResolvedValue(undefined);
     allocateWorkOrderNumberMock.mockResolvedValue("AO-1001");
@@ -168,11 +170,20 @@ describe("work-order vendor contract assignment", () => {
         status: "active",
         OR: [{ property_id: null }, { property_id: "property-1" }],
       },
-      select: { id: true, name: true, category: true },
+      select: { id: true, name: true, category: true, email: true },
     });
     expect(workOrderCreateMock).toHaveBeenCalledWith({
       data: expect.objectContaining({ vendor_contract_id: "vendor-1" }),
     });
+    expect(notifyVendor).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "manager-1", company_id: "company-1" }),
+      expect.objectContaining({
+        workOrderId: "work-order-1",
+        vendorContractId: "vendor-1",
+        vendorEmail: "kontakt@stad.se",
+        workOrderNumber: "AO-1001",
+      }),
+    );
     expect(writeAuditLogMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
