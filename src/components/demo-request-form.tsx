@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { readResponseJson } from "@/lib/fetch-json";
@@ -16,7 +16,20 @@ type DemoResponse = {
 const fieldClass = "mt-1.5 h-12 w-full rounded-xl border border-sand-300 bg-white px-3.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-400 focus:ring-2 focus:ring-petroleum-600/10";
 const textareaClass = "mt-1.5 min-h-32 w-full resize-y rounded-xl border border-sand-300 bg-white px-3.5 py-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-400 focus:ring-2 focus:ring-petroleum-600/10";
 
-export function DemoRequestForm() {
+function demoReasonCopy(reason?: string | null) {
+  if (reason === "invalid") return "Fyll i namn, giltig e-post och företag";
+  if (reason === "rate") return "För många förfrågningar. Försök igen senare.";
+  if (reason === "error") return "Demoförfrågan kunde inte skickas just nu.";
+  return "";
+}
+
+export function DemoRequestForm({
+  initialSent = false,
+  initialReason = "",
+}: {
+  initialSent?: boolean;
+  initialReason?: string;
+}) {
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -28,13 +41,20 @@ export function DemoRequestForm() {
     website: "",
   });
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(initialSent);
+  const [error, setError] = useState(() => demoReasonCopy(initialReason));
   const [requestId, setRequestId] = useState("");
 
   function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
   }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("sent") === "1") setSuccess(true);
+    const reasonCopy = demoReasonCopy(params.get("reason"));
+    if (reasonCopy) setError(reasonCopy);
+  }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,7 +95,13 @@ export function DemoRequestForm() {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-[24px] border border-sand-200 bg-white p-5 shadow-premium-lg sm:p-7 lg:p-8">
+    <form
+      id="demo-request-form"
+      method="post"
+      action="/api/demo-request"
+      onSubmit={submit}
+      className="relative rounded-[24px] border border-sand-200 bg-white p-5 shadow-premium-lg sm:p-7 lg:p-8"
+    >
       <div className="mb-7">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Boka demo</p>
         <h2 className="mt-2 font-display text-2xl font-semibold tracking-[-0.035em] text-ink-950 sm:text-[28px]">Berätta kort om er förvaltning</h2>
@@ -102,33 +128,33 @@ export function DemoRequestForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-xs font-semibold text-ink-700">
           Namn *
-          <input required autoComplete="name" maxLength={120} value={form.name} onChange={(event) => update("name", event.target.value)} className={fieldClass} placeholder="För- och efternamn" />
+          <input required name="name" autoComplete="name" maxLength={120} value={form.name} onChange={(event) => update("name", event.target.value)} className={fieldClass} placeholder="För- och efternamn" />
         </label>
         <label className="block text-xs font-semibold text-ink-700">
           E-post *
-          <input required type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => update("email", event.target.value)} className={fieldClass} placeholder="namn@foretag.se" />
+          <input required name="email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => update("email", event.target.value)} className={fieldClass} placeholder="namn@foretag.se" />
         </label>
         <label className="block text-xs font-semibold text-ink-700">
           Företag / organisation *
-          <input required autoComplete="organization" maxLength={160} value={form.company} onChange={(event) => update("company", event.target.value)} className={fieldClass} placeholder="Företagsnamn" />
+          <input required name="company" autoComplete="organization" maxLength={160} value={form.company} onChange={(event) => update("company", event.target.value)} className={fieldClass} placeholder="Företagsnamn" />
         </label>
         <label className="block text-xs font-semibold text-ink-700">
           Telefon
-          <input type="tel" autoComplete="tel" maxLength={50} value={form.phone} onChange={(event) => update("phone", event.target.value)} className={fieldClass} placeholder="070-000 00 00" />
+          <input name="phone" type="tel" autoComplete="tel" maxLength={50} value={form.phone} onChange={(event) => update("phone", event.target.value)} className={fieldClass} placeholder="070-000 00 00" />
         </label>
         <label className="block text-xs font-semibold text-ink-700">
           Roll
-          <input maxLength={120} value={form.role} onChange={(event) => update("role", event.target.value)} className={fieldClass} placeholder="T.ex. fastighetschef" />
+          <input name="role" maxLength={120} value={form.role} onChange={(event) => update("role", event.target.value)} className={fieldClass} placeholder="T.ex. fastighetschef" />
         </label>
         <label className="block text-xs font-semibold text-ink-700">
           Bestånd / omfattning
-          <input maxLength={160} value={form.portfolio} onChange={(event) => update("portfolio", event.target.value)} className={fieldClass} placeholder="T.ex. 25 fastigheter" />
+          <input name="portfolio" maxLength={160} value={form.portfolio} onChange={(event) => update("portfolio", event.target.value)} className={fieldClass} placeholder="T.ex. 25 fastigheter" />
         </label>
       </div>
 
       <label className="mt-4 block text-xs font-semibold text-ink-700">
         Vad vill ni se i Revalta?
-        <textarea maxLength={2000} value={form.message} onChange={(event) => update("message", event.target.value)} className={textareaClass} placeholder="Exempel: felanmälan, arbetsorder, planerat underhåll, ekonomi eller boendeportal." />
+        <textarea name="message" maxLength={2000} value={form.message} onChange={(event) => update("message", event.target.value)} className={textareaClass} placeholder="Exempel: felanmälan, arbetsorder, planerat underhåll, ekonomi eller boendeportal." />
       </label>
 
       <div className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">

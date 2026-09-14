@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
+import { getPublicAppUrl } from "@/lib/app-url";
 import db from "@/lib/db";
 import { deliverDemoRequest, type DemoRequest } from "@/lib/demo-request-email";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -41,37 +42,92 @@ function retryAfterSeconds(resetAt: Date) {
   return Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000));
 }
 
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readDemoPayload(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return {
+      name: String(form?.get("name") || ""),
+      email: String(form?.get("email") || ""),
+      company: String(form?.get("company") || ""),
+      phone: String(form?.get("phone") || ""),
+      role: String(form?.get("role") || ""),
+      portfolio: String(form?.get("portfolio") || ""),
+      message: String(form?.get("message") || ""),
+      website: String(form?.get("website") || ""),
+    };
+  }
+  const parsed = await request.json();
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid json object");
+  return parsed as Record<string, unknown>;
+}
+
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
-  const reject = (status: number, code: Parameters<typeof apiErrorResponse>[0]["code"], message: string, event: string, headers?: HeadersInit) => {
+  const nativeForm = isNativeFormPost(request);
+  const withSecurityHeaders = (response: NextResponse, headers?: HeadersInit) => {
+    for (const [name, value] of Object.entries(SUCCESS_HEADERS)) {
+      response.headers.set(name, value);
+    }
+    if (headers) {
+      new Headers(headers).forEach((value, name) => {
+        if (name.toLowerCase() === "retry-after") response.headers.set(name, value);
+      });
+    }
+    return observability.correlate(response);
+  };
+  const reject = (
+    status: number,
+    code: Parameters<typeof apiErrorResponse>[0]["code"],
+    message: string,
+    event: string,
+    reason: "invalid" | "rate" | "error",
+    headers?: HeadersInit,
+  ) => {
     observability.logger.warn("demo request rejected", observability.elapsed({ event, status }));
-    return apiErrorResponse({ status, code, message, requestId: observability.requestId, headers });
+    if (!nativeForm) {
+      return apiErrorResponse({ status, code, message, requestId: observability.requestId, headers });
+    }
+    const url = new URL("/demo", getPublicAppUrl(request.url));
+    url.searchParams.set("reason", reason);
+    return withSecurityHeaders(NextResponse.redirect(url, 303), headers);
+  };
+  const accept = (status: number, body: Record<string, unknown>) => {
+    if (!nativeForm) {
+      return observability.correlate(NextResponse.json(body, { status, headers: SUCCESS_HEADERS }));
+    }
+    const url = new URL("/demo", getPublicAppUrl(request.url));
+    url.searchParams.set("sent", "1");
+    return withSecurityHeaders(NextResponse.redirect(url, 303));
   };
 
   try {
     if (!isTrustedMutationRequest(request)) {
-      return reject(403, API_ERROR_CODES.untrustedMutation, "Begäran kunde inte verifieras", "demo_request.untrusted_origin");
+      return reject(403, API_ERROR_CODES.untrustedMutation, "Begäran kunde inte verifieras", "demo_request.untrusted_origin", "error");
     }
     if (isDeclaredRequestBodyTooLarge(request)) {
-      return reject(413, API_ERROR_CODES.payloadTooLarge, "Förfrågan är för stor", "demo_request.payload_too_large");
+      return reject(413, API_ERROR_CODES.payloadTooLarge, "Förfrågan är för stor", "demo_request.payload_too_large", "invalid");
     }
 
     let payload: Record<string, unknown>;
     try {
-      const parsed = await request.json();
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid json object");
-      payload = parsed as Record<string, unknown>;
+      payload = await readDemoPayload(request);
     } catch {
-      return reject(400, API_ERROR_CODES.validationFailed, "Ogiltig förfrågan", "demo_request.invalid_json");
+      return reject(400, API_ERROR_CODES.validationFailed, "Ogiltig förfrågan", "demo_request.invalid_json", "invalid");
     }
 
     const input = normalizePayload(payload);
     if (input.website) {
       observability.logger.info("demo request honeypot accepted silently", observability.elapsed({ event: "demo_request.honeypot" }));
-      return observability.correlate(NextResponse.json({ ok: true }, { headers: SUCCESS_HEADERS }));
+      return accept(200, { ok: true });
     }
     if (input.name.length < 2 || input.company.length < 2 || !isValidEmail(input.email)) {
-      return reject(400, API_ERROR_CODES.validationFailed, "Fyll i namn, giltig e-post och företag", "demo_request.validation_failed");
+      return reject(400, API_ERROR_CODES.validationFailed, "Fyll i namn, giltig e-post och företag", "demo_request.validation_failed", "invalid");
     }
 
     const ip = getClientIp(request);
@@ -82,6 +138,7 @@ export async function POST(request: Request) {
         API_ERROR_CODES.rateLimited,
         "För många förfrågningar. Försök igen senare.",
         "demo_request.ip_rate_limited",
+        "rate",
         { "Retry-After": String(retryAfterSeconds(ipLimit.resetAt)) },
       );
     }
@@ -93,6 +150,7 @@ export async function POST(request: Request) {
         API_ERROR_CODES.rateLimited,
         "För många förfrågningar. Försök igen senare.",
         "demo_request.identity_rate_limited",
+        "rate",
         { "Retry-After": String(retryAfterSeconds(identityLimit.resetAt)) },
       );
     }
@@ -155,10 +213,7 @@ export async function POST(request: Request) {
         reason: delivery.reason,
         leadId: lead.id,
       }));
-      return observability.correlate(NextResponse.json(
-        { ok: true, deliveryPending: true },
-        { status: 202, headers: SUCCESS_HEADERS },
-      ));
+      return accept(202, { ok: true, deliveryPending: true });
     }
 
     observability.logger.info("demo request completed", observability.elapsed({
@@ -167,9 +222,14 @@ export async function POST(request: Request) {
       leadId: lead.id,
       hasProviderId: Boolean(delivery.providerId),
     }));
-    return observability.correlate(NextResponse.json({ ok: true }, { headers: SUCCESS_HEADERS }));
+    return accept(200, { ok: true });
   } catch (error) {
     observability.logger.error("demo request failed", error, observability.elapsed({ event: "demo_request.failed" }));
+    if (nativeForm) {
+      const url = new URL("/demo", getPublicAppUrl(request.url));
+      url.searchParams.set("reason", "error");
+      return withSecurityHeaders(NextResponse.redirect(url, 303));
+    }
     return apiErrorResponse({
       status: 500,
       code: API_ERROR_CODES.internalError,
