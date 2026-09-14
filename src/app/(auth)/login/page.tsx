@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isResident } from "@/lib/permissions";
 import { homePathForRole, isStaffOnlyDashboardPath } from "@/lib/resident-access";
-import { safeInternalPath } from "@/lib/security";
+import { isValidEmail, safeInternalPath } from "@/lib/security";
 import { AuthAlert, AuthShell, authButtonClass, authInputClass } from "@/components/auth/auth-shell";
 
 const EMAIL_VERIFICATION_REQUIRED = "EMAIL_VERIFICATION_REQUIRED";
@@ -33,12 +33,20 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const submittedEmail = String(form.get("email") || "");
+    const submittedEmail = String(form.get("email") || "").trim();
     const submittedPassword = String(form.get("password") || "");
     setEmail(submittedEmail);
     setError("");
     setResendStatus("");
     setVerificationRequired(false);
+    if (!submittedEmail || !submittedPassword) {
+      setError("Ange både e-post och lösenord.");
+      return;
+    }
+    if (!isValidEmail(submittedEmail)) {
+      setError("Ange en giltig e-postadress.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {

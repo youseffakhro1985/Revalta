@@ -16,5 +16,8 @@ describe("login form", () => {
     expect(source).toContain('defaultValue=""');
     expect(source).not.toContain("value={email}");
     expect(source).not.toContain("value={password}");
+    expect(source).toContain("Ange både e-post och lösenord.");
+    expect(source).toContain("Ange en giltig e-postadress.");
+    expect(source).toContain("isValidEmail");
   });
 });
