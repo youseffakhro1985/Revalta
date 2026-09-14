@@ -85,6 +85,11 @@ export function schemaCompatibilityBannerMessage() {
   return "Databasschema väntar på Database Release. Listor körs tillfälligt utan soft-delete-filter så att du kan arbeta vidare i preview.";
 }
 
+/** Översikt queries core models with deleted_at, not ronder/underhåll tables. */
+export function canRenderHomeDashboard(schema: Pick<SchemaReadiness, "missing">) {
+  return !schema.missing.some((item) => item.column !== "*");
+}
+
 export async function getSchemaReadiness(): Promise<SchemaReadiness> {
   const client = getPrismaBaseClient();
   const missingModels = await getMissingSoftDeleteModels(client);

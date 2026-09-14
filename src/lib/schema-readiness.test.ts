@@ -8,6 +8,7 @@ import {
   isMissingTableError,
   schemaCompatibilityBannerMessage,
   schemaMismatchUserMessage,
+  canRenderHomeDashboard,
   ticketAiSourceSelect,
   ticketAiSourceWrite,
 } from "@/lib/schema-readiness";
@@ -85,6 +86,28 @@ describe("schema-readiness", () => {
         "AuditLog.module",
       ]),
     ).toBe("Ticket.deleted_at, InspectionChecklistTemplate, AuditLog.module");
+  });
+
+  it("keeps Översikt available when only module tables are missing", () => {
+    expect(
+      canRenderHomeDashboard({
+        missing: [{ table: "InspectionChecklistTemplate", column: "*" }],
+      }),
+    ).toBe(true);
+    expect(
+      canRenderHomeDashboard({
+        missing: [
+          { table: "InspectionRound", column: "*" },
+          { table: "MaintenancePlan", column: "*" },
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      canRenderHomeDashboard({
+        missing: [{ table: "Ticket", column: "deleted_at" }],
+      }),
+    ).toBe(false);
+    expect(canRenderHomeDashboard({ missing: [] })).toBe(true);
   });
 
   it("omits Ticket.ai_source writes and selects until Database Release", () => {
