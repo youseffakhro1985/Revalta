@@ -651,7 +651,7 @@ export default function RoundsPage() {
             <div className="overflow-x-auto">
               <table className="min-w-[960px] w-full text-left">
                 <thead>
-                  <tr className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-500">
+                  <tr className="text-xs font-semibold uppercase tracking-[0.11em] text-ink-500">
                     <th className="px-5 py-3">Rond</th>
                     <th className="px-4 py-3">Fastighet</th>
                     <th className="px-4 py-3">Rondtyp</th>
@@ -673,20 +673,20 @@ export default function RoundsPage() {
                         <td className="px-5 py-4">
                           <button type="button" onClick={() => openRound(round)} className="max-w-[250px] text-left outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
                             <span className="block truncate text-sm font-semibold text-ink-900 group-hover:text-petroleum-900">{round.title || "Rond"}</span>
-                            <span className="mt-1 block truncate text-[11px] text-ink-500">{openDeviationCount(round) ? `${openDeviationCount(round)} öppen avvikelse` : "Inga öppna avvikelser"}</span>
+                            <span className="mt-1 block truncate text-xs text-ink-500">{openDeviationCount(round) ? `${openDeviationCount(round)} öppen avvikelse` : "Inga öppna avvikelser"}</span>
                           </button>
                         </td>
                         <td className="px-4 py-4">
                           <p className="text-xs font-semibold text-ink-800">{round.propertyName || "Fastighet"}</p>
-                          <p className="mt-1 max-w-[180px] truncate text-[11px] text-ink-500">{[round.propertyAddress, round.propertyCity].filter(Boolean).join(", ") || "Adress saknas"}</p>
+                          <p className="mt-1 max-w-[180px] truncate text-xs text-ink-500">{[round.propertyAddress, round.propertyCity].filter(Boolean).join(", ") || "Adress saknas"}</p>
                         </td>
                         <td className="px-4 py-4 text-xs text-ink-700">{intervalLabels[round.interval || "monthly"] || round.interval}</td>
                         <td className="px-4 py-4">
                           <p className={`text-xs font-semibold ${isOverdue(round, nowMs) ? "text-danger-700" : "text-ink-800"}`}>{round.nextDue ? dateTimeFormat.format(new Date(round.nextDue)) : "Ej satt"}</p>
-                          <p className="mt-1 text-[11px] text-ink-500">{intervalLongLabels[round.interval || "monthly"]}</p>
+                          <p className="mt-1 text-xs text-ink-500">{intervalLongLabels[round.interval || "monthly"]}</p>
                         </td>
-                        <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${pill.className}`}>{pill.label}</span></td>
-                        <td className="px-4 py-4">{round.status === "completed" && result !== null ? <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${result >= 90 ? "bg-success-50 text-success-700" : result >= 60 ? "bg-warning-50 text-warning-800" : "bg-danger-50 text-danger-700"}`}>{result}%</span> : <span className="text-xs text-ink-400">—</span>}</td>
+                        <td className="px-4 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${pill.className}`}>{pill.label}</span></td>
+                        <td className="px-4 py-4">{round.status === "completed" && result !== null ? <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${result >= 90 ? "bg-success-50 text-success-700" : result >= 60 ? "bg-warning-50 text-warning-800" : "bg-danger-50 text-danger-700"}`}>{result}%</span> : <span className="text-xs text-ink-400">—</span>}</td>
                         <td className="px-4 py-4">
                           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-700">
                             {addressed === total && total > 0 ? <CheckCircle2 className="h-3.5 w-3.5 text-success-600" /> : <Circle className="h-3.5 w-3.5 text-ink-300" />}
@@ -722,8 +722,8 @@ export default function RoundsPage() {
               <div className="divide-y divide-sand-100">
                 {overdueRounds.slice(0, 5).map((round) => (
                   <button key={round.id} type="button" onClick={() => openRound(round)} className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-sand-50">
-                    <span className="min-w-0"><span className="block truncate text-xs font-semibold text-ink-900">{round.propertyName || round.title}</span><span className="mt-1 block truncate text-[11px] text-ink-500">{round.title}</span></span>
-                    <span className="shrink-0 text-[11px] font-semibold text-danger-700">{daysOverdue(round, nowMs)} dagar</span>
+                    <span className="min-w-0"><span className="block truncate text-xs font-semibold text-ink-900">{round.propertyName || round.title}</span><span className="mt-1 block truncate text-xs text-ink-500">{round.title}</span></span>
+                    <span className="shrink-0 text-xs font-semibold text-danger-700">{daysOverdue(round, nowMs)} dagar</span>
                   </button>
                 ))}
               </div>
@@ -739,8 +739,8 @@ export default function RoundsPage() {
                     const round = rounds.find((item) => item.id === deviation.roundId);
                     if (round) openRound(round);
                   }} className="w-full p-4 text-left transition hover:bg-sand-50">
-                    <div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-ink-900">{deviation.item.label}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${deviation.item.workOrderId ? "bg-success-50 text-success-700" : deviation.overdue ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{deviation.item.workOrderId ? "Arbetsorder" : deviation.overdue ? "Hög" : "Öppen"}</span></div>
-                    <p className="mt-1 text-[11px] text-ink-500">{deviation.propertyName} · {deviation.roundTitle}</p>
+                    <div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-ink-900">{deviation.item.label}</p><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${deviation.item.workOrderId ? "bg-success-50 text-success-700" : deviation.overdue ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{deviation.item.workOrderId ? "Arbetsorder" : deviation.overdue ? "Hög" : "Öppen"}</span></div>
+                    <p className="mt-1 text-xs text-ink-500">{deviation.propertyName} · {deviation.roundTitle}</p>
                   </button>
                 ))}
               </div>
@@ -760,7 +760,7 @@ export default function RoundsPage() {
         </Panel>
 
         <Panel title="Rondernas resultat" description="Genomförda ronder de senaste 12 månaderna, grupperade efter kontrollresultat." bodyClassName="px-5 pb-5 pt-3">
-          <div className="mb-4 flex flex-wrap gap-4 text-[11px] font-medium text-ink-500">
+          <div className="mb-4 flex flex-wrap gap-4 text-xs font-medium text-ink-500">
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-success-500" /> Godkända</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-warning-400" /> Med anmärkning</span>
             <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-danger-400" /> Underkända</span>
@@ -779,7 +779,7 @@ export default function RoundsPage() {
                     {attentionPct ? <div className="bg-warning-400" style={{ height: `${attentionPct}%` }} /> : null}
                     {failedPct ? <div className="bg-danger-400" style={{ height: `${failedPct}%` }} /> : null}
                   </div>
-                  <span className="text-[9px] font-medium capitalize text-ink-400">{month.label}</span>
+                  <span className="text-xs font-medium capitalize text-ink-400">{month.label}</span>
                 </div>
               );
             })}
@@ -795,8 +795,8 @@ export default function RoundsPage() {
               {templates.slice(0, 4).map((template) => (
                 <div key={template.id} className="p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0"><p className="truncate text-xs font-semibold text-ink-900">{template.name}</p><p className="mt-1 text-[11px] text-ink-500">{INSPECTION_CHECKLIST_CATEGORY_LABELS[template.category] || template.category}</p></div>
-                    <span className="shrink-0 rounded-full bg-petroleum-50 px-2 py-1 text-[10px] font-semibold text-petroleum-800">{template.itemCount} punkter</span>
+                    <div className="min-w-0"><p className="truncate text-xs font-semibold text-ink-900">{template.name}</p><p className="mt-1 text-xs text-ink-500">{INSPECTION_CHECKLIST_CATEGORY_LABELS[template.category] || template.category}</p></div>
+                    <span className="shrink-0 rounded-full bg-petroleum-50 px-2 py-1 text-xs font-semibold text-petroleum-800">{template.itemCount} punkter</span>
                   </div>
                   {canManage ? <div className="mt-3 flex gap-2"><button type="button" onClick={() => openNewRound(template)} className={premiumCompactButtonClass}>Använd i rond</button><button type="button" onClick={() => openEditTemplate(template)} className={premiumCompactButtonClass}>Ändra</button></div> : null}
                 </div>
@@ -813,7 +813,7 @@ export default function RoundsPage() {
               <Field label="Rondens namn"><input required maxLength={200} value={roundForm.title} onChange={(event) => setRoundForm({ ...roundForm, title: event.target.value })} className={premiumFieldClass} placeholder="Exempel: Daglig tillsyn" /></Field>
               <Field label="Fastighet"><select required value={roundForm.propertyId} onChange={(event) => setRoundForm({ ...roundForm, propertyId: event.target.value })} className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.city}</option>)}</select></Field>
               <Field label="Rondtyp"><select value={roundForm.interval} onChange={(event) => setRoundForm({ ...roundForm, interval: event.target.value })} className={premiumFieldClass}>{Object.entries(intervalLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-              <Field label="Nästa datum"><input type="date" value={roundForm.nextDue} onChange={(event) => setRoundForm({ ...roundForm, nextDue: event.target.value })} className={premiumFieldClass} /><span className="mt-1.5 block text-[11px] text-ink-500">Om datum lämnas tomt räknas det automatiskt från intervallet.</span></Field>
+              <Field label="Nästa datum"><input type="date" value={roundForm.nextDue} onChange={(event) => setRoundForm({ ...roundForm, nextDue: event.target.value })} className={premiumFieldClass} /><span className="mt-1.5 block text-xs text-ink-500">Om datum lämnas tomt räknas det automatiskt från intervallet.</span></Field>
             </div>
             <Field label="Checklista"><select value={roundForm.templateId} onChange={(event) => setRoundForm({ ...roundForm, templateId: event.target.value })} className={premiumFieldClass}><option value="">Egen checklista</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.name} · {template.itemCount} punkter</option>)}</select></Field>
             {roundForm.templateId ? (
@@ -821,7 +821,7 @@ export default function RoundsPage() {
                 <p className="text-xs font-semibold text-petroleum-900">{templates.find((template) => template.id === roundForm.templateId)?.name}</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">{(templates.find((template) => template.id === roundForm.templateId)?.items || []).slice(0, 8).map((item) => <div key={item} className="flex items-start gap-2 text-xs text-ink-600"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-petroleum-600" />{item}</div>)}</div>
               </div>
-            ) : <Field label="Kontrollpunkter"><textarea rows={7} value={roundForm.checklistText} onChange={(event) => setRoundForm({ ...roundForm, checklistText: event.target.value })} className={premiumTextareaClass} placeholder="En kontrollpunkt per rad" /><span className="mt-1.5 block text-[11px] text-ink-500">En kontrollpunkt per rad. Checklistan sparas i ronden.</span></Field>}
+            ) : <Field label="Kontrollpunkter"><textarea rows={7} value={roundForm.checklistText} onChange={(event) => setRoundForm({ ...roundForm, checklistText: event.target.value })} className={premiumTextareaClass} placeholder="En kontrollpunkt per rad" /><span className="mt-1.5 block text-xs text-ink-500">En kontrollpunkt per rad. Checklistan sparas i ronden.</span></Field>}
             <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end"><button type="button" onClick={() => setRoundModalOpen(false)} className={premiumSecondaryButtonClass}>Avbryt</button><button disabled={savingRound} className={premiumPrimaryButtonClass}>{savingRound ? "Skapar rond…" : "Skapa rond"}</button></div>
           </form>
         </Modal>
@@ -835,7 +835,7 @@ export default function RoundsPage() {
               <Field label="Kategori"><select value={templateForm.category} onChange={(event) => setTemplateForm({ ...templateForm, category: event.target.value })} className={premiumFieldClass}>{templateCategories.map((category) => <option key={category} value={category}>{INSPECTION_CHECKLIST_CATEGORY_LABELS[category]}</option>)}</select></Field>
             </div>
             <Field label="Beskrivning"><input maxLength={600} value={templateForm.description} onChange={(event) => setTemplateForm({ ...templateForm, description: event.target.value })} className={premiumFieldClass} placeholder="Kort beskrivning av när checklistan används" /></Field>
-            <Field label="Kontrollpunkter"><textarea required rows={10} value={templateForm.itemsText} onChange={(event) => setTemplateForm({ ...templateForm, itemsText: event.target.value })} className={premiumTextareaClass} placeholder="Kontrollera utrymningsvägar\nKontrollera branddörrar\nKontrollera skyltning" /><span className="mt-1.5 block text-[11px] text-ink-500">En kontrollpunkt per rad, högst 100 punkter.</span></Field>
+            <Field label="Kontrollpunkter"><textarea required rows={10} value={templateForm.itemsText} onChange={(event) => setTemplateForm({ ...templateForm, itemsText: event.target.value })} className={premiumTextareaClass} placeholder="Kontrollera utrymningsvägar\nKontrollera branddörrar\nKontrollera skyltning" /><span className="mt-1.5 block text-xs text-ink-500">En kontrollpunkt per rad, högst 100 punkter.</span></Field>
             {editingTemplateId && confirmDeleteTemplate ? <InlineAlert tone="warning">Checklistan tas bort från mallbiblioteket. Redan skapade ronder behåller sina kontrollpunkter.</InlineAlert> : null}
             <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
               <div>{editingTemplateId ? (confirmDeleteTemplate ? <button type="button" disabled={savingTemplate} onClick={() => void deleteTemplate()} className={premiumDangerButtonClass}><Trash2 className="mr-2 h-4 w-4" /> Bekräfta borttagning</button> : <button type="button" onClick={() => setConfirmDeleteTemplate(true)} className={premiumDangerButtonClass}><Trash2 className="mr-2 h-4 w-4" /> Ta bort</button>) : null}</div>
@@ -851,7 +851,7 @@ export default function RoundsPage() {
           <aside className="absolute right-0 top-0 flex h-full w-full max-w-[620px] flex-col border-l border-sand-200 bg-surface-subtle shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-sand-200 bg-white px-5 py-5 sm:px-6">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-700">{selectedRound.propertyName || "Fastighet"}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">{selectedRound.propertyName || "Fastighet"}</p>
                 <h2 className="mt-1 truncate font-display text-2xl font-semibold tracking-[-0.03em] text-ink-950">{selectedRound.title}</h2>
                 <p className="mt-1 text-xs text-ink-500">{intervalLongLabels[selectedRound.interval || "monthly"]} · {selectedRound.nextDue ? `nästa ${dateFormat.format(new Date(selectedRound.nextDue))}` : "datum saknas"}</p>
               </div>
@@ -879,7 +879,7 @@ export default function RoundsPage() {
                   {(selectedRound.checklist || []).map((item, index) => (
                     <div key={item.id} className={`rounded-2xl border p-4 ${item.hasDeviation ? "border-warning-200 bg-warning-50/40" : "border-sand-200 bg-white"}`}>
                       <div className="flex items-start gap-3">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sand-100 text-[10px] font-bold text-ink-500">{index + 1}</span>
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sand-100 text-xs font-bold text-ink-500">{index + 1}</span>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-ink-900">{item.label}</p>
                           {canManage && selectedRound.source !== "legacy" ? (
@@ -887,7 +887,7 @@ export default function RoundsPage() {
                               <label className="inline-flex items-center gap-2 text-xs font-semibold text-success-700"><input type="checkbox" checked={item.completed} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { completed: event.target.checked })} /> Utförd</label>
                               <label className="inline-flex items-center gap-2 text-xs font-semibold text-warning-800"><input type="checkbox" checked={item.hasDeviation} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { hasDeviation: event.target.checked, note: event.target.checked ? item.note : "" })} /> Avvikelse</label>
                             </div>
-                          ) : <div className="mt-2 flex gap-2">{item.completed ? <span className="rounded-full bg-success-50 px-2 py-1 text-[10px] font-semibold text-success-700">Utförd</span> : null}{item.hasDeviation ? <span className="rounded-full bg-warning-50 px-2 py-1 text-[10px] font-semibold text-warning-800">Avvikelse</span> : null}</div>}
+                          ) : <div className="mt-2 flex gap-2">{item.completed ? <span className="rounded-full bg-success-50 px-2 py-1 text-xs font-semibold text-success-700">Utförd</span> : null}{item.hasDeviation ? <span className="rounded-full bg-warning-50 px-2 py-1 text-xs font-semibold text-warning-800">Avvikelse</span> : null}</div>}
                           {item.hasDeviation && canManage && selectedRound.source !== "legacy" ? <textarea value={item.note} onChange={(event) => updateLocalChecklist(selectedRound.id, item.id, { note: event.target.value })} className={`${premiumTextareaClass} mt-3 min-h-20`} placeholder="Beskriv avvikelsen, plats och nästa steg" aria-label={`Avvikelse för ${item.label}`} /> : item.hasDeviation && item.note ? <p className="mt-3 text-xs leading-5 text-ink-600">{item.note}</p> : null}
                           {item.workOrderId ? <Link href={`/dashboard/arbetsorder/${item.workOrderId}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-petroleum-800 hover:text-petroleum-950"><Wrench className="h-3.5 w-3.5" /> Öppna arbetsorder</Link> : null}
                         </div>
@@ -933,7 +933,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Mini({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-sand-200 bg-white px-3.5 py-3"><p className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-500">{label}</p><p className="mt-1.5 text-sm font-semibold text-ink-800">{value}</p></div>;
+  return <div className="rounded-xl border border-sand-200 bg-white px-3.5 py-3"><p className="text-xs font-semibold uppercase tracking-[0.11em] text-ink-500">{label}</p><p className="mt-1.5 text-sm font-semibold text-ink-800">{value}</p></div>;
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {

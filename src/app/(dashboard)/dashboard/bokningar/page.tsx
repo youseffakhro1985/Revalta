@@ -235,7 +235,7 @@ export default function BookingsPage() {
                 <article key={booking.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
                   <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_auto] lg:items-center">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-petroleum-700">{booking.resource}</p><StatusBadge tone={booking.status === "cancelled" ? "neutral" : "success"}>{booking.status === "cancelled" ? "Avbokad" : "Bekräftad"}</StatusBadge></div>
+                      <div className="flex flex-wrap items-center gap-2"><p className="text-xs font-semibold uppercase tracking-[0.1em] text-petroleum-700">{booking.resource}</p><StatusBadge tone={booking.status === "cancelled" ? "neutral" : "success"}>{booking.status === "cancelled" ? "Avbokad" : "Bekräftad"}</StatusBadge></div>
                       <h3 className="mt-2 font-semibold text-ink-900">{booking.resident_name || "Bokad resurs"}</h3>
                       <p className="mt-1 text-sm text-ink-500">{booking.property_name || "Fastighet"}{booking.unit ? ` · ${booking.unit}` : ""}</p>
                       {booking.note ? <p className="mt-2 line-clamp-2 text-xs leading-5 text-ink-500">{booking.note}</p> : null}
