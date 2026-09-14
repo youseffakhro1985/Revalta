@@ -75,7 +75,7 @@ export function ModuleNavigation({
       {visibleSections.map((section, sectionIndex) => (
         <div key={section.label || `section-${sectionIndex}`} className={sectionIndex > 0 ? "mt-2 border-t border-sand-200/80 px-1 pt-2" : ""}>
           {section.label ? (
-            <p className="px-3 pb-1 pt-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500">{section.label}</p>
+            <p className="px-3 pb-1 pt-1 text-xs font-semibold uppercase tracking-[0.16em] text-ink-500">{section.label}</p>
           ) : null}
           <div className="flex flex-wrap gap-1.5">
             {section.items.map((item) => {

@@ -345,7 +345,7 @@ function CommandHome({
           <div className="space-y-3">
             {navigationGroups.map((group) => (
               <div key={group.label} className="rounded-xl border border-sand-200/80 bg-white p-3">
-                <p className="px-1 pb-2 text-[9px] font-semibold uppercase tracking-[0.15em] text-ink-500">{group.label}</p>
+                <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-[0.15em] text-ink-500">{group.label}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {group.items.map((item) => {
                     const Icon = item.icon;
