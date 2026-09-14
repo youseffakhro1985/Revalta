@@ -130,6 +130,67 @@ describe("work-order execution atomic persistence", () => {
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
+  it("applies a tenant-scoped checklist template atomically without logging item titles", async () => {
+    queryRawMock.mockResolvedValueOnce([{ id: "tpl-1", name: "Teknisk rundgång", items: ["Pump", "Filter", "Pump"] }]);
+    txQueryRawMock
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ max_sort: 1 }]);
+
+    const response = await POST(request({ action: "checklist.applyTemplate", templateId: "tpl-1" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.addedCount).toBe(2);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(txExecuteRawMock).toHaveBeenCalledTimes(2);
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      expect.objectContaining({
+        action: "work_order.checklist_template_applied",
+        metadata: { templateId: "tpl-1", addedCount: 2, skippedCount: 0 },
+      }),
+      tx,
+    );
+    expect(JSON.stringify(writeAuditLogMock.mock.calls[0][1].metadata)).not.toContain("Pump");
+  });
+
+  it("does not apply a checklist template from another company", async () => {
+    queryRawMock.mockResolvedValueOnce([]);
+
+    const response = await POST(request({ action: "checklist.applyTemplate", templateId: "foreign" }), params);
+
+    expect(response.status).toBe(404);
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when a concurrent template apply already holds the lock", async () => {
+    queryRawMock.mockResolvedValueOnce([{ id: "tpl-1", name: "Mall", items: ["Punkt"] }]);
+    txQueryRawMock.mockResolvedValueOnce([{ locked: false }]);
+
+    const response = await POST(request({ action: "checklist.applyTemplate", templateId: "tpl-1" }), params);
+
+    expect(response.status).toBe(409);
+    expect(txExecuteRawMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("skips checklist titles that already exist on the work order", async () => {
+    queryRawMock.mockResolvedValueOnce([{ id: "tpl-1", name: "Mall", items: ["Pump", "Filter"] }]);
+    txQueryRawMock
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([{ title: "pump" }])
+      .mockResolvedValueOnce([{ max_sort: 0 }]);
+
+    const response = await POST(request({ action: "checklist.applyTemplate", templateId: "tpl-1" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.addedCount).toBe(1);
+    expect(txExecuteRawMock).toHaveBeenCalledTimes(1);
+  });
+
   it("creates an execution entry and audit in one transaction", async () => {
     const response = await POST(request({ action: "entry.create", entryType: "time", description: "Felsökning", quantity: 1, unitCost: 0, minutes: 30 }), params);
 

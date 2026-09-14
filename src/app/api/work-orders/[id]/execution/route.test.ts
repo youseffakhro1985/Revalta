@@ -139,7 +139,7 @@ describe("work-order execution lifecycle boundaries", () => {
 
   it.each(["completed", "invoiced", "cancelled"])("rejects checklist and execution-entry writes after %s", async (status) => {
     workOrderFindFirstMock.mockResolvedValue(workOrder(status));
-    for (const action of ["checklist.create", "checklist.complete", "entry.create"]) {
+    for (const action of ["checklist.create", "checklist.complete", "checklist.applyTemplate", "entry.create"]) {
       const response = await POST(request({ action, title: "Kontroll", itemId: "item-1", entryType: "time", description: "Arbete" }), params);
       expect(response.status).toBe(409);
     }
