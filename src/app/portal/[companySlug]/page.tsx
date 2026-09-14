@@ -1,5 +1,6 @@
 import { PublicPortalClient } from "@/components/portal/public-portal-client";
 import { loadPortalTrackedTicket, type PortalSearchParams } from "@/lib/portal-page-track";
+import { loadPublicPortalCatalogSafe } from "@/lib/public-portal-properties";
 
 export default async function CompanyPortalPage({
   params,
@@ -10,7 +11,10 @@ export default async function CompanyPortalPage({
 }) {
   const { companySlug } = await params;
   const query = await searchParams;
-  const tracked = await loadPortalTrackedTicket(query);
+  const [tracked, catalog] = await Promise.all([
+    loadPortalTrackedTicket(query),
+    loadPublicPortalCatalogSafe(companySlug),
+  ]);
   return (
     <PublicPortalClient
       companySlug={companySlug}
@@ -23,6 +27,11 @@ export default async function CompanyPortalPage({
       initialTrackError={tracked.error}
       initialCommented={query.commented === "1"}
       initialAttached={query.attached === "1"}
+      initialCatalog={{
+        properties: catalog.properties,
+        companyName: catalog.companyName,
+        error: catalog.error || undefined,
+      }}
     />
   );
 }

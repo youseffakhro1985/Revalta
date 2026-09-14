@@ -30,6 +30,8 @@ describe("public portal ticket form", () => {
     expect(source).toContain("initialTrackedTicket");
     expect(source).toContain("initialCommented");
     expect(source).toContain("initialAttached");
+    expect(source).toContain("initialCatalog");
+    expect(source).toContain("if (initialCatalog) return");
     expect(source).toContain('id="public-attachment-form"');
     expect(source).toContain('name="file"');
     expect(source).toContain('name="native"');
