@@ -55,6 +55,13 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
   upsertTimeEntry: upsertTimeEntryMock,
   upsertMaterialEntry: upsertMaterialEntryMock,
 }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasWorkOrderVendorContractColumn: vi.fn(async () => false),
+}));
+vi.mock("@/lib/vendor-notify", () => ({
+  notifyVendor: vi.fn().mockResolvedValue({ emailed: false }),
+}));
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },

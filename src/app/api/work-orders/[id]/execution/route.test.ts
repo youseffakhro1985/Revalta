@@ -14,6 +14,9 @@ const {
   getModernMaterialEntryMock,
   upsertTimeEntryMock,
   upsertMaterialEntryMock,
+  hasVendorColumnMock,
+  notifyVendorMock,
+  vendorFindFirstMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
@@ -26,6 +29,9 @@ const {
   getModernMaterialEntryMock: vi.fn(),
   upsertTimeEntryMock: vi.fn(),
   upsertMaterialEntryMock: vi.fn(),
+  hasVendorColumnMock: vi.fn(),
+  notifyVendorMock: vi.fn(),
+  vendorFindFirstMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", () => ({
@@ -49,9 +55,17 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
   upsertTimeEntry: upsertTimeEntryMock,
   upsertMaterialEntry: upsertMaterialEntryMock,
 }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasWorkOrderVendorContractColumn: hasVendorColumnMock,
+}));
+vi.mock("@/lib/vendor-notify", () => ({
+  notifyVendor: (...args: unknown[]) => notifyVendorMock(...args),
+}));
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },
+    vendorContract: { findFirst: vendorFindFirstMock },
     $queryRaw: queryRawMock,
     $executeRaw: executeRawMock,
     $transaction: transactionMock,
@@ -95,6 +109,9 @@ describe("work-order execution lifecycle boundaries", () => {
     getModernMaterialEntryMock.mockResolvedValue(null);
     upsertTimeEntryMock.mockResolvedValue({});
     upsertMaterialEntryMock.mockResolvedValue({});
+    hasVendorColumnMock.mockResolvedValue(false);
+    notifyVendorMock.mockResolvedValue({ emailed: false });
+    vendorFindFirstMock.mockResolvedValue(null);
   });
 
   it.each([
@@ -218,5 +235,46 @@ describe("work-order execution lifecycle boundaries", () => {
       legacySlaStatus: "met",
     }));
     expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+    expect(notifyVendorMock).not.toHaveBeenCalled();
+  });
+
+  it("emails the vendor register contact after a successful finalize", async () => {
+    hasVendorColumnMock.mockResolvedValue(true);
+    workOrderFindFirstMock
+      .mockResolvedValueOnce(workOrder("in_progress"))
+      .mockResolvedValueOnce({
+        title: "Test",
+        work_order_number: "AO-0012",
+        vendor_contract_id: "vendor-1",
+        property: { name: "Storgatan 12" },
+      });
+    vendorFindFirstMock.mockResolvedValue({ email: "kontakt@stad.se" });
+    queryRawMock.mockResolvedValue([{ required_incomplete: 0, before_photos: 1, after_photos: 1 }]);
+    const tx = {
+      $queryRaw: vi.fn().mockImplementation(async (query: unknown) => {
+        const text = sqlText(query);
+        if (text.includes("total_cost")) return [{ total_cost: 225 }];
+        if (text.includes("completion_due_at")) return [{ completion_due_at: new Date(Date.now() + 60_000) }];
+        if (text.includes("WorkOrderExecutionEntry")) return [];
+        return [];
+      }),
+    };
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
+    notifyVendorMock.mockResolvedValue({ emailed: true });
+
+    const response = await POST(request({ action: "completion.finalize" }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyVendorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", company_id: "company-1" }),
+      expect.objectContaining({
+        workOrderId: "wo-1",
+        workOrderNumber: "AO-0012",
+        propertyName: "Storgatan 12",
+        vendorContractId: "vendor-1",
+        vendorEmail: "kontakt@stad.se",
+        kind: "completed",
+      }),
+    );
   });
 });

@@ -8,7 +8,8 @@ import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work
 import { completeWorkOrderLifecycle, WorkOrderCompletionConflict } from "@/lib/work-order-completion";
 import { canFinalizeWorkOrderExecution, isWorkOrderExecutionLocked } from "@/lib/work-order-execution-policy";
 import { normalizeInspectionTemplateItems } from "@/lib/inspection-checklist-template";
-import { isMissingTableError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
+import { isMissingTableError, schemaMismatchUserMessage, hasWorkOrderVendorContractColumn } from "@/lib/schema-readiness";
+import { notifyVendor } from "@/lib/vendor-notify";
 import {
   getModernMaterialEntry,
   getModernTimeEntry,
@@ -553,6 +554,38 @@ export async function POST(
         return NextResponse.json({ error: error.message }, { status: 409 });
       }
       throw error;
+    }
+
+    try {
+      if (await hasWorkOrderVendorContractColumn()) {
+        const assigned = await db.workOrder.findFirst({
+          where: { id, company_id: user.company_id, deleted_at: null },
+          select: {
+            title: true,
+            work_order_number: true,
+            vendor_contract_id: true,
+            property: { select: { name: true } },
+          },
+        });
+        const vendorContractId = assigned?.vendor_contract_id?.trim() || "";
+        if (vendorContractId) {
+          const vendor = await db.vendorContract.findFirst({
+            where: { id: vendorContractId, company_id: user.company_id },
+            select: { email: true },
+          });
+          await notifyVendor(user, {
+            workOrderId: id,
+            title: assigned?.title || workOrder.title,
+            workOrderNumber: assigned?.work_order_number,
+            propertyName: assigned?.property?.name,
+            vendorContractId,
+            vendorEmail: vendor?.email,
+            kind: "completed",
+          });
+        }
+      }
+    } catch {
+      // Completion is already persisted; vendor mail must not fail the finalize response.
     }
 
     return NextResponse.json({
