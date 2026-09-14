@@ -23,6 +23,7 @@ export default async function PortalPage({
       initialTrackError={tracked.error}
       initialCommented={params.commented === "1"}
       initialAttached={params.attached === "1"}
+      initialFeedback={params.feedback === "1"}
       initialCatalog={{
         properties: catalog.properties,
         companyName: catalog.companyName,

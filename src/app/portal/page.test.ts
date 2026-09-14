@@ -14,6 +14,7 @@ describe("public portal pages", () => {
       expect(source).toContain("initialTrackedTicket={");
       expect(source).toContain("initialCommented={");
       expect(source).toContain("initialAttached={");
+      expect(source).toContain("initialFeedback={");
       expect(source).toContain("initialCatalog={");
       expect(source).toContain("loadPublicPortalCatalogSafe");
       expect(source).toContain("loadPortalTrackedTicket");

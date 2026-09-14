@@ -64,6 +64,7 @@ function portalReasonCopy(reason?: string | null) {
 const createdTicketCopy = "Tack! Ärendet är mottaget och skickat till förvaltningen.";
 const commentedTicketCopy = "Kommentaren är skickad till förvaltningen.";
 const attachedTicketCopy = "Bilagan är mottagen och kopplad till ärendet.";
+const feedbackTicketCopy = "Tack för återkopplingen.";
 
 type PublicPortalClientProps = {
   companySlug?: string;
@@ -76,6 +77,7 @@ type PublicPortalClientProps = {
   initialTrackError?: string;
   initialCommented?: boolean;
   initialAttached?: boolean;
+  initialFeedback?: boolean;
   initialCatalog?: {
     properties: PublicPortalProperty[];
     companyName: string;
@@ -101,6 +103,7 @@ export function PublicPortalClient({
   initialTrackError = "",
   initialCommented = false,
   initialAttached = false,
+  initialFeedback = false,
   initialCatalog,
 }: PublicPortalClientProps) {
   const normalizedInitialReference = initialReference.trim().toUpperCase();
@@ -134,9 +137,11 @@ export function PublicPortalClient({
         ? commentedTicketCopy
         : initialAttached
           ? attachedTicketCopy
-          : initialTrackedTicket
-            ? "Ärendet hittades."
-            : "",
+          : initialFeedback
+            ? feedbackTicketCopy
+            : initialTrackedTicket
+              ? "Ärendet hittades."
+              : "",
   );
   const [loading, setLoading] = useState(false);
 
@@ -182,6 +187,7 @@ export function PublicPortalClient({
     const created = params.get("created") === "1";
     const commented = params.get("commented") === "1";
     const attached = params.get("attached") === "1";
+    const feedback = params.get("feedback") === "1";
     const ref = params.get("ref")?.trim();
     const token = params.get("token")?.trim() || "";
     const email = params.get("email")?.trim() || "";
@@ -192,6 +198,8 @@ export function PublicPortalClient({
       setSuccess(commentedTicketCopy);
     } else if (attached) {
       setSuccess(attachedTicketCopy);
+    } else if (feedback) {
+      setSuccess(feedbackTicketCopy);
     }
     if (!ref) return;
     setReference(ref.toUpperCase());
@@ -199,14 +207,14 @@ export function PublicPortalClient({
     if (email) setTrackEmail(email);
     if (initialTrackedTicket) return;
     void (async () => {
-      if (!created && !commented && !attached) {
+      if (!created && !commented && !attached && !feedback) {
         setError("");
         setSuccess("");
       }
       setLoading(true);
       try {
         await loadTrackedTicket(ref, email, token);
-        if (!created && !commented && !attached) setSuccess("Ärendet hittades.");
+        if (!created && !commented && !attached && !feedback) setSuccess("Ärendet hittades.");
         if (params.get("feedback") === "1") {
           document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }
