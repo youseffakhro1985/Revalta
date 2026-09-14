@@ -446,7 +446,22 @@ export default function TicketDetailPage() {
           </div>
           {ticket.property ? <div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-700">Fastighet</p><p className="mt-2 text-lg font-semibold text-ink-950">{ticket.property.name}</p><p className="mt-1 text-sm text-ink-600">{ticket.property.address}, {ticket.property.city}</p></div> : <InlineAlert>Ärendet saknar fastighetskoppling. Koppla en fastighet innan arbetsorder kan skapas.</InlineAlert>}
           <div><h2 className="text-lg font-semibold text-ink-950">Beskrivning</h2><p className="mt-3 whitespace-pre-wrap rounded-2xl bg-sand-50 p-5 text-sm leading-7 text-ink-700">{ticket.description}</p></div>
-          {ticket.source === "public_portal" ? <div className="grid gap-4 rounded-2xl border border-sand-200 p-5 sm:grid-cols-2"><Info label="Rapportör" value={ticket.reporter_name || "Ej angivet"} /><Info label="Referens" value={ticket.public_reference || "Ej angivet"} /><Info label="E-post" value={ticket.reporter_email || "Ej angivet"} /><Info label="Telefon / lägenhet" value={`${ticket.reporter_phone || "Ej angivet"} · ${ticket.reporter_unit || "Ej angivet"}`} />{ticket.reporter_phone && permissions.canManage ? <div className="sm:col-span-2"><button type="button" onClick={() => void sendReporterSms()} disabled={sendingSms} className={premiumPrimaryButtonClass}><MessageSquare className="h-4 w-4" />{sendingSms ? "Skickar SMS…" : "Skicka SMS till rapportören"}</button></div> : null}</div> : null}
+          {ticket.source === "public_portal" || ticket.source === "resident_portal" || ticket.reporter_phone || ticket.reporter_name || ticket.public_reference ? (
+            <div className="grid gap-4 rounded-2xl border border-sand-200 p-5 sm:grid-cols-2">
+              <Info label="Rapportör" value={ticket.reporter_name || "Ej angivet"} />
+              <Info label="Referens" value={ticket.public_reference || "Ej angivet"} />
+              <Info label="Källa" value={ticket.source === "resident_portal" ? "Boendeportal" : ticket.source === "public_portal" ? "Publik felanmälan" : ticket.source} />
+              <Info label="E-post" value={ticket.reporter_email || "Ej angivet"} />
+              <Info label="Telefon / lägenhet" value={`${ticket.reporter_phone || "Ej angivet"} · ${ticket.reporter_unit || "Ej angivet"}`} />
+              {ticket.reporter_phone && permissions.canManage ? (
+                <div className="sm:col-span-2">
+                  <button type="button" onClick={() => void sendReporterSms()} disabled={sendingSms} className={premiumPrimaryButtonClass}>
+                    <MessageSquare className="h-4 w-4" />{sendingSms ? "Skickar SMS…" : "Skicka SMS till rapportören"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </Panel>
 
         <Panel title="AI-insikt" description="Prioritering och rekommenderad åtgärd baserad på ärendets innehåll." bodyClassName="p-6 sm:p-8">
