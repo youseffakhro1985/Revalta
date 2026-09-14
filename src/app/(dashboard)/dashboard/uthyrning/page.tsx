@@ -97,7 +97,7 @@ function dateValue(value?: string | null) {
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-500">{children}</span>;
+  return <span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-ink-500">{children}</span>;
 }
 
 function leaseStatusClass(status: string) {
@@ -398,8 +398,8 @@ export default function LeasingPage() {
         <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="max-w-2xl">
             <div className="flex flex-wrap items-center gap-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Uthyrning</p>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-success-100 bg-success-50 px-2.5 py-1 text-[10px] font-semibold text-success-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-petroleum-700">Uthyrning</p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-success-100 bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-success-500" /> Live-data
               </span>
             </div>
@@ -452,14 +452,14 @@ export default function LeasingPage() {
                 <Link key={property.id} href={`/dashboard/fastigheter/${property.id}`} className="group grid gap-3 px-5 py-4 transition hover:bg-sand-50/60 sm:grid-cols-[minmax(0,1fr)_190px_95px] sm:items-center">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink-900 transition group-hover:text-petroleum-800">{property.name}</p>
-                    <p className="mt-1 text-[11px] text-ink-500">{property.city || "Ort saknas"} · {property.occupied}/{property.total} belagda</p>
+                    <p className="mt-1 text-xs text-ink-500">{property.city || "Ort saknas"} · {property.occupied}/{property.total} belagda</p>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-sand-100" aria-label={`${property.occupancy} procent uthyrt`}>
                     <div className="h-full rounded-full bg-petroleum-600" style={{ width: `${Math.max(0, Math.min(100, property.occupancy))}%` }} />
                   </div>
                   <div className="flex items-center justify-between gap-2 sm:justify-end">
                     <span className="text-xs font-semibold text-ink-700">{property.occupancy.toLocaleString("sv-SE")} %</span>
-                    {property.vacant ? <span className="rounded-full border border-warning-100 bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700">{property.vacant} lediga</span> : null}
+                    {property.vacant ? <span className="rounded-full border border-warning-100 bg-warning-50 px-2 py-0.5 text-xs font-semibold text-warning-700">{property.vacant} lediga</span> : null}
                   </div>
                 </Link>
               ))}
@@ -472,7 +472,7 @@ export default function LeasingPage() {
             <div className="relative h-36 w-36 shrink-0 rounded-full" style={{ background: `conic-gradient(#174a40 ${Math.max(0, Math.min(100, summary.occupancy))}%, #ece8df 0)` }}>
               <div className="absolute inset-[14px] flex flex-col items-center justify-center rounded-full border border-sand-100 bg-white">
                 <span className="font-display text-[27px] font-semibold tracking-[-0.04em] text-ink-950">{summary.occupancy.toLocaleString("sv-SE")} %</span>
-                <span className="mt-0.5 text-[10px] font-medium text-ink-400">uthyrt</span>
+                <span className="mt-0.5 text-xs font-medium text-ink-400">uthyrt</span>
               </div>
             </div>
             <div className="w-full space-y-3">
@@ -490,7 +490,7 @@ export default function LeasingPage() {
           <Panel title={form.id ? "Redigera avtal" : "Nytt avtal"} description={form.id ? `Uppdaterar ${form.leaseNumber}` : "Koppla objekt och hyrespart. Avtalet sparas i den befintliga tenant-säkrade avtalsmotorn."}>
             <form onSubmit={submit} className="space-y-6">
               <div className="flex items-center justify-between rounded-xl border border-petroleum-100 bg-petroleum-50 px-3.5 py-3">
-                <div><p className="text-sm font-semibold text-petroleum-900">{form.id ? "Redigeringsläge" : "Avtalseditor"}</p><p className="mt-0.5 text-[11px] text-petroleum-700/80">{form.id ? "Ändringar loggas via befintligt avtalsflöde." : "Fyll i objekt, hyrespart och villkor."}</p></div>
+                <div><p className="text-sm font-semibold text-petroleum-900">{form.id ? "Redigeringsläge" : "Avtalseditor"}</p><p className="mt-0.5 text-xs text-petroleum-700/80">{form.id ? "Ändringar loggas via befintligt avtalsflöde." : "Fyll i objekt, hyrespart och villkor."}</p></div>
                 <button type="button" onClick={closeForm} className="rounded-lg p-2 text-petroleum-800 transition hover:bg-white" aria-label="Stäng avtalseditor"><X className="h-4 w-4" /></button>
               </div>
 
@@ -566,8 +566,8 @@ export default function LeasingPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-sm font-semibold text-ink-900">{unit.designation}</h3>
-                      <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-[10px] font-semibold text-ink-600">{typeLabels[unit.unit_type] || unit.unit_type}</span>
-                      <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${lease ? leaseStatusClass(lease.status) : "border-success-100 bg-success-50 text-success-700"}`}>{lease ? statusLabels[lease.status] : "Ledigt"}</span>
+                      <span className="rounded-full border border-sand-200 bg-sand-50 px-2.5 py-1 text-xs font-semibold text-ink-600">{typeLabels[unit.unit_type] || unit.unit_type}</span>
+                      <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${lease ? leaseStatusClass(lease.status) : "border-success-100 bg-success-50 text-success-700"}`}>{lease ? statusLabels[lease.status] : "Ledigt"}</span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-500">
                       <Link href={`/dashboard/fastigheter/${property.id}`} className="font-medium text-ink-600 transition hover:text-petroleum-800">{property.name}</Link>
@@ -575,16 +575,16 @@ export default function LeasingPage() {
                       <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {property.address}{property.city ? `, ${property.city}` : ""}</span>
                     </div>
                     <p className="mt-2 text-sm font-medium text-ink-800">{lease?.lease_holder.name || "Ingen hyrespart"}</p>
-                    <p className="mt-1 text-[11px] text-ink-500">{lease ? `${lease.lease_number}${lease.start_date ? ` · från ${dateValue(lease.start_date)}` : ""}` : `${unit.area ? `${unit.area.toLocaleString("sv-SE")} m² · ` : ""}klart för nytt avtal`}</p>
+                    <p className="mt-1 text-xs text-ink-500">{lease ? `${lease.lease_number}${lease.start_date ? ` · från ${dateValue(lease.start_date)}` : ""}` : `${unit.area ? `${unit.area.toLocaleString("sv-SE")} m² · ` : ""}klart för nytt avtal`}</p>
                   </div>
                   <div className="lg:text-right">
                     <p className="text-[17px] font-semibold tracking-[-0.02em] text-ink-900">{lease ? `${money.format(lease.monthly_rent)}/mån` : "Ledigt"}</p>
-                    {lease?.notice_date ? <p className="mt-1 text-[11px] font-medium text-warning-700">Uppsagt {dateValue(lease.notice_date)}</p> : null}
+                    {lease?.notice_date ? <p className="mt-1 text-xs font-medium text-warning-700">Uppsagt {dateValue(lease.notice_date)}</p> : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <Link href={`/dashboard/fastigheter/${property.id}`} className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-[11px] font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800">Fastighet <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
-                    {canManage && lease ? <button type="button" onClick={() => editLease(lease)} className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-[11px] font-semibold text-ink-700 transition hover:border-petroleum-300 hover:text-petroleum-800"><Pencil className="mr-1.5 h-3.5 w-3.5" /> Redigera</button> : null}
-                    {canManage && !lease ? <button type="button" onClick={() => beginLeaseForUnit(property.id, unit.id)} className="inline-flex h-9 items-center rounded-lg bg-petroleum-700 px-3 text-[11px] font-semibold text-white transition hover:bg-petroleum-800"><Plus className="mr-1.5 h-3.5 w-3.5" /> Skapa avtal</button> : null}
+                    <Link href={`/dashboard/fastigheter/${property.id}`} className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800">Fastighet <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
+                    {canManage && lease ? <button type="button" onClick={() => editLease(lease)} className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition hover:border-petroleum-300 hover:text-petroleum-800"><Pencil className="mr-1.5 h-3.5 w-3.5" /> Redigera</button> : null}
+                    {canManage && !lease ? <button type="button" onClick={() => beginLeaseForUnit(property.id, unit.id)} className="inline-flex h-9 items-center rounded-lg bg-petroleum-700 px-3 text-xs font-semibold text-white transition hover:bg-petroleum-800"><Plus className="mr-1.5 h-3.5 w-3.5" /> Skapa avtal</button> : null}
                   </div>
                 </div>
               </article>
@@ -598,7 +598,7 @@ export default function LeasingPage() {
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-sand-200 bg-surface-subtle text-[10px] uppercase tracking-[0.08em] text-ink-500">
+                <thead className="border-b border-sand-200 bg-surface-subtle text-xs uppercase tracking-[0.08em] text-ink-500">
                   <tr><th className="px-5 py-3 font-semibold">Avtal</th><th className="px-5 py-3 font-semibold">Hyrespart</th><th className="px-5 py-3 font-semibold">Objekt</th><th className="px-5 py-3 font-semibold">Period</th><th className="px-5 py-3 font-semibold">Hyra</th><th className="px-5 py-3 font-semibold">Status</th><th className="px-5 py-3"><span className="sr-only">Åtgärd</span></th></tr>
                 </thead>
                 <tbody className="divide-y divide-sand-100">
@@ -631,7 +631,7 @@ function QuickLink({ href, icon: Icon, label, hint }: { href: string; icon: type
   return (
     <Link href={href} className="group flex items-center gap-3 rounded-xl border border-sand-200 bg-white px-3.5 py-3 transition hover:border-petroleum-200 hover:shadow-premium-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-petroleum-50 text-petroleum-700"><Icon className="h-4 w-4" strokeWidth={1.65} /></span>
-      <span className="min-w-0 flex-1"><span className="block text-[11px] font-semibold text-ink-800 transition group-hover:text-petroleum-800">{label}</span><span className="mt-0.5 block text-[10px] text-ink-400">{hint}</span></span>
+      <span className="min-w-0 flex-1"><span className="block text-xs font-semibold text-ink-800 transition group-hover:text-petroleum-800">{label}</span><span className="mt-0.5 block text-xs text-ink-400">{hint}</span></span>
       <ArrowRight className="h-3.5 w-3.5 text-ink-300 transition group-hover:translate-x-0.5 group-hover:text-petroleum-600" />
     </Link>
   );
@@ -642,9 +642,9 @@ function LeasingMetric({ icon: Icon, label, value, hint, tone = "neutral" }: { i
   return (
     <article className="rounded-2xl border border-sand-200/90 bg-white p-4 shadow-premium-sm sm:p-5">
       <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconTone}`}><Icon className="h-4 w-4" strokeWidth={1.65} /></div>
-      <p className="mt-3 text-[11px] font-medium text-ink-500">{label}</p>
+      <p className="mt-3 text-xs font-medium text-ink-500">{label}</p>
       <p className="mt-0.5 font-display text-[25px] font-semibold tracking-[-0.035em] text-ink-950">{value}</p>
-      <p className="mt-1 text-[10px] leading-4 text-ink-400">{hint}</p>
+      <p className="mt-1 text-xs leading-4 text-ink-400">{hint}</p>
     </article>
   );
 }
