@@ -5,6 +5,7 @@ import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/integrations/sms/inbound" });
 const PUBLIC_REFERENCE = /\bRV-\d{4}-[A-Z0-9]+\b/i;
+const OPEN_TICKET_STATUSES = new Set(["new", "received", "in_progress", "waiting"]);
 
 function secretsEqual(left: string, right: string) {
   const leftDigest = createHash("sha256").update(left).digest();
@@ -53,6 +54,59 @@ async function parsePayload(request: Request) {
   return Object.fromEntries(params.entries()) as Record<string, unknown>;
 }
 
+export function swedishPhoneVariants(raw: string): string[] {
+  const trimmed = raw.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return trimmed ? [trimmed] : [];
+
+  let national = digits;
+  if (national.startsWith("0046") && national.length >= 12) {
+    national = `0${national.slice(4)}`;
+  } else if (national.startsWith("46") && national.length >= 10) {
+    national = `0${national.slice(2)}`;
+  } else if (!national.startsWith("0") && national.length === 9) {
+    national = `0${national}`;
+  }
+
+  const rest = national.startsWith("0") ? national.slice(1) : national;
+  return [...new Set([
+    trimmed,
+    digits,
+    national,
+    rest,
+    `46${rest}`,
+    `+46${rest}`,
+    `0046${rest}`,
+  ].filter(Boolean))];
+}
+
+type PhoneTicket = {
+  id: string;
+  company_id: string;
+  user_id: string;
+  status: string;
+};
+
+function pickTenantSafeTicket(tickets: PhoneTicket[]) {
+  const companyIds = new Set(tickets.map((ticket) => ticket.company_id));
+  if (tickets.length === 0 || companyIds.size !== 1) return null;
+  const open = tickets.filter((ticket) => OPEN_TICKET_STATUSES.has(ticket.status));
+  return open[0] || tickets[0] || null;
+}
+
+async function attachResidentComment(ticket: { id: string; user_id: string }, from: string, message: string) {
+  await db.ticketComment.create({
+    data: {
+      ticket_id: ticket.id,
+      user_id: ticket.user_id,
+      body: message || `Inkommande SMS från ${from || "okänt nummer"}`,
+      is_internal: false,
+      author_type: "resident",
+      author_name: from || "SMS",
+    },
+  });
+}
+
 export async function POST(request: Request) {
   try {
     if (!inboundSecret()) {
@@ -70,6 +124,8 @@ export async function POST(request: Request) {
 
     let ticketId: string | null = null;
     let companyId: string | null = null;
+    let matchMethod: "reference" | "phone" | null = null;
+
     if (reference) {
       const ticket = await db.ticket.findFirst({
         where: { public_reference: reference, deleted_at: null },
@@ -78,16 +134,24 @@ export async function POST(request: Request) {
       if (ticket) {
         ticketId = ticket.id;
         companyId = ticket.company_id;
-        await db.ticketComment.create({
-          data: {
-            ticket_id: ticket.id,
-            user_id: ticket.user_id,
-            body: message || `Inkommande SMS från ${from || "okänt nummer"}`,
-            is_internal: false,
-            author_type: "resident",
-            author_name: from || "SMS",
-          },
-        });
+        matchMethod = "reference";
+        await attachResidentComment(ticket, from, message);
+      }
+    }
+
+    if (!ticketId && from) {
+      const tickets = await db.ticket.findMany({
+        where: { deleted_at: null, reporter_phone: { in: swedishPhoneVariants(from) } },
+        select: { id: true, company_id: true, user_id: true, status: true },
+        orderBy: { created_at: "desc" },
+        take: 40,
+      });
+      const ticket = pickTenantSafeTicket(tickets);
+      if (ticket) {
+        ticketId = ticket.id;
+        companyId = ticket.company_id;
+        matchMethod = "phone";
+        await attachResidentComment(ticket, from, message);
       }
     }
 
@@ -102,6 +166,7 @@ export async function POST(request: Request) {
           providerId: providerId || null,
           ticketId,
           reference: reference || null,
+          matchMethod,
           messagePreview: message.slice(0, 140),
         },
       },
