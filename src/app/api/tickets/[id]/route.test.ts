@@ -7,6 +7,7 @@ const {
   userFindFirstMock,
   writeAuditLogMock,
   queueTicketNotificationMock,
+  notifyTicketReporterMock,
   transactionMock,
   auditLogCreateMock,
 } = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const {
   userFindFirstMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
   queueTicketNotificationMock: vi.fn(),
+  notifyTicketReporterMock: vi.fn(),
   transactionMock: vi.fn(),
   auditLogCreateMock: vi.fn(),
 }));
@@ -31,6 +33,9 @@ vi.mock("@/lib/audit", () => ({
 
 vi.mock("@/lib/integrations", () => ({
   queueTicketNotification: queueTicketNotificationMock,
+}));
+vi.mock("@/lib/ticket-reporter-notify", () => ({
+  notifyTicketReporter: notifyTicketReporterMock,
 }));
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
@@ -219,7 +224,7 @@ describe("tickets/[id] PATCH", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     writeAuditLogMock.mockResolvedValue(undefined);
-    queueTicketNotificationMock.mockResolvedValue(undefined);
+    notifyTicketReporterMock.mockResolvedValue({ emailed: true, sms: true });
     auditLogCreateMock.mockResolvedValue(undefined);
     ticketUpdateManyMock.mockResolvedValue({ count: 1 });
   });
@@ -431,6 +436,9 @@ describe("tickets/[id] PATCH", () => {
       priority: "normal",
       assigned_to_id: null,
       due_date: null,
+      public_reference: "RV-12",
+      reporter_email: "anna@example.se",
+      reporter_phone: "0701234567",
     });
     userFindFirstMock.mockResolvedValue({ id: "tech-1" });
     transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => {
@@ -472,9 +480,10 @@ describe("tickets/[id] PATCH", () => {
       expect.objectContaining({ id: "user-1" }),
       expect.objectContaining({ action: "ticket.lifecycle_processed", entityId: "ticket-1" }),
     );
-    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+    expect(notifyTicketReporterMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: "user-1" }),
-      expect.objectContaining({ ticketId: "ticket-1", event: "updated" }),
+      expect.objectContaining({ id: "ticket-1", reporter_email: "anna@example.se" }),
+      "updated",
     );
   });
 

@@ -7,6 +7,7 @@ const {
   transactionMock,
   writeAuditLogMock,
   queueTicketNotificationMock,
+  notifyTicketReporterMock,
   loggerErrorMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
@@ -15,6 +16,7 @@ const {
   transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
   queueTicketNotificationMock: vi.fn(),
+  notifyTicketReporterMock: vi.fn(),
   loggerErrorMock: vi.fn(),
 }));
 
@@ -29,6 +31,7 @@ vi.mock("@/lib/assigned-work-access", () => ({
 }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/integrations", () => ({ queueTicketNotification: queueTicketNotificationMock }));
+vi.mock("@/lib/ticket-reporter-notify", () => ({ notifyTicketReporter: notifyTicketReporterMock }));
 vi.mock("@/lib/structured-logger", () => ({
   createLogger: () => ({ error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
@@ -45,7 +48,7 @@ function request() {
   return new Request("https://www.revalta.se/api/tickets/ticket-1/comments", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ body: "  Kontrollera läckan  ", isInternal: true }),
+    body: JSON.stringify({ body: "  Kontrollera läckan  ", isInternal: false }),
   });
 }
 
@@ -53,7 +56,7 @@ const context = { params: Promise.resolve({ id: "ticket-1" }) };
 const comment = {
   id: "comment-1",
   body: "Kontrollera läckan",
-  is_internal: true,
+  is_internal: false,
   created_at: new Date("2026-09-02T00:00:00Z"),
   author_type: "staff",
   author_name: "Owner",
@@ -74,21 +77,21 @@ describe("ticket comment reliability", () => {
     ticketFindFirstMock.mockResolvedValue({ id: "ticket-1", title: "Leak", assigned_to_id: null });
     commentCreateMock.mockResolvedValue(comment);
     writeAuditLogMock.mockResolvedValue(undefined);
-    queueTicketNotificationMock.mockResolvedValue(undefined);
+    notifyTicketReporterMock.mockResolvedValue({ emailed: true, sms: false });
     transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => callback({
       ticketComment: { create: commentCreateMock },
     }));
   });
 
   it("returns 201 after commit even when notification delivery/journaling fails", async () => {
-    queueTicketNotificationMock.mockRejectedValue(new Error("email integration unavailable"));
+    notifyTicketReporterMock.mockRejectedValue(new Error("email integration unavailable"));
 
     const response = await POST(request(), context);
     const body = await response.json();
 
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ success: true, comment: { id: "comment-1", body: "Kontrollera läckan" } });
-    expect(loggerErrorMock).toHaveBeenCalledWith("Ticket comment notification failed", expect.any(Error));
+    expect(loggerErrorMock).toHaveBeenCalledWith("Ticket reporter comment notification failed", expect.any(Error));
   });
 
   it("keeps comment creation and audit in one transaction and does not notify after rollback", async () => {
@@ -104,7 +107,7 @@ describe("ticket comment reliability", () => {
       expect.objectContaining({ action: "ticket.comment_created" }),
       expect.objectContaining({ ticketComment: { create: commentCreateMock } }),
     );
-    expect(queueTicketNotificationMock).not.toHaveBeenCalled();
+    expect(notifyTicketReporterMock).not.toHaveBeenCalled();
   });
 
   it("does not create a comment for a ticket outside the tenant scope", async () => {
@@ -117,6 +120,6 @@ describe("ticket comment reliability", () => {
       where: expect.objectContaining({ id: "ticket-1", company_id: "company-1", deleted_at: null }),
     }));
     expect(transactionMock).not.toHaveBeenCalled();
-    expect(queueTicketNotificationMock).not.toHaveBeenCalled();
+    expect(notifyTicketReporterMock).not.toHaveBeenCalled();
   });
 });

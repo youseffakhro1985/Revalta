@@ -21,6 +21,7 @@ import { getWorkOrderAssetLink, setWorkOrderAssetLinks, validateWorkOrderAssetLi
 import { syncCompletedWorkOrderToComponent } from "@/lib/component-work-order-sync";
 import { completeWorkOrderLifecycle } from "@/lib/work-order-completion";
 import { syncWorkOrderToTicket } from "@/lib/work-order-ticket-sync";
+import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
 import {
   normalizeWorkOrderPriority,
   normalizeWorkOrderStatus,
@@ -34,6 +35,9 @@ import {
   parseWorkOrderLockInput,
   WorkOrderLockError,
 } from "@/lib/work-order-edit-lock";
+import { createLogger } from "@/lib/structured-logger";
+
+const logger = createLogger({ route: "/api/work-orders/[id]" });
 
 function parseOptionalDate(value: unknown) {
   if (value === null || value === "" || value === undefined) return null;
@@ -466,6 +470,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   if (!transactionResult) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+
+  if (transactionResult.ticketSync?.changed && existing.ticket_id) {
+    try {
+      const linkedTicket = await db.ticket.findFirst({
+        where: { id: existing.ticket_id, company_id: companyId, deleted_at: null },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          public_reference: true,
+          reporter_email: true,
+          reporter_phone: true,
+        },
+      });
+      if (linkedTicket) {
+        await notifyTicketReporter(user, linkedTicket, "updated");
+      }
+    } catch (notificationError) {
+      logger.error("Work-order reporter notification failed", notificationError);
+    }
+  }
 
   const { workOrder, enterprise, statusEvents, assetLink } = transactionResult;
   return NextResponse.json({
