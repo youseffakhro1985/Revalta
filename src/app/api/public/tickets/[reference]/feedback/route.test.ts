@@ -120,4 +120,39 @@ describe("POST /api/public/tickets/[reference]/feedback", () => {
     expect(response.status).toBe(400);
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
+
+  it("accepts a native form post and redirects without putting the reporter email in the URL", async () => {
+    const response = await POST(
+      new Request("https://www.revalta.se/api/public/tickets/RV-2026-TEST/feedback?companySlug=demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "email=boende%40example.se&rating=5&comment=Snabbt+åtgärdat&companySlug=demo",
+      }),
+      { params },
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "https://www.revalta.se/portal/demo?feedback=1&ref=RV-2026-TEST",
+    );
+    expect(response.headers.get("location")).not.toContain("boende");
+    expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the native form to the portal when rating is missing", async () => {
+    const response = await POST(
+      new Request("https://www.revalta.se/api/public/tickets/RV-2026-TEST/feedback?companySlug=demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "email=boende%40example.se&comment=Hej&companySlug=demo",
+      }),
+      { params },
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "https://www.revalta.se/portal/demo?reason=invalid&ref=RV-2026-TEST",
+    );
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });

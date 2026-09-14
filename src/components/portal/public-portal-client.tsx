@@ -519,24 +519,38 @@ export function PublicPortalClient({
                           {trackedTicket.residentFeedback.comment ? <p className="mt-2 text-sm text-ink-700">{trackedTicket.residentFeedback.comment}</p> : null}
                         </div>
                       ) : (
-                        <form onSubmit={submitResidentFeedback}>
+                        <form
+                          id="public-feedback-form"
+                          method="post"
+                          action={`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/feedback`}
+                          onSubmit={submitResidentFeedback}
+                        >
+                          {companySlug ? <input type="hidden" name="companySlug" value={companySlug} /> : null}
+                          {trackingToken ? <input type="hidden" name="token" value={trackingToken} /> : null}
+                          {trackEmail ? <input type="hidden" name="email" value={trackEmail} /> : null}
                           <p className="text-sm font-semibold text-ink-900">Hur gick det?</p>
                           <p className="mt-1 text-xs text-ink-500">Betygsätt ärendet när det är avslutat. En gång per ärende.</p>
                           <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Betyg 1 till 5">
                             {[1, 2, 3, 4, 5].map((value) => (
-                              <button
+                              <label
                                 key={value}
-                                type="button"
-                                onClick={() => setFeedbackRating(value)}
-                                className={`h-10 w-10 rounded-xl border text-sm font-semibold ${feedbackRating === value ? "border-petroleum-600 bg-petroleum-600 text-white" : "border-sand-200 bg-white text-ink-800 hover:bg-sand-50"}`}
-                                aria-pressed={feedbackRating === value}
-                                aria-label={`${value} av 5`}
+                                className={`grid h-10 w-10 cursor-pointer place-items-center rounded-xl border text-sm font-semibold ${feedbackRating === value ? "border-petroleum-600 bg-petroleum-600 text-white" : "border-sand-200 bg-white text-ink-800 hover:bg-sand-50"}`}
                               >
+                                <input
+                                  type="radio"
+                                  name="rating"
+                                  value={value}
+                                  checked={feedbackRating === value}
+                                  onChange={() => setFeedbackRating(value)}
+                                  className="sr-only"
+                                  aria-label={`${value} av 5`}
+                                />
                                 {value}
-                              </button>
+                              </label>
                             ))}
                           </div>
                           <textarea
+                            name="comment"
                             rows={3}
                             maxLength={1000}
                             value={feedbackComment}

@@ -32,6 +32,10 @@ describe("public portal ticket form", () => {
     expect(source).toContain('id="public-comment-form"');
     expect(source).toContain('name="body"');
     expect(source).toContain("commentedTicketCopy");
+    expect(source).toContain('id="public-feedback-form"');
+    expect(source).toContain('name="rating"');
+    expect(source).toContain('name="comment"');
+    expect(source).toContain('type="radio"');
     expect(source).not.toContain("searchParams.set(\"email\"");
   });
 });
