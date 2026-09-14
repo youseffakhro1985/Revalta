@@ -23,6 +23,8 @@ describe("login form", () => {
     expect(source).toContain("isValidEmail");
     expect(source).toContain('get("reset") === "1"');
     expect(source).toContain("Lösenordet är återställt. Logga in med det nya lösenordet.");
+    expect(source).toContain('get("verified") === "1"');
+    expect(source).toContain("E-postadressen är verifierad. Du kan nu logga in.");
     expect(source).not.toContain("••••");
   });
 });

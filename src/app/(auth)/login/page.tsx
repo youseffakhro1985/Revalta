@@ -33,6 +33,9 @@ export default function LoginPage() {
     if (params.get("reset") === "1") {
       setNotice("Lösenordet är återställt. Logga in med det nya lösenordet.");
     }
+    if (params.get("verified") === "1") {
+      setNotice("E-postadressen är verifierad. Du kan nu logga in.");
+    }
     const reason = params.get("reason");
     if (reason === "invalid") setError("Ogiltiga uppgifter");
     if (reason === "verify") {
