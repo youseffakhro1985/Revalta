@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
 import { readResponseJson } from "@/lib/fetch-json";
+import type { PublicPortalProperty } from "@/lib/public-portal-properties";
 import type { PublicTrackedTicket } from "@/lib/public-ticket-track";
 
 function withCompanySlug(path: string, companySlug?: string) {
@@ -14,14 +15,7 @@ function withCompanySlug(path: string, companySlug?: string) {
   return `${url.pathname}${url.search}`;
 }
 
-type Property = {
-  id: string;
-  name: string;
-  address: string;
-  postal_code: string | null;
-  city: string;
-  company?: { name: string };
-};
+type Property = PublicPortalProperty;
 
 type PublicTicket = {
   public_reference: string;
@@ -82,6 +76,11 @@ type PublicPortalClientProps = {
   initialTrackError?: string;
   initialCommented?: boolean;
   initialAttached?: boolean;
+  initialCatalog?: {
+    properties: PublicPortalProperty[];
+    companyName: string;
+    error?: string;
+  };
 };
 
 function asPublicTicket(ticket: PublicTrackedTicket): PublicTicket {
@@ -102,10 +101,11 @@ export function PublicPortalClient({
   initialTrackError = "",
   initialCommented = false,
   initialAttached = false,
+  initialCatalog,
 }: PublicPortalClientProps) {
   const normalizedInitialReference = initialReference.trim().toUpperCase();
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [companyName, setCompanyName] = useState("Revalta");
+  const [properties, setProperties] = useState<Property[]>(initialCatalog?.properties ?? []);
+  const [companyName, setCompanyName] = useState(initialCatalog?.companyName || "Revalta");
   const [reporterName, setReporterName] = useState("");
   const [reporterEmail, setReporterEmail] = useState("");
   const [reporterPhone, setReporterPhone] = useState("");
@@ -126,7 +126,7 @@ export function PublicPortalClient({
   const [residentComment, setResidentComment] = useState("");
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState("");
-  const [error, setError] = useState(() => initialTrackError || portalReasonCopy(initialReason));
+  const [error, setError] = useState(() => initialTrackError || portalReasonCopy(initialReason) || initialCatalog?.error || "");
   const [success, setSuccess] = useState(
     initialCreated && normalizedInitialReference
       ? createdTicketCopy
@@ -141,6 +141,7 @@ export function PublicPortalClient({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (initialCatalog) return;
     async function loadProperties() {
       const response = await fetch(withCompanySlug("/api/public/properties", companySlug), { cache: "no-store" });
       const data = await readResponseJson(response);
@@ -152,8 +153,8 @@ export function PublicPortalClient({
       }
     }
 
-    loadProperties();
-  }, [companySlug]);
+    void loadProperties();
+  }, [companySlug, initialCatalog]);
 
   async function loadTrackedTicket(nextReference: string, nextEmail: string, nextToken: string) {
     const normalizedReference = nextReference.trim().toUpperCase();
