@@ -55,6 +55,13 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
   upsertTimeEntry: upsertTimeEntryMock,
   upsertMaterialEntry: upsertMaterialEntryMock,
 }));
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasWorkOrderVendorContractColumn: vi.fn(async () => false),
+}));
+vi.mock("@/lib/vendor-notify", () => ({
+  notifyVendor: vi.fn().mockResolvedValue({ emailed: false }),
+}));
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },
@@ -89,7 +96,7 @@ describe("work-order execution atomic persistence", () => {
     txExecuteRawMock.mockResolvedValue(1);
     txQueryRawMock.mockResolvedValue([]);
     writeAuditLogMock.mockResolvedValue(undefined);
-    completeLifecycleMock.mockResolvedValue({ ticketSync: null, componentSync: null });
+    completeLifecycleMock.mockResolvedValue({ ticketSync: null, componentSync: null, workOrder: { ticket_id: null } });
     getModernTimeEntryMock.mockResolvedValue(null);
     getModernMaterialEntryMock.mockResolvedValue(null);
     upsertTimeEntryMock.mockResolvedValue({});

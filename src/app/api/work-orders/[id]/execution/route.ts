@@ -8,7 +8,9 @@ import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work
 import { completeWorkOrderLifecycle, WorkOrderCompletionConflict } from "@/lib/work-order-completion";
 import { canFinalizeWorkOrderExecution, isWorkOrderExecutionLocked } from "@/lib/work-order-execution-policy";
 import { normalizeInspectionTemplateItems } from "@/lib/inspection-checklist-template";
-import { isMissingTableError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
+import { isMissingTableError, schemaMismatchUserMessage, hasWorkOrderVendorContractColumn } from "@/lib/schema-readiness";
+import { notifyVendor } from "@/lib/vendor-notify";
+import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
 import {
   getModernMaterialEntry,
   getModernTimeEntry,
@@ -418,7 +420,14 @@ export async function POST(
 
     const companyId = user.company_id;
     const completedAt = new Date();
-    let result: { actualCost: number; finalSlaStatus: string; promotedTime: number; promotedMaterial: number };
+    let result: {
+      actualCost: number;
+      finalSlaStatus: string;
+      promotedTime: number;
+      promotedMaterial: number;
+      ticketSync: { changed?: boolean } | null;
+      ticketId: string | null;
+    };
     try {
       result = await db.$transaction(async (tx) => {
         const totals = await tx.$queryRaw<{ total_cost: number }[]>(Prisma.sql`
@@ -517,7 +526,7 @@ export async function POST(
           }
         }
 
-        await completeWorkOrderLifecycle(tx, {
+        const lifecycle = await completeWorkOrderLifecycle(tx, {
           companyId,
           workOrderId: id,
           actorUserId: user.id,
@@ -546,13 +555,73 @@ export async function POST(
           },
         }, tx);
 
-        return { actualCost, finalSlaStatus, promotedTime, promotedMaterial };
+        return {
+          actualCost,
+          finalSlaStatus,
+          promotedTime,
+          promotedMaterial,
+          ticketSync: lifecycle.ticketSync,
+          ticketId: lifecycle.workOrder.ticket_id,
+        };
       });
     } catch (error) {
       if (error instanceof WorkOrderCompletionConflict) {
         return NextResponse.json({ error: error.message }, { status: 409 });
       }
       throw error;
+    }
+
+    try {
+      if (await hasWorkOrderVendorContractColumn()) {
+        const assigned = await db.workOrder.findFirst({
+          where: { id, company_id: user.company_id, deleted_at: null },
+          select: {
+            title: true,
+            work_order_number: true,
+            vendor_contract_id: true,
+            property: { select: { name: true } },
+          },
+        });
+        const vendorContractId = assigned?.vendor_contract_id?.trim() || "";
+        if (vendorContractId) {
+          const vendor = await db.vendorContract.findFirst({
+            where: { id: vendorContractId, company_id: user.company_id },
+            select: { email: true },
+          });
+          await notifyVendor(user, {
+            workOrderId: id,
+            title: assigned?.title || workOrder.title,
+            workOrderNumber: assigned?.work_order_number,
+            propertyName: assigned?.property?.name,
+            vendorContractId,
+            vendorEmail: vendor?.email,
+            kind: "completed",
+          });
+        }
+      }
+    } catch {
+      // Completion is already persisted; vendor mail must not fail the finalize response.
+    }
+
+    if (result.ticketSync?.changed && result.ticketId) {
+      try {
+        const linkedTicket = await db.ticket.findFirst({
+          where: { id: result.ticketId, company_id: user.company_id, deleted_at: null },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            public_reference: true,
+            reporter_email: true,
+            reporter_phone: true,
+          },
+        });
+        if (linkedTicket) {
+          await notifyTicketReporter(user, linkedTicket, "updated");
+        }
+      } catch {
+        // Completion is already persisted; reporter mail must not fail the finalize response.
+      }
     }
 
     return NextResponse.json({

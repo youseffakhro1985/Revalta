@@ -577,6 +577,31 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       logger.error("Work-order vendor notification failed", notificationError);
     }
   }
+  const completedNow = assignedWorkOrder.status === "completed" && existing.status !== "completed";
+  if (completedNow) {
+    const completedVendorId = persistVendor
+      ? assignedVendorId || (existing as { vendor_contract_id?: string | null }).vendor_contract_id || null
+      : null;
+    if (completedVendorId) {
+      try {
+        const vendorEmail = assignedVendorEmail || (await db.vendorContract.findFirst({
+          where: { id: completedVendorId, company_id: companyId },
+          select: { email: true },
+        }))?.email || null;
+        await notifyVendor(user, {
+          workOrderId: assignedWorkOrder.id,
+          title: assignedWorkOrder.title,
+          workOrderNumber: enterpriseBefore?.work_order_number,
+          propertyName: existing.property?.name,
+          vendorContractId: completedVendorId,
+          vendorEmail,
+          kind: "completed",
+        });
+      } catch (notificationError) {
+        logger.error("Work-order vendor completion notification failed", notificationError);
+      }
+    }
+  }
 
   const { workOrder, enterprise, statusEvents, assetLink } = transactionResult;
   return NextResponse.json({
