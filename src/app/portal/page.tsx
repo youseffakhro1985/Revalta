@@ -17,6 +17,7 @@ export default async function PortalPage({
       initialTrackEmail={params.email?.trim() || ""}
       initialTrackedTicket={tracked.ticket}
       initialTrackError={tracked.error}
+      initialCommented={params.commented === "1"}
     />
   );
 }

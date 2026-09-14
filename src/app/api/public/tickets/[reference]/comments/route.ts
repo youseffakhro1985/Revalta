@@ -1,42 +1,99 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { queueTicketNotification } from "@/lib/integrations";
 import { extractPortalTrackingToken, verifyPortalTrackingToken } from "@/lib/portal-tracking";
+import { extractPortalCompanySlug } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/public/tickets/[reference]/comments" });
 
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+function portalLandingPath(companySlug: string | null) {
+  return companySlug ? `/portal/${encodeURIComponent(companySlug)}` : "/portal";
+}
+
+async function readCommentFields(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return {
+      email: String(form?.get("email") || ""),
+      name: String(form?.get("name") || ""),
+      body: String(form?.get("body") || ""),
+      token: String(form?.get("token") || ""),
+      companySlug: String(form?.get("companySlug") || ""),
+      form,
+    };
+  }
+  const bodyJson = await request.json().catch(() => ({})) as Record<string, unknown>;
+  return {
+    email: typeof bodyJson.email === "string" ? bodyJson.email : "",
+    name: typeof bodyJson.name === "string" ? bodyJson.name : "",
+    body: typeof bodyJson.body === "string" ? bodyJson.body : "",
+    token: typeof bodyJson.token === "string" ? bodyJson.token : "",
+    companySlug: typeof bodyJson.companySlug === "string" ? bodyJson.companySlug : "",
+    form: null as FormData | null,
+  };
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ reference: string }> }
 ) {
+  const nativeForm = isNativeFormPost(request);
+  const { reference } = await params;
+  const fail = (
+    status: number,
+    message: string,
+    reason: "invalid" | "rate" | "error",
+    companySlug?: string | null,
+    token?: string,
+  ) => {
+    if (!nativeForm) {
+      return NextResponse.json({ error: message }, { status });
+    }
+    const url = new URL(portalLandingPath(companySlug || extractPortalCompanySlug(request)), getPublicAppUrl(request.url));
+    url.searchParams.set("reason", reason);
+    if (reference) url.searchParams.set("ref", reference.toUpperCase());
+    if (token) url.searchParams.set("token", token);
+    const response = NextResponse.redirect(url, 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    return response;
+  };
+
   try {
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(`public-comment:${ip}`, 10, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
-      return NextResponse.json({ error: "För många kommentarer. Vänta en stund och prova igen." }, { status: 429 });
+      return fail(429, "För många kommentarer. Vänta en stund och prova igen.", "rate", extractPortalCompanySlug(request));
     }
 
-    const { reference } = await params;
-    const bodyJson = await request.json();
-    const email = typeof bodyJson.email === "string" ? bodyJson.email.trim().toLowerCase() : "";
-    const name = typeof bodyJson.name === "string" ? bodyJson.name.trim() : "";
-    const body = typeof bodyJson.body === "string" ? bodyJson.body.trim() : "";
+    const fields = await readCommentFields(request);
+    const email = fields.email.trim().toLowerCase();
+    const name = fields.name.trim();
+    const body = fields.body.trim();
+    const companySlug = extractPortalCompanySlug(request, fields.companySlug);
     const tracking = verifyPortalTrackingToken(
-      typeof bodyJson.token === "string" ? bodyJson.token : extractPortalTrackingToken(request),
+      fields.token || extractPortalTrackingToken(request, fields.form),
     );
     const authorizedEmail = tracking?.email || email;
 
     if (!authorizedEmail.includes("@") || !body) {
-      return NextResponse.json({ error: "E-post eller spårningstoken och kommentar krävs" }, { status: 400 });
+      return fail(400, "E-post eller spårningstoken och kommentar krävs", "invalid", companySlug, fields.token);
     }
     if (authorizedEmail.length > 254 || name.length > 120 || body.length > 5_000) {
-      return NextResponse.json({ error: "En eller flera uppgifter är för långa" }, { status: 400 });
+      return fail(400, "En eller flera uppgifter är för långa", "invalid", companySlug, fields.token);
     }
     if (tracking && tracking.reference !== reference.toUpperCase()) {
-      return NextResponse.json({ error: "Ogiltig spårningstoken" }, { status: 403 });
+      return fail(403, "Ogiltig spårningstoken", "invalid", companySlug);
     }
 
     const ticket = await db.ticket.findFirst({
@@ -58,7 +115,7 @@ export async function POST(
     });
 
     if (!ticket?.company_id) {
-      return NextResponse.json({ error: "Ärendet hittades inte. Kontrollera referensnummer och e-post." }, { status: 404 });
+      return fail(404, "Ärendet hittades inte. Kontrollera referensnummer och e-post.", "invalid", companySlug, fields.token);
     }
 
     const authorName = name || ticket.reporter_name || "Boende";
@@ -108,6 +165,18 @@ export async function POST(
       logger.error("Public comment notification failed", notificationError);
     }
 
+    if (nativeForm) {
+      const url = new URL(portalLandingPath(companySlug), getPublicAppUrl(request.url));
+      url.searchParams.set("commented", "1");
+      url.searchParams.set("ref", reference.toUpperCase());
+      const token = fields.token || extractPortalTrackingToken(request, fields.form);
+      if (token) url.searchParams.set("token", token);
+      const response = NextResponse.redirect(url, 303);
+      response.headers.set("Cache-Control", "no-store");
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      return response;
+    }
+
     return NextResponse.json({
       success: true,
       comment: {
@@ -119,6 +188,6 @@ export async function POST(
     }, { status: 201 });
   } catch (error) {
     logger.error("Create public comment error", error);
-    return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
+    return fail(500, "Internt serverfel", "error", extractPortalCompanySlug(request));
   }
 }
