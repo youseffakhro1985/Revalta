@@ -311,7 +311,10 @@ export async function POST(request: Request) {
         existingCategory: category || "other",
       });
       category = classified.category;
-      classificationSource = classified.source;
+      classificationSource =
+        classified.source === "provider" || classified.source === "fallback" || classified.source === "staff"
+          ? classified.source
+          : "staff";
     }
 
     let resolvedPropertyId = propertyId || null;
@@ -426,6 +429,7 @@ export async function POST(request: Request) {
           hasPropertyScope: Boolean(resolvedPropertyId),
           hasUnitScope: Boolean(resolvedUnitId),
           hasLeaseScope: Boolean(resolvedLeaseId),
+          classificationSource,
         },
       }, tx);
 
@@ -452,7 +456,7 @@ export async function POST(request: Request) {
         documentId: document.id,
       }));
     }
-    return successResponse(observability, { success: true, document }, { status: 201 });
+    return successResponse(observability, { success: true, document, classificationSource }, { status: 201 });
   } catch (error) {
     if (error instanceof StorageConfigurationError) {
       observability.logger.error("document storage unavailable", error, observability.elapsed({

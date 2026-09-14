@@ -7,6 +7,7 @@ const {
   managedFindManyMock,
   propertyFindManyMock,
   leaseFindManyMock,
+  auditFindManyMock,
   loggerInfoMock,
   loggerErrorMock,
 } = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const {
   managedFindManyMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   leaseFindManyMock: vi.fn(),
+  auditFindManyMock: vi.fn(),
   loggerInfoMock: vi.fn(),
   loggerErrorMock: vi.fn(),
 }));
@@ -35,6 +37,7 @@ vi.mock("@/lib/db", () => ({
     },
     property: { findMany: propertyFindManyMock },
     lease: { findMany: leaseFindManyMock },
+    auditLog: { findMany: auditFindManyMock },
   },
 }));
 
@@ -88,6 +91,7 @@ function primeBaseData() {
     .mockResolvedValueOnce(emptyGroups[2]);
   propertyFindManyMock.mockResolvedValue([]);
   leaseFindManyMock.mockResolvedValue([]);
+  auditFindManyMock.mockResolvedValue([]);
   managedFindManyMock
     .mockResolvedValueOnce([modernRow()])
     .mockResolvedValueOnce([])
@@ -125,7 +129,7 @@ describe("documents/library GET — tenant and pagination contract", () => {
     expect(response.status).toBe(200);
     expect(body.pagination).toEqual({ page: 3, pageSize: 25, total: 60, totalPages: 3 });
     expect(body.documents).toHaveLength(1);
-    expect(body.documents[0]).toEqual(expect.objectContaining({ id: "doc-1", source: "table" }));
+    expect(body.documents[0]).toEqual(expect.objectContaining({ id: "doc-1", source: "table", classificationSource: null }));
     expect(response.headers.get("cache-control")).toContain("private");
     expect(response.headers.get("cache-control")).toContain("no-store");
     for (const call of managedCountMock.mock.calls) expect(call[0]?.where).toEqual(expect.objectContaining({ company_id: "company-a" }));
@@ -142,6 +146,7 @@ describe("documents/library GET — tenant and pagination contract", () => {
     managedGroupByMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     propertyFindManyMock.mockResolvedValue([]);
     leaseFindManyMock.mockResolvedValue([]);
+    auditFindManyMock.mockResolvedValue([]);
     managedFindManyMock.mockResolvedValueOnce([modernRow()]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const response = await GET(new Request("https://www.revalta.se/api/documents/library?pageSize=99999"));
     const body = await response.json();
@@ -149,5 +154,24 @@ describe("documents/library GET — tenant and pagination contract", () => {
     expect(body.pagination.pageSize).toBe(100);
     expect(managedFindManyMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ skip: 0, take: 100 }));
     expect(leaseFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ company_id: "company-a", deleted_at: null }), take: 2000 }));
+  });
+
+  it("returns classification source from the tenant-scoped create audit without exposing other companies", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-a", role: "owner", company_id: "company-a" });
+    primeBaseData();
+    auditFindManyMock.mockResolvedValue([
+      { entity_id: "doc-1", metadata: { classificationSource: "provider" } },
+    ]);
+    const response = await GET(new Request("https://www.revalta.se/api/documents/library"));
+    const body = await response.json();
+    expect(body.documents[0].classificationSource).toBe("provider");
+    expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-a",
+        entity_type: "document",
+        action: "document.created",
+        entity_id: { in: ["doc-1"] },
+      }),
+    }));
   });
 });

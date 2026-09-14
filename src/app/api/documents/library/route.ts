@@ -214,6 +214,27 @@ export async function GET(request: Request) {
 
     const propertyMap = new Map(properties.map((property) => [property.id, property]));
     const leaseMap = new Map(leases.map((lease) => [lease.id, lease]));
+    const documentIds = [...new Set([...rows, ...recentRows, ...attentionRows].map((row) => row.id))];
+    const classificationAudits = documentIds.length
+      ? await db.auditLog.findMany({
+          where: {
+            company_id: companyId,
+            entity_type: "document",
+            action: "document.created",
+            entity_id: { in: documentIds },
+          },
+          select: { entity_id: true, metadata: true },
+        })
+      : [];
+    const classificationById = new Map<string, "provider" | "fallback" | "staff">();
+    for (const audit of classificationAudits) {
+      if (!audit.entity_id) continue;
+      const metadata = (audit.metadata || {}) as Record<string, unknown>;
+      const source = metadata.classificationSource;
+      if (source === "provider" || source === "fallback" || source === "staff") {
+        classificationById.set(audit.entity_id, source);
+      }
+    }
 
     const mapDocument = (row: DocumentRow) => {
       const property = row.property_id ? propertyMap.get(row.property_id) || null : null;
@@ -244,6 +265,7 @@ export async function GET(request: Request) {
         uploadedBy: row.created_by?.name || row.created_by?.email || "Okänd",
         createdAt: row.created_at,
         source: "table" as const,
+        classificationSource: classificationById.get(row.id) || null,
       };
     };
 

@@ -57,7 +57,7 @@ vi.mock("@/lib/ai", () => ({
   analyzeDocument: vi.fn(async ({ existingCategory }: { existingCategory?: string }) => ({
     category: existingCategory || "other",
     confidence: 1,
-    summary: "test",
+    source: "staff",
   })),
   documentTextSnippet: vi.fn(() => ""),
   LIBRARY_DOCUMENT_CATEGORIES: ["contract", "invoice", "protocol", "drawing", "insurance", "energy", "inspection", "other"],
@@ -155,6 +155,7 @@ describe("document upload write security", () => {
           hasPropertyScope: true,
           hasUnitScope: true,
           hasLeaseScope: false,
+          classificationSource: "staff",
         },
       }),
       tx,
