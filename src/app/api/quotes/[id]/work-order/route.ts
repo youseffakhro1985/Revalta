@@ -10,7 +10,7 @@ import { hasWorkOrderVendorContractColumn, isMissingTableError, schemaMismatchUs
 import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/quotes/[id]/work-order" });
-export const QUOTE_WORK_ORDER_ACTION = "quote.work_order_created";
+const QUOTE_WORK_ORDER_ACTION = "quote.work_order_created";
 const ELIGIBLE_STATUSES = new Set(["approved", "invoiced"]);
 const BLOCKED_STATUSES = new Set(["rejected", "cancelled"]);
 
