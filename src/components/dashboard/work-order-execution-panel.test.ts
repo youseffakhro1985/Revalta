@@ -5,6 +5,7 @@ describe("work-order execution completion copy", () => {
   it("tells staff that a register vendor is emailed on finalize", () => {
     const source = readFileSync(new URL("./work-order-execution-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain("avslutmejl");
+    expect(source).toContain("Kopplat ärende meddelar anmälaren");
     expect(source).toContain("completion.finalize");
   });
 });

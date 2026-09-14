@@ -96,7 +96,7 @@ describe("work-order execution atomic persistence", () => {
     txExecuteRawMock.mockResolvedValue(1);
     txQueryRawMock.mockResolvedValue([]);
     writeAuditLogMock.mockResolvedValue(undefined);
-    completeLifecycleMock.mockResolvedValue({ ticketSync: null, componentSync: null });
+    completeLifecycleMock.mockResolvedValue({ ticketSync: null, componentSync: null, workOrder: { ticket_id: null } });
     getModernTimeEntryMock.mockResolvedValue(null);
     getModernMaterialEntryMock.mockResolvedValue(null);
     upsertTimeEntryMock.mockResolvedValue({});

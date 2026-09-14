@@ -17,6 +17,8 @@ const {
   hasVendorColumnMock,
   notifyVendorMock,
   vendorFindFirstMock,
+  ticketFindFirstMock,
+  notifyTicketReporterMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
@@ -32,6 +34,8 @@ const {
   hasVendorColumnMock: vi.fn(),
   notifyVendorMock: vi.fn(),
   vendorFindFirstMock: vi.fn(),
+  ticketFindFirstMock: vi.fn(),
+  notifyTicketReporterMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", () => ({
@@ -62,10 +66,14 @@ vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
 vi.mock("@/lib/vendor-notify", () => ({
   notifyVendor: (...args: unknown[]) => notifyVendorMock(...args),
 }));
+vi.mock("@/lib/ticket-reporter-notify", () => ({
+  notifyTicketReporter: (...args: unknown[]) => notifyTicketReporterMock(...args),
+}));
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },
     vendorContract: { findFirst: vendorFindFirstMock },
+    ticket: { findFirst: ticketFindFirstMock },
     $queryRaw: queryRawMock,
     $executeRaw: executeRawMock,
     $transaction: transactionMock,
@@ -104,7 +112,7 @@ describe("work-order execution lifecycle boundaries", () => {
     getCurrentUserMock.mockResolvedValue(user());
     executeRawMock.mockResolvedValue(1);
     writeAuditLogMock.mockResolvedValue(undefined);
-    completeLifecycleMock.mockResolvedValue({ ticketSync: null, componentSync: null });
+    completeLifecycleMock.mockResolvedValue({ ticketSync: null, componentSync: null, workOrder: { ticket_id: null } });
     getModernTimeEntryMock.mockResolvedValue(null);
     getModernMaterialEntryMock.mockResolvedValue(null);
     upsertTimeEntryMock.mockResolvedValue({});
@@ -112,6 +120,8 @@ describe("work-order execution lifecycle boundaries", () => {
     hasVendorColumnMock.mockResolvedValue(false);
     notifyVendorMock.mockResolvedValue({ emailed: false });
     vendorFindFirstMock.mockResolvedValue(null);
+    ticketFindFirstMock.mockResolvedValue(null);
+    notifyTicketReporterMock.mockResolvedValue({ emailed: false, sms: false });
   });
 
   it.each([
@@ -275,6 +285,47 @@ describe("work-order execution lifecycle boundaries", () => {
         vendorEmail: "kontakt@stad.se",
         kind: "completed",
       }),
+    );
+  });
+
+  it("notifies the linked ticket reporter after a successful finalize", async () => {
+    completeLifecycleMock.mockResolvedValue({
+      ticketSync: { changed: true },
+      componentSync: null,
+      workOrder: { ticket_id: "ticket-1" },
+    });
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      title: "Läckande kran",
+      status: "completed",
+      public_reference: "RV-1001",
+      reporter_email: "boende@example.se",
+      reporter_phone: null,
+    });
+    workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
+    queryRawMock.mockResolvedValue([{ required_incomplete: 0, before_photos: 1, after_photos: 1 }]);
+    const tx = {
+      $queryRaw: vi.fn().mockImplementation(async (query: unknown) => {
+        const text = sqlText(query);
+        if (text.includes("total_cost")) return [{ total_cost: 80 }];
+        if (text.includes("completion_due_at")) return [{ completion_due_at: null }];
+        if (text.includes("WorkOrderExecutionEntry")) return [];
+        return [];
+      }),
+    };
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
+
+    const response = await POST(request({ action: "completion.finalize" }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyTicketReporterMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1", company_id: "company-1" }),
+      expect.objectContaining({
+        id: "ticket-1",
+        status: "completed",
+        reporter_email: "boende@example.se",
+      }),
+      "updated",
     );
   });
 });
