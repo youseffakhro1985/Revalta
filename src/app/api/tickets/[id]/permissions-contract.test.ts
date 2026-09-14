@@ -13,6 +13,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 vi.mock("@/lib/db", () => ({
   default: {
     ticket: { findFirst: ticketFindFirstMock },
+    auditLog: { findFirst: vi.fn().mockResolvedValue(null) },
   },
 }));
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({

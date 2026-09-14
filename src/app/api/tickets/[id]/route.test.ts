@@ -10,6 +10,7 @@ const {
   notifyTicketReporterMock,
   transactionMock,
   auditLogCreateMock,
+  auditLogFindFirstMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   ticketFindFirstMock: vi.fn(),
@@ -20,6 +21,7 @@ const {
   notifyTicketReporterMock: vi.fn(),
   transactionMock: vi.fn(),
   auditLogCreateMock: vi.fn(),
+  auditLogFindFirstMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -53,6 +55,7 @@ vi.mock("@/lib/db", () => {
     },
     auditLog: {
       create: auditLogCreateMock,
+      findFirst: auditLogFindFirstMock,
     },
     $transaction: transactionMock,
   };
@@ -113,6 +116,7 @@ function makeRequest(method: string, body?: unknown) {
 describe("tickets/[id] GET", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    auditLogFindFirstMock.mockResolvedValue(null);
   });
 
   it("returns 401 when there is no current user", async () => {
@@ -191,6 +195,7 @@ describe("tickets/[id] GET", () => {
     expect(response.status).toBe(200);
     expect(body.ticket.id).toBe("ticket-1");
     expect(body.ticket.reporter_email).toBe("anna@example.se");
+    expect(body.ticket.residentFeedback).toBeNull();
     expect(body.ticket.attachments[0].data_url).toBe("/api/attachments/attachment-1");
     expect(body.ticket.allowedTransitions).toEqual(["planned", "assigned", "in_progress", "cancelled"]);
     expect(body.permissions).toEqual({ canManage: true, canAssign: true });

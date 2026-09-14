@@ -4,6 +4,7 @@ import {
   extractPortalTrackingToken,
   verifyPortalTrackingToken,
 } from "@/lib/portal-tracking";
+import { loadTicketResidentFeedback } from "@/lib/ticket-resident-feedback";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
@@ -114,6 +115,10 @@ export async function GET(
       email: authorizedEmail,
       companyId: ticket.company_id,
     });
+    const residentFeedback = await loadTicketResidentFeedback(db, {
+      companyId: ticket.company_id,
+      ticketId: ticket.id,
+    });
 
     return NextResponse.json({
       trackingToken,
@@ -127,6 +132,7 @@ export async function GET(
         updated_at: ticket.updated_at,
         ai_summary: ticket.ai_summary,
         property: ticket.property,
+        residentFeedback,
         comments: ticket.comments.map((comment) => {
           if (comment.author_name) {
             return {

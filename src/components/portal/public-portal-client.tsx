@@ -43,6 +43,11 @@ type PublicTicket = {
     author?: { type: string; name: string };
     user?: { name: string | null };
   }>;
+  residentFeedback?: {
+    rating: number;
+    comment: string | null;
+    submittedAt: string;
+  } | null;
 };
 
 const statusLabels = TICKET_STATUS_LABELS;
@@ -70,6 +75,8 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
   const [createdReference, setCreatedReference] = useState("");
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [residentComment, setResidentComment] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -88,6 +95,50 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
 
     loadProperties();
   }, [companySlug]);
+
+  async function loadTrackedTicket(nextReference: string, nextEmail: string, nextToken: string) {
+    const normalizedReference = nextReference.trim().toUpperCase();
+    const params = new URLSearchParams();
+    if (nextEmail) params.set("email", nextEmail);
+    if (nextToken) params.set("token", nextToken);
+    const response = await fetch(`/api/public/tickets/${encodeURIComponent(normalizedReference)}?${params.toString()}`, { cache: "no-store" });
+    const data = await readResponseJson(response);
+    if (!response.ok) {
+      throw new Error(data.error || "Kunde inte hitta ärendet");
+    }
+    if (typeof data.trackingToken === "string") setTrackingToken(data.trackingToken);
+    setTrackedTicket(data.ticket);
+    setReference(normalizedReference);
+    return data.ticket as PublicTicket;
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref")?.trim();
+    const token = params.get("token")?.trim() || "";
+    const email = params.get("email")?.trim() || "";
+    if (!ref) return;
+    setReference(ref.toUpperCase());
+    if (token) setTrackingToken(token);
+    if (email) setTrackEmail(email);
+    void (async () => {
+      setError("");
+      setSuccess("");
+      setLoading(true);
+      try {
+        await loadTrackedTicket(ref, email, token);
+        setSuccess("Ärendet hittades.");
+        if (params.get("feedback") === "1") {
+          document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Kunde inte hitta ärendet");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   async function createTicket(event: React.FormEvent) {
     event.preventDefault();
@@ -136,23 +187,11 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
     setLoading(true);
 
     try {
-      const normalizedReference = reference.trim().toUpperCase();
-      const params = new URLSearchParams();
-      if (trackEmail) params.set("email", trackEmail);
-      if (trackingToken) params.set("token", trackingToken);
-      const response = await fetch(`/api/public/tickets/${encodeURIComponent(normalizedReference)}?${params.toString()}`, { cache: "no-store" });
-      const data = await readResponseJson(response);
-
-      if (!response.ok) {
-        setError(data.error || "Kunde inte hitta ärendet");
-        return;
-      }
-
-      if (typeof data.trackingToken === "string") setTrackingToken(data.trackingToken);
-      setTrackedTicket(data.ticket);
+      const dataTicket = await loadTrackedTicket(reference, trackEmail, trackingToken);
+      setTrackedTicket(dataTicket);
       setSuccess("Ärendet hittades.");
-    } catch {
-      setError("Kunde inte kontakta servern");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Kunde inte kontakta servern");
     } finally {
       setLoading(false);
     }
@@ -160,7 +199,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
 
   async function uploadAttachment(event: React.FormEvent) {
     event.preventDefault();
-    if (!attachmentFile || !reference || !trackEmail) return;
+    if (!attachmentFile || !reference || (!trackEmail && !trackingToken)) return;
     setError("");
     setSuccess("");
     setLoading(true);
@@ -190,7 +229,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
 
   async function addResidentComment(event: React.FormEvent) {
     event.preventDefault();
-    if (!reference || !trackEmail || !residentComment.trim()) return;
+    if (!reference || (!trackEmail && !trackingToken) || !residentComment.trim()) return;
     setError("");
     setSuccess("");
     setLoading(true);
@@ -217,6 +256,43 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
       setLoading(false);
     }
   }
+
+  async function submitResidentFeedback(event: React.FormEvent) {
+    event.preventDefault();
+    if (!reference || (!trackEmail && !trackingToken) || feedbackRating < 1) return;
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: trackEmail || undefined,
+          token: trackingToken || undefined,
+          rating: feedbackRating,
+          comment: feedbackComment.trim() || undefined,
+        }),
+      });
+      const data = await readResponseJson(response);
+      if (!response.ok) {
+        setError(data.error || "Kunde inte spara återkopplingen");
+        if (data.feedback) {
+          setTrackedTicket((current) => current ? { ...current, residentFeedback: data.feedback } : current);
+        }
+        return;
+      }
+      setTrackedTicket((current) => current ? { ...current, residentFeedback: data.feedback } : current);
+      setFeedbackComment("");
+      setSuccess("Tack för återkopplingen.");
+    } catch {
+      setError("Kunde inte kontakta servern");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const closedTicket = trackedTicket && ["closed", "completed"].includes(trackedTicket.status);
 
   return (
     <>
@@ -246,10 +322,14 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 animate-slide-up-soft" style={{ animationDelay: "100ms" }}>
-              {["Mottaget direkt", "Spårbart ärende", "Tydlig återkoppling"].map((item) => (
-                <div key={item} className="rounded-xl border border-sand-200 bg-white p-5 shadow-sm">
-                  <p className="text-sm font-semibold text-ink-950">{item}</p>
-                  <p className="mt-1 text-xs text-ink-500">Byggt för smidig fastighetsservice.</p>
+              {[
+                { title: "Mottaget direkt", text: "Förvaltningen får ärendet så fort du skickar det." },
+                { title: "Spårbart ärende", text: "Följ status med referens eller länken i e-posten." },
+                { title: "Tydlig återkoppling", text: "När ärendet är klart kan du betygsätta hur det gick." },
+              ].map((item) => (
+                <div key={item.title} className="rounded-xl border border-sand-200 bg-white p-5 shadow-sm">
+                  <p className="text-sm font-semibold text-ink-950">{item.title}</p>
+                  <p className="mt-1 text-xs text-ink-500">{item.text}</p>
                 </div>
               ))}
             </div>
@@ -300,7 +380,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
               <h2 className="text-xl font-semibold text-ink-950">Följ ditt ärende</h2>
               <form onSubmit={trackTicket} className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
                 <label><span className="sr-only">Ärendets referensnummer</span><input required autoComplete="off" maxLength={32} value={reference} onChange={(event) => setReference(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="RV-2026-XXXXXX" /></label>
-                <label><span className="sr-only">E-post som användes för ärendet</span><input required type="email" autoComplete="email" maxLength={254} value={trackEmail} onChange={(event) => setTrackEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="Din e-post" /></label>
+                <label><span className="sr-only">E-post som användes för ärendet</span><input required={!trackingToken} type="email" autoComplete="email" maxLength={254} value={trackEmail} onChange={(event) => setTrackEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="Din e-post" /></label>
                 <button type="submit" disabled={loading} className="rounded-xl border border-sand-200 bg-white px-5 py-3 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-sand-100 disabled:opacity-70">
                   Följ
                 </button>
@@ -344,7 +424,50 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                       ))}
                     </div>
                   )}
-                  
+
+                  {closedTicket ? (
+                    <div id="boende-aterkoppling" className="mt-6 border-t border-sand-100 pt-5">
+                      {trackedTicket.residentFeedback ? (
+                        <div className="rounded-xl border border-petroleum-100 bg-petroleum-50 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">Din återkoppling</p>
+                          <p className="mt-2 text-sm font-semibold text-ink-950">{trackedTicket.residentFeedback.rating} av 5</p>
+                          {trackedTicket.residentFeedback.comment ? <p className="mt-2 text-sm text-ink-700">{trackedTicket.residentFeedback.comment}</p> : null}
+                        </div>
+                      ) : (
+                        <form onSubmit={submitResidentFeedback}>
+                          <p className="text-sm font-semibold text-ink-900">Hur gick det?</p>
+                          <p className="mt-1 text-xs text-ink-500">Betygsätt ärendet när det är avslutat. En gång per ärende.</p>
+                          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Betyg 1 till 5">
+                            {[1, 2, 3, 4, 5].map((value) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setFeedbackRating(value)}
+                                className={`h-10 w-10 rounded-xl border text-sm font-semibold ${feedbackRating === value ? "border-petroleum-600 bg-petroleum-600 text-white" : "border-sand-200 bg-white text-ink-800 hover:bg-sand-50"}`}
+                                aria-pressed={feedbackRating === value}
+                                aria-label={`${value} av 5`}
+                              >
+                                {value}
+                              </button>
+                            ))}
+                          </div>
+                          <textarea
+                            rows={3}
+                            maxLength={1000}
+                            value={feedbackComment}
+                            onChange={(event) => setFeedbackComment(event.target.value)}
+                            className="mt-3 w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-900 outline-none transition-all focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500"
+                            placeholder="Valfri kommentar till förvaltningen..."
+                            aria-label="Valfri kommentar"
+                          />
+                          <button disabled={loading || feedbackRating < 1} className="mt-3 rounded-lg bg-petroleum-600 px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-petroleum-700 transition-colors">
+                            Skicka återkoppling
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  ) : null}
+
                   <form onSubmit={addResidentComment} className="mt-6 border-t border-sand-100 pt-5">
                     <p className="text-sm font-semibold text-ink-900">Skicka kommentar</p>
                     <textarea

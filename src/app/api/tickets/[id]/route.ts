@@ -25,6 +25,7 @@ import {
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 import { hasTicketAiSourceColumn, ticketAiSourceSelect } from "@/lib/schema-readiness";
+import { loadTicketResidentFeedback } from "@/lib/ticket-resident-feedback";
 
 const logger = createLogger({ route: "/api/tickets/[id]" });
 
@@ -122,11 +123,16 @@ export async function GET(
 
     const normalizedStatus = isWorkOrderStatus(ticket.status) ? ticket.status : "new";
     const redacted = redactTicketReporterPii(user, ticket);
+    const companyId = user.company_id;
+    const residentFeedback = companyId
+      ? await loadTicketResidentFeedback(db, { companyId, ticketId: ticket.id })
+      : null;
 
     return NextResponse.json({
       ticket: {
         ...redacted,
         status: normalizedStatus,
+        residentFeedback,
         allowedTransitions: allowedWorkOrderTransitions(normalizedStatus),
         attachments: ticket.attachments.map((attachment) => ({
           ...attachment,
