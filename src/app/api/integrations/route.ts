@@ -2,7 +2,7 @@ import db from "@/lib/db";
 import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
 import { hasStorageConfig } from "@/lib/storage";
 import { isStripeBillingReady } from "@/lib/stripe";
-import { isAiConfigured, isSmsConfigured } from "@/lib/integrations";
+import { isAiConfigured, isSmsConfigured, isSmsInboundConfigured } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -48,11 +48,19 @@ export async function GET() {
       return NextResponse.json({ error: "Du saknar behörighet att visa integrationer" }, { status: 403 });
     }
 
-    const integrations = Object.entries(requiredEnv).map(([type, envKeys]) => ({
-      type,
-      configured: isIntegrationConfigured(type, envKeys),
-      requiredEnv: envKeys,
-    }));
+    const integrations = Object.entries(requiredEnv).map(([type, envKeys]) => {
+      const integration = {
+        type,
+        configured: isIntegrationConfigured(type, envKeys),
+        requiredEnv: envKeys,
+      };
+      if (type !== "sms") return integration;
+      return {
+        ...integration,
+        inboundConfigured: isSmsInboundConfigured(),
+        inboundRequiredEnv: ["SMS_PROVIDER_WEBHOOK_SECRET"],
+      };
+    });
 
     const companyFilter = user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" };
 
