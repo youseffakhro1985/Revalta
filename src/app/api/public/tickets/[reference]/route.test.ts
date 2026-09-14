@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { ticketFindFirstMock, auditFindManyMock, checkRateLimitMock, getClientIpMock } = vi.hoisted(() => ({
+const { ticketFindFirstMock, auditFindManyMock, auditFindFirstMock, checkRateLimitMock, getClientIpMock } = vi.hoisted(() => ({
   ticketFindFirstMock: vi.fn(),
   auditFindManyMock: vi.fn(),
+  auditFindFirstMock: vi.fn(),
   checkRateLimitMock: vi.fn(),
   getClientIpMock: vi.fn(),
 }));
@@ -14,7 +15,7 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/db", () => ({
   default: {
     ticket: { findFirst: ticketFindFirstMock },
-    auditLog: { findMany: auditFindManyMock },
+    auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
   },
 }));
 
@@ -29,6 +30,7 @@ describe("public ticket tracking", () => {
     checkRateLimitMock.mockResolvedValue({ allowed: true });
     getClientIpMock.mockReturnValue("127.0.0.1");
     auditFindManyMock.mockResolvedValue([]);
+    auditFindFirstMock.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -61,6 +63,8 @@ describe("public ticket tracking", () => {
 
     expect(response.status).toBe(200);
     expect(typeof body.trackingToken).toBe("string");
+    expect(body.ticket.residentFeedback).toBeNull();
+    expect(auditFindFirstMock).toHaveBeenCalled();
     expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         public_reference: "RV-2026-TEST",

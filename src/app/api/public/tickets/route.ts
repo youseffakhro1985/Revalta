@@ -2,7 +2,13 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, queueSmsNotification } from "@/lib/integrations";
 import { analyzeTicket } from "@/lib/ai";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { createPortalTrackingToken, hasPortalTrackingConfig } from "@/lib/portal-tracking";
+import {
+  reporterCreatedEmailCopy,
+  reporterCreatedSmsCopy,
+  reporterStaffCreatedEmailCopy,
+} from "@/lib/ticket-reporter-notify";
 import { extractPortalCompanySlug, generatePublicReference, resolvePublicPortalCompany } from "@/lib/public-portal";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { calculateDueDate } from "@/lib/sla";
@@ -140,12 +146,17 @@ export async function POST(request: Request) {
       return created;
     });
 
+    const trackUrl = `${getPublicAppUrl()}/portal?ref=${encodeURIComponent(publicReference)}&token=${encodeURIComponent(trackingToken)}`;
     try {
       await queueTicketNotification({ company_id: portal.company.id }, {
         ticketId: ticket.id,
         title: ticket.title,
         recipient: normalizedReporterEmail,
         event: "created",
+        emailContent: reporterCreatedEmailCopy({
+          title: ticket.title,
+          public_reference: publicReference,
+        }, trackUrl),
       });
     } catch {
       observability.logger.warn("public ticket email notification failed", observability.elapsed({
@@ -155,12 +166,33 @@ export async function POST(request: Request) {
       }));
     }
 
+    if (portal.owner.email) {
+      try {
+        await queueTicketNotification({ company_id: portal.company.id }, {
+          ticketId: ticket.id,
+          title: ticket.title,
+          recipient: portal.owner.email,
+          event: "created",
+          emailContent: reporterStaffCreatedEmailCopy({
+            title: ticket.title,
+            public_reference: publicReference,
+          }),
+        });
+      } catch {
+        observability.logger.warn("public ticket staff email notification failed", observability.elapsed({
+          event: "public.ticket.staff_email_failed",
+          ticketId: ticket.id,
+          companyId: portal.company.id,
+        }));
+      }
+    }
+
     if (normalizedReporterPhone) {
       try {
         await queueSmsNotification({ company_id: portal.company.id }, {
           ticketId: ticket.id,
           recipient: normalizedReporterPhone,
-          message: `Tack! Ärende ${publicReference} är mottaget.`,
+          message: reporterCreatedSmsCopy(publicReference),
         });
       } catch {
         observability.logger.warn("public ticket sms notification failed", observability.elapsed({

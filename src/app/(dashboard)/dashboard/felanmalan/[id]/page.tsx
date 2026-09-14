@@ -69,6 +69,11 @@ type Ticket = {
     data_url: string;
     created_at: string;
   }>;
+  residentFeedback?: {
+    rating: number;
+    comment: string | null;
+    submittedAt: string;
+  } | null;
 };
 type TimelineItem = { id: string; type: string; title: string; description: string; created_at: string };
 type TicketOperation = {
@@ -455,6 +460,16 @@ export default function TicketDetailPage() {
               <Info label="Källa" value={ticket.source === "resident_portal" ? "Boendeportal" : ticket.source === "public_portal" ? "Publik felanmälan" : ticket.source} />
               <Info label="E-post" value={ticket.reporter_email || "Ej angivet"} />
               <Info label="Telefon / lägenhet" value={`${ticket.reporter_phone || "Ej angivet"} · ${ticket.reporter_unit || "Ej angivet"}`} />
+              {ticket.residentFeedback ? (
+                <div className="sm:col-span-2 rounded-xl border border-petroleum-100 bg-petroleum-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">Boendeåterkoppling</p>
+                  <p className="mt-2 text-sm font-semibold text-ink-900">{ticket.residentFeedback.rating} av 5</p>
+                  {ticket.residentFeedback.comment ? <p className="mt-1 text-sm text-ink-700">{ticket.residentFeedback.comment}</p> : <p className="mt-1 text-sm text-ink-500">Ingen kommentar lämnades.</p>}
+                  <p className="mt-2 text-xs text-ink-500">{dateFormatter.format(new Date(ticket.residentFeedback.submittedAt))}</p>
+                </div>
+              ) : ["closed", "completed"].includes(ticket.status) ? (
+                <p className="sm:col-span-2 text-sm text-ink-500">Ingen boendeåterkoppling ännu.</p>
+              ) : null}
               {ticket.reporter_phone && permissions.canManage ? (
                 <div className="sm:col-span-2">
                   <button type="button" onClick={() => void sendReporterSms()} disabled={sendingSms} className={premiumPrimaryButtonClass}>

@@ -159,8 +159,33 @@ describe("POST /api/public/tickets", () => {
     expect(response.status).toBe(201);
     expect(body).toMatchObject({ success: true, trackingToken: "token-1", ticket: { id: "ticket-1" } });
     expect(transactionMock).toHaveBeenCalledTimes(1);
-    expect(queueTicketNotificationMock).toHaveBeenCalledTimes(1);
+    expect(queueTicketNotificationMock).toHaveBeenCalledTimes(2);
+    expect(queueTicketNotificationMock).toHaveBeenNthCalledWith(
+      1,
+      { company_id: "company-1" },
+      expect.objectContaining({
+        recipient: "anna@example.com",
+        event: "created",
+        emailContent: expect.objectContaining({
+          text: expect.stringMatching(/https:\/\/www\.revalta\.se\/portal\?ref=RV-\d{4}-[A-Z0-9]+&token=token-1/),
+        }),
+      }),
+    );
+    expect(queueTicketNotificationMock).toHaveBeenNthCalledWith(
+      2,
+      { company_id: "company-1" },
+      expect.objectContaining({
+        recipient: "owner@example.com",
+        event: "created",
+        emailContent: expect.objectContaining({
+          subject: expect.stringContaining("Ny felanmälan"),
+        }),
+      }),
+    );
+    expect(JSON.stringify(queueTicketNotificationMock.mock.calls[1])).not.toContain("token-1");
     expect(queueSmsNotificationMock).toHaveBeenCalledTimes(1);
+    expect(queueSmsNotificationMock.mock.calls[0][1].message).toContain("https://www.revalta.se/portal");
+    expect(queueSmsNotificationMock.mock.calls[0][1].message).not.toContain("token-1");
   });
 
   it("returnerar 500 och skickar inga notifieringar när ticket+audit-transaktionen faller", async () => {
