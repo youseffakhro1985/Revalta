@@ -650,7 +650,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
         )}
       </Panel>
 
-      <Panel title="Fakturaexport" description="Köa export till Fortnox, Visma eller webhook när underlaget är klart.">
+      <Panel title="Fakturaexport" description="Köa HTTP-export till er Fortnox- eller Visma-endpoint, eller en generell webhook, när underlaget är klart.">
         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <label className="space-y-2 text-sm">
             <span className="font-semibold text-ink-700">Leverantör</span>

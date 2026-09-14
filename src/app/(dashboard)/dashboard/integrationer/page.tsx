@@ -49,8 +49,8 @@ const descriptions: Record<string, string> = {
   stripe: "Checkout, abonnemang och webhookar med pris-ID för samtliga köpbara planer.",
   storage: "Dokument, bilder och bilagor i extern fillagring. BLOB_READ_WRITE_TOKEN föredras; STORAGE_PROVIDER_KEY stöds som legacy-reserv.",
   ai: "Diskret klassificering och prioritering bakom gränssnittet.",
-  fortnox: "Automatisk export av godkända faktureringsunderlag till Fortnox.",
-  visma: "Automatisk export av godkända faktureringsunderlag till Visma.",
+  fortnox: "HTTP-export av godkända faktureringsunderlag till en Fortnox-mottagare (FORTNOX_INVOICE_ENDPOINT). Detta är en generisk JSON-POST, inte Fortnox officiella API-adapter.",
+  visma: "HTTP-export av godkända faktureringsunderlag till en Visma-mottagare (VISMA_INVOICE_ENDPOINT). Detta är en generisk JSON-POST, inte Visma officiella API-adapter.",
   invoice_webhook: "Säker generell webhook för externa ekonomi- och fakturasystem.",
 };
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
