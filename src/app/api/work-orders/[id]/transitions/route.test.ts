@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, workOrderFindFirstMock, userFindManyMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, workOrderFindFirstMock, userFindManyMock, getLatestInvoiceDraftMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
   userFindManyMock: vi.fn(),
+  getLatestInvoiceDraftMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -16,6 +17,10 @@ vi.mock("@/lib/db", () => ({
     workOrder: { findFirst: workOrderFindFirstMock },
     user: { findMany: userFindManyMock },
   },
+}));
+
+vi.mock("@/lib/work-order-ops-storage", () => ({
+  getLatestInvoiceDraft: getLatestInvoiceDraftMock,
 }));
 
 import { GET } from "./route";
@@ -36,6 +41,7 @@ describe("GET /api/work-orders/[id]/transitions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     userFindManyMock.mockResolvedValue(activeUsers);
+    getLatestInvoiceDraftMock.mockResolvedValue(null);
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -131,7 +137,7 @@ describe("GET /api/work-orders/[id]/transitions", () => {
       { status: "in_progress", allowed: ["in_progress", "planned", "waiting_material", "blocked", "completed", "cancelled"] },
       { status: "waiting_material", allowed: ["waiting_material", "planned", "in_progress", "blocked", "cancelled"] },
       { status: "blocked", allowed: ["blocked", "planned", "in_progress", "waiting_material", "cancelled"] },
-      { status: "completed", allowed: ["completed", "in_progress", "invoiced"] },
+      { status: "completed", allowed: ["completed", "in_progress"] },
       { status: "invoiced", allowed: ["invoiced", "completed"] },
       { status: "cancelled", allowed: ["cancelled", "new", "planned"] },
     ];
@@ -146,6 +152,34 @@ describe("GET /api/work-orders/[id]/transitions", () => {
       expect(response.status).toBe(200);
       expect(body.currentStatus).toBe(status);
       expect(body.allowedStatuses).toEqual(allowed);
+    });
+
+    it("offers invoiced on a completed work order when the invoice draft is ready", async () => {
+      getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
+      workOrderFindFirstMock.mockResolvedValue({ id: "wo-1", status: "completed", assigned_to_id: null });
+      getLatestInvoiceDraftMock.mockResolvedValue({ status: "ready" });
+
+      const response = await GET(makeRequest(), { params });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.allowedStatuses).toEqual(["completed", "in_progress", "invoiced"]);
+      expect(body.canMarkInvoiced).toBe(true);
+      expect(body.invoiceDraftReady).toBe(true);
+      expect(body.invoiceBlockReason).toBeNull();
+      expect(getLatestInvoiceDraftMock).toHaveBeenCalledWith("company-1", "wo-1");
+    });
+
+    it("offers invoiced when the latest underlag is already exported", async () => {
+      getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
+      workOrderFindFirstMock.mockResolvedValue({ id: "wo-1", status: "completed", assigned_to_id: null });
+      getLatestInvoiceDraftMock.mockResolvedValue({ status: "exported" });
+
+      const response = await GET(makeRequest(), { params });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.allowedStatuses).toContain("invoiced");
     });
 
     it("never includes a status outside the canonical set, and each listed target is reachable from the reported current status", async () => {

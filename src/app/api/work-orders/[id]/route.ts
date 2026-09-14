@@ -45,6 +45,11 @@ import {
   workOrderVendorIdSelect,
 } from "@/lib/schema-readiness";
 import { findAssignableVendorContract, listAssignableVendorContracts } from "@/lib/work-order-vendor";
+import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
+import {
+  INVOICE_DRAFT_NOT_READY_FOR_INVOICING,
+  invoiceDraftAllowsWorkOrderInvoicing,
+} from "@/lib/invoice-draft-invoicing";
 
 const logger = createLogger({ route: "/api/work-orders/[id]" });
 
@@ -208,6 +213,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!canTransitionWorkOrder(currentStatus, nextStatus)) return NextResponse.json({ error: `Status kan inte ändras från ${currentStatus} till ${nextStatus}` }, { status: 409 });
     if (nextStatus !== currentStatus && (currentStatus === "invoiced" || nextStatus === "invoiced") && !canManageWorkOrderFinance(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att ändra faktureringsstatus" }, { status: 403 });
+    }
+    if (nextStatus === "invoiced" && currentStatus !== "invoiced") {
+      const draft = await getLatestInvoiceDraft(companyId, id);
+      if (!invoiceDraftAllowsWorkOrderInvoicing(draft)) {
+        return NextResponse.json(
+          { error: INVOICE_DRAFT_NOT_READY_FOR_INVOICING, code: "invoice_draft_not_ready" },
+          { status: 409 },
+        );
+      }
     }
     if (["blocked", "cancelled"].includes(nextStatus) && !statusReason) return NextResponse.json({ error: "Ange en orsak till statusändringen" }, { status: 400 });
     if (statusReason && statusReason.length > 1000) return NextResponse.json({ error: "Statusorsaken får vara högst 1 000 tecken" }, { status: 400 });
