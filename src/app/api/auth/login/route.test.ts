@@ -246,4 +246,42 @@ describe("POST /api/auth/login", () => {
       expect.objectContaining({ event: "auth.login.failed" }),
     );
   });
+
+  it("accepts a native email/password form post and redirects into the app", async () => {
+    userFindUniqueMock.mockResolvedValue(activeUser());
+    comparePasswordMock.mockResolvedValue(true);
+
+    const response = await POST(new Request("https://www.revalta.se/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "email=OWNER%40example.se&password=secret-value&next=%2Fdashboard%2Farbetsorder%2Fwo-1",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/arbetsorder/wo-1");
+    expect(signTokenMock).toHaveBeenCalledWith(expect.objectContaining({ sub: "user-1" }));
+    expect(cookieSetMock).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("secret-value");
+  });
+
+  it("returns the native form to login with a generic reason when credentials are wrong", async () => {
+    userFindUniqueMock.mockResolvedValue(null);
+    comparePasswordMock.mockResolvedValue(false);
+
+    const response = await POST(new Request("https://www.revalta.se/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "email=missing%40example.se&password=secret-value",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/login?reason=invalid");
+    expect(signTokenMock).not.toHaveBeenCalled();
+  });
 });
