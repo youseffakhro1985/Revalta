@@ -100,7 +100,7 @@ export default function InvoiceExportOperationsPage() {
           <Link href="/dashboard/integrationer" className="text-sm font-semibold text-petroleum-700">Integrationer</Link>
           <p className="mt-4 text-[11px] font-semibold uppercase tracking-[.16em] text-petroleum-600">Ekonomi · integrationer</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink-950">Driftcenter för fakturaexporter</h1>
-          <p className="mt-2 max-w-3xl text-ink-600">Samlad kontroll över Fortnox-, Visma- och webhookexporter för hela organisationen. Följ köer, fel, kvittenser och återförsök från en plats.</p>
+          <p className="mt-2 max-w-3xl text-ink-600">Samlad kontroll över HTTP-exporter märkta Fortnox och Visma samt generell webhook. Revalta skickar JSON till er konfigurerade endpoint — det är inte en inbyggd Fortnox- eller Visma-SDK.</p>
         </div>
         <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Uppdatera

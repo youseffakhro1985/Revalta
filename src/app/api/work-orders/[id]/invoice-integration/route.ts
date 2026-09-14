@@ -77,8 +77,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   return NextResponse.json({
     providers: [
-      { id: "fortnox", name: "Fortnox", configured: configured("fortnox") },
-      { id: "visma", name: "Visma", configured: configured("visma") },
+      { id: "fortnox", name: "Fortnox (HTTP-endpoint)", configured: configured("fortnox") },
+      { id: "visma", name: "Visma (HTTP-endpoint)", configured: configured("visma") },
       { id: "webhook", name: "Generell webhook", configured: configured("webhook") },
     ],
     jobs: rows,
