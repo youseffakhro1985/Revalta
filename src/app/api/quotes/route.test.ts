@@ -240,4 +240,54 @@ describe("quotes route", () => {
     expect(body.error).toMatch(/backfill/i);
     expect(quoteUpdateManyMock).not.toHaveBeenCalled();
   });
+
+  it("marks a draft quote as sent and records the status change", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user-1",
+      company_id: "company-1",
+      role: "owner",
+      name: "Anna",
+      email: "anna@example.se",
+    });
+    quoteFindFirstMock.mockResolvedValue({
+      id: "quote-1",
+      property_id: "property-1",
+      title: "Takrenovering",
+      supplier: "Bygg AB",
+      status: "draft",
+      valid_until: null,
+      labor: 1000,
+      material: 500,
+      supplier_cost: 0,
+      other: 0,
+      vat_rate: 25,
+      note: null,
+    });
+    quoteDecisionCreateMock.mockResolvedValue({ id: "decision-1" });
+
+    const response = await PATCH(new Request("http://localhost/api/quotes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quoteId: "quote-1", status: "sent" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(quoteUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote-1", company_id: "company-1" },
+      data: expect.objectContaining({ status: "sent" }),
+    }));
+    expect(quoteDecisionCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        quote_id: "quote-1",
+        previous_status: "draft",
+        status: "sent",
+      }),
+    }));
+    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: "quote.status_changed",
+      metadata: expect.objectContaining({ previous_status: "draft", status: "sent" }),
+    }));
+    expect(body).toMatchObject({ success: true, id: "quote-1", status: "sent" });
+  });
 });
