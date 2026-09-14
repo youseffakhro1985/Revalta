@@ -21,6 +21,7 @@ export default async function CompanyPortalPage({
       initialTrackEmail={query.email?.trim() || ""}
       initialTrackedTicket={tracked.ticket}
       initialTrackError={tracked.error}
+      initialCommented={query.commented === "1"}
     />
   );
 }

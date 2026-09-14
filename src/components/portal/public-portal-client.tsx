@@ -68,6 +68,7 @@ function portalReasonCopy(reason?: string | null) {
 }
 
 const createdTicketCopy = "Tack! Ärendet är mottaget och skickat till förvaltningen.";
+const commentedTicketCopy = "Kommentaren är skickad till förvaltningen.";
 
 type PublicPortalClientProps = {
   companySlug?: string;
@@ -78,6 +79,7 @@ type PublicPortalClientProps = {
   initialTrackEmail?: string;
   initialTrackedTicket?: PublicTrackedTicket | null;
   initialTrackError?: string;
+  initialCommented?: boolean;
 };
 
 function asPublicTicket(ticket: PublicTrackedTicket): PublicTicket {
@@ -96,6 +98,7 @@ export function PublicPortalClient({
   initialTrackEmail = "",
   initialTrackedTicket = null,
   initialTrackError = "",
+  initialCommented = false,
 }: PublicPortalClientProps) {
   const normalizedInitialReference = initialReference.trim().toUpperCase();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -124,9 +127,11 @@ export function PublicPortalClient({
   const [success, setSuccess] = useState(
     initialCreated && normalizedInitialReference
       ? createdTicketCopy
-      : initialTrackedTicket
-        ? "Ärendet hittades."
-        : "",
+      : initialCommented
+        ? commentedTicketCopy
+        : initialTrackedTicket
+          ? "Ärendet hittades."
+          : "",
   );
   const [loading, setLoading] = useState(false);
 
@@ -169,12 +174,15 @@ export function PublicPortalClient({
     if (reasonCopy) setError(reasonCopy);
 
     const created = params.get("created") === "1";
+    const commented = params.get("commented") === "1";
     const ref = params.get("ref")?.trim();
     const token = params.get("token")?.trim() || "";
     const email = params.get("email")?.trim() || "";
     if (created && ref) {
       setCreatedReference(ref.toUpperCase());
       setSuccess(createdTicketCopy);
+    } else if (commented) {
+      setSuccess(commentedTicketCopy);
     }
     if (!ref) return;
     setReference(ref.toUpperCase());
@@ -182,14 +190,14 @@ export function PublicPortalClient({
     if (email) setTrackEmail(email);
     if (initialTrackedTicket) return;
     void (async () => {
-      if (!created) {
+      if (!created && !commented) {
         setError("");
         setSuccess("");
       }
       setLoading(true);
       try {
         await loadTrackedTicket(ref, email, token);
-        if (!created) setSuccess("Ärendet hittades.");
+        if (!created && !commented) setSuccess("Ärendet hittades.");
         if (params.get("feedback") === "1") {
           document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
         }
@@ -545,11 +553,22 @@ export function PublicPortalClient({
                     </div>
                   ) : null}
 
-                  <form onSubmit={addResidentComment} className="mt-6 border-t border-sand-100 pt-5">
+                  <form
+                    id="public-comment-form"
+                    method="post"
+                    action={`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/comments`}
+                    onSubmit={addResidentComment}
+                    className="mt-6 border-t border-sand-100 pt-5"
+                  >
+                    {companySlug ? <input type="hidden" name="companySlug" value={companySlug} /> : null}
+                    {trackingToken ? <input type="hidden" name="token" value={trackingToken} /> : null}
+                    {trackEmail ? <input type="hidden" name="email" value={trackEmail} /> : null}
                     <p className="text-sm font-semibold text-ink-900">Skicka kommentar</p>
                     <textarea
                       required
+                      name="body"
                       rows={3}
+                      maxLength={5_000}
                       value={residentComment}
                       onChange={(event) => setResidentComment(event.target.value)}
                       className="mt-3 w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-900 outline-none transition-all focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500"

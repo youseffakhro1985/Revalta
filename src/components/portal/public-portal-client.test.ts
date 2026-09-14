@@ -28,6 +28,10 @@ describe("public portal ticket form", () => {
     expect(source).toContain('name="email"');
     expect(source).toContain('name="token"');
     expect(source).toContain("initialTrackedTicket");
+    expect(source).toContain("initialCommented");
+    expect(source).toContain('id="public-comment-form"');
+    expect(source).toContain('name="body"');
+    expect(source).toContain("commentedTicketCopy");
     expect(source).not.toContain("searchParams.set(\"email\"");
   });
 });
