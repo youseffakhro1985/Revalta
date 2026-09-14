@@ -21,6 +21,7 @@ import {
   deriveWorkOrderStatus,
   isTerminalWorkOrderStatus,
   isWorkOrderStatus,
+  workOrderStatusLabels,
   type WorkOrderStatus,
 } from "@/lib/work-order-lifecycle";
 import { NextResponse } from "next/server";
@@ -353,17 +354,64 @@ export async function PATCH(
     }
 
     const nextAssignedToId = ticket.assigned_to?.id ?? null;
+    const assigneeTarget = {
+      id: ticket.id,
+      title: ticket.title,
+      kind: "ticket" as const,
+      assigneeId: nextAssignedToId,
+      assigneeEmail: ticket.assigned_to?.email,
+    };
     if (nextAssignedToId && nextAssignedToId !== existing.assigned_to_id) {
       try {
-        await notifyAssignee(user, {
-          id: ticket.id,
-          title: ticket.title,
-          kind: "ticket",
-          assigneeId: nextAssignedToId,
-          assigneeEmail: ticket.assigned_to?.email,
-        });
+        await notifyAssignee(user, assigneeTarget);
       } catch (notificationError) {
         logger.error("Ticket assignee notification failed", notificationError);
+      }
+    }
+
+    const completedNow = ticket.status === "completed" && existing.status !== "completed";
+    const pausedNow = ticket.status === "waiting" && existing.status !== "waiting";
+    const cancelledNow = ticket.status === "cancelled" && existing.status !== "cancelled";
+    const resumedNow = existing.status === "waiting"
+      && ["planned", "assigned", "in_progress"].includes(ticket.status);
+    const statusLabel = isWorkOrderStatus(ticket.status)
+      ? workOrderStatusLabels[ticket.status]
+      : ticket.status;
+
+    if (completedNow) {
+      try {
+        await notifyAssignee(user, { ...assigneeTarget, notifyKind: "completed" });
+      } catch (notificationError) {
+        logger.error("Ticket assignee completion notification failed", notificationError);
+      }
+    }
+    if (pausedNow) {
+      try {
+        await notifyAssignee(user, {
+          ...assigneeTarget,
+          notifyKind: "paused",
+          pauseLabel: statusLabel,
+        });
+      } catch (notificationError) {
+        logger.error("Ticket assignee pause notification failed", notificationError);
+      }
+    }
+    if (cancelledNow) {
+      try {
+        await notifyAssignee(user, { ...assigneeTarget, notifyKind: "cancelled" });
+      } catch (notificationError) {
+        logger.error("Ticket assignee cancellation notification failed", notificationError);
+      }
+    }
+    if (resumedNow) {
+      try {
+        await notifyAssignee(user, {
+          ...assigneeTarget,
+          notifyKind: "resumed",
+          resumeLabel: statusLabel,
+        });
+      } catch (notificationError) {
+        logger.error("Ticket assignee resume notification failed", notificationError);
       }
     }
 
