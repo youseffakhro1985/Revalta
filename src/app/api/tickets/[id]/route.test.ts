@@ -490,6 +490,16 @@ describe("tickets/[id] PATCH", () => {
       expect.objectContaining({ id: "ticket-1", reporter_email: "anna@example.se" }),
       "updated",
     );
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "user-1" }),
+      expect.objectContaining({
+        recipient: "tech@example.se",
+        event: "updated",
+        emailContent: expect.objectContaining({
+          subject: "Tilldelad: Läckande kran",
+        }),
+      }),
+    );
   });
 
   it("returns 404 when the transactional update affects no rows (lost the race)", async () => {

@@ -199,7 +199,7 @@ describe("work-order create tenant and atomicity boundaries", () => {
     expect(body.error).toBe("Ansvarig användare hittades inte");
     expect(userFindFirstMock).toHaveBeenCalledWith({
       where: { id: "foreign-user", company_id: "company-1", status: "active" },
-      select: { id: true },
+      select: { id: true, email: true },
     });
     expect(transactionMock).not.toHaveBeenCalled();
   });

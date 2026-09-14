@@ -18,6 +18,7 @@ import { normalizeWorkOrderPriority } from "@/lib/work-order-workflow";
 import { createLogger } from "@/lib/structured-logger";
 import { analyzeTicket } from "@/lib/ai";
 import { recordAiEvent } from "@/lib/integrations";
+import { notifyAssignee } from "@/lib/assignee-notify";
 import { hasTicketAiSourceColumn, ticketAiSourceWrite } from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
@@ -159,14 +160,16 @@ export async function POST(
     }
   }
 
+  let assigneeEmail: string | null = null;
   if (assignedToId) {
     const assignee = await db.user.findFirst({
       where: { id: assignedToId, company_id: user.company_id, status: "active" },
-      select: { id: true },
+      select: { id: true, email: true },
     });
     if (!assignee) {
       return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
     }
+    assigneeEmail = assignee.email;
   }
 
   const analysis = ticket.ai_processed_at
@@ -283,6 +286,21 @@ export async function POST(
         });
       } catch {
         logger.warn("work-order from ticket ai telemetry failed", { workOrderId: result.id, ticketId: ticket.id });
+      }
+    }
+
+    const nextAssigneeId = assignedToId || ticket.assigned_to_id;
+    if (result.created && nextAssigneeId && nextAssigneeId !== user.id) {
+      try {
+        await notifyAssignee(user, {
+          id: result.id,
+          title: ticket.title,
+          kind: "work_order",
+          assigneeId: nextAssigneeId,
+          assigneeEmail,
+        });
+      } catch (notificationError) {
+        logger.error("Work-order from ticket assignee notification failed", notificationError);
       }
     }
 

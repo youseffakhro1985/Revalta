@@ -22,6 +22,7 @@ import { syncCompletedWorkOrderToComponent } from "@/lib/component-work-order-sy
 import { completeWorkOrderLifecycle } from "@/lib/work-order-completion";
 import { syncWorkOrderToTicket } from "@/lib/work-order-ticket-sync";
 import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
+import { notifyAssignee } from "@/lib/assignee-notify";
 import {
   normalizeWorkOrderPriority,
   normalizeWorkOrderStatus,
@@ -489,6 +490,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     } catch (notificationError) {
       logger.error("Work-order reporter notification failed", notificationError);
+    }
+  }
+
+  const assignedWorkOrder = transactionResult.workOrder;
+  if (assignedWorkOrder.assigned_to_id && assignedWorkOrder.assigned_to_id !== existing.assigned_to_id) {
+    try {
+      await notifyAssignee(user, {
+        id: assignedWorkOrder.id,
+        title: assignedWorkOrder.title,
+        kind: "work_order",
+        assigneeId: assignedWorkOrder.assigned_to_id,
+        assigneeEmail: assignedWorkOrder.assigned_to?.email,
+      });
+    } catch (notificationError) {
+      logger.error("Work-order assignee notification failed", notificationError);
     }
   }
 

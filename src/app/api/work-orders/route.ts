@@ -34,6 +34,7 @@ import { findAccessibleTicket } from "@/lib/assigned-work-access";
 import { createRouteObservability } from "@/lib/route-observability";
 import { analyzeTicket } from "@/lib/ai";
 import { recordAiEvent } from "@/lib/integrations";
+import { notifyAssignee } from "@/lib/assignee-notify";
 
 const ROUTE = "/api/work-orders";
 const ACTIVE_WORK_ORDER_STATUSES = ["completed", "invoiced", "cancelled"] as const;
@@ -434,9 +435,14 @@ export async function POST(request: Request) {
       const unit = await db.unit.findFirst({ where: { id: unitId, property_id: propertyId }, select: { id: true } });
       if (!unit) return validationFailure("Enheten tillhör inte fastigheten", "unit_property_mismatch");
     }
+    let assigneeEmail: string | null = null;
     if (assignedToId) {
-      const assignee = await db.user.findFirst({ where: { id: assignedToId, company_id: user.company_id, status: "active" }, select: { id: true } });
+      const assignee = await db.user.findFirst({
+        where: { id: assignedToId, company_id: user.company_id, status: "active" },
+        select: { id: true, email: true },
+      });
       if (!assignee) return validationFailure("Ansvarig användare hittades inte", "assignee_not_found");
+      assigneeEmail = assignee.email;
     }
     if (ticketId) {
       const ticket = await findAccessibleTicket(user, ticketId);
@@ -494,6 +500,24 @@ export async function POST(request: Request) {
       companyId: user.company_id,
       workOrderId: workOrder.id,
     }));
+    if (assignedToId && assignedToId !== user.id) {
+      try {
+        await notifyAssignee(user, {
+          id: workOrder.id,
+          title: workOrder.title,
+          kind: "work_order",
+          assigneeId: assignedToId,
+          assigneeEmail,
+        });
+      } catch {
+        observability.logger.warn("work-order create assignee notification failed", observability.elapsed({
+          event: "work_orders.create.assignee_notification_failed",
+          userId: user.id,
+          companyId: user.company_id,
+          workOrderId: workOrder.id,
+        }));
+      }
+    }
     try {
       await recordAiEvent(user, {
         workOrderId: workOrder.id,
