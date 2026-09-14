@@ -21,7 +21,14 @@ export type SchemaReadiness = {
 };
 
 /** Tables that APIs query directly and that 500 when absent even if soft-delete columns exist. */
-export const REQUIRED_OPERATIONAL_TABLES = ["InspectionChecklistTemplate"] as const;
+export const REQUIRED_OPERATIONAL_TABLES = [
+  "InspectionChecklistTemplate",
+  "InspectionRound",
+  "OperationalDocument",
+  "MaintenancePlan",
+  "ComponentLifecycleEvent",
+  "ComponentCostEntry",
+] as const;
 
 export function formatSchemaMissingItem(item: SchemaMissingItem) {
   return item.column === "*" ? item.table : `${item.table}.${item.column}`;

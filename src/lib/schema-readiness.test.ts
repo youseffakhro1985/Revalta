@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import {
+  REQUIRED_OPERATIONAL_TABLES,
   formatSchemaMissing,
   formatSchemaMissingItem,
   isMissingSchemaColumnError,
@@ -59,6 +60,17 @@ describe("schema-readiness", () => {
     expect(schemaMismatchUserMessage()).toMatch(/Database Release/);
     expect(schemaMismatchUserMessage()).toMatch(/migrate deploy/);
     expect(schemaCompatibilityBannerMessage()).toMatch(/kompatibilitetsläge|utan soft-delete/i);
+  });
+
+  it("probes operational tables that 500 staff APIs when absent", () => {
+    expect([...REQUIRED_OPERATIONAL_TABLES]).toEqual([
+      "InspectionChecklistTemplate",
+      "InspectionRound",
+      "OperationalDocument",
+      "MaintenancePlan",
+      "ComponentLifecycleEvent",
+      "ComponentCostEntry",
+    ]);
   });
 
   it("formats missing columns as table.column and missing tables by name", () => {

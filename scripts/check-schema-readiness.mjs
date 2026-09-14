@@ -20,7 +20,14 @@ const REQUIRED_COLUMNS = [
   { table: "TicketOperation", column: "deleted_at" },
 ];
 
-const REQUIRED_TABLES = ["InspectionChecklistTemplate"];
+const REQUIRED_TABLES = [
+  "InspectionChecklistTemplate",
+  "InspectionRound",
+  "OperationalDocument",
+  "MaintenancePlan",
+  "ComponentLifecycleEvent",
+  "ComponentCostEntry",
+];
 
 const db = new PrismaClient();
 

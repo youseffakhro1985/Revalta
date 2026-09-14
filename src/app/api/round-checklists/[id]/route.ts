@@ -4,6 +4,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { normalizeInspectionTemplateItems, parseInspectionTemplatePayload } from "@/lib/inspection-checklist-template";
+import { isMissingTableError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/round-checklists/[id]" });
@@ -98,6 +99,9 @@ export async function PATCH(
 
     return NextResponse.json({ template: serialize(template) }, { headers: noStoreHeaders });
   } catch (error) {
+    if (isMissingTableError(error, "InspectionChecklistTemplate")) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503, headers: noStoreHeaders });
+    }
     logger.error("Update round checklist template error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500, headers: noStoreHeaders });
   }
@@ -131,6 +135,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders });
   } catch (error) {
+    if (isMissingTableError(error, "InspectionChecklistTemplate")) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503, headers: noStoreHeaders });
+    }
     logger.error("Delete round checklist template error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500, headers: noStoreHeaders });
   }
