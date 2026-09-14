@@ -7,6 +7,8 @@ import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import { completeWorkOrderLifecycle, WorkOrderCompletionConflict } from "@/lib/work-order-completion";
 import { canFinalizeWorkOrderExecution, isWorkOrderExecutionLocked } from "@/lib/work-order-execution-policy";
+import { normalizeInspectionTemplateItems } from "@/lib/inspection-checklist-template";
+import { isMissingTableError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 import {
   getModernMaterialEntry,
   getModernTimeEntry,
@@ -216,7 +218,7 @@ export async function POST(
   }
   const action = String(body.action || "");
 
-  if (["checklist.create", "checklist.complete", "entry.create"].includes(action) && isWorkOrderExecutionLocked(workOrder.status)) {
+  if (["checklist.create", "checklist.complete", "checklist.applyTemplate", "entry.create"].includes(action) && isWorkOrderExecutionLocked(workOrder.status)) {
     return NextResponse.json({ error: "Arbetsorderns utförande är låst i nuvarande status" }, { status: 409 });
   }
 
@@ -244,6 +246,89 @@ export async function POST(
       }, tx);
     });
     return NextResponse.json({ id: itemId }, { status: 201 });
+  }
+
+  if (action === "checklist.applyTemplate") {
+    const templateId = String(body.templateId || "").trim();
+    if (!templateId) return NextResponse.json({ error: "Checklistmallen saknas" }, { status: 400 });
+    const companyId = user.company_id;
+
+    let template: { id: string; name: string; items: Prisma.JsonValue } | undefined;
+    try {
+      const templates = await db.$queryRaw<Array<{ id: string; name: string; items: Prisma.JsonValue }>>(Prisma.sql`
+        SELECT "id", "name", "items"
+        FROM "InspectionChecklistTemplate"
+        WHERE "id" = ${templateId} AND "company_id" = ${companyId}
+        LIMIT 1
+      `);
+      template = templates[0];
+    } catch (error) {
+      if (isMissingTableError(error, "InspectionChecklistTemplate")) {
+        return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+      }
+      throw error;
+    }
+    if (!template) return NextResponse.json({ error: "Checklistmallen hittades inte" }, { status: 404 });
+    const selectedTemplate = template;
+
+    const labels = normalizeInspectionTemplateItems(selectedTemplate.items);
+    if (labels.length === 0) {
+      return NextResponse.json({ error: "Mallen saknar kontrollpunkter" }, { status: 409 });
+    }
+
+    const applied = await db.$transaction(async (tx) => {
+      const lock = await tx.$queryRaw<Array<{ locked: boolean }>>(Prisma.sql`
+        SELECT pg_try_advisory_xact_lock(hashtext(${`work-order-checklist:${id}`})) AS locked
+      `);
+      if (!lock[0]?.locked) return { conflict: "locked" as const, added: 0 };
+
+      const existingRows = await tx.$queryRaw<Array<{ title: string }>>(Prisma.sql`
+        SELECT "title"
+        FROM "WorkOrderChecklistItem"
+        WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
+      `);
+      const existingTitles = new Set(existingRows.map((row) => row.title.trim().toLowerCase()));
+      const maxRows = await tx.$queryRaw<Array<{ max_sort: number }>>(Prisma.sql`
+        SELECT COALESCE(MAX("sort_order"), -1)::integer AS "max_sort"
+        FROM "WorkOrderChecklistItem"
+        WHERE "company_id" = ${companyId} AND "work_order_id" = ${id}
+      `);
+      let sortOrder = (maxRows[0]?.max_sort ?? -1) + 1;
+      const toAdd = labels.filter((label) => !existingTitles.has(label.toLowerCase()));
+      if (toAdd.length === 0) return { conflict: "duplicate" as const, added: 0 };
+
+      for (const title of toAdd) {
+        const itemId = crypto.randomUUID();
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO "WorkOrderChecklistItem"
+            ("id", "company_id", "work_order_id", "created_by_id", "title", "description", "is_required", "sort_order")
+          VALUES
+            (${itemId}, ${companyId}, ${id}, ${user.id}, ${title}, ${null}, true, ${sortOrder})
+        `);
+        sortOrder += 1;
+      }
+
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.checklist_template_applied",
+        metadata: {
+          templateId: selectedTemplate.id,
+          addedCount: toAdd.length,
+          skippedCount: labels.length - toAdd.length,
+        },
+      }, tx);
+
+      return { conflict: null, added: toAdd.length };
+    });
+
+    if (applied.conflict === "locked") {
+      return NextResponse.json({ error: "Checklistan uppdateras redan, försök igen om en stund" }, { status: 409 });
+    }
+    if (applied.conflict === "duplicate") {
+      return NextResponse.json({ error: "Alla punkter från mallen finns redan på arbetsordern" }, { status: 409 });
+    }
+    return NextResponse.json({ success: true, addedCount: applied.added }, { status: 201 });
   }
 
   if (action === "checklist.complete") {

@@ -5,7 +5,8 @@ import { canFinalizeWorkOrderExecution, canMutateWorkOrderExecution, isWorkOrder
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Banknote, CheckCircle2, Clock3, Info, Package, Route, Square, Wrench } from "lucide-react";
-import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumSecondaryButtonClass } from "@/components/dashboard/premium-ui";
+import { INSPECTION_CHECKLIST_CATEGORY_LABELS } from "@/lib/inspection-checklist-template";
 
 type ChecklistItem = {
   id: string;
@@ -43,6 +44,13 @@ type Completion = {
   after_photo_count: number;
 };
 
+type ChecklistTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  itemCount: number;
+};
+
 type Props = { workOrderId: string };
 
 const money = new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
@@ -54,6 +62,8 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
   const [entries, setEntries] = useState<ExecutionEntry[]>([]);
   const [summary, setSummary] = useState<Summary>({ total_minutes: 0, material_cost: 0, travel_cost: 0, external_cost: 0, total_cost: 0 });
   const [completion, setCompletion] = useState<Completion>({ status: "planned", before_photo_count: 0, after_photo_count: 0 });
+  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
+  const [templateId, setTemplateId] = useState("");
   const [canManage, setCanManage] = useState(false);
   const [canViewFinance, setCanViewFinance] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -74,6 +84,23 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
       setCompletion(data.completion || { status: data.workOrder?.status || "planned", before_photo_count: 0, after_photo_count: 0 });
       setCanManage(Boolean(data.canManage));
       setCanViewFinance(Boolean(data.canViewFinance));
+      try {
+        const templateResponse = await fetch("/api/round-checklists", { cache: "no-store" });
+        const templateData = await readResponseJson(templateResponse);
+        if (templateResponse.ok && Array.isArray(templateData.templates)) {
+          setTemplates(templateData.templates.map((item: ChecklistTemplate) => ({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            itemCount: item.itemCount,
+          })));
+          setTemplateId((current) => current || templateData.templates[0]?.id || "");
+        } else {
+          setTemplates([]);
+        }
+      } catch {
+        setTemplates([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta arbetsorderregistreringar");
     } finally {
@@ -144,15 +171,32 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
       ) : null}
     </Panel>
 
-    <Panel title="Checklista" description="Kontrollpunkter som ska vara klara innan arbetsordern avslutas.">
-      {canMutate ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); void post({ action: "checklist.create", title: data.get("title"), description: data.get("description"), isRequired: data.get("isRequired") === "on" }, "Kontrollpunkten har lagts till.", () => form.reset()); }} className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2">
+    <Panel title="Checklista" description="Kontrollpunkter som ska vara klara innan arbetsordern avslutas. Samma mallar som ronder kan fyllas i här.">
+      {canMutate ? <div className="space-y-3">
+        {templates.length > 0 ? (
+          <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); void post({ action: "checklist.applyTemplate", templateId }, "Checklistmallen har lagts till på arbetsordern."); }} className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-[1fr_auto]">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Sparad rondchecklista</span>
+              <select value={templateId} onChange={(event) => setTemplateId(event.target.value)} disabled={saving} className={premiumFieldClass} aria-label="Välj checklistmall">
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} · {template.itemCount} punkter · {INSPECTION_CHECKLIST_CATEGORY_LABELS[template.category] || template.category}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button disabled={saving || !templateId} className={`${premiumSecondaryButtonClass} self-end`}>{saving ? "Lägger till…" : "Använd mall"}</button>
+          </form>
+        ) : null}
+        <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); void post({ action: "checklist.create", title: data.get("title"), description: data.get("description"), isRequired: data.get("isRequired") === "on" }, "Kontrollpunkten har lagts till.", () => form.reset()); }} className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2">
         <input name="title" required placeholder="Ny kontrollpunkt" aria-label="Rubrik för ny kontrollpunkt" disabled={saving} className={premiumFieldClass} />
         <input name="description" placeholder="Beskrivning eller krav" aria-label="Beskrivning av kontrollpunkt" disabled={saving} className={premiumFieldClass} />
         <label className="inline-flex min-h-11 items-center gap-2 text-sm text-ink-600"><input name="isRequired" type="checkbox" defaultChecked disabled={saving} className="h-4 w-4 rounded border-sand-300" />Obligatorisk</label>
         <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till"}</button>
-      </form> : <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">Checklistan visas skrivskyddad i nuvarande behörighet eller livscykelstatus.</div>}
+      </form>
+      </div> : <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">Checklistan visas skrivskyddad i nuvarande behörighet eller livscykelstatus.</div>}
       <div className="mt-4 space-y-3">
-        {checklist.length === 0 ? <EmptyState title="Ingen checklista ännu" description="Lägg till kontrollpunkter för kvalitetssäkring och avslut." /> : checklist.map((item) => {
+        {checklist.length === 0 ? <EmptyState title="Ingen checklista ännu" description={templates.length ? "Välj en sparad rondchecklista eller lägg till kontrollpunkter för kvalitetssäkring och avslut." : "Lägg till kontrollpunkter för kvalitetssäkring och avslut."} /> : checklist.map((item) => {
           const content = <>{item.completed_at ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-petroleum-700" aria-hidden="true" /> : <Square className="mt-0.5 h-5 w-5 shrink-0 text-ink-300" aria-hidden="true" />}<span className="min-w-0"><span className={`block text-sm font-semibold ${item.completed_at ? "text-ink-500 line-through" : "text-ink-900"}`}>{item.title}</span>{item.description ? <span className="mt-1 block text-xs leading-5 text-ink-500">{item.description}</span> : null}{item.is_required ? <span className="mt-2 inline-block rounded-full bg-sand-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">Obligatorisk</span> : null}</span></>;
           return canMutate ? <button key={item.id} type="button" disabled={saving} onClick={() => void post({ action: "checklist.complete", itemId: item.id, completed: !item.completed_at }, item.completed_at ? "Kontrollpunkten har återöppnats." : "Kontrollpunkten är klar.")} aria-pressed={Boolean(item.completed_at)} className="flex min-h-14 w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left transition hover:border-petroleum-200 hover:bg-petroleum-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-500 disabled:opacity-60">{content}</button> : <div key={item.id} className="flex min-h-14 w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left">{content}</div>;
         })}
