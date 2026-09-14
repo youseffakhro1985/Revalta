@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ShieldCheck, Users, UserRoundCog, Eye } from "lucide-react";
 import db from "@/lib/db";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { permissionMatrixRows } from "@/lib/permissions";
 import { MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
 
 const roles = [
@@ -14,18 +15,7 @@ const roles = [
   { key: "resident", label: "Boende", description: "Portalroll för boende. Har inte tillgång till förvaltarens arbetsyta eller adminmenyer." },
 ];
 
-const permissions = [
-  ["Översikt", true, true, true, true, true, false],
-  ["Rapporter", true, true, true, false, false, false],
-  ["Fastigheter och objekt", true, true, true, true, true, false],
-  ["Ärenden och arbetsordrar", true, true, true, true, true, false],
-  ["Boendeportal (självservice)", true, true, true, false, true, true],
-  ["Team och roller", true, true, false, false, false, false],
-  ["Händelselogg", true, true, false, false, false, false],
-  ["Integrationer", true, true, false, false, false, false],
-  ["Abonnemang och betalning", true, true, false, false, false, false],
-  ["Systeminställningar", true, true, false, false, false, false],
-];
+const permissions = permissionMatrixRows();
 
 export default async function PermissionsPage() {
   const user = await getCurrentUser();
@@ -66,12 +56,12 @@ export default async function PermissionsPage() {
         ))}
       </section>
 
-      <Panel title="Behörighetsmatris" description="Standardbehörighet för respektive roll. Boende är avsedd för portal/självservice och ska inte användas som intern förvaltarroll." bodyClassName="p-0">
+      <Panel title="Behörighetsmatris" description="Matrisen speglar samma rollkontroller som API:erna. Boende är avsedd för portal/självservice och ska inte användas som intern förvaltarroll. Roller ändras i Team." bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-sand-50 text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-6 py-4">Område</th>{roles.map((role) => <th key={role.key} className="px-4 py-4 text-center">{role.label}</th>)}</tr></thead>
             <tbody className="divide-y divide-sand-100">
-              {permissions.map(([label, ...values]) => <tr key={String(label)} className="hover:bg-sand-50/60"><td className="px-6 py-4 font-medium text-ink-800">{String(label)}</td>{values.map((allowed, index) => <td key={index} className="px-4 py-4 text-center"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${allowed ? "bg-petroleum-50 text-petroleum-700" : "bg-sand-50 text-ink-500"}`}>{allowed ? "Tillåten" : "Begränsad"}</span></td>)}</tr>)}
+              {permissions.map((row) => <tr key={row.label} className="hover:bg-sand-50/60"><td className="px-6 py-4 font-medium text-ink-800">{row.label}</td>{row.values.map((allowed, index) => <td key={index} className="px-4 py-4 text-center"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${allowed ? "bg-petroleum-50 text-petroleum-700" : "bg-sand-50 text-ink-500"}`}>{allowed ? "Tillåten" : "Begränsad"}</span></td>)}</tr>)}
             </tbody>
           </table>
         </div>
