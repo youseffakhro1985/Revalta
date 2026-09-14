@@ -23,15 +23,12 @@ describe("login form", () => {
     expect(source).toContain("isValidEmail");
     expect(source).toContain('get("reset") === "1"');
     expect(source).toContain("Lösenordet är återställt. Logga in med det nya lösenordet.");
-<<<<<<< HEAD
     expect(source).toContain('get("verified") === "1"');
     expect(source).toContain("E-postadressen är verifierad. Du kan nu logga in.");
-=======
     expect(source).toContain('id="resend-verification-form"');
     expect(source).toContain('action="/api/auth/email-verification/resend"');
     expect(source).toContain('get("resent") === "1"');
     expect(source).toContain("Om kontot behöver verifieras skickar vi en ny verifieringslänk.");
->>>>>>> 165c91c (feat(auth): accept native form posts on verification resend)
     expect(source).not.toContain("••••");
   });
 });
