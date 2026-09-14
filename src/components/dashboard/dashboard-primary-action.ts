@@ -1,4 +1,4 @@
-import { canAssignWorkOrders, canCreateProperties, canManageTickets, canManageWorkOrderFinance } from "@/lib/permissions";
+import { canAssignWorkOrders, canCreateProperties, canManageLeases, canManageTickets, canManageWorkOrderFinance, canViewOperations } from "@/lib/permissions";
 
 export type DashboardPrimaryCreateAction = {
   href: string;
@@ -38,6 +38,25 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   const inClaims = current === claimsRoot || current.startsWith(`${claimsRoot}/`);
   if (canManageWorkOrderFinance(role) && inClaims) {
     return { href: `${claimsRoot}?create=1`, label: "Nytt skadeärende" };
+  }
+
+  if (canViewOperations(role) && (current === "/dashboard/ronder" || current.startsWith("/dashboard/ronder/"))) {
+    return { href: "/dashboard/ronder?create=1", label: "Ny rond" };
+  }
+  if (canViewOperations(role) && (current === "/dashboard/besiktningar" || current.startsWith("/dashboard/besiktningar/"))) {
+    return { href: "/dashboard/besiktningar#ny-kontroll", label: "Ny kontroll" };
+  }
+  if (canViewOperations(role) && (current === "/dashboard/underhall" || current.startsWith("/dashboard/underhall/"))) {
+    return { href: "/dashboard/underhall#ny-underhallsatgard", label: "Ny åtgärd" };
+  }
+  if (canViewOperations(role) && (current === "/dashboard/kalender" || current.startsWith("/dashboard/kalender/"))) {
+    return { href: "/dashboard/kalender#ny-aktivitet", label: "Ny aktivitet" };
+  }
+  if (canViewOperations(role) && (current === "/dashboard/leverantorer" || current.startsWith("/dashboard/leverantorer/"))) {
+    return { href: "/dashboard/leverantorer#ny-leverantor", label: "Ny leverantör" };
+  }
+  if (canManageLeases(role) && (current === "/dashboard/bokningar" || current.startsWith("/dashboard/bokningar/"))) {
+    return { href: "/dashboard/bokningar#ny-bokning", label: "Ny bokning" };
   }
 
   return null;

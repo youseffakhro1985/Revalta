@@ -48,6 +48,23 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/skador", "technician")).toBeNull();
   });
 
+  it("visar modulspecifika skapa-knappar på drift- och boendesidor", () => {
+    expect(dashboardPrimaryCreateAction("/dashboard/ronder", "owner")).toEqual({
+      href: "/dashboard/ronder?create=1",
+      label: "Ny rond",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/besiktningar", "manager")?.label).toBe("Ny kontroll");
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall", "admin")?.href).toBe("/dashboard/underhall#ny-underhallsatgard");
+    expect(dashboardPrimaryCreateAction("/dashboard/kalender", "owner")?.label).toBe("Ny aktivitet");
+    expect(dashboardPrimaryCreateAction("/dashboard/leverantorer", "manager")?.label).toBe("Ny leverantör");
+    expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "owner")).toEqual({
+      href: "/dashboard/bokningar#ny-bokning",
+      label: "Ny bokning",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
+  });
+
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "owner")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/dokument", "owner")).toBeNull();

@@ -69,7 +69,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const user = { id: "user-1", company_id: "company-1", role: "owner" };
 const workOrder = {
@@ -223,5 +223,23 @@ describe("work-order reports route atomicity", () => {
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(txExecuteRawMock).toHaveBeenCalledTimes(1);
     expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx);
+  });
+
+  it("tells the UI when approved billable rows exist for invoice basis", async () => {
+    listTimeEntriesMock.mockResolvedValue([{ status: "approved", billable: true, kind: "work", minutes: 60 }]);
+
+    const response = await GET(new Request("http://localhost/api/work-orders/wo-1/reports"), context);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.canCreateInvoiceBasis).toBe(true);
+  });
+
+  it("does not offer invoice basis when nothing is attested", async () => {
+    const response = await GET(new Request("http://localhost/api/work-orders/wo-1/reports"), context);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.canCreateInvoiceBasis).toBe(false);
   });
 });

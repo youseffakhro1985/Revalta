@@ -10,9 +10,21 @@ import {
   listMaterialEntries,
   listTimeEntries,
   type InvoiceDraftPayload,
+  type MaterialEntryPayload,
+  type TimeEntryPayload,
 } from "@/lib/work-order-ops-storage";
 
 const signerRoles = new Set(["executor", "contractor", "customer"]);
+
+function hasInvoiceBasisLines(
+  times: TimeEntryPayload[],
+  materials: MaterialEntryPayload[],
+  fixedRevenue = 0,
+) {
+  const hasApprovedTime = times.some((row) => row.status === "approved" && row.billable === true && row.kind !== "break" && Number(row.minutes || 0) > 0);
+  const hasApprovedMaterial = materials.some((row) => row.status === "approved" && row.billable === true && Number(row.total || 0) > 0);
+  return hasApprovedTime || hasApprovedMaterial || Number(fixedRevenue || 0) > 0;
+}
 
 async function resolveWorkOrder(user: CompanyUser, id: string) {
   const workOrder = await db.workOrder.findFirst({
@@ -82,7 +94,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const workOrder = await resolveWorkOrder(user as CompanyUser, id);
   if (!workOrder) return notFoundWorkOrder();
 
-  const [signatures, reports, invoiceBases] = await Promise.all([
+  const [signatures, reports, invoiceBases, times, materials, profit] = await Promise.all([
     db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
       SELECT "id", "signer_role", "signer_name", "signer_email", "confirmation_text", "signed_at"
       FROM "WorkOrderSignature"
@@ -103,9 +115,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
       ORDER BY "created_at" DESC
     `),
+    listTimeEntries(user.company_id, id),
+    listMaterialEntries(user.company_id, id),
+    getProfitabilitySettings(user.company_id, id),
   ]);
 
-  return NextResponse.json({ workOrder, signatures, reports, invoiceBases });
+  return NextResponse.json({
+    workOrder,
+    signatures,
+    reports,
+    invoiceBases,
+    canCreateInvoiceBasis: hasInvoiceBasisLines(times, materials, Number(profit.fixedRevenue || 0)),
+  });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
