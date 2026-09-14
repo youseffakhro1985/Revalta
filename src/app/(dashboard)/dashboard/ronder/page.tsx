@@ -358,7 +358,9 @@ export default function RoundsPage() {
     if (!canManage) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("create") !== "1") return;
-    openNewRound();
+    setError("");
+    setMessage("");
+    setRoundModalOpen(true);
     params.delete("create");
     const queryString = params.toString();
     router.replace(queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname);
