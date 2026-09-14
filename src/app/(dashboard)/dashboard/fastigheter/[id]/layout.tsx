@@ -32,7 +32,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
       {capabilities.canOperate ? (
         <section id="drift" aria-labelledby="property-operations-heading" className="scroll-mt-36 space-y-5">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">Drift</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-600">Drift</p>
             <h2 id="property-operations-heading" className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-ink-950">Drift och livscykel</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Arbetsordrar, service, besiktningar, avtal och andra driftrelaterade händelser samlade på fastigheten.</p>
           </div>
@@ -45,7 +45,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
       {capabilities.canOperate ? (
         <section id="teknik" aria-labelledby="property-technical-heading" className="scroll-mt-36 space-y-5">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">Teknik</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-600">Teknik</p>
             <h2 id="property-technical-heading" className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-ink-950">Tekniska installationer och komponenter</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Komponentregister, tekniskt skick, livslängd och servicehistorik från fastighetens befintliga tekniska register.</p>
           </div>
@@ -57,7 +57,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
       {capabilities.canViewMaintenance ? (
         <section id="underhall" aria-labelledby="property-maintenance-heading" className="scroll-mt-36 space-y-5">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">Underhåll</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-600">Underhåll</p>
             <h2 id="property-maintenance-heading" className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-ink-950">Planerat underhåll och investeringsbehov</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Underhållsplan, budgettidslinje, governance och åtgärder återanvänder befintliga underhållsdata för fastigheten.</p>
           </div>
@@ -67,7 +67,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
           <MaintenanceBudgetTimeline propertyId={id} />
           <div className="rounded-2xl border border-sand-200 bg-white p-5 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-6">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Hela beståndet</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-600">Hela beståndet</p>
               <h3 className="mt-2 text-lg font-semibold text-ink-950">Jämför fastigheten med portföljen</h3>
               <p className="mt-1 text-sm leading-6 text-ink-500">Öppna organisationsvyn för samlad budget, finansieringsbehov, underhållsskuld och riskjämförelse.</p>
             </div>
@@ -82,7 +82,7 @@ export default async function PropertyCardLayout({ children, params }: { childre
       {capabilities.canViewDocuments ? (
         <section id="dokument" aria-labelledby="property-documents-heading" className="scroll-mt-36 space-y-5">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">Dokument</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-600">Dokument</p>
             <h2 id="property-documents-heading" className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-ink-950">Fastighetsdokument</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Ritningar, driftinstruktioner, garantier, besiktningsprotokoll, avtal och andra underlag i samma digitala fastighetspärm.</p>
           </div>

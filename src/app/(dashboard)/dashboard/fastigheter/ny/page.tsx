@@ -46,14 +46,14 @@ export default function NewPropertyPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <div className="flex items-center gap-2 text-[11px] font-medium text-ink-500">
+      <div className="flex items-center gap-2 text-xs font-medium text-ink-500">
         <Link href="/dashboard/fastigheter" className="inline-flex items-center gap-1.5 transition hover:text-petroleum-800"><ArrowLeft className="h-3.5 w-3.5" /> Fastigheter</Link>
         <span>/</span>
         <span>Ny fastighet</span>
       </div>
 
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portfölj / Fastigheter</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portfölj / Fastigheter</p>
         <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Ny fastighet</h1>
         <p className="mt-1 text-sm text-ink-500">Registrera grunduppgifterna. När fastigheten är skapad öppnas fastighetskortet direkt.</p>
       </div>
@@ -95,7 +95,7 @@ export default function NewPropertyPage() {
           <section className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-petroleum-50 text-petroleum-700"><Building2 className="h-5 w-5" /></div>
             <h2 className="mt-4 text-sm font-semibold text-ink-900">Efter registreringen</h2>
-            <div className="mt-3 space-y-3 text-[11px] leading-5 text-ink-550">
+            <div className="mt-3 space-y-3 text-xs leading-5 text-ink-550">
               <InfoRow icon={CheckCircle2}>Fastighetskortet skapas i organisationens säkra tenant.</InfoRow>
               <InfoRow icon={MapPin}>Byggnader, objekt och kontaktuppgifter kan fyllas på direkt.</InfoRow>
               <InfoRow icon={CheckCircle2}>Arbetsorder, ärenden, dokument och uthyrning kan sedan kopplas till fastigheten.</InfoRow>
@@ -108,7 +108,7 @@ export default function NewPropertyPage() {
 }
 
 function Field({ label, description, children }: { label: string; description: string; children: React.ReactNode }) {
-  return <label className="block"><span className="block text-[12px] font-semibold text-ink-750">{label}</span><span className="mt-0.5 block text-[10px] text-ink-450">{description}</span><span className="mt-2 block">{children}</span></label>;
+  return <label className="block"><span className="block text-[12px] font-semibold text-ink-750">{label}</span><span className="mt-0.5 block text-xs text-ink-450">{description}</span><span className="mt-2 block">{children}</span></label>;
 }
 
 function InfoRow({ icon: Icon, children }: { icon: typeof CheckCircle2; children: React.ReactNode }) {
