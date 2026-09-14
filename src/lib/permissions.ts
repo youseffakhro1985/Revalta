@@ -120,3 +120,27 @@ export function canCreateResidentPortalTicket(role: string) {
 export function canDownloadResidentDocuments(role: string) {
   return canViewOperations(role) || isResident(role);
 }
+
+export const PERMISSION_MATRIX = [
+  { label: "Översikt", allows: isStaffRole },
+  { label: "Rapporter", allows: canViewOperations },
+  { label: "Fastigheter och objekt", allows: isStaffRole },
+  { label: "Visa ärenden och arbetsordrar", allows: isStaffRole },
+  { label: "Ändra ärenden och arbetsordrar", allows: canManageTickets },
+  { label: "Tilldela arbetsordrar", allows: canAssignWorkOrders },
+  { label: "Boendeportal (självservice)", allows: canAccessResidentPortal },
+  { label: "Hyresavtal och leasing", allows: canViewLeasingData },
+  { label: "Ekonomi, skador och avier", allows: canViewFinanceData },
+  { label: "Team och roller", allows: canManageTeam },
+  { label: "Händelselogg", allows: canViewAudit },
+  { label: "Integrationer", allows: canManageIntegrations },
+  { label: "Abonnemang och betalning", allows: canManageBilling },
+  { label: "Systeminställningar", allows: canManageCompany },
+] as const;
+
+export function permissionMatrixRows() {
+  return PERMISSION_MATRIX.map((area) => ({
+    label: area.label,
+    values: USER_ROLES.map((role) => area.allows(role)),
+  }));
+}

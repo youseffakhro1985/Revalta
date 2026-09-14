@@ -20,6 +20,7 @@ import {
   isResident,
   isStaffRole,
   isUserRole,
+  permissionMatrixRows,
   shouldScopeToAssignedWork,
   USER_ROLES,
 } from "@/lib/permissions";
@@ -158,5 +159,23 @@ describe("permissions", () => {
 
   it.each(["technician", "viewer", "unknown", ""])("nekar %s nedladdning av boendedokument", (role) => {
     expect(canDownloadResidentDocuments(role)).toBe(false);
+  });
+
+  it("bygger behörighetsmatrisen från samma helpers som API:erna använder", () => {
+    const rows = permissionMatrixRows();
+    const byLabel = Object.fromEntries(rows.map((row) => [row.label, row.values]));
+    const owner = USER_ROLES.indexOf("owner");
+    const technician = USER_ROLES.indexOf("technician");
+    const viewer = USER_ROLES.indexOf("viewer");
+    const resident = USER_ROLES.indexOf("resident");
+
+    expect(byLabel["Ändra ärenden och arbetsordrar"][technician]).toBe(true);
+    expect(byLabel["Tilldela arbetsordrar"][technician]).toBe(false);
+    expect(byLabel["Boendeportal (självservice)"][technician]).toBe(false);
+    expect(byLabel["Boendeportal (självservice)"][resident]).toBe(true);
+    expect(byLabel["Ekonomi, skador och avier"][viewer]).toBe(true);
+    expect(byLabel["Team och roller"][owner]).toBe(true);
+    expect(byLabel["Team och roller"][technician]).toBe(false);
+    expect(byLabel["Rapporter"][technician]).toBe(false);
   });
 });
