@@ -15,6 +15,9 @@ describe("public portal ticket form", () => {
     expect(source).toContain('name="title"');
     expect(source).toContain('name="description"');
     expect(source).toContain('name="companySlug"');
+    expect(source).toContain("initialCreated");
+    expect(source).toContain("portalReasonCopy");
+    expect(source).toContain("createdTicketCopy");
     expect(source).toContain('get("created")');
     expect(source).toContain('get("reason")');
     expect(source).toContain("Kontrollera namn, e-post, fastighet, rubrik och beskrivning.");

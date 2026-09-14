@@ -58,7 +58,32 @@ const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
   timeStyle: "short",
 });
 
-export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
+function portalReasonCopy(reason?: string | null) {
+  if (reason === "invalid") return "Kontrollera namn, e-post, fastighet, rubrik och beskrivning.";
+  if (reason === "rate") return "För många försök. Vänta en stund och prova igen.";
+  if (reason === "unavailable") return "Boendeportalen är inte tillgänglig just nu.";
+  if (reason === "error") return "Något gick fel. Försök igen.";
+  return "";
+}
+
+const createdTicketCopy = "Tack! Ärendet är mottaget och skickat till förvaltningen.";
+
+type PublicPortalClientProps = {
+  companySlug?: string;
+  initialCreated?: boolean;
+  initialReference?: string;
+  initialReason?: string;
+  initialToken?: string;
+};
+
+export function PublicPortalClient({
+  companySlug,
+  initialCreated = false,
+  initialReference = "",
+  initialReason = "",
+  initialToken = "",
+}: PublicPortalClientProps) {
+  const normalizedInitialReference = initialReference.trim().toUpperCase();
   const [properties, setProperties] = useState<Property[]>([]);
   const [companyName, setCompanyName] = useState("Revalta");
   const [reporterName, setReporterName] = useState("");
@@ -68,17 +93,21 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
   const [propertyId, setPropertyId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [reference, setReference] = useState("");
+  const [reference, setReference] = useState(normalizedInitialReference);
   const [trackEmail, setTrackEmail] = useState("");
-  const [trackingToken, setTrackingToken] = useState("");
+  const [trackingToken, setTrackingToken] = useState(initialToken);
   const [trackedTicket, setTrackedTicket] = useState<PublicTicket | null>(null);
-  const [createdReference, setCreatedReference] = useState("");
+  const [createdReference, setCreatedReference] = useState(
+    initialCreated && normalizedInitialReference ? normalizedInitialReference : "",
+  );
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [residentComment, setResidentComment] = useState("");
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useState(() => portalReasonCopy(initialReason));
+  const [success, setSuccess] = useState(
+    initialCreated && normalizedInitialReference ? createdTicketCopy : "",
+  );
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -116,10 +145,8 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const reason = params.get("reason");
-    if (reason === "invalid") setError("Kontrollera namn, e-post, fastighet, rubrik och beskrivning.");
-    if (reason === "rate") setError("För många försök. Vänta en stund och prova igen.");
-    if (reason === "unavailable") setError("Boendeportalen är inte tillgänglig just nu.");
-    if (reason === "error") setError("Något gick fel. Försök igen.");
+    const reasonCopy = portalReasonCopy(reason);
+    if (reasonCopy) setError(reasonCopy);
 
     const created = params.get("created") === "1";
     const ref = params.get("ref")?.trim();
@@ -127,7 +154,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
     const email = params.get("email")?.trim() || "";
     if (created && ref) {
       setCreatedReference(ref.toUpperCase());
-      setSuccess("Tack! Ärendet är mottaget och skickat till förvaltningen.");
+      setSuccess(createdTicketCopy);
     }
     if (!ref) return;
     setReference(ref.toUpperCase());
@@ -186,7 +213,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
       setPropertyId("");
       setTitle("");
       setDescription("");
-      setSuccess("Tack! Ärendet är mottaget och skickat till förvaltningen.");
+      setSuccess(createdTicketCopy);
     } catch {
       setError("Kunde inte kontakta servern");
     } finally {
