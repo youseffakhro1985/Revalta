@@ -11,6 +11,7 @@ import { normalizeInspectionTemplateItems } from "@/lib/inspection-checklist-tem
 import { isMissingTableError, schemaMismatchUserMessage, hasWorkOrderVendorContractColumn } from "@/lib/schema-readiness";
 import { notifyVendor } from "@/lib/vendor-notify";
 import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
+import { notifyAssignee } from "@/lib/assignee-notify";
 import {
   getModernMaterialEntry,
   getModernTimeEntry,
@@ -82,7 +83,7 @@ function nonNegativeNumber(value: unknown, fallback = 0) {
 async function resolveWorkOrder(user: CompanyUser, id: string) {
   const workOrder = await db.workOrder.findFirst({
     where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } },
-    select: { id: true, title: true, status: true, assigned_to_id: true },
+    select: { id: true, title: true, status: true, assigned_to_id: true, assigned_to: { select: { email: true } } },
   });
   if (!workOrder) return null;
   if (!isAssignedWorkAccessible(user, workOrder.assigned_to_id)) return null;
@@ -174,8 +175,9 @@ export async function GET(
   ]);
 
   const includeFinance = canViewFinanceData(user.role);
-  const { assigned_to_id: _aid, ...workOrderData } = workOrder;
+  const { assigned_to_id: _aid, assigned_to: _assignedTo, ...workOrderData } = workOrder;
   void _aid;
+  void _assignedTo;
   const visibleEntries = includeFinance
     ? entries
     : entries.map((e) => ({ ...e, unit_cost: null, total_amount: null }));
@@ -601,6 +603,19 @@ export async function POST(
       }
     } catch {
       // Completion is already persisted; vendor mail must not fail the finalize response.
+    }
+
+    try {
+      await notifyAssignee(user, {
+        id,
+        title: workOrder.title,
+        kind: "work_order",
+        assigneeId: workOrder.assigned_to_id,
+        assigneeEmail: workOrder.assigned_to?.email,
+        notifyKind: "completed",
+      });
+    } catch {
+      // Completion is already persisted; assignee mail must not fail the finalize response.
     }
 
     if (result.ticketSync?.changed && result.ticketId) {

@@ -3,20 +3,30 @@ import { queueTicketNotification } from "@/lib/integrations";
 
 type Actor = { id: string; company_id: string | null };
 
+export type AssigneeNotifyKind = "assigned" | "paused" | "completed";
+
 export type AssigneeNotifyTarget = {
   id: string;
   title: string;
   kind: "ticket" | "work_order";
   assigneeId?: string | null;
   assigneeEmail?: string | null;
+  notifyKind?: AssigneeNotifyKind;
+  pauseLabel?: string | null;
 };
+
+function staffPath(target: AssigneeNotifyTarget) {
+  return target.kind === "work_order"
+    ? `/dashboard/arbetsorder/${target.id}`
+    : `/dashboard/felanmalan/${target.id}`;
+}
+
+function staffUrl(target: AssigneeNotifyTarget) {
+  return `${getPublicAppUrl()}${staffPath(target)}`;
+}
 
 export function assigneeAssignedEmailCopy(target: AssigneeNotifyTarget) {
   const kindLabel = target.kind === "work_order" ? "arbetsordern" : "ärendet";
-  const path = target.kind === "work_order"
-    ? `/dashboard/arbetsorder/${target.id}`
-    : `/dashboard/felanmalan/${target.id}`;
-  const url = `${getPublicAppUrl()}${path}`;
   return {
     subject: `Tilldelad: ${target.title}`,
     text: [
@@ -24,12 +34,53 @@ export function assigneeAssignedEmailCopy(target: AssigneeNotifyTarget) {
       "",
       `Du har tilldelats ${kindLabel} "${target.title}".`,
       "",
-      `Öppna i Revalta: ${url}`,
+      `Öppna i Revalta: ${staffUrl(target)}`,
       "",
       "Vänliga hälsningar,",
       "Revalta",
     ].join("\n"),
   };
+}
+
+export function assigneePausedEmailCopy(target: AssigneeNotifyTarget) {
+  const kindLabel = target.kind === "work_order" ? "Arbetsordern" : "Ärendet";
+  const pauseLabel = target.pauseLabel?.trim() || "Pausad";
+  return {
+    subject: `Pausad: ${target.title}`,
+    text: [
+      "Hej!",
+      "",
+      `${kindLabel} "${target.title}" är pausad i Revalta: ${pauseLabel}.`,
+      "",
+      `Öppna i Revalta: ${staffUrl(target)}`,
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  };
+}
+
+export function assigneeCompletedEmailCopy(target: AssigneeNotifyTarget) {
+  const kindLabel = target.kind === "work_order" ? "Arbetsordern" : "Ärendet";
+  return {
+    subject: `Slutförd: ${target.title}`,
+    text: [
+      "Hej!",
+      "",
+      `${kindLabel} "${target.title}" är markerad som slutförd i Revalta.`,
+      "",
+      `Öppna i Revalta: ${staffUrl(target)}`,
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  };
+}
+
+export function assigneeNotifyEmailCopy(target: AssigneeNotifyTarget) {
+  if (target.notifyKind === "completed") return assigneeCompletedEmailCopy(target);
+  if (target.notifyKind === "paused") return assigneePausedEmailCopy(target);
+  return assigneeAssignedEmailCopy(target);
 }
 
 export async function notifyAssignee(actor: Actor, target: AssigneeNotifyTarget) {
@@ -43,7 +94,7 @@ export async function notifyAssignee(actor: Actor, target: AssigneeNotifyTarget)
     title: target.title,
     recipient: email,
     event: "updated",
-    emailContent: assigneeAssignedEmailCopy(target),
+    emailContent: assigneeNotifyEmailCopy(target),
   });
 
   return { emailed: true };

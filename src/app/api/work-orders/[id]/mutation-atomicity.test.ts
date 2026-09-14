@@ -55,6 +55,7 @@ vi.mock("@/lib/component-work-order-sync", () => ({ syncCompletedWorkOrderToComp
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/ticket-reporter-notify", () => ({ notifyTicketReporter: notifyTicketReporterMock }));
 vi.mock("@/lib/vendor-notify", () => ({ notifyVendor: vi.fn().mockResolvedValue({ emailed: false }) }));
+vi.mock("@/lib/assignee-notify", () => ({ notifyAssignee: vi.fn().mockResolvedValue({ emailed: false }) }));
 
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
@@ -72,6 +73,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { DELETE, PATCH } from "./route";
+import { notifyAssignee } from "@/lib/assignee-notify";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 
@@ -235,6 +237,29 @@ describe("core work-order mutation atomicity", () => {
       expect.objectContaining({ id: "owner-1" }),
       expect.objectContaining({ id: "ticket-1", reporter_email: "anna@example.se" }),
       "updated",
+    );
+  });
+
+  it("emails the assignee when a work order is paused", async () => {
+    txWorkOrderFindFirstMock.mockResolvedValue({
+      ...updated,
+      status: "waiting_material",
+      assigned_to: { id: "tech-1", name: "Tekniker", email: "tech@example.se" },
+    });
+
+    const response = await PATCH(patchRequest({ status: "waiting_material" }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyAssignee).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "owner-1", company_id: "company-1" }),
+      expect.objectContaining({
+        id: "wo-1",
+        kind: "work_order",
+        notifyKind: "paused",
+        pauseLabel: "Väntar material",
+        assigneeId: "tech-1",
+        assigneeEmail: "tech@example.se",
+      }),
     );
   });
 

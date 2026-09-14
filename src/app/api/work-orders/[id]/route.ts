@@ -545,15 +545,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const assignedWorkOrder = transactionResult.workOrder;
+  const assigneeTarget = {
+    id: assignedWorkOrder.id,
+    title: assignedWorkOrder.title,
+    kind: "work_order" as const,
+    assigneeId: assignedWorkOrder.assigned_to_id,
+    assigneeEmail: assignedWorkOrder.assigned_to?.email,
+  };
   if (assignedWorkOrder.assigned_to_id && assignedWorkOrder.assigned_to_id !== existing.assigned_to_id) {
     try {
-      await notifyAssignee(user, {
-        id: assignedWorkOrder.id,
-        title: assignedWorkOrder.title,
-        kind: "work_order",
-        assigneeId: assignedWorkOrder.assigned_to_id,
-        assigneeEmail: assignedWorkOrder.assigned_to?.email,
-      });
+      await notifyAssignee(user, assigneeTarget);
     } catch (notificationError) {
       logger.error("Work-order assignee notification failed", notificationError);
     }
@@ -628,6 +629,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       } catch (notificationError) {
         logger.error("Work-order vendor pause notification failed", notificationError);
       }
+    }
+  }
+  if (completedNow) {
+    try {
+      await notifyAssignee(user, { ...assigneeTarget, notifyKind: "completed" });
+    } catch (notificationError) {
+      logger.error("Work-order assignee completion notification failed", notificationError);
+    }
+  }
+  if (pausedNow) {
+    try {
+      await notifyAssignee(user, {
+        ...assigneeTarget,
+        notifyKind: "paused",
+        pauseLabel: WORK_ORDER_STATUS_LABELS[normalizeWorkOrderStatus(assignedWorkOrder.status)],
+      });
+    } catch (notificationError) {
+      logger.error("Work-order assignee pause notification failed", notificationError);
     }
   }
 
