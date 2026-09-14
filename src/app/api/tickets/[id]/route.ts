@@ -8,6 +8,7 @@ import {
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
+import { notifyAssignee } from "@/lib/assignee-notify";
 import { calculateDueDate } from "@/lib/sla";
 import {
   isAssignedWorkAccessible,
@@ -348,6 +349,21 @@ export async function PATCH(
         }, "updated");
       } catch (notificationError) {
         logger.error("Ticket reporter notification failed", notificationError);
+      }
+    }
+
+    const nextAssignedToId = ticket.assigned_to?.id ?? null;
+    if (nextAssignedToId && nextAssignedToId !== existing.assigned_to_id) {
+      try {
+        await notifyAssignee(user, {
+          id: ticket.id,
+          title: ticket.title,
+          kind: "ticket",
+          assigneeId: nextAssignedToId,
+          assigneeEmail: ticket.assigned_to?.email,
+        });
+      } catch (notificationError) {
+        logger.error("Ticket assignee notification failed", notificationError);
       }
     }
 

@@ -3,6 +3,7 @@ import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { canAssignWorkOrders, canExportTickets, canManageTickets, getCurrentUser, requireCompanyUser, shouldScopeToAssignedWork, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { queueTicketNotification, recordAiEvent } from "@/lib/integrations";
+import { notifyAssignee } from "@/lib/assignee-notify";
 import { analyzeTicket } from "@/lib/ai";
 import { calculateDueDate } from "@/lib/sla";
 import {
@@ -443,6 +444,25 @@ export async function POST(request: Request) {
         companyId: user.company_id,
         ticketId: ticket.id,
       }));
+    }
+
+    if (ticket.assigned_to_id && ticket.assigned_to_id !== user.id) {
+      try {
+        await notifyAssignee(user, {
+          id: ticket.id,
+          title: ticket.title,
+          kind: "ticket",
+          assigneeId: ticket.assigned_to_id,
+          assigneeEmail: ticket.assigned_to?.email,
+        });
+      } catch {
+        observability.logger.warn("ticket create assignee notification failed", observability.elapsed({
+          event: "tickets.create.assignee_notification_failed",
+          userId: user.id,
+          companyId: user.company_id,
+          ticketId: ticket.id,
+        }));
+      }
     }
 
     try {
