@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import db from "@/lib/db";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { createResetToken, hashResetToken } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -37,6 +38,21 @@ function deliveryFailureMeta(error: unknown) {
     providerStatus: typeof candidate.providerStatus === "number" ? candidate.providerStatus : undefined,
     providerCode: typeof candidate.providerCode === "string" ? candidate.providerCode : undefined,
   };
+}
+
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readResetEmail(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return String(form?.get("email") || "");
+  }
+  const body = await request.json().catch(() => ({})) as { email?: unknown };
+  return typeof body.email === "string" ? body.email : "";
 }
 
 async function processResetRequest(input: {
@@ -150,11 +166,19 @@ export async function POST(request: Request) {
     return observability.correlate(NextResponse.json(RESPONSE, { headers: HEADERS }));
   };
 
-  const body = await request.json().catch(() => ({})) as { email?: unknown };
-  const email = normalizeEmail(body.email);
+  const nativeForm = isNativeFormPost(request);
+  const email = normalizeEmail(await readResetEmail(request));
   if (isValidEmail(email)) {
     const ip = getClientIp(request);
     after(() => processResetRequest({ email, ip, observability }));
+  }
+  if (nativeForm) {
+    const url = new URL("/forgot-password", getPublicAppUrl(request.url));
+    url.searchParams.set("sent", "1");
+    const response = NextResponse.redirect(url, 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    return observability.correlate(response);
   }
   return neutralResponse();
 }

@@ -434,4 +434,41 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.headers.get("x-request-id")).toBe(requestId);
   });
+
+  it("accepts a native form post and redirects without putting the email in the URL", async () => {
+    userFindUniqueMock.mockResolvedValue({
+      id: "user-1",
+      email: "owner@example.se",
+      status: "active",
+      company: { status: "active" },
+    });
+
+    const response = await POST(new Request("https://www.revalta.se/api/auth/password-reset/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "x-request-id": requestId },
+      body: "email=OWNER%40example.se",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/forgot-password?sent=1");
+    expect(afterMock).toHaveBeenCalledTimes(1);
+
+    await runScheduledAfterCallbacks();
+    expect(userFindUniqueMock).toHaveBeenCalledWith({
+      where: { email: "owner@example.se" },
+      select: { id: true, email: true, status: true, company: { select: { status: true } } },
+    });
+  });
+
+  it("redirects a native form post even when the email is missing, without starting reset work", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/auth/password-reset/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "x-request-id": requestId },
+      body: "email=",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/forgot-password?sent=1");
+    expect(afterMock).not.toHaveBeenCalled();
+  });
 });
