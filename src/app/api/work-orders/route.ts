@@ -33,6 +33,7 @@ import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { findAccessibleTicket } from "@/lib/assigned-work-access";
 import { createRouteObservability } from "@/lib/route-observability";
 import { analyzeTicket } from "@/lib/ai";
+import { recordAiEvent } from "@/lib/integrations";
 
 const ROUTE = "/api/work-orders";
 const ACTIVE_WORK_ORDER_STATUSES = ["completed", "invoiced", "cancelled"] as const;
@@ -493,6 +494,24 @@ export async function POST(request: Request) {
       companyId: user.company_id,
       workOrderId: workOrder.id,
     }));
+    try {
+      await recordAiEvent(user, {
+        workOrderId: workOrder.id,
+        action: "classification.completed",
+        category: analysis.category,
+        priority: analysis.priority,
+        confidence: analysis.confidence,
+        summary: analysis.summary,
+        source: analysis.source,
+      });
+    } catch {
+      observability.logger.warn("work-order create ai telemetry failed", observability.elapsed({
+        event: "work_orders.create.ai_telemetry_failed",
+        userId: user.id,
+        companyId: user.company_id,
+        workOrderId: workOrder.id,
+      }));
+    }
     return successResponse(observability, { workOrder }, { status: 201 });
   } catch (error) {
     if (isMissingSchemaColumnError(error)) {
