@@ -310,7 +310,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                 <div className="mt-6 rounded-xl border border-sand-200 bg-white p-6 shadow-sm">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-petroleum-600">{trackedTicket.public_reference}</p>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-petroleum-600">{trackedTicket.public_reference}</p>
                       <h3 className="mt-1.5 text-lg font-semibold text-ink-950">{trackedTicket.title}</h3>
                       <p className="mt-1 text-xs text-ink-500">
                         {trackedTicket.property ? `${trackedTicket.property.name} · ` : ""}
@@ -318,8 +318,8 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <span className="rounded bg-sand-100 px-2 py-1 text-[10px] font-semibold text-ink-700 border border-sand-200">{statusLabels[trackedTicket.status] || trackedTicket.status}</span>
-                      <span className="rounded bg-warning-50 px-2 py-1 text-[10px] font-semibold text-warning-700 border border-warning-200">{priorityLabels[trackedTicket.priority] || trackedTicket.priority}</span>
+                      <span className="rounded bg-sand-100 px-2 py-1 text-xs font-semibold text-ink-700 border border-sand-200">{statusLabels[trackedTicket.status] || trackedTicket.status}</span>
+                      <span className="rounded bg-warning-50 px-2 py-1 text-xs font-semibold text-warning-700 border border-warning-200">{priorityLabels[trackedTicket.priority] || trackedTicket.priority}</span>
                     </div>
                   </div>
                   
@@ -327,7 +327,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                     <div className="mt-5 rounded-lg border border-petroleum-100 bg-petroleum-50/50 p-4">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="w-3.5 h-3.5 text-petroleum-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        <span className="text-[10px] font-semibold text-petroleum-700 uppercase">AI-sammanfattning</span>
+                        <span className="text-xs font-semibold text-petroleum-700 uppercase">AI-sammanfattning</span>
                       </div>
                       <p className="text-sm text-ink-700 leading-relaxed">{trackedTicket.ai_summary}</p>
                     </div>
@@ -338,7 +338,7 @@ export function PublicPortalClient({ companySlug }: { companySlug?: string }) {
                       <p className="text-xs font-semibold text-ink-900 uppercase tracking-wide">Uppdateringar</p>
                       {trackedTicket.comments.map((comment) => (
                         <div key={comment.id} className="rounded-lg border border-sand-100 bg-sand-50/50 p-3.5">
-                           <p className="text-xs font-medium text-ink-950 mb-1">{comment.author?.name || comment.user?.name || "Förvaltningen"} <span className="text-[10px] text-ink-500 font-normal ml-2">{dateFormatter.format(new Date(comment.created_at))}</span></p>
+                           <p className="text-xs font-medium text-ink-950 mb-1">{comment.author?.name || comment.user?.name || "Förvaltningen"} <span className="text-xs text-ink-500 font-normal ml-2">{dateFormatter.format(new Date(comment.created_at))}</span></p>
                            <p className="text-sm text-ink-700">{comment.body}</p>
                         </div>
                       ))}
