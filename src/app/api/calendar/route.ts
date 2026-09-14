@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
+import { isMissingTableError } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -37,29 +38,63 @@ function calendarStatusFromWorkOrder(status: string) {
   return "planned";
 }
 
+function calendarStatusFromOps(status: string) {
+  if (status === "completed" || status === "settled" || status === "closed") return "done";
+  if (status === "cancelled") return "cancelled";
+  return "planned";
+}
+
+async function optionalFindMany<T>(table: string, query: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await query();
+  } catch (error) {
+    if (isMissingTableError(error, table)) return [];
+    throw error;
+  }
+}
+
+type DerivedCalendarEvent = {
+  id: string;
+  entity_id: string;
+  title: string;
+  date: string;
+  time: string;
+  type: string;
+  property_name: string;
+  responsible: string;
+  note: string;
+  status: string;
+  created_at: Date;
+  source: "work_order" | "round" | "inspection" | "maintenance" | "lease";
+  href: string;
+  work_order_id?: string;
+};
+
 export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
 
-    const [rows, events, workOrders] = await Promise.all([
-      user.company_id
+    const companyId = user.company_id;
+    const empty = Promise.resolve([]);
+    const [rows, events, workOrders, rounds, inspections, maintenanceItems, leases] = await Promise.all([
+      companyId
         ? db.calendarEvent.findMany({
-            where: { company_id: user.company_id },
+            where: { company_id: companyId },
             orderBy: { date: "asc" },
             take: 500,
           })
-        : Promise.resolve([]),
+        : empty,
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "asc" },
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       })),
-      user.company_id
+      companyId
         ? db.workOrder.findMany({
             where: {
-              company_id: user.company_id,
+              company_id: companyId,
               deleted_at: null,
               scheduled_start: { not: null },
               property: { deleted_at: null },
@@ -77,7 +112,89 @@ export async function GET() {
               assigned_to: { select: { name: true, email: true } },
             },
           })
-        : Promise.resolve([]),
+        : empty,
+      companyId
+        ? optionalFindMany("InspectionRound", () => db.inspectionRound.findMany({
+            where: {
+              company_id: companyId,
+              status: { not: "completed" },
+              property: { deleted_at: null },
+            },
+            orderBy: { next_due: "asc" },
+            take: 400,
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              next_due: true,
+              interval: true,
+              created_at: true,
+              property: { select: { name: true } },
+            },
+          }))
+        : empty,
+      companyId
+        ? optionalFindMany("ComplianceInspection", () => db.complianceInspection.findMany({
+            where: {
+              company_id: companyId,
+              status: { notIn: ["completed", "cancelled"] },
+              property: { deleted_at: null },
+            },
+            orderBy: { due_date: "asc" },
+            take: 400,
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              status: true,
+              due_date: true,
+              responsible: true,
+              created_at: true,
+              property: { select: { name: true } },
+            },
+          }))
+        : empty,
+      companyId
+        ? optionalFindMany("PortfolioMaintenanceItem", () => db.portfolioMaintenanceItem.findMany({
+            where: {
+              company_id: companyId,
+              status: { in: ["planned", "in_progress"] },
+              property: { deleted_at: null },
+            },
+            orderBy: { planned_year: "asc" },
+            take: 400,
+            select: {
+              id: true,
+              component: true,
+              measure: true,
+              planned_year: true,
+              status: true,
+              created_at: true,
+              property: { select: { name: true } },
+            },
+          }))
+        : empty,
+      companyId
+        ? optionalFindMany("Lease", () => db.lease.findMany({
+            where: {
+              company_id: companyId,
+              deleted_at: null,
+              status: { in: ["reserved", "active", "notice"] },
+              property: { deleted_at: null },
+            },
+            orderBy: { start_date: "asc" },
+            take: 400,
+            select: {
+              id: true,
+              lease_number: true,
+              start_date: true,
+              end_date: true,
+              created_at: true,
+              property: { select: { name: true } },
+              unit: { select: { designation: true } },
+            },
+          }))
+        : empty,
     ]);
 
     const modern = rows.map((row) => ({
@@ -105,10 +222,12 @@ export async function GET() {
         source: "legacy" as const,
       }));
 
-    const canonicalWorkOrders = workOrders.flatMap((workOrder) => {
-      if (!workOrder.scheduled_start) return [];
+    const derived: DerivedCalendarEvent[] = [];
+
+    for (const workOrder of workOrders) {
+      if (!workOrder.scheduled_start) continue;
       const scheduled = stockholmDateTime(workOrder.scheduled_start);
-      return [{
+      derived.push({
         id: `work-order:${workOrder.id}`,
         entity_id: workOrder.id,
         work_order_id: workOrder.id,
@@ -121,13 +240,110 @@ export async function GET() {
         note: workOrder.work_order_number ? `Arbetsorder ${workOrder.work_order_number}` : "Schemalagd arbetsorder",
         status: calendarStatusFromWorkOrder(workOrder.status),
         created_at: workOrder.created_at,
-        source: "work_order" as const,
-      }];
-    });
+        source: "work_order",
+        href: `/dashboard/arbetsorder/${workOrder.id}`,
+      });
+    }
+
+    for (const round of rounds) {
+      const due = stockholmDateTime(round.next_due);
+      derived.push({
+        id: `round:${round.id}`,
+        entity_id: round.id,
+        title: round.title,
+        date: due.date,
+        time: due.time === "00:00" ? "" : due.time,
+        type: "Rond",
+        property_name: round.property.name,
+        responsible: "",
+        note: round.interval ? `Nästa rond · ${round.interval}` : "Nästa rond",
+        status: calendarStatusFromOps(round.status),
+        created_at: round.created_at,
+        source: "round",
+        href: "/dashboard/ronder",
+      });
+    }
+
+    for (const inspection of inspections) {
+      const due = stockholmDateTime(inspection.due_date);
+      derived.push({
+        id: `inspection:${inspection.id}`,
+        entity_id: inspection.id,
+        title: inspection.title,
+        date: due.date,
+        time: due.time === "00:00" ? "" : due.time,
+        type: "Besiktning",
+        property_name: inspection.property.name,
+        responsible: inspection.responsible || "",
+        note: inspection.type ? `Besiktning · ${inspection.type}` : "Besiktning",
+        status: calendarStatusFromOps(inspection.status),
+        created_at: inspection.created_at,
+        source: "inspection",
+        href: "/dashboard/besiktningar",
+      });
+    }
+
+    for (const item of maintenanceItems) {
+      derived.push({
+        id: `maintenance:${item.id}`,
+        entity_id: item.id,
+        title: `${item.component} – ${item.measure}`,
+        date: `${item.planned_year}-01-01`,
+        time: "",
+        type: "Underhåll",
+        property_name: item.property.name,
+        responsible: "",
+        note: `Planerat ${item.planned_year}`,
+        status: calendarStatusFromOps(item.status),
+        created_at: item.created_at,
+        source: "maintenance",
+        href: "/dashboard/underhall",
+      });
+    }
+
+    for (const lease of leases) {
+      const unitName = lease.unit?.designation ? ` · ${lease.unit.designation}` : "";
+      if (lease.start_date) {
+        const start = stockholmDateTime(lease.start_date);
+        derived.push({
+          id: `lease-start:${lease.id}`,
+          entity_id: lease.id,
+          title: `Inflytt ${lease.lease_number}`,
+          date: start.date,
+          time: "",
+          type: "Avtal",
+          property_name: lease.property.name,
+          responsible: "",
+          note: `Hyresavtal startar${unitName}`,
+          status: "planned",
+          created_at: lease.created_at,
+          source: "lease",
+          href: "/dashboard/uthyrning",
+        });
+      }
+      if (lease.end_date) {
+        const end = stockholmDateTime(lease.end_date);
+        derived.push({
+          id: `lease-end:${lease.id}`,
+          entity_id: lease.id,
+          title: `Utflytt ${lease.lease_number}`,
+          date: end.date,
+          time: "",
+          type: "Avtal",
+          property_name: lease.property.name,
+          responsible: "",
+          note: `Hyresavtal slutar${unitName}`,
+          status: "planned",
+          created_at: lease.created_at,
+          source: "lease",
+          href: "/dashboard/uthyrning",
+        });
+      }
+    }
 
     const calendarEvents = mergeByCreatedAt(modern, legacy, 500);
     return NextResponse.json({
-      events: [...calendarEvents, ...canonicalWorkOrders].sort((left, right) => {
+      events: [...calendarEvents, ...derived].sort((left, right) => {
         const leftDate = `${String((left as { date?: string }).date || "")}T${String((left as { time?: string }).time || "00:00")}`;
         const rightDate = `${String((right as { date?: string }).date || "")}T${String((right as { time?: string }).time || "00:00")}`;
         return leftDate.localeCompare(rightDate);

@@ -34,8 +34,9 @@ type CalendarEvent = {
   responsible?: string;
   note?: string;
   status?: string;
-  source?: "table" | "legacy" | "work_order";
+  source?: "table" | "legacy" | "work_order" | "round" | "inspection" | "maintenance" | "lease";
   work_order_id?: string;
+  href?: string;
 };
 
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", { weekday: "short", day: "numeric", month: "long" });
@@ -61,7 +62,25 @@ function statusClass(status?: string) {
 }
 
 function isEditableCalendarEvent(event: CalendarEvent) {
-  return event.source !== "legacy" && event.source !== "work_order";
+  return !event.source || event.source === "table";
+}
+
+function derivedSourceNotice(event: CalendarEvent) {
+  if (event.source === "work_order") return "Schemalagd arbetsorder – tid, ansvar och status ändras i arbetsordervyn och speglas automatiskt här.";
+  if (event.source === "round") return "Rond från ronderingsregistret – nästa datum ändras i rondvyn.";
+  if (event.source === "inspection") return "Besiktning från kontrollregistret – förfallodatum ändras i besiktningsvyn.";
+  if (event.source === "maintenance") return "Underhållspost från underhållsplanen – visas som planerat år.";
+  if (event.source === "lease") return "Hyresavtal – inflytt och utflytt hämtas från uthyrningen.";
+  return "";
+}
+
+function derivedSourceError(event: CalendarEvent) {
+  if (event.source === "work_order") return "Arbetsordern hanteras från arbetsordervyn.";
+  if (event.source === "round") return "Ronden hanteras från rondvyn.";
+  if (event.source === "inspection") return "Besiktningen hanteras från besiktningsvyn.";
+  if (event.source === "maintenance") return "Underhållsposten hanteras från underhållsplanen.";
+  if (event.source === "lease") return "Avtalet hanteras från uthyrningen.";
+  return "Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.";
 }
 
 export default function CalendarPage() {
@@ -134,9 +153,7 @@ export default function CalendarPage() {
 
   async function updateStatus(event: CalendarEvent, status: string) {
     if (!isEditableCalendarEvent(event)) {
-      setError(event.source === "work_order"
-        ? "Arbetsorderns status hanteras från arbetsordervyn."
-        : "Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.");
+      setError(derivedSourceError(event));
       return;
     }
     if (status === event.status) return;
@@ -162,9 +179,7 @@ export default function CalendarPage() {
 
   async function saveEdit(event: CalendarEvent) {
     if (!isEditableCalendarEvent(event)) {
-      setError(event.source === "work_order"
-        ? "Arbetsordern redigeras från arbetsordervyn."
-        : "Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan uppdateras.");
+      setError(derivedSourceError(event));
       return;
     }
     setUpdatingId(event.id);
@@ -198,9 +213,7 @@ export default function CalendarPage() {
 
   async function removeEvent(event: CalendarEvent) {
     if (!isEditableCalendarEvent(event)) {
-      setError(event.source === "work_order"
-        ? "Arbetsordern hanteras från arbetsordervyn."
-        : "Aktiviteten finns i äldre lagring. Kör backfill till CalendarEvent innan den kan tas bort.");
+      setError(derivedSourceError(event));
       return;
     }
     if (!window.confirm("Ta bort den här aktiviteten?")) return;
@@ -298,7 +311,7 @@ export default function CalendarPage() {
         {canManage ? (
           <Panel
             title="Planera aktivitet"
-            description="Skapa ett tydligt planeringsunderlag med datum, ansvar och fastighetskoppling. Arbetsorder schemaläggs i arbetsordervyn och visas automatiskt här."
+            description="Skapa ett tydligt planeringsunderlag med datum, ansvar och fastighetskoppling. Arbetsorder, ronder, besiktningar, underhåll och avtalsdatum hämtas automatiskt från respektive register."
             className="xl:sticky xl:top-[118px]"
           >
             <form id="ny-aktivitet" onSubmit={submit} className="space-y-4">
@@ -322,7 +335,7 @@ export default function CalendarPage() {
 
         <Panel
           title="Operativ tidslinje"
-          description="Aktiviteter grupperade efter när de ska genomföras. Schemalagda arbetsorder hämtas direkt från arbetsorderregistret."
+          description="Aktiviteter grupperade efter när de ska genomföras. Schemalagda arbetsorder, ronder, besiktningar, underhåll och avtalsdatum hämtas från respektive register."
           bodyClassName="p-0"
         >
           <div className="flex flex-col gap-3 border-b border-sand-200 bg-sand-50/55 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -373,13 +386,13 @@ export default function CalendarPage() {
                             </p>
                             {event.note ? <p className="mt-2 text-xs leading-5 text-ink-500">{event.note}</p> : null}
                             {event.source === "legacy" ? <InlineAlert tone="warning">Äldre rad – kör backfill innan uppdatering eller borttagning.</InlineAlert> : null}
-                            {event.source === "work_order" ? <InlineAlert tone="info">Canonical arbetsorder – tid, ansvar och status ändras i arbetsordervyn och speglas automatiskt här.</InlineAlert> : null}
+                            {derivedSourceNotice(event) ? <InlineAlert tone="info">{derivedSourceNotice(event)}</InlineAlert> : null}
                           </div>
 
-                          {event.source === "work_order" && event.work_order_id ? (
+                          {event.href && !isEditableCalendarEvent(event) && event.source !== "legacy" ? (
                             <div className="lg:text-right">
-                              <a href={`/dashboard/arbetsorder/${event.work_order_id}`} className={`${premiumSecondaryButtonClass} h-9 px-3 text-xs`}>
-                                Öppna arbetsorder
+                              <a href={event.href} className={`${premiumSecondaryButtonClass} h-9 px-3 text-xs`}>
+                                {event.source === "work_order" ? "Öppna arbetsorder" : "Öppna källa"}
                               </a>
                             </div>
                           ) : canManage && isEditableCalendarEvent(event) ? (
