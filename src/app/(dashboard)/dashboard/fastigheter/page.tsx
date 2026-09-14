@@ -269,7 +269,7 @@ export default function PropertiesPage() {
     <div className="space-y-4 sm:space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portfölj / Fastigheter</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-petroleum-700">Portfölj / Fastigheter</p>
           <h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Fastigheter</h1>
           <p className="mt-1 text-sm text-ink-500">Sök, filtrera och följ upp fastighetsbeståndet utan att ladda hela portföljen i webbläsaren.</p>
         </div>
@@ -299,11 +299,11 @@ export default function PropertiesPage() {
           </label>
           <label>
             <span className="sr-only">Filtrera ort</span>
-            <input value={city} onChange={(event) => setCity(event.target.value)} maxLength={160} placeholder="Ort" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-[11px] text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+            <input value={city} onChange={(event) => setCity(event.target.value)} maxLength={160} placeholder="Ort" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
           </label>
           <label>
             <span className="sr-only">Filtrera status</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-[11px] text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100">
+            <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100">
               <option value="all">Alla statusar</option>
               <option value="active">Aktiv</option>
               <option value="inactive">Inaktiv</option>
@@ -314,10 +314,10 @@ export default function PropertiesPage() {
           </label>
           <label>
             <span className="sr-only">Filtrera ansvarig</span>
-            <input value={manager} onChange={(event) => setManager(event.target.value)} maxLength={160} placeholder="Ansvarig" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-[11px] text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+            <input value={manager} onChange={(event) => setManager(event.target.value)} maxLength={160} placeholder="Ansvarig" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
           </label>
-          <button type="button" onClick={resetFilters} disabled={!hasFilters} className="h-10 rounded-xl border border-sand-200 bg-white px-3 text-[11px] font-semibold text-ink-600 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-45">Rensa</button>
-          <button type="button" onClick={() => void exportCsv()} disabled={!pagination.total || exporting} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-[11px] font-semibold text-petroleum-800 transition hover:bg-petroleum-50 disabled:cursor-not-allowed disabled:opacity-45">
+          <button type="button" onClick={resetFilters} disabled={!hasFilters} className="h-10 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-600 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-45">Rensa</button>
+          <button type="button" onClick={() => void exportCsv()} disabled={!pagination.total || exporting} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-petroleum-800 transition hover:bg-petroleum-50 disabled:cursor-not-allowed disabled:opacity-45">
             <Download className="h-3.5 w-3.5" /> {exporting ? "Exporterar…" : "Exportera"}
           </button>
         </div>
@@ -328,9 +328,9 @@ export default function PropertiesPage() {
           <div className="flex items-center justify-between gap-4 border-b border-sand-100 px-5 py-4">
             <div>
               <h2 className="text-[16px] font-semibold text-ink-950">Fastigheter ({pagination.total.toLocaleString("sv-SE")})</h2>
-              <p className="mt-0.5 text-[11px] text-ink-500">Resultatet hämtas sida för sida med tenant-säker serversökning.</p>
+              <p className="mt-0.5 text-xs text-ink-500">Resultatet hämtas sida för sida med tenant-säker serversökning.</p>
             </div>
-            <button type="button" onClick={() => setSortAscending((value) => !value)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-[11px] font-semibold text-ink-650 transition hover:bg-sand-50" aria-label={sortAscending ? "Sortera fastighetsnamn fallande" : "Sortera fastighetsnamn stigande"}>
+            <button type="button" onClick={() => setSortAscending((value) => !value)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-650 transition hover:bg-sand-50" aria-label={sortAscending ? "Sortera fastighetsnamn fallande" : "Sortera fastighetsnamn stigande"}>
               <ArrowDownUp className="h-3.5 w-3.5" /> {sortAscending ? "A–Ö" : "Ö–A"}
             </button>
           </div>
@@ -347,7 +347,7 @@ export default function PropertiesPage() {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[920px] text-left">
                 <thead>
-                  <tr className="border-b border-sand-100 bg-surface-subtle text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-400">
+                  <tr className="border-b border-sand-100 bg-surface-subtle text-xs font-semibold uppercase tracking-[0.06em] text-ink-400">
                     <th className="px-5 py-3">Fastighet</th>
                     <th className="px-3 py-3">Adress</th>
                     <th className="px-3 py-3">Ort</th>
@@ -382,25 +382,25 @@ export default function PropertiesPage() {
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sand-200 bg-sand-50 text-petroleum-700"><Building2 className="h-4 w-4" /></span>
                             <div className="min-w-0">
                               <p className="truncate text-[12px] font-semibold text-ink-900">{property.name}</p>
-                              {property.property_identifier ? <p className="mt-0.5 truncate text-[10px] text-ink-400">{property.property_identifier}</p> : null}
+                              {property.property_identifier ? <p className="mt-0.5 truncate text-xs text-ink-400">{property.property_identifier}</p> : null}
                             </div>
                           </div>
                         </td>
-                        <td className="max-w-[210px] px-3 py-3.5 text-[11px] text-ink-600"><span className="block truncate">{property.address}{property.postal_code ? `, ${property.postal_code}` : ""}</span></td>
-                        <td className="px-3 py-3.5 text-[11px] text-ink-600">{property.city}</td>
-                        <td className="px-3 py-3.5 text-[11px] font-medium text-ink-700">{property._count.units}</td>
-                        <td className="px-3 py-3.5 text-[11px] font-medium text-ink-700">{property._count.tickets}</td>
+                        <td className="max-w-[210px] px-3 py-3.5 text-xs text-ink-600"><span className="block truncate">{property.address}{property.postal_code ? `, ${property.postal_code}` : ""}</span></td>
+                        <td className="px-3 py-3.5 text-xs text-ink-600">{property.city}</td>
+                        <td className="px-3 py-3.5 text-xs font-medium text-ink-700">{property._count.units}</td>
+                        <td className="px-3 py-3.5 text-xs font-medium text-ink-700">{property._count.tickets}</td>
                         <td className="px-3 py-3.5"><StatusBadge status={property.status} /></td>
-                        <td className="max-w-[190px] px-3 py-3.5 text-[11px] text-ink-600">
+                        <td className="max-w-[190px] px-3 py-3.5 text-xs text-ink-600">
                           {nextMaintenance ? (
                             <>
                               <span className="block truncate font-medium text-ink-700">{nextMaintenance.measure || nextMaintenance.component || "Planerad åtgärd"}</span>
-                              <span className="mt-0.5 block text-[10px] text-ink-400">{nextMaintenance.planned_year || "Planerad"}</span>
+                              <span className="mt-0.5 block text-xs text-ink-400">{nextMaintenance.planned_year || "Planerad"}</span>
                             </>
                           ) : <span className="text-ink-400">Ingen planerad åtgärd</span>}
                         </td>
-                        <td className="px-3 py-3.5 text-[11px] text-ink-600">{property.manager_name || "Ej tilldelad"}</td>
-                        <td className="px-5 py-3.5 text-right"><span className="inline-flex items-center gap-1 text-[11px] font-semibold text-petroleum-700">Visa <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></td>
+                        <td className="px-3 py-3.5 text-xs text-ink-600">{property.manager_name || "Ej tilldelad"}</td>
+                        <td className="px-5 py-3.5 text-right"><span className="inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">Visa <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></td>
                       </tr>
                     );
                   })}
@@ -410,13 +410,13 @@ export default function PropertiesPage() {
           )}
 
           <div className="flex flex-col gap-3 border-t border-sand-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[10px] text-ink-500">Visar {firstVisible}–{lastVisible} av {pagination.total.toLocaleString("sv-SE")} fastigheter</p>
+            <p className="text-xs text-ink-500">Visar {firstVisible}–{lastVisible} av {pagination.total.toLocaleString("sv-SE")} fastigheter</p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" disabled={!pagination.hasPrevious || loading} onClick={() => setPage((value) => Math.max(1, value - 1))} aria-label="Föregående sida" className="flex h-8 w-8 items-center justify-center rounded-lg border border-sand-200 bg-white text-ink-500 transition hover:bg-sand-50 disabled:opacity-35"><ChevronLeft className="h-3.5 w-3.5" /></button>
-              <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-petroleum-900 px-2 text-[11px] font-semibold text-white">{pagination.page}</span>
-              <span className="text-[10px] text-ink-400">av {pagination.totalPages}</span>
+              <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-petroleum-900 px-2 text-xs font-semibold text-white">{pagination.page}</span>
+              <span className="text-xs text-ink-400">av {pagination.totalPages}</span>
               <button type="button" disabled={!pagination.hasNext || loading} onClick={() => setPage((value) => value + 1)} aria-label="Nästa sida" className="flex h-8 w-8 items-center justify-center rounded-lg border border-sand-200 bg-white text-ink-500 transition hover:bg-sand-50 disabled:opacity-35"><ChevronRight className="h-3.5 w-3.5" /></button>
-              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="Antal fastigheter per sida" className="h-8 rounded-lg border border-sand-200 bg-white px-2 text-[10px] font-medium text-ink-600 outline-none focus:ring-2 focus:ring-petroleum-100">
+              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} aria-label="Antal fastigheter per sida" className="h-8 rounded-lg border border-sand-200 bg-white px-2 text-xs font-medium text-ink-600 outline-none focus:ring-2 focus:ring-petroleum-100">
                 {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>Visa {size}</option>)}
               </select>
             </div>
@@ -429,20 +429,20 @@ export default function PropertiesPage() {
               <div className="space-y-1.5">
                 {upcomingMaintenance.map((item) => (
                   <Link key={item.id} href={item.property_id ? `/dashboard/fastigheter/${item.property_id}` : "/dashboard/drift"} className="group flex items-start gap-2.5 rounded-lg px-1 py-2 transition hover:bg-sand-50">
-                    <span className="mt-0.5 rounded-md border border-sand-200 bg-sand-50 px-1.5 py-1 text-[9px] font-semibold text-ink-500">{item.planned_year || "—"}</span>
+                    <span className="mt-0.5 rounded-md border border-sand-200 bg-sand-50 px-1.5 py-1 text-xs font-semibold text-ink-500">{item.planned_year || "—"}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[11px] font-medium text-ink-750">{item.measure || item.component || "Planerad åtgärd"}</span>
-                      <span className="mt-0.5 block truncate text-[9px] text-ink-400">{item.property_name || "Fastighet"}</span>
+                      <span className="block truncate text-xs font-medium text-ink-750">{item.measure || item.component || "Planerad åtgärd"}</span>
+                      <span className="mt-0.5 block truncate text-xs text-ink-400">{item.property_name || "Fastighet"}</span>
                     </span>
                     <ChevronRight className="mt-1 h-3 w-3 shrink-0 text-ink-300 group-hover:text-petroleum-700" />
                   </Link>
                 ))}
               </div>
-            ) : <p className="text-[11px] text-ink-400">Inga kommande åtgärder registrerade.</p>}
+            ) : <p className="text-xs text-ink-400">Inga kommande åtgärder registrerade.</p>}
           </SidePanel>
 
           <SidePanel title="Skalbar listning" icon={Layers3}>
-            <div className="space-y-2 text-[11px] leading-5 text-ink-500">
+            <div className="space-y-2 text-xs leading-5 text-ink-500">
               <p>Listan laddar högst {pageSize} fastigheter åt gången. Sökning och filter körs på servern inom er organisation.</p>
               <p>CSV-export hämtar resultatet i bounded batcher om 100 poster utan att öppna en obegränsad databasfråga.</p>
             </div>
@@ -458,12 +458,12 @@ function KpiCard({ icon: Icon, label, value, helper }: { icon: LucideIcon; label
     <article className="rounded-2xl border border-sand-200 bg-white p-4 shadow-premium-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-400">{label}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-400">{label}</p>
           <p className="mt-2 font-display text-[27px] font-semibold tracking-[-0.04em] text-ink-950">{value}</p>
         </div>
         <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sand-200 bg-sand-50 text-petroleum-700"><Icon className="h-4 w-4" /></span>
       </div>
-      <p className="mt-2 text-[10px] leading-4 text-ink-400">{helper}</p>
+      <p className="mt-2 text-xs leading-4 text-ink-400">{helper}</p>
     </article>
   );
 }
@@ -488,7 +488,7 @@ function StatusBadge({ status }: { status: string }) {
     : attention
       ? "border-warning-200 bg-warning-50 text-warning-700"
       : "border-sand-200 bg-sand-50 text-ink-500";
-  return <span className={`inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold ${classes}`}>{statusLabel(status)}</span>;
+  return <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${classes}`}>{statusLabel(status)}</span>;
 }
 
 function statusLabel(status: string) {
