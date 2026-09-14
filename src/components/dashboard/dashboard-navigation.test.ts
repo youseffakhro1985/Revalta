@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   activeDashboardSectionId,
+  commandCenterNavigationGroups,
   isDashboardNavItemActive,
   rememberedExpandedSectionId,
   staffAdministrationNavigation,
@@ -103,5 +104,15 @@ describe("dashboard navigation v2", () => {
     expect(rememberedExpandedSectionId("drift", "ekonomi-analys")).toBe("ekonomi-analys");
     expect(rememberedExpandedSectionId(null, "boende-uthyrning")).toBe("boende-uthyrning");
     expect(rememberedExpandedSectionId(null, null)).toBeNull();
+  });
+
+  it("lägger Behörigheter och Integrationer i Command Center för owner", () => {
+    const admin = commandCenterNavigationGroups("owner").find((group) => group.label === "Administration");
+    expect(admin?.items.map((item) => item.label)).toEqual(["Inställningar", "Behörigheter", "Integrationer"]);
+  });
+
+  it("visar bara Inställningar i Command Center för manager", () => {
+    const admin = commandCenterNavigationGroups("manager").find((group) => group.label === "Administration");
+    expect(admin?.items.map((item) => item.label)).toEqual(["Inställningar"]);
   });
 });
