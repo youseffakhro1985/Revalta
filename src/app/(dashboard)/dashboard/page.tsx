@@ -7,7 +7,12 @@ import { FirstRunOnboarding } from "@/components/dashboard/first-run-onboarding"
 import { dashboardModeForRole } from "@/components/dashboard/dashboard-role";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 import { residentHomePath } from "@/lib/resident-access";
-import { getCachedSchemaReadiness, formatSchemaMissing, schemaCompatibilityBannerMessage } from "@/lib/schema-readiness";
+import {
+  canRenderHomeDashboard,
+  formatSchemaMissing,
+  getCachedSchemaReadiness,
+  schemaCompatibilityBannerMessage,
+} from "@/lib/schema-readiness";
 
 export default async function Dashboard() {
   const user = await getCurrentUser();
@@ -17,6 +22,7 @@ export default async function Dashboard() {
   if (mode === "resident") redirect(residentHomePath());
 
   const schema = await getCachedSchemaReadiness();
+  const showHome = canRenderHomeDashboard(schema);
 
   return (
     <div className="animate-fade-in-soft space-y-6 sm:space-y-7">
@@ -39,9 +45,9 @@ export default async function Dashboard() {
         </div>
       ) : null}
 
-      {schema.ready && canManageCompany(user.role) ? <FirstRunOnboarding /> : null}
+      {showHome && canManageCompany(user.role) ? <FirstRunOnboarding /> : null}
 
-      {schema.ready ? (
+      {showHome ? (
         mode === "portfolio" ? <PortfolioDashboard user={user} />
           : mode === "manager" ? <ManagerDashboard user={user} />
             : mode === "technician" ? <TechnicianDashboard user={user} />
