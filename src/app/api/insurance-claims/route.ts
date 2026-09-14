@@ -82,9 +82,10 @@ export async function GET() {
 
     const workOrderByClaim = new Map<string, { workOrderId: string; workOrderNumber: string | null }>();
     for (const log of workOrderLogs) {
+      const claimId = log.entity_id;
       const link = workOrderLinkFromMetadata(log.metadata);
-      if (link && !workOrderByClaim.has(log.entity_id)) {
-        workOrderByClaim.set(log.entity_id, link);
+      if (claimId && link && !workOrderByClaim.has(claimId)) {
+        workOrderByClaim.set(claimId, link);
       }
     }
 
