@@ -12,6 +12,8 @@ const {
   ticketSyncMock,
   componentSyncMock,
   writeAuditLogMock,
+  ticketFindFirstMock,
+  notifyTicketReporterMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
@@ -24,6 +26,8 @@ const {
   ticketSyncMock: vi.fn(),
   componentSyncMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  ticketFindFirstMock: vi.fn(),
+  notifyTicketReporterMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -45,10 +49,12 @@ vi.mock("@/lib/work-order-asset-links", async (importOriginal) => ({
 vi.mock("@/lib/work-order-ticket-sync", () => ({ syncWorkOrderToTicket: ticketSyncMock }));
 vi.mock("@/lib/component-work-order-sync", () => ({ syncCompletedWorkOrderToComponent: componentSyncMock }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+vi.mock("@/lib/ticket-reporter-notify", () => ({ notifyTicketReporter: notifyTicketReporterMock }));
 
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },
+    ticket: { findFirst: ticketFindFirstMock },
     user: { findFirst: vi.fn(), findMany: vi.fn() },
     $transaction: transactionMock,
   },
@@ -133,6 +139,8 @@ describe("core work-order mutation atomicity", () => {
     ticketSyncMock.mockResolvedValue(null);
     componentSyncMock.mockResolvedValue(null);
     writeAuditLogMock.mockResolvedValue(undefined);
+    notifyTicketReporterMock.mockResolvedValue({ emailed: true, sms: true });
+    ticketFindFirstMock.mockResolvedValue(null);
     transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
     (tx.$queryRaw as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([{ updated_at: existing.updated_at }])
@@ -190,6 +198,31 @@ describe("core work-order mutation atomicity", () => {
     expect(response.status).toBe(409);
     expect(body.code).toBe("version_conflict");
     expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("notifies the linked ticket reporter after a work-order status sync", async () => {
+    workOrderFindFirstMock.mockResolvedValue({ ...existing, ticket_id: "ticket-1" });
+    ticketSyncMock.mockResolvedValue({ changed: true, status: "in_progress" });
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      title: "Läckande kran",
+      status: "in_progress",
+      public_reference: "RV-12",
+      reporter_email: "anna@example.se",
+      reporter_phone: "0701234567",
+    });
+
+    const response = await PATCH(patchRequest({ status: "in_progress" }), params);
+
+    expect(response.status).toBe(200);
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "ticket-1", company_id: "company-1", deleted_at: null },
+    }));
+    expect(notifyTicketReporterMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "owner-1" }),
+      expect.objectContaining({ id: "ticket-1", reporter_email: "anna@example.se" }),
+      "updated",
+    );
   });
 
   it("does not report PATCH success when the mandatory audit write fails", async () => {

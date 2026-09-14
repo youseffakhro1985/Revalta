@@ -1,7 +1,7 @@
 import db from "@/lib/db";
 import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { queueTicketNotification } from "@/lib/integrations";
+import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
@@ -28,7 +28,7 @@ export async function POST(
 
     const ticket = await db.ticket.findFirst({
       where: { id, deleted_at: null, ...tenantWhere(user), OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-      select: { id: true, title: true, assigned_to_id: true },
+      select: { id: true, title: true, assigned_to_id: true, status: true, public_reference: true, reporter_email: true, reporter_phone: true },
     });
 
     if (!ticket) return notFoundTicket();
@@ -73,15 +73,12 @@ export async function POST(
       return created;
     });
 
-    try {
-      await queueTicketNotification(user, {
-        ticketId: ticket.id,
-        title: ticket.title,
-        recipient: user.email,
-        event: "commented",
-      });
-    } catch (notificationError) {
-      logger.error("Ticket comment notification failed", notificationError);
+    if (!comment.is_internal) {
+      try {
+        await notifyTicketReporter(user, ticket, "commented");
+      } catch (notificationError) {
+        logger.error("Ticket reporter comment notification failed", notificationError);
+      }
     }
 
     return NextResponse.json({ success: true, comment }, { status: 201 });

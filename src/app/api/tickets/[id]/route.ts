@@ -7,7 +7,7 @@ import {
   tenantWhere,
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
-import { queueTicketNotification } from "@/lib/integrations";
+import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
 import { calculateDueDate } from "@/lib/sla";
 import {
   isAssignedWorkAccessible,
@@ -172,6 +172,9 @@ export async function PATCH(
         priority: true,
         assigned_to_id: true,
         due_date: true,
+        public_reference: true,
+        reporter_email: true,
+        reporter_phone: true,
       },
     });
 
@@ -327,15 +330,19 @@ export async function PATCH(
       logger.error("Ticket lifecycle telemetry audit failed", auditError);
     }
 
-    try {
-      await queueTicketNotification(user, {
-        ticketId: ticket.id,
-        title: ticket.title,
-        recipient: user.email,
-        event: "updated",
-      });
-    } catch (notificationError) {
-      logger.error("Ticket update notification failed", notificationError);
+    if (currentStatus !== nextStatus) {
+      try {
+        await notifyTicketReporter(user, {
+          id: ticket.id,
+          title: ticket.title,
+          status: ticket.status,
+          public_reference: existing.public_reference,
+          reporter_email: existing.reporter_email,
+          reporter_phone: existing.reporter_phone,
+        }, "updated");
+      } catch (notificationError) {
+        logger.error("Ticket reporter notification failed", notificationError);
+      }
     }
 
     return NextResponse.json({

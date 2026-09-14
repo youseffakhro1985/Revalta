@@ -7,7 +7,7 @@ const {
   auditLogCreateMock,
   transactionMock,
   writeAuditLogMock,
-  queueTicketNotificationMock,
+  notifyTicketReporterMock,
   loggerErrorMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
@@ -16,7 +16,7 @@ const {
   auditLogCreateMock: vi.fn(),
   transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
-  queueTicketNotificationMock: vi.fn(),
+  notifyTicketReporterMock: vi.fn(),
   loggerErrorMock: vi.fn(),
 }));
 
@@ -33,7 +33,7 @@ vi.mock("@/lib/assigned-work-access", () => ({
   redactTicketReporterPii: (_user: unknown, ticket: unknown) => ticket,
 }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
-vi.mock("@/lib/integrations", () => ({ queueTicketNotification: queueTicketNotificationMock }));
+vi.mock("@/lib/ticket-reporter-notify", () => ({ notifyTicketReporter: notifyTicketReporterMock }));
 vi.mock("@/lib/structured-logger", () => ({
   createLogger: () => ({ error: loggerErrorMock, warn: vi.fn(), info: vi.fn(), debug: vi.fn() }),
 }));
@@ -92,7 +92,7 @@ describe("ticket mutation post-commit reliability", () => {
     ticketUpdateManyMock.mockResolvedValue({ count: 1 });
     auditLogCreateMock.mockResolvedValue(undefined);
     writeAuditLogMock.mockResolvedValue(undefined);
-    queueTicketNotificationMock.mockResolvedValue(undefined);
+    notifyTicketReporterMock.mockResolvedValue({ emailed: true, sms: true });
     transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => callback({
       ticket: { findFirst: ticketFindFirstMock, updateMany: ticketUpdateManyMock },
       auditLog: { create: auditLogCreateMock },
@@ -104,7 +104,7 @@ describe("ticket mutation post-commit reliability", () => {
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce(updated);
     writeAuditLogMock.mockRejectedValue(new Error("secondary audit unavailable"));
-    queueTicketNotificationMock.mockRejectedValue(new Error("notification unavailable"));
+    notifyTicketReporterMock.mockRejectedValue(new Error("notification unavailable"));
 
     const response = await PATCH(patchRequest(), { params });
     const body = await response.json();
@@ -120,7 +120,7 @@ describe("ticket mutation post-commit reliability", () => {
       }),
     }));
     expect(loggerErrorMock).toHaveBeenCalledWith("Ticket lifecycle telemetry audit failed", expect.any(Error));
-    expect(loggerErrorMock).toHaveBeenCalledWith("Ticket update notification failed", expect.any(Error));
+    expect(loggerErrorMock).toHaveBeenCalledWith("Ticket reporter notification failed", expect.any(Error));
   });
 
   it("returns 200 for an already committed soft-delete even if audit journaling fails", async () => {
