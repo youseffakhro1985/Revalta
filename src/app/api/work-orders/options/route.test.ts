@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, propertyFindManyMock, userFindManyMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, propertyFindManyMock, userFindManyMock, vendorFindManyMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   userFindManyMock: vi.fn(),
+  vendorFindManyMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -13,11 +14,13 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   notDeletedFilter: vi.fn(async () => ({ deleted_at: null })),
+  hasWorkOrderVendorContractColumn: vi.fn(async () => true),
 }));
 vi.mock("@/lib/db", () => ({
   default: {
     property: { findMany: propertyFindManyMock },
     user: { findMany: userFindManyMock },
+    vendorContract: { findMany: vendorFindManyMock },
   },
 }));
 
@@ -28,6 +31,7 @@ describe("GET /api/work-orders/options", () => {
     vi.clearAllMocks();
     propertyFindManyMock.mockResolvedValue([]);
     userFindManyMock.mockResolvedValue([{ id: "tech-2", email: "tech@example.se" }]);
+    vendorFindManyMock.mockResolvedValue([{ id: "vendor-1", name: "Städ AB", category: "Städ", property_id: null, status: "active" }]);
   });
 
   it("does not disclose the company user directory to technicians", async () => {
@@ -38,7 +42,9 @@ describe("GET /api/work-orders/options", () => {
 
     expect(response.status).toBe(200);
     expect(userFindManyMock).not.toHaveBeenCalled();
+    expect(vendorFindManyMock).not.toHaveBeenCalled();
     expect(body.users).toEqual([]);
+    expect(body.vendors).toEqual([]);
     expect(body.permissions.canAssign).toBe(false);
   });
 
@@ -49,7 +55,10 @@ describe("GET /api/work-orders/options", () => {
     const body = await response.json();
 
     expect(userFindManyMock).toHaveBeenCalled();
+    expect(vendorFindManyMock).toHaveBeenCalled();
     expect(body.users).toHaveLength(1);
+    expect(body.vendors).toHaveLength(1);
     expect(body.permissions.canAssign).toBe(true);
+    expect(body.permissions.vendorAssignmentAvailable).toBe(true);
   });
 });

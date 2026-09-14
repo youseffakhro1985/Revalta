@@ -32,6 +32,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   notDeletedFilter: notDeletedFilterMock,
+  hasWorkOrderVendorContractColumn: vi.fn(async () => false),
 }));
 
 vi.mock("@/lib/soft-delete-compat", () => ({

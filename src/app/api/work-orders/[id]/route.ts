@@ -37,6 +37,12 @@ import {
   WorkOrderLockError,
 } from "@/lib/work-order-edit-lock";
 import { createLogger } from "@/lib/structured-logger";
+import {
+  hasWorkOrderVendorContractColumn,
+  schemaMismatchUserMessage,
+  workOrderVendorIdSelect,
+} from "@/lib/schema-readiness";
+import { findAssignableVendorContract, listAssignableVendorContracts } from "@/lib/work-order-vendor";
 
 const logger = createLogger({ route: "/api/work-orders/[id]" });
 
@@ -52,7 +58,7 @@ function parseOptionalMoney(value: unknown) {
   return Number.isFinite(number) && number >= 0 ? number : undefined;
 }
 
-const include = {
+const workOrderDetailIncludeBase = {
   property: { select: { id: true, name: true, address: true, city: true } },
   unit: { select: { id: true, designation: true, unit_type: true } },
   ticket: { select: { id: true, public_reference: true, title: true } },
@@ -66,19 +72,31 @@ const include = {
   },
 };
 
+function workOrderDetailInclude(persistVendor: boolean) {
+  return persistVendor
+    ? {
+        ...workOrderDetailIncludeBase,
+        vendor_contract: { select: { id: true, name: true, category: true, status: true } },
+      }
+    : workOrderDetailIncludeBase;
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
-  const [workOrder, users, enterprise, statusEvents, assetLink] = await Promise.all([
-    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include }),
+  const persistVendor = await hasWorkOrderVendorContractColumn();
+  const canAssign = canAssignWorkOrders(user.role);
+  const [workOrder, users, vendors, enterprise, statusEvents, assetLink] = await Promise.all([
+    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include: workOrderDetailInclude(persistVendor) }),
     db.user.findMany({
       where: { company_id: user.company_id, status: "active" },
       orderBy: [{ name: "asc" }, { email: "asc" }],
       select: { id: true, name: true, email: true, role: true },
     }),
+    canAssign ? listAssignableVendorContracts(db, user.company_id) : Promise.resolve([]),
     getWorkOrderEnterpriseState(db, user.company_id, id),
     getWorkOrderStatusEvents(db, user.company_id, id),
     getWorkOrderAssetLink(db, user.company_id, id),
@@ -95,10 +113,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     {
       workOrder: { ...workOrderPayload, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
       users,
+      vendors,
       canManage: canManageTickets(user.role),
-      canAssign: canAssignWorkOrders(user.role),
+      canAssign,
       canManageFinance: canManageWorkOrderFinance(user.role),
       canViewFinance: includeFinance,
+      vendorAssignmentAvailable: persistVendor,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );
@@ -112,6 +132,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const companyId = user.company_id;
 
   const { id } = await params;
+  const persistVendor = await hasWorkOrderVendorContractColumn();
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
       where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
@@ -130,6 +151,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         completed_at: true,
         created_at: true,
         updated_at: true,
+        ...workOrderVendorIdSelect(persistVendor),
       },
     }),
     getWorkOrderEnterpriseState(db, companyId, id),
@@ -149,6 +171,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     status?: string;
     priority?: string;
     assigned_to_id?: string | null;
+    vendor_contract_id?: string | null;
     scheduled_start?: Date | null;
     scheduled_end?: Date | null;
     estimated_cost?: number | null;
@@ -214,6 +237,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
       }
       data.assigned_to_id = assignedToId;
+    }
+  }
+  if (body.vendorContractId !== undefined) {
+    if (!persistVendor) {
+      return NextResponse.json({ error: schemaMismatchUserMessage() }, { status: 503 });
+    }
+    const vendorContractId = body.vendorContractId ? String(body.vendorContractId).trim() : null;
+    const existingVendorId = (existing as { vendor_contract_id?: string | null }).vendor_contract_id ?? null;
+    if (vendorContractId !== existingVendorId) {
+      if (!canAssignWorkOrders(user.role)) {
+        return NextResponse.json({ error: "Du saknar behörighet att tilldela arbetsordrar" }, { status: 403 });
+      }
+      if (vendorContractId) {
+        const vendor = await findAssignableVendorContract(db, {
+          companyId,
+          vendorContractId,
+          propertyId: existing.property_id,
+        });
+        if (!vendor) return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 400 });
+      }
+      data.vendor_contract_id = vendorContractId;
     }
   }
   if (body.scheduledStart !== undefined) {
@@ -329,7 +373,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
       const completedWorkOrder = await tx.workOrder.findFirst({
         where: { deleted_at: null, id: existing.id, company_id: companyId },
-        include,
+        include: workOrderDetailInclude(persistVendor),
       });
       if (!completedWorkOrder) throw new Error("WORK_ORDER_NOT_FOUND");
 
@@ -347,6 +391,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           status: completedWorkOrder.status,
           statusReason,
           assignedToId: completedWorkOrder.assigned_to_id,
+          vendorContractId: persistVendor ? (completedWorkOrder as { vendor_contract_id?: string | null }).vendor_contract_id ?? null : null,
           buildingId,
           technicalAssetId,
           estimatedCost: completedWorkOrder.estimated_cost?.toString() ?? null,
@@ -361,7 +406,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const updated = await tx.workOrder.findFirst({
       where: { deleted_at: null, id: existing.id, company_id: companyId },
-      include,
+      include: workOrderDetailInclude(persistVendor),
     });
     if (!updated) throw new Error("WORK_ORDER_NOT_FOUND");
 
@@ -436,6 +481,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         status: updated.status,
         statusReason,
         assignedToId: updated.assigned_to_id,
+        vendorContractId: persistVendor ? (updated as { vendor_contract_id?: string | null }).vendor_contract_id ?? null : null,
         buildingId,
         technicalAssetId,
         estimatedCost: updated.estimated_cost?.toString() ?? null,

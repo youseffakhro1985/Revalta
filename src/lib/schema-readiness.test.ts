@@ -11,6 +11,9 @@ import {
   canRenderHomeDashboard,
   ticketAiSourceSelect,
   ticketAiSourceWrite,
+  workOrderVendorIdSelect,
+  workOrderVendorRelationSelect,
+  workOrderVendorWrite,
 } from "@/lib/schema-readiness";
 
 describe("schema-readiness", () => {
@@ -115,5 +118,17 @@ describe("schema-readiness", () => {
     expect(ticketAiSourceWrite(true, "provider")).toEqual({ ai_source: "provider" });
     expect(ticketAiSourceSelect(false)).toEqual({});
     expect(ticketAiSourceSelect(true)).toEqual({ ai_source: true });
+  });
+
+  it("omits WorkOrder.vendor_contract_id writes and relations until Database Release", () => {
+    expect(workOrderVendorWrite(false, "vendor-1")).toEqual({});
+    expect(workOrderVendorWrite(true, "vendor-1")).toEqual({ vendor_contract_id: "vendor-1" });
+    expect(workOrderVendorWrite(true, null)).toEqual({ vendor_contract_id: null });
+    expect(workOrderVendorIdSelect(false)).toEqual({});
+    expect(workOrderVendorIdSelect(true)).toEqual({ vendor_contract_id: true });
+    expect(workOrderVendorRelationSelect(false)).toEqual({});
+    expect(workOrderVendorRelationSelect(true)).toEqual({
+      vendor_contract: { select: { id: true, name: true, category: true, status: true } },
+    });
   });
 });

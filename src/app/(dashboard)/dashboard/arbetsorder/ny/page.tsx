@@ -25,18 +25,27 @@ type PropertyOption = {
 };
 
 type UserOption = { id: string; name: string | null; email: string; role: string };
+type VendorOption = { id: string; name: string; category: string; property_id: string | null; status: string };
 
 type OptionsResponse = {
   properties?: PropertyOption[];
   users?: UserOption[];
+  vendors?: VendorOption[];
+  permissions?: { canAssign?: boolean; vendorAssignmentAvailable?: boolean };
   error?: string;
 };
+
+function vendorsForProperty(vendors: VendorOption[], propertyId: string | null) {
+  if (!propertyId) return vendors.filter((vendor) => !vendor.property_id);
+  return vendors.filter((vendor) => !vendor.property_id || vendor.property_id === propertyId);
+}
 
 const initialForm = {
   propertyId: "",
   buildingId: "",
   unitId: "",
   assignedToId: "",
+  vendorContractId: "",
   title: "",
   description: "",
   status: "planned",
@@ -52,6 +61,8 @@ export default function NewWorkOrderPage() {
   const router = useRouter();
   const [properties, setProperties] = useState<PropertyOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [vendorAssignmentAvailable, setVendorAssignmentAvailable] = useState(true);
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,6 +82,8 @@ export default function NewWorkOrderPage() {
         if (!mounted) return;
         setProperties(data.properties || []);
         setUsers(data.users || []);
+        setVendors(data.vendors || []);
+        setVendorAssignmentAvailable(data.permissions?.vendorAssignmentAvailable !== false);
       } catch (cause) {
         if (mounted) setError(cause instanceof Error ? cause.message : "Kunde inte hämta val för arbetsordern");
       } finally {
@@ -86,6 +99,11 @@ export default function NewWorkOrderPage() {
   const selectedProperty = useMemo(
     () => properties.find((property) => property.id === form.propertyId) || null,
     [form.propertyId, properties],
+  );
+
+  const propertyVendors = useMemo(
+    () => vendorsForProperty(vendors, form.propertyId || null),
+    [form.propertyId, vendors],
   );
 
   const units = useMemo(() => {
@@ -112,6 +130,7 @@ export default function NewWorkOrderPage() {
           buildingId: form.buildingId || null,
           unitId: form.unitId || null,
           assignedToId: form.assignedToId || null,
+          vendorContractId: form.vendorContractId || null,
           scheduledStart: form.scheduledStart || null,
           scheduledEnd: form.scheduledEnd || null,
           estimatedCost: form.estimatedCost || null,
@@ -155,7 +174,17 @@ export default function NewWorkOrderPage() {
                 disabled={loading}
                 required
                 onChange={(event) => {
-                  setForm((current) => ({ ...current, propertyId: event.target.value, buildingId: "", unitId: "" }));
+                  setForm((current) => {
+                    const nextVendors = vendorsForProperty(vendors, event.target.value || null);
+                    const vendorStillValid = nextVendors.some((vendor) => vendor.id === current.vendorContractId);
+                    return {
+                      ...current,
+                      propertyId: event.target.value,
+                      buildingId: "",
+                      unitId: "",
+                      vendorContractId: vendorStillValid ? current.vendorContractId : "",
+                    };
+                  });
                 }}
               >
                 <option value="">Välj fastighet</option>
@@ -177,6 +206,30 @@ export default function NewWorkOrderPage() {
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="space-y-2 text-sm font-medium text-ink-700">
+              Leverantör
+              <select
+                className={premiumFieldClass}
+                value={form.vendorContractId}
+                disabled={loading || !vendorAssignmentAvailable}
+                onChange={(event) => updateField("vendorContractId", event.target.value)}
+              >
+                <option value="">Ingen leverantör</option>
+                {propertyVendors.map((vendor) => (
+                  <option key={vendor.id} value={vendor.id}>
+                    {vendor.name}{vendor.category ? ` · ${vendor.category}` : ""}
+                  </option>
+                ))}
+              </select>
+              {!vendorAssignmentAvailable ? (
+                <span className="block text-xs text-ink-500">Leverantörskoppling väntar på Database Release.</span>
+              ) : propertyVendors.length === 0 ? (
+                <span className="block text-xs text-ink-500">Inga aktiva leverantörer i registret för vald fastighet. Lägg till under Leverantörer.</span>
+              ) : (
+                <span className="block text-xs text-ink-500">Valfritt. Intern tekniker och extern leverantör kan anges samtidigt.</span>
+              )}
             </label>
 
             <label className="space-y-2 text-sm font-medium text-ink-700">

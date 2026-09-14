@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Banknote, Building2, CalendarClock, CheckCircle2, Clock3, FolderKanban, History, LockKeyhole, MapPin, PauseCircle, RefreshCw, ShieldAlert, UserRound, Wrench } from "lucide-react";
+import { ArrowLeft, Banknote, BriefcaseBusiness, Building2, CalendarClock, CheckCircle2, Clock3, FolderKanban, History, LockKeyhole, MapPin, PauseCircle, RefreshCw, ShieldAlert, UserRound, Wrench } from "lucide-react";
 import { InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 import { WORK_ORDER_STATUS_LABELS } from "@/lib/domain-labels";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
@@ -26,17 +26,20 @@ type EnterpriseState = {
 type StatusEvent = { id: string; from_status: string | null; to_status: string; reason: string | null; created_at: string; actor_name: string | null; actor_email: string };
 type WorkOrder = {
   id: string; title: string; description: string; status: string; priority: string; assigned_to_id: string | null; updated_at: string;
+  vendor_contract_id?: string | null;
   scheduled_start: string | null; scheduled_end: string | null;
   estimated_cost: string | number | null; actual_cost: string | number | null;
   property: { id: string; name: string; address: string; city: string };
   unit: { id: string; designation: string; unit_type: string } | null;
   ticket: { id: string; public_reference: string | null; title: string } | null;
   assigned_to: { id: string; name: string | null; email: string } | null;
+  vendor_contract?: { id: string; name: string; category: string | null; status: string } | null;
   created_by: { id: string; name: string | null; email: string };
   projects: { id: string; name: string; status: string }[];
   enterprise: EnterpriseState; statusEvents: StatusEvent[];
 };
 type Person = { id: string; name: string | null; email: string; role: string };
+type VendorOption = { id: string; name: string; category: string; property_id: string | null; status: string };
 type TransitionData = {
   currentStatus: string;
   allowedStatuses: string[];
@@ -80,6 +83,9 @@ export default function WorkOrderDetailPage() {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [statusReason, setStatusReason] = useState("");
   const [assignedToId, setAssignedToId] = useState("");
+  const [vendorContractId, setVendorContractId] = useState("");
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [vendorAssignmentAvailable, setVendorAssignmentAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -114,6 +120,9 @@ export default function WorkOrderDetailPage() {
       setTechnicalAssetId(workOrderData.workOrder.enterprise?.technical_asset_id || "");
       setSelectedStatus(transitionData.currentStatus);
       setAssignedToId(transitionData.assignedToId || "");
+      setVendorContractId(workOrderData.workOrder.vendor_contract?.id || workOrderData.workOrder.vendor_contract_id || "");
+      setVendors(workOrderData.vendors || []);
+      setVendorAssignmentAvailable(workOrderData.vendorAssignmentAvailable !== false);
       setStatusReason("");
     } catch (err) { setError(err instanceof Error ? err.message : "Kunde inte hämta arbetsordern"); }
     finally { setLoading(false); }
@@ -133,6 +142,7 @@ export default function WorkOrderDetailPage() {
         status: selectedStatus,
         statusReason,
         assignedToId,
+        vendorContractId,
         buildingId,
         technicalAssetId,
         editToken: editLock.state.token,
@@ -221,6 +231,7 @@ export default function WorkOrderDetailPage() {
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={MapPin} label="Fastighet" value={workOrder.property.name} hint={`${workOrder.property.address}, ${workOrder.property.city}`} />
       <MetricCard icon={UserRound} label="Ansvarig" value={workOrder.assigned_to?.name || workOrder.assigned_to?.email || "Ej tilldelad"} />
+      <MetricCard icon={BriefcaseBusiness} label="Leverantör" value={workOrder.vendor_contract?.name || "Ingen leverantör"} hint={workOrder.vendor_contract?.category || undefined} />
       <MetricCard icon={CalendarClock} label="Planerat slut" value={workOrder.scheduled_end ? date.format(new Date(workOrder.scheduled_end)) : "Ej satt"} />
       {capabilities.canViewFinance ? <MetricCard icon={Banknote} label="Kostnadsutfall" value={actual === null ? "Ej satt" : money.format(actual)} hint={estimated === null ? "Beräknat ej satt" : `Beräknat ${money.format(estimated)}`} /> : null}
     </section>
@@ -257,6 +268,7 @@ export default function WorkOrderDetailPage() {
           <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select disabled={!editable} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!["blocked", "cancelled"].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass}>{transitions.allowedStatuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
           <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={!editable} defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={!editable || !transitions.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{transitions.users.map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select>{!transitions.canAssign ? <span className="block text-xs text-ink-500">Endast förvaltare och administratörer kan tilldela ansvarig.</span> : null}</label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Leverantör</span><select disabled={!editable || !transitions.canAssign || !vendorAssignmentAvailable} value={vendorContractId} onChange={(event) => setVendorContractId(event.target.value)} className={premiumFieldClass}><option value="">Ingen leverantör</option>{vendors.filter((vendor) => !vendor.property_id || vendor.property_id === workOrder.property.id).map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}{vendor.category ? ` · ${vendor.category}` : ""}</option>)}</select>{!vendorAssignmentAvailable ? <span className="block text-xs text-ink-500">Leverantörskoppling väntar på Database Release.</span> : !transitions.canAssign ? <span className="block text-xs text-ink-500">Endast förvaltare och administratörer kan koppla leverantör.</span> : <span className="block text-xs text-ink-500">Valfritt. Intern tekniker och extern leverantör kan anges samtidigt.</span>}</label>
           <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={!editable} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
           <input name="scheduledStart" type="date" disabled={!editable} defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat startdatum" />
           <input name="scheduledEnd" type="date" disabled={!editable} defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat slutdatum" />

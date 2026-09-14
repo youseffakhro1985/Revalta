@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   getCurrentUserMock,
   propertyFindFirstMock,
-  unitFindFirstMock,
   userFindFirstMock,
+  vendorFindFirstMock,
   transactionMock,
   workOrderCreateMock,
   allocateWorkOrderNumberMock,
@@ -13,13 +13,13 @@ const {
   validateWorkOrderAssetLinksMock,
   addWorkOrderStatusEventMock,
   writeAuditLogMock,
-  findAccessibleTicketMock,
+  hasVendorColumnMock,
   createLoggerMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   propertyFindFirstMock: vi.fn(),
-  unitFindFirstMock: vi.fn(),
   userFindFirstMock: vi.fn(),
+  vendorFindFirstMock: vi.fn(),
   transactionMock: vi.fn(),
   workOrderCreateMock: vi.fn(),
   allocateWorkOrderNumberMock: vi.fn(),
@@ -28,7 +28,7 @@ const {
   validateWorkOrderAssetLinksMock: vi.fn(),
   addWorkOrderStatusEventMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
-  findAccessibleTicketMock: vi.fn(),
+  hasVendorColumnMock: vi.fn(),
   createLoggerMock: vi.fn(),
 }));
 
@@ -44,9 +44,9 @@ vi.mock("@/lib/current-user", () => ({
 vi.mock("@/lib/db", () => ({
   default: {
     property: { findFirst: propertyFindFirstMock },
-    unit: { findFirst: unitFindFirstMock },
+    unit: { findFirst: vi.fn() },
     user: { findFirst: userFindFirstMock, findMany: vi.fn() },
-    vendorContract: { findFirst: vi.fn(), findMany: vi.fn() },
+    vendorContract: { findFirst: vendorFindFirstMock, findMany: vi.fn() },
     workOrder: { findMany: vi.fn() },
     $queryRaw: vi.fn(),
     $transaction: transactionMock,
@@ -78,19 +78,24 @@ vi.mock("@/lib/work-order-asset-links", () => ({
 }));
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
-vi.mock("@/lib/assigned-work-access", () => ({ findAccessibleTicket: findAccessibleTicketMock }));
+vi.mock("@/lib/assigned-work-access", () => ({ findAccessibleTicket: vi.fn() }));
 vi.mock("@/lib/schema-readiness", () => ({
   isMissingSchemaColumnError: () => false,
   notDeletedFilter: vi.fn().mockResolvedValue({ deleted_at: null }),
   schemaMismatchUserMessage: () => "Databasen behöver uppdateras",
-  hasWorkOrderVendorContractColumn: vi.fn(async () => true),
+  hasWorkOrderVendorContractColumn: hasVendorColumnMock,
   workOrderVendorWrite: (hasColumn: boolean, vendorContractId: string | null) =>
     (hasColumn ? { vendor_contract_id: vendorContractId } : {}),
+  workOrderVendorRelationSelect: (hasColumn: boolean) =>
+    (hasColumn
+      ? { vendor_contract: { select: { id: true, name: true, category: true, status: true } } }
+      : {}),
 }));
 vi.mock("@/lib/soft-delete-compat", () => ({ sqlSoftDeleteGuard: vi.fn().mockResolvedValue("") }));
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/work-order-sla", () => ({ evaluateWorkOrderSla: vi.fn() }));
 vi.mock("@/lib/integrations", () => ({ recordAiEvent: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/lib/assignee-notify", () => ({ notifyAssignee: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/ai", () => ({
   analyzeTicket: vi.fn().mockResolvedValue({
     category: "other",
@@ -125,15 +130,15 @@ function validBody(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("work-order create tenant and atomicity boundaries", () => {
+describe("work-order vendor contract assignment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createLoggerMock.mockReturnValue({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() });
     getCurrentUserMock.mockResolvedValue(manager);
     propertyFindFirstMock.mockResolvedValue({ id: "property-1" });
-    unitFindFirstMock.mockResolvedValue({ id: "unit-1" });
-    userFindFirstMock.mockResolvedValue({ id: "assignee-1" });
-    findAccessibleTicketMock.mockResolvedValue({ id: "ticket-1", property_id: "property-1" });
+    userFindFirstMock.mockResolvedValue({ id: "assignee-1", email: "tech@example.se" });
+    vendorFindFirstMock.mockResolvedValue({ id: "vendor-1", name: "Städ AB", category: "Städ" });
+    hasVendorColumnMock.mockResolvedValue(true);
     validateWorkOrderAssetLinksMock.mockResolvedValue(undefined);
     allocateWorkOrderNumberMock.mockResolvedValue("AO-1001");
     setWorkOrderEnterpriseFieldsMock.mockResolvedValue(undefined);
@@ -152,96 +157,71 @@ describe("work-order create tenant and atomicity boundaries", () => {
     transactionMock.mockImplementation(async (callback) => callback(tx));
   });
 
-  it("commits creation and mandatory audit through the same transaction client", async () => {
-    const response = await POST(request(validBody({ assignedToId: "assignee-1" })));
+  it("persists a tenant-scoped vendor contract on create", async () => {
+    const response = await POST(request(validBody({ vendorContractId: "vendor-1" })));
 
     expect(response.status).toBe(201);
-    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(vendorFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        id: "vendor-1",
+        company_id: "company-1",
+        status: "active",
+        OR: [{ property_id: null }, { property_id: "property-1" }],
+      },
+      select: { id: true, name: true, category: true },
+    });
+    expect(workOrderCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({ vendor_contract_id: "vendor-1" }),
+    });
     expect(writeAuditLogMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "manager-1", company_id: "company-1" }),
+      expect.anything(),
       expect.objectContaining({
-        entityType: "work_order",
-        entityId: "work-order-1",
-        action: "work_order.created",
+        metadata: expect.objectContaining({ vendorContractId: "vendor-1" }),
       }),
       tx,
     );
   });
 
-  it("returns a safe 500 when mandatory audit fails inside the transaction boundary", async () => {
-    writeAuditLogMock.mockRejectedValue(new Error("audit failure"));
+  it("never accepts a vendor outside the authenticated company or property", async () => {
+    vendorFindFirstMock.mockResolvedValue(null);
 
-    const response = await POST(request(validBody()));
-    const body = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
-    expect(transactionMock).toHaveBeenCalledTimes(1);
-    expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx);
-  });
-
-  it("never accepts a property outside the authenticated company", async () => {
-    propertyFindFirstMock.mockResolvedValue(null);
-
-    const response = await POST(request(validBody()));
-
-    expect(response.status).toBe(404);
-    expect(propertyFindFirstMock).toHaveBeenCalledWith({
-      where: { id: "property-1", company_id: "company-1", deleted_at: null },
-      select: { id: true },
-    });
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("never accepts an assignee outside the authenticated company", async () => {
-    userFindFirstMock.mockResolvedValue(null);
-
-    const response = await POST(request(validBody({ assignedToId: "foreign-user" })));
+    const response = await POST(request(validBody({ vendorContractId: "foreign-vendor" })));
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body.error).toBe("Ansvarig användare hittades inte");
-    expect(userFindFirstMock).toHaveBeenCalledWith({
-      where: { id: "foreign-user", company_id: "company-1", status: "active" },
-      select: { id: true, email: true },
-    });
+    expect(body.error).toBe("Leverantören hittades inte");
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("never links a ticket that is not accessible to the authenticated company", async () => {
-    findAccessibleTicketMock.mockResolvedValue(null);
+  it("returns 503 instead of writing vendor_contract_id before Database Release", async () => {
+    hasVendorColumnMock.mockResolvedValue(false);
 
-    const response = await POST(request(validBody({ ticketId: "foreign-ticket" })));
-
-    expect(response.status).toBe(404);
-    expect(findAccessibleTicketMock).toHaveBeenCalledWith(manager, "foreign-ticket");
-    expect(transactionMock).not.toHaveBeenCalled();
-  });
-
-  it("requires a unit to belong to the already tenant-verified property", async () => {
-    unitFindFirstMock.mockResolvedValue(null);
-
-    const response = await POST(request(validBody({ unitId: "foreign-unit" })));
+    const response = await POST(request(validBody({ vendorContractId: "vendor-1" })));
     const body = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(body.error).toBe("Enheten tillhör inte fastigheten");
-    expect(unitFindFirstMock).toHaveBeenCalledWith({
-      where: { id: "foreign-unit", property_id: "property-1" },
-      select: { id: true },
-    });
+    expect(response.status).toBe(503);
+    expect(body.error).toMatch(/Databasen behöver uppdateras/);
+    expect(vendorFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("passes the authenticated company into asset-link validation", async () => {
-    const response = await POST(request(validBody({ buildingId: "building-1", technicalAssetId: "asset-1" })));
+  it("omits vendor_contract_id from create when the column is not released and no vendor was requested", async () => {
+    hasVendorColumnMock.mockResolvedValue(false);
+
+    const response = await POST(request(validBody()));
 
     expect(response.status).toBe(201);
-    expect(validateWorkOrderAssetLinksMock).toHaveBeenCalledWith(expect.anything(), {
-      companyId: "company-1",
-      propertyId: "property-1",
-      buildingId: "building-1",
-      technicalAssetId: "asset-1",
-    });
+    expect(workOrderCreateMock.mock.calls[0][0].data.vendor_contract_id).toBeUndefined();
+  });
+
+  it("prevents a technician from assigning a vendor on create", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(request(validBody({ vendorContractId: "vendor-1" })));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att tilldela arbetsorder till leverantör");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

@@ -25,9 +25,12 @@ import { setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { WORK_ORDER_PRIORITIES, WORK_ORDER_STATUSES, normalizeWorkOrderPriority, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import {
+  hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   notDeletedFilter,
   schemaMismatchUserMessage,
+  workOrderVendorRelationSelect,
+  workOrderVendorWrite,
 } from "@/lib/schema-readiness";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { findAccessibleTicket } from "@/lib/assigned-work-access";
@@ -35,6 +38,7 @@ import { createRouteObservability } from "@/lib/route-observability";
 import { analyzeTicket } from "@/lib/ai";
 import { recordAiEvent } from "@/lib/integrations";
 import { notifyAssignee } from "@/lib/assignee-notify";
+import { findAssignableVendorContract } from "@/lib/work-order-vendor";
 
 const ROUTE = "/api/work-orders";
 const ACTIVE_WORK_ORDER_STATUSES = ["completed", "invoiced", "cancelled"] as const;
@@ -145,11 +149,12 @@ export async function GET(request: Request) {
       });
     }
 
-    const [workOrderActive, projectActive, workOrderGuard, propertyGuard] = await Promise.all([
+    const [workOrderActive, projectActive, workOrderGuard, propertyGuard, persistVendor] = await Promise.all([
       notDeletedFilter("WorkOrder"),
       notDeletedFilter("Project"),
       sqlSoftDeleteGuard(db, "WorkOrder", "w"),
       sqlSoftDeleteGuard(db, "Property", "p"),
+      hasWorkOrderVendorContractColumn(),
     ]);
 
     const scopedToAssigned = shouldScopeToAssignedWork(user.role);
@@ -185,6 +190,7 @@ export async function GET(request: Request) {
         unit: { select: { id: true, designation: true, unit_type: true } },
         ticket: { select: { id: true, public_reference: true, title: true } },
         assigned_to: { select: { id: true, name: true, email: true } },
+        ...workOrderVendorRelationSelect(persistVendor),
         projects: {
           ...(Object.keys(projectActive).length > 0 ? { where: projectActive } : {}),
           select: { id: true, name: true, status: true },
@@ -364,6 +370,7 @@ export async function POST(request: Request) {
     const technicalAssetId = body.technicalAssetId ? String(body.technicalAssetId).trim() : null;
     const unitId = body.unitId ? String(body.unitId).trim() : null;
     const requestedAssigneeId = body.assignedToId ? String(body.assignedToId).trim() : null;
+    const requestedVendorContractId = body.vendorContractId ? String(body.vendorContractId).trim() : null;
     const ticketId = body.ticketId ? String(body.ticketId).trim() : null;
     const title = String(body.title || "").trim();
     const description = String(body.description || "").trim();
@@ -389,7 +396,17 @@ export async function POST(request: Request) {
         context: { userId: user.id, companyId: user.company_id },
       });
     }
+    if (!canAssign && requestedVendorContractId) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet att tilldela arbetsorder till leverantör",
+        event: "work_orders.create.vendor_assignment_forbidden",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
     const assignedToId = canAssign ? requestedAssigneeId : user.id;
+    const vendorContractId = canAssign ? requestedVendorContractId : null;
 
     const validationFailure = (message: string, reason: string) => reject(observability, {
       status: 400,
@@ -444,6 +461,24 @@ export async function POST(request: Request) {
       if (!assignee) return validationFailure("Ansvarig användare hittades inte", "assignee_not_found");
       assigneeEmail = assignee.email;
     }
+    const persistVendor = await hasWorkOrderVendorContractColumn();
+    if (vendorContractId && !persistVendor) {
+      return reject(observability, {
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        event: "work_orders.create.vendor_schema_unavailable",
+        context: { userId: user.id, companyId: user.company_id },
+      });
+    }
+    if (vendorContractId) {
+      const vendor = await findAssignableVendorContract(db, {
+        companyId: user.company_id,
+        vendorContractId,
+        propertyId,
+      });
+      if (!vendor) return validationFailure("Leverantören hittades inte", "vendor_not_found");
+    }
     if (ticketId) {
       const ticket = await findAccessibleTicket(user, ticketId);
       if (!ticket) {
@@ -484,13 +519,30 @@ export async function POST(request: Request) {
     const workOrder = await db.$transaction(async (tx) => {
       const workOrderNumber = await allocateWorkOrderNumber(tx, user.company_id!, createdAt);
       const created = await tx.workOrder.create({
-        data: { company_id: user.company_id!, property_id: propertyId, unit_id: unitId, assigned_to_id: assignedToId, ticket_id: ticketId, created_by_id: user.id, title, description, notes, status, priority, scheduled_start: scheduledStart, scheduled_end: scheduledEnd, estimated_cost: estimatedCost, created_at: createdAt },
+        data: {
+          company_id: user.company_id!,
+          property_id: propertyId,
+          unit_id: unitId,
+          assigned_to_id: assignedToId,
+          ticket_id: ticketId,
+          created_by_id: user.id,
+          title,
+          description,
+          notes,
+          status,
+          priority,
+          scheduled_start: scheduledStart,
+          scheduled_end: scheduledEnd,
+          estimated_cost: estimatedCost,
+          created_at: createdAt,
+          ...workOrderVendorWrite(persistVendor, vendorContractId),
+        },
       });
       await setWorkOrderEnterpriseFields(tx, { workOrderId: created.id, companyId: user.company_id!, workOrderNumber, workType, source, responseDueAt: sla.responseDueAt, resolutionDueAt: sla.resolutionDueAt });
       await setWorkOrderAssetLinks(tx, { workOrderId: created.id, companyId: user.company_id!, buildingId, technicalAssetId });
       await addWorkOrderStatusEvent(tx, { companyId: user.company_id!, workOrderId: created.id, actorUserId: user.id, fromStatus: null, toStatus: status, reason: "Arbetsorder skapad", metadata: { workOrderNumber, priority, workType, source, buildingId, technicalAssetId } });
       const enterprise = { work_order_number: workOrderNumber, work_type: workType, source, sla_response_due_at: sla.responseDueAt, sla_resolution_due_at: sla.resolutionDueAt, responded_at: null, paused_at: null, pause_reason: null, closed_at: null, building_id: buildingId, technical_asset_id: technicalAssetId };
-      await writeAuditLog(user, { entityType: "work_order", entityId: created.id, action: "work_order.created", metadata: { workOrderNumber, propertyId, buildingId, technicalAssetId, unitId, assignedToId, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } }, tx);
+      await writeAuditLog(user, { entityType: "work_order", entityId: created.id, action: "work_order.created", metadata: { workOrderNumber, propertyId, buildingId, technicalAssetId, unitId, assignedToId, vendorContractId: persistVendor ? vendorContractId : null, ticketId, status, priority, workType, source, estimatedCost, scheduledStart, scheduledEnd, sla } }, tx);
       return { ...created, enterprise };
     });
 
