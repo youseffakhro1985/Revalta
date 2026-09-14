@@ -299,6 +299,34 @@ describe("POST /api/auth/password-reset/confirm", () => {
     });
   });
 
+  it("accepts a native form post and redirects to login without putting the password in the URL", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `token=${RAW_TOKEN}&password=${encodeURIComponent(STRONG_PASSWORD)}&confirmPassword=${encodeURIComponent(STRONG_PASSWORD)}`,
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/login?reset=1");
+    expect(response.headers.get("location")).not.toContain("NewPass");
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: VALID_RESET.user_id },
+      data: { password: "new-hash" },
+    });
+  });
+
+  it("returns the native form to reset-password with mismatch reason and keeps the token", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/auth/password-reset/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `token=${RAW_TOKEN}&password=${encodeURIComponent(STRONG_PASSWORD)}&confirmPassword=SomethingElse123`,
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`https://www.revalta.se/reset-password?reason=mismatch&token=${RAW_TOKEN}`);
+    expect(userUpdateMock).not.toHaveBeenCalled();
+  });
+
   it("returns 500 and does not leak internal details when the database throws", async () => {
     passwordResetTokenFindUniqueMock.mockRejectedValue(new Error("connection string leaked-secret"));
 

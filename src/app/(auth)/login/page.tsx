@@ -30,6 +30,9 @@ export default function LoginPage() {
     if (params.get("registered") === "1") {
       setNotice("Kontot är skapat. Kontrollera din e-post och verifiera adressen innan du loggar in.");
     }
+    if (params.get("reset") === "1") {
+      setNotice("Lösenordet är återställt. Logga in med det nya lösenordet.");
+    }
     const reason = params.get("reason");
     if (reason === "invalid") setError("Ogiltiga uppgifter");
     if (reason === "verify") {
