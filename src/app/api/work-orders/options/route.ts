@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canAssignWorkOrders, canManageTickets, getCurrentUser } from "@/lib/current-user";
 import {
+  hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   notDeletedFilter,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
 import { createLogger } from "@/lib/structured-logger";
+import { listAssignableVendorContracts } from "@/lib/work-order-vendor";
 
 const logger = createLogger({ route: "/api/work-orders/options" });
 
@@ -23,7 +25,8 @@ export async function GET() {
 
     const propertyActive = await notDeletedFilter("Property");
     const canAssign = canAssignWorkOrders(user.role);
-    const [properties, users] = await Promise.all([
+    const persistVendor = await hasWorkOrderVendorContractColumn();
+    const [properties, users, vendors] = await Promise.all([
       db.property.findMany({
         where: { company_id: user.company_id, status: "active", ...propertyActive },
         orderBy: [{ name: "asc" }, { address: "asc" }],
@@ -50,10 +53,16 @@ export async function GET() {
             select: { id: true, name: true, email: true, role: true },
           })
         : Promise.resolve([]),
+      canAssign ? listAssignableVendorContracts(db, user.company_id) : Promise.resolve([]),
     ]);
 
     return NextResponse.json(
-      { properties, users, permissions: { canAssign } },
+      {
+        properties,
+        users,
+        vendors,
+        permissions: { canAssign, vendorAssignmentAvailable: persistVendor },
+      },
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {

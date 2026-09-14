@@ -118,6 +118,7 @@ export async function getSchemaReadiness(): Promise<SchemaReadiness> {
 
 const FEATURE_COLUMN_TTL_MS = 15_000;
 let featureColumnCache: { aiSource: boolean; expiresAt: number } | null = null;
+let workOrderVendorColumnCache: { value: boolean; expiresAt: number } | null = null;
 
 export function ticketAiSourceWrite(hasColumn: boolean, source: string) {
   return hasColumn ? { ai_source: source } : {};
@@ -125,6 +126,24 @@ export function ticketAiSourceWrite(hasColumn: boolean, source: string) {
 
 export function ticketAiSourceSelect(hasColumn: boolean) {
   return hasColumn ? { ai_source: true as const } : {};
+}
+
+export function workOrderVendorWrite(hasColumn: boolean, vendorContractId: string | null) {
+  return hasColumn ? { vendor_contract_id: vendorContractId } : {};
+}
+
+export function workOrderVendorIdSelect(hasColumn: boolean) {
+  return hasColumn ? { vendor_contract_id: true as const } : {};
+}
+
+export function workOrderVendorRelationSelect(hasColumn: boolean) {
+  return hasColumn
+    ? {
+        vendor_contract: {
+          select: { id: true, name: true, category: true, status: true },
+        },
+      }
+    : {};
 }
 
 export async function hasTicketAiSourceColumn(): Promise<boolean> {
@@ -144,9 +163,27 @@ export async function hasTicketAiSourceColumn(): Promise<boolean> {
   return aiSource;
 }
 
+export async function hasWorkOrderVendorContractColumn(): Promise<boolean> {
+  if (workOrderVendorColumnCache && workOrderVendorColumnCache.expiresAt > Date.now()) {
+    return workOrderVendorColumnCache.value;
+  }
+  const rows = await getPrismaBaseClient().$queryRaw<Array<{ column_name: string }>>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'WorkOrder'
+      AND column_name = 'vendor_contract_id'
+    LIMIT 1
+  `;
+  const value = rows.length > 0;
+  workOrderVendorColumnCache = { value, expiresAt: Date.now() + FEATURE_COLUMN_TTL_MS };
+  return value;
+}
+
 export function resetSchemaReadinessCache() {
   resetSoftDeleteCompatCache();
   featureColumnCache = null;
+  workOrderVendorColumnCache = null;
 }
 
 export async function getCachedSchemaReadiness(): Promise<SchemaReadiness> {

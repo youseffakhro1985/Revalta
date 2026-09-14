@@ -14,6 +14,8 @@ const {
   writeAuditLogMock,
   ticketFindFirstMock,
   notifyTicketReporterMock,
+  hasVendorColumnMock,
+  vendorFindFirstMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   workOrderFindFirstMock: vi.fn(),
@@ -28,6 +30,8 @@ const {
   writeAuditLogMock: vi.fn(),
   ticketFindFirstMock: vi.fn(),
   notifyTicketReporterMock: vi.fn(),
+  hasVendorColumnMock: vi.fn(),
+  vendorFindFirstMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -51,11 +55,17 @@ vi.mock("@/lib/component-work-order-sync", () => ({ syncCompletedWorkOrderToComp
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/ticket-reporter-notify", () => ({ notifyTicketReporter: notifyTicketReporterMock }));
 
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasWorkOrderVendorContractColumn: hasVendorColumnMock,
+}));
+
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock },
     ticket: { findFirst: ticketFindFirstMock },
     user: { findFirst: vi.fn(), findMany: vi.fn() },
+    vendorContract: { findFirst: vendorFindFirstMock, findMany: vi.fn().mockResolvedValue([]) },
     $transaction: transactionMock,
   },
 }));
@@ -141,6 +151,8 @@ describe("core work-order mutation atomicity", () => {
     writeAuditLogMock.mockResolvedValue(undefined);
     notifyTicketReporterMock.mockResolvedValue({ emailed: true, sms: true });
     ticketFindFirstMock.mockResolvedValue(null);
+    hasVendorColumnMock.mockResolvedValue(false);
+    vendorFindFirstMock.mockResolvedValue({ id: "vendor-1", name: "Städ AB", category: "Städ" });
     transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
     (tx.$queryRaw as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce([{ updated_at: existing.updated_at }])
@@ -236,6 +248,47 @@ describe("core work-order mutation atomicity", () => {
       expect.objectContaining({ action: "work_order.updated" }),
       tx,
     );
+  });
+
+  it("persists a tenant-scoped vendor on PATCH when the column is released", async () => {
+    hasVendorColumnMock.mockResolvedValue(true);
+
+    const response = await PATCH(patchRequest({ vendorContractId: "vendor-1" }), params);
+
+    expect(response.status).toBe(200);
+    expect(vendorFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        id: "vendor-1",
+        company_id: "company-1",
+        status: "active",
+        OR: [{ property_id: null }, { property_id: "property-1" }],
+      },
+      select: { id: true, name: true, category: true },
+    });
+    expect(workOrderUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ vendor_contract_id: "vendor-1" }),
+    }));
+  });
+
+  it("rejects a vendor outside the work order property on PATCH", async () => {
+    hasVendorColumnMock.mockResolvedValue(true);
+    vendorFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(patchRequest({ vendorContractId: "foreign-vendor" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Leverantören hittades inte");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 when PATCH tries to set a vendor before Database Release", async () => {
+    const response = await PATCH(patchRequest({ vendorContractId: "vendor-1" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toMatch(/Database Release/);
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("soft-deletes a work order and writes its audit record through one transaction", async () => {

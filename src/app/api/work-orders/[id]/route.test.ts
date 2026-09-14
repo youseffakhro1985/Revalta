@@ -34,10 +34,16 @@ vi.mock("@/lib/work-order-asset-links", async (importOriginal) => ({
   getWorkOrderAssetLink: getWorkOrderAssetLinkMock,
 }));
 
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasWorkOrderVendorContractColumn: vi.fn(async () => false),
+}));
+
 vi.mock("@/lib/db", () => ({
   default: {
     workOrder: { findFirst: workOrderFindFirstMock, updateMany: vi.fn() },
     user: { findMany: userFindManyMock, findFirst: vi.fn() },
+    vendorContract: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     $transaction: transactionMock,
   },
 }));

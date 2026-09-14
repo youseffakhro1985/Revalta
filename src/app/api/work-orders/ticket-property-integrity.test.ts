@@ -24,6 +24,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 vi.mock("@/lib/db", () => ({
   default: {
     property: { findFirst: propertyFindFirstMock },
+    vendorContract: { findFirst: vi.fn() },
     $transaction: transactionMock,
   },
 }));
@@ -38,6 +39,13 @@ vi.mock("@/lib/work-order-asset-links", () => ({
 }));
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: vi.fn() }));
+
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  hasWorkOrderVendorContractColumn: vi.fn(async () => true),
+  workOrderVendorWrite: (hasColumn: boolean, vendorContractId: string | null) =>
+    (hasColumn ? { vendor_contract_id: vendorContractId } : {}),
+}));
 
 vi.mock("@/lib/route-observability", () => ({
   createRouteObservability: () => ({

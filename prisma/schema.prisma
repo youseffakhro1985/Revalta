@@ -337,6 +337,7 @@ model WorkOrder {
   unit_id                       String?
   technical_asset_id            String?
   assigned_to_id                String?
+  vendor_contract_id            String?
   created_by_id                 String
   title                         String
   description                   String
@@ -372,6 +373,7 @@ model WorkOrder {
   unit                          Unit?                     @relation(fields: [unit_id], references: [id], onDelete: SetNull)
   technical_asset               PropertyTechnicalAsset?   @relation(fields: [technical_asset_id], references: [id], onDelete: SetNull)
   assigned_to                   User?                     @relation("AssignedWorkOrders", fields: [assigned_to_id], references: [id], onDelete: SetNull)
+  vendor_contract               VendorContract?           @relation(fields: [vendor_contract_id], references: [id], onDelete: SetNull)
   created_by                    User                      @relation("CreatedWorkOrders", fields: [created_by_id], references: [id], onDelete: Restrict)
   projects                      Project[]
   comments                      WorkOrderComment[]
@@ -402,6 +404,8 @@ model WorkOrder {
   @@index([property_id])
   @@index([unit_id])
   @@index([assigned_to_id])
+  @@index([vendor_contract_id])
+  @@index([company_id, vendor_contract_id], map: "WorkOrder_company_vendor_idx")
   @@index([scheduled_start])
   @@index([building_id])
   @@index([technical_asset_id])
@@ -1442,6 +1446,7 @@ model VendorContract {
   company         Company   @relation(fields: [company_id], references: [id], onDelete: Cascade)
   property        Property? @relation(fields: [property_id], references: [id], onDelete: SetNull)
   created_by      User      @relation("VendorContractCreatedBy", fields: [created_by_id], references: [id], onDelete: Restrict)
+  work_orders     WorkOrder[]
 
   @@index([company_id, created_at])
   @@index([company_id, property_id])
