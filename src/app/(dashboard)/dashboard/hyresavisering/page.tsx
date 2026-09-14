@@ -162,10 +162,10 @@ export default function RentNoticesPage() {
   }
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Hyresadministration" title="Hyresavisering och index" description="Skapa hyresavier, hantera indexuppräkning och följ betalningsstatus per objekt och period." />
+    <PageHeader eyebrow="Hyresadministration" title="Hyresavisering och index" description="Skapa hyresavier, hantera indexuppräkning och sätt manuell aviestatus per objekt och period. Inbetalning mot bank eller autogiro sker utanför Revalta." />
     <section className="grid gap-4 md:grid-cols-3">
       <MetricCard icon={CircleDollarSign} label="Aviserat totalt" value={money.format(summary.total)} />
-      <MetricCard icon={BadgeCheck} label="Betalt" value={money.format(summary.paid)} />
+      <MetricCard icon={BadgeCheck} label="Markerade som betalda" value={money.format(summary.paid)} />
       <MetricCard icon={CalendarClock} label="Förfallna" value={String(summary.overdue)} />
     </section>
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
@@ -208,9 +208,9 @@ export default function RentNoticesPage() {
         </form>
       </Panel>
       ) : null}
-      <Panel title="Avier och betalningsläge" description="Samlad översikt över perioder, förfallodatum och betalningsstatus." bodyClassName="p-0">
+      <Panel title="Avier och manuell status" description="Status sätts manuellt i Revalta. Det finns ingen automatisk koppling till bankgiro eller inbetalningar." bodyClassName="p-0">
         {loading ? <p className="p-6 text-sm text-ink-500">Hämtar hyresavier…</p> : notices.length === 0 ? (
-          <EmptyState title="Inga hyresavier registrerade" description="Skapa den första hyresavin för att börja följa avisering och betalningsläge." />
+          <EmptyState title="Inga hyresavier registrerade" description="Skapa den första hyresavin för att börja följa avisering och manuell aviestatus." />
         ) : (
           <div className="divide-y divide-sand-100">
             {notices.map((notice) => (

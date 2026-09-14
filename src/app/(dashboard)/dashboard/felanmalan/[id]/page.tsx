@@ -15,6 +15,7 @@ import {
 } from "@/components/dashboard/premium-ui";
 import { OPERATIONS_STATUS_LABELS, PRIORITY_LABELS } from "@/lib/domain-labels";
 import { readResponseJson } from "@/lib/fetch-json";
+import { getSlaLabel } from "@/lib/sla";
 
 type TeamMember = { id: string; name: string | null; email: string };
 type WorkOrder = {
@@ -432,7 +433,7 @@ export default function TicketDetailPage() {
 
   return <div className="mx-auto max-w-7xl space-y-7">
     <Link href="/dashboard/felanmalan" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900"><ArrowLeft className="h-4 w-4" />Tillbaka till alla ärenden</Link>
-    <PageHeader eyebrow="Felanmälan och service" title={ticket.title} description={`Ärende #${ticket.id.slice(0, 8)} · Skapat ${dateFormatter.format(new Date(ticket.created_at))}`} />
+    <PageHeader eyebrow="Felanmälan och service" title={ticket.title} description={`Ärende #${ticket.id.slice(0, 8)} · Skapat ${dateFormatter.format(new Date(ticket.created_at))}${ticket.due_date ? ` · SLA ${getSlaLabel(ticket.priority)}, senast ${dateFormatter.format(new Date(ticket.due_date))}` : ""}`} />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
@@ -443,6 +444,7 @@ export default function TicketDetailPage() {
             <span className="rounded-full border border-petroleum-200 bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-700">{statusLabels[ticket.status] || ticket.status}</span>
             <span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{priorityLabels[ticket.priority] || ticket.priority}</span>
             <span className="rounded-full border border-sand-200 bg-white px-3 py-1 text-xs font-semibold text-ink-500">{ticket.assigned_to ? ticket.assigned_to.name || ticket.assigned_to.email : "Ej tilldelad"}</span>
+            {ticket.due_date ? <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${["closed", "completed"].includes(ticket.status) ? "border-sand-200 bg-sand-50 text-ink-600" : new Date(ticket.due_date).getTime() < Date.now() ? "border-danger-200 bg-danger-50 text-danger-700" : "border-petroleum-200 bg-petroleum-50 text-petroleum-700"}`}>SLA {dateFormatter.format(new Date(ticket.due_date))} · {getSlaLabel(ticket.priority)}</span> : null}
           </div>
           {ticket.property ? <div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-700">Fastighet</p><p className="mt-2 text-lg font-semibold text-ink-950">{ticket.property.name}</p><p className="mt-1 text-sm text-ink-600">{ticket.property.address}, {ticket.property.city}</p></div> : <InlineAlert>Ärendet saknar fastighetskoppling. Koppla en fastighet innan arbetsorder kan skapas.</InlineAlert>}
           <div><h2 className="text-lg font-semibold text-ink-950">Beskrivning</h2><p className="mt-3 whitespace-pre-wrap rounded-2xl bg-sand-50 p-5 text-sm leading-7 text-ink-700">{ticket.description}</p></div>
