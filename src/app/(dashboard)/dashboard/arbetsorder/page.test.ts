@@ -6,6 +6,6 @@ describe("arbetsorder vendor notify copy", () => {
     const createPage = readFileSync(new URL("./ny/page.tsx", import.meta.url), "utf8");
     const detailPage = readFileSync(new URL("./[id]/page.tsx", import.meta.url), "utf8");
     expect(createPage).toContain("mejlas leverantörens kontaktadress i registret");
-    expect(detailPage).toContain("mejlas leverantörens kontaktadress i registret");
+    expect(detailPage).toContain("Vid koppling, paus och avslut mejlas leverantörens kontaktadress i registret");
   });
 });

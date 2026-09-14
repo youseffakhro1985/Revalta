@@ -8,7 +8,7 @@ vi.mock("@/lib/integrations", () => ({
   queueTicketNotification: queueTicketNotificationMock,
 }));
 
-import { notifyVendor, vendorAssignedEmailCopy, vendorCompletedEmailCopy } from "./vendor-notify";
+import { notifyVendor, vendorAssignedEmailCopy, vendorCompletedEmailCopy, vendorPausedEmailCopy } from "./vendor-notify";
 
 describe("vendor-notify", () => {
   beforeEach(() => {
@@ -57,6 +57,24 @@ describe("vendor-notify", () => {
     expect(copy.text).not.toMatch(/\d+\s*kr/i);
   });
 
+  it("names a paused work order without staff login links, amounts or free-text reasons", () => {
+    const copy = vendorPausedEmailCopy({
+      workOrderId: "wo-1",
+      title: "Filterbyte",
+      workOrderNumber: "AO-0012",
+      propertyName: "Storgatan 12",
+      vendorContractId: "vendor-1",
+      vendorEmail: "kontakt@stad.se",
+      kind: "paused",
+      pauseLabel: "Väntar material",
+    });
+    expect(copy.subject).toBe("Arbetsorder pausad AO-0012: Filterbyte");
+    expect(copy.text).toContain("Väntar material");
+    expect(copy.text).not.toContain("/dashboard");
+    expect(copy.text).not.toMatch(/\d+\s*kr/i);
+    expect(copy.text).not.toContain("statusReason");
+  });
+
   it("emails a vendor contact and skips missing or invalid addresses", async () => {
     const actor = { id: "manager-1", company_id: "company-1" };
     const target = {
@@ -88,6 +106,21 @@ describe("vendor-notify", () => {
       expect.objectContaining({
         emailContent: expect.objectContaining({
           subject: "Arbetsorder klar AO-0012: Filterbyte",
+        }),
+      }),
+    );
+
+    queueTicketNotificationMock.mockClear();
+    await expect(notifyVendor(actor, {
+      ...target,
+      kind: "paused",
+      pauseLabel: "Blockerad",
+    })).resolves.toEqual({ emailed: true });
+    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
+      actor,
+      expect.objectContaining({
+        emailContent: expect.objectContaining({
+          subject: "Arbetsorder pausad AO-0012: Filterbyte",
         }),
       }),
     );
