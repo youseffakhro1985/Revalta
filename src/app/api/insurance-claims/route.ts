@@ -15,6 +15,18 @@ import { createLogger } from "@/lib/structured-logger";
 const logger = createLogger({ route: "/api/insurance-claims" });
 
 const action = "insurance_claim.created";
+const workOrderAction = "insurance_claim.work_order_created";
+
+function workOrderLinkFromMetadata(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const record = metadata as { workOrderId?: unknown; workOrderNumber?: unknown };
+  const workOrderId = typeof record.workOrderId === "string" ? record.workOrderId : "";
+  if (!workOrderId) return null;
+  return {
+    workOrderId,
+    workOrderNumber: typeof record.workOrderNumber === "string" ? record.workOrderNumber : null,
+  };
+}
 
 async function listInsuranceClaimRows(companyId: string, propertyRelation: Record<string, unknown>) {
   try {
@@ -44,7 +56,7 @@ export async function GET() {
       notDeletedFilter("Property"),
       activePropertyRelationFilter(),
     ]);
-    const [rows, logs, properties] = await Promise.all([
+    const [rows, logs, workOrderLogs, properties] = await Promise.all([
       user.company_id ? listInsuranceClaimRows(user.company_id, propertyRelation) : Promise.resolve([]),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
@@ -52,6 +64,15 @@ export async function GET() {
         take: 400,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       })),
+      db.auditLog.findMany({
+        where: { ...auditScopedWhere(user), action: workOrderAction },
+        orderBy: { created_at: "desc" },
+        take: 400,
+        select: { entity_id: true, metadata: true },
+      }).catch((error) => {
+        if (isMissingTableError(error, "AuditLog")) return [];
+        throw error;
+      }),
       db.property.findMany({
         where: { ...propertyActive, ...tenantWhere(user) },
         orderBy: { name: "asc" },
@@ -59,9 +80,18 @@ export async function GET() {
       }),
     ]);
 
+    const workOrderByClaim = new Map<string, { workOrderId: string; workOrderNumber: string | null }>();
+    for (const log of workOrderLogs) {
+      const link = workOrderLinkFromMetadata(log.metadata);
+      if (link && !workOrderByClaim.has(log.entity_id)) {
+        workOrderByClaim.set(log.entity_id, link);
+      }
+    }
+
     const modern = rows.map((row) => {
       const estimated = asNumber(row.estimated_cost);
       const compensation = asNumber(row.compensation);
+      const workOrder = workOrderByClaim.get(row.id);
       return {
         id: row.id,
         property_id: row.property_id,
@@ -80,6 +110,8 @@ export async function GET() {
         net_cost: Math.max(0, estimated - compensation),
         note: row.note || "",
         created_at: row.created_at,
+        work_order_id: workOrder?.workOrderId || null,
+        work_order_number: workOrder?.workOrderNumber || null,
         source: "table" as const,
       };
     });
