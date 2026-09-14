@@ -281,6 +281,11 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
 
   async function saveInvoice(status: string) {
     if (!draft) return;
+    if (status === "ready" && !draft.customerName.trim()) {
+      setError("Ange kundnamn innan underlaget kan markeras som klart.");
+      setSuccess("");
+      return;
+    }
     await post(`/api/work-orders/${workOrderId}/invoice-basis`, {
       ...draft,
       status,
@@ -589,7 +594,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
               <input
                 value={draft.customerName}
                 onChange={(event) => setDraft({ ...draft, customerName: event.target.value })}
-                placeholder="Kundnamn"
+                placeholder="Kundnamn (obligatoriskt för klar)"
                 aria-label="Kundnamn"
                 disabled={!canManage}
                 className={premiumFieldClass}
@@ -641,7 +646,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 <button type="button" disabled={saving} onClick={() => void saveInvoice("draft")} className="rounded-xl border border-sand-200 px-4 py-2.5 text-sm font-semibold text-ink-800 hover:bg-sand-50">
                   Spara utkast
                 </button>
-                <button type="button" disabled={saving} onClick={() => void saveInvoice("ready")} className={premiumPrimaryButtonClass}>
+                <button type="button" disabled={saving || !draft.customerName.trim()} onClick={() => void saveInvoice("ready")} className={premiumPrimaryButtonClass}>
                   Markera som klar
                 </button>
               </div>

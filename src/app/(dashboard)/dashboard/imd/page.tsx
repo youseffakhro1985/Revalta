@@ -274,7 +274,7 @@ export default function ImdPage() {
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra mätvärden.</InlineAlert> : null}
 
-    {showCreate && canManage ? <Panel title="Registrera avläsning" description="Förbrukning, debiteringsbelopp och öppen debiteringsrad skapas automatiskt från registrerade mätvärden.">
+    {showCreate && canManage ? <Panel title="Registrera avläsning" description="Förbrukning och belopp beräknas från mätvärdena. En öppen debiteringsrad sparas som underlag och kopplas till hyresavi när du gör det manuellt.">
       <form key={formKey} action={submit} className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <select required value={propertyId} onChange={(event) => { setPropertyId(event.target.value); setLeaseId(""); }} className={premiumFieldClass} aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>

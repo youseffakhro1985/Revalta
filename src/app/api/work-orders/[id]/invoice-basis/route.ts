@@ -188,6 +188,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }, { status: 409 });
   }
   if (!clientWritableStatuses.has(status)) return NextResponse.json({ error: "Ogiltig status" }, { status: 400 });
+  const customerName = String(body.customerName ?? "").trim().slice(0, 200);
+  if (status === "ready" && !customerName) {
+    return NextResponse.json({ error: "Kundnamn krävs för att markera fakturaunderlaget som klart." }, { status: 400 });
+  }
   if (!Array.isArray(body.lines) || body.lines.length > 100) return NextResponse.json({ error: "Fakturarader saknas eller är för många" }, { status: 400 });
   const lines = body.lines.map(cleanLine);
   if (lines.some((line: Line | null) => !line)) return NextResponse.json({ error: "En eller flera fakturarader är ogiltiga" }, { status: 400 });
@@ -208,7 +212,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     versionId: crypto.randomUUID(),
     workOrderId: id,
     status,
-    customerName: String(body.customerName ?? "").trim().slice(0, 200),
+    customerName,
     customerOrgNumber: String(body.customerOrgNumber ?? "").trim().slice(0, 50),
     customerReference: String(body.customerReference ?? "").trim().slice(0, 200),
     invoiceDate: String(body.invoiceDate ?? new Date().toISOString().slice(0, 10)),
