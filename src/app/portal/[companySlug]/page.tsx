@@ -27,6 +27,7 @@ export default async function CompanyPortalPage({
       initialTrackError={tracked.error}
       initialCommented={query.commented === "1"}
       initialAttached={query.attached === "1"}
+      initialFeedback={query.feedback === "1"}
       initialCatalog={{
         properties: catalog.properties,
         companyName: catalog.companyName,

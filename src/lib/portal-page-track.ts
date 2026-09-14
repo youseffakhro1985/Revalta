@@ -6,6 +6,7 @@ export type PortalSearchParams = {
   created?: string;
   commented?: string;
   attached?: string;
+  feedback?: string;
   ref?: string;
   reason?: string;
   token?: string;
