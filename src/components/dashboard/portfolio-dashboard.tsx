@@ -2,14 +2,17 @@ import Link from "next/link";
 import {
   ArrowRight,
   Building2,
+  CalendarDays,
   CircleDollarSign,
   DoorOpen,
   Gauge,
   MessageSquareText,
+  UserRoundX,
   Wrench,
 } from "lucide-react";
 import db from "@/lib/db";
 import { tenantWhere, type CurrentUser } from "@/lib/current-user";
+import { isMissingTableError } from "@/lib/schema-readiness";
 import {
   OverviewEmpty,
   OverviewHero,
@@ -31,6 +34,16 @@ const shortDate = new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "sho
 
 const activeLeaseStatuses = ["reserved", "active", "notice"];
 const activeWorkStatuses = { notIn: ["completed", "invoiced", "cancelled"] };
+const date = new Intl.DateTimeFormat("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+
+async function optionalFindMany<T>(table: string, query: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await query();
+  } catch (error) {
+    if (isMissingTableError(error, table)) return [];
+    throw error;
+  }
+}
 
 function unitTypeLabel(type: string) {
   if (type === "apartment") return "Bostäder";
@@ -78,7 +91,11 @@ function statusClass(status: string) {
 export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
   const now = new Date();
   const year = now.getFullYear();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const horizon = new Date(today.getTime() + 30 * 86400000);
   const propertyScope = { deleted_at: null, ...tenantWhere(user) };
+  const companyId = user.company_id;
 
   const [
     totalProperties,
@@ -91,6 +108,9 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
     budget,
     maintenanceDue,
     overdueWorkOrders,
+    unassignedWorkOrders,
+    upcomingRounds,
+    upcomingInspections,
     recentWorkOrders,
     unitTypeTotals,
   ] = await Promise.all([
@@ -119,10 +139,10 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
       },
     }),
     db.unit.count({ where: { property: propertyScope } }),
-    user.company_id
+    companyId
       ? db.lease.findMany({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             deleted_at: null,
             status: { in: activeLeaseStatuses },
             property: { deleted_at: null },
@@ -131,10 +151,10 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
           select: { unit_id: true },
         })
       : Promise.resolve([]),
-    user.company_id
+    companyId
       ? db.lease.aggregate({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             deleted_at: null,
             status: { in: activeLeaseStatuses },
             property: { deleted_at: null },
@@ -142,26 +162,26 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
           _sum: { monthly_rent: true },
         })
       : Promise.resolve({ _sum: { monthly_rent: null } }),
-    user.company_id
+    companyId
       ? db.budgetEntry.aggregate({
-          where: { company_id: user.company_id, year, property: { deleted_at: null } },
+          where: { company_id: companyId, year, property: { deleted_at: null } },
           _sum: { budget: true, actual: true },
         })
       : Promise.resolve({ _sum: { budget: null, actual: null } }),
-    user.company_id
+    companyId
       ? db.portfolioMaintenanceItem.count({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             property: { deleted_at: null },
             planned_year: { lte: year + 1 },
             status: { in: ["planned", "approved", "in_progress"] },
           },
         })
       : Promise.resolve(0),
-    user.company_id
+    companyId
       ? db.workOrder.count({
           where: {
-            company_id: user.company_id,
+            company_id: companyId,
             deleted_at: null,
             property: { deleted_at: null },
             status: activeWorkStatuses,
@@ -169,9 +189,46 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
           },
         })
       : Promise.resolve(0),
-    user.company_id
+    companyId
+      ? db.workOrder.count({
+          where: {
+            company_id: companyId,
+            deleted_at: null,
+            assigned_to_id: null,
+            property: { deleted_at: null },
+            status: activeWorkStatuses,
+          },
+        })
+      : Promise.resolve(0),
+    companyId
+      ? optionalFindMany("InspectionRound", () => db.inspectionRound.findMany({
+          where: {
+            company_id: companyId,
+            status: { not: "completed" },
+            next_due: { gte: today, lte: horizon },
+            property: { deleted_at: null },
+          },
+          orderBy: { next_due: "asc" },
+          take: 6,
+          select: { id: true, title: true, next_due: true, property: { select: { name: true } } },
+        }))
+      : Promise.resolve([]),
+    companyId
+      ? optionalFindMany("ComplianceInspection", () => db.complianceInspection.findMany({
+          where: {
+            company_id: companyId,
+            status: { notIn: ["completed", "cancelled"] },
+            due_date: { gte: today, lte: horizon },
+            property: { deleted_at: null },
+          },
+          orderBy: { due_date: "asc" },
+          take: 6,
+          select: { id: true, title: true, type: true, due_date: true, responsible: true, property: { select: { name: true } } },
+        }))
+      : Promise.resolve([]),
+    companyId
       ? db.workOrder.findMany({
-          where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
+          where: { company_id: companyId, deleted_at: null, property: { deleted_at: null } },
           orderBy: { created_at: "desc" },
           take: 5,
           select: {
@@ -200,11 +257,11 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
       })
     : [];
 
-  const budgetByProperty = user.company_id && focusProperties.length
+  const budgetByProperty = companyId && focusProperties.length
     ? await db.budgetEntry.groupBy({
         by: ["property_id"],
         where: {
-          company_id: user.company_id,
+          company_id: companyId,
           year,
           property_id: { in: focusProperties.map((property) => property.id) },
         },
@@ -236,7 +293,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
     .sort((a, b) => b.total - a.total)
     .slice(0, 4);
 
-  const attentionCount = urgentTickets + overdueWorkOrders;
+  const attentionCount = urgentTickets + overdueWorkOrders + unassignedWorkOrders;
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -276,8 +333,8 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
       <OverviewPulse
         attentionCount={attentionCount}
         summary={attentionCount
-          ? `${urgentTickets} akuta ärenden och ${overdueWorkOrders} försenade arbetsordrar.`
-          : "Inga akuta ärenden eller försenade arbetsordrar är registrerade just nu."}
+          ? `${urgentTickets} akuta ärenden, ${unassignedWorkOrders} otilldelade och ${overdueWorkOrders} försenade arbetsordrar.`
+          : "Inga akuta ärenden, otilldelade eller försenade arbetsordrar är registrerade just nu."}
         actions={[
           { href: "/dashboard/felanmalan", label: "Öppna ärenden →" },
           { href: "/dashboard/arbetsorder", label: "Öppna arbetsorder →" },
@@ -370,6 +427,7 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
         <OverviewPanel title="Prestandaöversikt" description="Operativa signaler från live-data">
           <div className="divide-y divide-sand-100">
             <PerformanceRow icon={MessageSquareText} label="Akuta ärenden" value={integer.format(urgentTickets)} href="/dashboard/felanmalan" tone={urgentTickets ? "warning" : "good"} />
+            <PerformanceRow icon={UserRoundX} label="Otilldelade arbetsordrar" value={integer.format(unassignedWorkOrders)} href="/dashboard/arbetsorder/planering" tone={unassignedWorkOrders ? "warning" : "good"} />
             <PerformanceRow icon={Wrench} label="Försenade arbetsordrar" value={integer.format(overdueWorkOrders)} href="/dashboard/arbetsorder" tone={overdueWorkOrders ? "warning" : "good"} />
             <PerformanceRow icon={Gauge} label="Underhåll till nästa år" value={integer.format(maintenanceDue)} href="/dashboard/underhall" tone="neutral" />
             <PerformanceRow icon={CircleDollarSign} label="Budgetutfall" value={budgetTotal ? `${budgetProgress.toLocaleString("sv-SE")} %` : "—"} href="/dashboard/budget" tone={budgetTotal && budgetProgress > 105 ? "warning" : "good"} />
@@ -377,6 +435,39 @@ export async function PortfolioDashboard({ user }: { user: CurrentUser }) {
           <Link href="/dashboard/rapporter" className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Visa hela prestandarapporten <ArrowRight className="h-3.5 w-3.5" /></Link>
         </OverviewPanel>
       </section>
+
+      <OverviewPanel title="Kommande ronder och besiktningar" description="Nästa 30 dagar från ronder och besiktningar. Tomma tabeller visas som tom lista, inte som fel." bodyClassName="p-0">
+        {(() => {
+          const upcoming = [
+            ...upcomingRounds.map((round) => ({
+              id: `round:${round.id}`,
+              title: round.title,
+              date: round.next_due,
+              type: "Rond",
+              property_name: round.property.name,
+              responsible: null as string | null,
+              href: "/dashboard/ronder",
+            })),
+            ...upcomingInspections.map((inspection) => ({
+              id: `inspection:${inspection.id}`,
+              title: inspection.title,
+              date: inspection.due_date,
+              type: "Besiktning",
+              property_name: inspection.property.name,
+              responsible: inspection.responsible,
+              href: "/dashboard/besiktningar",
+            })),
+          ].sort((left, right) => left.date.getTime() - right.date.getTime()).slice(0, 6);
+
+          return upcoming.length ? <div className="divide-y divide-sand-100">{upcoming.map((event) => (
+            <Link key={event.id} href={event.href} className="grid gap-3 px-5 py-4 transition hover:bg-sand-50/70 sm:grid-cols-[110px_minmax(0,1fr)] sm:items-center">
+              <div><p className="text-xs font-semibold uppercase tracking-[0.08em] text-petroleum-700">{date.format(event.date)}</p></div>
+              <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink-900">{event.title}</p><p className="mt-1 truncate text-xs text-ink-500">{[event.type, event.property_name, event.responsible].filter(Boolean).join(" · ")}</p></div>
+            </Link>
+          ))}</div> : <OverviewEmpty icon={CalendarDays} title="Inga kommande ronder eller besiktningar" description="När ronder och besiktningar planeras visas de här 30 dagar framåt." />;
+        })()}
+        <div className="border-t border-sand-100 p-4"><Link href="/dashboard/kalender" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700">Öppna kalender <CalendarDays className="h-4 w-4" /></Link></div>
+      </OverviewPanel>
     </div>
   );
 }
