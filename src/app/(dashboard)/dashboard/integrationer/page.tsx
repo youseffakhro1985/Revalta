@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CheckCircle2, CircleDashed, Plug, ReceiptText, Send, ShieldCheck } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
+import { unmatchedInboundSmsCount, withUnmatchedInboundSmsFirst } from "@/lib/integration-event-list";
 
 type Integration = {
   type: string;
@@ -89,13 +90,20 @@ export default function IntegrationsPage() {
     configured: integrations.filter((integration) => integration.configured).length,
     pending: integrations.filter((integration) => !integration.configured).length,
     successfulEvents: events.filter((event) => event.status === "sent" || event.status === "success" || event.status === "completed").length,
+    unmatchedSms: unmatchedInboundSmsCount(events),
   }), [events, integrations]);
+  const orderedEvents = useMemo(() => withUnmatchedInboundSmsFirst(events), [events]);
 
   return (
     <div className="space-y-8 animate-fade-in-soft">
       <PageHeader eyebrow="System och anslutningar" title="Integrationer" description="Samlad status för externa tjänster, ekonomisystem, tekniska krav och senaste integrationshändelser." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Hemligheter skyddas i miljövariabler</div>} />
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
+      {!loading && summary.unmatchedSms > 0 ? (
+        <InlineAlert>
+          {summary.unmatchedSms} inkommande SMS kunde inte kopplas till ett ärende. De ligger överst i händelselistan så drift kan följa upp numret.
+        </InlineAlert>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Plug} label="Integrationer" value={loading ? "—" : integrations.length} />
@@ -143,7 +151,7 @@ export default function IntegrationsPage() {
       </section>
 
       <Panel title="Senaste integrationshändelser" description="Teknisk historik för utskick, betalningar, fakturaexporter och externa anrop." bodyClassName="p-0">
-        {loading ? <div className="space-y-4 p-6">{[1,2,3].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-sand-100" />)}</div> : events.length > 0 ? <div className="divide-y divide-sand-100">{events.map((event) => <article key={event.id} className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-950">{labels[event.type] || event.type}</h3><p className="mt-1 text-sm text-ink-500">{event.recipient || "Ingen mottagare"} · {dateFormatter.format(new Date(event.created_at))}</p></div><span className="w-fit rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{statusLabels[event.status] || event.status}</span></article>)}</div> : <EmptyState title="Inga integrationshändelser ännu" description="När Revalta skickar eller tar emot data via en integration visas händelsen här." />}
+        {loading ? <div className="space-y-4 p-6">{[1,2,3].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-sand-100" />)}</div> : orderedEvents.length > 0 ? <div className="divide-y divide-sand-100">{orderedEvents.map((event) => <article key={event.id} className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-950">{labels[event.type] || event.type}</h3><p className="mt-1 text-sm text-ink-500">{event.recipient || "Ingen mottagare"} · {dateFormatter.format(new Date(event.created_at))}</p></div><span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${event.type === "sms" && event.status === "unmatched" ? "border-warning-200 bg-warning-50 text-warning-800" : "border-sand-200 bg-sand-50 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></article>)}</div> : <EmptyState title="Inga integrationshändelser ännu" description="När Revalta skickar eller tar emot data via en integration visas händelsen här." />}
       </Panel>
     </div>
   );
