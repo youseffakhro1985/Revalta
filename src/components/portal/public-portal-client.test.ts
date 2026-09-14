@@ -22,6 +22,12 @@ describe("public portal ticket form", () => {
     expect(source).toContain('get("reason")');
     expect(source).toContain("Kontrollera namn, e-post, fastighet, rubrik och beskrivning.");
     expect(source).toContain("Boendeportalen är inte tillgänglig just nu.");
+    expect(source).toContain('id="public-track-form"');
+    expect(source).toContain('method="get"');
+    expect(source).toContain('name="ref"');
+    expect(source).toContain('name="email"');
+    expect(source).toContain('name="token"');
+    expect(source).toContain("initialTrackedTicket");
     expect(source).not.toContain("searchParams.set(\"email\"");
   });
 });
