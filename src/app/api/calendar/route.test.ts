@@ -8,6 +8,10 @@ const {
   calendarUpdateManyMock,
   calendarDeleteManyMock,
   workOrderFindManyMock,
+  roundFindManyMock,
+  inspectionFindManyMock,
+  maintenanceFindManyMock,
+  leaseFindManyMock,
   auditFindManyMock,
   auditFindFirstMock,
   transactionMock,
@@ -20,6 +24,10 @@ const {
   calendarUpdateManyMock: vi.fn(),
   calendarDeleteManyMock: vi.fn(),
   workOrderFindManyMock: vi.fn(),
+  roundFindManyMock: vi.fn(),
+  inspectionFindManyMock: vi.fn(),
+  maintenanceFindManyMock: vi.fn(),
+  leaseFindManyMock: vi.fn(),
   auditFindManyMock: vi.fn(),
   auditFindFirstMock: vi.fn(),
   transactionMock: vi.fn(),
@@ -53,6 +61,10 @@ vi.mock("@/lib/db", () => ({
       deleteMany: calendarDeleteManyMock,
     },
     workOrder: { findMany: workOrderFindManyMock },
+    inspectionRound: { findMany: roundFindManyMock },
+    complianceInspection: { findMany: inspectionFindManyMock },
+    portfolioMaintenanceItem: { findMany: maintenanceFindManyMock },
+    lease: { findMany: leaseFindManyMock },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
     $transaction: transactionMock,
   },
@@ -78,6 +90,10 @@ describe("calendar route", () => {
     vi.clearAllMocks();
     calendarFindManyMock.mockResolvedValue([]);
     workOrderFindManyMock.mockResolvedValue([]);
+    roundFindManyMock.mockResolvedValue([]);
+    inspectionFindManyMock.mockResolvedValue([]);
+    maintenanceFindManyMock.mockResolvedValue([]);
+    leaseFindManyMock.mockResolvedValue([]);
     auditFindManyMock.mockResolvedValue([]);
     calendarCreateMock.mockResolvedValue({ id: "event-1" });
     calendarUpdateManyMock.mockResolvedValue({ count: 1 });
@@ -124,6 +140,67 @@ describe("calendar route", () => {
         responsible: "Anna Tekniker",
         status: "planned",
         source: "work_order",
+        href: "/dashboard/arbetsorder/wo-1",
+      }),
+    ]));
+  });
+
+  it("projects ronder, besiktningar and underhåll from operational registers", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+    roundFindManyMock.mockResolvedValue([{
+      id: "round-1",
+      title: "Månadsrond",
+      status: "planned",
+      next_due: new Date("2026-09-12T07:00:00Z"),
+      interval: "monthly",
+      created_at: new Date("2026-09-01T10:00:00Z"),
+      property: { name: "Storgatan 1" },
+    }]);
+    inspectionFindManyMock.mockResolvedValue([{
+      id: "insp-1",
+      title: "OVK",
+      type: "ovk",
+      status: "action_required",
+      due_date: new Date("2026-09-20T00:00:00Z"),
+      responsible: "Anna",
+      created_at: new Date("2026-09-01T10:00:00Z"),
+      property: { name: "Storgatan 1" },
+    }]);
+    maintenanceFindManyMock.mockResolvedValue([{
+      id: "maint-1",
+      component: "Tak",
+      measure: "Omläggning",
+      planned_year: 2027,
+      status: "planned",
+      created_at: new Date("2026-09-01T10:00:00Z"),
+      property: { name: "Storgatan 1" },
+    }]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "round:round-1",
+        type: "Rond",
+        source: "round",
+        href: "/dashboard/ronder",
+        title: "Månadsrond",
+      }),
+      expect.objectContaining({
+        id: "inspection:insp-1",
+        type: "Besiktning",
+        source: "inspection",
+        href: "/dashboard/besiktningar",
+        responsible: "Anna",
+      }),
+      expect.objectContaining({
+        id: "maintenance:maint-1",
+        type: "Underhåll",
+        source: "maintenance",
+        date: "2027-01-01",
+        href: "/dashboard/underhall",
       }),
     ]));
   });
