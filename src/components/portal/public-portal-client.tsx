@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { PRIORITY_LABELS, TICKET_STATUS_LABELS } from "@/lib/domain-labels";
 import { readResponseJson } from "@/lib/fetch-json";
+import type { PublicTrackedTicket } from "@/lib/public-ticket-track";
 
 function withCompanySlug(path: string, companySlug?: string) {
   if (!companySlug) return path;
@@ -74,7 +75,17 @@ type PublicPortalClientProps = {
   initialReference?: string;
   initialReason?: string;
   initialToken?: string;
+  initialTrackEmail?: string;
+  initialTrackedTicket?: PublicTrackedTicket | null;
+  initialTrackError?: string;
 };
+
+function asPublicTicket(ticket: PublicTrackedTicket): PublicTicket {
+  return {
+    ...ticket,
+    public_reference: ticket.public_reference || "",
+  };
+}
 
 export function PublicPortalClient({
   companySlug,
@@ -82,6 +93,9 @@ export function PublicPortalClient({
   initialReference = "",
   initialReason = "",
   initialToken = "",
+  initialTrackEmail = "",
+  initialTrackedTicket = null,
+  initialTrackError = "",
 }: PublicPortalClientProps) {
   const normalizedInitialReference = initialReference.trim().toUpperCase();
   const [properties, setProperties] = useState<Property[]>([]);
@@ -94,9 +108,11 @@ export function PublicPortalClient({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [reference, setReference] = useState(normalizedInitialReference);
-  const [trackEmail, setTrackEmail] = useState("");
+  const [trackEmail, setTrackEmail] = useState(initialTrackEmail);
   const [trackingToken, setTrackingToken] = useState(initialToken);
-  const [trackedTicket, setTrackedTicket] = useState<PublicTicket | null>(null);
+  const [trackedTicket, setTrackedTicket] = useState<PublicTicket | null>(
+    initialTrackedTicket ? asPublicTicket(initialTrackedTicket) : null,
+  );
   const [createdReference, setCreatedReference] = useState(
     initialCreated && normalizedInitialReference ? normalizedInitialReference : "",
   );
@@ -104,9 +120,13 @@ export function PublicPortalClient({
   const [residentComment, setResidentComment] = useState("");
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState("");
-  const [error, setError] = useState(() => portalReasonCopy(initialReason));
+  const [error, setError] = useState(() => initialTrackError || portalReasonCopy(initialReason));
   const [success, setSuccess] = useState(
-    initialCreated && normalizedInitialReference ? createdTicketCopy : "",
+    initialCreated && normalizedInitialReference
+      ? createdTicketCopy
+      : initialTrackedTicket
+        ? "Ärendet hittades."
+        : "",
   );
   const [loading, setLoading] = useState(false);
 
@@ -160,6 +180,7 @@ export function PublicPortalClient({
     setReference(ref.toUpperCase());
     if (token) setTrackingToken(token);
     if (email) setTrackEmail(email);
+    if (initialTrackedTicket) return;
     void (async () => {
       if (!created) {
         setError("");
@@ -180,7 +201,7 @@ export function PublicPortalClient({
         setLoading(false);
       }
     })();
-  }, []);
+  }, [initialTrackedTicket]);
 
   async function createTicket(event: React.FormEvent) {
     event.preventDefault();
@@ -427,9 +448,16 @@ export function PublicPortalClient({
 
             <div className="rounded-2xl border border-sand-200 bg-sand-50/50 p-6 sm:p-8">
               <h2 className="text-xl font-semibold text-ink-950">Följ ditt ärende</h2>
-              <form onSubmit={trackTicket} className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                <label><span className="sr-only">Ärendets referensnummer</span><input required autoComplete="off" maxLength={32} value={reference} onChange={(event) => setReference(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="RV-2026-XXXXXX" /></label>
-                <label><span className="sr-only">E-post som användes för ärendet</span><input required={!trackingToken} type="email" autoComplete="email" maxLength={254} value={trackEmail} onChange={(event) => setTrackEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="Din e-post" /></label>
+              <form
+                id="public-track-form"
+                method="get"
+                action={companySlug ? `/portal/${encodeURIComponent(companySlug)}` : "/portal"}
+                onSubmit={trackTicket}
+                className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]"
+              >
+                {trackingToken ? <input type="hidden" name="token" value={trackingToken} /> : null}
+                <label><span className="sr-only">Ärendets referensnummer</span><input required name="ref" autoComplete="off" maxLength={32} value={reference} onChange={(event) => setReference(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="RV-2026-XXXXXX" /></label>
+                <label><span className="sr-only">E-post som användes för ärendet</span><input required={!trackingToken} name="email" type="email" autoComplete="email" maxLength={254} value={trackEmail} onChange={(event) => setTrackEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="Din e-post" /></label>
                 <button type="submit" disabled={loading} className="rounded-xl border border-sand-200 bg-white px-5 py-3 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-sand-100 disabled:opacity-70">
                   Följ
                 </button>
