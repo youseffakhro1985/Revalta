@@ -57,6 +57,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
   const [signatures, setSignatures] = useState<SignatureItem[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [invoiceBases, setInvoiceBases] = useState<InvoiceBasis[]>([]);
+  const [canCreateInvoiceBasis, setCanCreateInvoiceBasis] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -73,6 +74,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
       setSignatures(data.signatures || []);
       setReports(data.reports || []);
       setInvoiceBases(data.invoiceBases || []);
+      setCanCreateInvoiceBasis(Boolean(data.canCreateInvoiceBasis));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunde inte hämta rapportflödet");
     } finally {
@@ -115,7 +117,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
 
       <section className="grid gap-4 sm:grid-cols-3">
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
-          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Signaturer</p><p className="mt-2 text-2xl font-semibold text-ink-950">{signatures.length}/3</p><p className="mt-1 text-xs text-ink-500">Utförare, entreprenör och beställare</p></div><Signature className="h-5 w-5 text-petroleum-700" /></div>
+          <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Intyganden</p><p className="mt-2 text-2xl font-semibold text-ink-950">{signatures.length}/3</p><p className="mt-1 text-xs text-ink-500">Utförare, entreprenör och beställare</p></div><Signature className="h-5 w-5 text-petroleum-700" /></div>
         </article>
         <article className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm">
           <div className="flex items-start justify-between"><div><p className="text-sm text-ink-500">Godkända rapporter</p><p className="mt-2 text-2xl font-semibold text-ink-950">{approvedReports}/{reports.length}</p><p className="mt-1 text-xs text-ink-500">Frysta och spårbara underlag</p></div><FileCheck2 className="h-5 w-5 text-petroleum-700" /></div>
@@ -126,7 +128,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <Panel title="Digital signering" description="Registrera ett spårbart intygande från utförare, entreprenör eller beställare.">
+        <Panel title="Intygande" description="Registrera en spårbar bekräftelse från utförare, entreprenör eller beställare. Det här är ett loggat intygande i Revalta, inte e-legitimation eller BankID.">
           <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -137,18 +139,18 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
               signerName: data.get("signerName"),
               signerEmail: data.get("signerEmail"),
               confirmationText: data.get("confirmationText"),
-            }, "Signaturen har registrerats.", () => form.reset());
+            }, "Intygandet har registrerats.", () => form.reset());
           }} className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-1.5 text-sm text-ink-600"><span>Roll</span><select name="signerRole" className={premiumFieldClass} defaultValue="executor">{Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label className="space-y-1.5 text-sm text-ink-600"><span>Namn</span><input name="signerName" required className={premiumFieldClass} placeholder="För- och efternamn" /></label>
             <label className="space-y-1.5 text-sm text-ink-600"><span>E-post</span><input name="signerEmail" type="email" className={premiumFieldClass} placeholder="namn@foretag.se" /></label>
             <label className="space-y-1.5 text-sm text-ink-600"><span>Intygandetext</span><input name="confirmationText" className={premiumFieldClass} defaultValue="Jag intygar att uppgifterna är korrekta." /></label>
-            <label className="sm:col-span-2 inline-flex items-start gap-3 rounded-xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600"><input type="checkbox" required className="mt-0.5 h-4 w-4 rounded border-sand-300" /><span>Jag bekräftar att signeringen är avsiktlig och får registreras med datum och tid.</span></label>
-            <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Signerar…" : "Registrera signatur"}</button>
+            <label className="sm:col-span-2 inline-flex items-start gap-3 rounded-xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600"><input type="checkbox" required className="mt-0.5 h-4 w-4 rounded border-sand-300" /><span>Jag bekräftar att intygandet är avsiktligt och får registreras med datum och tid.</span></label>
+            <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Registrerar…" : "Registrera intygande"}</button>
           </form>
 
           <div className="mt-5 space-y-3 border-t border-sand-100 pt-5">
-            {signatures.length === 0 ? <EmptyState title="Inga signaturer ännu" description="Registrera den första signaturen när arbetet har granskats." /> : signatures.map((item) => (
+            {signatures.length === 0 ? <EmptyState title="Inga intyganden ännu" description="Registrera den första bekräftelsen när arbetet har granskats." /> : signatures.map((item) => (
               <article key={item.id} className="rounded-2xl border border-sand-200 bg-white p-4">
                 <div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-petroleum-700" /><div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-ink-900">{item.signer_name}</p><span className="rounded-full bg-petroleum-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-petroleum-800">{roleLabels[item.signer_role]}</span></div><p className="mt-1 text-sm text-ink-500">{item.confirmation_text}</p><p className="mt-2 text-xs text-ink-500">{dateTime.format(new Date(item.signed_at))}{item.signer_email ? ` · ${item.signer_email}` : ""}</p></div></div>
               </article>
@@ -163,8 +165,12 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
               <button type="button" disabled={saving} onClick={() => void post({ action: "report.create" }, "En ny arbetsrapport har skapats.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa arbetsrapport"}</button>
             </div>
             <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
-              <div className="flex items-start gap-3"><ReceiptText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Fakturaunderlag</h3><p className="mt-1 text-sm leading-6 text-ink-500">Bygger exportbart underlag från attesterad tid och material (samma källa som Ekonomi och fakturering) och arkiverar en rapportsnapshot.</p></div></div>
-              <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.create" }, "Exportbart fakturaunderlag har skapats från attesterade rader.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa fakturaunderlag"}</button>
+              <div className="flex items-start gap-3"><ReceiptText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Fakturaunderlag</h3><p className="mt-1 text-sm leading-6 text-ink-500">{canCreateInvoiceBasis ? "Bygger exportbart underlag från attesterad tid och material (samma källa som Ekonomi och fakturering) och arkiverar en rapportsnapshot." : "Attestera tid eller material under Ekonomi och fakturering innan underlag kan skapas här."}</p></div></div>
+              {canCreateInvoiceBasis ? (
+                <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.create" }, "Exportbart fakturaunderlag har skapats från attesterade rader.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa fakturaunderlag"}</button>
+              ) : (
+                <Link href={`/dashboard/arbetsorder/${workOrderId}#ekonomi`} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "…" : "Öppna Ekonomi och attestera rader"}</Link>
+              )}
             </div>
           </div>
         </Panel>

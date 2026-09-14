@@ -198,7 +198,7 @@ export default function MaintenancePage() {
       const response = await fetch("/api/work-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ propertyId: item.property_id, title: `${item.component} – förebyggande underhåll`, description: item.measure, status: "planned", priority: item.priority, workType: "preventive", source: "internal", scheduledStart, estimatedCost: item.estimated_cost }),
+        body: JSON.stringify({ propertyId: item.property_id, title: `${item.component} – förebyggande underhåll`, description: item.measure, status: "planned", priority: item.priority, workType: "preventive", source: "maintenance_plan", scheduledStart, estimatedCost: item.estimated_cost }),
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Kunde inte skapa arbetsordern");

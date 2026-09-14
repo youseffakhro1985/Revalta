@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Ban, Building2, CalendarDays, Clock3, Search } from "lucide-react";
+import { Ban, Building2, CalendarDays, Clock3, Plus, Search } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
@@ -189,7 +189,17 @@ export default function BookingsPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Boendeservice" title="Bokningar och resurser" description="Planera gemensamma resurser med tydliga tider, boendekoppling och kontroll över kommande bokningar." />
+      <PageHeader
+        eyebrow="Boendeservice"
+        title="Bokningar och resurser"
+        description="Planera gemensamma resurser med tydliga tider, boendekoppling och kontroll över kommande bokningar."
+        action={canManage ? (
+          <a href="#ny-bokning" className={premiumPrimaryButtonClass}>
+            <Plus className="mr-2 h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+            Ny bokning
+          </a>
+        ) : undefined}
+      />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={CalendarDays} label="Kommande" value={upcoming.length} hint="Aktiva bokningar framåt" />
@@ -205,7 +215,7 @@ export default function BookingsPage() {
       <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
         {canManage ? (
           <Panel title="Ny bokning" description="Registrera resurs, boende och tidsintervall." className="h-fit xl:sticky xl:top-[112px]">
-            <form onSubmit={submit} className="space-y-4">
+            <form id="ny-bokning" onSubmit={submit} className="space-y-4">
               <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fastighet</span><select required aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.city}</option>)}</select></label>
               <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Resurs</span><select aria-label="Resurstyp" value={form.resource} onChange={(event) => setForm({ ...form, resource: event.target.value })} className={premiumFieldClass}>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select></label>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">

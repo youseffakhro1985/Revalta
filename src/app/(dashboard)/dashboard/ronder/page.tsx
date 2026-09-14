@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -172,6 +173,7 @@ function monthKey(date: Date) {
 }
 
 export default function RoundsPage() {
+  const router = useRouter();
   const [rounds, setRounds] = useState<Round[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
@@ -351,6 +353,16 @@ export default function RoundsPage() {
     });
     setRoundModalOpen(true);
   }
+
+  useEffect(() => {
+    if (!canManage) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    openNewRound();
+    params.delete("create");
+    const queryString = params.toString();
+    router.replace(queryString ? `${window.location.pathname}?${queryString}` : window.location.pathname);
+  }, [canManage, router]);
 
   async function createRound(event: React.FormEvent) {
     event.preventDefault();
