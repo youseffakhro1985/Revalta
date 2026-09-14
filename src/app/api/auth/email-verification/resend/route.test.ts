@@ -266,4 +266,43 @@ describe("POST /api/auth/email-verification/resend", () => {
       expect.objectContaining({ event: "auth.email_verification.resend_background_failed" }),
     );
   });
+
+  it("accepts a native form post and redirects without putting the email in the URL", async () => {
+    userFindUniqueMock.mockResolvedValue(enrolledUser());
+
+    const response = await POST(new Request("https://www.revalta.se/api/auth/email-verification/resend", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "email=OWNER%40example.se",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/login?reason=verify&resent=1");
+    expect(response.headers.get("location")).not.toContain("OWNER");
+    expect(response.headers.get("location")).not.toContain("example.se");
+    expect(afterMock).toHaveBeenCalledTimes(1);
+
+    await runScheduledAfterCallbacks();
+    expect(userFindUniqueMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { email: "owner@example.se" },
+    }));
+  });
+
+  it("redirects a native form post even when the email is missing, without starting resend work", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/auth/email-verification/resend", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "email=",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/login?reason=verify&resent=1");
+    expect(afterMock).not.toHaveBeenCalled();
+  });
 });

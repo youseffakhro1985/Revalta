@@ -42,6 +42,10 @@ export default function LoginPage() {
       setError("Verifiera din e-postadress innan du loggar in.");
       setVerificationRequired(true);
     }
+    if (params.get("resent") === "1") {
+      setVerificationRequired(true);
+      setResendStatus("Om kontot behöver verifieras skickar vi en ny verifieringslänk.");
+    }
     if (reason === "rate") setError("För många inloggningsförsök. Vänta en stund och prova igen.");
     if (reason === "error") setError("Något gick fel");
   }, []);
@@ -89,15 +93,22 @@ export default function LoginPage() {
     }
   };
 
-  const handleResendVerification = async () => {
-    if (!email || resending) return;
-    setResending(true);
+  const handleResendVerification = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (resending || !hydrated) return;
+    const submittedEmail = String(new FormData(e.currentTarget).get("email") || "").trim();
+    setEmail(submittedEmail);
     setResendStatus("");
+    if (!submittedEmail || !isValidEmail(submittedEmail)) {
+      setResendStatus("Ange en giltig e-postadress.");
+      return;
+    }
+    setResending(true);
     try {
       const res = await fetch("/api/auth/email-verification/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: submittedEmail }),
       });
       const data = await readResponseJson<{ message?: string }>(res);
       setResendStatus(data.message || "Om kontot behöver verifieras skickar vi en ny verifieringslänk.");
@@ -131,16 +142,37 @@ export default function LoginPage() {
       {verificationRequired ? (
         <div className="mt-3 rounded-2xl border border-ink-200 bg-white px-4 py-3">
           <p className="text-sm leading-6 text-ink-600">
-            Har länken gått ut eller inte kommit fram? Skicka en ny verifieringslänk till adressen ovan.
+            Har länken gått ut eller inte kommit fram? Skicka en ny verifieringslänk till adressen.
           </p>
-          <button
-            type="button"
-            onClick={handleResendVerification}
-            disabled={resending}
-            className="mt-3 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+          <form
+            id="resend-verification-form"
+            method="post"
+            action="/api/auth/email-verification/resend"
+            noValidate
+            data-ready={hydrated ? "1" : "0"}
+            onSubmit={handleResendVerification}
+            className="mt-3 space-y-3"
           >
-            {resending ? "Skickar..." : "Skicka ny verifieringslänk"}
-          </button>
+            <input
+              id="resend-verification-email"
+              name="email"
+              type="email"
+              required
+              maxLength={254}
+              autoComplete="email"
+              defaultValue={email}
+              placeholder="namn@exempel.se"
+              className={authInputClass}
+            />
+            <button
+              type="submit"
+              disabled={!hydrated || resending}
+              aria-busy={resending}
+              className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {resending ? "Skickar..." : "Skicka ny verifieringslänk"}
+            </button>
+          </form>
           {resendStatus ? <p className="mt-2 text-xs leading-5 text-ink-500">{resendStatus}</p> : null}
         </div>
       ) : null}

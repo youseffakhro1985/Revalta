@@ -26,6 +26,21 @@ function phaseLatency(startedAt: number) {
   return Math.max(0, Date.now() - startedAt);
 }
 
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readResendEmail(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return String(form?.get("email") || "");
+  }
+  const body = await request.json().catch(() => ({})) as { email?: unknown };
+  return typeof body.email === "string" ? body.email : "";
+}
+
 async function invalidateFreshToken(tokenHash: string, userId: string, observability: ReturnType<typeof createRouteObservability>) {
   try {
     await db.$transaction(
@@ -161,15 +176,23 @@ async function processResend(input: {
 
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, "/api/auth/email-verification/resend");
-  const neutralResponse = () => observability.correlate(NextResponse.json(RESPONSE, { headers: HEADERS }));
-
-  const body = await request.json().catch(() => ({})) as { email?: unknown };
-  const email = normalizeEmail(body.email);
+  const nativeForm = isNativeFormPost(request);
+  const email = normalizeEmail(await readResendEmail(request));
   if (isValidEmail(email)) {
     const ip = getClientIp(request);
     const publicAppUrl = getPublicAppUrl(request.url);
     after(() => processResend({ email, ip, publicAppUrl, observability }));
   }
 
-  return neutralResponse();
+  if (nativeForm) {
+    const url = new URL("/login", getPublicAppUrl(request.url));
+    url.searchParams.set("reason", "verify");
+    url.searchParams.set("resent", "1");
+    const response = NextResponse.redirect(url, 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    return observability.correlate(response);
+  }
+
+  return observability.correlate(NextResponse.json(RESPONSE, { headers: HEADERS }));
 }
