@@ -29,6 +29,7 @@ import {
   normalizeWorkOrderStatus,
   WORK_ORDER_PRIORITIES,
   WORK_ORDER_STATUSES,
+  WORK_ORDER_STATUS_LABELS,
   type WorkOrderPriority,
   type WorkOrderStatus,
 } from "@/lib/work-order-workflow";
@@ -599,6 +600,33 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         });
       } catch (notificationError) {
         logger.error("Work-order vendor completion notification failed", notificationError);
+      }
+    }
+  }
+  const pausedNow = ["waiting_material", "blocked"].includes(assignedWorkOrder.status)
+    && !["waiting_material", "blocked"].includes(existing.status);
+  if (pausedNow) {
+    const pausedVendorId = persistVendor
+      ? assignedVendorId || (existing as { vendor_contract_id?: string | null }).vendor_contract_id || null
+      : null;
+    if (pausedVendorId) {
+      try {
+        const vendorEmail = assignedVendorEmail || (await db.vendorContract.findFirst({
+          where: { id: pausedVendorId, company_id: companyId },
+          select: { email: true },
+        }))?.email || null;
+        await notifyVendor(user, {
+          workOrderId: assignedWorkOrder.id,
+          title: assignedWorkOrder.title,
+          workOrderNumber: enterpriseBefore?.work_order_number,
+          propertyName: existing.property?.name,
+          vendorContractId: pausedVendorId,
+          vendorEmail,
+          kind: "paused",
+          pauseLabel: WORK_ORDER_STATUS_LABELS[normalizeWorkOrderStatus(assignedWorkOrder.status)],
+        });
+      } catch (notificationError) {
+        logger.error("Work-order vendor pause notification failed", notificationError);
       }
     }
   }

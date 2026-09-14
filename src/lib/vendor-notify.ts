@@ -2,7 +2,7 @@ import { queueTicketNotification } from "@/lib/integrations";
 
 type Actor = { id: string; company_id: string | null };
 
-export type VendorNotifyKind = "assigned" | "completed";
+export type VendorNotifyKind = "assigned" | "completed" | "paused";
 
 export type VendorNotifyTarget = {
   workOrderId: string;
@@ -12,6 +12,7 @@ export type VendorNotifyTarget = {
   vendorContractId: string;
   vendorEmail?: string | null;
   kind?: VendorNotifyKind;
+  pauseLabel?: string | null;
 };
 
 function headingLines(target: VendorNotifyTarget) {
@@ -68,8 +69,31 @@ export function vendorCompletedEmailCopy(target: VendorNotifyTarget) {
   };
 }
 
+export function vendorPausedEmailCopy(target: VendorNotifyTarget) {
+  const { number, details } = headingLines(target);
+  const pauseLabel = target.pauseLabel?.trim() || "Pausad";
+  const heading = number ? `Arbetsorder pausad ${number}` : "Arbetsorder pausad";
+  return {
+    subject: `${heading}: ${target.title}`,
+    text: [
+      "Hej!",
+      "",
+      `Arbetsordern är pausad i Revalta: ${pauseLabel}.`,
+      "",
+      ...details,
+      "",
+      "Kontakta beställaren om ni behöver mer information. Mejlet innehåller ingen inloggning.",
+      "",
+      "Vänliga hälsningar,",
+      "Revalta",
+    ].join("\n"),
+  };
+}
+
 export function vendorNotifyEmailCopy(target: VendorNotifyTarget) {
-  return target.kind === "completed" ? vendorCompletedEmailCopy(target) : vendorAssignedEmailCopy(target);
+  if (target.kind === "completed") return vendorCompletedEmailCopy(target);
+  if (target.kind === "paused") return vendorPausedEmailCopy(target);
+  return vendorAssignedEmailCopy(target);
 }
 
 export async function notifyVendor(actor: Actor, target: VendorNotifyTarget) {
