@@ -49,7 +49,7 @@ import { GET, POST } from "./route";
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const tx = { marker: "invoice-draft-tx" };
 
-function postRequest(status: string) {
+function postRequest(status: string, extra: Record<string, unknown> = {}) {
   return new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -68,9 +68,11 @@ function postRequest(status: string) {
         type: "labor",
         description: "Arbete",
         quantity: 1,
-        unit: "tim",
+        unit: "h",
         unitPrice: 650,
+        total: 650,
       }],
+      ...extra,
     }),
   });
 }
@@ -174,6 +176,16 @@ describe("work-order invoice basis material approval", () => {
       tx,
     );
     expect(body.draft.status).toBe("ready");
+  });
+
+  it("rejects ready without a customer name before creating a version", async () => {
+    const response = await POST(postRequest("ready", { customerName: "  " }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain("Kundnamn");
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("does not report success when the mandatory invoice audit write fails", async () => {
