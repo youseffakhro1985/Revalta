@@ -308,4 +308,43 @@ describe("resident-portal ticket comments route", () => {
       expect.objectContaining({ event: "resident_tickets.comments.failed" }),
     );
   });
+
+  it("accepts a native form comment and redirects without putting the comment in the URL", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+
+    const response = await POST(new Request("https://www.revalta.se/api/resident-portal/tickets/ticket-1/comments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "body=Porten+%C3%A4r+fortfarande+trasig",
+    }), { params: Promise.resolve({ id: "ticket-1" }) });
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "https://www.revalta.se/dashboard/boendeportal/arenden/ticket-1?commented=1",
+    );
+    expect(response.headers.get("location")).not.toContain("trasig");
+    expect(ticketCommentCreateMock).toHaveBeenCalled();
+  });
+
+  it("returns the native form to the ticket with a generic reason when the comment is empty", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+
+    const response = await POST(new Request("https://www.revalta.se/api/resident-portal/tickets/ticket-1/comments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "body=",
+    }), { params: Promise.resolve({ id: "ticket-1" }) });
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "https://www.revalta.se/dashboard/boendeportal/arenden/ticket-1?reason=invalid",
+    );
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

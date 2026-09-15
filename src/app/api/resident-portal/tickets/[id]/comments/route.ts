@@ -15,6 +15,7 @@ import {
   findAccessibleResidentPortalTicket,
 } from "@/lib/resident-portal-tickets";
 import { createRouteObservability } from "@/lib/route-observability";
+import { getPublicAppUrl } from "@/lib/app-url";
 
 const ROUTE = "/api/resident-portal/tickets/[id]/comments";
 const SUCCESS_HEADERS = {
@@ -23,6 +24,25 @@ const SUCCESS_HEADERS = {
   "Vercel-CDN-Cache-Control": "no-store",
   "X-Content-Type-Options": "nosniff",
 };
+
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readCommentBody(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return String(form?.get("body") || "").trim();
+  }
+  const bodyJson = await request.json().catch(() => ({})) as { body?: unknown };
+  return typeof bodyJson.body === "string" ? bodyJson.body.trim() : "";
+}
+
+function ticketPath(id: string) {
+  return `/dashboard/boendeportal/arenden/${encodeURIComponent(id)}`;
+}
 
 function reject(
   observability: ReturnType<typeof createRouteObservability>,
@@ -51,10 +71,20 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const observability = createRouteObservability(request, ROUTE);
+  const nativeForm = isNativeFormPost(request);
+  const { id } = await params;
+
+  const nativeRedirect = (path: string) => {
+    const response = NextResponse.redirect(new URL(path, getPublicAppUrl(request.url)), 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    return observability.correlate(response);
+  };
 
   try {
     const user = requireCompanyMember(await getCurrentUser());
     if (!user) {
+      if (nativeForm) return nativeRedirect("/login");
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -63,6 +93,7 @@ export async function POST(
       });
     }
     if (!canAccessResidentPortal(user.role) || !canCommentOnResidentPortalTicket(user.role)) {
+      if (nativeForm) return nativeRedirect(`${ticketPath(id)}?reason=forbidden`);
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
@@ -75,6 +106,7 @@ export async function POST(
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(`resident-comment:${user.id}:${ip}`, 20, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
+      if (nativeForm) return nativeRedirect(`${ticketPath(id)}?reason=rate`);
       return reject(observability, {
         status: 429,
         code: API_ERROR_CODES.rateLimited,
@@ -84,10 +116,9 @@ export async function POST(
       });
     }
 
-    const { id } = await params;
-    const bodyJson = await request.json().catch(() => ({})) as { body?: unknown };
-    const body = typeof bodyJson.body === "string" ? bodyJson.body.trim() : "";
+    const body = await readCommentBody(request);
     if (!body) {
+      if (nativeForm) return nativeRedirect(`${ticketPath(id)}?reason=invalid`);
       return reject(observability, {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
@@ -97,6 +128,7 @@ export async function POST(
       });
     }
     if (body.length > 5_000) {
+      if (nativeForm) return nativeRedirect(`${ticketPath(id)}?reason=invalid`);
       return reject(observability, {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
@@ -108,6 +140,7 @@ export async function POST(
 
     const ticket = await findAccessibleResidentPortalTicket(user, id);
     if (!ticket?.company_id) {
+      if (nativeForm) return nativeRedirect("/dashboard/boendeportal?reason=missing");
       return reject(observability, {
         status: 404,
         code: API_ERROR_CODES.notFound,
@@ -187,6 +220,7 @@ export async function POST(
       authorType,
     }));
 
+    if (nativeForm) return nativeRedirect(`${ticketPath(ticket.id)}?commented=1`);
     return observability.correlate(NextResponse.json({
       success: true,
       comment: {
@@ -203,6 +237,7 @@ export async function POST(
     observability.logger.error("resident ticket comment create failed", error, observability.elapsed({
       event: "resident_tickets.comments.failed",
     }));
+    if (nativeForm) return nativeRedirect(`${ticketPath(id)}?reason=error`);
     return apiErrorResponse({
       status: 500,
       code: API_ERROR_CODES.internalError,
