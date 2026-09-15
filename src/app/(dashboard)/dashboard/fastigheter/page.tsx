@@ -365,23 +365,13 @@ export default function PropertiesPage() {
                     return (
                       <tr
                         key={property.id}
-                        tabIndex={0}
-                        role="link"
-                        aria-label={`Öppna ${property.name}`}
-                        onClick={() => router.push(`/dashboard/fastigheter/${property.id}`)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            router.push(`/dashboard/fastigheter/${property.id}`);
-                          }
-                        }}
-                        className="group cursor-pointer outline-none transition hover:bg-sand-50/70 focus-visible:bg-petroleum-50/60"
+                        className="group outline-none transition hover:bg-sand-50/70"
                       >
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sand-200 bg-sand-50 text-petroleum-700"><Building2 className="h-4 w-4" /></span>
                             <div className="min-w-0">
-                              <p className="truncate text-[12px] font-semibold text-ink-900">{property.name}</p>
+                              <Link href={`/dashboard/fastigheter/${property.id}`} className="block truncate text-[12px] font-semibold text-ink-900 hover:underline">{property.name}</Link>
                               {property.property_identifier ? <p className="mt-0.5 truncate text-xs text-ink-400">{property.property_identifier}</p> : null}
                             </div>
                           </div>
@@ -400,7 +390,11 @@ export default function PropertiesPage() {
                           ) : <span className="text-ink-400">Ingen planerad åtgärd</span>}
                         </td>
                         <td className="px-3 py-3.5 text-xs text-ink-600">{property.manager_name || "Ej tilldelad"}</td>
-                        <td className="px-5 py-3.5 text-right"><span className="inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">Visa <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></td>
+                        <td className="px-5 py-3.5 text-right">
+                          <Link href={`/dashboard/fastigheter/${property.id}`} aria-label={`Öppna ${property.name}`} className="inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">
+                            Visa <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                          </Link>
+                        </td>
                       </tr>
                     );
                   })}
