@@ -17,6 +17,11 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
 
   const inProperties = current === propertiesRoot || current.startsWith(`${propertiesRoot}/`);
   const creatingProperty = current === `${propertiesRoot}/ny` || current.startsWith(`${propertiesRoot}/ny/`);
+  const propertySegment = current.startsWith(`${propertiesRoot}/`) ? current.slice(propertiesRoot.length + 1) : "";
+  const propertyDetail = Boolean(propertySegment) && !propertySegment.includes("/") && propertySegment !== "ny";
+  if (canCreateProperties(role) && propertyDetail) {
+    return { href: `${current}#spara-fastighet`, label: "Spara fastighet" };
+  }
   if (canCreateProperties(role) && inProperties && !creatingProperty) {
     return { href: `${propertiesRoot}/ny`, label: "Ny fastighet" };
   }
