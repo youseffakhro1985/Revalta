@@ -121,6 +121,11 @@ export function AuditLogCenter() {
     void loadLogs();
   }, [loadLogs]);
 
+  useEffect(() => {
+    if (window.location.hash !== "#auditfilter") return;
+    document.getElementById("auditfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   function resetFilters() {
     setEntityType("");
     setAction("");
@@ -130,6 +135,7 @@ export function AuditLogCenter() {
 
   return (
     <div className="space-y-6">
+      <div id="auditfilter" className="scroll-mt-36">
       <Panel
         title="Systemlogg"
         description="Spårbar historik över viktiga ändringar i organisationen. Endast ägare och administratörer har åtkomst."
@@ -138,6 +144,8 @@ export function AuditLogCenter() {
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Händelsetyp
             <select
+              autoFocus
+              aria-label="Filtrera efter händelsetyp"
               className={premiumFieldClass}
               value={entityType}
               onChange={(event) => {
@@ -163,6 +171,7 @@ export function AuditLogCenter() {
                 setPage(1);
               }}
               placeholder="Exempel: created eller updated"
+              aria-label="Filtrera efter åtgärd"
             />
           </label>
           <label className="space-y-2 text-sm font-medium text-slate-700">
@@ -175,6 +184,7 @@ export function AuditLogCenter() {
                 setPage(1);
               }}
               placeholder="Namn eller e-post"
+              aria-label="Filtrera efter utförare"
             />
           </label>
           <div className="flex flex-wrap items-end gap-2">
@@ -193,6 +203,7 @@ export function AuditLogCenter() {
           </div>
         </div>
       </Panel>
+      </div>
 
       <Panel title="Händelser" description={`${pagination.total.toLocaleString("sv-SE")} loggade händelser`}>
         <div className="space-y-4">
