@@ -46,6 +46,10 @@ describe("public portal ticket form", () => {
     expect(source).toContain('name="rating"');
     expect(source).toContain('name="comment"');
     expect(source).toContain('type="radio"');
+    expect(source).toContain("required");
+    expect(source).not.toContain("disabled={loading || feedbackRating < 1}");
+    expect(source).not.toContain("disabled={loading || !residentComment.trim()}");
+    expect(source).not.toContain("disabled={loading || !attachmentFile}");
     expect(source).not.toContain("searchParams.set(\"email\"");
   });
 });

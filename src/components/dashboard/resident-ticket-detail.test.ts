@@ -13,5 +13,7 @@ describe("resident ticket detail native comments", () => {
     expect(detail).toContain('method="post"');
     expect(detail).toContain('name="body"');
     expect(detail).toContain("event.preventDefault()");
+    expect(detail).not.toContain("disabled={saving || !commentBody.trim()}");
+    expect(detail).toContain("disabled={saving}");
   });
 });

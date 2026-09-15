@@ -558,6 +558,7 @@ export function PublicPortalClient({
                                   type="radio"
                                   name="rating"
                                   value={value}
+                                  required
                                   checked={feedbackRating === value}
                                   onChange={() => setFeedbackRating(value)}
                                   className="sr-only"
@@ -577,7 +578,7 @@ export function PublicPortalClient({
                             placeholder="Valfri kommentar till förvaltningen..."
                             aria-label="Valfri kommentar"
                           />
-                          <button disabled={loading || feedbackRating < 1} className="mt-3 rounded-lg bg-petroleum-600 px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-petroleum-700 transition-colors">
+                          <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-petroleum-600 px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-petroleum-700 transition-colors">
                             Skicka återkoppling
                           </button>
                         </form>
@@ -607,7 +608,7 @@ export function PublicPortalClient({
                       placeholder="Skriv en komplettering eller fråga till förvaltningen..."
                       aria-label="Skicka kommentar"
                     />
-                    <button disabled={loading || !residentComment.trim()} className="mt-3 rounded-lg bg-petroleum-600 px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-petroleum-700 transition-colors">
+                    <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-petroleum-600 px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-50 hover:bg-petroleum-700 transition-colors">
                       Skicka kommentar
                     </button>
                   </form>
@@ -635,7 +636,7 @@ export function PublicPortalClient({
                       onChange={(event) => setAttachmentFile(event.target.files?.[0] || null)}
                       className="mt-3 block w-full rounded-xl border border-sand-200 bg-sand-50/30 p-2.5 text-sm text-ink-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-petroleum-50 file:text-petroleum-700 hover:file:bg-petroleum-100 transition-all cursor-pointer"
                     />
-                    <button disabled={loading || !attachmentFile} className="mt-3 rounded-lg bg-white border border-sand-200 px-4 py-2 text-xs font-semibold text-ink-800 shadow-sm disabled:opacity-50 hover:bg-sand-50 transition-colors">
+                    <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-white border border-sand-200 px-4 py-2 text-xs font-semibold text-ink-800 shadow-sm disabled:opacity-50 hover:bg-sand-50 transition-colors">
                       Ladda upp
                     </button>
                   </form>
