@@ -308,6 +308,79 @@ describe("resident-portal route", () => {
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-lease");
   });
 
+  it("accepts a native form post and redirects to boendeportal without putting the description in the URL", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+    leaseFindFirstMock.mockResolvedValue({
+      id: "lease-1",
+      lease_number: "AVT-1",
+      property_id: "property-1",
+      unit: { designation: "1101" },
+      lease_holder: {
+        id: "holder-1",
+        name: "Ada Boende",
+        contact_name: null,
+        email: "boende@exempel.se",
+        phone: null,
+      },
+    });
+    transactionMock.mockImplementation(async (callback: (tx: {
+      ticket: { create: typeof ticketCreateMock };
+      auditLog: { create: typeof auditLogCreateMock };
+    }) => Promise<unknown>) => callback({
+      ticket: { create: ticketCreateMock },
+      auditLog: { create: auditLogCreateMock },
+    }));
+    ticketCreateMock.mockResolvedValue({ id: "ticket-1", public_reference: "RV-TEST-1" });
+
+    const response = await POST(new Request("https://www.revalta.se/api/resident-portal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "leaseId=lease-1&subject=L%C3%A4ckage&message=Det+droppar+under+diskb%C3%A4nken+sedan+ig%C3%A5r.&category=plumbing&priority=high",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "https://www.revalta.se/dashboard/boendeportal?created=1&ref=RV-TEST-1",
+    );
+    expect(response.headers.get("location")).not.toContain("droppar");
+    expect(ticketCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        reporter_email: "boende@exempel.se",
+        source: "resident_portal",
+      }),
+    }));
+  });
+
+  it("returns the native form to boendeportal with a generic reason when the description is too short", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("https://www.revalta.se/api/resident-portal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "x-request-id": requestId,
+      },
+      body: "leaseId=lease-1&subject=L%C3%A4ckage&message=kort",
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal?reason=invalid");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("blocks viewer from creating tickets with a stable correlated 403", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "user-1",

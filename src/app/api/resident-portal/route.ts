@@ -10,6 +10,7 @@ import {
   isResident,
 } from "@/lib/current-user";
 import { generatePublicReference } from "@/lib/public-portal";
+import { getPublicAppUrl } from "@/lib/app-url";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { loadLegacyRows } from "@/lib/dual-list";
 import { leaseHolderEmailMatch, reporterEmailMatch } from "@/lib/resident-portal-scope";
@@ -28,6 +29,35 @@ const allowedCategories = new Set(["maintenance", "plumbing", "electrical", "hea
 const allowedPriorities = new Set(["low", "normal", "high", "urgent"]);
 const residentDocumentVisibilities = new Set(["resident_all", "resident_property", "resident_unit", "resident_lease"]);
 const activeLeaseStatuses = ["active", "notice"];
+const HOME_PATH = "/dashboard/boendeportal";
+
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readTicketFields(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return {
+      leaseId: String(form?.get("leaseId") || ""),
+      subject: String(form?.get("subject") || ""),
+      message: String(form?.get("message") || ""),
+      category: String(form?.get("category") || "other"),
+      priority: String(form?.get("priority") || "normal"),
+    };
+  }
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return null;
+  return {
+    leaseId: typeof body.leaseId === "string" ? body.leaseId : "",
+    subject: typeof body.subject === "string" ? body.subject : "",
+    message: typeof body.message === "string" ? body.message : "",
+    category: typeof body.category === "string" ? body.category : "other",
+    priority: typeof body.priority === "string" ? body.priority : "normal",
+  };
+}
 
 type DocumentMetadata = {
   name?: unknown;
@@ -321,10 +351,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
+  const nativeForm = isNativeFormPost(request);
+
+  const nativeRedirect = (path: string) => {
+    const response = NextResponse.redirect(new URL(path, getPublicAppUrl(request.url)), 303);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    return observability.correlate(response);
+  };
 
   try {
     const user = await getCurrentUser();
     if (!user) {
+      if (nativeForm) return nativeRedirect("/login");
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -333,6 +372,7 @@ export async function POST(request: Request) {
       });
     }
     if (!user.company_id) {
+      if (nativeForm) return nativeRedirect(`${HOME_PATH}?reason=error`);
       return reject(observability, {
         status: 400,
         code: API_ERROR_CODES.validationFailed,
@@ -342,6 +382,7 @@ export async function POST(request: Request) {
       });
     }
     if (!canCreateResidentPortalTicket(user.role)) {
+      if (nativeForm) return nativeRedirect(`${HOME_PATH}?reason=forbidden`);
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
@@ -351,21 +392,24 @@ export async function POST(request: Request) {
       });
     }
 
-    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-    const validationFailure = (message: string, reason: string) => reject(observability, {
-      status: 400,
-      code: API_ERROR_CODES.validationFailed,
-      message,
-      event: "resident_portal.ticket.validation_failed",
-      context: { reason, userId: user.id, companyId: user.company_id },
-    });
-    if (!body) return validationFailure("Ogiltig förfrågan", "invalid_body");
+    const fields = await readTicketFields(request);
+    const validationFailure = (message: string, reason: string, nativeReason: "invalid" | "error" = "invalid") => {
+      if (nativeForm) return nativeRedirect(`${HOME_PATH}?reason=${nativeReason}`);
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message,
+        event: "resident_portal.ticket.validation_failed",
+        context: { reason, userId: user.id, companyId: user.company_id },
+      });
+    };
+    if (!fields) return validationFailure("Ogiltig förfrågan", "invalid_body");
 
-    const leaseId = String(body.leaseId || "").trim();
-    const subject = String(body.subject || "").trim();
-    const message = String(body.message || "").trim();
-    const category = String(body.category || "other").trim();
-    const priority = String(body.priority || "normal").trim();
+    const leaseId = fields.leaseId.trim();
+    const subject = fields.subject.trim();
+    const message = fields.message.trim();
+    const category = fields.category.trim();
+    const priority = fields.priority.trim();
     const residentView = isResident(user.role);
 
     if (!leaseId || !subject || message.length < 10) return validationFailure("Hyresavtal, ämne och en tydlig beskrivning krävs", "missing_required_fields");
@@ -390,6 +434,7 @@ export async function POST(request: Request) {
       },
     });
     if (!lease) {
+      if (nativeForm) return nativeRedirect(`${HOME_PATH}?reason=missing`);
       return reject(observability, {
         status: 404,
         code: API_ERROR_CODES.notFound,
@@ -466,11 +511,18 @@ export async function POST(request: Request) {
       ticketId: ticket.id,
       residentView,
     }));
+    if (nativeForm) {
+      const url = new URL(HOME_PATH, getPublicAppUrl(request.url));
+      url.searchParams.set("created", "1");
+      if (ticket.public_reference) url.searchParams.set("ref", ticket.public_reference);
+      return nativeRedirect(`${url.pathname}${url.search}`);
+    }
     return successResponse(observability, { ticket }, { status: 201 });
   } catch (error) {
     observability.logger.error("resident portal ticket create failed", error, observability.elapsed({
       event: "resident_portal.ticket.failed",
     }));
+    if (nativeForm) return nativeRedirect(`${HOME_PATH}?reason=error`);
     return apiErrorResponse({
       status: 500,
       code: API_ERROR_CODES.internalError,
