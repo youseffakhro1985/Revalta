@@ -66,7 +66,7 @@ const existing = {
 const updated = {
   id: "ticket-1",
   title: "Läckande kran",
-  status: "planned",
+  status: "received",
   priority: "normal",
   due_date: null,
   closed_at: null,
@@ -77,7 +77,7 @@ function patchRequest() {
   return new Request("https://www.revalta.se/api/tickets/ticket-1", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status: "planned" }),
+    body: JSON.stringify({ status: "received" }),
   });
 }
 
@@ -110,7 +110,7 @@ describe("ticket mutation post-commit reliability", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toMatchObject({ success: true, ticket: { id: "ticket-1", status: "planned" } });
+    expect(body).toMatchObject({ success: true, ticket: { id: "ticket-1", status: "received" } });
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(auditLogCreateMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({

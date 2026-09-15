@@ -67,7 +67,7 @@ const categoryLabels: Record<string, string> = {
   heating: "Värme",
   outdoor: "Utemiljö",
 };
-const openStatuses = new Set(["new", "received", "in_progress", "waiting"]);
+const openStatuses = new Set(["new", "received", "assigned", "planned", "in_progress", "waiting"]);
 const closedStatuses = new Set(["completed", "closed"]);
 const dateTime = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" });
 const timeOnly = new Intl.DateTimeFormat("sv-SE", { hour: "2-digit", minute: "2-digit" });

@@ -235,8 +235,32 @@ describe("tickets/[id] GET", () => {
     expect(body.ticket.reporter_email).toBe("anna@example.se");
     expect(body.ticket.residentFeedback).toBeNull();
     expect(body.ticket.attachments[0].data_url).toBe("/api/attachments/attachment-1");
-    expect(body.ticket.allowedTransitions).toEqual(["planned", "assigned", "in_progress", "cancelled"]);
+    expect(body.ticket.allowedTransitions).toEqual(["received", "in_progress", "closed"]);
     expect(body.permissions).toEqual({ canManage: true, canAssign: true });
+  });
+
+  it("keeps stored received status instead of coercing it to new", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue({ ...baseTicketRow, status: "received" });
+
+    const response = await GET(makeRequest("GET"), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.status).toBe("received");
+    expect(body.ticket.allowedTransitions).toEqual(["in_progress", "waiting", "completed", "closed"]);
+  });
+
+  it("normalizes leftover assigned status to received", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue({ ...baseTicketRow, status: "assigned" });
+
+    const response = await GET(makeRequest("GET"), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.status).toBe("received");
+    expect(body.ticket.allowedTransitions).toEqual(["in_progress", "waiting", "completed", "closed"]);
   });
 
   it("redacts reporter PII for roles without leasing data access", async () => {
@@ -408,7 +432,7 @@ describe("tickets/[id] PATCH", () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body.error).toBe("Ogiltig arbetsorderstatus");
+    expect(body.error).toBe("Ogiltig ärendestatus");
     expect(ticketUpdateManyMock).not.toHaveBeenCalled();
   });
 
@@ -442,7 +466,7 @@ describe("tickets/[id] PATCH", () => {
       due_date: null,
     });
 
-    const response = await PATCH(makeRequest("PATCH", { status: "planned" }), { params });
+    const response = await PATCH(makeRequest("PATCH", { status: "new" }), { params });
     const body = await response.json();
 
     expect(response.status).toBe(409);
@@ -462,7 +486,7 @@ describe("tickets/[id] PATCH", () => {
       due_date: null,
     });
 
-    const response = await PATCH(makeRequest("PATCH", { status: "assigned" }), { params });
+    const response = await PATCH(makeRequest("PATCH", { status: "in_progress" }), { params });
     const body = await response.json();
 
     expect(response.status).toBe(400);
@@ -489,7 +513,7 @@ describe("tickets/[id] PATCH", () => {
         ticket: { updateMany: ticketUpdateManyMock, findFirst: vi.fn().mockResolvedValue({
           id: "ticket-1",
           title: "Läckande kran",
-          status: "assigned",
+          status: "received",
           priority: "normal",
           due_date: null,
           closed_at: null,
@@ -508,7 +532,7 @@ describe("tickets/[id] PATCH", () => {
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(body.ticket.status).toBe("assigned");
+    expect(body.ticket.status).toBe("received");
     expect(ticketUpdateManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "ticket-1", company_id: "company-1", deleted_at: null },
@@ -536,6 +560,47 @@ describe("tickets/[id] PATCH", () => {
         emailContent: expect.objectContaining({
           subject: "Tilldelad: Läckande kran",
         }),
+      }),
+    );
+  });
+
+  it("heals leftover assigned status to received on a later update", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", email: "user@example.se", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      title: "Läckande kran",
+      status: "assigned",
+      priority: "normal",
+      assigned_to_id: "tech-1",
+      due_date: null,
+      public_reference: "RV-12",
+      reporter_email: "anna@example.se",
+      reporter_phone: "0701234567",
+    });
+    transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) => {
+      const tx = {
+        ticket: { updateMany: ticketUpdateManyMock, findFirst: vi.fn().mockResolvedValue({
+          id: "ticket-1",
+          title: "Läckande kran",
+          status: "received",
+          priority: "high",
+          due_date: null,
+          closed_at: null,
+          assigned_to: { id: "tech-1", name: "Tekniker", email: "tech@example.se" },
+        }) },
+        auditLog: { create: auditLogCreateMock },
+      };
+      return callback(tx);
+    });
+
+    const response = await PATCH(makeRequest("PATCH", { priority: "high" }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.status).toBe("received");
+    expect(ticketUpdateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "received", priority: "high" }),
       }),
     );
   });
@@ -579,19 +644,24 @@ describe("tickets/[id] PATCH", () => {
     );
   });
 
-  it("emails the assignee when a ticket is cancelled", async () => {
-    mockAssignedTicketPatch("in_progress", "cancelled");
+  it("rejects cancelled because it is not a ticket status", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      title: "Läckande kran",
+      status: "in_progress",
+      priority: "normal",
+      assigned_to_id: "tech-1",
+      due_date: null,
+    });
 
     const response = await PATCH(makeRequest("PATCH", { status: "cancelled" }), { params });
+    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(queueTicketNotificationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "user-1" }),
-      expect.objectContaining({
-        recipient: "tech@example.se",
-        emailContent: expect.objectContaining({ subject: "Avbruten: Läckande kran" }),
-      }),
-    );
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Ogiltig ärendestatus");
+    expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+    expect(queueTicketNotificationMock).not.toHaveBeenCalled();
   });
 
   it("emails the assignee when a paused ticket is resumed", async () => {
@@ -606,7 +676,7 @@ describe("tickets/[id] PATCH", () => {
         recipient: "tech@example.se",
         emailContent: expect.objectContaining({
           subject: "Återupptagen: Läckande kran",
-          text: expect.stringContaining("Pågående"),
+          text: expect.stringContaining("Pågår"),
         }),
       }),
     );

@@ -15,6 +15,7 @@ import {
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 import { createRouteObservability } from "@/lib/route-observability";
+import { normalizeTicketStatus, ticketStatusFilterValues } from "@/lib/ticket-lifecycle";
 
 const ROUTE = "/api/tickets";
 const DEFAULT_PAGE_SIZE = 50;
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
     const where = {
       ...ticketActive,
       ...tenantWhere(user),
-      ...(status ? { status } : {}),
+      ...(status ? { status: { in: ticketStatusFilterValues(status) } } : {}),
       ...(priority ? { priority } : {}),
       ...(propertyId ? { property_id: propertyId } : {}),
       ...(scopedAssignedToId ? { assigned_to_id: scopedAssignedToId } : {}),
@@ -154,7 +155,10 @@ export async function GET(request: Request) {
     }));
 
     return successResponse(observability, {
-      tickets,
+      tickets: tickets.map((ticket) => ({
+        ...ticket,
+        status: normalizeTicketStatus(ticket.status),
+      })),
       pagination: {
         page,
         pageSize,

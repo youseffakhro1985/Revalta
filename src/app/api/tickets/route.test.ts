@@ -231,6 +231,27 @@ describe("GET /api/tickets pagination", () => {
     );
   });
 
+  it("normalizes leftover assigned rows to received and expands received filters", async () => {
+    ticketFindManyMock.mockResolvedValue([{
+      id: "ticket-1",
+      title: "Läckande kran",
+      status: "assigned",
+      priority: "normal",
+    }]);
+    ticketCountMock.mockResolvedValue(1);
+
+    const response = await GET(getRequest("?status=received"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        status: { in: ["received", "assigned", "planned"] },
+      }),
+    }));
+    expect(body.tickets[0].status).toBe("received");
+  });
+
   it("returns a safe correlated 401 without touching ticket data", async () => {
     getCurrentUserMock.mockResolvedValue(null);
 

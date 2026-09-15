@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { canExportTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
+import { normalizeTicketStatus } from "@/lib/ticket-lifecycle";
 
 const logger = createLogger({ route: "/api/tickets/export" });
 
@@ -44,7 +45,7 @@ export async function GET() {
     const rows = tickets.map((ticket) => [
       ticket.public_reference,
       ticket.title,
-      ticket.status,
+      normalizeTicketStatus(ticket.status),
       ticket.priority,
       ticket.category,
       ticket.property?.name,

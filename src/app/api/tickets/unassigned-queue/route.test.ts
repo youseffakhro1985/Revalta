@@ -64,8 +64,31 @@ describe("GET /api/tickets/unassigned-queue", () => {
       id: "ticket-1",
       href: "/dashboard/felanmalan/ticket-1",
       publicReference: "RV-1001",
+      status: "new",
+      statusLabel: "Ny",
     }));
     expect(body.assignees).toEqual([expect.objectContaining({ id: "tech-1", name: "Tina Tekniker" })]);
     expect(body.selfId).toBe("mgr-1");
+  });
+
+  it("normalizes leftover assigned tickets to received", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "mgr-1", company_id: "company-1", role: "manager" });
+    ticketFindManyMock.mockResolvedValue([{
+      id: "ticket-2",
+      title: "Trasig dörr",
+      status: "assigned",
+      priority: "normal",
+      public_reference: "RV-1002",
+      created_at: new Date("2026-09-14T08:00:00.000Z"),
+      property: { id: "prop-1", name: "Storgatan 12" },
+    }]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.tickets[0]).toEqual(expect.objectContaining({
+      status: "received",
+      statusLabel: "Mottagen",
+    }));
   });
 });
