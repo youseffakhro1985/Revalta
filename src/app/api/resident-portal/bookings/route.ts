@@ -8,13 +8,20 @@ import {
   getCurrentUser,
   isResident,
   requireCompanyMember,
+  type CompanyUser,
 } from "@/lib/current-user";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { listResidentMatchedLeases } from "@/lib/resident-portal-leases";
+import {
+  mapResidentPortalBooking,
+  mapResidentPortalLease,
+} from "@/lib/resident-portal-bookings";
 import { createRouteObservability } from "@/lib/route-observability";
+import { getPublicAppUrl } from "@/lib/app-url";
 
 const ROUTE = "/api/resident-portal/bookings";
 const action = "booking.created";
+const HOME_PATH = "/dashboard/boendeportal/bokningar";
 const SUCCESS_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
   "CDN-Cache-Control": "no-store",
@@ -51,6 +58,80 @@ function reject(
     code: options.code,
     message: options.message,
     requestId: observability.requestId,
+  });
+}
+
+function isNativeFormPost(request: Request) {
+  const contentType = request.headers.get("content-type") || "";
+  return contentType.includes("application/x-www-form-urlencoded")
+    || contentType.includes("multipart/form-data");
+}
+
+async function readBookingFields(request: Request) {
+  if (isNativeFormPost(request)) {
+    const form = await request.formData().catch(() => null);
+    return {
+      intent: String(form?.get("intent") || ""),
+      leaseId: String(form?.get("leaseId") || ""),
+      resource: String(form?.get("resource") || ""),
+      start: String(form?.get("start") || ""),
+      end: String(form?.get("end") || ""),
+      note: String(form?.get("note") || ""),
+      bookingId: String(form?.get("bookingId") || ""),
+      status: String(form?.get("status") || ""),
+    };
+  }
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  return {
+    intent: typeof body.intent === "string" ? body.intent : "",
+    leaseId: String(body.leaseId || ""),
+    resource: String(body.resource || ""),
+    start: String(body.start || ""),
+    end: String(body.end || ""),
+    note: String(body.note || ""),
+    bookingId: String(body.bookingId || ""),
+    status: String(body.status || ""),
+  };
+}
+
+function nativeRedirect(
+  observability: ReturnType<typeof createRouteObservability>,
+  request: Request,
+  path: string,
+) {
+  const response = NextResponse.redirect(new URL(path, getPublicAppUrl(request.url)), 303);
+  response.headers.set("Cache-Control", "no-store");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  return observability.correlate(response);
+}
+
+async function cancelOwnBooking(user: CompanyUser, bookingId: string) {
+  return db.$transaction(async (tx) => {
+    const booking = await tx.booking.findFirst({
+      where: {
+        id: bookingId,
+        company_id: user.company_id,
+        created_by_id: user.id,
+        property: { deleted_at: null },
+      },
+      select: { id: true, status: true },
+    });
+    if (!booking) return null;
+
+    const cancelled = await tx.booking.update({
+      where: { id: booking.id },
+      data: { status: "cancelled" },
+      select: { id: true, status: true },
+    });
+
+    await writeAuditLog(user, {
+      entityType: "booking",
+      entityId: booking.id,
+      action: "booking.cancelled",
+      metadata: { accessMode: "resident_self_service", previousStatus: booking.status },
+    }, tx);
+
+    return cancelled;
   });
 }
 
@@ -101,26 +182,8 @@ export async function GET(request: Request) {
     }));
 
     return successResponse(observability, {
-      leases: leases.map((lease) => ({
-        id: lease.id,
-        leaseNumber: lease.lease_number,
-        property: lease.property,
-        unit: lease.unit,
-        holderName: lease.lease_holder.contact_name || lease.lease_holder.name,
-      })),
-      bookings: bookings.map((booking) => ({
-        id: booking.id,
-        property: booking.property,
-        resource: booking.resource,
-        residentName: booking.resident_name,
-        unit: booking.unit,
-        start: booking.start_at.toISOString(),
-        end: booking.end_at.toISOString(),
-        note: booking.note,
-        status: booking.status,
-        createdByMe: booking.created_by_id === user.id,
-        createdAt: booking.created_at,
-      })),
+      leases: leases.map(mapResidentPortalLease),
+      bookings: bookings.map((booking) => mapResidentPortalBooking(booking, user.id)),
     });
   } catch (error) {
     observability.logger.error("resident booking list failed", error, observability.elapsed({
@@ -137,10 +200,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
+  const nativeForm = isNativeFormPost(request);
+  let intent = "create";
 
   try {
     const user = requireCompanyMember(await getCurrentUser());
     if (!user) {
+      if (nativeForm) return nativeRedirect(observability, request, "/login");
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -149,6 +215,7 @@ export async function POST(request: Request) {
       });
     }
     if (!canAccessResidentPortal(user.role) || !isResident(user.role)) {
+      if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=forbidden`);
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
@@ -158,9 +225,49 @@ export async function POST(request: Request) {
       });
     }
 
+    const fields = await readBookingFields(request);
+    intent = fields.intent.trim() || "create";
+
+    if (intent === "cancel") {
+      const bookingId = fields.bookingId.trim();
+      const status = fields.status.trim();
+      if (!bookingId || status !== "cancelled") {
+        if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=invalid`);
+        return reject(observability, {
+          status: 400,
+          code: API_ERROR_CODES.validationFailed,
+          message: "Endast avbokning stöds",
+          event: "resident_bookings.cancel.validation_failed",
+          context: { reason: "invalid_cancel_request", userId: user.id, companyId: user.company_id },
+        });
+      }
+
+      const updated = await cancelOwnBooking(user, bookingId);
+      if (!updated) {
+        if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=missing`);
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Bokningen hittades inte",
+          event: "resident_bookings.cancel.not_found",
+          context: { userId: user.id, companyId: user.company_id },
+        });
+      }
+
+      observability.logger.info("resident booking cancelled", observability.elapsed({
+        event: "resident_bookings.cancel.completed",
+        userId: user.id,
+        companyId: user.company_id,
+        bookingId: updated.id,
+      }));
+      if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?cancelled=1`);
+      return successResponse(observability, { success: true, booking: updated });
+    }
+
     const ip = getClientIp(request);
     const rateLimit = await checkRateLimit(`resident-booking:${user.id}:${ip}`, 20, 60 * 60 * 1000);
     if (!rateLimit.allowed) {
+      if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=rate`);
       return reject(observability, {
         status: 429,
         code: API_ERROR_CODES.rateLimited,
@@ -170,19 +277,21 @@ export async function POST(request: Request) {
       });
     }
 
-    const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    const leaseId = String(body.leaseId || "").trim();
-    const resource = String(body.resource || "").trim();
-    const start = new Date(String(body.start || ""));
-    const end = new Date(String(body.end || ""));
-    const note = String(body.note || "").trim();
-    const validationFailure = (message: string, reason: string) => reject(observability, {
-      status: 400,
-      code: API_ERROR_CODES.validationFailed,
-      message,
-      event: "resident_bookings.create.validation_failed",
-      context: { reason, userId: user.id, companyId: user.company_id },
-    });
+    const leaseId = fields.leaseId.trim();
+    const resource = fields.resource.trim();
+    const start = new Date(String(fields.start || ""));
+    const end = new Date(String(fields.end || ""));
+    const note = fields.note.trim();
+    const validationFailure = (message: string, reason: string) => {
+      if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=invalid`);
+      return reject(observability, {
+        status: 400,
+        code: API_ERROR_CODES.validationFailed,
+        message,
+        event: "resident_bookings.create.validation_failed",
+        context: { reason, userId: user.id, companyId: user.company_id },
+      });
+    };
 
     if (!leaseId || !resource || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
       return validationFailure("Kontrollera avtal, resurs och tid", "invalid_booking_input");
@@ -194,6 +303,7 @@ export async function POST(request: Request) {
     const leases = await listResidentMatchedLeases(user.company_id, user.email);
     const lease = leases.find((item) => item.id === leaseId);
     if (!lease) {
+      if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=missing`);
       return reject(observability, {
         status: 404,
         code: API_ERROR_CODES.notFound,
@@ -251,6 +361,7 @@ export async function POST(request: Request) {
           note: true,
           status: true,
           created_at: true,
+          created_by_id: true,
           property: { select: { id: true, name: true, address: true, city: true } },
         },
       });
@@ -279,6 +390,7 @@ export async function POST(request: Request) {
     });
 
     if (bookingResult.conflict) {
+      if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=conflict`);
       return reject(observability, {
         status: 409,
         code: API_ERROR_CODES.conflict,
@@ -289,6 +401,15 @@ export async function POST(request: Request) {
     }
 
     const booking = bookingResult.booking;
+    if (!booking) {
+      if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=error`);
+      return apiErrorResponse({
+        status: 500,
+        code: API_ERROR_CODES.internalError,
+        message: "Internt serverfel",
+        requestId: observability.requestId,
+      });
+    }
     observability.logger.info("resident booking created", observability.elapsed({
       event: "resident_bookings.create.completed",
       userId: user.id,
@@ -297,26 +418,20 @@ export async function POST(request: Request) {
       leaseId: lease.id,
     }));
 
+    if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?created=1`);
     return successResponse(observability, {
       success: true,
-      booking: {
-        id: booking.id,
-        property: booking.property,
-        resource: booking.resource,
-        residentName: booking.resident_name,
-        unit: booking.unit,
-        start: booking.start_at.toISOString(),
-        end: booking.end_at.toISOString(),
-        note: booking.note,
-        status: booking.status,
-        createdByMe: true,
-        createdAt: booking.created_at,
-      },
+      booking: mapResidentPortalBooking(booking, user.id),
     }, { status: 201 });
   } catch (error) {
-    observability.logger.error("resident booking create failed", error, observability.elapsed({
-      event: "resident_bookings.create.failed",
-    }));
+    observability.logger.error(
+      intent === "cancel" ? "resident booking cancel failed" : "resident booking create failed",
+      error,
+      observability.elapsed({
+        event: intent === "cancel" ? "resident_bookings.cancel.failed" : "resident_bookings.create.failed",
+      }),
+    );
+    if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=error`);
     return apiErrorResponse({
       status: 500,
       code: API_ERROR_CODES.internalError,
@@ -362,33 +477,7 @@ export async function PATCH(request: Request) {
       });
     }
 
-    const updated = await db.$transaction(async (tx) => {
-      const booking = await tx.booking.findFirst({
-        where: {
-          id: bookingId,
-          company_id: user.company_id,
-          created_by_id: user.id,
-          property: { deleted_at: null },
-        },
-        select: { id: true, status: true },
-      });
-      if (!booking) return null;
-
-      const cancelled = await tx.booking.update({
-        where: { id: booking.id },
-        data: { status: "cancelled" },
-        select: { id: true, status: true },
-      });
-
-      await writeAuditLog(user, {
-        entityType: "booking",
-        entityId: booking.id,
-        action: "booking.cancelled",
-        metadata: { accessMode: "resident_self_service", previousStatus: booking.status },
-      }, tx);
-
-      return cancelled;
-    });
+    const updated = await cancelOwnBooking(user, bookingId);
 
     if (!updated) {
       return reject(observability, {

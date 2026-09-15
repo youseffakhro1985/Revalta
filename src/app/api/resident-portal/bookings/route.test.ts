@@ -92,6 +92,33 @@ function request(method = "GET", body?: Record<string, unknown>) {
   });
 }
 
+function nativeRequest(body: string) {
+  return new Request("https://www.revalta.se/api/resident-portal/bookings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "x-request-id": requestId,
+    },
+    body,
+  });
+}
+
+function createdBooking() {
+  return {
+    id: "booking-1",
+    resource: "Tvättstuga",
+    resident_name: "Boende Test",
+    unit: "1201",
+    start_at: new Date("2026-08-01T10:00:00.000Z"),
+    end_at: new Date("2026-08-01T12:00:00.000Z"),
+    note: "Ta med nyckel",
+    status: "confirmed",
+    created_at: new Date("2026-07-27T10:00:00.000Z"),
+    created_by_id: "user-resident",
+    property: lease.property,
+  };
+}
+
 function bookingInput() {
   return {
     leaseId: "lease-1",
@@ -169,18 +196,7 @@ describe("resident-portal bookings route", () => {
 
   it("creates a booking on a matched lease with lock, write and audit in one transaction", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
-    bookingCreateMock.mockResolvedValue({
-      id: "booking-1",
-      resource: "Tvättstuga",
-      resident_name: "Boende Test",
-      unit: "1201",
-      start_at: new Date("2026-08-01T10:00:00.000Z"),
-      end_at: new Date("2026-08-01T12:00:00.000Z"),
-      note: "Ta med nyckel",
-      status: "confirmed",
-      created_at: new Date("2026-07-27T10:00:00.000Z"),
-      property: lease.property,
-    });
+    bookingCreateMock.mockResolvedValue(createdBooking());
 
     const response = await POST(request("POST", bookingInput()));
 
@@ -386,5 +402,51 @@ describe("resident-portal bookings route", () => {
       expect.any(Error),
       expect.objectContaining({ event: "resident_bookings.list.failed" }),
     );
+  });
+
+  it("accepts a native form booking and redirects without putting note or times in the URL", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    bookingCreateMock.mockResolvedValue(createdBooking());
+
+    const response = await POST(nativeRequest(
+      "intent=create&leaseId=lease-1&resource=Tv%C3%A4ttstuga&start=2026-08-01T10:00:00.000Z&end=2026-08-01T12:00:00.000Z&note=Ta+med+nyckel",
+    ));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal/bokningar?created=1");
+    expect(response.headers.get("location")).not.toContain("nyckel");
+    expect(response.headers.get("location")).not.toContain("2026-08-01");
+    expect(response.headers.get("location")).not.toContain("Tv");
+    expect(bookingCreateMock).toHaveBeenCalled();
+  });
+
+  it("returns the native form to bokningar with a generic reason when the times are invalid", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+
+    const response = await POST(nativeRequest(
+      "intent=create&leaseId=lease-1&resource=Tv%C3%A4ttstuga&start=&end=&note=hemlig-anteckning",
+    ));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal/bokningar?reason=invalid");
+    expect(response.headers.get("location")).not.toContain("hemlig");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("cancels a booking from a native form POST and redirects without leaking the booking id", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    bookingFindFirstMock.mockResolvedValue({ id: "booking-1", status: "confirmed" });
+    bookingUpdateMock.mockResolvedValue({ id: "booking-1", status: "cancelled" });
+
+    const response = await POST(nativeRequest("intent=cancel&bookingId=booking-1&status=cancelled"));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal/bokningar?cancelled=1");
+    expect(response.headers.get("location")).not.toContain("booking-1");
+    expect(checkRateLimitMock).not.toHaveBeenCalled();
+    expect(bookingUpdateMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "booking-1" },
+      data: { status: "cancelled" },
+    }));
   });
 });
