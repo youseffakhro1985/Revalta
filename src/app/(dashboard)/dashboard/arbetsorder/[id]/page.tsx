@@ -11,7 +11,7 @@ import { OperationalActivityPanel } from "@/components/dashboard/operational-act
 import { WorkOrderExecutionPanel } from "@/components/dashboard/work-order-execution-panel";
 import { WorkOrderEconomicsPanel } from "@/components/dashboard/work-order-economics-panel";
 import { WorkOrderReportingPanel } from "@/components/dashboard/work-order-reporting-panel";
-import { useWorkOrderEditLock } from "@/hooks/use-work-order-edit-lock";
+import { useSharedWorkOrderEditLock } from "@/components/dashboard/work-order-edit-lock-provider";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type EnterpriseState = {
@@ -95,7 +95,7 @@ export default function WorkOrderDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const editLock = useWorkOrderEditLock(id, Boolean(transitions?.canManage));
+  const editLock = useSharedWorkOrderEditLock();
 
   const load = useCallback(async () => {
     setError("");
