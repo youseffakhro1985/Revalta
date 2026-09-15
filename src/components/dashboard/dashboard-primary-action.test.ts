@@ -73,7 +73,12 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/felanmalan?create=1",
       label: "Nytt ärende",
     });
-    expect(dashboardPrimaryCreateAction("/dashboard/felanmalan/ticket-1", "technician")?.label).toBe("Nytt ärende");
+    expect(dashboardPrimaryCreateAction("/dashboard/felanmalan/ticket-1", "technician")).toEqual({
+      href: "/dashboard/felanmalan/ticket-1#spara-arende",
+      label: "Spara ärende",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/felanmalan/ticket-1", "owner")?.label).toBe("Spara ärende");
+    expect(dashboardPrimaryCreateAction("/dashboard/felanmalan/ticket-1", "viewer")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/felanmalan", "viewer")).toBeNull();
   });
 

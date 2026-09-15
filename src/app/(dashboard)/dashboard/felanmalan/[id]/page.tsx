@@ -187,6 +187,12 @@ export default function TicketDetailPage() {
     return () => { mounted = false; };
   }, [params.id, router]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-arende") return;
+    document.getElementById("spara-arende")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, ticket]);
+
   async function updateTicket(event: React.FormEvent) {
     event.preventDefault();
     setError(""); setSuccess(""); setSaving(true);
@@ -433,16 +439,18 @@ export default function TicketDetailPage() {
     }
   }
 
-  if (loading) return <div className="h-72 animate-pulse rounded-3xl bg-sand-100" />;
-  if (!ticket) return <InlineAlert>{error || "Ärendet hittades inte"}</InlineAlert>;
+  if (!loading && !ticket) return <InlineAlert>{error || "Ärendet hittades inte"}</InlineAlert>;
+
+  const formLocked = saving || loading || !ticket;
 
   return <div className="mx-auto max-w-7xl space-y-7">
     <Link href="/dashboard/felanmalan" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900"><ArrowLeft className="h-4 w-4" />Tillbaka till alla ärenden</Link>
-    <PageHeader eyebrow="Felanmälan och service" title={ticket.title} description={`Ärende #${ticket.id.slice(0, 8)} · Skapat ${dateFormatter.format(new Date(ticket.created_at))}${ticket.due_date ? ` · SLA ${getSlaLabel(ticket.priority)}, senast ${dateFormatter.format(new Date(ticket.due_date))}` : ""}`} />
+    <PageHeader eyebrow="Felanmälan och service" title={ticket?.title || "Ärende"} description={ticket ? `Ärende #${ticket.id.slice(0, 8)} · Skapat ${dateFormatter.format(new Date(ticket.created_at))}${ticket.due_date ? ` · SLA ${getSlaLabel(ticket.priority)}, senast ${dateFormatter.format(new Date(ticket.due_date))}` : ""}` : "Status, prioritet och ansvarig för ärendet."} />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      {ticket ? (
       <div className="space-y-6">
         <Panel title="Ärendedetaljer" description="Samlad information, dokumentation och historik för ärendet." bodyClassName="space-y-6 p-6 sm:p-8">
           <div className="flex flex-wrap gap-2">
@@ -495,18 +503,20 @@ export default function TicketDetailPage() {
           <div className="border-t border-sand-200 pt-6"><h3 className="font-semibold text-ink-900">Tidslinje</h3><div className="mt-4 space-y-3">{timeline.map((item) => <div key={`${item.type}-${item.id}`} className="flex gap-3"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-petroleum-600" /><div><p className="text-sm font-semibold text-ink-900">{item.title}</p><p className="mt-1 text-sm text-ink-500">{item.description}</p><p className="mt-1 text-xs text-ink-500">{dateFormatter.format(new Date(item.created_at))}</p></div></div>)}</div></div>
         </Panel>
       </div>
+      ) : <div className="h-72 animate-pulse rounded-3xl bg-sand-100" aria-hidden="true" />}
 
       <aside className="space-y-6">
         <Panel title="Arbetsorder" description="Operativ åtgärd kopplad till ärendet." bodyClassName="p-6">
           {workOrder ? <div className="space-y-4"><div className="rounded-2xl border border-petroleum-100 bg-petroleum-50 p-4"><div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-petroleum-700" /><div><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">Kopplad arbetsorder</p><p className="mt-1 font-semibold text-ink-950">{workOrder.title}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-petroleum-700">{statusLabels[workOrder.status] || workOrder.status}</span><span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-ink-600">{priorityLabels[workOrder.priority] || workOrder.priority}</span></div></div><Link href={`/dashboard/arbetsorder/${workOrder.id}`} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />Öppna arbetsorder</Link></div> : <div className="space-y-4"><p className="text-sm leading-6 text-ink-600">Skapa en arbetsorder med ärendets titel, beskrivning, prioritet, fastighet och ansvarig.</p><button type="button" onClick={createWorkOrder} disabled={!canCreateWorkOrder || creatingWorkOrder} className={`${premiumPrimaryButtonClass} w-full justify-center`}><BriefcaseBusiness className="h-4 w-4" />{creatingWorkOrder ? "Skapar arbetsorder…" : "Skapa arbetsorder"}</button>{!canCreateWorkOrder ? <p className="text-xs font-medium text-warning-700">Fastighet måste väljas innan arbetsorder kan skapas.</p> : null}</div>}
         </Panel>
 
+        <div id="spara-arende" className="scroll-mt-36">
         <Panel title="Styr ärendet" description="Status, prioritet och ansvarig." bodyClassName="p-6">
           <form onSubmit={updateTicket} className="space-y-4">
-            <SelectField label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} />
-            <SelectField label="Prioritet" value={priority} onChange={setPriority} options={Object.entries(priorityLabels)} />
-            <label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select disabled={!permissions.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>{!permissions.canAssign ? <span className="mt-2 block text-xs text-ink-500">Endast förvaltare och administratörer kan ändra ansvarig.</span> : null}</label>
-            <button disabled={!permissions.canManage || saving} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button>
+            <SelectField autoFocus disabled={formLocked} label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} />
+            <SelectField disabled={formLocked} label="Prioritet" value={priority} onChange={setPriority} options={Object.entries(priorityLabels)} />
+            <label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select disabled={formLocked || !permissions.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass} aria-label="Ansvarig"><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>{!permissions.canAssign && !loading ? <span className="mt-2 block text-xs text-ink-500">Endast förvaltare och administratörer kan ändra ansvarig.</span> : null}</label>
+            <button disabled={formLocked || !permissions.canManage} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button>
           </form>
           {permissions.canAssign ? <div className="mt-5 border-t border-sand-100 pt-4">
             <button
@@ -519,6 +529,7 @@ export default function TicketDetailPage() {
             </button>
           </div> : null}
         </Panel>
+        </div>
 
         <Panel title="Ny kommentar" description="Dokumentera nästa åtgärd." bodyClassName="p-6"><form onSubmit={addComment}><textarea required minLength={2} rows={4} value={comment} onChange={(event) => setComment(event.target.value)} className={premiumTextareaClass} placeholder="Skriv en uppdatering…" aria-label="Skriv en uppdatering…" /><button disabled={saving} className={`${premiumPrimaryButtonClass} mt-4 w-full justify-center`}><Send className="h-4 w-4" />Lägg till kommentar</button></form></Panel>
 
@@ -654,6 +665,6 @@ function Info({ label, value }: { label: string; value: string }) {
 function Insight({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl bg-sand-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{label}</p><p className="mt-2 text-sm leading-6 text-ink-700">{value}</p></div>;
 }
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]> }) {
-  return <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>;
+function SelectField({ label, value, onChange, options, disabled, autoFocus }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]>; disabled?: boolean; autoFocus?: boolean }) {
+  return <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">{label}</span><select autoFocus={autoFocus} disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass} aria-label={label}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>;
 }

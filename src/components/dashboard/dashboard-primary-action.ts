@@ -56,6 +56,11 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
 
   const ticketsRoot = "/dashboard/felanmalan";
   const inTickets = current === ticketsRoot || current.startsWith(`${ticketsRoot}/`);
+  const ticketSegment = current.startsWith(`${ticketsRoot}/`) ? current.slice(ticketsRoot.length + 1) : "";
+  const ticketDetail = Boolean(ticketSegment) && !ticketSegment.includes("/");
+  if (canManageTickets(role) && ticketDetail) {
+    return { href: `${current}#spara-arende`, label: "Spara ärende" };
+  }
   if (canManageTickets(role) && inTickets) {
     return { href: `${ticketsRoot}?create=1`, label: "Nytt ärende" };
   }
