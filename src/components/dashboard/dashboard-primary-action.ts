@@ -127,6 +127,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canManageBilling(role) && current === "/dashboard/billing") {
     return { href: "/dashboard/billing#planer", label: "Byt plan" };
   }
+  if (canViewOperations(role) && current === "/dashboard/drift") {
+    return { href: "/dashboard/drift#kritiska-secrets", label: "Kritiska secrets" };
+  }
 
   if (current === "/dashboard/installningar") {
     return { href: "/dashboard/installningar#losenord", label: "Byt lösenord" };

@@ -166,6 +166,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/billing", "admin")?.label).toBe("Byt plan");
     expect(dashboardPrimaryCreateAction("/dashboard/billing", "manager")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/drift", "owner")).toEqual({
+      href: "/dashboard/drift#kritiska-secrets",
+      label: "Kritiska secrets",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/drift", "manager")?.label).toBe("Kritiska secrets");
+    expect(dashboardPrimaryCreateAction("/dashboard/drift", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });

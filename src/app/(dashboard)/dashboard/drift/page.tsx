@@ -97,6 +97,11 @@ export default function OperationsPage() {
     void loadHealth();
   }, [loadHealth]);
 
+  useEffect(() => {
+    if (window.location.hash !== "#kritiska-secrets") return;
+    document.getElementById("kritiska-secrets")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, health]);
+
   const env = health?.env || {};
   const criticalMissing = criticalLabels.filter((item) => !env[item.key]).map((item) => item.label);
   const schemaReady = Boolean(health?.schema?.ready);
@@ -112,15 +117,18 @@ export default function OperationsPage() {
             Kontrollera databas, schema, kritiska secrets, modern storage och cron-beredskap från en plats.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadHealth()}
-          disabled={loading}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Uppdatera
-        </button>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <a href="#kritiska-secrets" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white">Kritiska secrets</a>
+          <button
+            type="button"
+            onClick={() => void loadHealth()}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Uppdatera
+          </button>
+        </div>
       </header>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
@@ -189,14 +197,6 @@ export default function OperationsPage() {
             </Panel>
           </div>
 
-          <Panel title="Kritiska secrets" description="Måste finnas i Vercel Production för trygg drift.">
-            <div className="grid gap-3 md:grid-cols-2">
-              {criticalLabels.map((item) => (
-                <FlagCard key={item.key} label={item.label} hint={item.hint} ok={Boolean(env[item.key])} />
-              ))}
-            </div>
-          </Panel>
-
           <Panel title="Valfria integrationer" description="Aktiveras när respektive funktion ska användas live.">
             <div className="grid gap-3 md:grid-cols-2">
               {optionalLabels.map((item) => (
@@ -222,6 +222,24 @@ export default function OperationsPage() {
       ) : (
         <div className="h-64 animate-pulse rounded-2xl bg-sand-100" />
       )}
+
+      <div id="kritiska-secrets" className="scroll-mt-36">
+        <Panel title="Kritiska secrets" description="Måste finnas i Vercel Production för trygg drift.">
+          {health ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {criticalLabels.map((item) => (
+                <FlagCard key={item.key} label={item.label} hint={item.hint} ok={Boolean(env[item.key])} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2" aria-hidden="true">
+              {criticalLabels.map((item) => (
+                <div key={item.key} className="h-24 animate-pulse rounded-2xl border border-sand-100 bg-sand-50" />
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }
