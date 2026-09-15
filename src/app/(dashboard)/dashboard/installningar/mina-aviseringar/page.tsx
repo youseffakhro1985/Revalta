@@ -41,6 +41,12 @@ export default function MyServiceNotificationsPage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash !== "#mina-val") return;
+    document.getElementById("mina-val")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   async function save() {
     setSaving(true);
     setError("");
@@ -69,14 +75,17 @@ export default function MyServiceNotificationsPage() {
         <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Personliga inställningar</p>
         <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Mina serviceaviseringar</h1>
         <p className="mt-3 max-w-3xl text-ink-600">Välj hur du själv vill ta emot organisationens serviceöversikt. Dina val påverkar endast ditt konto.</p>
+        <nav aria-label="Hoppa till aviseringsval" className="mt-4">
+          <a href="#mina-val" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Mina val</a>
+        </nav>
       </header>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {success ? <div className="flex items-center gap-2 rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800"><CheckCircle2 className="h-4 w-4" />{success}</div> : null}
 
+      <div id="mina-val" className="scroll-mt-36">
       <Panel title="E-postaviseringar" description="Personliga val för den dagliga serviceöversikten.">
-        {loading ? <div className="h-52 animate-pulse rounded-xl bg-sand-100" /> : (
-          <div className="space-y-4">
+        <fieldset disabled={loading || saving} className="space-y-4 disabled:opacity-60">
             <button type="button" onClick={() => setPreferences((current) => ({ ...current, enabled: !current.enabled }))} className={`flex w-full items-start justify-between gap-5 rounded-2xl border p-5 text-left transition ${preferences.enabled ? "border-petroleum-200 bg-petroleum-50/40" : "border-sand-200 bg-sand-50"}`}>
               <div className="flex gap-4">
                 <div className={`rounded-xl p-3 ${preferences.enabled ? "bg-petroleum-800 text-white" : "bg-white text-ink-500"}`}>{preferences.enabled ? <BellRing className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}</div>
@@ -98,9 +107,9 @@ export default function MyServiceNotificationsPage() {
             </div>
 
             <div className="flex flex-col justify-between gap-3 rounded-xl bg-sand-50 p-4 text-sm text-ink-600 sm:flex-row sm:items-center"><span>{data?.updatedAt ? `Senast ändrad ${dateTime.format(new Date(data.updatedAt))}` : "Standardinställningar används tills du sparar."}</span><button type="button" onClick={() => void save()} disabled={saving} className="rounded-xl bg-petroleum-800 px-5 py-3 font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara mina val"}</button></div>
-          </div>
-        )}
+        </fieldset>
       </Panel>
+      </div>
     </div>
   );
 }
