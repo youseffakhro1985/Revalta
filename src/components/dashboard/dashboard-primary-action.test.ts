@@ -113,6 +113,11 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Ny hyresavi",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/hyresavisering", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/nycklar", "owner")).toEqual({
+      href: "/dashboard/nycklar#ny-nyckel",
+      label: "Ny nyckel",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/nycklar", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
