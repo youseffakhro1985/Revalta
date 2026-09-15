@@ -24,8 +24,12 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   const inWorkOrders = current === workOrdersRoot || current.startsWith(`${workOrdersRoot}/`);
   const creatingWorkOrder = current === `${workOrdersRoot}/ny` || current.startsWith(`${workOrdersRoot}/ny/`);
   const editLockAdmin = current === `${workOrdersRoot}/redigeringslas` || current.startsWith(`${workOrdersRoot}/redigeringslas/`);
-  if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin))) {
+  const recurringSchedules = current === `${workOrdersRoot}/aterkommande` || current.startsWith(`${workOrdersRoot}/aterkommande/`);
+  if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin && !recurringSchedules))) {
     return { href: `${workOrdersRoot}/ny`, label: "Ny arbetsorder" };
+  }
+  if (canAssignWorkOrders(role) && current === `${workOrdersRoot}/aterkommande`) {
+    return { href: `${workOrdersRoot}/aterkommande#nytt-schema`, label: "Nytt schema" };
   }
 
   const ticketsRoot = "/dashboard/felanmalan";

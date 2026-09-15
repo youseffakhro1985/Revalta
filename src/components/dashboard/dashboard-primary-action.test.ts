@@ -18,6 +18,12 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/AO-2026-0142", "admin")?.label).toBe("Ny arbetsorder");
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/ny", "admin")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/redigeringslas", "admin")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande", "admin")).toEqual({
+      href: "/dashboard/arbetsorder/aterkommande#nytt-schema",
+      label: "Nytt schema",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter", "admin")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande", "technician")).toBeNull();
   });
 
   it("visar ny fastighet endast i fastighetsområdet", () => {
