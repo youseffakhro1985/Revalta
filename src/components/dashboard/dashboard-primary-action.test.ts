@@ -118,6 +118,13 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Ny nyckel",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/nycklar", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/team", "owner")).toEqual({
+      href: "/dashboard/team#bjud-in",
+      label: "Bjud in",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/team", "admin")?.label).toBe("Bjud in");
+    expect(dashboardPrimaryCreateAction("/dashboard/team", "manager")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/team", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
