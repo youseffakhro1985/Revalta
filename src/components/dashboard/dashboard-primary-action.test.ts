@@ -172,6 +172,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/drift", "manager")?.label).toBe("Kritiska secrets");
     expect(dashboardPrimaryCreateAction("/dashboard/drift", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/aviseringscenter", "owner")).toEqual({
+      href: "/dashboard/aviseringscenter#aviseringsfilter",
+      label: "Filtrera aviseringar",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/aviseringscenter", "manager")?.label).toBe("Filtrera aviseringar");
+    expect(dashboardPrimaryCreateAction("/dashboard/aviseringscenter", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });

@@ -105,6 +105,11 @@ export default function NotificationCenterPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (window.location.hash !== "#aviseringsfilter") return;
+    document.getElementById("aviseringsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   async function patch(kind: NotificationKind, body: Record<string, unknown>) {
     const response = await fetch(endpointFor(kind), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const result = await readResponseJson(response);
@@ -169,7 +174,11 @@ export default function NotificationCenterPage() {
     <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
       <header className="flex flex-col justify-between gap-4 rounded-2xl border border-sand-200/80 bg-white p-7 shadow-premium-sm sm:flex-row sm:items-end sm:p-8">
         <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och leveranssäkerhet</p><h1 className="mt-3 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Aviseringscenter</h1><p className="mt-3 max-w-2xl text-ink-600">Prioritera service, schemakörningar och SLA-risker, markera läst och hantera aviseringar med full spårbarhet.</p></div>
-        <div className="flex flex-wrap gap-2"><button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button><button onClick={() => void markAllRead()} disabled={!data?.summary.unread} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50"><CheckCheck className="h-4 w-4" /> Markera alla som lästa</button></div>
+        <div className="flex flex-wrap gap-2">
+          <a href="#aviseringsfilter" className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50">Filtrera</a>
+          <button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+          <button onClick={() => void markAllRead()} disabled={!data?.summary.unread} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50"><CheckCheck className="h-4 w-4" /> Markera alla som lästa</button>
+        </div>
       </header>
 
       {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm font-semibold text-danger-700">{error}</div> : null}
@@ -187,7 +196,7 @@ export default function NotificationCenterPage() {
         ].map(({ label, value, icon: Icon }) => <div key={label} className="rounded-2xl border border-sand-200/80 bg-white p-5 shadow-premium-sm"><div className="flex items-center justify-between"><p className="text-sm font-medium text-ink-500">{label}</p><Icon className="h-5 w-5 text-petroleum-700" /></div><p className="mt-4 text-3xl font-semibold text-ink-950">{value}</p></div>)}
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-sand-200 bg-white p-2 shadow-premium-sm">{filters.map((item) => <button key={item.id} onClick={() => setFilter(item.id)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${filter === item.id ? "bg-petroleum-800 text-white" : "text-ink-600 hover:bg-sand-50"}`}>{item.label}</button>)}</div>
+      <div id="aviseringsfilter" className="scroll-mt-36 flex flex-wrap gap-2 rounded-2xl border border-sand-200 bg-white p-2 shadow-premium-sm">{filters.map((item, index) => <button key={item.id} autoFocus={index === 0} onClick={() => setFilter(item.id)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${filter === item.id ? "bg-petroleum-800 text-white" : "text-ink-600 hover:bg-sand-50"}`}>{item.label}</button>)}</div>
 
       <section className="overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-premium-sm">
         {loading && !data ? <div className="h-64 animate-pulse bg-sand-50" /> : null}

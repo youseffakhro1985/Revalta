@@ -130,6 +130,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canViewOperations(role) && current === "/dashboard/drift") {
     return { href: "/dashboard/drift#kritiska-secrets", label: "Kritiska secrets" };
   }
+  if (canViewOperations(role) && current === "/dashboard/aviseringscenter") {
+    return { href: "/dashboard/aviseringscenter#aviseringsfilter", label: "Filtrera aviseringar" };
+  }
 
   if (current === "/dashboard/installningar") {
     return { href: "/dashboard/installningar#losenord", label: "Byt lösenord" };
