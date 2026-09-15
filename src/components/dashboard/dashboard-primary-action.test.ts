@@ -66,6 +66,11 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Nytt dokument",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/dokument", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/energi", "owner")).toEqual({
+      href: "/dashboard/energi#ny-avlasning",
+      label: "Ny avläsning",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/energi", "technician")).toBeNull();
   });
 
   it("visar modulspecifika skapa-knappar på drift- och boendesidor", () => {

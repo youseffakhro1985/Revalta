@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Droplets, Flame, Gauge, Search, Zap } from "lucide-react";
+import { Download, Droplets, Flame, Gauge, Plus, Search, Zap } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
@@ -73,6 +73,12 @@ export default function EnergyPage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-avlasning") return;
+    document.getElementById("ny-avlasning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, canManage]);
 
   const periods = useMemo(() => [...new Set(readings.map((row) => row.period || "").filter(Boolean))].sort().reverse(), [readings]);
   const propertyNames = useMemo(() => [...new Set(readings.map((row) => row.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [readings]);
@@ -206,7 +212,7 @@ export default function EnergyPage() {
       eyebrow="Drift och hållbarhet"
       title="Energi och förbrukning"
       description="Följ el, värme och vatten per fastighet och period. Upptäck kostnadsdrivare, jämför beståndet och gå från mätvärde till åtgärd med en tydlig driftbild."
-      action={visibleReadings.length ? <button type="button" onClick={exportCsv} className={premiumSecondaryButtonClass}><Download className="mr-2 h-4 w-4" aria-hidden="true" />Exportera CSV</button> : undefined}
+      action={<div className="flex flex-wrap gap-2">{visibleReadings.length ? <button type="button" onClick={exportCsv} className={premiumSecondaryButtonClass}><Download className="mr-2 h-4 w-4" aria-hidden="true" />Exportera CSV</button> : null}{canManage || loading ? <a href="#ny-avlasning" className={premiumPrimaryButtonClass}><Plus className="mr-2 h-4 w-4" strokeWidth={1.8} aria-hidden="true" />Ny avläsning</a> : null}</div>}
     />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -247,10 +253,10 @@ export default function EnergyPage() {
       </Panel>
     </section>
 
-    <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
-      {canManage ? <div className="xl:sticky xl:top-24 xl:self-start"><Panel title="Ny avläsning" description="Registrera månadsvis förbrukning och kostnad med rätt enhet.">
+    <section className={`grid gap-6 ${canManage || loading ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+      {canManage || loading ? <div id="ny-avlasning" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start"><Panel title="Ny avläsning" description="Registrera månadsvis förbrukning och kostnad med rätt enhet.">
         <form onSubmit={submit} className="space-y-4">
-          <select className={premiumFieldClass} aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+          <select className={premiumFieldClass} aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required autoFocus><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           <div className="grid gap-3 sm:grid-cols-2"><select className={premiumFieldClass} aria-label="Typ av avläsning" value={form.type} onChange={(event) => { const type = event.target.value; setForm({ ...form, type, unit: type === "water" ? "m³" : "kWh" }); }}>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><input className={premiumFieldClass} type="month" aria-label="Period" value={form.period} onChange={(event) => setForm({ ...form, period: event.target.value })} required /></div>
           <div className="grid gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" aria-label="Förbrukning" value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} required /><input className={premiumFieldClass} aria-label="Enhet" value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} required /></div>
           <input className={premiumFieldClass} type="number" min="0" step="1" placeholder="Kostnad i SEK" aria-label="Kostnad i SEK" value={form.cost} onChange={(event) => setForm({ ...form, cost: event.target.value })} />
