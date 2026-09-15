@@ -66,7 +66,7 @@ vi.mock("@/lib/db", () => {
   return { default: dbMock };
 });
 
-import { PATCH } from "./route";
+import { PATCH, POST } from "./route";
 
 const CURRENT_USER = { id: "user-1", company_id: "company-1", role: "owner" };
 const STRONG_NEW_PASSWORD = "NewPassw0rd!";
@@ -314,5 +314,37 @@ describe("PATCH /api/settings/password", () => {
 
     expect(response.status).toBe(500);
     expect(JSON.stringify(body)).not.toContain("leaked-secret");
+  });
+
+  it("accepts a native form password change and redirects without putting secrets in the URL", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/settings/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `currentPassword=old-password-1&newPassword=${encodeURIComponent(STRONG_NEW_PASSWORD)}&confirmPassword=${encodeURIComponent(STRONG_NEW_PASSWORD)}`,
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal/konto?password=1");
+    expect(response.headers.get("location")).not.toContain("old-password");
+    expect(response.headers.get("location")).not.toContain("NewPass");
+    expect(userUpdateMock).toHaveBeenCalledWith({
+      where: { id: CURRENT_USER.id },
+      data: { password: "new-hash" },
+    });
+    expect(cookieSetMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns the native form with a generic mismatch reason without leaking passwords", async () => {
+    const response = await POST(new Request("https://www.revalta.se/api/settings/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `currentPassword=old-password-1&newPassword=${encodeURIComponent(STRONG_NEW_PASSWORD)}&confirmPassword=SomethingElse123`,
+    }));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://www.revalta.se/dashboard/boendeportal/konto?reason=mismatch");
+    expect(response.headers.get("location")).not.toContain("old-password");
+    expect(response.headers.get("location")).not.toContain("SomethingElse");
+    expect(userFindUniqueMock).not.toHaveBeenCalled();
   });
 });
