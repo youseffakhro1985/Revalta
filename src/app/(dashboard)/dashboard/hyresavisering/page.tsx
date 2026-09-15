@@ -40,6 +40,7 @@ export default function RentNoticesPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({ propertyId: "", leaseId: "", tenantName: "", unit: "", period: "", dueDate: "", status: "draft", baseRent: "", additions: "", deductions: "", indexPercent: "0", note: "" });
+  const [focusedId, setFocusedId] = useState("");
 
   async function load() {
     setLoading(true);
@@ -54,6 +55,16 @@ export default function RentNoticesPage() {
     setLoading(false);
   }
   useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    const id = new URLSearchParams(window.location.search).get("id")?.trim() || "";
+    if (!id) return;
+    setFocusedId(id);
+    const node = document.getElementById(`rent-notice-${id}`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [loading, notices]);
 
   const summary = useMemo(() => ({
     total: notices.reduce((sum, item) => sum + Number(item.total || 0), 0),
@@ -214,7 +225,11 @@ export default function RentNoticesPage() {
         ) : (
           <div className="divide-y divide-sand-100">
             {notices.map((notice) => (
-              <article key={notice.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
+              <article
+                key={notice.id}
+                id={`rent-notice-${notice.id}`}
+                className={`p-5 transition hover:bg-sand-50/60 sm:p-6 ${focusedId === notice.id ? "bg-petroleum-50/70 ring-1 ring-inset ring-petroleum-200" : ""}`}
+              >
                 <div className="flex flex-col justify-between gap-4 sm:flex-row">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">

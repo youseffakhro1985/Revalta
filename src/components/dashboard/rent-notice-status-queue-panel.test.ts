@@ -14,6 +14,7 @@ describe("rent notice status queue panel", () => {
     expect(source).toContain("Öppna");
     expect(source).toContain("status === 403");
     expect(source).toContain("utanför Revalta");
+    expect(source).not.toContain('href="/dashboard/hyresavisering"');
     expect(source).not.toContain("stripe");
   });
 });
