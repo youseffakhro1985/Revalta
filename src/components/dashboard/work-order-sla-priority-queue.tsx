@@ -75,7 +75,7 @@ export function WorkOrderSlaPriorityQueue() {
   if (error) return <InlineAlert>{error}</InlineAlert>;
   if (queue.length === 0) return null;
 
-  return <Panel title="Nästa SLA-åtgärder" description="Automatiskt prioriterad kö med passerade, kritiska och snart förfallande arbetsordrar.">
+  return <Panel title="Nästa SLA-åtgärder" description="Automatiskt prioriterad kö med passerade, kritiska och snart förfallande arbetsordrar. Otilldelade arbetsordrar tilldelas i Planering eller Dagens förvaltning.">
     <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
       {queue.map((entry) => {
         const workOrder = entry.payload!;
@@ -102,7 +102,10 @@ export function WorkOrderSlaPriorityQueue() {
             <p className="mt-1 text-xs opacity-75">{sla.dueAt ? dateTime.format(new Date(sla.dueAt)) : "Konfigurera SLA-deadline"}</p>
           </div>
           <p className="mt-3 truncate text-xs opacity-75">{workOrder.property.name} · {workOrder.assigned_to?.name || workOrder.assigned_to?.email || "Ej tilldelad"}</p>
-          <Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-current/20 bg-white/70 text-xs font-semibold transition hover:bg-white">Öppna och åtgärda <ArrowRight className="h-3.5 w-3.5" /></Link>
+          <div className="mt-4 grid gap-2">
+            {!workOrder.assigned_to ? <Link href="/dashboard/arbetsorder/planering" className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-current/20 bg-white/70 text-xs font-semibold transition hover:bg-white">Tilldela i Planering <ArrowRight className="h-3.5 w-3.5" /></Link> : null}
+            <Link href={`/dashboard/arbetsorder/${workOrder.id}`} className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-current/20 bg-white/70 text-xs font-semibold transition hover:bg-white">Öppna och åtgärda <ArrowRight className="h-3.5 w-3.5" /></Link>
+          </div>
         </article>;
       })}
     </div>
