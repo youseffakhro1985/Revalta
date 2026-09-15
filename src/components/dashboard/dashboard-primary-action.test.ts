@@ -96,6 +96,11 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Nytt avtal",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/hyresavisering", "owner")).toEqual({
+      href: "/dashboard/hyresavisering#ny-hyresavi",
+      label: "Ny hyresavi",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/hyresavisering", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });

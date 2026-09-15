@@ -88,6 +88,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canManageLeases(role) && (current === "/dashboard/bokningar" || current.startsWith("/dashboard/bokningar/"))) {
     return { href: "/dashboard/bokningar#ny-bokning", label: "Ny bokning" };
   }
+  if (canManageLeases(role) && (current === "/dashboard/hyresavisering" || current.startsWith("/dashboard/hyresavisering/"))) {
+    return { href: "/dashboard/hyresavisering#ny-hyresavi", label: "Ny hyresavi" };
+  }
 
   if (current === "/dashboard/installningar") {
     return { href: "/dashboard/installningar#losenord", label: "Byt lösenord" };

@@ -21,4 +21,13 @@ describe("hyresavisering focus", () => {
     expect(form).toContain("initialFocusedId");
     expect(form).toContain("useState(initialFocusedId)");
   });
+
+  it("keeps the create form hash target in the first HTML", () => {
+    expect(form).toContain('id="ny-hyresavi"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#ny-hyresavi"');
+    expect(form).toContain("canManage || loading");
+    expect(form).toContain("autoFocus");
+    expect(form).not.toContain('<form id="ny-hyresavi"');
+  });
 });
