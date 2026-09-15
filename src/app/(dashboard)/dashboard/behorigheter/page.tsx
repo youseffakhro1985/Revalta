@@ -5,6 +5,7 @@ import db from "@/lib/db";
 import { canManageCompany, getCurrentUser } from "@/lib/current-user";
 import { permissionMatrixRows } from "@/lib/permissions";
 import { MetricCard, PageHeader, Panel } from "@/components/dashboard/premium-ui";
+import { HashScroll } from "./hash-scroll";
 
 const roles = [
   { key: "owner", label: "Ägare", description: "Full kontroll över organisation, ekonomi och systeminställningar." },
@@ -36,6 +37,11 @@ export default async function PermissionsPage() {
   return (
     <div className="space-y-8 animate-fade-in-soft">
       <PageHeader eyebrow="Organisation" title="Roller och behörigheter" description="Tydlig ansvarsfördelning för säker och professionell fastighetsförvaltning." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Säker rollstyrning</div>} />
+      <HashScroll ids={["behorighetsmatris", "anvandare"]} />
+      <nav aria-label="Hoppa till behörighetsavsnitt" className="flex flex-wrap gap-2">
+        <a href="#behorighetsmatris" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Behörighetsmatris</a>
+        <a href="#anvandare" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Användare</a>
+      </nav>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={Users} label="Aktiva användare" value={members.length} />
@@ -56,6 +62,7 @@ export default async function PermissionsPage() {
         ))}
       </section>
 
+      <div id="behorighetsmatris" className="scroll-mt-36">
       <Panel title="Behörighetsmatris" description="Matrisen speglar samma rollkontroller som API:erna. Boende är avsedd för portal/självservice och ska inte användas som intern förvaltarroll. Roller ändras i Team." bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
@@ -66,16 +73,19 @@ export default async function PermissionsPage() {
           </table>
         </div>
       </Panel>
+      </div>
 
+      <div id="anvandare" className="scroll-mt-36">
       <Panel title="Användare och roller" description="Här ser du organisationens aktuella rolläge. Roller och användarstatus ändras säkert i Team; ägarrollen är fortsatt särskilt skyddad." bodyClassName="p-0">
         <div className="flex items-center justify-between gap-4 border-b border-sand-100 px-6 py-4">
           <p className="text-sm text-ink-500">Individuell fastighetsbehörighet är inte en separat rättighetsmodell i denna vy.</p>
-          <Link href="/dashboard/team" className="shrink-0 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-petroleum-800 shadow-premium-sm transition hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">Hantera roller i Team</Link>
+          <Link href="/dashboard/team#bjud-in" className="shrink-0 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-petroleum-800 shadow-premium-sm transition hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">Hantera roller i Team</Link>
         </div>
         <div className="divide-y divide-sand-100">
           {members.map((member) => <div key={member.id} className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-ink-900">{member.name || "Namn saknas"}</p><p className="text-sm text-ink-500">{member.email}</p></div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-sand-200 bg-sand-50 px-3 py-1 text-xs font-semibold text-ink-600">{roles.find((role) => role.key === member.role)?.label || member.role}</span><span className="rounded-full border border-petroleum-100 bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-700">{member.status === "active" ? "Aktiv" : member.status}</span></div></div>)}
         </div>
       </Panel>
+      </div>
     </div>
   );
 }
