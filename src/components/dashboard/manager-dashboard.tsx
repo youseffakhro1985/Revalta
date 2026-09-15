@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { AlertTriangle, BriefcaseBusiness, Building2, CalendarDays, ClipboardList, UserRoundX, Wrench } from "lucide-react";
+import { BriefcaseBusiness, Building2, CalendarDays, ClipboardList, UserRoundX, Wrench } from "lucide-react";
 import db from "@/lib/db";
 import { tenantWhere, type CurrentUser } from "@/lib/current-user";
 import { isMissingTableError } from "@/lib/schema-readiness";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 import { OverviewEmpty, OverviewHero, OverviewMetricLink, OverviewPanel } from "@/components/dashboard/overview-chrome";
+import { TicketAssignQueuePanel } from "@/components/dashboard/ticket-assign-queue-panel";
 
 const date = new Intl.DateTimeFormat("sv-SE", { weekday: "short", day: "numeric", month: "short" });
 
@@ -26,7 +27,7 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
   const propertyScope = { deleted_at: null, ...tenantWhere(user) };
   const companyId = user.company_id;
 
-  const [totalProperties, properties, unassignedTickets, unassignedWorkOrders, overdueWorkOrders, upcomingActivities, upcomingRounds, upcomingInspections, activeVendors, expiringVendors, ticketQueue] = await Promise.all([
+  const [totalProperties, properties, unassignedTickets, unassignedWorkOrders, overdueWorkOrders, upcomingActivities, upcomingRounds, upcomingInspections, activeVendors, expiringVendors] = await Promise.all([
     db.property.count({ where: propertyScope }),
     db.property.findMany({
       where: propertyScope,
@@ -119,18 +120,6 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           },
         })
       : Promise.resolve(0),
-    db.ticket.findMany({
-      where: {
-        deleted_at: null,
-        ...tenantWhere(user),
-        status: { not: "closed" },
-        assigned_to_id: null,
-        OR: [{ property_id: null }, { property: { deleted_at: null } }],
-      },
-      orderBy: [{ priority: "desc" }, { created_at: "asc" }],
-      take: 6,
-      select: { id: true, title: true, priority: true, public_reference: true, property: { select: { name: true } } },
-    }),
   ]);
 
   return (
@@ -169,14 +158,7 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           ))}</div> : <OverviewEmpty icon={Building2} title="Ingen fastighet ännu" description="När fastigheter registreras visas de här som en snabbväg in i beståndet." />}
         </OverviewPanel>
 
-        <OverviewPanel title="Otilldelade ärenden" description="Äldsta och viktigaste ärenden som fortfarande saknar ansvarig." bodyClassName="p-0">
-          {ticketQueue.length ? <div className="divide-y divide-sand-100">{ticketQueue.map((ticket) => (
-            <Link key={ticket.id} href={`/dashboard/felanmalan/${ticket.id}`} className="flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-sand-50/70">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate text-sm font-semibold text-ink-900">{ticket.title}</p>{ticket.priority === "urgent" ? <span className="rounded-full bg-danger-50 px-2 py-0.5 text-[10px] font-semibold text-danger-700">Akut</span> : null}</div><p className="mt-1 text-xs text-ink-500">{ticket.public_reference || "Ärende"} · {ticket.property?.name || "Ingen fastighet"}</p></div>
-              <AlertTriangle className="h-4 w-4 shrink-0 text-ink-300" aria-hidden="true" />
-            </Link>
-          ))}</div> : <OverviewEmpty icon={ClipboardList} title="Inga otilldelade ärenden" description="Kön är tom — alla öppna ärenden har en ansvarig." />}
-        </OverviewPanel>
+        <TicketAssignQueuePanel />
       </section>
 
       <DashboardSlaOperations />
