@@ -85,6 +85,10 @@ export default function KeysPage() {
   }
 
   useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    if (window.location.hash !== "#ny-nyckel") return;
+    document.getElementById("ny-nyckel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
 
   const summary = useMemo(() => ({
     total: credentials.length,
@@ -214,9 +218,10 @@ export default function KeysPage() {
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
       <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
+        <div id="ny-nyckel" className="scroll-mt-36">
         <Panel title="Registrera behörighet" description="Dokumentera lager, utlämning, återlämning och spärrning." className="h-fit xl:sticky xl:top-[112px]">
           <form onSubmit={submit} className="space-y-4">
-            <select className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+            <select className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required aria-label="Välj fastighet" autoFocus><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
             <div className="grid grid-cols-2 gap-3"><input className={premiumFieldClass} placeholder="Nyckel-/taggnummer" value={form.identifier} onChange={(event) => setForm({ ...form, identifier: event.target.value })} required aria-label="Nyckel-/taggnummer" /><select className={premiumFieldClass} value={form.credentialType} onChange={(event) => setForm({ ...form, credentialType: event.target.value })} aria-label="Typ av behörighet">{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
             <select className={premiumFieldClass} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} aria-label="Status">{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             <input className={premiumFieldClass} placeholder="Mottagare eller innehavare" value={form.holder} onChange={(event) => setForm({ ...form, holder: event.target.value })} aria-label="Mottagare eller innehavare" />
@@ -226,6 +231,7 @@ export default function KeysPage() {
             <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara i registret"}</button>
           </form>
         </Panel>
+        </div>
 
         <Panel title="Nyckelregister" description="Spårbar översikt över samtliga behörigheter och återlämningar." bodyClassName="p-0">
           <div className="grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-[1fr_190px_170px] sm:p-5">
