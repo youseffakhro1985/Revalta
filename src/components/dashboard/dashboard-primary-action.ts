@@ -25,7 +25,8 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   const creatingWorkOrder = current === `${workOrdersRoot}/ny` || current.startsWith(`${workOrdersRoot}/ny/`);
   const editLockAdmin = current === `${workOrdersRoot}/redigeringslas` || current.startsWith(`${workOrdersRoot}/redigeringslas/`);
   const recurringSchedules = current === `${workOrdersRoot}/aterkommande` || current.startsWith(`${workOrdersRoot}/aterkommande/`);
-  if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin && !recurringSchedules))) {
+  const operationsOverview = current === `${workOrdersRoot}/operationsoversikt` || current.startsWith(`${workOrdersRoot}/operationsoversikt/`);
+  if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin && !recurringSchedules && !operationsOverview))) {
     return { href: `${workOrdersRoot}/ny`, label: "Ny arbetsorder" };
   }
   if (canAssignWorkOrders(role) && current === `${workOrdersRoot}/aterkommande`) {
@@ -36,6 +37,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   }
   if (canAssignWorkOrders(role) && current === `${workOrdersRoot}/aterkommande/incidenter/sla-rapport`) {
     return { href: `${workOrdersRoot}/aterkommande/incidenter/sla-rapport#exportera-csv`, label: "Exportera CSV" };
+  }
+  if (canViewOperations(role) && current === `${workOrdersRoot}/operationsoversikt`) {
+    return { href: `${workOrdersRoot}/operationsoversikt#oversiktsfilter`, label: "Filtrera kö" };
   }
   if (canViewOperations(role) && current === `${workOrdersRoot}/redigeringslas`) {
     return { href: `${workOrdersRoot}/redigeringslas#lasfilter`, label: "Sök lås" };
