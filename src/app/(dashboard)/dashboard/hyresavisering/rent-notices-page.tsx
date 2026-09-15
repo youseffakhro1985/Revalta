@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, CalendarClock, CircleDollarSign } from "lucide-react";
+import { BadgeCheck, CalendarClock, CircleDollarSign, Plus } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, PageHeader, Panel, premiumFieldClass, premiumPrimaryButtonClass, premiumTextareaClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -65,6 +65,12 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
     if (!node) return;
     node.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [loading, notices, initialFocusedId]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-hyresavi") return;
+    document.getElementById("ny-hyresavi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, canManage]);
 
   const summary = useMemo(() => ({
     total: notices.reduce((sum, item) => sum + Number(item.total || 0), 0),
@@ -173,7 +179,7 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
   }
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Hyresadministration" title="Hyresavisering och index" description="Skapa hyresavier, hantera indexuppräkning och sätt manuell aviestatus per objekt och period. Inbetalning mot bank eller autogiro sker utanför Revalta." />
+    <PageHeader eyebrow="Hyresadministration" title="Hyresavisering och index" description="Skapa hyresavier, hantera indexuppräkning och sätt manuell aviestatus per objekt och period. Inbetalning mot bank eller autogiro sker utanför Revalta." action={canManage || loading ? <a href="#ny-hyresavi" className={premiumPrimaryButtonClass}><Plus className="mr-2 h-4 w-4" strokeWidth={1.8} aria-hidden="true" />Ny hyresavi</a> : undefined} />
     <section className="grid gap-4 md:grid-cols-3">
       <MetricCard icon={CircleDollarSign} label="Aviserat totalt" value={money.format(summary.total)} />
       <MetricCard icon={BadgeCheck} label="Markerade som betalda" value={money.format(summary.paid)} />
@@ -181,11 +187,12 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
     </section>
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra hyresavier.</InlineAlert> : null}
-    <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
-      {canManage ? (
+    <section className={`grid gap-6 ${canManage || loading ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+      {canManage || loading ? (
+      <div id="ny-hyresavi" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start">
       <Panel title="Ny hyresavi" description="Utgå från ett aktivt kontrakt eller registrera uppgifterna manuellt.">
         <form onSubmit={submit} className="space-y-4">
-          <select className={premiumFieldClass} value={form.leaseId} onChange={(e) => selectLease(e.target.value)} aria-label="Avtal">
+          <select className={premiumFieldClass} value={form.leaseId} onChange={(e) => selectLease(e.target.value)} aria-label="Avtal" autoFocus>
             <option value="">Välj kontrakt</option>
             {leases.filter((lease) => lease.status === "active" || lease.status === "notice").map((lease) => (
               <option key={lease.id} value={lease.id}>{lease.property_name} · {lease.unit} · {lease.tenant_name || "Ingen hyresgäst"}</option>
@@ -218,6 +225,7 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Skapa hyresavi"}</button>
         </form>
       </Panel>
+      </div>
       ) : null}
       <Panel title="Avier och manuell status" description="Status sätts manuellt i Revalta. Det finns ingen automatisk koppling till bankgiro eller inbetalningar." bodyClassName="p-0">
         {loading ? <p className="p-6 text-sm text-ink-500">Hämtar hyresavier…</p> : notices.length === 0 ? (
