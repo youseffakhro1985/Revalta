@@ -115,6 +115,12 @@ export default function CalendarPage() {
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-aktivitet") return;
+    document.getElementById("ny-aktivitet")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, canManage]);
+
   function startEdit(event: CalendarEvent) {
     if (!isEditableCalendarEvent(event)) return;
     setEditingId(event.id);
@@ -307,15 +313,17 @@ export default function CalendarPage() {
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet till kalendern. Förvaltare eller administratör kan skapa och ändra aktiviteter.</InlineAlert> : null}
 
-      <section className={`grid items-start gap-6 ${canManage ? "xl:grid-cols-[390px_minmax(0,1fr)]" : "grid-cols-1"}`}>
-        {canManage ? (
+      <section className={`grid items-start gap-6 ${canManage || loading ? "xl:grid-cols-[390px_minmax(0,1fr)]" : "grid-cols-1"}`}>
+        {canManage || loading ? (
+          <div id="ny-aktivitet" className="scroll-mt-36">
           <Panel
             title="Planera aktivitet"
             description="Skapa ett tydligt planeringsunderlag med datum, ansvar och fastighetskoppling. Arbetsorder, ronder, besiktningar, underhåll och avtalsdatum hämtas automatiskt från respektive register."
             className="xl:sticky xl:top-[118px]"
           >
-            <form id="ny-aktivitet" onSubmit={submit} className="space-y-4">
-              <input required placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={premiumFieldClass} />
+            {canManage ? (
+            <form onSubmit={submit} className="space-y-4">
+              <input required autoFocus placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={premiumFieldClass} />
               <div className="grid grid-cols-2 gap-3">
                 <input required type="date" aria-label="Datum" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className={premiumFieldClass} />
                 <input type="time" aria-label="Tid" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className={premiumFieldClass} />
@@ -330,7 +338,11 @@ export default function CalendarPage() {
                 {saving ? "Sparar…" : "Spara aktivitet"}
               </button>
             </form>
+            ) : (
+              <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
+            )}
           </Panel>
+          </div>
         ) : null}
 
         <Panel
