@@ -86,7 +86,13 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
     return { href: "/dashboard/besiktningar#ny-kontroll", label: "Ny kontroll" };
   }
   if (canViewOperations(role) && (current === "/dashboard/underhall" || current.startsWith("/dashboard/underhall/"))) {
-    return { href: "/dashboard/underhall#ny-underhallsatgard", label: "Ny åtgärd" };
+    const service = current === "/dashboard/underhall/service" || current.startsWith("/dashboard/underhall/service/");
+    if (!service) {
+      return { href: "/dashboard/underhall#ny-underhallsatgard", label: "Ny åtgärd" };
+    }
+  }
+  if (canViewOperations(role) && current === "/dashboard/underhall/service") {
+    return { href: "/dashboard/underhall/service#kor-motor", label: "Kör underhåll" };
   }
   if (canViewOperations(role) && (current === "/dashboard/kalender" || current.startsWith("/dashboard/kalender/"))) {
     return { href: "/dashboard/kalender#ny-aktivitet", label: "Ny aktivitet" };
