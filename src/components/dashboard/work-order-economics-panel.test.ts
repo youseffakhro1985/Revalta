@@ -13,5 +13,7 @@ describe("work-order economics invoice copy", () => {
     expect(source).toContain("Avvisa alla inskickade");
     expect(source).toContain("/api/work-orders/${workOrderId}/attestation");
     expect(source).toContain("approveSubmitted");
+    expect(source).toContain('href="/dashboard/ekonomi"');
+    expect(source).toContain("eller från kön på");
   });
 });
