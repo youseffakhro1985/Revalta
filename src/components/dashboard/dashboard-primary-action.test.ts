@@ -113,7 +113,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/underhall/service", "manager")?.label).toBe("Kör underhåll");
     expect(dashboardPrimaryCreateAction("/dashboard/underhall/service", "technician")).toBeNull();
-    expect(dashboardPrimaryCreateAction("/dashboard/underhall/portfolio", "admin")?.href).toBe("/dashboard/underhall#ny-underhallsatgard");
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall/portfolio", "admin")).toEqual({
+      href: "/dashboard/underhall/portfolio#portfoljfilter",
+      label: "Filtrera portfölj",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall/portfolio", "manager")?.label).toBe("Filtrera portfölj");
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall/portfolio", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/kalender", "owner")?.label).toBe("Ny aktivitet");
     expect(dashboardPrimaryCreateAction("/dashboard/leverantorer", "manager")?.label).toBe("Ny leverantör");
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "owner")).toEqual({
