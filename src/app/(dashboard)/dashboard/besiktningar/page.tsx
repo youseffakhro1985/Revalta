@@ -96,6 +96,12 @@ export default function InspectionsPage() {
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-kontroll") return;
+    document.getElementById("ny-kontroll")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, canManage]);
+
   const summary = useMemo(() => ({
     overdue: inspections.filter((i) => i.status !== "completed" && daysUntil(i.due_date) < 0).length,
     upcoming: inspections.filter((i) => i.status !== "completed" && daysUntil(i.due_date) >= 0 && daysUntil(i.due_date) <= 60).length,
@@ -248,10 +254,12 @@ export default function InspectionsPage() {
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra besiktningar.</InlineAlert> : null}
 
-      <section className={`grid items-start gap-6 ${canManage ? "xl:grid-cols-[390px_minmax(0,1fr)]" : "grid-cols-1"}`}>
-        {canManage ? (
-          <Panel title="Ny kontroll" description="Lägg in förfallodatum, ansvarig och återkommande intervall." className="xl:sticky xl:top-[118px]">
-            <form id="ny-kontroll" onSubmit={submit} className="space-y-4">
+      <section className={`grid items-start gap-6 ${canManage || loading ? "xl:grid-cols-[390px_minmax(0,1fr)]" : "grid-cols-1"}`}>
+        {canManage || loading ? (
+          <div id="ny-kontroll" className="scroll-mt-36">
+            <Panel title="Ny kontroll" description="Lägg in förfallodatum, ansvarig och återkommande intervall." className="xl:sticky xl:top-[118px]">
+              {canManage ? (
+            <form onSubmit={submit} className="space-y-4">
               <Field label="Fastighet">
                 <select required className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
                   <option value="">Välj fastighet</option>
@@ -264,7 +272,7 @@ export default function InspectionsPage() {
                 </select>
               </Field>
               <Field label="Namn">
-                <input required className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
+                <input required autoFocus className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Förfallodatum"><input required type="date" className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></Field>
@@ -280,7 +288,11 @@ export default function InspectionsPage() {
               <Field label="Anteckning"><textarea className={premiumTextareaClass} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Anteckning eller krav" /></Field>
               <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara kontroll"}</button>
             </form>
-          </Panel>
+              ) : (
+                <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
+              )}
+            </Panel>
+          </div>
         ) : null}
 
         <Panel title="Kontrollplan" description="Kommande myndighetskrav och kontroller sorterade efter förfallodatum." bodyClassName="p-0">
