@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CircleDollarSign, Download, Search, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
+import { BarChart3, CircleDollarSign, Download, Plus, Search, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import {
   EmptyState,
   InlineAlert,
@@ -78,6 +78,12 @@ export default function BudgetPage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-budgetrad") return;
+    document.getElementById("ny-budgetrad")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, canManage]);
 
   const years = useMemo(
     () => [...new Set(entries.map((item) => String(item.year || "")).filter(Boolean))].sort((a, b) => Number(b) - Number(a)),
@@ -240,11 +246,11 @@ export default function BudgetPage() {
       eyebrow="Ekonomisk styrning"
       title="Budget, prognos och utfall"
       description="En lugn portföljvy för budgetansvar: filtrera beståndet, hitta avvikelser och följ prognosen utan att tappa underliggande konton."
-      action={visibleEntries.length ? (
+      action={<div className="flex flex-wrap gap-2">{visibleEntries.length ? (
         <button type="button" onClick={exportCsv} className={premiumSecondaryButtonClass}>
           <Download className="mr-2 h-4 w-4" aria-hidden="true" /> Exportera CSV
         </button>
-      ) : undefined}
+      ) : null}{canManage || loading ? <a href="#ny-budgetrad" className={premiumPrimaryButtonClass}><Plus className="mr-2 h-4 w-4" strokeWidth={1.8} aria-hidden="true" />Ny budgetrad</a> : null}</div>}
     />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -323,12 +329,12 @@ export default function BudgetPage() {
       </Panel>
     </section>
 
-    <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
-      {canManage ? (
-        <div className="xl:sticky xl:top-24 xl:self-start">
+    <section className={`grid gap-6 ${canManage || loading ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+      {canManage || loading ? (
+        <div id="ny-budgetrad" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start">
           <Panel title="Ny budgetrad" description="Registrera budget, prognos och verkligt utfall per kostnadsslag.">
             <form onSubmit={submit} className="space-y-4">
-              <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+              <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Välj fastighet" autoFocus><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
               <div className="grid gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} aria-label="År" /><select className={premiumFieldClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} aria-label="Kategori">{Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
               <input className={premiumFieldClass} placeholder="Konto eller kostnadsslag" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} required aria-label="Konto eller kostnadsslag" />
               <div className="grid gap-3 sm:grid-cols-3"><input className={premiumFieldClass} type="number" placeholder="Budget" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} aria-label="Budget" /><input className={premiumFieldClass} type="number" placeholder="Prognos" value={form.forecast} onChange={(e) => setForm({ ...form, forecast: e.target.value })} aria-label="Prognos" /><input className={premiumFieldClass} type="number" placeholder="Utfall" value={form.actual} onChange={(e) => setForm({ ...form, actual: e.target.value })} aria-label="Utfall" /></div>
