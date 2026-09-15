@@ -16,5 +16,7 @@ describe("ekonomi overview", () => {
     expect(source).not.toContain('role="link"');
     expect(source).not.toContain("router.push(`/dashboard/hyresavisering?id=${n.id}`)");
     expect(source).toContain("Ändra aviestatus i kön ovan");
+    expect(source).toContain("canManage||loading");
+    expect(source).toContain('href="/dashboard/ekonomi/ny-utbetalning"');
   });
 });

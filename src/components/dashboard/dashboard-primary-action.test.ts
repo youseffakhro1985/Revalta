@@ -82,6 +82,12 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Ny budgetrad",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/budget", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "owner")).toEqual({
+      href: "/dashboard/ekonomi/ny-utbetalning",
+      label: "Ny utbetalning",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/ekonomi/ny-utbetalning", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "technician")).toBeNull();
   });
 
   it("visar modulspecifika skapa-knappar på drift- och boendesidor", () => {
@@ -144,7 +150,7 @@ describe("dashboardPrimaryCreateAction", () => {
   });
 
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
-    expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/rapporter", "owner")).toBeNull();
   });
 
   it("respekterar rollbehörigheter", () => {
