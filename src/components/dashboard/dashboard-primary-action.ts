@@ -27,6 +27,11 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   const recurringSchedules = current === `${workOrdersRoot}/aterkommande` || current.startsWith(`${workOrdersRoot}/aterkommande/`);
   const operationsOverview = current === `${workOrdersRoot}/operationsoversikt` || current.startsWith(`${workOrdersRoot}/operationsoversikt/`);
   const technicianPlanning = current === `${workOrdersRoot}/planering` || current.startsWith(`${workOrdersRoot}/planering/`);
+  const workOrderSegment = current.startsWith(`${workOrdersRoot}/`) ? current.slice(workOrdersRoot.length + 1) : "";
+  const workOrderDetail = Boolean(workOrderSegment) && !workOrderSegment.includes("/") && !["ny", "redigeringslas", "aterkommande", "operationsoversikt", "planering"].includes(workOrderSegment);
+  if (canAssignWorkOrders(role) && workOrderDetail) {
+    return { href: `${current}#spara-arbetsorder`, label: "Spara arbetsorder" };
+  }
   if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin && !recurringSchedules && !operationsOverview && !technicianPlanning))) {
     return { href: `${workOrdersRoot}/ny`, label: "Ny arbetsorder" };
   }

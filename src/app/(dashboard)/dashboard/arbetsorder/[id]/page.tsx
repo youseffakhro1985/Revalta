@@ -141,6 +141,12 @@ export default function WorkOrderDetailPage() {
     node.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, workOrder, capabilities.canViewFinance]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-arbetsorder") return;
+    document.getElementById("spara-arbetsorder")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, workOrder]);
+
   async function save(formData: FormData) {
     if (editLock.state.status !== "owned") {
       setError("Arbetsordern saknar ett aktivt redigeringslås. Försök låsa den igen.");
@@ -183,12 +189,12 @@ export default function WorkOrderDetailPage() {
   const requiresReason = selectedStatus === "blocked" || selectedStatus === "cancelled";
   const editable = Boolean(transitions?.canManage) && editLock.state.status === "owned";
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-  if (!workOrder || !transitions) return <InlineAlert>{error || "Arbetsordern hittades inte"}</InlineAlert>;
+  if (!loading && (!workOrder || !transitions)) return <InlineAlert>{error || "Arbetsordern hittades inte"}</InlineAlert>;
 
-  const estimated = workOrder.estimated_cost === null ? null : Number(workOrder.estimated_cost);
-  const actual = workOrder.actual_cost === null ? null : Number(workOrder.actual_cost);
-  const enterprise = workOrder.enterprise;
+  const estimated = workOrder?.estimated_cost == null ? null : Number(workOrder.estimated_cost);
+  const actual = workOrder?.actual_cost == null ? null : Number(workOrder.actual_cost);
+  const enterprise = workOrder?.enterprise ?? null;
+  const formLocked = saving || loading || !workOrder || !transitions || !editable;
 
   async function createProjectFromWorkOrder() {
     if (!window.confirm("Skapa ett projekt från den här arbetsordern?")) return;
@@ -231,14 +237,15 @@ export default function WorkOrderDetailPage() {
 
   return <div className="space-y-8">
     <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordrar</Link>
-    <PageHeader eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder.title} description={workOrder.description} />
+    <PageHeader eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder?.title || "Arbetsorder"} description={workOrder?.description || "Styrning, SLA, ekonomi och revisionshistorik för arbetsordern."} />
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
-    {transitions.canManage ? <div className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${editable ? "border-success-200 bg-success-50" : editLock.state.status === "locked" ? "border-warning-200 bg-warning-50" : "border-sand-200 bg-white"}`}>
+    {transitions?.canManage ? <div className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${editable ? "border-success-200 bg-success-50" : editLock.state.status === "locked" ? "border-warning-200 bg-warning-50" : "border-sand-200 bg-white"}`}>
       <div className="flex items-start gap-3"><LockKeyhole className={`mt-0.5 h-5 w-5 ${editable ? "text-success-700" : "text-warning-700"}`} /><div><p className="font-semibold text-ink-900">{editable ? "Säker redigering aktiv" : editLock.state.status === "locked" ? "Arbetsordern redigeras av en annan användare" : editLock.state.status === "acquiring" ? "Låser arbetsordern för redigering…" : "Redigeringslåset är inte aktivt"}</p><p className="mt-1 text-sm text-ink-600">{editable ? `Låset förnyas automatiskt till ${dateTime.format(new Date(editLock.state.expiresAt))}.` : editLock.state.status === "locked" ? `${editLock.state.holder.name || editLock.state.holder.email} har låset till ${dateTime.format(new Date(editLock.state.expiresAt))}.` : editLock.state.status === "lost" || editLock.state.status === "error" ? editLock.state.message : "Vänta medan ett exklusivt redigeringslås skapas."}</p></div></div>
       {!editable && editLock.state.status !== "acquiring" ? <button type="button" onClick={() => void editLock.acquire()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-4 py-2 text-sm font-semibold text-petroleum-800"><RefreshCw className="h-4 w-4" />Försök igen</button> : null}
-    </div> : null}
+    </div> : loading ? <div className="h-24 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
 
+    {workOrder ? (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={MapPin} label="Fastighet" value={workOrder.property.name} hint={`${workOrder.property.address}, ${workOrder.property.city}`} />
       <MetricCard icon={UserRound} label="Ansvarig" value={workOrder.assigned_to?.name || workOrder.assigned_to?.email || "Ej tilldelad"} />
@@ -246,6 +253,7 @@ export default function WorkOrderDetailPage() {
       <MetricCard icon={CalendarClock} label="Planerat slut" value={workOrder.scheduled_end ? date.format(new Date(workOrder.scheduled_end)) : "Ej satt"} />
       {capabilities.canViewFinance ? <MetricCard icon={Banknote} label="Kostnadsutfall" value={actual === null ? "Ej satt" : money.format(actual)} hint={estimated === null ? "Beräknat ej satt" : `Beräknat ${money.format(estimated)}`} /> : null}
     </section>
+    ) : <div className="h-40 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
 
     <Panel title="Identifiering och spårning" description="Operativ identifiering, SLA och oföränderligt revisionsspår för arbetsordern.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -265,17 +273,18 @@ export default function WorkOrderDetailPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
         <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Byggnad</span><select disabled={!editable} value={buildingId} onChange={(event) => { const next = event.target.value; setBuildingId(next); if (technicalAssetId && !assets.some((asset) => asset.id === technicalAssetId && (!next || !asset.building_id || asset.building_id === next))) setTechnicalAssetId(""); }} className={premiumFieldClass}><option value="">Ingen särskild byggnad</option>{buildings.map((building) => <option key={building.id} value={building.id}>{building.name}{building.address ? ` · ${building.address}` : ""}</option>)}</select></label>
         <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Teknisk komponent</span><select disabled={!editable} value={technicalAssetId} onChange={(event) => setTechnicalAssetId(event.target.value)} className={premiumFieldClass}><option value="">Ingen särskild komponent</option>{filteredAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}{asset.building_name ? ` · ${asset.building_name}` : ""}{asset.location ? ` · ${asset.location}` : ""}</option>)}</select></label>
-        <Link href={`/dashboard/fastigheter/${workOrder.property.id}#component-registry-heading`} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-petroleum-800 hover:bg-sand-50">Öppna register</Link>
+        {workOrder ? <Link href={`/dashboard/fastigheter/${workOrder.property.id}#component-registry-heading`} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-petroleum-800 hover:bg-sand-50">Öppna register</Link> : <span className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-400">Öppna register</span>}
       </div>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-sand-200 p-4"><div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-petroleum-700" /><p className="font-semibold text-ink-900">Vald byggnad</p></div><p className="mt-2 text-sm text-ink-600">{buildings.find((building) => building.id === buildingId)?.name || enterprise?.building_name || "Ingen särskild byggnad kopplad"}</p></div>
-        <div className="rounded-xl border border-sand-200 p-4"><div className="flex items-center gap-2"><Wrench className="h-4 w-4 text-petroleum-700" /><p className="font-semibold text-ink-900">Vald komponent</p></div>{selectedAsset ? <div className="mt-2"><Link href={`/dashboard/fastigheter/${workOrder.property.id}/komponenter/${selectedAsset.id}`} className="font-semibold text-petroleum-800 hover:text-petroleum-950">{selectedAsset.name}</Link><p className="mt-1 text-sm text-ink-500">{selectedAsset.component_class || selectedAsset.category}{selectedAsset.location ? ` · ${selectedAsset.location}` : ""} · {selectedAsset.status}</p></div> : <p className="mt-2 text-sm text-ink-600">Ingen särskild komponent kopplad</p>}</div>
+        <div className="rounded-xl border border-sand-200 p-4"><div className="flex items-center gap-2"><Wrench className="h-4 w-4 text-petroleum-700" /><p className="font-semibold text-ink-900">Vald komponent</p></div>{selectedAsset && workOrder ? <div className="mt-2"><Link href={`/dashboard/fastigheter/${workOrder.property.id}/komponenter/${selectedAsset.id}`} className="font-semibold text-petroleum-800 hover:text-petroleum-950">{selectedAsset.name}</Link><p className="mt-1 text-sm text-ink-500">{selectedAsset.component_class || selectedAsset.category}{selectedAsset.location ? ` · ${selectedAsset.location}` : ""} · {selectedAsset.status}</p></div> : <p className="mt-2 text-sm text-ink-600">Ingen särskild komponent kopplad</p>}</div>
       </div>
     </Panel>
 
     <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+      <div id="spara-arbetsorder" className="scroll-mt-36">
       <Panel title="Styrning" description="Endast giltiga statusövergångar visas. Alla ändringar kräver ett aktivt redigeringslås och registreras i revisionshistoriken.">
-        {transitions.invoiceBlockReason ? (
+        {transitions?.invoiceBlockReason ? (
           <div className="mb-4">
             <InlineAlert tone="warning">
               {transitions.invoiceBlockReason}{" "}
@@ -284,19 +293,20 @@ export default function WorkOrderDetailPage() {
           </div>
         ) : null}
         <form action={save} className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select disabled={!editable} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!["blocked", "cancelled"].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass}>{transitions.allowedStatuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
-          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={!editable} defaultValue={workOrder.priority} className={premiumFieldClass}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={!editable || !transitions.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass}><option value="">Ej tilldelad</option>{transitions.users.map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select>{!transitions.canAssign ? <span className="block text-xs text-ink-500">Endast förvaltare och administratörer kan tilldela ansvarig.</span> : <span className="block text-xs text-ink-500">Vid tilldelning, paus, avbrott, återupptagning och avslut mejlas den ansvariga, utom när du agerar på din egen arbetsorder.</span>}</label>
-          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Leverantör</span><select disabled={!editable || !transitions.canAssign || !vendorAssignmentAvailable} value={vendorContractId} onChange={(event) => setVendorContractId(event.target.value)} className={premiumFieldClass}><option value="">Ingen leverantör</option>{vendors.filter((vendor) => !vendor.property_id || vendor.property_id === workOrder.property.id).map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}{vendor.category ? ` · ${vendor.category}` : ""}</option>)}</select>{!vendorAssignmentAvailable ? <span className="block text-xs text-ink-500">Leverantörskoppling väntar på Database Release.</span> : !transitions.canAssign ? <span className="block text-xs text-ink-500">Endast förvaltare och administratörer kan koppla leverantör.</span> : <span className="block text-xs text-ink-500">Vid koppling, paus, avbrott, återupptagning och avslut mejlas leverantörens kontaktadress i registret.</span>}</label>
-          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={!editable} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
-          <input name="scheduledStart" type="date" disabled={!editable} defaultValue={workOrder.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat startdatum" />
-          <input name="scheduledEnd" type="date" disabled={!editable} defaultValue={workOrder.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat slutdatum" />
+          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Nästa status</span><select autoFocus disabled={formLocked} value={selectedStatus} onChange={(event) => { setSelectedStatus(event.target.value); if (!["blocked", "cancelled"].includes(event.target.value)) setStatusReason(""); }} className={premiumFieldClass} aria-label="Nästa status">{(transitions?.allowedStatuses.length ? transitions.allowedStatuses : selectedStatus ? [selectedStatus] : []).map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}</select></label>
+          <label className="space-y-2"><span className="text-sm font-semibold text-ink-700">Prioritet</span><select name="priority" disabled={formLocked} defaultValue={workOrder?.priority || "normal"} className={premiumFieldClass} aria-label="Prioritet">{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Ansvarig</span><select disabled={formLocked || !transitions?.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass} aria-label="Ansvarig"><option value="">Ej tilldelad</option>{(transitions?.users ?? []).map((person) => <option key={person.id} value={person.id}>{person.name || person.email} · {person.role}</option>)}</select>{!transitions?.canAssign ? <span className="block text-xs text-ink-500">Endast förvaltare och administratörer kan tilldela ansvarig.</span> : <span className="block text-xs text-ink-500">Vid tilldelning, paus, avbrott, återupptagning och avslut mejlas den ansvariga, utom när du agerar på din egen arbetsorder.</span>}</label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Leverantör</span><select disabled={formLocked || !transitions?.canAssign || !vendorAssignmentAvailable} value={vendorContractId} onChange={(event) => setVendorContractId(event.target.value)} className={premiumFieldClass} aria-label="Leverantör"><option value="">Ingen leverantör</option>{vendors.filter((vendor) => !vendor.property_id || vendor.property_id === workOrder?.property.id).map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}{vendor.category ? ` · ${vendor.category}` : ""}</option>)}</select>{!vendorAssignmentAvailable ? <span className="block text-xs text-ink-500">Leverantörskoppling väntar på Database Release.</span> : !transitions?.canAssign ? <span className="block text-xs text-ink-500">Endast förvaltare och administratörer kan koppla leverantör.</span> : <span className="block text-xs text-ink-500">Vid koppling, paus, avbrott, återupptagning och avslut mejlas leverantörens kontaktadress i registret.</span>}</label>
+          <label className="space-y-2 sm:col-span-2"><span className="text-sm font-semibold text-ink-700">Orsak till statusändring{requiresReason ? " *" : ""}</span><textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} required={requiresReason} maxLength={1000} disabled={formLocked} placeholder={requiresReason ? "Beskriv varför arbetsordern blockeras eller avbryts" : "Valfri intern förklaring till statusändringen"} className={`${premiumFieldClass} min-h-24`} /></label>
+          <input name="scheduledStart" type="date" disabled={formLocked} defaultValue={workOrder?.scheduled_start?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat startdatum" />
+          <input name="scheduledEnd" type="date" disabled={formLocked} defaultValue={workOrder?.scheduled_end?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Planerat slutdatum" />
           {capabilities.canManageFinance ? <>
-            <input name="estimatedCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={estimated ?? ""} placeholder="Beräknad kostnad" className={premiumFieldClass} aria-label="Beräknad kostnad" />
-            <input name="actualCost" type="number" min="0" step="0.01" disabled={!editable} defaultValue={actual ?? ""} placeholder="Faktisk kostnad" className={premiumFieldClass} aria-label="Faktisk kostnad" />
+            <input name="estimatedCost" type="number" min="0" step="0.01" disabled={formLocked} defaultValue={estimated ?? ""} placeholder="Beräknad kostnad" className={premiumFieldClass} aria-label="Beräknad kostnad" />
+            <input name="actualCost" type="number" min="0" step="0.01" disabled={formLocked} defaultValue={actual ?? ""} placeholder="Faktisk kostnad" className={premiumFieldClass} aria-label="Faktisk kostnad" />
           </> : null}
-          {transitions.canManage ? <button disabled={!editable || saving || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : editable ? "Spara låst och validerad ändring" : "Väntar på redigeringslås"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
+          {transitions?.canManage || loading || !workOrder ? <button disabled={formLocked || (requiresReason && !statusReason.trim())} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : editable ? "Spara låst och validerad ändring" : loading || !workOrder ? "Spara låst och validerad ändring" : "Väntar på redigeringslås"}</button> : <p className="sm:col-span-2 text-sm text-ink-500">Du har läsbehörighet men kan inte ändra arbetsordern.</p>}
         </form>
+        {workOrder ? (
         <div className="mt-5 space-y-3 border-t border-sand-100 pt-5 text-sm text-ink-500">
           {workOrder.unit ? <p>Enhet: <strong className="text-ink-800">{workOrder.unit.designation}</strong></p> : null}
           {workOrder.ticket ? <p>Ursprungsärende: <strong className="text-ink-800">{workOrder.ticket.public_reference || workOrder.ticket.title}</strong></p> : null}
@@ -323,23 +333,27 @@ export default function WorkOrderDetailPage() {
             </button>
           ) : null}
         </div>
+        ) : null}
       </Panel>
-      <OperationalActivityPanel entityType="work_order" entityId={workOrder.id} />
+      </div>
+      {workOrder ? <OperationalActivityPanel entityType="work_order" entityId={workOrder.id} /> : <div className="h-64 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
     </section>
 
+    {workOrder ? (
     <Panel title="Statushistorik" description="Oföränderligt revisionsspår för alla statusövergångar i arbetsordern.">
       {!workOrder.statusEvents.length ? <div className="rounded-xl border border-dashed border-sand-300 p-8 text-center text-sm text-ink-500">Ingen statushistorik finns för den här äldre arbetsordern ännu.</div> : <div className="space-y-3">{workOrder.statusEvents.map((event, index) => <div key={event.id} className="grid gap-3 rounded-xl border border-sand-200 p-4 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center"><div className={`flex h-9 w-9 items-center justify-center rounded-full ${index === 0 ? "bg-petroleum-100 text-petroleum-800" : "bg-sand-100 text-ink-500"}`}>{event.to_status === "completed" || event.to_status === "invoiced" ? <CheckCircle2 className="h-4 w-4" /> : <History className="h-4 w-4" />}</div><div><p className="font-semibold text-ink-900">{event.from_status ? `${statusLabels[event.from_status] || event.from_status} → ` : "Skapad som "}{statusLabels[event.to_status] || event.to_status}</p><p className="mt-1 text-sm text-ink-500">{event.actor_name || event.actor_email}{event.reason ? ` · ${event.reason}` : ""}</p></div><time className="text-sm text-ink-500">{dateTime.format(new Date(event.created_at))}</time></div>)}</div>}
     </Panel>
+    ) : null}
 
-    <WorkOrderExecutionPanel workOrderId={workOrder.id} />
-    {capabilities.canViewFinance ? <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
+    {workOrder ? <WorkOrderExecutionPanel workOrderId={workOrder.id} /> : null}
+    {workOrder && capabilities.canViewFinance ? <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>
         <p className="mt-1 text-sm text-ink-500">Här samlas attesterad tid, material, lönsamhet och exportbart fakturaunderlag mot er Fortnox-/Visma-HTTP-endpoint. Fältregistreringen ovan är driftunderlag, inte fakturarader.</p>
       </div>
       <WorkOrderEconomicsPanel workOrderId={workOrder.id} />
     </section> : null}
-    <WorkOrderReportingPanel workOrderId={workOrder.id} />
-    <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} />
+    {workOrder ? <WorkOrderReportingPanel workOrderId={workOrder.id} /> : null}
+    {workOrder ? <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} /> : null}
   </div>;
 }
