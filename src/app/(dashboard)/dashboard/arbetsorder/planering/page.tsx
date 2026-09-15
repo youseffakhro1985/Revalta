@@ -89,6 +89,11 @@ export default function TechnicianPlanningPage() {
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    if (window.location.hash !== "#arbetsbelastning") return;
+    document.getElementById("arbetsbelastning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, orders]);
+
   const active = useMemo(() => orders.filter((item) => !terminal.has(item.status)), [orders]);
   const groups = useMemo<Group[]>(() => {
     const map = new Map<string, Group>();
@@ -148,7 +153,7 @@ export default function TechnicianPlanningPage() {
       description={scopedToAssigned
         ? "Din tilldelade arbetsbelastning efter SLA-risk och nästa deadline."
         : "Fördela arbetsbelastningen efter ansvarig, SLA-risk och nästa deadline. Tilldela direkt i listan."}
-      action={<button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>}
+      action={<div className="flex flex-wrap gap-2">{canAssign || loading ? <a href="#arbetsbelastning" className="inline-flex h-11 items-center gap-2 rounded-xl bg-petroleum-800 px-4 text-sm font-semibold text-white hover:bg-petroleum-900">Fördela arbete</a> : null}<button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button></div>}
     />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     {scopedToAssigned ? <InlineAlert tone="info">Du ser endast arbetsordrar som är tilldelade dig.</InlineAlert> : null}
@@ -160,6 +165,7 @@ export default function TechnicianPlanningPage() {
       <MetricCard icon={CheckCircle2} label="Planerade utan akut risk" value={ready} hint="Tilldelade och inom stabilt läge" />
     </section>
 
+    <div id="arbetsbelastning" className="scroll-mt-36">
     <Panel title="Arbetsbelastning per ansvarig" description="Ej tilldelade visas först, därefter teammedlemmar med högst SLA-risk." bodyClassName="p-4 sm:p-6">
       {loading && !orders.length ? <div className="h-64 animate-pulse rounded-xl bg-sand-50" /> : null}
       {!loading && groups.length === 0 ? <EmptyState title="Inga aktiva arbetsordrar" description="När arbetsordrar skapas eller planeras visas teamets arbetsbelastning här." /> : null}
@@ -198,5 +204,6 @@ export default function TechnicianPlanningPage() {
         </section>)}
       </div>
     </Panel>
+    </div>
   </div>;
 }
