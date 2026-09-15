@@ -115,6 +115,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canManageIntegrations(role) && current === "/dashboard/integrationer") {
     return { href: "/dashboard/integrationer/fakturaexporter", label: "Fakturaexport" };
   }
+  if (canManageIntegrations(role) && current === "/dashboard/integrationer/fakturaexporter") {
+    return { href: "/dashboard/integrationer/fakturaexporter#exportfilter", label: "Filtrera export" };
+  }
 
   if (current === "/dashboard/installningar") {
     return { href: "/dashboard/installningar#losenord", label: "Byt lösenord" };
