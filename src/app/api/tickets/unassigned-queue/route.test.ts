@@ -1,0 +1,71 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { getCurrentUserMock, ticketFindManyMock, userFindManyMock } = vi.hoisted(() => ({
+  getCurrentUserMock: vi.fn(),
+  ticketFindManyMock: vi.fn(),
+  userFindManyMock: vi.fn(),
+}));
+
+vi.mock("@/lib/current-user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/current-user")>()),
+  getCurrentUser: getCurrentUserMock,
+}));
+
+vi.mock("@/lib/db", () => ({
+  default: {
+    ticket: { findMany: ticketFindManyMock },
+    user: { findMany: userFindManyMock },
+  },
+}));
+
+import { GET } from "./route";
+
+describe("GET /api/tickets/unassigned-queue", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ticketFindManyMock.mockResolvedValue([]);
+    userFindManyMock.mockResolvedValue([]);
+  });
+
+  it("denies technicians from reading the unassigned ticket queue", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(ticketFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("lists unassigned open tickets and assignable staff", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "mgr-1", company_id: "company-1", role: "manager" });
+    ticketFindManyMock.mockResolvedValue([{
+      id: "ticket-1",
+      title: "Läckande kran",
+      status: "new",
+      priority: "urgent",
+      public_reference: "RV-1001",
+      created_at: new Date("2026-09-14T08:00:00.000Z"),
+      property: { id: "prop-1", name: "Storgatan 12" },
+    }]);
+    userFindManyMock.mockResolvedValue([
+      { id: "tech-1", name: "Tina Tekniker", email: "tina@example.com", role: "technician" },
+    ]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        assigned_to_id: null,
+        deleted_at: null,
+      }),
+    }));
+    expect(ticketFindManyMock.mock.calls[0]?.[0].where.company_id).toBe("company-1");
+    expect(body.tickets[0]).toEqual(expect.objectContaining({
+      id: "ticket-1",
+      href: "/dashboard/felanmalan/ticket-1",
+      publicReference: "RV-1001",
+    }));
+    expect(body.assignees).toEqual([expect.objectContaining({ id: "tech-1", name: "Tina Tekniker" })]);
+    expect(body.selfId).toBe("mgr-1");
+  });
+});
