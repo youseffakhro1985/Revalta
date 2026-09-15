@@ -85,6 +85,12 @@ export default function BookingsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-bokning") return;
+    document.getElementById("ny-bokning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, canManage]);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -212,14 +218,16 @@ export default function BookingsPage() {
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet till resurskalendern. Förvaltare kan skapa, ändra och avboka bokningar.</InlineAlert> : null}
 
-      <section className={`grid gap-6 ${canManage ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
-        {canManage ? (
+      <section className={`grid gap-6 ${canManage || loading ? "xl:grid-cols-[390px_1fr]" : "grid-cols-1"}`}>
+        {canManage || loading ? (
+          <div id="ny-bokning" className="scroll-mt-36">
           <Panel title="Ny bokning" description="Registrera resurs, boende och tidsintervall." className="h-fit xl:sticky xl:top-[112px]">
-            <form id="ny-bokning" onSubmit={submit} className="space-y-4">
+            {canManage ? (
+            <form onSubmit={submit} className="space-y-4">
               <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fastighet</span><select required aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.city}</option>)}</select></label>
               <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Resurs</span><select aria-label="Resurstyp" value={form.resource} onChange={(event) => setForm({ ...form, resource: event.target.value })} className={premiumFieldClass}>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select></label>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Boende</span><input required aria-label="Boendes namn" placeholder="Namn" value={form.residentName} onChange={(event) => setForm({ ...form, residentName: event.target.value })} className={premiumFieldClass} /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Boende</span><input required autoFocus aria-label="Boendes namn" placeholder="Namn" value={form.residentName} onChange={(event) => setForm({ ...form, residentName: event.target.value })} className={premiumFieldClass} /></label>
                 <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Lägenhet/lokal</span><input aria-label="Lägenhet/lokal" placeholder="Exempel: 1203" value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} className={premiumFieldClass} /></label>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
@@ -229,7 +237,11 @@ export default function BookingsPage() {
               <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Anteckning</span><textarea aria-label="Anteckning" placeholder="Valfri information om bokningen" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} className={premiumTextareaClass} /></label>
               <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Registrera bokning"}</button>
             </form>
+            ) : (
+              <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
+            )}
           </Panel>
+          </div>
         ) : null}
 
         <Panel title="Bokningsöversikt" description="Sök, filtrera och hantera samtliga resurser." bodyClassName="p-0">
