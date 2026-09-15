@@ -46,11 +46,29 @@ export function WorkOrderQuickActions({
   async function patch(body: Record<string, unknown>, mode: "status" | "assign") {
     setBusy(mode);
     setError("");
+    let token = "";
     try {
-      const response = await fetch(`/api/work-orders/${workOrderId}`, {
+      const lockResponse = await fetch(`/api/work-orders/${workOrderId}/edit-lock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acquire", leaseSeconds: 120 }),
+      });
+      const lockBody = await readResponseJson<{
+        error?: string;
+        lock?: { token?: string; version?: string };
+      }>(lockResponse);
+      if (lockResponse.status === 423) {
+        throw new Error(lockBody.error || "Arbetsordern redigeras av någon annan.");
+      }
+      if (!lockResponse.ok) throw new Error(lockBody.error || "Kunde inte låsa arbetsordern för redigering");
+      token = String(lockBody.lock?.token || "");
+      const version = typeof lockBody.lock?.version === "string" ? lockBody.lock.version : "";
+      if (!token || !version) throw new Error("Redigeringslåset saknar token eller version");
+
+      const response = await fetch(`/api/work-orders/${workOrderId}/locked-update`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, editToken: token, version }),
       });
       const data = await readResponseJson<{
         error?: string;
@@ -67,6 +85,17 @@ export function WorkOrderQuickActions({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Kunde inte uppdatera arbetsordern");
     } finally {
+      if (token) {
+        try {
+          await fetch(`/api/work-orders/${workOrderId}/edit-lock`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "release", token }),
+          });
+        } catch {
+          // The mutation may already have succeeded; a leftover short lease expires on its own.
+        }
+      }
       setBusy(null);
     }
   }
