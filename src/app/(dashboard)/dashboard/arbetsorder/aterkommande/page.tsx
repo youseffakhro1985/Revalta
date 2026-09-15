@@ -73,6 +73,10 @@ export default function RecurringWorkOrdersPage() {
   }
 
   useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    if (window.location.hash !== "#nytt-schema") return;
+    document.getElementById("nytt-schema")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
   const paused = schedules.filter((item) => !item.active).length;
   const dueSoon = useMemo(() => {
     const limit = Date.now() + 7 * 24 * 60 * 60 * 1000;
@@ -180,9 +184,10 @@ export default function RecurringWorkOrdersPage() {
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard icon={CheckCircle2} label="Aktiva scheman" value={health.activeSchedules} /><MetricCard icon={PauseCircle} label="Pausade" value={paused} /><MetricCard icon={CalendarClock} label="Nästa 7 dagar" value={dueSoon} /><MetricCard icon={AlertTriangle} label="Förfallna" value={health.overdueSchedules} hint={health.lastRunAt ? `Senaste körning ${dateTime.format(new Date(health.lastRunAt))}` : "Ingen körning registrerad"} /></section>
     {error ? <InlineAlert>{error}</InlineAlert> : null}{message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
     <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
+      <div id="nytt-schema" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start">
       <Panel title="Nytt återkommande schema" description="Definiera vad som ska skapas och när nästa arbetsorder ska planeras.">
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Fastighet"><select required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
+          <Field label="Fastighet"><select required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} autoFocus><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
           <Field label="Rubrik"><input required maxLength={180} className={premiumFieldClass} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Ex. Månadsvis kontroll av undercentral" /></Field>
           <Field label="Arbetsbeskrivning"><textarea required className={premiumTextareaClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Beskriv moment, kontrollpunkter och förväntat resultat" /></Field>
           <div className="grid grid-cols-2 gap-3"><Field label="Frekvens"><select className={premiumFieldClass} value={form.frequency} onChange={(event) => setForm({ ...form, frequency: event.target.value })}><option value="weekly">Vecka</option><option value="monthly">Månad</option><option value="quarterly">Kvartal</option><option value="yearly">År</option></select></Field><Field label="Prioritet"><select className={premiumFieldClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="urgent">Akut</option></select></Field></div>
@@ -191,6 +196,7 @@ export default function RecurringWorkOrdersPage() {
           <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Skapar…" : "Skapa schema"}</button>
         </form>
       </Panel>
+      </div>
       <Panel title="Scheman" description={`${schedules.length} återkommande arbetsflöden`} bodyClassName="p-0">
         {loading && !schedules.length ? <div className="p-8 text-sm text-ink-500">Hämtar scheman…</div> : null}
         {!loading && schedules.length === 0 ? <EmptyState title="Inga återkommande scheman" description="Skapa ett schema för att automatisera återkommande drift och underhåll." /> : null}
