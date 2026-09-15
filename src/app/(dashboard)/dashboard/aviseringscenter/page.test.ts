@@ -1,15 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("aviseringscenter SLA copy", () => {
-  it("sends SLA assignment to Planering and Dagens förvaltning instead of inventing a third assign surface", () => {
+describe("aviseringscenter filter hash", () => {
+  it("keeps the filter chips hash target in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
-    expect(source).not.toContain("Öppna arbetsordern för att tilldela ansvarig");
-    expect(source).toContain("Otilldelade arbetsordrar tilldelas i Planering eller Dagens förvaltning.");
-    expect(source).toContain('href="/dashboard/arbetsorder/planering"');
-    expect(source).toContain('href="/dashboard"');
-    expect(source).toContain("Tilldela i Planering");
-    expect(source).toContain("Dagens förvaltning");
-    expect(source).not.toContain("/api/work-orders/unassigned-queue");
+    expect(source).toContain('id="aviseringsfilter"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#aviseringsfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain('href="#aviseringsfilter"');
   });
 });
