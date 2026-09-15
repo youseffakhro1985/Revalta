@@ -22,6 +22,10 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canCreateProperties(role) && propertyDetail) {
     return { href: `${current}#spara-fastighet`, label: "Spara fastighet" };
   }
+  const componentDetail = /^\/dashboard\/fastigheter\/[^/]+\/komponenter\/[^/]+$/.test(current);
+  if (canCreateProperties(role) && componentDetail) {
+    return { href: `${current}#spara-komponent`, label: "Spara komponent" };
+  }
   if (canCreateProperties(role) && inProperties && !creatingProperty) {
     return { href: `${propertiesRoot}/ny`, label: "Ny fastighet" };
   }
