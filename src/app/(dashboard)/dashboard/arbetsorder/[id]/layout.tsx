@@ -4,7 +4,8 @@ import db from "@/lib/db";
 import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
 import { InvoiceExportReconciliationPanel } from "@/components/dashboard/invoice-export-reconciliation-panel";
 import { WorkOrderSlaDetailPanel } from "@/components/dashboard/work-order-sla-detail-panel";
-import { canManageWorkOrderFinance, getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
+import { WorkOrderEditLockProvider } from "@/components/dashboard/work-order-edit-lock-provider";
+import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
 import { getWorkOrderEnterpriseState } from "@/lib/work-order-enterprise-core";
 
 export default async function WorkOrderDetailLayout({
@@ -35,16 +36,18 @@ export default async function WorkOrderDetailLayout({
   if (!workOrder) notFound();
   if (shouldScopeToAssignedWork(user.role) && workOrder.assigned_to_id !== user.id) notFound();
 
-  return <div className="space-y-8">
-    <DashboardBreadcrumbs
-      items={[
-        { label: "Drift" },
-        { label: "Arbetsordrar", href: "/dashboard/arbetsorder" },
-        { label: enterprise?.work_order_number || workOrder.title },
-      ]}
-    />
-    {children}
-    {canManageWorkOrderFinance(user.role) ? <InvoiceExportReconciliationPanel workOrderId={id} /> : null}
-    <WorkOrderSlaDetailPanel workOrderId={id} />
-  </div>;
+  return <WorkOrderEditLockProvider workOrderId={id} enabled={canManageTickets(user.role)}>
+    <div className="space-y-8">
+      <DashboardBreadcrumbs
+        items={[
+          { label: "Drift" },
+          { label: "Arbetsordrar", href: "/dashboard/arbetsorder" },
+          { label: enterprise?.work_order_number || workOrder.title },
+        ]}
+      />
+      {children}
+      {canManageWorkOrderFinance(user.role) ? <InvoiceExportReconciliationPanel workOrderId={id} /> : null}
+      <WorkOrderSlaDetailPanel workOrderId={id} />
+    </div>
+  </WorkOrderEditLockProvider>;
 }

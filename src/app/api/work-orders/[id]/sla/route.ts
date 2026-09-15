@@ -6,6 +6,11 @@ import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/curren
 import { getWorkOrderEnterpriseState } from "@/lib/work-order-enterprise-core";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import {
+  assertWorkOrderLockAndVersion,
+  parseWorkOrderLockInput,
+  WorkOrderLockError,
+} from "@/lib/work-order-edit-lock";
 
 function optionalDate(value: unknown) {
   if (value === null || value === undefined || value === "") return null;
@@ -25,6 +30,7 @@ async function resolveSla(user: CompanyUser, id: string) {
         created_at: true,
         completed_at: true,
         assigned_to_id: true,
+        updated_at: true,
       },
     }),
     getWorkOrderEnterpriseState(db, companyId, id),
@@ -82,6 +88,7 @@ export async function GET(
       evaluatedAt: result.evaluatedAt.toISOString(),
       priority: result.workOrder.priority,
       createdAt: result.workOrder.created_at,
+      version: result.workOrder.updated_at.toISOString(),
       canManage: canManageTickets(user.role),
       governance: {
         responseLocked: Boolean(result.enterprise?.responded_at),
@@ -107,11 +114,12 @@ export async function PATCH(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
+  if (!companyId) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ändra SLA" }, { status: 403 });
 
   const { id } = await params;
-  const current = await resolveSla(user as CompanyUser, id);
+  const current = await resolveSla({ ...user, company_id: companyId }, id);
   if (!current) return notFoundWorkOrder();
 
   const body = await request.json().catch(() => null);
@@ -150,27 +158,69 @@ export async function PATCH(
     return NextResponse.json({ error: "Ingen deadline har ändrats" }, { status: 400 });
   }
 
-  await db.$executeRaw(Prisma.sql`
-    UPDATE "WorkOrder"
-    SET "sla_response_due_at" = ${responseDueAt},
-        "sla_resolution_due_at" = ${resolutionDueAt},
-        "updated_at" = CURRENT_TIMESTAMP
-    WHERE "id" = ${id} AND "company_id" = ${user.company_id}
-  `);
+  const lockInput = parseWorkOrderLockInput(body as Record<string, unknown>);
+  if (!lockInput.ok) {
+    if (lockInput.code === "invalid_version") {
+      return NextResponse.json({ error: "Ogiltig arbetsorderversion", code: "invalid_version" }, { status: 400 });
+    }
+    return NextResponse.json(
+      { error: "Ett aktivt redigeringslås och en dokumentversion krävs", code: "lock_required" },
+      { status: 409 },
+    );
+  }
 
-  await writeAuditLog(user, {
-    entityType: "work_order",
-    entityId: id,
-    action: "work_order.sla_deadlines_updated",
-    metadata: { before, after, reason },
-  });
+  try {
+    await db.$transaction(async (tx) => {
+      await assertWorkOrderLockAndVersion(tx, {
+        companyId,
+        workOrderId: current.workOrder.id,
+        userId: user.id,
+        token: lockInput.editToken,
+        expectedUpdatedAt: lockInput.expectedUpdatedAt,
+      });
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE "WorkOrder"
+        SET "sla_response_due_at" = ${responseDueAt},
+            "sla_resolution_due_at" = ${resolutionDueAt},
+            "updated_at" = CURRENT_TIMESTAMP
+        WHERE "id" = ${id} AND "company_id" = ${companyId}
+      `);
+      await writeAuditLog({ ...user, company_id: companyId }, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.sla_deadlines_updated",
+        metadata: { before, after, reason },
+      }, tx);
+    });
+  } catch (error) {
+    if (error instanceof WorkOrderLockError) {
+      if (error.code === "lock_lost") {
+        return NextResponse.json(
+          { error: "Redigeringslåset har gått förlorat. Ladda om arbetsordern.", code: "lock_lost" },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        {
+          error: "Arbetsordern har ändrats av någon annan sedan du öppnade den. Ladda om innan du sparar.",
+          code: "version_conflict",
+        },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") {
+      return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    }
+    throw error;
+  }
 
-  const updated = await resolveSla(user as CompanyUser, id);
+  const updated = await resolveSla({ ...user, company_id: companyId }, id);
   return NextResponse.json(
     {
       success: true,
       sla: updated?.sla,
       evaluatedAt: updated?.evaluatedAt.toISOString(),
+      version: updated?.workOrder.updated_at.toISOString(),
       governance: {
         responseLocked: Boolean(updated?.enterprise?.responded_at),
         resolutionLocked: Boolean(updated?.workOrder.completed_at || updated?.enterprise?.closed_at),
