@@ -99,7 +99,7 @@ function AcceptInviteForm() {
 
   async function acceptInvite(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!hydrated || loading) return;
+    if (loading) return;
     const form = new FormData(event.currentTarget);
     const submittedToken = String(form.get("token") || "").trim();
     const submittedName = String(form.get("name") || "").trim();
@@ -196,7 +196,7 @@ function AcceptInviteForm() {
             />
             <p className="mt-2 text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
           </div>
-          <button type="submit" disabled={!hydrated || loading || Boolean(message)} className={authButtonClass}>
+          <button type="submit" disabled={loading || Boolean(message)} className={authButtonClass}>
             {loading ? "Skapar konto..." : copy.submit}
           </button>
         </form>

@@ -22,6 +22,7 @@ describe("register form", () => {
     expect(source).toContain("Ange en giltig e-postadress.");
     expect(source).toContain("isValidEmail");
     expect(source).toContain("isStrongPassword");
+    expect(source).not.toContain("disabled={!hydrated || loading}");
     expect(source).not.toContain("••••");
   });
 });

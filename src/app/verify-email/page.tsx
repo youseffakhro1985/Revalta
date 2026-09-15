@@ -23,7 +23,7 @@ function VerifyEmailForm() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!hydrated || loading) return;
+    if (loading) return;
     const submittedToken = String(new FormData(event.currentTarget).get("token") || "");
     setMessage("");
     setError("");
@@ -73,7 +73,7 @@ function VerifyEmailForm() {
         className="mt-7"
       >
         <input type="hidden" name="token" value={token} />
-        <button type="submit" disabled={!hydrated || loading || !token || Boolean(message)} className={authButtonClass}>
+        <button type="submit" disabled={loading || !token || Boolean(message)} className={authButtonClass}>
           {loading ? "Verifierar..." : message ? "Verifierad" : "Verifiera e-post"}
         </button>
       </form>

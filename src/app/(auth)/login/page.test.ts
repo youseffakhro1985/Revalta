@@ -14,7 +14,8 @@ describe("login form", () => {
     expect(source).toContain('action="/api/auth/login"');
     expect(source).toContain("data-ready");
     expect(source).toContain('defaultValue=""');
-    expect(source).toContain('disabled={!hydrated || loading}');
+    expect(source).toContain('disabled={loading}');
+    expect(source).not.toContain("disabled={!hydrated || loading}");
     expect(source).toContain('name="next"');
     expect(source).not.toContain("value={email}");
     expect(source).not.toContain("value={password}");

@@ -14,5 +14,6 @@ describe("verify-email form", () => {
     expect(source).not.toContain('type="button"');
     expect(source).toContain('get("reason")');
     expect(source).toContain("Verifieringslänken är ogiltig eller har gått ut");
+    expect(source).not.toContain("disabled={!hydrated");
   });
 });
