@@ -6,7 +6,8 @@ import { type CurrentUser } from "@/lib/current-user";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 import { OverviewEmpty, OverviewHero, OverviewMetricLink, OverviewPanel } from "@/components/dashboard/overview-chrome";
 import { isMissingSchemaColumnError } from "@/lib/schema-readiness";
-import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
+import { WORK_ORDER_STATUS_LABELS, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
+import { TechnicianNextOrderTimeForm } from "@/components/dashboard/technician-next-order-time-form";
 
 type DailyExecutionSummary = { total_minutes: number; material_entries: number };
 type DailyPhotoSummary = { photo_count: number };
@@ -144,8 +145,9 @@ export async function TechnicianDashboard({ user }: { user: CurrentUser }) {
               <p className="mt-2 text-sm text-ink-600">{nextOrder.property.name} · {nextOrder.property.address}, {nextOrder.property.city}</p>
               <div className="mt-5 rounded-2xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">
                 <p><span className="font-semibold text-ink-800">Start:</span> {nextOrder.scheduled_start ? dateTime.format(nextOrder.scheduled_start) : "Inte schemalagd"}</p>
-                <p className="mt-2"><span className="font-semibold text-ink-800">Status:</span> {nextOrder.status}</p>
+                <p className="mt-2"><span className="font-semibold text-ink-800">Status:</span> {WORK_ORDER_STATUS_LABELS[normalizeWorkOrderStatus(nextOrder.status)]}</p>
               </div>
+              <TechnicianNextOrderTimeForm workOrderId={nextOrder.id} />
               <Link href={`/dashboard/arbetsorder/${nextOrder.id}`} className="mt-5 inline-flex text-sm font-semibold text-petroleum-700">Öppna arbetsordern →</Link>
             </div>
           ) : <OverviewEmpty icon={Wrench} title="Inga aktiva arbetsordrar" description="Du har inga aktiva arbetsordrar tilldelade just nu." />}
