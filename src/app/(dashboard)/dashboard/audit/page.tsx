@@ -14,6 +14,7 @@ export default function AuditPage() {
           Granska viktiga förändringar i organisationen med tydliga filter, ansvarig användare och teknisk händelsedata.
           Loggen är tenant-isolerad och endast tillgänglig för ägare och administratörer.
         </p>
+        <a href="#auditfilter" className="mt-5 inline-flex items-center justify-center rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm">Filtrera logg</a>
       </header>
 
       <AuditLogCenter />

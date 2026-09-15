@@ -154,6 +154,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/notiser", "manager")?.label).toBe("Nytt meddelande");
     expect(dashboardPrimaryCreateAction("/dashboard/notiser", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/audit", "owner")).toEqual({
+      href: "/dashboard/audit#auditfilter",
+      label: "Filtrera logg",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/audit", "admin")?.label).toBe("Filtrera logg");
+    expect(dashboardPrimaryCreateAction("/dashboard/audit", "manager")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
