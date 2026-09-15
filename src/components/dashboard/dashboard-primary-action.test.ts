@@ -51,6 +51,11 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Nytt projekt",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/projekt", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/offerter", "owner")).toEqual({
+      href: "/dashboard/offerter?create=1",
+      label: "Ny offert",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/offerter", "technician")).toBeNull();
   });
 
   it("visar modulspecifika skapa-knappar på drift- och boendesidor", () => {
