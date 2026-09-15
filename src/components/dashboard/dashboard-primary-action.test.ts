@@ -112,7 +112,13 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/uthyrning?create=1",
       label: "Nytt avtal",
     });
-    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "owner")).toEqual({
+      href: "/dashboard/uthyrning/overlamning#valj-avtal",
+      label: "Välj avtal",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "manager")?.label).toBe("Välj avtal");
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning/rapport/abc", "owner")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/hyresavisering", "owner")).toEqual({
       href: "/dashboard/hyresavisering#ny-hyresavi",
       label: "Ny hyresavi",
