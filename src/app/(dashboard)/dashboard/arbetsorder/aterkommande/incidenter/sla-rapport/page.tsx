@@ -71,6 +71,11 @@ export default function RecurringIncidentSlaReportPage() {
 
   useEffect(() => { void load("30"); }, [load]);
 
+  useEffect(() => {
+    if (window.location.hash !== "#exportera-csv") return;
+    document.getElementById("exportera-csv")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
+
   return <div className="space-y-8">
     <PageHeader
       eyebrow="Driftuppföljning"
@@ -78,7 +83,7 @@ export default function RecurringIncidentSlaReportPage() {
       description="Följ svarstider, lösningstider, måluppfyllelse och aktiva avvikelser för återkommande arbetsordrar."
       action={<div className="flex flex-wrap gap-2">
         <Link href="/dashboard/arbetsorder/aterkommande/incidenter" className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><ChevronLeft className="h-4 w-4" /> Till incidenter</Link>
-        <a href={`/api/work-orders/recurring/incidents/sla-report?days=${days}&format=csv`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-petroleum-700 px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Exportera CSV</a>
+        <a id="exportera-csv" href={`/api/work-orders/recurring/incidents/sla-report?days=${days}&format=csv`} className="scroll-mt-36 inline-flex h-11 items-center gap-2 rounded-xl bg-petroleum-700 px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Exportera CSV</a>
         <button type="button" onClick={() => void load(days)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
       </div>}
     />

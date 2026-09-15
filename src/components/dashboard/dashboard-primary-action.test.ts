@@ -33,6 +33,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter", "manager")?.label).toBe("Kontrollera eskalering");
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter/sla-rapport", "admin")).toEqual({
+      href: "/dashboard/arbetsorder/aterkommande/incidenter/sla-rapport#exportera-csv",
+      label: "Exportera CSV",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter/sla-rapport", "manager")?.label).toBe("Exportera CSV");
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter/sla-rapport", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande", "technician")).toBeNull();
   });
 
