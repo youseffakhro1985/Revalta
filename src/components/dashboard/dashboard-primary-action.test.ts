@@ -94,6 +94,10 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Aviseringsval",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/installningar/aviseringar", "technician")?.label).toBe("Aviseringsval");
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/mina-aviseringar", "owner")).toEqual({
+      href: "/dashboard/installningar/mina-aviseringar#mina-val",
+      label: "Mina val",
+    });
     expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar", "admin")).toBeNull();
   });
 
