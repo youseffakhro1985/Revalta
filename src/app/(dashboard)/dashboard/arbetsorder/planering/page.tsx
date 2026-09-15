@@ -153,7 +153,7 @@ export default function TechnicianPlanningPage() {
       description={scopedToAssigned
         ? "Din tilldelade arbetsbelastning efter SLA-risk och nästa deadline."
         : "Fördela arbetsbelastningen efter ansvarig, SLA-risk och nästa deadline. Tilldela direkt i listan."}
-      action={<div className="flex flex-wrap gap-2"><a href="#arbetsbelastning" className="inline-flex h-11 items-center gap-2 rounded-xl bg-petroleum-800 px-4 text-sm font-semibold text-white hover:bg-petroleum-900">Fördela arbete</a><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button></div>}
+      action={<div className="flex flex-wrap gap-2">{canAssign || loading ? <a href="#arbetsbelastning" className="inline-flex h-11 items-center gap-2 rounded-xl bg-petroleum-800 px-4 text-sm font-semibold text-white hover:bg-petroleum-900">Fördela arbete</a> : null}<button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button></div>}
     />
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     {scopedToAssigned ? <InlineAlert tone="info">Du ser endast arbetsordrar som är tilldelade dig.</InlineAlert> : null}
