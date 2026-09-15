@@ -114,11 +114,12 @@ export async function PATCH(
 ) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const companyId = user.company_id;
+  if (!companyId) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ändra SLA" }, { status: 403 });
 
   const { id } = await params;
-  const current = await resolveSla(user as CompanyUser, id);
+  const current = await resolveSla({ ...user, company_id: companyId }, id);
   if (!current) return notFoundWorkOrder();
 
   const body = await request.json().catch(() => null);
@@ -171,7 +172,7 @@ export async function PATCH(
   try {
     await db.$transaction(async (tx) => {
       await assertWorkOrderLockAndVersion(tx, {
-        companyId: user.company_id,
+        companyId,
         workOrderId: current.workOrder.id,
         userId: user.id,
         token: lockInput.editToken,
@@ -182,9 +183,9 @@ export async function PATCH(
         SET "sla_response_due_at" = ${responseDueAt},
             "sla_resolution_due_at" = ${resolutionDueAt},
             "updated_at" = CURRENT_TIMESTAMP
-        WHERE "id" = ${id} AND "company_id" = ${user.company_id}
+        WHERE "id" = ${id} AND "company_id" = ${companyId}
       `);
-      await writeAuditLog(user, {
+      await writeAuditLog({ ...user, company_id: companyId }, {
         entityType: "work_order",
         entityId: id,
         action: "work_order.sla_deadlines_updated",
@@ -213,7 +214,7 @@ export async function PATCH(
     throw error;
   }
 
-  const updated = await resolveSla(user as CompanyUser, id);
+  const updated = await resolveSla({ ...user, company_id: companyId }, id);
   return NextResponse.json(
     {
       success: true,
