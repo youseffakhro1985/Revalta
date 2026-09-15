@@ -78,10 +78,9 @@ export function LoginForm(props: LoginFormProps) {
       });
       if (res.ok) {
         const data = await readResponseJson<{ user?: { role?: string } }>(res);
-        const params = new URLSearchParams(window.location.search);
         const role = String(data.user?.role || "");
         const fallback = homePathForRole(role);
-        const nextPath = safeInternalPath(params.get("next"), fallback);
+        const nextPath = safeInternalPath(props.nextPath, fallback);
         router.push(isResident(role) && isStaffOnlyDashboardPath(nextPath) ? fallback : nextPath);
       } else {
         const data = await readResponseJson<{ error?: string; errorCode?: string }>(res);
