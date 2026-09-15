@@ -74,7 +74,7 @@ export async function GET() {
       nextStatus,
       nextStatusLabel: nextStatus === "sent" ? "Markera som skickad" : "Markera som betald",
       canMarkOverdue: row.status === "sent" && pastDue,
-      href: "/dashboard/hyresavisering",
+      href: `/dashboard/hyresavisering?id=${row.id}`,
     };
   });
 

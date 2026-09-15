@@ -71,7 +71,7 @@ describe("GET /api/rent-notices/status-queue", () => {
       nextStatus: "sent",
       nextStatusLabel: "Markera som skickad",
       canMarkOverdue: false,
-      href: "/dashboard/hyresavisering",
+      href: "/dashboard/hyresavisering?id=notice-draft",
     }));
     expect(body.notices[1]).toEqual(expect.objectContaining({
       id: "notice-sent",
