@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { legacyWorkOrderEconomyRedirect } from "@/lib/dashboard-route-compat";
 
 export default async function LegacyWorkOrderEconomyPage({
   params,
@@ -6,5 +7,5 @@ export default async function LegacyWorkOrderEconomyPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/dashboard/arbetsorder/${id}`);
+  redirect(legacyWorkOrderEconomyRedirect(id));
 }
