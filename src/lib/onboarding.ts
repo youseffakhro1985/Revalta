@@ -69,7 +69,7 @@ export function buildOnboardingProgress(signals: OnboardingSignals): OnboardingP
       id: "notifications",
       title: "Notifieringsinställningar",
       description: "Spara organisationens service- och notifieringsinställningar.",
-      href: "/dashboard/installningar/aviseringar",
+      href: "/dashboard/installningar/aviseringar#aviseringsinstallningar",
       actionLabel: "Öppna notifieringar",
       completed: Boolean(signals.notificationSettingsUpdatedAt),
     },

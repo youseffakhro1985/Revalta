@@ -80,7 +80,7 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
 
-  it("visar byt lösenord på inställningsöversikten men inte i underflikar", () => {
+  it("visar byt lösenord på inställningsöversikten och aviseringsval på serviceaviseringar", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/installningar", "owner")).toEqual({
       href: "/dashboard/installningar#losenord",
       label: "Byt lösenord",
@@ -89,7 +89,11 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/installningar#losenord",
       label: "Byt lösenord",
     });
-    expect(dashboardPrimaryCreateAction("/dashboard/installningar/aviseringar", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/aviseringar", "owner")).toEqual({
+      href: "/dashboard/installningar/aviseringar#aviseringsinstallningar",
+      label: "Aviseringsval",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/aviseringar", "technician")?.label).toBe("Aviseringsval");
     expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar", "admin")).toBeNull();
   });
 
