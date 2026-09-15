@@ -107,6 +107,13 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/besiktningar", "manager")?.label).toBe("Ny kontroll");
     expect(dashboardPrimaryCreateAction("/dashboard/underhall", "admin")?.href).toBe("/dashboard/underhall#ny-underhallsatgard");
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall/service", "admin")).toEqual({
+      href: "/dashboard/underhall/service#kor-motor",
+      label: "Kör underhåll",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall/service", "manager")?.label).toBe("Kör underhåll");
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall/service", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/underhall/portfolio", "admin")?.href).toBe("/dashboard/underhall#ny-underhallsatgard");
     expect(dashboardPrimaryCreateAction("/dashboard/kalender", "owner")?.label).toBe("Ny aktivitet");
     expect(dashboardPrimaryCreateAction("/dashboard/leverantorer", "manager")?.label).toBe("Ny leverantör");
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "owner")).toEqual({

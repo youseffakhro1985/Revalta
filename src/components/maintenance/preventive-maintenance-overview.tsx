@@ -69,6 +69,12 @@ export function PreventiveMaintenanceOverview() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#kor-motor") return;
+    document.getElementById("kor-motor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   async function runEngine() {
     setRunning(true); setError(""); setMessage("");
     try {
@@ -95,9 +101,8 @@ export function PreventiveMaintenanceOverview() {
     });
   }, [data, filter]);
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-  if (error && !data) return <InlineAlert>{error}</InlineAlert>;
-  if (!data) return null;
+  const metrics = data?.metrics ?? { total: 0, overdue: 0, dueSoon: 0, automatic: 0, withWorkOrder: 0, completedCycles: 0 };
+  const showRun = Boolean(data?.canRun || loading);
 
   return (
     <div className="space-y-6">
@@ -109,7 +114,7 @@ export function PreventiveMaintenanceOverview() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50"><RefreshCw className="h-4 w-4" /> Uppdatera</button>
-          {data.canRun ? <button type="button" onClick={() => void runEngine()} disabled={running} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-petroleum-900 disabled:opacity-50"><Play className="h-4 w-4" /> {running ? "Kör..." : "Kör underhållsmotorn"}</button> : null}
+          {showRun ? <span id="kor-motor" className="scroll-mt-36"><button type="button" onClick={() => void runEngine()} disabled={running || !data?.canRun} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-petroleum-900 disabled:opacity-50"><Play className="h-4 w-4" /> {running ? "Kör..." : "Kör underhållsmotorn"}</button></span> : null}
         </div>
       </div>
 
@@ -117,20 +122,22 @@ export function PreventiveMaintenanceOverview() {
       {message ? <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm font-medium text-success-900">{message}</div> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <MetricCard icon={Wrench} label="Komponenter" value={data.metrics.total} hint="Aktiva och planerade" />
-        <MetricCard icon={AlertTriangle} label="Förfallen service" value={data.metrics.overdue} hint="Kräver åtgärd" />
-        <MetricCard icon={CalendarClock} label="Inom 30 dagar" value={data.metrics.dueSoon} hint="Kommande service" />
-        <MetricCard icon={Settings2} label="Automatik aktiv" value={data.metrics.automatic} hint="Skapar arbetsorder" />
-        <MetricCard icon={ClipboardList} label="Med arbetsorder" value={data.metrics.withWorkOrder} hint="Senaste servicecykeln" />
-        <MetricCard icon={RefreshCw} label="Avslutade cykler" value={data.metrics.completedCycles} hint="Datum framflyttat" />
+        <MetricCard icon={Wrench} label="Komponenter" value={metrics.total} hint="Aktiva och planerade" />
+        <MetricCard icon={AlertTriangle} label="Förfallen service" value={metrics.overdue} hint="Kräver åtgärd" />
+        <MetricCard icon={CalendarClock} label="Inom 30 dagar" value={metrics.dueSoon} hint="Kommande service" />
+        <MetricCard icon={Settings2} label="Automatik aktiv" value={metrics.automatic} hint="Skapar arbetsorder" />
+        <MetricCard icon={ClipboardList} label="Med arbetsorder" value={metrics.withWorkOrder} hint="Senaste servicecykeln" />
+        <MetricCard icon={RefreshCw} label="Avslutade cykler" value={metrics.completedCycles} hint="Datum framflyttat" />
       </div>
 
       <Panel title="Serviceöversikt" description="Filtrera och öppna komponenter eller deras senaste planerade arbetsorder.">
         <div className="mb-5 flex flex-wrap gap-2">
-          {([["all","Alla"],["overdue","Förfallna"],["soon","Inom 30 dagar"],["automatic","Automatik aktiv"]] as const).map(([value,label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
+          {([["all","Alla"],["overdue","Förfallna"],["soon","Inom 30 dagar"],["automatic","Automatik aktiv"]] as const).map(([value,label], index) => <button key={value} type="button" autoFocus={index === 0} onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
         </div>
 
-        {rows.length === 0 ? <EmptyState title="Inga servicepunkter i detta urval" description="Ändra filtret eller lägg till nästa servicedatum på komponenterna." /> : (
+        {loading && !data ? <div className="h-48 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}
+        {!loading && rows.length === 0 ? <EmptyState title="Inga servicepunkter i detta urval" description="Ändra filtret eller lägg till nästa servicedatum på komponenterna." /> : null}
+        {rows.length > 0 ? (
           <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200 bg-white">
             {rows.map((row) => {
               const state = serviceState(row.next_service_at);
@@ -143,7 +150,7 @@ export function PreventiveMaintenanceOverview() {
               </div>;
             })}
           </div>
-        )}
+        ) : null}
       </Panel>
     </div>
   );
