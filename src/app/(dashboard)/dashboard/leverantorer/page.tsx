@@ -78,6 +78,12 @@ export default function VendorsPage() {
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-leverantor") return;
+    document.getElementById("ny-leverantor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
+
   function startEdit(vendor: Vendor) {
     setEditingId(vendor.id);
     setEditForm({
@@ -220,9 +226,9 @@ export default function VendorsPage() {
       {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
       <section className="grid items-start gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
-        <Panel title="Lägg till leverantör" description="Registrera kontakt, kategori och avtalsbevakning." className="xl:sticky xl:top-[118px]">
+        <Panel title="Lägg till leverantör" description="Registrera kontakt, kategori och avtalsbevakning." className="scroll-mt-36 xl:sticky xl:top-[118px]">
           <form id="ny-leverantor" onSubmit={submit} className="space-y-4">
-            <input required placeholder="Företagsnamn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={premiumFieldClass} aria-label="Företagsnamn" />
+            <input required autoFocus placeholder="Företagsnamn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={premiumFieldClass} aria-label="Företagsnamn" />
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={premiumFieldClass} aria-label="Kategori">{categories.map((item) => <option key={item}>{item}</option>)}</select>
             <input placeholder="Kontaktperson" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className={premiumFieldClass} aria-label="Kontaktperson" />
             <div className="grid gap-3 sm:grid-cols-2"><input type="email" placeholder="E-post" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={premiumFieldClass} aria-label="E-post" /><input placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={premiumFieldClass} aria-label="Telefon" /></div>
