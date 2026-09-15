@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   WORK_ORDER_STATUS_LABELS,
-  getAllowedWorkOrderTransitions,
   normalizeWorkOrderStatus,
   type WorkOrderStatus,
 } from "@/lib/work-order-workflow";
+import { allowedStatusesForWorkOrderQuickActions } from "@/lib/invoice-draft-invoicing";
 import { readResponseJson } from "@/lib/fetch-json";
 import { premiumFieldClass } from "@/components/dashboard/premium-ui";
 
@@ -38,8 +38,39 @@ export function WorkOrderQuickActions({
 }: WorkOrderQuickActionsProps) {
   const [busy, setBusy] = useState<"status" | "assign" | null>(null);
   const [error, setError] = useState("");
+  const [canMarkInvoiced, setCanMarkInvoiced] = useState(false);
+  const [invoiceBlockReason, setInvoiceBlockReason] = useState<string | null>(null);
   const currentStatus = normalizeWorkOrderStatus(status);
-  const allowedStatuses = getAllowedWorkOrderTransitions(currentStatus);
+  const allowedStatuses = allowedStatusesForWorkOrderQuickActions(currentStatus, canMarkInvoiced);
+
+  useEffect(() => {
+    if (!canManage || currentStatus !== "completed") {
+      setCanMarkInvoiced(false);
+      setInvoiceBlockReason(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/work-orders/${workOrderId}/transitions`, { cache: "no-store" });
+        const body = await readResponseJson<{
+          canMarkInvoiced?: boolean;
+          invoiceBlockReason?: string | null;
+        }>(response);
+        if (!response.ok || cancelled) return;
+        setCanMarkInvoiced(Boolean(body.canMarkInvoiced));
+        setInvoiceBlockReason(typeof body.invoiceBlockReason === "string" ? body.invoiceBlockReason : null);
+      } catch {
+        if (!cancelled) {
+          setCanMarkInvoiced(false);
+          setInvoiceBlockReason(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, currentStatus, workOrderId]);
 
   if (!canManage && !canAssign) return null;
 
@@ -103,6 +134,7 @@ export function WorkOrderQuickActions({
   async function changeStatus(next: string) {
     if (!canManage || next === currentStatus) return;
     const normalized = normalizeWorkOrderStatus(next);
+    if (normalized === "invoiced" && currentStatus === "completed" && !canMarkInvoiced) return;
     let statusReason: string | undefined;
     if (normalized === "blocked" || normalized === "cancelled") {
       const reason = window.prompt(
@@ -139,6 +171,7 @@ export function WorkOrderQuickActions({
               </option>
             ))}
           </select>
+          {invoiceBlockReason ? <p className="mt-1 text-[11px] text-ink-500">{invoiceBlockReason}</p> : null}
         </label>
       ) : null}
       {canAssign ? (

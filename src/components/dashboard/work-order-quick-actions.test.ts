@@ -12,4 +12,12 @@ describe("work order quick actions", () => {
     expect(source).toContain("status === 423");
     expect(source).not.toContain("`/api/work-orders/${workOrderId}`");
   });
+
+  it("asks the transitions API whether Fakturerad is allowed before offering it", () => {
+    const source = readFileSync(new URL("./work-order-quick-actions.tsx", import.meta.url), "utf8");
+    expect(source).toContain("/api/work-orders/${workOrderId}/transitions");
+    expect(source).toContain("allowedStatusesForWorkOrderQuickActions");
+    expect(source).toContain("canMarkInvoiced");
+    expect(source).toContain("invoiceBlockReason");
+  });
 });
