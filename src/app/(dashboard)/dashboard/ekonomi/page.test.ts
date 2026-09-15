@@ -7,5 +7,6 @@ describe("ekonomi overview", () => {
     expect(source).toContain("AttestationQueuePanel");
     expect(source).toContain("InvoiceBasisQueuePanel");
     expect(source).toContain("InvoiceExportQueuePanel");
+    expect(source).toContain("InvoiceCloseQueuePanel");
   });
 });
