@@ -2,6 +2,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Banknote, Clock3, Package, Percent, ReceiptText } from "lucide-react";
 import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
@@ -701,7 +702,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
               </div>
             ) : null}
             {["ready", "exported"].includes(draft.status) ? (
-              <p className="text-sm text-ink-600">Underlaget är klart. Sätt arbetsordern till Fakturerad under Styrning när ni vill stänga den ekonomiskt.</p>
+              <p className="text-sm text-ink-600">Underlaget är klart. Sätt arbetsordern till Fakturerad under Styrning, eller från kön på <Link href="/dashboard/ekonomi" className="font-semibold text-petroleum-800 hover:underline">Ekonomi</Link>, när ni vill stänga den ekonomiskt.</p>
             ) : canManage ? (
               <p className="text-sm text-ink-500">Arbetsordern kan inte sättas som fakturerad förrän underlaget är markerat som klart.</p>
             ) : null}
