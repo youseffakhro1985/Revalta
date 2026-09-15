@@ -133,6 +133,14 @@ export default function WorkOrderDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading || !workOrder || !capabilities.canViewFinance) return;
+    if (window.location.hash !== "#ekonomi") return;
+    const node = document.getElementById("ekonomi");
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, workOrder, capabilities.canViewFinance]);
+
   async function save(formData: FormData) {
     if (editLock.state.status !== "owned") {
       setError("Arbetsordern saknar ett aktivt redigeringslås. Försök låsa den igen.");
