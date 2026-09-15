@@ -52,6 +52,10 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
     return { href: "/dashboard/imd?create=1", label: "Ny avläsning" };
   }
 
+  if (canManageWorkOrderFinance(role) && (current === "/dashboard/dokument" || current.startsWith("/dashboard/dokument/"))) {
+    return { href: "/dashboard/dokument?create=1", label: "Nytt dokument" };
+  }
+
   if (canViewOperations(role) && (current === "/dashboard/ronder" || current.startsWith("/dashboard/ronder/"))) {
     return { href: "/dashboard/ronder?create=1", label: "Ny rond" };
   }

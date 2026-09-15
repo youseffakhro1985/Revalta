@@ -61,6 +61,11 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Ny avläsning",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/imd", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/dokument", "owner")).toEqual({
+      href: "/dashboard/dokument?create=1",
+      label: "Nytt dokument",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/dokument", "technician")).toBeNull();
   });
 
   it("visar modulspecifika skapa-knappar på drift- och boendesidor", () => {
@@ -108,7 +113,6 @@ describe("dashboardPrimaryCreateAction", () => {
 
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "owner")).toBeNull();
-    expect(dashboardPrimaryCreateAction("/dashboard/dokument", "owner")).toBeNull();
   });
 
   it("respekterar rollbehörigheter", () => {
