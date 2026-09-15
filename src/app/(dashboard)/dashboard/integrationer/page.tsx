@@ -86,6 +86,13 @@ export default function IntegrationsPage() {
     return () => { isMounted = false; };
   }, [router]);
 
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash !== "#fakturaexport" && hash !== "#handelser") return;
+    if (hash === "#handelser" && loading) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
+
   const summary = useMemo(() => ({
     configured: integrations.filter((integration) => integration.configured).length,
     pending: integrations.filter((integration) => !integration.configured).length,
@@ -97,6 +104,10 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-8 animate-fade-in-soft">
       <PageHeader eyebrow="System och anslutningar" title="Integrationer" description="Samlad status för externa tjänster, ekonomisystem, tekniska krav och senaste integrationshändelser." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Hemligheter skyddas i miljövariabler</div>} />
+      <nav aria-label="Hoppa till integrationsavsnitt" className="flex flex-wrap gap-2">
+        <a href="#fakturaexport" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Fakturaexport</a>
+        <a href="#handelser" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Händelser</a>
+      </nav>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {!loading && summary.unmatchedSms > 0 ? (
@@ -112,7 +123,7 @@ export default function IntegrationsPage() {
         <MetricCard icon={Send} label="Slutförda händelser" value={loading ? "—" : summary.successfulEvents} />
       </section>
 
-      <Link href="/dashboard/integrationer/fakturaexporter" className="group block rounded-2xl border border-petroleum-100 bg-gradient-to-br from-white to-petroleum-50/50 p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)] transition hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-lg">
+      <Link id="fakturaexport" href="/dashboard/integrationer/fakturaexporter" className="scroll-mt-36 group block rounded-2xl border border-petroleum-100 bg-gradient-to-br from-white to-petroleum-50/50 p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)] transition hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-lg">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-petroleum-800 text-white"><ReceiptText className="h-6 w-6" /></div>
@@ -150,9 +161,11 @@ export default function IntegrationsPage() {
         ))}
       </section>
 
+      <div id="handelser" className="scroll-mt-36">
       <Panel title="Senaste integrationshändelser" description="Teknisk historik för utskick, betalningar, fakturaexporter och externa anrop." bodyClassName="p-0">
         {loading ? <div className="space-y-4 p-6">{[1,2,3].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-sand-100" />)}</div> : orderedEvents.length > 0 ? <div className="divide-y divide-sand-100">{orderedEvents.map((event) => <article key={event.id} className="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-semibold text-ink-950">{labels[event.type] || event.type}</h3><p className="mt-1 text-sm text-ink-500">{event.recipient || "Ingen mottagare"} · {dateFormatter.format(new Date(event.created_at))}</p></div><span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${event.type === "sms" && event.status === "unmatched" ? "border-warning-200 bg-warning-50 text-warning-800" : "border-sand-200 bg-sand-50 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></article>)}</div> : <EmptyState title="Inga integrationshändelser ännu" description="När Revalta skickar eller tar emot data via en integration visas händelsen här." />}
       </Panel>
+      </div>
     </div>
   );
 }

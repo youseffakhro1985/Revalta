@@ -136,6 +136,13 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/behorigheter", "admin")?.label).toBe("Hantera roller");
     expect(dashboardPrimaryCreateAction("/dashboard/behorigheter", "manager")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/integrationer", "owner")).toEqual({
+      href: "/dashboard/integrationer/fakturaexporter",
+      label: "Fakturaexport",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/integrationer", "admin")?.label).toBe("Fakturaexport");
+    expect(dashboardPrimaryCreateAction("/dashboard/integrationer/fakturaexporter", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/integrationer", "manager")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
@@ -173,7 +180,7 @@ describe("dashboardPrimaryCreateAction", () => {
   });
 
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
-    expect(dashboardPrimaryCreateAction("/dashboard/integrationer", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull();
   });
 
   it("respekterar rollbehörigheter", () => {
