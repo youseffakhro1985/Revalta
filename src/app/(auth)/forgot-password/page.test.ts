@@ -19,5 +19,6 @@ describe("forgot-password form", () => {
     expect(source).toContain("setError");
     expect(source).toContain('get("sent") === "1"');
     expect(source).toContain("Om kontot finns skickar vi en återställningslänk.");
+    expect(source).not.toContain("disabled={!hydrated || loading}");
   });
 });

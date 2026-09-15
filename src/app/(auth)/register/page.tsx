@@ -24,7 +24,7 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!hydrated || loading) return;
+    if (loading) return;
 
     const formData = new FormData(e.currentTarget);
     const payload = {
@@ -149,7 +149,7 @@ export default function RegisterPage() {
           />
           <p className="mt-2 text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
         </div>
-        <button type="submit" disabled={!hydrated || loading} className={authButtonClass}>
+        <button type="submit" disabled={loading} className={authButtonClass}>
           {loading ? "Skapar konto..." : "Skapa konto"}
         </button>
       </form>

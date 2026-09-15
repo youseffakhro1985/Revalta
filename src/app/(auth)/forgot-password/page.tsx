@@ -87,7 +87,7 @@ export default function ForgotPasswordPage() {
             placeholder="namn@exempel.se"
           />
         </div>
-        <button type="submit" disabled={!hydrated || loading} aria-busy={loading} className={authButtonClass}>
+        <button type="submit" disabled={loading} aria-busy={loading} className={authButtonClass}>
           {loading ? "Skickar..." : "Skicka återställningslänk"}
         </button>
       </form>

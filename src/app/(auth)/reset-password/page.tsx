@@ -27,7 +27,7 @@ function ResetPasswordForm() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!hydrated || loading) return;
+    if (loading) return;
     const form = new FormData(event.currentTarget);
     const submittedToken = String(form.get("token") || "");
     const password = String(form.get("password") || "");
@@ -116,7 +116,7 @@ function ResetPasswordForm() {
           />
         </div>
         <p className="text-xs leading-5 text-ink-500">Minst 10 tecken med både bokstav och siffra.</p>
-        <button type="submit" disabled={!hydrated || loading || !token || Boolean(message)} className={authButtonClass}>
+        <button type="submit" disabled={loading || !token || Boolean(message)} className={authButtonClass}>
           {loading ? "Sparar..." : message ? "Lösenord sparat" : "Spara nytt lösenord"}
         </button>
       </form>

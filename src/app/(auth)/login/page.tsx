@@ -166,7 +166,7 @@ export default function LoginPage() {
             />
             <button
               type="submit"
-              disabled={!hydrated || resending}
+              disabled={resending}
               aria-busy={resending}
               className="text-sm font-semibold text-petroleum-700 hover:text-petroleum-900 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -221,7 +221,7 @@ export default function LoginPage() {
             defaultValue=""
           />
         </div>
-        <button type="submit" disabled={!hydrated || loading} aria-busy={loading} className={authButtonClass}>
+        <button type="submit" disabled={loading} aria-busy={loading} className={authButtonClass}>
           {loading ? "Loggar in..." : "Logga in"}
         </button>
       </form>

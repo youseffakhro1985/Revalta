@@ -16,5 +16,6 @@ describe("accept-invite form", () => {
     expect(source).not.toContain("value={password}");
     expect(source).toContain('get("reason")');
     expect(source).toContain("AuthShell");
+    expect(source).not.toContain("disabled={!hydrated");
   });
 });

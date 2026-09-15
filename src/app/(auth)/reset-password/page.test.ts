@@ -18,5 +18,6 @@ describe("reset-password form", () => {
     expect(source).toContain("Lösenorden matchar inte");
     expect(source).toContain("passwordPolicyMessage");
     expect(source).toContain('get("reason")');
+    expect(source).not.toContain("disabled={!hydrated");
   });
 });
