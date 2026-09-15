@@ -70,7 +70,7 @@ describe("GET /api/work-orders/invoice-basis-queue", () => {
     }));
   });
 
-  it("hides work orders whose latest draft is ready, exported, or already has lines", async () => {
+  it("hides ready or exported drafts but keeps lined drafts so they can be marked ready", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "mgr-1", company_id: "company-1", role: "manager" });
     workOrderFindManyMock.mockResolvedValue([
       {
@@ -82,7 +82,7 @@ describe("GET /api/work-orders/invoice-basis-queue", () => {
         property: { id: "prop-1", name: "Storgatan 12" },
         time_entries: [{ id: "t-1" }],
         material_entries: [],
-        invoice_drafts: [{ status: "ready", lines: [] }],
+        invoice_drafts: [{ status: "ready", lines: [], customer_name: "Kund AB" }],
       },
       {
         id: "wo-lines",
@@ -93,7 +93,7 @@ describe("GET /api/work-orders/invoice-basis-queue", () => {
         property: { id: "prop-1", name: "Storgatan 12" },
         time_entries: [{ id: "t-2" }],
         material_entries: [],
-        invoice_drafts: [{ status: "draft", lines: [{ id: "line-1" }] }],
+        invoice_drafts: [{ status: "draft", lines: [{ id: "line-1" }], customer_name: "" }],
       },
       {
         id: "wo-empty",
@@ -104,14 +104,20 @@ describe("GET /api/work-orders/invoice-basis-queue", () => {
         property: { id: "prop-1", name: "Storgatan 12" },
         time_entries: [{ id: "t-3" }],
         material_entries: [],
-        invoice_drafts: [{ status: "draft", lines: [] }],
+        invoice_drafts: [{ status: "draft", lines: [], customer_name: "" }],
       },
     ]);
 
     const response = await GET();
     const body = await response.json();
-    expect(body.workOrders.map((row: { id: string }) => row.id)).toEqual(["wo-empty"]);
-    expect(body.workOrders[0].draftStatus).toBe("empty");
+    expect(body.workOrders.map((row: { id: string }) => row.id)).toEqual(["wo-lines", "wo-empty"]);
+    expect(body.workOrders[0]).toEqual(expect.objectContaining({
+      id: "wo-lines",
+      draftStatus: "built",
+      draftStatusLabel: "Utkast med rader",
+      lineCount: 1,
+    }));
+    expect(body.workOrders[1].draftStatus).toBe("empty");
   });
 
   it("returns an empty queue without leaking other tenants", async () => {

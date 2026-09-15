@@ -50,7 +50,7 @@ export async function GET() {
       invoice_drafts: {
         orderBy: { created_at: "desc" },
         take: 1,
-        select: { status: true, lines: true },
+        select: { status: true, lines: true, customer_name: true },
       },
     },
   });
@@ -58,7 +58,8 @@ export async function GET() {
   const workOrders = rows.flatMap((row) => {
     const latest = row.invoice_drafts[0];
     if (latest && lockedDraftStatuses.has(latest.status)) return [];
-    if (latest && draftLineCount(latest.lines) > 0) return [];
+    const lineCount = latest ? draftLineCount(latest.lines) : 0;
+    const draftStatus = !latest ? "missing" : lineCount > 0 ? "built" : "empty";
     const status = normalizeWorkOrderStatus(row.status);
     return [{
       id: row.id,
@@ -68,8 +69,10 @@ export async function GET() {
       propertyName: row.property.name,
       approvedTime: row.time_entries.length,
       approvedMaterial: row.material_entries.length,
-      draftStatus: latest ? "empty" : "missing",
-      draftStatusLabel: latest ? "Tomt utkast" : "Saknas",
+      draftStatus,
+      draftStatusLabel: draftStatus === "built" ? "Utkast med rader" : draftStatus === "empty" ? "Tomt utkast" : "Saknas",
+      customerName: latest?.customer_name?.trim() || "",
+      lineCount,
       updatedAt: row.updated_at.toISOString(),
       completedAt: row.completed_at?.toISOString() ?? null,
       href: `/dashboard/arbetsorder/${row.id}#ekonomi`,
