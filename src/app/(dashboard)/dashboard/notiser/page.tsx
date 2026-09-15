@@ -44,22 +44,36 @@ export default function NotificationsPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [permissions, setPermissions] = useState<Permissions>({ canManage: false });
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "unread" | "urgent">("all");
   const [form, setForm] = useState({ title: "", message: "", priority: "normal", audience: "Alla användare" });
+  const canManage = permissions.canManage;
+  const showCreate = canManage || loading;
 
   async function load() {
+    setLoading(true);
     const response = await fetch("/api/notifications", { cache: "no-store" });
-    if (!response.ok) return;
     const data = await readResponseJson(response);
-    setNotifications(data.notifications || []);
-    setEvents(data.recentEvents || []);
-    setPermissions(data.permissions || { canManage: false });
+    if (response.ok) {
+      setNotifications(data.notifications || []);
+      setEvents(data.recentEvents || []);
+      setPermissions(data.permissions || { canManage: false });
+    } else {
+      setError(data.error || "Kunde inte hämta notiser");
+    }
+    setLoading(false);
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#nytt-meddelande") return;
+    document.getElementById("nytt-meddelande")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, canManage]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -124,10 +138,13 @@ export default function NotificationsPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-ink-950">Notiscenter</h1>
           <p className="mt-2 max-w-2xl text-sm text-ink-500">Samla intern information, viktiga besked och senaste händelser i en tydlig arbetsyta.</p>
         </div>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+        {showCreate ? <a href="#nytt-meddelande" className="inline-flex items-center justify-center rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white">Nytt meddelande</a> : null}
         <div className="flex gap-2 rounded-xl border border-sand-200 bg-white p-1 shadow-premium-sm">
           {([['all', 'Alla'], ['unread', 'Olästa'], ['urgent', 'Brådskande']] as const).map(([value, label]) => (
             <button key={value} onClick={() => setFilter(value)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === value ? "bg-petroleum-800 text-white" : "text-ink-500 hover:bg-sand-50"}`}>{label}</button>
           ))}
+        </div>
         </div>
       </header>
 
@@ -142,14 +159,16 @@ export default function NotificationsPage() {
         ))}
       </section>
 
-      <section className={`grid gap-6 ${permissions.canManage ? "xl:grid-cols-[380px_1fr]" : ""}`}>
-        {permissions.canManage ? (
+      <section className={`grid gap-6 ${showCreate ? "xl:grid-cols-[380px_1fr]" : ""}`}>
+        {showCreate ? (
+          <div id="nytt-meddelande" className="scroll-mt-36">
           <form onSubmit={submit} className="space-y-4 rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm">
+            <fieldset disabled={!canManage} className="space-y-4 disabled:opacity-60">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Nytt meddelande</p>
               <h2 className="mt-2 text-lg font-semibold text-ink-950">Publicera intern information</h2>
             </div>
-            <input required maxLength={120} placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <input autoFocus required maxLength={120} placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
             <textarea required maxLength={2000} rows={6} placeholder="Meddelande" aria-label="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
             <div className="grid grid-cols-2 gap-3">
               <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} aria-label="Prioritet" className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
@@ -165,7 +184,9 @@ export default function NotificationsPage() {
               </select>
             </div>
             <button disabled={saving} className="w-full rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Publicerar…" : "Publicera meddelande"}</button>
+            </fieldset>
           </form>
+          </div>
         ) : null}
 
         <div className="space-y-6">

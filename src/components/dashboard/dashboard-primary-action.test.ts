@@ -148,6 +148,12 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/integrationer/fakturaexporter", "admin")?.label).toBe("Filtrera export");
     expect(dashboardPrimaryCreateAction("/dashboard/integrationer/fakturaexporter", "manager")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/integrationer", "manager")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/notiser", "owner")).toEqual({
+      href: "/dashboard/notiser#nytt-meddelande",
+      label: "Nytt meddelande",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/notiser", "manager")?.label).toBe("Nytt meddelande");
+    expect(dashboardPrimaryCreateAction("/dashboard/notiser", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
