@@ -15,6 +15,12 @@ describe("dashboardPrimaryCreateAction", () => {
 
   it("behåller arbetsorderåtgärden inne i arbetsordermodulen men inte i admin- eller skapa-vyn", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/planering", "admin")?.label).toBe("Ny arbetsorder");
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/operationsoversikt", "admin")).toEqual({
+      href: "/dashboard/arbetsorder/operationsoversikt#oversiktsfilter",
+      label: "Filtrera kö",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/operationsoversikt", "manager")?.label).toBe("Filtrera kö");
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/operationsoversikt", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/AO-2026-0142", "admin")?.label).toBe("Ny arbetsorder");
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/ny", "admin")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/redigeringslas", "admin")).toEqual({
