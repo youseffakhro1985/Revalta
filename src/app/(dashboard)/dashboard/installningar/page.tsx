@@ -189,6 +189,15 @@ export default function SettingsPage() {
 
   useEffect(() => { void loadSettings(); }, [loadSettings]);
 
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash !== "#profil" && hash !== "#organisation" && hash !== "#losenord") return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (hash === "#losenord") {
+      window.setTimeout(() => document.getElementById("current-password")?.focus(), 0);
+    }
+  }, []);
+
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -292,6 +301,11 @@ export default function SettingsPage() {
             </div>
             <h1 className="mt-3 text-[32px] font-semibold leading-tight tracking-[-0.04em] text-ink-950 sm:text-[38px]">Inställningar</h1>
             <p className="mt-3 max-w-3xl text-[15px] leading-6 text-ink-600">Ett samlat nav för konto, organisation, säkerhet, aviseringar och de administrationsområden din roll har tillgång till.</p>
+            <nav aria-label="Hoppa till inställningsavsnitt" className="mt-4 flex flex-wrap gap-2">
+              <a href="#profil" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Profil</a>
+              <a href="#organisation" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Organisation</a>
+              <a href="#losenord" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Lösenord</a>
+            </nav>
           </div>
           <button
             type="button"
@@ -345,6 +359,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
+        <div id="profil" className="scroll-mt-36">
         <Panel title="Profil" description="Dina personliga uppgifter i Revalta. E-post och roll styrs av kontot och organisationens behörigheter.">
           <form onSubmit={saveProfile} className="space-y-5">
             <label className="block space-y-1.5">
@@ -370,7 +385,9 @@ export default function SettingsPage() {
             </button>
           </form>
         </Panel>
+        </div>
 
+        <div id="organisation" className="scroll-mt-36">
         <Panel title="Organisation" description="Grunduppgifter för den organisation du arbetar i. Ändringar följer befintlig organisationsbehörighet.">
           <form onSubmit={saveCompany} className="space-y-5">
             <fieldset disabled={!canManageOrganisation || initialLoading || Boolean(saving)} className="space-y-4 disabled:opacity-60">
@@ -401,14 +418,16 @@ export default function SettingsPage() {
             ) : null}
           </form>
         </Panel>
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+        <div id="losenord" className="scroll-mt-36">
         <Panel title="Lösenord och sessioner" description="Byt lösenord här. Ett godkänt lösenordsbyte avslutar automatiskt tidigare sessioner enligt befintligt säkerhetsflöde.">
           <form onSubmit={changePassword} className="grid gap-4 lg:grid-cols-3">
             <label className="block space-y-1.5">
               <span className="text-xs font-semibold text-ink-700">Nuvarande lösenord</span>
-              <input required autoComplete="current-password" type="password" maxLength={512} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className={premiumFieldClass} aria-label="Nuvarande lösenord" />
+              <input id="current-password" required autoComplete="current-password" type="password" maxLength={512} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className={premiumFieldClass} aria-label="Nuvarande lösenord" />
             </label>
             <label className="block space-y-1.5">
               <span className="text-xs font-semibold text-ink-700">Nytt lösenord</span>
@@ -431,6 +450,7 @@ export default function SettingsPage() {
             </button>
           </form>
         </Panel>
+        </div>
 
         <Panel title="Säkerhetsöversikt" description="Snabb väg till de säkerhetsfunktioner som redan finns för din roll.">
           <div className="space-y-3">

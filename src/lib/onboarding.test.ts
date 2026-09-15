@@ -15,6 +15,7 @@ describe("first-run onboarding progress", () => {
     expect(progress.completedCount).toBe(0);
     expect(progress.percent).toBe(0);
     expect(progress.complete).toBe(false);
+    expect(progress.steps.find((step) => step.id === "company")?.href).toBe("/dashboard/installningar#organisation");
   });
 
   it("räknar en väntande teaminbjudan som genomfört teamsteg", () => {

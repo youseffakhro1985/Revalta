@@ -37,7 +37,7 @@ export function buildOnboardingProgress(signals: OnboardingSignals): OnboardingP
       id: "company",
       title: "Företagsuppgifter",
       description: "Kontrollera organisationsnamn och organisationsnummer.",
-      href: "/dashboard/installningar",
+      href: "/dashboard/installningar#organisation",
       actionLabel: "Öppna företagsuppgifter",
       completed: signals.companyConfigured,
     },

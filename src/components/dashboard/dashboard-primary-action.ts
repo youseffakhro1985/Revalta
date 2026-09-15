@@ -69,5 +69,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
     return { href: "/dashboard/bokningar#ny-bokning", label: "Ny bokning" };
   }
 
+  if (current === "/dashboard/installningar") {
+    return { href: "/dashboard/installningar#losenord", label: "Byt lösenord" };
+  }
+
   return null;
 }
