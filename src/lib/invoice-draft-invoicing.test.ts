@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { invoiceDraftAllowsWorkOrderInvoicing } from "./invoice-draft-invoicing";
+import {
+  allowedStatusesForWorkOrderQuickActions,
+  invoiceDraftAllowsWorkOrderInvoicing,
+} from "./invoice-draft-invoicing";
 
 describe("invoiceDraftAllowsWorkOrderInvoicing", () => {
   it("allows ready and exported drafts", () => {
@@ -13,5 +16,19 @@ describe("invoiceDraftAllowsWorkOrderInvoicing", () => {
     expect(invoiceDraftAllowsWorkOrderInvoicing({ status: "draft" })).toBe(false);
     expect(invoiceDraftAllowsWorkOrderInvoicing({ status: "cancelled" })).toBe(false);
     expect(invoiceDraftAllowsWorkOrderInvoicing({ status: "  " })).toBe(false);
+  });
+
+  it("hides invoiced on completed work orders until the underlag is ready", () => {
+    expect(allowedStatusesForWorkOrderQuickActions("completed", false)).toEqual([
+      "completed",
+      "in_progress",
+    ]);
+    expect(allowedStatusesForWorkOrderQuickActions("completed", true)).toEqual([
+      "completed",
+      "in_progress",
+      "invoiced",
+    ]);
+    expect(allowedStatusesForWorkOrderQuickActions("in_progress", false)).toContain("completed");
+    expect(allowedStatusesForWorkOrderQuickActions("in_progress", false)).not.toContain("invoiced");
   });
 });
