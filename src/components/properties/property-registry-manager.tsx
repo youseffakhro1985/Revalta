@@ -2,7 +2,7 @@
 
 import { readResponseJson } from "@/lib/fetch-json";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Building = { id: string; name: string };
 
@@ -109,10 +109,16 @@ export function PropertyRegistryManager({
     }
   }
 
+  useEffect(() => {
+    if (window.location.hash !== "#spara-fastighet") return;
+    document.getElementById("spara-fastighet")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   return (
     <div className="space-y-6">
       {(message || error) && <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${error ? "border-danger-200 bg-danger-50 text-danger-700" : "border-success-200 bg-success-50 text-success-700"}`}>{error || message}</div>}
 
+      <div id="spara-fastighet" className="scroll-mt-36">
       <form onSubmit={saveProperty} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm sm:p-7">
         <div className="mb-6">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Fastighetsdata</p>
@@ -122,7 +128,7 @@ export function PropertyRegistryManager({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[
             ["name", "Fastighetsnamn"], ["propertyIdentifier", "Fastighetsbeteckning"], ["address", "Adress"], ["postalCode", "Postnummer"], ["city", "Ort"], ["constructionYear", "Byggår"], ["totalArea", "Total area, m²"], ["boa", "BOA, m²"], ["loa", "LOA, m²"], ["managerName", "Ansvarig förvaltare"], ["contactName", "Kontaktperson"], ["contactEmail", "Kontaktens e-post"], ["contactPhone", "Kontaktens telefon"],
-          ].map(([field, label]) => <label key={field} className={labelClass}>{label}<input className={inputClass} value={values[field as keyof PropertyValues]} onChange={(event) => updateValue(field as keyof PropertyValues, event.target.value)} required={["name", "address", "city"].includes(field)} /></label>)}
+          ].map(([field, label]) => <label key={field} className={labelClass}>{label}<input autoFocus={field === "name"} className={inputClass} value={values[field as keyof PropertyValues]} onChange={(event) => updateValue(field as keyof PropertyValues, event.target.value)} required={["name", "address", "city"].includes(field)} aria-label={label} /></label>)}
           <label className={labelClass}>Fastighetstyp<select className={inputClass} value={values.propertyType} onChange={(event) => updateValue("propertyType", event.target.value)}><option value="residential">Bostäder</option><option value="commercial">Kommersiell</option><option value="mixed">Blandfastighet</option><option value="community">Samhällsfastighet</option><option value="industrial">Industri</option><option value="other">Övrig</option></select></label>
           <label className={labelClass}>Status<select className={inputClass} value={values.status} onChange={(event) => updateValue("status", event.target.value)}><option value="active">Aktiv</option><option value="planning">Planering</option><option value="inactive">Inaktiv</option><option value="sold">Avyttrad</option></select></label>
         </div>
@@ -140,6 +146,7 @@ export function PropertyRegistryManager({
           <button disabled={busy === "property"} className="rounded-lg bg-petroleum-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-800 disabled:opacity-60">{busy === "property" ? "Sparar..." : "Spara fastighetsuppgifter"}</button>
         </div>
       </form>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <form onSubmit={addBuilding} className="rounded-2xl border border-sand-200 bg-white p-6 shadow-premium-sm sm:p-7">

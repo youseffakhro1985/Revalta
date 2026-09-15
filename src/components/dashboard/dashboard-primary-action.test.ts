@@ -64,7 +64,12 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/fastigheter/ny",
       label: "Ny fastighet",
     });
-    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1", "manager")?.label).toBe("Ny fastighet");
+    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1", "manager")).toEqual({
+      href: "/dashboard/fastigheter/fastighet-1#spara-fastighet",
+      label: "Spara fastighet",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1", "owner")?.label).toBe("Spara fastighet");
+    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/ny", "manager")).toBeNull();
   });
 
