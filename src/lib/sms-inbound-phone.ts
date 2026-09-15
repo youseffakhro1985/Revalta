@@ -1,4 +1,4 @@
-const OPEN_TICKET_STATUSES = new Set(["new", "received", "in_progress", "waiting"]);
+const OPEN_TICKET_STATUSES = new Set(["new", "received", "assigned", "planned", "in_progress", "waiting"]);
 
 export type PhoneTicket = {
   id: string;

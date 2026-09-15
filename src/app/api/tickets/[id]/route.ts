@@ -16,14 +16,15 @@ import {
   redactTicketReporterPii,
 } from "@/lib/assigned-work-access";
 import {
-  allowedWorkOrderTransitions,
-  canTransitionWorkOrder,
-  deriveWorkOrderStatus,
-  isTerminalWorkOrderStatus,
-  isWorkOrderStatus,
-  workOrderStatusLabels,
-  type WorkOrderStatus,
-} from "@/lib/work-order-lifecycle";
+  allowedTicketTransitions,
+  canTransitionTicket,
+  deriveTicketStatus,
+  isTerminalTicketStatus,
+  isTicketStatus,
+  normalizeTicketStatus,
+  ticketStatusLabel,
+  ticketStatusRequiresAssignee,
+} from "@/lib/ticket-lifecycle";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 import { hasTicketAiSourceColumn, ticketAiSourceSelect } from "@/lib/schema-readiness";
@@ -123,7 +124,7 @@ export async function GET(
     if (!ticket) return notFoundTicket();
     if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
-    const normalizedStatus = isWorkOrderStatus(ticket.status) ? ticket.status : "new";
+    const normalizedStatus = normalizeTicketStatus(ticket.status);
     const redacted = redactTicketReporterPii(user, ticket);
     const companyId = user.company_id;
     const residentFeedback = companyId
@@ -135,7 +136,7 @@ export async function GET(
         ...redacted,
         status: normalizedStatus,
         residentFeedback,
-        allowedTransitions: allowedWorkOrderTransitions(normalizedStatus),
+        allowedTransitions: allowedTicketTransitions(normalizedStatus),
         attachments: ticket.attachments.map((attachment) => ({
           ...attachment,
           data_url: `/api/attachments/${attachment.id}`,
@@ -189,7 +190,7 @@ export async function PATCH(
     if (!existing) return notFoundTicket();
     if (!isAssignedWorkAccessible(user, existing.assigned_to_id)) return notFoundTicket();
 
-    const currentStatus: WorkOrderStatus = isWorkOrderStatus(existing.status) ? existing.status : "new";
+    const currentStatus = normalizeTicketStatus(existing.status);
     const shouldUpdateAssignee = typeof body.assignedToId === "string" || body.assignedToId === null;
 
     if (shouldUpdateAssignee && !canAssignWorkOrders(user.role)) {
@@ -212,8 +213,8 @@ export async function PATCH(
     }
 
     const requestedStatus = body.status === undefined ? undefined : body.status;
-    if (requestedStatus !== undefined && !isWorkOrderStatus(requestedStatus)) {
-      return NextResponse.json({ error: "Ogiltig arbetsorderstatus" }, { status: 400 });
+    if (requestedStatus !== undefined && !isTicketStatus(requestedStatus)) {
+      return NextResponse.json({ error: "Ogiltig ärendestatus" }, { status: 400 });
     }
 
     const normalizedPriority =
@@ -224,31 +225,31 @@ export async function PATCH(
     }
 
     const nextAssigneeId = shouldUpdateAssignee ? normalizedAssignedToId : existing.assigned_to_id;
-    const nextStatus = deriveWorkOrderStatus({
+    const nextStatus = deriveTicketStatus({
       current: currentStatus,
-      requested: requestedStatus as WorkOrderStatus | undefined,
+      requested: requestedStatus,
       assignedToId: nextAssigneeId,
     });
 
-    if (!canTransitionWorkOrder(currentStatus, nextStatus)) {
+    if (!canTransitionTicket(currentStatus, nextStatus)) {
       return NextResponse.json(
         {
           error: "Statusövergången är inte tillåten",
           currentStatus,
           requestedStatus: nextStatus,
-          allowedTransitions: allowedWorkOrderTransitions(currentStatus),
+          allowedTransitions: allowedTicketTransitions(currentStatus),
         },
         { status: 409 },
       );
     }
 
-    if (["assigned", "in_progress", "inspection"].includes(nextStatus) && !nextAssigneeId) {
+    if (ticketStatusRequiresAssignee(nextStatus) && !nextAssigneeId) {
       return NextResponse.json({ error: "En ansvarig måste väljas för denna status" }, { status: 400 });
     }
 
     const nextPriority = normalizedPriority || existing.priority;
     const priorityChanged = Boolean(normalizedPriority && normalizedPriority !== existing.priority);
-    const terminal = isTerminalWorkOrderStatus(nextStatus);
+    const terminal = isTerminalTicketStatus(nextStatus);
     const transitionReason = typeof body.transitionReason === "string"
       ? body.transitionReason.trim().slice(0, 500)
       : "";
@@ -369,14 +370,11 @@ export async function PATCH(
       }
     }
 
-    const completedNow = ticket.status === "completed" && existing.status !== "completed";
-    const pausedNow = ticket.status === "waiting" && existing.status !== "waiting";
-    const cancelledNow = ticket.status === "cancelled" && existing.status !== "cancelled";
-    const resumedNow = existing.status === "waiting"
-      && ["planned", "assigned", "in_progress"].includes(ticket.status);
-    const statusLabel = isWorkOrderStatus(ticket.status)
-      ? workOrderStatusLabels[ticket.status]
-      : ticket.status;
+    const completedNow = nextStatus === "completed" && currentStatus !== "completed";
+    const pausedNow = nextStatus === "waiting" && currentStatus !== "waiting";
+    const resumedNow = currentStatus === "waiting"
+      && (nextStatus === "in_progress" || nextStatus === "received");
+    const statusLabel = ticketStatusLabel(nextStatus);
 
     if (completedNow) {
       try {
@@ -396,13 +394,6 @@ export async function PATCH(
         logger.error("Ticket assignee pause notification failed", notificationError);
       }
     }
-    if (cancelledNow) {
-      try {
-        await notifyAssignee(user, { ...assigneeTarget, notifyKind: "cancelled" });
-      } catch (notificationError) {
-        logger.error("Ticket assignee cancellation notification failed", notificationError);
-      }
-    }
     if (resumedNow) {
       try {
         await notifyAssignee(user, {
@@ -417,8 +408,8 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      ticket,
-      allowedTransitions: allowedWorkOrderTransitions(ticket.status as WorkOrderStatus),
+      ticket: { ...ticket, status: nextStatus },
+      allowedTransitions: allowedTicketTransitions(nextStatus),
     });
   } catch (error) {
     logger.error("Update ticket error", error);

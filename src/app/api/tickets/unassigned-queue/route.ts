@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { canAssignWorkOrders, getCurrentUser, tenantWhere } from "@/lib/current-user";
-import { OPERATIONS_STATUS_LABELS, PRIORITY_LABELS } from "@/lib/domain-labels";
+import { PRIORITY_LABELS } from "@/lib/domain-labels";
+import { normalizeTicketStatus, ticketStatusLabel } from "@/lib/ticket-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function GET() {
       where: {
         deleted_at: null,
         ...tenantWhere(user),
-        status: { notIn: ["closed", "cancelled"] },
+        status: { notIn: ["closed", "cancelled", "invoiced"] },
         assigned_to_id: null,
         OR: [{ property_id: null }, { property: { deleted_at: null } }],
       },
@@ -45,18 +46,21 @@ export async function GET() {
     }),
   ]);
 
-  const tickets = rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    status: row.status,
-    statusLabel: OPERATIONS_STATUS_LABELS[row.status] || row.status,
-    priority: row.priority,
-    priorityLabel: PRIORITY_LABELS[row.priority] || row.priority,
-    publicReference: row.public_reference,
-    propertyName: row.property?.name || "Ingen fastighet",
-    createdAt: row.created_at.toISOString(),
-    href: `/dashboard/felanmalan/${row.id}`,
-  }));
+  const tickets = rows.map((row) => {
+    const status = normalizeTicketStatus(row.status);
+    return {
+      id: row.id,
+      title: row.title,
+      status,
+      statusLabel: ticketStatusLabel(status),
+      priority: row.priority,
+      priorityLabel: PRIORITY_LABELS[row.priority] || row.priority,
+      publicReference: row.public_reference,
+      propertyName: row.property?.name || "Ingen fastighet",
+      createdAt: row.created_at.toISOString(),
+      href: `/dashboard/felanmalan/${row.id}`,
+    };
+  });
 
   return NextResponse.json(
     {

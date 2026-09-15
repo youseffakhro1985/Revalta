@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
+import type { TicketStatus } from "@/lib/domain-labels";
 import type { WorkOrderStatus } from "@/lib/work-order-workflow";
-
-export type TicketStatus = "new" | "received" | "in_progress" | "waiting" | "completed" | "closed";
 
 export function ticketStatusForWorkOrder(status: WorkOrderStatus): TicketStatus {
   switch (status) {

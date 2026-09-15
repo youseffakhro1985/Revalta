@@ -11,9 +11,10 @@ import {
 import { notDeletedFilter } from "@/lib/schema-readiness";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { createRouteObservability } from "@/lib/route-observability";
+import { normalizeTicketStatus, ticketStatusFilterValues } from "@/lib/ticket-lifecycle";
 
 const ROUTE = "/api/tickets/dashboard";
-const CLOSED_STATUSES = ["completed", "closed"];
+const CLOSED_STATUSES = ticketStatusFilterValues("closed").concat("completed");
 const SUCCESS_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
   "CDN-Cache-Control": "no-store",
@@ -84,7 +85,7 @@ export async function GET(request: Request) {
       db.ticket.count({ where: baseWhere }),
       db.ticket.count({ where: { ...baseWhere, status: { notIn: CLOSED_STATUSES } } }),
       db.ticket.count({ where: { ...baseWhere, priority: "urgent", status: { notIn: CLOSED_STATUSES } } }),
-      db.ticket.count({ where: { ...baseWhere, status: "in_progress" } }),
+      db.ticket.count({ where: { ...baseWhere, status: { in: ticketStatusFilterValues("in_progress") } } }),
       db.ticket.count({
         where: {
           ...baseWhere,
@@ -142,13 +143,17 @@ export async function GET(request: Request) {
         inProgress,
         completedThisMonth,
       },
-      statusCounts: Object.fromEntries(statusGroups.map((row) => [row.status, row._count._all])),
+      statusCounts: statusGroups.reduce<Record<string, number>>((counts, row) => {
+        const status = normalizeTicketStatus(row.status);
+        counts[status] = (counts[status] || 0) + row._count._all;
+        return counts;
+      }, {}),
       categoryCounts: Object.fromEntries(categoryGroups.map((row) => [row.category, row._count._all])),
       trendStart: trendStart.toISOString(),
       trendRows: trendRows.map((row) => ({
         created_at: row.created_at,
         updated_at: row.updated_at,
-        status: row.status,
+        status: normalizeTicketStatus(row.status),
       })),
       truncatedTrend: trendRows.length >= 5000,
       permissions: {
