@@ -61,8 +61,11 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
     return { href: `${claimsRoot}?create=1`, label: "Nytt skadeärende" };
   }
 
-  if (canManageWorkOrderFinance(role) && (current === "/dashboard/projekt" || current.startsWith("/dashboard/projekt/"))) {
+  if (canManageWorkOrderFinance(role) && current === "/dashboard/projekt") {
     return { href: "/dashboard/projekt?create=1", label: "Nytt projekt" };
+  }
+  if (canManageWorkOrderFinance(role) && current.startsWith("/dashboard/projekt/")) {
+    return { href: `${current}#spara-projekt`, label: "Spara projekt" };
   }
 
   if (canManageWorkOrderFinance(role) && (current === "/dashboard/offerter" || current.startsWith("/dashboard/offerter/"))) {
