@@ -107,6 +107,12 @@ export default function EscalationAdminPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash !== "#regler" && hash !== "#driftkontroll" && hash !== "#historik") return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const configured = useMemo(() => {
     if (!data) return false;
     return data.configuration.cronSecret && data.configuration.emailApiKey && data.configuration.emailFrom;
@@ -120,6 +126,11 @@ export default function EscalationAdminPage() {
           <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och ansvar</p>
           <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Serviceeskaleringar</h1>
           <p className="mt-3 max-w-3xl text-ink-600">Övervaka blockerade uppgifter, passerade deadlines, mottagare och den automatiska eskaleringsmotorns leveranshistorik.</p>
+          <nav aria-label="Hoppa till eskaleringsavsnitt" className="mt-4 flex flex-wrap gap-2">
+            <a href="#regler" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Regler</a>
+            <a href="#driftkontroll" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Driftkontroll</a>
+            <a href="#historik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
+          </nav>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera
@@ -128,6 +139,7 @@ export default function EscalationAdminPage() {
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 
+      <div id="regler" className="scroll-mt-36">
       <Panel title="Aktiva organisationsregler" description="Driftöversikten använder exakt samma regler som den automatiska och manuella eskaleringsmotorn.">
         {data ? (
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
@@ -142,10 +154,13 @@ export default function EscalationAdminPage() {
         ) : <div className="h-24 animate-pulse rounded-xl bg-sand-100" />}
         {data?.rulesUpdatedAt ? <p className="mt-4 text-sm text-ink-500">Senast ändrad {dateTime.format(new Date(data.rulesUpdatedAt))}.</p> : null}
       </Panel>
+      </div>
 
+      <div id="driftkontroll" className="scroll-mt-36">
       <Panel title="Manuell driftkontroll" description="Verifiera e-postleveransen eller starta den tenant-säkra eskaleringsmotorn direkt. Varje åtgärd loggas med användare, status och resultat.">
         <EscalationAdminActions canManage={Boolean(data?.canManage)} configured={configured} onComplete={load} />
       </Panel>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={AlertOctagon} label="Aktiva eskaleringar" value={data?.summary.active ?? "–"} />
@@ -179,6 +194,7 @@ export default function EscalationAdminPage() {
         {data?.assignments.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{data.assignments.map((item) => <div key={item.notificationKey} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink-950">{item.componentName}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.reason === "blocked" ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{item.reason === "blocked" ? "Blockerad" : "Deadline passerad"}</span></div><p className="mt-1 text-sm text-ink-500">{item.propertyName}</p>{item.note ? <p className="mt-2 text-sm text-ink-600">{item.note}</p> : null}</div><div className="text-sm text-ink-600"><p><span className="font-semibold text-ink-800">Ansvarig:</span> {item.assigneeName || "Ej angiven"}</p><p className="mt-1"><span className="font-semibold text-ink-800">Deadline:</span> {item.deadline ? dateOnly.format(new Date(item.deadline)) : "Ingen"}</p></div><Link href={item.href} className="rounded-lg bg-petroleum-800 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-petroleum-900">Öppna komponent</Link></div>)}</div> : null}
       </Panel>
 
+      <div id="historik" className="scroll-mt-36">
       <Panel title="Revisionssäker eskaleringshistorik" description="Varje nytt leveransförsök sparar en oföränderlig ögonblicksbild av regler, kvalificering och faktiska mottagare.">
         {!loading && data?.events.length === 0 ? <EmptyState title="Ingen historik ännu" description="När eskaleringsmotorn körs visas resultatet och regelunderlaget här." /> : null}
         {data?.events.length ? <div className="space-y-3">{data.events.map((event) => {
@@ -214,6 +230,7 @@ export default function EscalationAdminPage() {
           );
         })}</div> : null}
       </Panel>
+      </div>
     </div>
   );
 }

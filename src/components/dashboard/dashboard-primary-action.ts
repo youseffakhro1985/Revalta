@@ -94,6 +94,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (current === "/dashboard/installningar/mina-aviseringar") {
     return { href: "/dashboard/installningar/mina-aviseringar#mina-val", label: "Mina val" };
   }
+  if (current === "/dashboard/installningar/eskaleringar") {
+    return { href: "/dashboard/installningar/eskaleringar/regler", label: "Hantera regler" };
+  }
 
   return null;
 }
