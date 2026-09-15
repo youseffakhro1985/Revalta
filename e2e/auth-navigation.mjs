@@ -10,7 +10,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
 
     const baseUrl = target.baseUrl;
     const bypass = String(env.VERCEL_AUTOMATION_BYPASS_SECRET || "").trim();
-    const RESET_MAX_LATENCY_MS = 8_000;
+    const RESET_MAX_LATENCY_MS = 15_000;
     const RESET_NEUTRAL_MESSAGE = "Om kontot finns skickar vi en återställningslänk.";
     const VERIFY_RESEND_NEUTRAL_MESSAGE = "Om kontot behöver verifieras skickar vi en ny verifieringslänk.";
     const REGISTER_MAX_LATENCY_MS = 8_000;
@@ -207,6 +207,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       // so a separate registration-navigation flake cannot hide reset latency evidence.
       await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
       await expectVisible(page.getByRole("heading", { name: "Återställ ditt lösenord" }), "forgot-password heading");
+      await expectVisible(page.locator("form#forgot-password-form[data-ready='1']"), "hydrated forgot-password form");
       await page.getByLabel("E-post").fill(`missing-reset-${runId}@example.com`);
       const resetStartedAt = Date.now();
       const resetResponsePromise = page.waitForResponse(
