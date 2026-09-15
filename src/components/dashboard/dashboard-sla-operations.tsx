@@ -146,22 +146,25 @@ export async function DashboardSlaOperations() {
             <h2 className="text-xl font-semibold text-ink-950">SLA och arbetsorderdrift</h2>
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${healthy ? "bg-success-50 text-success-700 ring-success-100" : "bg-warning-50 text-warning-700 ring-warning-100"}`}>{healthy ? "Stabilt läge" : "Kräver åtgärd"}</span>
           </div>
-          <p className="mt-1 text-sm text-ink-500">Serverberäknad riskbild för organisationens aktiva arbetsordrar.</p>
+          <p className="mt-1 text-sm text-ink-500">Serverberäknad riskbild för organisationens aktiva arbetsordrar. Otilldelade arbetsordrar tilldelas i Planering eller Dagens förvaltning.</p>
         </div>
-        <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Öppna arbetsordrar <ArrowRight className="h-4 w-4" /></Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/dashboard/arbetsorder/planering" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Tilldela i Planering <ArrowRight className="h-4 w-4" /></Link>
+          <Link href="/dashboard/arbetsorder" className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-700 hover:text-petroleum-900">Öppna arbetsordrar <ArrowRight className="h-4 w-4" /></Link>
+        </div>
       </div>
 
       <div className="grid gap-px bg-sand-200 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "SLA passerad", value: summary.overdue, icon: AlertTriangle, tone: summary.overdue > 0 ? "text-danger-700" : "text-ink-400" },
-          { label: "Kritiska inom 4 h", value: summary.critical, icon: Clock3, tone: summary.critical > 0 ? "text-warning-700" : "text-ink-400" },
-          { label: "Inom 24 timmar", value: summary.soon, icon: Clock3, tone: summary.soon > 0 ? "text-warning-700" : "text-ink-400" },
-          { label: "Ej tilldelade", value: summary.unassigned, icon: UserRoundX, tone: summary.unassigned > 0 ? "text-petroleum-700" : "text-ink-400" },
-        ].map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="bg-white p-5 sm:p-6">
+          { label: "SLA passerad", value: summary.overdue, icon: AlertTriangle, tone: summary.overdue > 0 ? "text-danger-700" : "text-ink-400", href: "/dashboard/arbetsorder" },
+          { label: "Kritiska inom 4 h", value: summary.critical, icon: Clock3, tone: summary.critical > 0 ? "text-warning-700" : "text-ink-400", href: "/dashboard/arbetsorder" },
+          { label: "Inom 24 timmar", value: summary.soon, icon: Clock3, tone: summary.soon > 0 ? "text-warning-700" : "text-ink-400", href: "/dashboard/arbetsorder" },
+          { label: "Ej tilldelade", value: summary.unassigned, icon: UserRoundX, tone: summary.unassigned > 0 ? "text-petroleum-700" : "text-ink-400", href: "/dashboard/arbetsorder/planering" },
+        ].map(({ label, value, icon: Icon, tone, href }) => (
+          <Link key={label} href={href} className="bg-white p-5 sm:p-6 transition hover:bg-sand-50/80">
             <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-ink-500">{label}</p><Icon className={`h-5 w-5 ${tone}`} /></div>
             <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-ink-950">{value}</p>
-          </div>
+          </Link>
         ))}
       </div>
 
