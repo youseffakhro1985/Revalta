@@ -61,6 +61,11 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/bokningar#ny-bokning",
       label: "Ny bokning",
     });
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning", "owner")).toEqual({
+      href: "/dashboard/uthyrning?create=1",
+      label: "Nytt avtal",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "owner")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
