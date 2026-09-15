@@ -31,6 +31,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canAssignWorkOrders(role) && current === `${workOrdersRoot}/aterkommande`) {
     return { href: `${workOrdersRoot}/aterkommande#nytt-schema`, label: "Nytt schema" };
   }
+  if (canViewOperations(role) && current === `${workOrdersRoot}/redigeringslas`) {
+    return { href: `${workOrdersRoot}/redigeringslas#lasfilter`, label: "Sök lås" };
+  }
 
   const ticketsRoot = "/dashboard/felanmalan";
   const inTickets = current === ticketsRoot || current.startsWith(`${ticketsRoot}/`);

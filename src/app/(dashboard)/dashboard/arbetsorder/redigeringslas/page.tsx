@@ -78,6 +78,11 @@ export default function WorkOrderEditLocksPage() {
     const interval = window.setInterval(() => void load(true), 30_000);
     return () => window.clearInterval(interval);
   }, [load]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#lasfilter") return;
+    document.getElementById("lasfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
 
   useEffect(() => {
     if (!selected) return;
@@ -141,14 +146,12 @@ export default function WorkOrderEditLocksPage() {
     } finally { setReleasing(false); }
   }
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-
   const locks = data?.locks || [];
   const expiringSoon = locks.filter((lock) => lock.remainingSeconds <= 60).length;
   const editors = new Set(locks.map((lock) => lock.holder.id)).size;
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Work Orders 2.0" title="Aktiva redigeringslås" description="Operativ överblick över exklusiva arbetsorderlås, aktiva redigerare och återstående leasetid." />
+    <PageHeader eyebrow="Work Orders 2.0" title="Aktiva redigeringslås" description="Operativ överblick över exklusiva arbetsorderlås, aktiva redigerare och återstående leasetid." action={<a href="#lasfilter" className={premiumPrimaryButtonClass}>Sök lås</a>} />
     {error ? <InlineAlert tone="error">{error}</InlineAlert> : null}
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
@@ -159,13 +162,15 @@ export default function WorkOrderEditLocksPage() {
       <MetricCard icon={ShieldCheck} label="Utgångna rensade" value={data?.removedExpired || 0} hint="Vid senaste laddningen" />
     </section>
 
+    <div id="lasfilter" className="scroll-mt-36">
     <Panel title="Driftläge" description="Vyn uppdateras automatiskt var 30:e sekund. Utgångna lås rensas innan resultatet visas.">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-xl"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök arbetsorder, fastighet eller redigerare" aria-label="Sök arbetsorder, fastighet eller redigerare" className={`${premiumFieldClass} pl-10`} /></div>
+        <div className="relative w-full max-w-xl"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök arbetsorder, fastighet eller redigerare" aria-label="Sök arbetsorder, fastighet eller redigerare" className={`${premiumFieldClass} pl-10`} /></div>
         <button type="button" onClick={() => void load(true)} disabled={refreshing} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-petroleum-800 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />Uppdatera</button>
       </div>
       {data?.generatedAt ? <p className="mt-3 text-xs text-ink-500">Senast kontrollerad {dateTime.format(new Date(data.generatedAt))}</p> : null}
     </Panel>
+    </div>
 
     <Panel title="Låsta arbetsordrar" description={`${filtered.length} av ${locks.length} aktiva lås visas.`}>
       {!filtered.length ? <div className="rounded-xl border border-dashed border-sand-300 p-10 text-center"><UnlockKeyhole className="mx-auto h-7 w-7 text-petroleum-700" /><p className="mt-3 font-semibold text-ink-900">Inga aktiva redigeringslås</p><p className="mt-1 text-sm text-ink-500">Arbetsordrar är tillgängliga för behöriga redigerare.</p></div> : <div className="space-y-3">{filtered.map((lock) => <article key={lock.workOrderId} className="grid gap-4 rounded-2xl border border-sand-200 bg-white p-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(220px,.8fr)_auto] lg:items-center">

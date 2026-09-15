@@ -17,7 +17,12 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/planering", "admin")?.label).toBe("Ny arbetsorder");
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/AO-2026-0142", "admin")?.label).toBe("Ny arbetsorder");
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/ny", "admin")).toBeNull();
-    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/redigeringslas", "admin")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/redigeringslas", "admin")).toEqual({
+      href: "/dashboard/arbetsorder/redigeringslas#lasfilter",
+      label: "Sök lås",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/redigeringslas", "manager")?.label).toBe("Sök lås");
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/redigeringslas", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande", "admin")).toEqual({
       href: "/dashboard/arbetsorder/aterkommande#nytt-schema",
       label: "Nytt schema",
