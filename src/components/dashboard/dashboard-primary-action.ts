@@ -97,6 +97,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
       return { href: "/dashboard/uthyrning?create=1", label: "Nytt avtal" };
     }
   }
+  if (canManageLeases(role) && current === "/dashboard/uthyrning/overlamning") {
+    return { href: "/dashboard/uthyrning/overlamning#valj-avtal", label: "Välj avtal" };
+  }
   if (canManageLeases(role) && (current === "/dashboard/bokningar" || current.startsWith("/dashboard/bokningar/"))) {
     return { href: "/dashboard/bokningar#ny-bokning", label: "Ny bokning" };
   }
