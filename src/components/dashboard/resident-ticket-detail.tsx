@@ -228,7 +228,7 @@ export function ResidentTicketDetailView({
                   placeholder="Beskriv till exempel om felet kvarstår eller om du har kompletterande information…"
                   className={premiumTextareaClass}
                 />
-                <button type="submit" disabled={saving || !commentBody.trim()} className={premiumPrimaryButtonClass}>
+                <button type="submit" disabled={saving} className={premiumPrimaryButtonClass}>
                   <Send className="mr-2 h-4 w-4" aria-hidden="true" />
                   {saving ? "Skickar…" : "Skicka kommentar"}
                 </button>
