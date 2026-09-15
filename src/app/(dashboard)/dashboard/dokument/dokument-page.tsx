@@ -693,7 +693,6 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
                       {item.validUntil ? <p className={`mt-1 text-xs font-medium ${(daysUntil(item.validUntil) ?? 9999) <= 60 ? "text-warning-700" : "text-ink-500"}`}>Giltigt till {item.validUntil}</p> : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- API download, not an App Router page */}
                       <a href={item.downloadUrl} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 hover:border-petroleum-200"><Download className="h-3.5 w-3.5" /> Ladda ner</a>
                       {data.canManageLifecycle && item.source !== "legacy" ? <button type="button" onClick={() => startEdit(item)} disabled={item.lifecycleState === "archived"} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 disabled:opacity-40"><Pencil className="h-3.5 w-3.5" /> Redigera</button> : null}
                       {data.canManageLifecycle && item.lifecycleState === "active" ? <button type="button" disabled={changingId === item.id} onClick={() => void changeLifecycle(item, "unpublish")} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700"><EyeOff className="h-3.5 w-3.5" /> Avpublicera</button> : null}
