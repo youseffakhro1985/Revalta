@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { legacyDashboardRedirects, legacyWorkOrderDetailRedirect } from "@/lib/dashboard-route-compat";
+import { legacyDashboardRedirects, legacyWorkOrderDetailRedirect, legacyWorkOrderEconomyRedirect } from "@/lib/dashboard-route-compat";
 
 describe("legacy dashboard route compatibility", () => {
   it("maps the legacy plural work-order index to the canonical singular route", () => {
@@ -13,5 +13,10 @@ describe("legacy dashboard route compatibility", () => {
   it("preserves the work-order id while safely building the canonical detail target", () => {
     expect(legacyWorkOrderDetailRedirect("AO-2026-0142")).toBe("/dashboard/arbetsorder/AO-2026-0142");
     expect(legacyWorkOrderDetailRedirect("id with spaces")).toBe("/dashboard/arbetsorder/id%20with%20spaces");
+  });
+
+  it("sends legacy economy and invoice-basis URLs to the canonical ekonomi section", () => {
+    expect(legacyWorkOrderEconomyRedirect("AO-2026-0142")).toBe("/dashboard/arbetsorder/AO-2026-0142#ekonomi");
+    expect(legacyWorkOrderEconomyRedirect("id with spaces")).toBe("/dashboard/arbetsorder/id%20with%20spaces#ekonomi");
   });
 });
