@@ -6,5 +6,6 @@ describe("ekonomi overview", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain("AttestationQueuePanel");
     expect(source).toContain("InvoiceBasisQueuePanel");
+    expect(source).toContain("InvoiceExportQueuePanel");
   });
 });
