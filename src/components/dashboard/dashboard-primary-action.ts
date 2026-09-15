@@ -1,4 +1,4 @@
-import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageCompany, canManageLeases, canManageTeam, canManageTickets, canManageWorkOrderFinance, canViewOperations } from "@/lib/permissions";
+import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageCompany, canManageIntegrations, canManageLeases, canManageTeam, canManageTickets, canManageWorkOrderFinance, canViewOperations } from "@/lib/permissions";
 
 export type DashboardPrimaryCreateAction = {
   href: string;
@@ -111,6 +111,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   }
   if (canManageCompany(role) && current === "/dashboard/behorigheter") {
     return { href: "/dashboard/team#bjud-in", label: "Hantera roller" };
+  }
+  if (canManageIntegrations(role) && current === "/dashboard/integrationer") {
+    return { href: "/dashboard/integrationer/fakturaexporter", label: "Fakturaexport" };
   }
 
   if (current === "/dashboard/installningar") {
