@@ -61,6 +61,12 @@ export default function ProjectDetailPage() {
     return () => { active = false; };
   }, [id, router]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-projekt") return;
+    document.getElementById("spara-projekt")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, project]);
+
   async function save(formData: FormData) {
     setSaving(true); setError(""); setSuccess("");
     try {
@@ -87,51 +93,55 @@ export default function ProjectDetailPage() {
     }
   }
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-  if (!project) return <InlineAlert>{error || "Projektet hittades inte"}</InlineAlert>;
+  if (!loading && !project) return <InlineAlert>{error || "Projektet hittades inte"}</InlineAlert>;
 
-  const budget = Number(project.budget || 0);
-  const forecast = Number(project.forecast || 0);
-  const actual = Number(project.actual || 0);
+  const budget = Number(project?.budget || 0);
+  const forecast = Number(project?.forecast || 0);
+  const actual = Number(project?.actual || 0);
   const deviation = forecast - budget;
 
   return <div className="space-y-8">
     <Link href="/dashboard/projekt" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till projektportföljen</Link>
-    <PageHeader eyebrow="Projektstyrning" title={project.name} description={project.description || "Samlad projektstyrning för tidsplan, risk, ekonomi, dokument och beslut."} />
+    <PageHeader eyebrow="Projektstyrning" title={project?.name || "Projekt"} description={project?.description || "Samlad projektstyrning för tidsplan, risk, ekonomi, dokument och beslut."} />
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
+    {loading && !project ? <div className="h-40 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+    {project ? (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={Building2} label="Fastighet" value={project.property.name} hint={`${project.property.address}, ${project.property.city}`} />
       <MetricCard icon={CalendarRange} label="Tidsplan" value={project.end_date ? date.format(new Date(project.end_date)) : "Ej satt"} hint={project.start_date ? `Start ${date.format(new Date(project.start_date))}` : "Start ej satt"} />
       <MetricCard icon={CircleDollarSign} label="Prognos" value={money.format(forecast)} hint={`Budget ${money.format(budget)}`} />
       <MetricCard icon={ShieldAlert} label="Risk och avvikelse" value={riskLabels[project.risk] || project.risk} hint={money.format(deviation)} />
     </section>
+    ) : null}
 
     <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+      <div id="spara-projekt" className="scroll-mt-36">
       <Panel title="Projektstyrning" description="Uppdatera ansvar, status, risk, tidsplan och ekonomi.">
         <form
-          key={`${project.id}-${project.manager?.id || "none"}-${project.status}-${project.risk}`}
+          key={`${project?.id || "new"}-${project?.manager?.id || "none"}-${project?.status || "planned"}-${project?.risk || "low"}`}
           action={save}
           className="grid gap-4 sm:grid-cols-2"
         >
-          <input name="name" defaultValue={project.name} className={`${premiumFieldClass} sm:col-span-2`} aria-label="Projektnamn" />
-          <input name="contractor" defaultValue={project.contractor || ""} placeholder="Entreprenör" className={premiumFieldClass} aria-label="Entreprenör" />
-          <select name="managerId" defaultValue={project.manager?.id || ""} className={premiumFieldClass} aria-label="Projektledare">
+          <input autoFocus name="name" defaultValue={project?.name || ""} disabled={saving || loading || !project} className={`${premiumFieldClass} sm:col-span-2`} aria-label="Projektnamn" />
+          <input name="contractor" defaultValue={project?.contractor || ""} disabled={saving || loading || !project} placeholder="Entreprenör" className={premiumFieldClass} aria-label="Entreprenör" />
+          <select name="managerId" defaultValue={project?.manager?.id || ""} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Projektledare">
             <option value="">Ej tilldelad</option>
             {members.map((member) => (
               <option key={member.id} value={member.id}>{member.name || member.email}</option>
             ))}
           </select>
-          <select name="status" defaultValue={project.status} className={premiumFieldClass} aria-label="Status">{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select name="risk" defaultValue={project.risk} className={premiumFieldClass} aria-label="Risk">{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
-          <input name="startDate" type="date" defaultValue={project.start_date?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Startdatum" />
-          <input name="endDate" type="date" defaultValue={project.end_date?.slice(0, 10) || ""} className={premiumFieldClass} aria-label="Slutdatum" />
-          <input name="budget" type="number" min="0" step="0.01" defaultValue={budget} className={premiumFieldClass} aria-label="Budget" />
-          <input name="forecast" type="number" min="0" step="0.01" defaultValue={forecast} className={premiumFieldClass} aria-label="Prognos" />
-          <input name="actual" type="number" min="0" step="0.01" defaultValue={actual} className={premiumFieldClass} aria-label="Utfall" />
-          <textarea name="description" defaultValue={project.description || ""} placeholder="Projektbeskrivning" className={`${premiumFieldClass} min-h-28 sm:col-span-2`} aria-label="Projektbeskrivning" />
-          <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara projekt"}</button>
+          <select name="status" defaultValue={project?.status || "planned"} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Status">{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select name="risk" defaultValue={project?.risk || "low"} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Risk">{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
+          <input name="startDate" type="date" defaultValue={project?.start_date?.slice(0, 10) || ""} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Startdatum" />
+          <input name="endDate" type="date" defaultValue={project?.end_date?.slice(0, 10) || ""} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Slutdatum" />
+          <input name="budget" type="number" min="0" step="0.01" defaultValue={budget} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Budget" />
+          <input name="forecast" type="number" min="0" step="0.01" defaultValue={forecast} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Prognos" />
+          <input name="actual" type="number" min="0" step="0.01" defaultValue={actual} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Utfall" />
+          <textarea name="description" defaultValue={project?.description || ""} disabled={saving || loading || !project} placeholder="Projektbeskrivning" className={`${premiumFieldClass} min-h-28 sm:col-span-2`} aria-label="Projektbeskrivning" />
+          <button disabled={saving || loading || !project} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : "Spara projekt"}</button>
         </form>
+        {project ? (
         <div className="mt-5 space-y-3 border-t border-sand-100 pt-5 text-sm text-ink-500">
           <p>Utfall: <strong className="text-ink-800">{money.format(actual)}</strong></p>
           {project.source_work_order ? <Link href={`/dashboard/arbetsorder/${project.source_work_order.id}`} className="font-semibold text-petroleum-700 hover:text-petroleum-900">Från arbetsorder: {project.source_work_order.title}</Link> : null}
@@ -144,10 +154,12 @@ export default function ProjectDetailPage() {
             Ta bort projekt
           </button>
         </div>
+        ) : null}
       </Panel>
-      <OperationalActivityPanel entityType="project" entityId={project.id} />
+      </div>
+      {project ? <OperationalActivityPanel entityType="project" entityId={project.id} /> : <div className="h-64 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
     </section>
 
-    <OperationalDocumentsPanel entityType="project" entityId={project.id} />
+    {project ? <OperationalDocumentsPanel entityType="project" entityId={project.id} /> : null}
   </div>;
 }

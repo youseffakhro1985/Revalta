@@ -83,6 +83,12 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/projekt?create=1",
       label: "Nytt projekt",
     });
+    expect(dashboardPrimaryCreateAction("/dashboard/projekt/proj-1", "owner")).toEqual({
+      href: "/dashboard/projekt/proj-1#spara-projekt",
+      label: "Spara projekt",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/projekt/proj-1", "manager")?.label).toBe("Spara projekt");
+    expect(dashboardPrimaryCreateAction("/dashboard/projekt/proj-1", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/projekt", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/offerter", "owner")).toEqual({
       href: "/dashboard/offerter?create=1",
