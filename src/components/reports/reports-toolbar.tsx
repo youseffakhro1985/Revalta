@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Download, FileDown, RotateCcw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -44,6 +45,11 @@ export function ReportsToolbar({ period, propertyId, properties, rows, generated
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  useEffect(() => {
+    if (window.location.hash !== "#rapportfilter") return;
+    document.getElementById("rapportfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   function updateFilter(name: "period" | "property", value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(name, value);
@@ -82,6 +88,7 @@ export function ReportsToolbar({ period, propertyId, properties, rows, generated
             value={period}
             onChange={(event) => updateFilter("period", event.target.value)}
             className="h-10 min-w-36 bg-transparent text-xs font-semibold text-ink-700 outline-none"
+            autoFocus
           >
             <option value="30">Senaste 30 dagarna</option>
             <option value="90">Senaste 90 dagarna</option>

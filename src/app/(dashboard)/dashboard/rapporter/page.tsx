@@ -385,6 +385,7 @@ export default async function ReportsPage({
         </div>
       </header>
 
+      <div id="rapportfilter" className="scroll-mt-36">
       <ReportsToolbar
         period={period}
         propertyId={selectedPropertyId}
@@ -392,6 +393,7 @@ export default async function ReportsPage({
         rows={exportRows}
         generatedAt={now.toISOString()}
       />
+      </div>
 
       <nav className="print:hidden grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="Rapportgenvägar">
         {[

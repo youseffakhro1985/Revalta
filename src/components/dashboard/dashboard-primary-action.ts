@@ -72,6 +72,10 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
     return { href: "/dashboard/ekonomi/ny-utbetalning", label: "Ny utbetalning" };
   }
 
+  if (canViewOperations(role) && current === "/dashboard/rapporter") {
+    return { href: "/dashboard/rapporter#rapportfilter", label: "Filtrera rapport" };
+  }
+
   if (canViewOperations(role) && (current === "/dashboard/ronder" || current.startsWith("/dashboard/ronder/"))) {
     return { href: "/dashboard/ronder?create=1", label: "Ny rond" };
   }
