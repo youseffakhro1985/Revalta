@@ -16,6 +16,16 @@ type Rules = {
 
 type ResponseData = { rules: Rules; updatedAt: string | null; canManage: boolean };
 
+const defaultRules: Rules = {
+  enabled: true,
+  escalateBlocked: true,
+  escalateOverdue: true,
+  graceDays: 0,
+  repeatDays: 1,
+  recipientRoles: ["owner", "admin"],
+  includeAssignee: true,
+};
+
 const roleOptions = [
   ["owner", "Ägare"],
   ["admin", "Administratör"],
@@ -25,7 +35,7 @@ const roleOptions = [
 
 export default function EscalationRulesPage() {
   const [data, setData] = useState<ResponseData | null>(null);
-  const [rules, setRules] = useState<Rules | null>(null);
+  const [rules, setRules] = useState<Rules>(defaultRules);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -47,8 +57,13 @@ export default function EscalationRulesPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash !== "#eskaleringsregler") return;
+    document.getElementById("eskaleringsregler")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   async function save() {
-    if (!rules) return;
     setSaving(true); setError(""); setMessage("");
     try {
       const response = await fetch("/api/settings/service-escalation-rules", {
@@ -64,7 +79,7 @@ export default function EscalationRulesPage() {
     } finally { setSaving(false); }
   }
 
-  if (loading || !rules) return <div className="mx-auto max-w-5xl rounded-2xl border border-sand-200 bg-white p-8">Laddar eskaleringsregler…</div>;
+  const locked = loading || saving || !data?.canManage;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -73,24 +88,29 @@ export default function EscalationRulesPage() {
         <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-600">Organisationens regler</p>
         <h1 className="mt-2 text-3xl font-semibold text-ink-950">Eskaleringsregler</h1>
         <p className="mt-3 max-w-3xl text-ink-600">Styr när eskaleringar ska skickas, hur ofta de upprepas och vilka roller som ska informeras.</p>
+        <nav aria-label="Hoppa till eskaleringsregler" className="mt-4">
+          <a href="#eskaleringsregler" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Regler</a>
+        </nav>
       </header>
 
       {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-sm font-semibold text-danger-700">{error}</div> : null}
       {message ? <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm font-semibold text-success-800">{message}</div> : null}
 
-      <section className="space-y-6 rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
-        <label className="flex items-center justify-between gap-4 rounded-xl border border-sand-200 p-4"><span><strong className="block text-ink-900">Automatiska eskaleringar</strong><span className="text-sm text-ink-500">Pausa eller aktivera hela motorn.</span></span><input type="checkbox" checked={rules.enabled} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, enabled: e.target.checked })} /></label>
+      <section id="eskaleringsregler" className="scroll-mt-36 space-y-6 rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
+        <fieldset disabled={locked} className="space-y-6 disabled:opacity-60">
+        <label className="flex items-center justify-between gap-4 rounded-xl border border-sand-200 p-4"><span><strong className="block text-ink-900">Automatiska eskaleringar</strong><span className="text-sm text-ink-500">Pausa eller aktivera hela motorn.</span></span><input type="checkbox" checked={rules.enabled} autoFocus onChange={(e) => setRules({ ...rules, enabled: e.target.checked })} /></label>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.escalateBlocked} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, escalateBlocked: e.target.checked })} /><span className="font-semibold text-ink-800">Eskalera blockerade uppgifter</span></label>
-          <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.escalateOverdue} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, escalateOverdue: e.target.checked })} /><span className="font-semibold text-ink-800">Eskalera passerade deadlines</span></label>
+          <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.escalateBlocked} onChange={(e) => setRules({ ...rules, escalateBlocked: e.target.checked })} /><span className="font-semibold text-ink-800">Eskalera blockerade uppgifter</span></label>
+          <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.escalateOverdue} onChange={(e) => setRules({ ...rules, escalateOverdue: e.target.checked })} /><span className="font-semibold text-ink-800">Eskalera passerade deadlines</span></label>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="text-sm font-semibold text-ink-700">Respittid i dagar<input className="mt-2 w-full rounded-xl border border-sand-200 px-3 py-2" type="number" min={0} max={30} value={rules.graceDays} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, graceDays: Number(e.target.value) })} /></label>
-          <label className="text-sm font-semibold text-ink-700">Upprepa efter antal dagar<input className="mt-2 w-full rounded-xl border border-sand-200 px-3 py-2" type="number" min={1} max={30} value={rules.repeatDays} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, repeatDays: Number(e.target.value) })} /></label>
+          <label className="text-sm font-semibold text-ink-700">Respittid i dagar<input className="mt-2 w-full rounded-xl border border-sand-200 px-3 py-2" type="number" min={0} max={30} value={rules.graceDays} onChange={(e) => setRules({ ...rules, graceDays: Number(e.target.value) })} /></label>
+          <label className="text-sm font-semibold text-ink-700">Upprepa efter antal dagar<input className="mt-2 w-full rounded-xl border border-sand-200 px-3 py-2" type="number" min={1} max={30} value={rules.repeatDays} onChange={(e) => setRules({ ...rules, repeatDays: Number(e.target.value) })} /></label>
         </div>
-        <div><p className="mb-3 text-sm font-semibold text-ink-700">Mottagarroller</p><div className="grid gap-3 md:grid-cols-2">{roleOptions.map(([value, label]) => <label key={value} className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.recipientRoles.includes(value)} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, recipientRoles: e.target.checked ? [...rules.recipientRoles, value] : rules.recipientRoles.filter((role) => role !== value) })} /><span className="font-semibold text-ink-800">{label}</span></label>)}</div></div>
-        <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.includeAssignee} disabled={!data?.canManage} onChange={(e) => setRules({ ...rules, includeAssignee: e.target.checked })} /><span className="font-semibold text-ink-800">Skicka även till ansvarig användare</span></label>
-        <div className="flex items-center justify-between gap-4 border-t border-sand-100 pt-5"><p className="text-sm text-ink-500">Senast ändrad: {data?.updatedAt ? new Date(data.updatedAt).toLocaleString("sv-SE") : "Standardregler används"}</p><button type="button" onClick={() => void save()} disabled={!data?.canManage || saving} className="rounded-xl bg-petroleum-800 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Sparar…" : "Spara regler"}</button></div>
+        <div><p className="mb-3 text-sm font-semibold text-ink-700">Mottagarroller</p><div className="grid gap-3 md:grid-cols-2">{roleOptions.map(([value, label]) => <label key={value} className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.recipientRoles.includes(value)} onChange={(e) => setRules({ ...rules, recipientRoles: e.target.checked ? [...rules.recipientRoles, value] : rules.recipientRoles.filter((role) => role !== value) })} /><span className="font-semibold text-ink-800">{label}</span></label>)}</div></div>
+        <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.includeAssignee} onChange={(e) => setRules({ ...rules, includeAssignee: e.target.checked })} /><span className="font-semibold text-ink-800">Skicka även till ansvarig användare</span></label>
+        <div className="flex items-center justify-between gap-4 border-t border-sand-100 pt-5"><p className="text-sm text-ink-500">Senast ändrad: {data?.updatedAt ? new Date(data.updatedAt).toLocaleString("sv-SE") : "Standardregler används"}</p><button type="button" onClick={() => void save()} className="rounded-xl bg-petroleum-800 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Sparar…" : "Spara regler"}</button></div>
+        </fieldset>
       </section>
     </div>
   );

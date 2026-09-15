@@ -101,6 +101,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (current === "/dashboard/installningar/eskaleringar") {
     return { href: "/dashboard/installningar/eskaleringar/regler", label: "Hantera regler" };
   }
+  if (current === "/dashboard/installningar/eskaleringar/regler") {
+    return { href: "/dashboard/installningar/eskaleringar/regler#eskaleringsregler", label: "Spara regler" };
+  }
 
   return null;
 }

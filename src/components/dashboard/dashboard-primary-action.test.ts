@@ -122,7 +122,14 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/installningar/eskaleringar/regler",
       label: "Hantera regler",
     });
-    expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar/regler", "admin")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar/regler", "admin")).toEqual({
+      href: "/dashboard/installningar/eskaleringar/regler#eskaleringsregler",
+      label: "Spara regler",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar/regler", "technician")).toEqual({
+      href: "/dashboard/installningar/eskaleringar/regler#eskaleringsregler",
+      label: "Spara regler",
+    });
   });
 
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
