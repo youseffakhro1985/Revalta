@@ -251,6 +251,74 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ draft }, { status: 201 });
   }
 
+  if (String(body.action ?? "") === "markReady") {
+    const source = await sourceData(id, companyId);
+    const saved = source.saved;
+    if (!saved) {
+      return NextResponse.json({
+        error: "Bygg fakturaunderlaget från attesterade rader innan det kan markeras som klart.",
+      }, { status: 409 });
+    }
+    if (saved.source === "legacy") {
+      return NextResponse.json({
+        error: "Underlaget finns kvar i äldre lagring. Kör backfill innan det kan markeras som klart.",
+      }, { status: 409 });
+    }
+    const locked = String(saved.status ?? "");
+    if (locked === "ready" || locked === "exported") {
+      return NextResponse.json({
+        error: "Ett klart eller exporterat underlag kan inte markeras som klart igen.",
+      }, { status: 409 });
+    }
+    const persistedLines = (Array.isArray(saved.lines) ? saved.lines : []).map(cleanLine);
+    if (persistedLines.some((line) => !line) || persistedLines.length === 0) {
+      return NextResponse.json({
+        error: "Underlaget saknar rader. Bygg det från attesterade rader först.",
+      }, { status: 409 });
+    }
+    const validLines = persistedLines as Line[];
+    const customerName = String(body.customerName ?? "").trim().slice(0, 200);
+    if (!customerName) {
+      return NextResponse.json({ error: "Kundnamn krävs för att markera fakturaunderlaget som klart." }, { status: 400 });
+    }
+    const discountPercent = num(saved.discountPercent);
+    const vatPercent = num(saved.vatPercent, 25);
+    const dueDays = Math.round(num(saved.dueDays, 30));
+    const { subtotal, discount, net, vat, total } = totalsFor(validLines, discountPercent, vatPercent);
+    const payload: InvoiceDraftPayload = {
+      versionId: crypto.randomUUID(),
+      workOrderId: id,
+      status: "ready",
+      customerName,
+      customerOrgNumber: String(saved.customerOrgNumber ?? "").trim().slice(0, 50),
+      customerReference: String(saved.customerReference ?? "").trim().slice(0, 200),
+      invoiceDate: String(saved.invoiceDate ?? new Date().toISOString().slice(0, 10)),
+      dueDays,
+      discountPercent,
+      vatPercent,
+      note: String(saved.note ?? "").trim().slice(0, 2000),
+      lines: validLines,
+      subtotal,
+      discount,
+      net,
+      vat,
+      total,
+      updatedById: user.id,
+      updatedAt: new Date().toISOString(),
+    };
+    const draft = await db.$transaction(async (tx) => {
+      const persistedDraft = await createInvoiceDraft(companyId, payload, tx);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.invoice_basis_ready",
+        metadata: { versionId: payload.versionId, subtotal, vat, total, lineCount: validLines.length, storage: "WorkOrderInvoiceDraft" },
+      }, tx);
+      return persistedDraft;
+    });
+    return NextResponse.json({ draft }, { status: 201 });
+  }
+
   const status = String(body.status ?? "draft");
   if (status === "exported") {
     return NextResponse.json({

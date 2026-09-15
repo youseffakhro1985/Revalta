@@ -301,4 +301,89 @@ describe("work-order invoice basis material approval", () => {
     expect(body.error).toContain("attesterade");
     expect(createInvoiceDraftMock).not.toHaveBeenCalled();
   });
+
+  it("marks a persisted draft ready from customer name without resending lines", async () => {
+    getLatestInvoiceDraftMock.mockResolvedValue({
+      status: "draft",
+      customerName: "",
+      customerOrgNumber: "556000-0000",
+      customerReference: "Ref",
+      invoiceDate: "2026-08-31",
+      dueDays: 30,
+      discountPercent: 0,
+      vatPercent: 25,
+      note: "",
+      lines: [{
+        id: "line-1",
+        type: "labor",
+        description: "Arbete enligt arbetsorder",
+        quantity: 1,
+        unit: "tim",
+        unitPrice: 650,
+        total: 650,
+      }],
+    });
+
+    const response = await POST(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "markReady", customerName: "Kund AB" }),
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(createInvoiceDraftMock).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({
+        status: "ready",
+        customerName: "Kund AB",
+        lines: [expect.objectContaining({ description: "Arbete enligt arbetsorder", total: 650 })],
+      }),
+      tx,
+    );
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "work_order.invoice_basis_ready" }),
+      tx,
+    );
+    expect(JSON.stringify(writeAuditLogMock.mock.calls[0]?.[1])).not.toMatch(/Kund AB|556000-0000/);
+    expect(body.draft.status).toBe("ready");
+  });
+
+  it("requires customer name before marking the draft ready", async () => {
+    getLatestInvoiceDraftMock.mockResolvedValue({
+      status: "draft",
+      lines: [{
+        id: "line-1",
+        type: "labor",
+        description: "Arbete",
+        quantity: 1,
+        unit: "tim",
+        unitPrice: 650,
+        total: 650,
+      }],
+    });
+
+    const response = await POST(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "markReady", customerName: "  " }),
+    }), params);
+
+    expect(response.status).toBe(400);
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("does not mark a draft ready when it has no lines", async () => {
+    getLatestInvoiceDraftMock.mockResolvedValue({ status: "draft", customerName: "Kund AB", lines: [] });
+
+    const response = await POST(new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "markReady", customerName: "Kund AB" }),
+    }), params);
+
+    expect(response.status).toBe(409);
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+  });
 });
