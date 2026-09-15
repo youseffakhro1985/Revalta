@@ -31,6 +31,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canAssignWorkOrders(role) && current === `${workOrdersRoot}/aterkommande`) {
     return { href: `${workOrdersRoot}/aterkommande#nytt-schema`, label: "Nytt schema" };
   }
+  if (canAssignWorkOrders(role) && current === `${workOrdersRoot}/aterkommande/incidenter`) {
+    return { href: `${workOrdersRoot}/aterkommande/incidenter#kontrollera-eskalering`, label: "Kontrollera eskalering" };
+  }
   if (canViewOperations(role) && current === `${workOrdersRoot}/redigeringslas`) {
     return { href: `${workOrdersRoot}/redigeringslas#lasfilter`, label: "Sök lås" };
   }

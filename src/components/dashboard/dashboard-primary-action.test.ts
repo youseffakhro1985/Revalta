@@ -27,7 +27,12 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/arbetsorder/aterkommande#nytt-schema",
       label: "Nytt schema",
     });
-    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter", "admin")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter", "admin")).toEqual({
+      href: "/dashboard/arbetsorder/aterkommande/incidenter#kontrollera-eskalering",
+      label: "Kontrollera eskalering",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter", "manager")?.label).toBe("Kontrollera eskalering");
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande/incidenter", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/aterkommande", "technician")).toBeNull();
   });
 
