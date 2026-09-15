@@ -10,6 +10,7 @@ describe("ekonomi overview", () => {
     expect(source).toContain("InvoiceCloseQueuePanel");
     expect(source).toContain("RentNoticeStatusQueuePanel");
     expect(source).toContain("`/dashboard/hyresavisering?id=${n.id}`");
+    expect(source).toContain("upcoming.map(n=><Link key={n.id} href={`/dashboard/hyresavisering?id=${n.id}`}");
     expect(source).toContain("Ändra aviestatus i kön ovan");
   });
 });
