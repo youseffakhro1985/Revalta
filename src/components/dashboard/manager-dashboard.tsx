@@ -6,6 +6,7 @@ import { isMissingTableError } from "@/lib/schema-readiness";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 import { OverviewEmpty, OverviewHero, OverviewMetricLink, OverviewPanel } from "@/components/dashboard/overview-chrome";
 import { TicketAssignQueuePanel } from "@/components/dashboard/ticket-assign-queue-panel";
+import { WorkOrderAssignQueuePanel } from "@/components/dashboard/work-order-assign-queue-panel";
 
 const date = new Intl.DateTimeFormat("sv-SE", { weekday: "short", day: "numeric", month: "short" });
 
@@ -158,7 +159,10 @@ export async function ManagerDashboard({ user }: { user: CurrentUser }) {
           ))}</div> : <OverviewEmpty icon={Building2} title="Ingen fastighet ännu" description="När fastigheter registreras visas de här som en snabbväg in i beståndet." />}
         </OverviewPanel>
 
-        <TicketAssignQueuePanel />
+        <div className="space-y-5">
+          <TicketAssignQueuePanel />
+          <WorkOrderAssignQueuePanel />
+        </div>
       </section>
 
       <DashboardSlaOperations />
