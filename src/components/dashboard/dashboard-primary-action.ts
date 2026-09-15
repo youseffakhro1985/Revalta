@@ -87,12 +87,16 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   }
   if (canViewOperations(role) && (current === "/dashboard/underhall" || current.startsWith("/dashboard/underhall/"))) {
     const service = current === "/dashboard/underhall/service" || current.startsWith("/dashboard/underhall/service/");
-    if (!service) {
+    const portfolio = current === "/dashboard/underhall/portfolio" || current.startsWith("/dashboard/underhall/portfolio/");
+    if (!service && !portfolio) {
       return { href: "/dashboard/underhall#ny-underhallsatgard", label: "Ny åtgärd" };
     }
   }
   if (canViewOperations(role) && current === "/dashboard/underhall/service") {
     return { href: "/dashboard/underhall/service#kor-motor", label: "Kör underhåll" };
+  }
+  if (canViewOperations(role) && current === "/dashboard/underhall/portfolio") {
+    return { href: "/dashboard/underhall/portfolio#portfoljfilter", label: "Filtrera portfölj" };
   }
   if (canViewOperations(role) && (current === "/dashboard/kalender" || current.startsWith("/dashboard/kalender/"))) {
     return { href: "/dashboard/kalender#ny-aktivitet", label: "Ny aktivitet" };

@@ -82,6 +82,11 @@ export function MaintenancePortfolioPanel() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (window.location.hash !== "#portfoljfilter") return;
+    document.getElementById("portfoljfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, rows]);
+
   const options = useMemo(() => ({
     properties: [...new Map(rows.map((row) => [row.property_id, row.property_name])).entries()].sort((a, b) => a[1].localeCompare(b[1], "sv")),
     categories: [...new Set(rows.map((row) => row.category).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, "sv")),
@@ -125,10 +130,6 @@ export function MaintenancePortfolioPanel() {
     return { properties, total, debt, nearTerm, criticalValue, peak, yearly };
   }, [filteredRows, zoom]);
 
-  if (loading) return <section className="space-y-6" aria-labelledby="portfolio-maintenance-heading"><PortfolioHeading /><div className="h-96 animate-pulse rounded-2xl bg-sand-100" /></section>;
-  if (error) return <section className="space-y-6" aria-labelledby="portfolio-maintenance-heading"><PortfolioHeading /><InlineAlert>{error}</InlineAlert></section>;
-  if (rows.length === 0) return <section className="space-y-6" aria-labelledby="portfolio-maintenance-heading"><PortfolioHeading /><EmptyState title="Inga aktiva underhållsplaner" description="Aktivera minst en plan för att bygga portföljbudgeten." /></section>;
-
   const maxYear = Math.max(1, ...portfolio.yearly.map((item) => item.amount));
   const hasFilters = Object.values(filters).some((value) => value !== "all");
 
@@ -142,9 +143,12 @@ export function MaintenancePortfolioPanel() {
         </div>
       </PortfolioHeading>
 
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+
+      <div id="portfoljfilter" className="scroll-mt-36">
       <Panel title="Filtrera portföljen" description="Alla nyckeltal och diagram räknas om efter valda filter.">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <FilterField label="Fastighet" value={filters.property} onChange={(value) => setFilters((current) => ({ ...current, property: value }))}>
+          <FilterField autoFocus label="Fastighet" value={filters.property} onChange={(value) => setFilters((current) => ({ ...current, property: value }))}>
             <option value="all">Alla fastigheter</option>
             {options.properties.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </FilterField>
@@ -160,7 +164,12 @@ export function MaintenancePortfolioPanel() {
         </div>
         <p className="mt-4 flex items-center gap-2 text-xs text-ink-500"><Filter className="h-3.5 w-3.5" />{filteredRows.filter((row) => row.action_id).length} av {rows.filter((row) => row.action_id).length} åtgärder ingår i analysen.</p>
       </Panel>
+      </div>
 
+      {loading && rows.length === 0 ? <div className="h-96 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+      {!loading && rows.length === 0 ? <EmptyState title="Inga aktiva underhållsplaner" description="Aktivera minst en plan för att bygga portföljbudgeten." /> : null}
+      {rows.length > 0 ? (
+        <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={CircleDollarSign} label={`${zoom}-årsbudget`} value={money.format(portfolio.total)} hint="Indexerad portföljkostnad" />
         <MetricCard icon={Landmark} label="Finansieringsbehov 3 år" value={money.format(portfolio.nearTerm)} hint="Planerade investeringar på kort sikt" />
@@ -202,12 +211,14 @@ export function MaintenancePortfolioPanel() {
           ))}
         </div>}
       </Panel>
+        </>
+      ) : null}
     </section>
   );
 }
 
-function FilterField({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
+function FilterField({ label, value, onChange, children, autoFocus = false }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; autoFocus?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select autoFocus={autoFocus} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
 }
 
 function SummaryRow({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
