@@ -76,6 +76,11 @@ export default function TeamPage() {
 
   useEffect(() => { void loadTeam(); }, [loadTeam]);
 
+  useEffect(() => {
+    if (window.location.hash !== "#bjud-in") return;
+    document.getElementById("bjud-in")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading]);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault(); setError(""); setSuccess(""); setSubmitting(true);
     try {
@@ -123,10 +128,11 @@ export default function TeamPage() {
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
     <section className="grid gap-6 xl:grid-cols-[390px_1fr]">
+      <div id="bjud-in" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start">
       <Panel title="Bjud in teammedlem" description="Skapa en säker inbjudan och välj rätt roll från början.">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={!canManage} className="space-y-4 disabled:opacity-60">
-            <input placeholder="Namn" aria-label="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} />
+            <input placeholder="Namn" aria-label="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} autoFocus />
             <input type="email" required placeholder="E-post" aria-label="E-post" value={email} onChange={(event) => setEmail(event.target.value)} className={premiumFieldClass} />
             <select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Roll" className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option><option value="resident">Boende</option></select>
             <button disabled={submitting || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skickar…" : "Skicka inbjudan"}</button>
@@ -135,6 +141,7 @@ export default function TeamPage() {
         {!canManage ? <p className="mt-4 text-xs leading-5 text-ink-500">Du behöver administratörsbehörighet för att bjuda in nya användare.</p> : null}
         {inviteUrl ? <div className="mt-5 rounded-xl border border-petroleum-100 bg-petroleum-50 p-4"><p className="text-xs font-semibold uppercase tracking-[0.1em] text-petroleum-700">Inbjudningslänk för lokal utveckling</p><p className="mt-2 break-all text-sm text-petroleum-800">{inviteUrl}</p></div> : null}
       </Panel>
+      </div>
 
       <Panel title="Team" description={permissions.canSeeEmails ? "Roller, status och aktuell arbetsbelastning." : "Aktiva kollegor och roller som du har behörighet att se."} bodyClassName="p-0">
         {loading ? <div className="space-y-3 p-6">{[1,2,3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-sand-100" />)}</div> : members.length === 0 ? <EmptyState title="Inga teammedlemmar" description={canManage ? "Bjud in den första kollegan för att bygga organisationen." : "Det finns inga teammedlemmar att visa med din nuvarande behörighet."} /> : <div className="divide-y divide-sand-100">{members.map((member) => {

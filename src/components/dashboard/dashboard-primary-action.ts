@@ -1,4 +1,4 @@
-import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageLeases, canManageTickets, canManageWorkOrderFinance, canViewOperations } from "@/lib/permissions";
+import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageLeases, canManageTeam, canManageTickets, canManageWorkOrderFinance, canViewOperations } from "@/lib/permissions";
 
 export type DashboardPrimaryCreateAction = {
   href: string;
@@ -101,6 +101,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   }
   if (canManageAccessCredentials(role) && (current === "/dashboard/nycklar" || current.startsWith("/dashboard/nycklar/"))) {
     return { href: "/dashboard/nycklar#ny-nyckel", label: "Ny nyckel" };
+  }
+  if (canManageTeam(role) && (current === "/dashboard/team" || current.startsWith("/dashboard/team/"))) {
+    return { href: "/dashboard/team#bjud-in", label: "Bjud in" };
   }
 
   if (current === "/dashboard/installningar") {
