@@ -84,6 +84,12 @@ export default function MaintenancePage() {
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ny-underhallsatgard") return;
+    document.getElementById("ny-underhallsatgard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, permissions.canManage]);
+
   const year = new Date().getFullYear();
   const debt = useMemo(() => items.filter((item) => item.planned_year < year && !["completed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.estimated_cost || 0), 0), [items, year]);
   const tenYear = useMemo(() => items.filter((item) => item.planned_year >= year && item.planned_year <= year + 10 && item.status !== "cancelled").reduce((sum, item) => sum + Number(item.estimated_cost || 0), 0), [items, year]);
@@ -235,12 +241,14 @@ export default function MaintenancePage() {
       {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
       {!permissions.canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet till underhållsplanen. Förvaltare eller administratör kan planera och ändra åtgärder.</InlineAlert> : null}
 
-      <section className={`grid items-start gap-6 ${permissions.canManage ? "xl:grid-cols-[390px_minmax(0,1fr)]" : "grid-cols-1"}`}>
-        {permissions.canManage ? (
-          <Panel title="Ny planerad åtgärd" description="Koppla åtgärden till rätt fastighet, år, kostnad och prioritet." className="xl:sticky xl:top-[118px]">
-            <form id="ny-underhallsatgard" onSubmit={submit} className="space-y-4">
+      <section className={`grid items-start gap-6 ${permissions.canManage || loading ? "xl:grid-cols-[390px_minmax(0,1fr)]" : "grid-cols-1"}`}>
+        {permissions.canManage || loading ? (
+          <div id="ny-underhallsatgard" className="scroll-mt-36">
+            <Panel title="Ny planerad åtgärd" description="Koppla åtgärden till rätt fastighet, år, kostnad och prioritet." className="xl:sticky xl:top-[118px]">
+              {permissions.canManage ? (
+            <form onSubmit={submit} className="space-y-4">
               <Field label="Fastighet"><select required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
-              <Field label="Byggnadsdel"><input required className={premiumFieldClass} value={form.component} onChange={(event) => setForm({ ...form, component: event.target.value })} placeholder="Ex. Tak, fasad eller ventilation" /></Field>
+              <Field label="Byggnadsdel"><input required autoFocus className={premiumFieldClass} value={form.component} onChange={(event) => setForm({ ...form, component: event.target.value })} placeholder="Ex. Tak, fasad eller ventilation" /></Field>
               <Field label="Åtgärd"><textarea required className={premiumTextareaClass} value={form.measure} onChange={(event) => setForm({ ...form, measure: event.target.value })} placeholder="Beskriv planerad åtgärd" /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Planerat år"><input required type="number" className={premiumFieldClass} value={form.plannedYear} onChange={(event) => setForm({ ...form, plannedYear: event.target.value })} /></Field>
@@ -250,7 +258,11 @@ export default function MaintenancePage() {
               <Field label="Prioritet"><select className={premiumFieldClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="critical">Kritisk</option></select></Field>
               <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Lägg till i planen"}</button>
             </form>
-          </Panel>
+              ) : (
+                <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
+              )}
+            </Panel>
+          </div>
         ) : null}
 
         <Panel title="Flerårsplan" description={`${items.length} åtgärder grupperade efter planerat år.`} bodyClassName="p-0">
