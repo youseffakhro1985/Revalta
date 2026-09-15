@@ -55,6 +55,12 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canViewOperations(role) && (current === "/dashboard/leverantorer" || current.startsWith("/dashboard/leverantorer/"))) {
     return { href: "/dashboard/leverantorer#ny-leverantor", label: "Ny leverantör" };
   }
+  if (canManageLeases(role) && (current === "/dashboard/uthyrning" || current.startsWith("/dashboard/uthyrning/"))) {
+    const handover = current === "/dashboard/uthyrning/overlamning" || current.startsWith("/dashboard/uthyrning/overlamning/");
+    if (!handover) {
+      return { href: "/dashboard/uthyrning?create=1", label: "Nytt avtal" };
+    }
+  }
   if (canManageLeases(role) && (current === "/dashboard/bokningar" || current.startsWith("/dashboard/bokningar/"))) {
     return { href: "/dashboard/bokningar#ny-bokning", label: "Ny bokning" };
   }
