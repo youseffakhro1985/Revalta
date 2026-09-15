@@ -113,6 +113,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   if (canManageLeases(role) && current === "/dashboard/uthyrning/overlamning") {
     return { href: "/dashboard/uthyrning/overlamning#valj-avtal", label: "Välj avtal" };
   }
+  if (canManageLeases(role) && (current === "/dashboard/uthyrning/overlamning/rapport" || current.startsWith("/dashboard/uthyrning/overlamning/rapport/"))) {
+    return { href: `${current}#skriv-ut`, label: "Skriv ut" };
+  }
   if (canManageLeases(role) && (current === "/dashboard/bokningar" || current.startsWith("/dashboard/bokningar/"))) {
     return { href: "/dashboard/bokningar#ny-bokning", label: "Ny bokning" };
   }

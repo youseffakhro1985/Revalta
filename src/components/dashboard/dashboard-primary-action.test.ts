@@ -135,7 +135,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "manager")?.label).toBe("Välj avtal");
     expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "technician")).toBeNull();
-    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning/rapport/abc", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning/rapport/abc", "owner")).toEqual({
+      href: "/dashboard/uthyrning/overlamning/rapport/abc#skriv-ut",
+      label: "Skriv ut",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning/rapport/abc", "manager")?.label).toBe("Skriv ut");
+    expect(dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning/rapport/abc", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/hyresavisering", "owner")).toEqual({
       href: "/dashboard/hyresavisering#ny-hyresavi",
       label: "Ny hyresavi",
