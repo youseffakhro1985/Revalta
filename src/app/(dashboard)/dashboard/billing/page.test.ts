@@ -19,4 +19,13 @@ describe("billing checkout return", () => {
     expect(form).toContain("{(success || error) && (");
     expect(form).not.toContain("{(success || (billing && error)) && (");
   });
+
+  it("keeps the plan hash target in the first HTML and scrolls after load", () => {
+    expect(form).toContain('id="planer"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#planer"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain('href="#planer"');
+    expect(form).toContain("Byt plan");
+  });
 });

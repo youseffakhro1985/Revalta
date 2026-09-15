@@ -160,6 +160,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/audit", "admin")?.label).toBe("Filtrera logg");
     expect(dashboardPrimaryCreateAction("/dashboard/audit", "manager")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/billing", "owner")).toEqual({
+      href: "/dashboard/billing#planer",
+      label: "Byt plan",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/billing", "admin")?.label).toBe("Byt plan");
+    expect(dashboardPrimaryCreateAction("/dashboard/billing", "manager")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/ronder", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });

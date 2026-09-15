@@ -96,6 +96,11 @@ export function BillingPage({ checkout }: { checkout: string }) {
     };
   }, [router, checkout]);
 
+  useEffect(() => {
+    if (window.location.hash !== "#planer") return;
+    document.getElementById("planer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, billing]);
+
   async function changePlan(plan: string) {
     setError("");
     setSuccess("");
@@ -182,12 +187,15 @@ export function BillingPage({ checkout }: { checkout: string }) {
   return (
     <div className="mx-auto max-w-6xl animate-fade-in space-y-6">
       <header className="overflow-hidden rounded-2xl border border-sand-200 bg-white text-ink-950 shadow-premium-md">
-        <div className="p-7 sm:p-8">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Abonnemang</p>
-          <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px]">Planer och kapacitet</h1>
-          <p className="mt-3 max-w-2xl text-ink-500">
-            Se aktiv plan, kapacitetsgränser och betalningsstatus. Planbyten i produktion genomförs säkert via Stripe Checkout.
-          </p>
+        <div className="flex flex-col justify-between gap-5 p-7 sm:p-8 lg:flex-row lg:items-end">
+          <div>
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Abonnemang</p>
+            <h1 className="text-[32px] font-semibold leading-tight tracking-[-0.035em] sm:text-[36px]">Planer och kapacitet</h1>
+            <p className="mt-3 max-w-2xl text-ink-500">
+              Se aktiv plan, kapacitetsgränser och betalningsstatus. Planbyten i produktion genomförs säkert via Stripe Checkout.
+            </p>
+          </div>
+          <a href="#planer" className={premiumPrimaryButtonClass}>Byt plan</a>
         </div>
       </header>
 
@@ -197,6 +205,7 @@ export function BillingPage({ checkout }: { checkout: string }) {
         </div>
       )}
 
+      <section id="planer" className="scroll-mt-36 space-y-6">
       {billing ? (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -299,6 +308,7 @@ export function BillingPage({ checkout }: { checkout: string }) {
           </button>
         </div>
       )}
+      </section>
     </div>
   );
 }

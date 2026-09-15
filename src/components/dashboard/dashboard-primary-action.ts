@@ -1,4 +1,4 @@
-import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageCompany, canManageIntegrations, canManageLeases, canManageTeam, canManageTickets, canManageWorkOrderFinance, canViewAudit, canViewOperations } from "@/lib/permissions";
+import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageBilling, canManageCompany, canManageIntegrations, canManageLeases, canManageTeam, canManageTickets, canManageWorkOrderFinance, canViewAudit, canViewOperations } from "@/lib/permissions";
 
 export type DashboardPrimaryCreateAction = {
   href: string;
@@ -123,6 +123,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   }
   if (canViewAudit(role) && current === "/dashboard/audit") {
     return { href: "/dashboard/audit#auditfilter", label: "Filtrera logg" };
+  }
+  if (canManageBilling(role) && current === "/dashboard/billing") {
+    return { href: "/dashboard/billing#planer", label: "Byt plan" };
   }
 
   if (current === "/dashboard/installningar") {
