@@ -85,6 +85,11 @@ export default function ServiceNotificationsPage() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
+    const hash = window.location.hash;
+    if (hash !== "#aviseringsinstallningar" && hash !== "#mottagare" && hash !== "#korningshistorik") return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+  useEffect(() => {
     if (!isDirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
@@ -144,6 +149,11 @@ export default function ServiceNotificationsPage() {
           <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och aviseringar</p>
           <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Serviceaviseringar</h1>
           <p className="mt-3 max-w-3xl text-ink-600">Styr mottagare och aviseringsperiod, övervaka den dagliga rutinen och verifiera e-postleveransen.</p>
+          <nav aria-label="Hoppa till aviseringsavsnitt" className="mt-4 flex flex-wrap gap-2">
+            <a href="#aviseringsinstallningar" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Aviseringsval</a>
+            <a href="#mottagare" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Mottagare</a>
+            <a href="#korningshistorik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
+          </nav>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => void load()} disabled={loading || isDirty} title={isDirty ? "Spara eller återställ ändringarna innan du uppdaterar" : undefined} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
@@ -165,6 +175,7 @@ export default function ServiceNotificationsPage() {
       </div>
 
       <form onSubmit={savePreferences}>
+        <div id="aviseringsinstallningar" className="scroll-mt-36">
         <Panel title="Aviseringsinställningar" description="Inställningarna gäller endast den egna organisationen och versionsloggas vid varje ändring.">
           <fieldset disabled={!data?.canManage || saving} className="grid gap-6 disabled:opacity-60 lg:grid-cols-3">
             <div className="space-y-4">
@@ -199,24 +210,29 @@ export default function ServiceNotificationsPage() {
             <button type="submit" disabled={!data?.canManage || saving || !formValid || !isDirty} className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" /> {saving ? "Sparar…" : "Spara inställningar"}</button>
           </div>
         </Panel>
+        </div>
       </form>
 
       <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <Panel title="Driftkonfiguration" description="Säker kontroll av nödvändiga produktionsvariabler.">
           <div className="space-y-3">{[["CRON_SECRET", data?.configuration.cronSecret, "Skyddar den schemalagda endpointen"], ["EMAIL_PROVIDER_API_KEY", data?.configuration.emailApiKey, "Ansluter Revalta till e-postleverantören"], ["EMAIL_FROM", data?.configuration.emailFrom, "Verifierad avsändaradress"]].map(([label, enabled, description]) => <div key={String(label)} className="flex items-start justify-between gap-4 rounded-xl border border-sand-200 p-4"><div><p className="font-semibold text-ink-900">{String(label)}</p><p className="mt-1 text-sm text-ink-500">{String(description)}</p></div><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${enabled ? "bg-success-50 text-success-800" : "bg-danger-50 text-danger-700"}`}>{enabled ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}{enabled ? "Aktiv" : "Saknas"}</span></div>)}</div>
         </Panel>
+        <div id="mottagare" className="scroll-mt-36">
         <Panel title="Aktiva systemmottagare" description="Användare som matchar valda roller.">
           {loading && !data ? <div className="h-40 animate-pulse rounded-xl bg-sand-100" /> : null}
           {!loading && data?.recipients.length === 0 ? <EmptyState title="Inga systemmottagare" description="Välj roller med aktiva användare eller lägg till extra e-postmottagare." /> : null}
           {data?.recipients.length ? <div className="overflow-hidden rounded-xl border border-sand-200"><div className="divide-y divide-sand-100">{data.recipients.map((recipient) => <div key={recipient.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold text-ink-900">{recipient.name || recipient.email}</p><p className="mt-1 truncate text-sm text-ink-500">{recipient.email}</p></div><span className="shrink-0 rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-600">{roleLabels[recipient.role] || recipient.role}</span></div>)}</div></div> : null}
         </Panel>
+        </div>
       </div>
 
+      <div id="korningshistorik" className="scroll-mt-36">
       <Panel title="Körningshistorik" description="De senaste automatiska och manuella aviseringsförsöken.">
         {loading && !data ? <div className="h-48 animate-pulse rounded-xl bg-sand-100" /> : null}
         {!loading && data?.events.length === 0 ? <EmptyState title="Ingen körningshistorik ännu" description="Automatiska utskick och testutskick loggas här." /> : null}
         {data?.events.length ? <div className="overflow-x-auto rounded-xl border border-sand-200"><table className="min-w-full divide-y divide-sand-100 text-sm"><thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-5 py-3">Tidpunkt</th><th className="px-5 py-3">Typ</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Mottagare / körning</th></tr></thead><tbody className="divide-y divide-sand-100">{data.events.map((event) => <tr key={event.id}><td className="px-5 py-4 font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</td><td className="px-5 py-4 text-ink-600">{event.type === "component_service_test" ? "Testutskick" : "Daglig sammanställning"}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-success-50 text-success-800" : event.status === "failed" ? "bg-danger-50 text-danger-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></td><td className="max-w-md truncate px-5 py-4 text-ink-500">{event.recipient || "–"}</td></tr>)}</tbody></table></div> : null}
       </Panel>
+      </div>
     </div>
   );
 }

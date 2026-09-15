@@ -45,6 +45,7 @@ describe("first-run onboarding progress", () => {
 
     expect(progress.steps.find((step) => step.id === "ticket-intake")?.completed).toBe(false);
     expect(progress.steps.find((step) => step.id === "notifications")?.completed).toBe(false);
+    expect(progress.steps.find((step) => step.id === "notifications")?.href).toBe("/dashboard/installningar/aviseringar#aviseringsinstallningar");
     expect(progress.complete).toBe(false);
   });
 
