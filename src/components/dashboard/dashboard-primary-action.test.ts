@@ -75,10 +75,22 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/bokningar", "technician")).toBeNull();
   });
 
+  it("visar byt lösenord på inställningsöversikten men inte i underflikar", () => {
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar", "owner")).toEqual({
+      href: "/dashboard/installningar#losenord",
+      label: "Byt lösenord",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar", "technician")).toEqual({
+      href: "/dashboard/installningar#losenord",
+      label: "Byt lösenord",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/aviseringar", "owner")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar", "admin")).toBeNull();
+  });
+
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/ekonomi", "owner")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/dokument", "owner")).toBeNull();
-    expect(dashboardPrimaryCreateAction("/dashboard/installningar", "owner")).toBeNull();
   });
 
   it("respekterar rollbehörigheter", () => {
