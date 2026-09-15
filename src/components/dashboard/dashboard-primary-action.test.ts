@@ -46,6 +46,11 @@ describe("dashboardPrimaryCreateAction", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/skador", "manager")?.label).toBe("Nytt skadeärende");
     expect(dashboardPrimaryCreateAction("/dashboard/skador", "viewer")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/skador", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/projekt", "owner")).toEqual({
+      href: "/dashboard/projekt?create=1",
+      label: "Nytt projekt",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/projekt", "technician")).toBeNull();
   });
 
   it("visar modulspecifika skapa-knappar på drift- och boendesidor", () => {
