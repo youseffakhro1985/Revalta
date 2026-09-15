@@ -6,6 +6,7 @@ import { type CurrentUser } from "@/lib/current-user";
 import { DashboardSlaOperations } from "@/components/dashboard/dashboard-sla-operations";
 import { OverviewEmpty, OverviewHero, OverviewMetricLink, OverviewPanel } from "@/components/dashboard/overview-chrome";
 import { isMissingSchemaColumnError } from "@/lib/schema-readiness";
+import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { WORK_ORDER_STATUS_LABELS, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import { TechnicianNextOrderTimeForm } from "@/components/dashboard/technician-next-order-time-form";
 
