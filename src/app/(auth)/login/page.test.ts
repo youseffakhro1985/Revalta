@@ -34,6 +34,8 @@ describe("login form", () => {
     expect(form).not.toContain("disabled={!hydrated || loading}");
     expect(form).toContain('name="next"');
     expect(form).toContain("value={props.nextPath}");
+    expect(form).toContain("safeInternalPath(props.nextPath, fallback)");
+    expect(form).not.toContain("URLSearchParams(window.location.search)");
     expect(form).not.toContain("value={email}");
     expect(form).not.toContain("value={password}");
     expect(form).toContain("Ange både e-post och lösenord.");
