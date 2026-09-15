@@ -113,7 +113,11 @@ describe("dashboardPrimaryCreateAction", () => {
       href: "/dashboard/installningar/mina-aviseringar#mina-val",
       label: "Mina val",
     });
-    expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar", "admin")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar", "admin")).toEqual({
+      href: "/dashboard/installningar/eskaleringar/regler",
+      label: "Hantera regler",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/installningar/eskaleringar/regler", "admin")).toBeNull();
   });
 
   it("visar inte en irrelevant global skapa-knapp i andra moduler", () => {
