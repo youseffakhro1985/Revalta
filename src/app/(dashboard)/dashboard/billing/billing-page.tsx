@@ -100,6 +100,11 @@ export function BillingPage({ checkout }: { checkout: string }) {
     if (window.location.hash !== "#planer") return;
     document.getElementById("planer")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, billing]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#planuppgifter") return;
+    document.getElementById("planuppgifter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, billing]);
 
   async function changePlan(plan: string) {
     setError("");
@@ -206,6 +211,7 @@ export function BillingPage({ checkout }: { checkout: string }) {
       )}
 
       <section id="planer" className="scroll-mt-36 space-y-6">
+      <div id="planuppgifter" className="scroll-mt-36 space-y-6">
       {billing ? (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -294,7 +300,7 @@ export function BillingPage({ checkout }: { checkout: string }) {
           </section>
         </>
       ) : loading ? (
-        <div className="h-64 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />
+        <p className="text-sm text-ink-500">Planerna hämtas.</p>
       ) : (
         <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5 text-sm text-danger-800">
           <p className="font-semibold">Abonnemangsuppgifterna kunde inte hämtas.</p>
@@ -308,6 +314,7 @@ export function BillingPage({ checkout }: { checkout: string }) {
           </button>
         </div>
       )}
+      </div>
       </section>
     </div>
   );
