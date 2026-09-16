@@ -84,6 +84,11 @@ export default function NotificationsPage() {
     if (window.location.hash !== "#notislista") return;
     document.getElementById("notislista")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, notifications]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#notisaktivitet") return;
+    document.getElementById("notisaktivitet")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, events]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -244,12 +249,12 @@ export default function NotificationsPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+          <section id="notisaktivitet" className="scroll-mt-36 overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
             <div className="border-b border-sand-200 px-5 py-4">
               <h2 className="text-sm font-semibold text-ink-950">Senaste aktivitet</h2>
             </div>
             <div className="divide-y divide-sand-200">
-              {events.length === 0 ? <p className="p-8 text-sm text-ink-500">Ingen aktivitet registrerad ännu.</p> : events.slice(0, 12).map((event) => (
+              {loading ? <p className="p-8 text-sm text-ink-500">Aktiviteten hämtas.</p> : events.length === 0 ? <p className="p-8 text-sm text-ink-500">Ingen aktivitet registrerad ännu.</p> : events.slice(0, 12).map((event) => (
                 <div key={event.id} className="flex items-center justify-between gap-4 p-4">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-ink-800">{eventTitle(event)}</p>

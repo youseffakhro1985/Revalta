@@ -30,3 +30,16 @@ describe("notiser leftover filter first HTML", () => {
     expect(source).toContain("canManage || loading");
   });
 });
+
+describe("notiser leftover activity first HTML", () => {
+  it("keeps leftover activity in the first HTML without stealing Nytt meddelande", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="notisaktivitet"');
+    expect(source).toContain('window.location.hash !== "#notisaktivitet"');
+    expect(source).toContain("Aktiviteten hämtas.");
+    expect(source).toContain('id="nytt-meddelande"');
+    expect(source).toContain('id="notisfilter"');
+    expect(source).toContain('id="notislista"');
+    expect(source).toContain("canManage || loading");
+  });
+});
