@@ -97,6 +97,12 @@ export default function ServiceNotificationsPage() {
   }, []);
   useEffect(() => {
     if (loading) return;
+    if (window.location.hash !== "#aviseringsinstallningar") return;
+    document.getElementById("aviseringsinstallningar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("days-ahead")?.focus(), 0);
+  }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#historikfilter") return;
     document.getElementById("historikfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
@@ -211,7 +217,7 @@ export default function ServiceNotificationsPage() {
               </label>
               <div>
                 <label htmlFor="days-ahead" className="block text-sm font-semibold text-ink-800">Avisera service inom</label>
-                <div className="mt-2 flex items-center gap-3"><input id="days-ahead" type="number" min={1} max={90} required value={preferences.daysAhead} onChange={(event) => setPreferences((current) => ({ ...current, daysAhead: Number(event.target.value) }))} aria-describedby="days-ahead-help" className="w-28 rounded-xl border border-sand-200 px-3 py-2.5" /><span className="text-sm text-ink-500">dagar</span></div>
+                <div className="mt-2 flex items-center gap-3"><input id="days-ahead" autoFocus type="number" min={1} max={90} required value={preferences.daysAhead} onChange={(event) => setPreferences((current) => ({ ...current, daysAhead: Number(event.target.value) }))} aria-describedby="days-ahead-help" className="w-28 rounded-xl border border-sand-200 px-3 py-2.5" /><span className="text-sm text-ink-500">dagar</span></div>
                 <p id="days-ahead-help" className="mt-2 text-xs text-ink-500">Tillåtet intervall: 1–90 dagar.</p>
               </div>
             </div>
