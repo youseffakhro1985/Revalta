@@ -52,6 +52,11 @@ export function InspectionResolutionCenter() {
     if (window.location.hash !== "#synkronisera-besiktning") return;
     document.getElementById("synkronisera-besiktning")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, record]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#synklista") return;
+    document.getElementById("synklista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, record]);
 
   const isLegacy = source === "legacy";
   const formLocked = syncing || loading;
@@ -102,6 +107,7 @@ export function InspectionResolutionCenter() {
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
         {isLegacy ? <InlineAlert tone="warning">{LEGACY_BACKFILL}</InlineAlert> : null}
+        <div id="synklista" className="scroll-mt-36">
         {loading ? (
           <p className="text-sm text-ink-500">Besiktningen hämtas.</p>
         ) : !record ? (
@@ -112,6 +118,7 @@ export function InspectionResolutionCenter() {
             <Stat label="Åtgärdade punkter" value={resolved} />
           </div>
         )}
+        </div>
         <div className="flex justify-end">
           <button type="submit" disabled={formLocked || isLegacy || !record} className={premiumPrimaryButtonClass}>
             <CheckCircle2 className="mr-2 h-4 w-4" />{syncing ? "Synkroniserar…" : "Synkronisera slutförda arbetsorder"}
