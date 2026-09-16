@@ -56,6 +56,11 @@ export function InspectionWorkOrderCenter() {
     if (window.location.hash !== "#skapa-besiktningsorder") return;
     document.getElementById("skapa-besiktningsorder")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, record]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#punktlista") return;
+    document.getElementById("punktlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, record]);
 
   const isLegacy = source === "legacy";
   const linkedByItem = useMemo(() => new Map(links.map((link) => [link.itemId, link])), [links]);
@@ -87,7 +92,9 @@ export function InspectionWorkOrderCenter() {
       </fieldset>
       {error ? <InlineAlert>{error}</InlineAlert> : null}{success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       {isLegacy ? <InlineAlert tone="warning">{LEGACY_BACKFILL}</InlineAlert> : null}
+      <div id="punktlista" className="scroll-mt-36">
       {loading ? <p className="text-sm text-ink-500">Punkterna hämtas.</p> : !record ? <EmptyState title="Välj ett avtal" description="Sparade besiktningspunkter visas här." /> : selected.length === 0 ? <EmptyState title="Inga valda åtgärdspunkter" description="Markera punkter med Åtgärd krävs och Välj för arbetsorder i besiktningsregistret." /> : <div className="space-y-3">{selected.map((item) => { const link = linkedByItem.get(item.id); return <article key={item.id} className="flex flex-col gap-3 rounded-xl border border-sand-200 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold text-ink-900">{item.area} · {item.component}</p><p className="mt-1 text-sm text-ink-500">{item.description}</p><p className="mt-1 text-xs font-semibold uppercase tracking-wide text-petroleum-700">{item.priority} prioritet</p></div>{link?.workOrder ? <div className="flex items-center gap-3"><span className="rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-700">{statusLabels[link.workOrder.status] || link.workOrder.status}</span><a href={`/dashboard/arbetsorder/${link.workOrder.id}`} className="inline-flex items-center rounded-lg border border-sand-200 px-3 py-2 text-sm font-semibold text-petroleum-800">Öppna<ExternalLink className="ml-2 h-3.5 w-3.5" /></a></div> : <span className="text-sm font-medium text-ink-500">Ej skapad</span>}</article>; })}</div>}
+      </div>
       <div className="flex justify-end"><button type="submit" disabled={formLocked || isLegacy || pending.length === 0} className={premiumPrimaryButtonClass}><Wrench className="mr-2 h-4 w-4" />{saving ? "Skapar…" : pending.length > 0 ? `Skapa ${pending.length} arbetsorder` : "Skapa arbetsorder"}</button></div>
     </form>
   </Panel>;
