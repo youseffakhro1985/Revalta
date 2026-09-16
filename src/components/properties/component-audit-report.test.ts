@@ -14,3 +14,17 @@ describe("component audit report first HTML", () => {
     expect(source).not.toContain('{loading && !data ? <div className="h-40 animate-pulse rounded-xl bg-sand-100" /> : null}');
   });
 });
+
+describe("component audit leftover first HTML", () => {
+  it("keeps leftover revision history in the first HTML without stealing export", () => {
+    const source = readFileSync(new URL("./component-audit-report.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="revisionslista"');
+    expect(source).toContain('window.location.hash !== "#revisionslista"');
+    expect(source).toContain("Historiken hämtas.");
+    expect(source).toContain('id="exportera-revision"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+    expect(source).not.toContain('id="auditlista"');
+  });
+});

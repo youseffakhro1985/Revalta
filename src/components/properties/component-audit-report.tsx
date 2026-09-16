@@ -48,6 +48,11 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
     if (window.location.hash !== "#exportera-revision") return;
     document.getElementById("exportera-revision")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#revisionslista") return;
+    document.getElementById("revisionslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   return (
     <div className="space-y-6">
@@ -68,6 +73,7 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
         </div>
 
         {error ? <InlineAlert>{error}</InlineAlert> : null}
+        <div id="revisionslista" className="scroll-mt-36">
         {loading && !data ? <p className="text-sm text-ink-500">Historiken hämtas.</p> : null}
         {!loading && data?.audits.length === 0 ? <EmptyState title="Ingen revisionshistorik ännu" description="Ändringar och korrigeringar visas här när komponenten används." /> : null}
         {data?.audits.length ? (
@@ -80,6 +86,7 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
             </div>
           </div>
         ) : null}
+        </div>
       </Panel>
     </div>
   );
