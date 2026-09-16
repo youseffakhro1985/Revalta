@@ -54,6 +54,7 @@ export function WorkOrderAssignQueuePanel() {
   const [error, setError] = useState("");
   const [actingId, setActingId] = useState("");
   const [itemError, setItemError] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("all");
 
   const applyQueue = useCallback((body: QueuePayload) => {
     const nextItems = body.workOrders || [];
@@ -104,6 +105,12 @@ export function WorkOrderAssignQueuePanel() {
     };
   }, [applyQueue]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#tilldelafilter") return;
+    document.getElementById("tilldelafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
+
   async function assign(item: QueueItem, assigneeId: string) {
     if (!assigneeId) {
       setItemError("Välj en ansvarig innan du tilldelar.");
@@ -150,19 +157,36 @@ export function WorkOrderAssignQueuePanel() {
 
   if (hidden) return null;
 
+  const visibleItems = priorityFilter === "all" ? items : items.filter((item) => item.priority === "urgent");
+  const formLocked = Boolean(actingId) || loading;
+
   return (
     <OverviewPanel title="Otilldelade arbetsordrar" description="Tilldela tekniker här. Samma redigeringslås som i Planering." bodyClassName="p-0">
-      <div className="space-y-3 px-5 py-4">
+      <div id="tilldelafilter" className="scroll-mt-36 space-y-3 px-5 py-4">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
-        {loading ? <div className="h-32 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}
+        <form id="tilldelafilter-form" onSubmit={(event) => event.preventDefault()}>
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera kön</span>
+              <select autoFocus value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera otilldelade arbetsordrar">
+                <option value="all">Alla prioriteringar</option>
+                <option value="urgent">Akut</option>
+              </select>
+            </label>
+          </fieldset>
+        </form>
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
       {!loading && !error && items.length === 0 ? (
         <OverviewEmpty icon={Wrench} title="Inga otilldelade arbetsordrar" description="Kön är tom — alla aktiva arbetsordrar har en ansvarig." />
       ) : null}
-      {!loading && !error && items.length > 0 ? (
+      {!loading && !error && items.length > 0 && visibleItems.length === 0 ? (
+        <OverviewEmpty icon={Wrench} title="Inga arbetsordrar matchar filtret" description="Ändra prioriteringsfiltret för att visa fler otilldelade arbetsordrar." />
+      ) : null}
+      {!loading && !error && visibleItems.length > 0 ? (
         <div className="divide-y divide-sand-100">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <div key={item.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -181,7 +205,7 @@ export function WorkOrderAssignQueuePanel() {
                   id={`work-order-assignee-${item.id}`}
                   value={selected[item.id] || ""}
                   onChange={(event) => setSelected((current) => ({ ...current, [item.id]: event.target.value }))}
-                  disabled={Boolean(actingId)}
+                  disabled={formLocked}
                   className={`${premiumFieldClass} h-9 min-w-[10rem] text-sm`}
                 >
                   <option value="">Välj ansvarig</option>
@@ -193,7 +217,7 @@ export function WorkOrderAssignQueuePanel() {
                 </select>
                 <button
                   type="button"
-                  disabled={Boolean(actingId)}
+                  disabled={formLocked}
                   onClick={() => void assign(item, selected[item.id] || "")}
                   className="inline-flex h-9 items-center justify-center rounded-lg bg-petroleum-800 px-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
