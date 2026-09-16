@@ -51,6 +51,12 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#godkann-plan") return;
+    document.getElementById("godkann-plan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   async function mutate(planId: string, action: "plan.approve" | "plan.archive") {
     setSaving(true);
     setError("");
@@ -72,17 +78,41 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
     }
   }
 
-  if (loading) return <div className="h-56 animate-pulse rounded-2xl bg-sand-100" />;
-  if (!data) return <InlineAlert>{error || "Versionshistoriken kunde inte laddas."}</InlineAlert>;
+  if (!loading && !data) return <InlineAlert>{error || "Versionshistoriken kunde inte laddas."}</InlineAlert>;
+
+  const plans = data?.plans || [];
+  const showPlaceholder = loading && plans.length === 0;
+  const formLocked = saving || loading || !data;
 
   return (
+    <div id="godkann-plan" className="scroll-mt-36">
     <Panel title="Godkännande och versionshistorik" description="Spårbar styrning av underhållsplanens planversioner, godkännanden och arkivering." bodyClassName="p-0">
       {(error || success) ? <div className="p-5 pb-0"><InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert></div> : null}
-      {data.plans.length === 0 ? (
+      {showPlaceholder ? (
+        <article className="p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <History className="h-4 w-4 text-petroleum-700" aria-hidden="true" />
+                <h3 className="font-semibold text-ink-900">Planversion</h3>
+              </div>
+              <p className="mt-2 text-sm text-ink-500">Laddar versionshistorik, godkännanden och arkivering.</p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button type="button" disabled autoFocus className={premiumPrimaryButtonClass}>
+                <CheckCircle2 className="h-4 w-4" /> Godkänn version
+              </button>
+              <button type="button" disabled className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-60">
+                <Archive className="h-4 w-4" /> Arkivera
+              </button>
+            </div>
+          </div>
+        </article>
+      ) : plans.length === 0 ? (
         <div className="p-8 text-center text-sm text-ink-500">Inga planversioner har skapats ännu.</div>
       ) : (
         <div className="divide-y divide-sand-100">
-          {data.plans.map((plan) => (
+          {plans.map((plan, index) => (
             <article key={plan.id} className="p-5 sm:p-6">
               <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
@@ -103,12 +133,12 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {plan.status !== "active" ? (
-                    <button type="button" disabled={saving} onClick={() => void mutate(plan.id, "plan.approve")} className={premiumPrimaryButtonClass}>
+                    <button type="button" autoFocus={index === 0} disabled={formLocked} onClick={() => void mutate(plan.id, "plan.approve")} className={premiumPrimaryButtonClass}>
                       <CheckCircle2 className="h-4 w-4" /> Godkänn version
                     </button>
                   ) : null}
                   {plan.status !== "archived" ? (
-                    <button type="button" disabled={saving} onClick={() => void mutate(plan.id, "plan.archive")} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-60">
+                    <button type="button" disabled={formLocked} onClick={() => void mutate(plan.id, "plan.archive")} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-60">
                       <Archive className="h-4 w-4" /> Arkivera
                     </button>
                   ) : null}
@@ -119,5 +149,6 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
         </div>
       )}
     </Panel>
+    </div>
   );
 }
