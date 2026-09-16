@@ -255,6 +255,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#spara-ekonomi") return;
     document.getElementById("spara-ekonomi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("ekonomi-starttid")?.focus(), 0);
   }, [loading, times]);
 
   async function post(url: string, body: Record<string, unknown>, message: string) {
@@ -423,7 +424,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
               <option value="break">Rast</option>
             </select>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input autoFocus name="startedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Starttid" />
+              <input id="ekonomi-starttid" autoFocus name="startedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Starttid" />
               <input name="endedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Sluttid" />
             </div>
             <input name="note" placeholder="Anteckning" aria-label="Anteckning" className={premiumFieldClass} />
