@@ -75,6 +75,11 @@ export default function RecurringIncidentSlaReportPage() {
     if (window.location.hash !== "#exportera-csv") return;
     document.getElementById("exportera-csv")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#sladetaljer") return;
+    document.getElementById("sladetaljer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, rows]);
 
   return <div className="space-y-8">
     <PageHeader
@@ -119,8 +124,9 @@ export default function RecurringIncidentSlaReportPage() {
       <MetricCard icon={CheckCircle2} label="Lösta inom mål" value={summary ? `${summary.resolutionMet}/${summary.resolutionMeasured}` : "0/0"} />
     </section>
 
+    <div id="sladetaljer" className="scroll-mt-36">
     <Panel title="Incidentdetaljer" description="Rapporten visar den senaste SLA-versionen inom vald period och aktuell incidentstatus." bodyClassName="p-0">
-      {loading && !rows.length ? <div className="p-8 text-sm text-ink-500">Hämtar rapportdata…</div> : null}
+      {loading && !rows.length ? <p className="p-8 text-sm text-ink-500">SLA-raderna hämtas.</p> : null}
       {!loading && !rows.length ? <EmptyState title="Ingen SLA-data i perioden" description="Sätt svarstid eller lösningstid på en schemaincident för att börja följa måluppfyllelse." /> : null}
       {rows.length ? <div className="overflow-x-auto"><table className="min-w-[1180px] w-full text-left text-sm">
         <thead className="border-b border-sand-200 bg-sand-50 text-xs font-semibold uppercase tracking-wide text-ink-500"><tr>
@@ -138,5 +144,6 @@ export default function RecurringIncidentSlaReportPage() {
         </tr>)}</tbody>
       </table></div> : null}
     </Panel>
+    </div>
   </div>;
 }
