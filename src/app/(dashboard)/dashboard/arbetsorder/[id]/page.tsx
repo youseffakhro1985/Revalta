@@ -147,6 +147,11 @@ export default function WorkOrderDetailPage() {
     if (window.location.hash !== "#spara-arbetsorder") return;
     document.getElementById("spara-arbetsorder")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, workOrder]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#ordernyckeltal") return;
+    document.getElementById("ordernyckeltal")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, workOrder]);
 
   async function save(formData: FormData) {
     if (editLock.state.status !== "owned") {
@@ -241,11 +246,14 @@ export default function WorkOrderDetailPage() {
     <PageHeader eyebrow={enterprise?.work_order_number || "Arbetsorder"} title={workOrder?.title || "Arbetsorder"} description={workOrder?.description || "Styrning, SLA, ekonomi och revisionshistorik för arbetsordern."} />
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
+    <div id="redigeringsstatus" className="scroll-mt-36">
     {transitions?.canManage ? <div className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${editable ? "border-success-200 bg-success-50" : editLock.state.status === "locked" ? "border-warning-200 bg-warning-50" : "border-sand-200 bg-white"}`}>
       <div className="flex items-start gap-3"><LockKeyhole className={`mt-0.5 h-5 w-5 ${editable ? "text-success-700" : "text-warning-700"}`} /><div><p className="font-semibold text-ink-900">{editable ? "Säker redigering aktiv" : editLock.state.status === "locked" ? "Arbetsordern redigeras av en annan användare" : editLock.state.status === "acquiring" ? "Låser arbetsordern för redigering…" : "Redigeringslåset är inte aktivt"}</p><p className="mt-1 text-sm text-ink-600">{editable ? `Låset förnyas automatiskt till ${dateTime.format(new Date(editLock.state.expiresAt))}.` : editLock.state.status === "locked" ? `${editLock.state.holder.name || editLock.state.holder.email} har låset till ${dateTime.format(new Date(editLock.state.expiresAt))}.` : editLock.state.status === "lost" || editLock.state.status === "error" ? editLock.state.message : "Vänta medan ett exklusivt redigeringslås skapas."}</p></div></div>
       {!editable && editLock.state.status !== "acquiring" ? <button type="button" onClick={() => void editLock.acquire()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-300 bg-white px-4 py-2 text-sm font-semibold text-petroleum-800"><RefreshCw className="h-4 w-4" />Försök igen</button> : null}
-    </div> : loading ? <div className="h-24 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+    </div> : loading ? <p className="text-sm text-ink-500">Redigeringsläget hämtas.</p> : null}
+    </div>
 
+    <div id="ordernyckeltal" className="scroll-mt-36">
     {workOrder ? (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={MapPin} label="Fastighet" value={workOrder.property.name} hint={`${workOrder.property.address}, ${workOrder.property.city}`} />
@@ -254,7 +262,8 @@ export default function WorkOrderDetailPage() {
       <MetricCard icon={CalendarClock} label="Planerat slut" value={workOrder.scheduled_end ? date.format(new Date(workOrder.scheduled_end)) : "Ej satt"} />
       {capabilities.canViewFinance ? <MetricCard icon={Banknote} label="Kostnadsutfall" value={actual === null ? "Ej satt" : money.format(actual)} hint={estimated === null ? "Beräknat ej satt" : `Beräknat ${money.format(estimated)}`} /> : null}
     </section>
-    ) : <div className="h-40 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
+    ) : <p className="text-sm text-ink-500">Nyckeltalen hämtas.</p>}
+    </div>
 
     <Panel title="Identifiering och spårning" description="Operativ identifiering, SLA och oföränderligt revisionsspår för arbetsordern.">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

@@ -53,6 +53,20 @@ describe("work order activity panel first HTML", () => {
   });
 });
 
+describe("work order leftover metrics first HTML", () => {
+  it("keeps metrics in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="ordernyckeltal"');
+    expect(source).toContain('id="redigeringsstatus"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#ordernyckeltal"');
+    expect(source).toContain('id="spara-arbetsorder"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).not.toContain('loading ? <div className="h-24 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}');
+    expect(source).not.toContain(') : <div className="h-40 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}');
+  });
+});
+
 describe("work order documents panel first HTML", () => {
   it("renders documents while the work order is still loading", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
