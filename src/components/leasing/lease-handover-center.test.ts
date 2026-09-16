@@ -5,11 +5,13 @@ describe("lease handover save first HTML", () => {
   it("keeps save actions in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./lease-handover-center.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="spara-overlamning"');
+    expect(source).toContain('id="overlamning-spara"');
     expect(source).toContain('id="overlamning-avtal"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#spara-overlamning"');
     expect(source).toContain('window.location.hash !== "#valj-avtal"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("overlamning-spara")?.focus()');
     expect(source).toContain('document.getElementById("overlamning-avtal")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("saving || loading");
@@ -28,6 +30,7 @@ describe("lease handover leftover first HTML", () => {
     expect(source).toContain('id="valj-avtal"');
     expect(source).toContain('id="overlamning-avtal"');
     expect(source).toContain('id="spara-overlamning"');
+    expect(source).toContain('id="overlamning-spara"');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading");
