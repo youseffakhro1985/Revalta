@@ -57,6 +57,7 @@ export default function ServiceNotificationsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   const currentSignature = useMemo(() => signature(preferences, extraEmails), [preferences, extraEmails]);
   const isDirty = currentSignature !== savedSignature;
@@ -65,6 +66,8 @@ export default function ServiceNotificationsPage() {
   const formValid = preferences.roles.length > 0 && preferences.daysAhead >= 1 && preferences.daysAhead <= 90 && emailCount <= 20;
   const events = data?.events || [];
   const visibleEvents = statusFilter === "all" ? events : events.filter((event) => event.status === statusFilter);
+  const recipients = data?.recipients || [];
+  const visibleRecipients = roleFilter === "all" ? recipients : recipients.filter((item) => item.role === roleFilter);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,6 +99,11 @@ export default function ServiceNotificationsPage() {
     if (loading) return;
     if (window.location.hash !== "#historikfilter") return;
     document.getElementById("historikfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#mottagarfilter") return;
+    document.getElementById("mottagarfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
   useEffect(() => {
     if (!isDirty) return;
@@ -227,9 +235,24 @@ export default function ServiceNotificationsPage() {
         </Panel>
         <div id="mottagare" className="scroll-mt-36">
         <Panel title="Aktiva systemmottagare" description="Användare som matchar valda roller.">
-          {loading && !data ? <div className="h-40 animate-pulse rounded-xl bg-sand-100" /> : null}
-          {!loading && data?.recipients.length === 0 ? <EmptyState title="Inga systemmottagare" description="Välj roller med aktiva användare eller lägg till extra e-postmottagare." /> : null}
-          {data?.recipients.length ? <div className="overflow-hidden rounded-xl border border-sand-200"><div className="divide-y divide-sand-100">{data.recipients.map((recipient) => <div key={recipient.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold text-ink-900">{recipient.name || recipient.email}</p><p className="mt-1 truncate text-sm text-ink-500">{recipient.email}</p></div><span className="shrink-0 rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-600">{roleLabels[recipient.role] || recipient.role}</span></div>)}</div></div> : null}
+          <form id="mottagarfilter" onSubmit={(event) => event.preventDefault()} className="mb-4 scroll-mt-36">
+            <fieldset disabled={loading} className="contents">
+              <label className="block max-w-sm">
+                <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera mottagare</span>
+                <select autoFocus value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera systemmottagare">
+                  <option value="all">Alla roller</option>
+                  <option value="owner">Ägare</option>
+                  <option value="admin">Administratör</option>
+                  <option value="manager">Förvaltare</option>
+                  <option value="property_manager">Fastighetsförvaltare</option>
+                </select>
+              </label>
+            </fieldset>
+          </form>
+          {loading && !data ? <p className="text-sm text-ink-500">Mottagarna hämtas.</p> : null}
+          {!loading && recipients.length === 0 ? <EmptyState title="Inga systemmottagare" description="Välj roller med aktiva användare eller lägg till extra e-postmottagare." /> : null}
+          {!loading && recipients.length > 0 && visibleRecipients.length === 0 ? <EmptyState title="Inga mottagare matchar filtret" description="Ändra rollfiltret för att visa fler systemmottagare." /> : null}
+          {visibleRecipients.length ? <div className="overflow-hidden rounded-xl border border-sand-200"><div className="divide-y divide-sand-100">{visibleRecipients.map((recipient) => <div key={recipient.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold text-ink-900">{recipient.name || recipient.email}</p><p className="mt-1 truncate text-sm text-ink-500">{recipient.email}</p></div><span className="shrink-0 rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-600">{roleLabels[recipient.role] || recipient.role}</span></div>)}</div></div> : null}
         </Panel>
         </div>
       </div>
