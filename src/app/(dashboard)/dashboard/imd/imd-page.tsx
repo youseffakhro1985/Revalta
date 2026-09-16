@@ -102,6 +102,11 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
     }
     if (new URLSearchParams(window.location.search).get("create") === "1") setShowCreate(true);
   }, [canManage, loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#imdfilter") return;
+    document.getElementById("imdfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, readings]);
 
   const availableLeases = useMemo(() => leases.filter((lease) => !propertyId || lease.property_id === propertyId), [leases, propertyId]);
   const propertyNames = useMemo(() => [...new Set(readings.map((item) => item.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [readings]);
@@ -315,12 +320,12 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
 
     <section className="grid gap-6 xl:grid-cols-[1fr_0.75fr]">
       <Panel title="Mätarfilter" description="Sök och avgränsa mätvärden utan att påverka debiteringen.">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_0.9fr_0.9fr_auto]">
-          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök objekt, mätare eller period" aria-label="Sök IMD" /></label>
-          <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
-          <select className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera mätartyp"><option value="all">Alla typer</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select className={premiumFieldClass} value={debitFilter} onChange={(event) => setDebitFilter(event.target.value)} aria-label="Filtrera debitering"><option value="all">Alla debiteringar</option><option value="open">Öppna</option><option value="linked">Kopplade</option><option value="none">Utan debitering</option></select>
-          <button type="button" disabled={!hasFilters} onClick={() => { setQuery(""); setPropertyFilter("all"); setTypeFilter("all"); setDebitFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+        <div id="imdfilter" className="scroll-mt-36 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_0.9fr_0.9fr_auto]">
+          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök objekt, mätare eller period" aria-label="Sök IMD" /></label>
+          <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
+          <select disabled={loading} className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera mätartyp"><option value="all">Alla typer</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select disabled={loading} className={premiumFieldClass} value={debitFilter} onChange={(event) => setDebitFilter(event.target.value)} aria-label="Filtrera debitering"><option value="all">Alla debiteringar</option><option value="open">Öppna</option><option value="linked">Kopplade</option><option value="none">Utan debitering</option></select>
+          <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setPropertyFilter("all"); setTypeFilter("all"); setDebitFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
         </div>
       </Panel>
 
@@ -330,7 +335,7 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
     </section>
 
     <Panel title="Avläsningar och debitering" description={`${visibleReadings.length} av ${readings.length} mätvärden i vald vy`} bodyClassName="p-0">
-      {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-sand-100" />)}</div> : visibleReadings.length === 0 ? <EmptyState title="Inga avläsningar matchar urvalet" description="Justera filtren eller registrera ett nytt mätvärde." /> : <div className="overflow-x-auto">
+      {loading ? <p className="p-6 text-sm text-ink-500">Avläsningarna hämtas.</p> : visibleReadings.length === 0 ? <EmptyState title="Inga avläsningar matchar urvalet" description="Justera filtren eller registrera ett nytt mätvärde." /> : <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead className="bg-sand-50 text-[10px] uppercase tracking-[0.1em] text-ink-500"><tr>{["Fastighet", "Objekt", "Mätare", "Typ / period", "Förbrukning", "Belopp", "Debitering", "Åtgärder"].map((head) => <th key={head} className="px-5 py-3 font-semibold">{head}</th>)}</tr></thead>
           <tbody className="divide-y divide-sand-100">{visibleReadings.map((item) => {
