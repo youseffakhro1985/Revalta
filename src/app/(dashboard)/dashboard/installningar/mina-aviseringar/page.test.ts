@@ -27,3 +27,21 @@ describe("mina aviseringar leftover status first HTML", () => {
     expect(source).toContain("disabled={loading || saving}");
   });
 });
+
+describe("mina aviseringar sticky mutate first HTML", () => {
+  it("keeps Mina val focused after load without leftover status stealing the sticky", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="mina-val"');
+    expect(source).toContain('id="mina-val-toggle"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain('window.location.hash !== "#mina-val"');
+    expect(source).toContain('document.getElementById("mina-val-toggle")?.focus()');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('id="minastatus"');
+    expect(source).toContain("disabled={saving || loading}");
+    const stickyIndex = source.indexOf('id="mina-val-toggle"');
+    const leftoverIndex = source.indexOf('id="minastatus"');
+    expect(stickyIndex).toBeGreaterThan(-1);
+    expect(leftoverIndex).toBeGreaterThan(stickyIndex);
+  });
+});

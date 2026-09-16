@@ -48,6 +48,11 @@ export default function MyServiceNotificationsPage() {
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
+    if (window.location.hash !== "#mina-val") return;
+    window.setTimeout(() => document.getElementById("mina-val-toggle")?.focus(), 0);
+  }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#minastatus") return;
     document.getElementById("minastatus")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
@@ -91,7 +96,7 @@ export default function MyServiceNotificationsPage() {
       <div id="mina-val" className="scroll-mt-36">
       <Panel title="E-postaviseringar" description="Personliga val för den dagliga serviceöversikten.">
         <fieldset disabled={loading || saving} className="space-y-4 disabled:opacity-60">
-            <button type="button" onClick={() => setPreferences((current) => ({ ...current, enabled: !current.enabled }))} className={`flex w-full items-start justify-between gap-5 rounded-2xl border p-5 text-left transition ${preferences.enabled ? "border-petroleum-200 bg-petroleum-50/40" : "border-sand-200 bg-sand-50"}`}>
+            <button type="button" id="mina-val-toggle" autoFocus onClick={() => setPreferences((current) => ({ ...current, enabled: !current.enabled }))} className={`flex w-full items-start justify-between gap-5 rounded-2xl border p-5 text-left transition ${preferences.enabled ? "border-petroleum-200 bg-petroleum-50/40" : "border-sand-200 bg-sand-50"}`}>
               <div className="flex gap-4">
                 <div className={`rounded-xl p-3 ${preferences.enabled ? "bg-petroleum-800 text-white" : "bg-white text-ink-500"}`}>{preferences.enabled ? <BellRing className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}</div>
                 <div><p className="font-semibold text-ink-950">Ta emot serviceaviseringar</p><p className="mt-1 text-sm leading-6 text-ink-500">Skickas till {data?.email}. Du kan pausa utskicken utan att ändra organisationens inställningar.</p></div>
@@ -115,7 +120,7 @@ export default function MyServiceNotificationsPage() {
               <div id="minastatus" className="scroll-mt-36">
                 {loading && !data ? <p>Valen hämtas.</p> : <span>{data?.updatedAt ? `Senast ändrad ${dateTime.format(new Date(data.updatedAt))}` : "Standardinställningar används tills du sparar."}</span>}
               </div>
-              <button type="button" onClick={() => void save()} disabled={saving} className="rounded-xl bg-petroleum-800 px-5 py-3 font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara mina val"}</button>
+              <button type="button" onClick={() => void save()} disabled={saving || loading} className="rounded-xl bg-petroleum-800 px-5 py-3 font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara mina val"}</button>
             </div>
         </fieldset>
       </Panel>
