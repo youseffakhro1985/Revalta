@@ -17,9 +17,11 @@ describe("technician next-order time first HTML", () => {
   it("keeps the time form in the first HTML and scrolls to the sticky hash", () => {
     const source = readFileSync(new URL("./technician-next-order-time-form.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="registrera-tid"');
+    expect(source).toContain('id="tid-beskrivning"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#registrera-tid"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("tid-beskrivning")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={saving}");
     expect(source).not.toContain("if (loading) return");

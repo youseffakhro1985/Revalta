@@ -18,6 +18,7 @@ export function TechnicianNextOrderTimeForm({ workOrderId }: TechnicianNextOrder
   useEffect(() => {
     if (window.location.hash !== "#registrera-tid") return;
     document.getElementById("registrera-tid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("tid-beskrivning")?.focus(), 0);
   }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -63,6 +64,7 @@ export function TechnicianNextOrderTimeForm({ workOrderId }: TechnicianNextOrder
       <label className="block">
         <span className="mb-1 block text-[11px] font-semibold text-ink-600">Vad gjordes</span>
         <input
+          id="tid-beskrivning"
           autoFocus
           name="description"
           required
