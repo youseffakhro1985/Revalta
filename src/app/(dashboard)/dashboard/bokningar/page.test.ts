@@ -25,3 +25,20 @@ describe("bokningar leftover create form first HTML", () => {
     expect(source).not.toContain("h-64 animate-pulse rounded-xl bg-sand-100");
   });
 });
+
+describe("bokningar leftover list first HTML", () => {
+  it("keeps leftover bookings in the first HTML without stealing Ny bokning", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="bokningsfilter"');
+    expect(source).toContain('id="bokningslista"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#bokningsfilter"');
+    expect(source).toContain('window.location.hash !== "#bokningslista"');
+    expect(source).toContain('id="ny-bokning"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("Bokningarna hämtas.");
+    expect(source).not.toContain("LoadingState");
+    expect(source).not.toContain("Hämtar bokningar…");
+  });
+});
