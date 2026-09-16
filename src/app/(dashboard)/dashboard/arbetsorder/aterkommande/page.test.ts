@@ -25,3 +25,15 @@ describe("aterkommande leftover list first HTML", () => {
     expect(source).not.toContain("Hämtar scheman…");
   });
 });
+
+describe("aterkommande leftover run history first HTML", () => {
+  it("keeps leftover run history in the first HTML without stealing Nytt schema", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="korhistorik"');
+    expect(source).toContain('window.location.hash !== "#korhistorik"');
+    expect(source).toContain("Körhistoriken hämtas.");
+    expect(source).toContain('id="nytt-schema"');
+    expect(source).toContain('id="schemalista"');
+    expect(source).toContain("scrollIntoView");
+  });
+});
