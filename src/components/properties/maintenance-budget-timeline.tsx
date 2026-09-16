@@ -102,6 +102,11 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
     if (window.location.hash !== "#budgetfilter") return;
     document.getElementById("budgetfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#arsprofil") return;
+    document.getElementById("arsprofil")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const filterOptions = useMemo(() => {
     const actions = data?.actions || [];
@@ -240,6 +245,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+        <div id="arsprofil" className="scroll-mt-36">
         <Panel title="Årsvis investeringsprofil" description={years.length ? `Visar ${years[0]}–${years.at(-1)} i aktiv planversion.` : "Laddar årsvis investeringsprofil för aktiv planversion."}>
           <div className="space-y-3">
             {yearly.map((item) => (
@@ -253,6 +259,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
             ))}
           </div>
         </Panel>
+        </div>
         <Panel title="Ekonomisk status" description="Planvärde per arbetsflöde i vald period.">
           <div className="space-y-4">
             <StatusRow label="Aktiv plan" amount={active} total={Math.max(total, 1)} />
