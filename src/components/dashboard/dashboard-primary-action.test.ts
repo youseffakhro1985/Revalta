@@ -13,6 +13,14 @@ describe("dashboardPrimaryCreateAction", () => {
     });
   });
 
+  it("visar registrera tid på översikten för tekniker", () => {
+    expect(dashboardPrimaryCreateAction("/dashboard", "technician")).toEqual({
+      href: "/dashboard#registrera-tid",
+      label: "Registrera tid",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder", "technician")).toBeNull();
+  });
+
   it("behåller arbetsorderåtgärden inne i arbetsordermodulen men inte i admin- eller skapa-vyn", () => {
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/planering", "admin")).toEqual({
       href: "/dashboard/arbetsorder/planering#arbetsbelastning",
@@ -297,7 +305,7 @@ describe("dashboardPrimaryCreateAction", () => {
   });
 
   it("respekterar rollbehörigheter", () => {
-    expect(dashboardPrimaryCreateAction("/dashboard", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/fastigheter", "viewer")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder", "resident")).toBeNull();
   });

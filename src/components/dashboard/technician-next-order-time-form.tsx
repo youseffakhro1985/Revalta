@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { readResponseJson } from "@/lib/fetch-json";
 import { premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
@@ -14,6 +14,11 @@ export function TechnicianNextOrderTimeForm({ workOrderId }: TechnicianNextOrder
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (window.location.hash !== "#registrera-tid") return;
+    document.getElementById("registrera-tid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,7 +55,7 @@ export function TechnicianNextOrderTimeForm({ workOrderId }: TechnicianNextOrder
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-5 space-y-3 rounded-2xl border border-sand-200 bg-white p-4">
+    <form id="registrera-tid" onSubmit={onSubmit} className="mt-5 scroll-mt-36 space-y-3 rounded-2xl border border-sand-200 bg-white p-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Registrera tid</p>
         <p className="mt-1 text-sm text-ink-600">Samma fältpost som på arbetsordern. Avslut och efterbilder görs där.</p>
@@ -58,6 +63,7 @@ export function TechnicianNextOrderTimeForm({ workOrderId }: TechnicianNextOrder
       <label className="block">
         <span className="mb-1 block text-[11px] font-semibold text-ink-600">Vad gjordes</span>
         <input
+          autoFocus
           name="description"
           required
           maxLength={500}

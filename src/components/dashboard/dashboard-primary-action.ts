@@ -1,4 +1,4 @@
-import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageBilling, canManageCompany, canManageIntegrations, canManageLeases, canManageTeam, canManageTickets, canManageWorkOrderFinance, canViewAudit, canViewOperations } from "@/lib/permissions";
+import { canAssignWorkOrders, canCreateProperties, canManageAccessCredentials, canManageBilling, canManageCompany, canManageIntegrations, canManageLeases, canManageTeam, canManageTickets, canManageWorkOrderFinance, canViewAudit, canViewOperations, canWriteOperations } from "@/lib/permissions";
 
 export type DashboardPrimaryCreateAction = {
   href: string;
@@ -43,6 +43,9 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   }
   if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin && !recurringSchedules && !operationsOverview && !technicianPlanning))) {
     return { href: `${workOrdersRoot}/ny`, label: "Ny arbetsorder" };
+  }
+  if (canWriteOperations(role) && current === "/dashboard") {
+    return { href: "/dashboard#registrera-tid", label: "Registrera tid" };
   }
   if (canAssignWorkOrders(role) && current === `${workOrdersRoot}/aterkommande`) {
     return { href: `${workOrdersRoot}/aterkommande#nytt-schema`, label: "Nytt schema" };
