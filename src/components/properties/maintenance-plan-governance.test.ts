@@ -5,9 +5,11 @@ describe("maintenance plan governance hash", () => {
   it("keeps approve and archive actions in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./maintenance-plan-governance.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="godkann-plan"');
+    expect(source).toContain('id="godkann-version"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#godkann-plan"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("godkann-version")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("saving || loading || !data");
     expect(source).toContain("Godkänn version");
@@ -22,6 +24,7 @@ describe("maintenance plan leftover versions first HTML", () => {
     expect(source).toContain('window.location.hash !== "#versionslista"');
     expect(source).toContain("Laddar versionshistorik, godkännanden och arkivering.");
     expect(source).toContain('id="godkann-plan"');
+    expect(source).toContain('id="godkann-version"');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading || !data");
