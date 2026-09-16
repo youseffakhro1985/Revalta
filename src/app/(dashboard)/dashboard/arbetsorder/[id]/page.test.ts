@@ -43,3 +43,12 @@ describe("work order reporting panel first HTML", () => {
     expect(source).toContain("workOrder?.id || id");
   });
 });
+
+describe("work order activity panel first HTML", () => {
+  it("renders comments while the work order is still loading", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain("workOrder || loading ? <OperationalActivityPanel");
+    expect(source).toContain("workOrder?.id || id");
+    expect(source).not.toContain("h-64 animate-pulse rounded-2xl bg-sand-100");
+  });
+});

@@ -77,6 +77,12 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-kommentar") return;
+    document.getElementById("spara-kommentar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, comments]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = body.trim();
@@ -102,14 +108,18 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
     }
   }
 
+  const formLocked = saving || loading;
+
   return (
     <div className="grid gap-6 xl:grid-cols-2">
       <Panel title="Kommentarer" description="Samla beslut, intern dialog och information som kan delas vidare.">
         <div className="space-y-5">
           {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
-          <form onSubmit={submit} className="space-y-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
+          <form id="spara-kommentar" onSubmit={submit} className="scroll-mt-36 space-y-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
+            <fieldset disabled={formLocked} className="contents">
             <textarea
+              autoFocus
               value={body}
               onChange={(event) => setBody(event.target.value)}
               maxLength={5000}
@@ -123,11 +133,12 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
                 <input type="checkbox" checked={isInternal} onChange={(event) => setIsInternal(event.target.checked)} className="h-4 w-4 rounded border-sand-300 text-petroleum-700 focus:ring-petroleum-500" />
                 Endast internt
               </label>
-              <button disabled={saving || !body.trim()} className={`${premiumPrimaryButtonClass} inline-flex items-center justify-center gap-2`}>
+              <button disabled={formLocked || !body.trim()} className={`${premiumPrimaryButtonClass} inline-flex items-center justify-center gap-2`}>
                 <Send className="h-4 w-4" />
                 {saving ? "Sparar…" : "Spara kommentar"}
               </button>
             </div>
+            </fieldset>
           </form>
 
           {loading ? (

@@ -13,3 +13,12 @@ describe("project detail save hash", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-96 animate-pulse rounded-2xl bg-sand-100\" />");
   });
 });
+
+describe("project activity panel first HTML", () => {
+  it("renders comments while the project is still loading", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain("project || loading ? <OperationalActivityPanel");
+    expect(source).toContain("project?.id || id");
+    expect(source).not.toContain("h-64 animate-pulse rounded-2xl bg-sand-100");
+  });
+});
