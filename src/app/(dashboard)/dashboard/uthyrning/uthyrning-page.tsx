@@ -186,6 +186,11 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#objektlista") return;
     document.getElementById("objektlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, properties]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#avtalshistorik") return;
+    document.getElementById("avtalshistorik")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, leases]);
 
   const currentLeaseByUnit = useMemo(() => {
     const map = new Map<string, Lease>();
@@ -645,8 +650,9 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
         </div>
       </Panel>
 
+      <div id="avtalshistorik" className="scroll-mt-36">
       <Panel title="Avtalshistorik" description="Utkast, aktiva, avslutade och makulerade avtal med samma befintliga redigerings- och återställningsflöden." bodyClassName="p-0">
-        {loading ? <p className="p-6 text-sm text-ink-500">Hämtar avtal…</p> : leases.length === 0 ? <EmptyState title="Inga avtal registrerade" description={canManage ? "Skapa det första avtalet via knappen Nytt avtal." : "Avtal visas här när de registreras."} /> : (
+        {loading ? <p className="p-6 text-sm text-ink-500">Avtalen hämtas.</p> : leases.length === 0 ? <EmptyState title="Inga avtal registrerade" description={canManage ? "Skapa det första avtalet via knappen Nytt avtal." : "Avtal visas här när de registreras."} /> : (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
@@ -675,6 +681,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
           </>
         )}
       </Panel>
+      </div>
     </div>
   );
 }
