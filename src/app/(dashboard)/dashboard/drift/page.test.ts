@@ -17,3 +17,18 @@ describe("drift secrets hash", () => {
     expect(source.slice(secretsIndex - 80, secretsIndex)).not.toContain("{health ?");
   });
 });
+
+describe("drift leftover health first HTML", () => {
+  it("keeps leftover health in the first HTML without stealing secrets", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="systemhalsa"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#systemhalsa"');
+    expect(source).toContain('id="kritiska-secrets"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("Systemhälsan hämtas.");
+    expect(source).toContain("Kritiska secrets hämtas.");
+    expect(source).not.toContain("h-64 animate-pulse rounded-2xl bg-sand-100");
+    expect(source).not.toContain("h-24 animate-pulse rounded-2xl border border-sand-100 bg-sand-50");
+  });
+});

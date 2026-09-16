@@ -101,6 +101,11 @@ export default function OperationsPage() {
     if (window.location.hash !== "#kritiska-secrets") return;
     document.getElementById("kritiska-secrets")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, health]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#systemhalsa") return;
+    document.getElementById("systemhalsa")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, health]);
 
   const env = health?.env || {};
   const criticalMissing = criticalLabels.filter((item) => !env[item.key]).map((item) => item.label);
@@ -133,6 +138,7 @@ export default function OperationsPage() {
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
 
+      <div id="systemhalsa" className="scroll-mt-36">
       {health ? (
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -220,8 +226,9 @@ export default function OperationsPage() {
           </Panel>
         </>
       ) : (
-        <div className="h-64 animate-pulse rounded-2xl bg-sand-100" />
+        <p className="text-sm text-ink-500">Systemhälsan hämtas.</p>
       )}
+      </div>
 
       <div id="kritiska-secrets" className="scroll-mt-36">
         <Panel title="Kritiska secrets" description="Måste finnas i Vercel Production för trygg drift.">
@@ -232,11 +239,7 @@ export default function OperationsPage() {
               ))}
             </div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2" aria-hidden="true">
-              {criticalLabels.map((item) => (
-                <div key={item.key} className="h-24 animate-pulse rounded-2xl border border-sand-100 bg-sand-50" />
-              ))}
-            </div>
+            <p className="text-sm text-ink-500">Kritiska secrets hämtas.</p>
           )}
         </Panel>
       </div>
