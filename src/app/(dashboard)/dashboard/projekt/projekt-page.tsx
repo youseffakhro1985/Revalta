@@ -118,6 +118,11 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#projektfilter") return;
     document.getElementById("projektfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, projects]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#projektlista") return;
+    document.getElementById("projektlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, projects]);
 
   const visibleProjects = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -238,6 +243,7 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
       </Panel>
     </section>
 
+    <div id="projektlista" className="scroll-mt-36">
     <Panel title="Projektportfölj" description={`${visibleProjects.length} projekt visas på sida ${pagination.page} av ${pagination.totalPages}`} bodyClassName="p-0">
       {loading ? <p className="p-6 text-sm text-ink-500">Projekten hämtas.</p> : visibleProjects.length === 0 ? <EmptyState title="Inga projekt matchar urvalet" description="Justera filtren, byt sida eller skapa ett nytt projekt." /> : <>
         <div className="divide-y divide-sand-100">{visibleProjects.map((project) => {
@@ -271,5 +277,6 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
         <nav className="flex flex-col gap-3 border-t border-sand-100 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between" aria-label="Projektpaginering"><p className="text-ink-500">Visar sida {pagination.page} av {pagination.totalPages} · {pagination.total} projekt totalt</p><div className="flex gap-2"><button type="button" disabled={loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className={premiumSecondaryButtonClass}>Föregående</button><button type="button" disabled={loading || page >= pagination.totalPages} onClick={() => setPage((current) => Math.min(pagination.totalPages, current + 1))} className={premiumSecondaryButtonClass}>Nästa</button></div></nav>
       </>}
     </Panel>
+    </div>
   </div>;
 }
