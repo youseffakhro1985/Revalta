@@ -89,6 +89,11 @@ export default function BudgetPage() {
     if (window.location.hash !== "#budgetfilter") return;
     document.getElementById("budgetfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, entries]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#budgetlista") return;
+    document.getElementById("budgetlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, entries]);
 
   const years = useMemo(
     () => [...new Set(entries.map((item) => String(item.year || "")).filter(Boolean))].sort((a, b) => Number(b) - Number(a)),
@@ -351,6 +356,7 @@ export default function BudgetPage() {
       ) : null}
 
       <Panel title="Ekonomiskt utfall" description={`${visibleEntries.length} av ${entries.length} budgetrader i vald vy`} bodyClassName="p-0">
+        <div id="budgetlista" className="scroll-mt-36">
         {loading ? <p className="p-6 text-sm text-ink-500">Budgetraderna hämtas.</p> : visibleEntries.length === 0 ? <EmptyState title="Inga budgetrader matchar urvalet" description="Justera filtren eller lägg till en ny budgetrad." /> : (
           <div className="divide-y divide-sand-100">{visibleEntries.map((item) => {
             const itemVariance = Number(item.actual || 0) - Number(item.budget || 0);
@@ -388,6 +394,7 @@ export default function BudgetPage() {
             </article>;
           })}</div>
         )}
+        </div>
       </Panel>
     </section>
   </div>;
