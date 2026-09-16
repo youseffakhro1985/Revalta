@@ -79,6 +79,11 @@ export function AcceptInviteForm({ token, reason }: { token: string; reason: str
     if (window.location.hash !== "#accept-invite-form") return;
     document.getElementById("accept-invite-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loadingPreview, preview]);
+  useEffect(() => {
+    if (loadingPreview) return;
+    if (window.location.hash !== "#inbjudan") return;
+    document.getElementById("inbjudan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loadingPreview, preview]);
 
   const residentInvite = isResident(preview?.role || "");
   const copy = useMemo(() => {
@@ -153,15 +158,18 @@ export function AcceptInviteForm({ token, reason }: { token: string; reason: str
       }
     >
       {preview ? (
-        <div className="mt-5 rounded-2xl border border-sand-200 bg-sand-50 px-4 py-3 text-sm text-ink-600">
+        <div id="inbjudan" className="scroll-mt-36 mt-5 rounded-2xl border border-sand-200 bg-sand-50 px-4 py-3 text-sm text-ink-600">
           <p className="font-medium text-ink-800">{preview.email}</p>
           <p className="mt-1">{preview.companyName}</p>
           <p className="mt-1">{residentInvite ? "Roll: Boende" : `Roll: ${preview.role}`}</p>
         </div>
+      ) : loadingPreview ? (
+        <div id="inbjudan" className="scroll-mt-36">
+          <p className="mt-6 text-sm text-ink-500">Inbjudan hämtas.</p>
+        </div>
       ) : null}
       {error ? <AuthAlert>{error}</AuthAlert> : null}
       {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
-      {loadingPreview ? <p className="mt-6 text-sm text-ink-500">Inbjudan hämtas.</p> : null}
       {token ? (
         <form
           id="accept-invite-form"
