@@ -93,6 +93,11 @@ export default function TechnicianPlanningPage() {
     if (window.location.hash !== "#arbetsbelastning") return;
     document.getElementById("arbetsbelastning")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, orders]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#belastningslista") return;
+    document.getElementById("belastningslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, orders]);
 
   const active = useMemo(() => orders.filter((item) => !terminal.has(item.status)), [orders]);
   const groups = useMemo<Group[]>(() => {
@@ -167,7 +172,8 @@ export default function TechnicianPlanningPage() {
 
     <div id="arbetsbelastning" className="scroll-mt-36">
     <Panel title="Arbetsbelastning per ansvarig" description="Ej tilldelade visas först, därefter teammedlemmar med högst SLA-risk." bodyClassName="p-4 sm:p-6">
-      {loading && !orders.length ? <div className="h-64 animate-pulse rounded-xl bg-sand-50" /> : null}
+      <div id="belastningslista" className="scroll-mt-36">
+      {loading && !orders.length ? <p className="p-2 text-sm text-ink-500">Arbetsbelastningen hämtas.</p> : null}
       {!loading && groups.length === 0 ? <EmptyState title="Inga aktiva arbetsordrar" description="När arbetsordrar skapas eller planeras visas teamets arbetsbelastning här." /> : null}
       <div className="grid gap-5 xl:grid-cols-2">
         {groups.map((group) => <section key={group.key} className={`overflow-hidden rounded-2xl border bg-white ${group.unassigned ? "border-warning-200" : "border-sand-200"}`}>
@@ -202,6 +208,7 @@ export default function TechnicianPlanningPage() {
             ))}
           </div>
         </section>)}
+      </div>
       </div>
     </Panel>
     </div>
