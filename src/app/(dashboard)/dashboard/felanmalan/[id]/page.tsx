@@ -192,6 +192,11 @@ export default function TicketDetailPage() {
     if (window.location.hash !== "#spara-arende") return;
     document.getElementById("spara-arende")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, ticket]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#arendedetaljer") return;
+    document.getElementById("arendedetaljer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, ticket]);
 
   async function updateTicket(event: React.FormEvent) {
     event.preventDefault();
@@ -450,6 +455,7 @@ export default function TicketDetailPage() {
     {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
 
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div id="arendedetaljer" className="scroll-mt-36">
       {ticket ? (
       <div className="space-y-6">
         <Panel title="Ärendedetaljer" description="Samlad information, dokumentation och historik för ärendet." bodyClassName="space-y-6 p-6 sm:p-8">
@@ -503,7 +509,8 @@ export default function TicketDetailPage() {
           <div className="border-t border-sand-200 pt-6"><h3 className="font-semibold text-ink-900">Tidslinje</h3><div className="mt-4 space-y-3">{timeline.map((item) => <div key={`${item.type}-${item.id}`} className="flex gap-3"><Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-petroleum-600" /><div><p className="text-sm font-semibold text-ink-900">{item.title}</p><p className="mt-1 text-sm text-ink-500">{item.description}</p><p className="mt-1 text-xs text-ink-500">{dateFormatter.format(new Date(item.created_at))}</p></div></div>)}</div></div>
         </Panel>
       </div>
-      ) : <div className="h-72 animate-pulse rounded-3xl bg-sand-100" aria-hidden="true" />}
+      ) : <p className="text-sm text-ink-500">Ärendedetaljerna hämtas.</p>}
+      </div>
 
       <aside className="space-y-6">
         <Panel title="Arbetsorder" description="Operativ åtgärd kopplad till ärendet." bodyClassName="p-6">
