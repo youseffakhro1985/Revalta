@@ -66,6 +66,11 @@ export default function ProjectDetailPage() {
     if (window.location.hash !== "#spara-projekt") return;
     document.getElementById("spara-projekt")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, project]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#projektnyckeltal") return;
+    document.getElementById("projektnyckeltal")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, project]);
 
   async function save(formData: FormData) {
     setSaving(true); setError(""); setSuccess("");
@@ -105,7 +110,7 @@ export default function ProjectDetailPage() {
     <PageHeader eyebrow="Projektstyrning" title={project?.name || "Projekt"} description={project?.description || "Samlad projektstyrning för tidsplan, risk, ekonomi, dokument och beslut."} />
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
-    {loading && !project ? <div className="h-40 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+    <div id="projektnyckeltal" className="scroll-mt-36">
     {project ? (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={Building2} label="Fastighet" value={project.property.name} hint={`${project.property.address}, ${project.property.city}`} />
@@ -113,7 +118,8 @@ export default function ProjectDetailPage() {
       <MetricCard icon={CircleDollarSign} label="Prognos" value={money.format(forecast)} hint={`Budget ${money.format(budget)}`} />
       <MetricCard icon={ShieldAlert} label="Risk och avvikelse" value={riskLabels[project.risk] || project.risk} hint={money.format(deviation)} />
     </section>
-    ) : null}
+    ) : <p className="text-sm text-ink-500">Nyckeltalen hämtas.</p>}
+    </div>
 
     <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
       <div id="spara-projekt" className="scroll-mt-36">
