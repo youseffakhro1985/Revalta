@@ -337,7 +337,7 @@ export default function WorkOrderDetailPage() {
         ) : null}
       </Panel>
       </div>
-      {workOrder ? <OperationalActivityPanel entityType="work_order" entityId={workOrder.id} /> : <div className="h-64 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
+      {workOrder || loading ? <OperationalActivityPanel entityType="work_order" entityId={workOrder?.id || id} /> : null}
     </section>
 
     {workOrder ? (

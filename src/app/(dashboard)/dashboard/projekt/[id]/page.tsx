@@ -157,7 +157,7 @@ export default function ProjectDetailPage() {
         ) : null}
       </Panel>
       </div>
-      {project ? <OperationalActivityPanel entityType="project" entityId={project.id} /> : <div className="h-64 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
+      {project || loading ? <OperationalActivityPanel entityType="project" entityId={project?.id || id} /> : null}
     </section>
 
     {project ? <OperationalDocumentsPanel entityType="project" entityId={project.id} /> : null}
