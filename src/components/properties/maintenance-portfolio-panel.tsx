@@ -86,6 +86,11 @@ export function MaintenancePortfolioPanel() {
     if (window.location.hash !== "#portfoljfilter") return;
     document.getElementById("portfoljfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, rows]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#portfoljbehov") return;
+    document.getElementById("portfoljbehov")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, rows]);
 
   const options = useMemo(() => ({
     properties: [...new Map(rows.map((row) => [row.property_id, row.property_name])).entries()].sort((a, b) => a[1].localeCompare(b[1], "sv")),
@@ -166,7 +171,8 @@ export function MaintenancePortfolioPanel() {
       </Panel>
       </div>
 
-      {loading && rows.length === 0 ? <div className="h-96 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+      <div id="portfoljbehov" className="scroll-mt-36 space-y-6">
+      {loading && rows.length === 0 ? <p className="text-sm text-ink-500">Portföljen hämtas.</p> : null}
       {!loading && rows.length === 0 ? <EmptyState title="Inga aktiva underhållsplaner" description="Aktivera minst en plan för att bygga portföljbudgeten." /> : null}
       {rows.length > 0 ? (
         <>
@@ -213,6 +219,7 @@ export function MaintenancePortfolioPanel() {
       </Panel>
         </>
       ) : null}
+      </div>
     </section>
   );
 }
