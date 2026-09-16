@@ -62,6 +62,11 @@ export function LeaseHandoverCenter() {
     if (window.location.hash !== "#spara-overlamning") return;
     document.getElementById("spara-overlamning")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, detail]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#overlamninglista") return;
+    document.getElementById("overlamninglista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, detail]);
 
   const isLegacy = detail?.source === "legacy";
   const canEdit = Boolean(detail?.permissions.canManage) && !isLegacy;
@@ -101,6 +106,7 @@ export function LeaseHandoverCenter() {
     <div className="space-y-6">
       <div id="valj-avtal" className="scroll-mt-36 flex flex-col gap-3 md:flex-row md:items-end"><label className="flex-1"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Avtal</span><select autoFocus aria-label="Välj avtal för överlämning" className={premiumFieldClass} value={leaseId} onChange={(event) => setLeaseId(event.target.value)}><option value="">Välj avtal</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.name}</option>)}</select></label><button type="button" onClick={() => void loadDetail(leaseId)} disabled={!leaseId || loading} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button></div>
       {error ? <InlineAlert>{error}</InlineAlert> : null}{success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
+      <div id="overlamninglista" className="scroll-mt-36">
       {loading ? <p className="text-sm text-ink-500">Överlämningen hämtas.</p> : !detail ? <EmptyState title="Välj ett avtal" description="Pågående och avslutade avtal kan hanteras här." /> : <>
         {isLegacy ? <InlineAlert tone="warning">{LEGACY_BACKFILL}</InlineAlert> : null}
         <div className="grid gap-4 md:grid-cols-3"><Summary label="Avtal" value={detail.lease.lease_number} /><Summary label="Objekt" value={`${detail.lease.property.name} · ${detail.lease.unit.designation}`} /><Summary label="Obligatoriskt klart" value={`${progress} %`} /></div>
@@ -110,6 +116,7 @@ export function LeaseHandoverCenter() {
         <textarea placeholder="Övergripande anteckning" aria-label="Övergripande anteckning" disabled={!canEdit} className={premiumTextareaClass} value={detail.handover.generalNote} onChange={(event) => update({ generalNote: event.target.value })} />
         <section className="rounded-2xl border border-sand-200 p-5"><div className="flex items-center gap-2"><History className="h-5 w-5 text-petroleum-700" /><h3 className="font-semibold text-ink-900">Historik</h3></div>{detail.history.length === 0 ? <p className="mt-3 text-sm text-ink-500">Ingen historik registrerad ännu.</p> : <div className="mt-3 divide-y divide-sand-100">{detail.history.map((item) => <div key={item.id} className="py-3 text-sm"><p className="font-medium text-ink-800">{item.action === "lease_handover.completed" ? "Överlämning slutförd" : "Överlämning uppdaterad"}</p><p className="mt-1 text-xs text-ink-500">{date.format(new Date(item.created_at))} · {item.actor?.name || item.actor?.email || "System"}</p></div>)}</div>}</section>
       </>}
+      </div>
       <div id="spara-overlamning" className="scroll-mt-36 flex flex-col gap-3 sm:flex-row sm:justify-end">
         <button type="button" disabled={saving || loading || !canEdit} onClick={() => void save(false)} className="rounded-xl border border-petroleum-700 px-4 py-2.5 text-sm font-semibold text-petroleum-800">Spara utkast</button>
         <button type="button" disabled={saving || loading || !canEdit || Boolean(detail?.handover.completedAt)} onClick={() => void save(true)} className={premiumPrimaryButtonClass}>{detail?.handover.completedAt ? "Överlämning slutförd" : "Slutför överlämning"}</button>
