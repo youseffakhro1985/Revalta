@@ -222,24 +222,20 @@ export default function BookingsPage() {
         {canManage || loading ? (
           <div id="ny-bokning" className="scroll-mt-36">
           <Panel title="Ny bokning" description="Registrera resurs, boende och tidsintervall." className="h-fit xl:sticky xl:top-[112px]">
-            {canManage ? (
             <form onSubmit={submit} className="space-y-4">
-              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fastighet</span><select required aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.city}</option>)}</select></label>
-              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Resurs</span><select aria-label="Resurstyp" value={form.resource} onChange={(event) => setForm({ ...form, resource: event.target.value })} className={premiumFieldClass}>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select></label>
+              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fastighet</span><select required disabled={saving || loading || !canManage} aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.city}</option>)}</select></label>
+              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Resurs</span><select disabled={saving || loading || !canManage} aria-label="Resurstyp" value={form.resource} onChange={(event) => setForm({ ...form, resource: event.target.value })} className={premiumFieldClass}>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select></label>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Boende</span><input required autoFocus aria-label="Boendes namn" placeholder="Namn" value={form.residentName} onChange={(event) => setForm({ ...form, residentName: event.target.value })} className={premiumFieldClass} /></label>
-                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Lägenhet/lokal</span><input aria-label="Lägenhet/lokal" placeholder="Exempel: 1203" value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} className={premiumFieldClass} /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Boende</span><input required autoFocus disabled={saving || loading || !canManage} aria-label="Boendes namn" placeholder="Namn" value={form.residentName} onChange={(event) => setForm({ ...form, residentName: event.target.value })} className={premiumFieldClass} /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Lägenhet/lokal</span><input disabled={saving || loading || !canManage} aria-label="Lägenhet/lokal" placeholder="Exempel: 1203" value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} className={premiumFieldClass} /></label>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Start</span><input required type="datetime-local" aria-label="Starttid" value={form.start} onChange={(event) => setForm({ ...form, start: event.target.value })} className={premiumFieldClass} /></label>
-                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Slut</span><input required type="datetime-local" aria-label="Sluttid" value={form.end} onChange={(event) => setForm({ ...form, end: event.target.value })} className={premiumFieldClass} /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Start</span><input required type="datetime-local" disabled={saving || loading || !canManage} aria-label="Starttid" value={form.start} onChange={(event) => setForm({ ...form, start: event.target.value })} className={premiumFieldClass} /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Slut</span><input required type="datetime-local" disabled={saving || loading || !canManage} aria-label="Sluttid" value={form.end} onChange={(event) => setForm({ ...form, end: event.target.value })} className={premiumFieldClass} /></label>
               </div>
-              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Anteckning</span><textarea aria-label="Anteckning" placeholder="Valfri information om bokningen" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} className={premiumTextareaClass} /></label>
-              <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Registrera bokning"}</button>
+              <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Anteckning</span><textarea disabled={saving || loading || !canManage} aria-label="Anteckning" placeholder="Valfri information om bokningen" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} className={premiumTextareaClass} /></label>
+              <button disabled={saving || loading || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Registrera bokning"}</button>
             </form>
-            ) : (
-              <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
-            )}
           </Panel>
           </div>
         ) : null}
