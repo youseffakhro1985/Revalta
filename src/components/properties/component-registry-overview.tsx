@@ -51,6 +51,11 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
     if (window.location.hash !== "#uppdatera-register") return;
     document.getElementById("uppdatera-register")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#registerlista") return;
+    document.getElementById("registerlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const replacementSchedule = useMemo(() => {
     if (!data) return [];
@@ -77,8 +82,9 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
         </button>
       </div>
 
-      {loading && !data ? <p className="text-sm text-ink-500">Registret hämtas.</p> : null}
       {error ? <InlineAlert>{error}</InlineAlert> : null}
+      <div id="registerlista" className="scroll-mt-36">
+      {loading && !data ? <p className="text-sm text-ink-500">Registret hämtas.</p> : null}
       {!loading && !error && (!data || data.assets.length === 0) ? (
         <EmptyState title="Inga komponenter registrerade" description="Komplettera tekniska installationer med livslängd, skick och återanskaffningsvärde." />
       ) : null}
@@ -121,6 +127,7 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
         </Panel>
       </div>
       </> : null}
+      </div>
     </section>
   );
 }
