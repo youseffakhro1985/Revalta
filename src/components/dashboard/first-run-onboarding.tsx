@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Check, ChevronRight, Circle, Loader2 } from "lucide-react";
-import type { OnboardingProgress, OnboardingStep } from "@/lib/onboarding";
+import { buildOnboardingProgress, type OnboardingProgress, type OnboardingStep } from "@/lib/onboarding";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type OnboardingResponse = {
@@ -12,13 +12,24 @@ type OnboardingResponse = {
   error?: string;
 };
 
+const loadingProgress = buildOnboardingProgress({
+  companyConfigured: false,
+  propertyCount: 0,
+  activeTeamMembers: 0,
+  pendingTeamInvites: 0,
+  ticketIntakeVerified: false,
+  notificationSettingsUpdatedAt: null,
+});
+
 function StepRow({
   step,
   verifying,
+  loading,
   onVerifyTicketIntake,
 }: {
   step: OnboardingStep;
   verifying: boolean;
+  loading: boolean;
   onVerifyTicketIntake: () => void;
 }) {
   const isTicketIntake = step.id === "ticket-intake";
@@ -57,8 +68,9 @@ function StepRow({
         {isTicketIntake && !step.completed ? (
           <button
             type="button"
+            id="verifiera-felanmalan"
             onClick={onVerifyTicketIntake}
-            disabled={verifying}
+            disabled={verifying || loading}
             className="inline-flex h-8 items-center gap-1 rounded-md bg-petroleum-800 px-2 text-xs font-semibold text-white transition hover:bg-petroleum-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {verifying ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" /> : null}
@@ -103,6 +115,13 @@ export function FirstRunOnboarding() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#kom-igang") return;
+    document.getElementById("kom-igang")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("verifiera-felanmalan")?.focus(), 0);
+  }, [loading, eligible, progress, error]);
+
   async function verifyTicketIntake() {
     setVerifying(true);
     setError("");
@@ -125,10 +144,12 @@ export function FirstRunOnboarding() {
     }
   }
 
-  if (loading || !eligible || !progress || progress.complete) return null;
+  if (!loading && !error && (!eligible || !progress || progress.complete)) return null;
+
+  const display = progress ?? loadingProgress;
 
   return (
-    <section className="overflow-hidden rounded-[18px] border border-sand-200 bg-white shadow-premium-sm" aria-labelledby="first-run-title">
+    <section id="kom-igang" className="scroll-mt-36 overflow-hidden rounded-[18px] border border-sand-200 bg-white shadow-premium-sm" aria-labelledby="first-run-title">
       <div className="border-b border-sand-100 px-4 py-3 sm:px-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -141,12 +162,12 @@ export function FirstRunOnboarding() {
           </div>
 
           <span className="inline-flex shrink-0 items-center rounded-full border border-petroleum-100 bg-petroleum-50 px-2 py-0.5 text-[11px] font-semibold text-petroleum-800">
-            {progress.completedCount}/{progress.totalCount} klara
+            {display.completedCount}/{display.totalCount} klara
           </span>
         </div>
 
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-sand-100" aria-label={`${progress.percent} procent av onboarding klar`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
-          <div className="h-full rounded-full bg-petroleum-600 transition-[width] duration-300" style={{ width: `${progress.percent}%` }} />
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-sand-100" aria-label={`${display.percent} procent av onboarding klar`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={display.percent}>
+          <div className="h-full rounded-full bg-petroleum-600 transition-[width] duration-300" style={{ width: `${display.percent}%` }} />
         </div>
       </div>
 
@@ -157,8 +178,8 @@ export function FirstRunOnboarding() {
       ) : null}
 
       <ol className="px-4 py-0.5 sm:px-5">
-        {progress.steps.map((step) => (
-          <StepRow key={step.id} step={step} verifying={verifying} onVerifyTicketIntake={verifyTicketIntake} />
+        {display.steps.map((step) => (
+          <StepRow key={step.id} step={step} verifying={verifying} loading={loading} onVerifyTicketIntake={verifyTicketIntake} />
         ))}
       </ol>
     </section>
