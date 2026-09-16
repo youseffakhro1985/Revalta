@@ -83,6 +83,11 @@ export default function VendorsPage() {
     if (window.location.hash !== "#ny-leverantor") return;
     document.getElementById("ny-leverantor")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#leverantorfilter") return;
+    document.getElementById("leverantorfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, vendors]);
 
   function startEdit(vendor: Vendor) {
     setEditingId(vendor.id);
@@ -228,6 +233,7 @@ export default function VendorsPage() {
       <section className="grid items-start gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
         <Panel title="Lägg till leverantör" description="Registrera kontakt, kategori och avtalsbevakning." className="scroll-mt-36 xl:sticky xl:top-[118px]">
           <form id="ny-leverantor" onSubmit={submit} className="space-y-4">
+            <fieldset disabled={saving || loading} className="contents">
             <input required autoFocus placeholder="Företagsnamn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={premiumFieldClass} aria-label="Företagsnamn" />
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={premiumFieldClass} aria-label="Kategori">{categories.map((item) => <option key={item}>{item}</option>)}</select>
             <input placeholder="Kontaktperson" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className={premiumFieldClass} aria-label="Kontaktperson" />
@@ -235,21 +241,22 @@ export default function VendorsPage() {
             <input placeholder="Avtalsnamn" value={form.contractTitle} onChange={(e) => setForm({ ...form, contractTitle: e.target.value })} className={premiumFieldClass} aria-label="Avtalsnamn" />
             <div className="grid gap-3 sm:grid-cols-2"><input type="number" min="0" placeholder="Årsvärde exkl. moms" value={form.contractValue} onChange={(e) => setForm({ ...form, contractValue: e.target.value })} className={premiumFieldClass} aria-label="Årsvärde exkl. moms" /><input type="number" min="0" placeholder="Uppsägning månader" value={form.noticeMonths} onChange={(e) => setForm({ ...form, noticeMonths: e.target.value })} className={premiumFieldClass} aria-label="Uppsägning månader" /></div>
             <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className={premiumFieldClass} aria-label="Slutdatum" />
-            <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara leverantör"}</button>
+            <button className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara leverantör"}</button>
+            </fieldset>
           </form>
         </Panel>
 
         <Panel title="Leverantörsregister" description="Sök leverantörer, avtal, kategorier och kontaktpersoner." bodyClassName="p-0">
-          <div className="border-b border-sand-200 bg-sand-50/55 p-5">
+          <div id="leverantorfilter" className="scroll-mt-36 border-b border-sand-200 bg-sand-50/55 p-5">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" />
-              <input placeholder="Sök leverantör, kategori, avtal eller kontaktperson" value={query} onChange={(e) => setQuery(e.target.value)} className={`${premiumFieldClass} pl-10`} aria-label="Sök leverantör, kategori, avtal eller kontaktperson" />
+              <input disabled={loading} placeholder="Sök leverantör, kategori, avtal eller kontaktperson" value={query} onChange={(e) => setQuery(e.target.value)} className={`${premiumFieldClass} pl-10`} aria-label="Sök leverantör, kategori, avtal eller kontaktperson" />
             </div>
             <p className="mt-2 text-xs text-ink-500">{visible.length} av {vendors.length} leverantörer visas</p>
           </div>
 
           {loading ? (
-            <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div>
+            <p className="p-6 text-sm text-ink-500">Leverantörerna hämtas.</p>
           ) : visible.length === 0 ? (
             <EmptyState title="Inga leverantörer matchar sökningen" description="Rensa sökningen eller registrera en ny leverantör." />
           ) : (
