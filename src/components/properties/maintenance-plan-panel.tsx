@@ -48,6 +48,7 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
     if (loading) return;
     if (window.location.hash !== "#spara-underhallsplan") return;
     document.getElementById("spara-underhallsplan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("atgard-titel")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -123,7 +124,7 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
           </>:<>
             <input type="hidden" name="action" value="action.create"/><input type="hidden" name="planId" value={card.activePlan?.id||card.plans[0]?.id||""}/>
             {!card.activePlan&&card.plans.length>0?<InlineAlert tone="warning">Åtgärden läggs i senaste planutkastet. Aktivera planen när den är granskad.</InlineAlert>:null}
-            <Field label="Åtgärd"><input autoFocus required name="title" className={premiumFieldClass} placeholder="Ex. Omläggning av tak"/></Field>
+            <Field label="Åtgärd"><input id="atgard-titel" autoFocus required name="title" className={premiumFieldClass} placeholder="Ex. Omläggning av tak"/></Field>
             <div className="grid grid-cols-2 gap-3"><Field label="Kategori"><select name="category" className={premiumFieldClass}>{categories.map(c=><option key={c}>{c}</option>)}</select></Field><Field label="Planerat år"><input required name="plannedYear" type="number" defaultValue={card.activePlan?.base_year||new Date().getFullYear()} className={premiumFieldClass}/></Field></div>
             <Field label="Kostnad exkl. moms"><input required name="estimatedCost" type="number" min="0" step="1000" className={premiumFieldClass} placeholder="0"/></Field>
             <div className="grid grid-cols-2 gap-3"><Field label="Prioritet"><select name="priority" defaultValue="normal" className={premiumFieldClass}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="urgent">Akut</option></select></Field><Field label="Risk"><select name="risk" defaultValue="low" className={premiumFieldClass}><option value="low">Låg</option><option value="medium">Medel</option><option value="high">Hög</option><option value="critical">Kritisk</option></select></Field></div>
