@@ -346,7 +346,7 @@ export default function WorkOrderDetailPage() {
     </Panel>
     ) : null}
 
-    {workOrder ? <WorkOrderExecutionPanel workOrderId={workOrder.id} /> : null}
+    {workOrder || loading ? <WorkOrderExecutionPanel workOrderId={workOrder?.id || id} /> : null}
     {capabilities.canViewFinance || loading ? <section id="ekonomi" aria-label="Ekonomi och fakturering" className="scroll-mt-36 space-y-3">
       <div>
         <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>

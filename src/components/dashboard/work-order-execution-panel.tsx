@@ -110,6 +110,12 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-utforande") return;
+    document.getElementById("spara-utforande")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, checklist]);
+
   async function post(payload: Record<string, unknown>, message: string, reset?: () => void) {
     setSaving(true);
     setError("");
@@ -138,13 +144,13 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
   const minutes = summary.total_minutes % 60;
   const lifecycleLocked = isWorkOrderExecutionLocked(completion.status);
   const canMutate = canMutateWorkOrderExecution(completion.status, canManage);
+  const showMutate = canMutate || loading;
+  const formLocked = saving || loading;
   const canFinalize = canMutate && canFinalizeWorkOrderExecution(completion.status) && requiredIncomplete === 0 && completion.after_photo_count > 0;
   const completionLabel = completion.status === "invoiced" ? "Arbetsordern är fakturerad" : completion.status === "cancelled" ? "Arbetsordern är avbruten" : "Arbetsordern är slutförd";
   const formattedFieldCost = summary.total_cost === null ? "Ej tillgängligt" : money.format(summary.total_cost);
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" aria-label="Laddar arbetsorderutförande" />;
-
-  return <div className="space-y-6" aria-busy={saving}>
+  return <div className="space-y-6" aria-busy={saving || loading}>
     <div aria-live="polite" aria-atomic="true">
       {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     </div>
@@ -162,7 +168,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
         <div className={`rounded-2xl border p-4 ${completion.after_photo_count > 0 ? "border-petroleum-200 bg-petroleum-50 text-petroleum-800" : "border-warning-200 bg-warning-50 text-warning-800"}`}><p className="text-xs font-semibold uppercase tracking-wide">Bilddokumentation</p><p className="mt-2 text-sm font-semibold">{completion.before_photo_count} före · {completion.after_photo_count} efter</p></div>
         <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-ink-700"><p className="text-xs font-semibold uppercase tracking-wide">Driftkostnad (fält)</p><p className="mt-2 text-sm font-semibold">{formattedFieldCost}</p></div>
       </div>
-      {canMutate ? <button type="button" disabled={!canFinalize || saving} onClick={() => void post({ action: "completion.finalize" }, "Arbetsordern är slutförd. Tid och material väntar på attestering.")} className={`${premiumPrimaryButtonClass} mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50`} aria-describedby="completion-help">{saving ? "Slutför…" : "Godkänn och slutför arbetsorder"}</button> : null}
+      {showMutate ? <button type="button" disabled={!canFinalize || formLocked} onClick={() => void post({ action: "completion.finalize" }, "Arbetsordern är slutförd. Tid och material väntar på attestering.")} className={`${premiumPrimaryButtonClass} mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50`} aria-describedby="completion-help">{saving ? "Slutför…" : "Godkänn och slutför arbetsorder"}</button> : null}
       <p id="completion-help" className="mt-2 text-xs text-ink-500">{lifecycleLocked ? `${completionLabel}. Fältregistreringarna är låsta.` : !canManage ? "Du har läsbehörighet men kan inte ändra utförandet." : !canFinalizeWorkOrderExecution(completion.status) ? "Arbetsordern måste vara påbörjad innan den kan slutföras." : canFinalize ? "Vid avslut uppdateras driftkostnad och tid/material skapas som attesterbara rader. Finns en leverantör med kontaktadress i registret skickas ett avslutmejl. Kopplat ärende meddelar anmälaren." : "Slutför checklistan och ladda upp minst en efterbild i dokumentpanelen."}</p>
       {(completion.status === "completed" || completion.status === "invoiced") && canViewFinance ? (
         <div className="mt-3">
@@ -175,12 +181,13 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
     </Panel>
 
     <Panel title="Checklista" description="Kontrollpunkter som ska vara klara innan arbetsordern avslutas. Samma mallar som ronder kan fyllas i här.">
-      {canMutate ? <div className="space-y-3">
+      {showMutate ? <div className="space-y-3">
         {templates.length > 0 ? (
           <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); void post({ action: "checklist.applyTemplate", templateId }, "Checklistmallen har lagts till på arbetsordern."); }} className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-[1fr_auto]">
+            <fieldset disabled={formLocked} className="contents">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Sparad rondchecklista</span>
-              <select value={templateId} onChange={(event) => setTemplateId(event.target.value)} disabled={saving} className={premiumFieldClass} aria-label="Välj checklistmall">
+              <select value={templateId} onChange={(event) => setTemplateId(event.target.value)} className={premiumFieldClass} aria-label="Välj checklistmall">
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.name} · {template.itemCount} punkter · {INSPECTION_CHECKLIST_CATEGORY_LABELS[template.category] || template.category}
@@ -188,40 +195,45 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
                 ))}
               </select>
             </label>
-            <button disabled={saving || !templateId} className={`${premiumSecondaryButtonClass} self-end`}>{saving ? "Lägger till…" : "Använd mall"}</button>
+            <button disabled={formLocked || !templateId} className={`${premiumSecondaryButtonClass} self-end`}>{saving ? "Lägger till…" : "Använd mall"}</button>
+            </fieldset>
           </form>
         ) : null}
-        <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); void post({ action: "checklist.create", title: data.get("title"), description: data.get("description"), isRequired: data.get("isRequired") === "on" }, "Kontrollpunkten har lagts till.", () => form.reset()); }} className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2">
-        <input name="title" required placeholder="Ny kontrollpunkt" aria-label="Rubrik för ny kontrollpunkt" disabled={saving} className={premiumFieldClass} />
-        <input name="description" placeholder="Beskrivning eller krav" aria-label="Beskrivning av kontrollpunkt" disabled={saving} className={premiumFieldClass} />
-        <label className="inline-flex min-h-11 items-center gap-2 text-sm text-ink-600"><input name="isRequired" type="checkbox" defaultChecked disabled={saving} className="h-4 w-4 rounded border-sand-300" />Obligatorisk</label>
-        <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till"}</button>
+        <form id="spara-utforande" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); void post({ action: "checklist.create", title: data.get("title"), description: data.get("description"), isRequired: data.get("isRequired") === "on" }, "Kontrollpunkten har lagts till.", () => form.reset()); }} className="grid scroll-mt-36 gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2">
+        <fieldset disabled={formLocked} className="contents">
+        <input autoFocus name="title" required placeholder="Ny kontrollpunkt" aria-label="Rubrik för ny kontrollpunkt" className={premiumFieldClass} />
+        <input name="description" placeholder="Beskrivning eller krav" aria-label="Beskrivning av kontrollpunkt" className={premiumFieldClass} />
+        <label className="inline-flex min-h-11 items-center gap-2 text-sm text-ink-600"><input name="isRequired" type="checkbox" defaultChecked className="h-4 w-4 rounded border-sand-300" />Obligatorisk</label>
+        <button disabled={formLocked} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till"}</button>
+        </fieldset>
       </form>
       </div> : <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">Checklistan visas skrivskyddad i nuvarande behörighet eller livscykelstatus.</div>}
       <div className="mt-4 space-y-3">
         {checklist.length === 0 ? <EmptyState title="Ingen checklista ännu" description={templates.length ? "Välj en sparad rondchecklista eller lägg till kontrollpunkter för kvalitetssäkring och avslut." : "Lägg till kontrollpunkter för kvalitetssäkring och avslut."} /> : checklist.map((item) => {
           const content = <>{item.completed_at ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-petroleum-700" aria-hidden="true" /> : <Square className="mt-0.5 h-5 w-5 shrink-0 text-ink-300" aria-hidden="true" />}<span className="min-w-0"><span className={`block text-sm font-semibold ${item.completed_at ? "text-ink-500 line-through" : "text-ink-900"}`}>{item.title}</span>{item.description ? <span className="mt-1 block text-xs leading-5 text-ink-500">{item.description}</span> : null}{item.is_required ? <span className="mt-2 inline-block rounded-full bg-sand-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500">Obligatorisk</span> : null}</span></>;
-          return canMutate ? <button key={item.id} type="button" disabled={saving} onClick={() => void post({ action: "checklist.complete", itemId: item.id, completed: !item.completed_at }, item.completed_at ? "Kontrollpunkten har återöppnats." : "Kontrollpunkten är klar.")} aria-pressed={Boolean(item.completed_at)} className="flex min-h-14 w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left transition hover:border-petroleum-200 hover:bg-petroleum-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-500 disabled:opacity-60">{content}</button> : <div key={item.id} className="flex min-h-14 w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left">{content}</div>;
+          return canMutate ? <button key={item.id} type="button" disabled={formLocked} onClick={() => void post({ action: "checklist.complete", itemId: item.id, completed: !item.completed_at }, item.completed_at ? "Kontrollpunkten har återöppnats." : "Kontrollpunkten är klar.")} aria-pressed={Boolean(item.completed_at)} className="flex min-h-14 w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left transition hover:border-petroleum-200 hover:bg-petroleum-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-500 disabled:opacity-60">{content}</button> : <div key={item.id} className="flex min-h-14 w-full items-start gap-3 rounded-2xl border border-sand-200 bg-white p-4 text-left">{content}</div>;
         })}
       </div>
     </Panel>
 
     <Panel title="Registrera arbete och kostnader" description={canViewFinance ? "Fältregistrering för driftutfall. Vid avslut förs tid och material över till attesterbara rader under Ekonomi." : "Fältregistrering för operativt arbete. Kostnader och attestering hanteras av behöriga ekonomianvändare."}>
-      {canMutate ? <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      {showMutate ? <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {([
           { type: "time", title: "Arbetstid", icon: Clock3, fields: "time" },
           { type: "material", title: "Material", icon: Package, fields: "cost" },
           { type: "travel", title: "Resa", icon: Route, fields: "travel" },
           { type: "external", title: "Extern kostnad", icon: Wrench, fields: "external" },
         ] as const).map((card) => { const Icon = card.icon; return <form key={card.type} onSubmit={(event) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); void post({ action: "entry.create", entryType: card.type, description: data.get("description"), minutes: data.get("minutes"), quantity: data.get("quantity"), unit: data.get("unit"), unitCost: data.get("unitCost"), totalAmount: data.get("totalAmount"), distanceKm: data.get("distanceKm"), supplier: data.get("supplier") }, `${card.title} har registrerats.`, () => form.reset()); }} className="rounded-2xl border border-sand-200 bg-white p-4 shadow-premium-sm">
+          <fieldset disabled={formLocked} className="contents">
           <div className="mb-4 flex items-center gap-2"><span className="rounded-xl bg-petroleum-50 p-2 text-petroleum-700"><Icon className="h-4 w-4" aria-hidden="true" /></span><h3 className="font-semibold text-ink-900">{card.title}</h3></div>
-          <div className="space-y-3"><input name="description" required placeholder="Beskrivning" aria-label={`${card.title}: beskrivning`} disabled={saving} className={premiumFieldClass} />
-            {card.fields === "time" ? <input name="minutes" type="number" min="1" required placeholder="Minuter" aria-label="Arbetstid i minuter" disabled={saving} className={premiumFieldClass} /> : null}
-            {card.fields === "cost" ? <><div className="grid grid-cols-2 gap-2"><input name="quantity" type="number" min="0" step="0.01" defaultValue="1" placeholder="Antal" aria-label="Materialantal" disabled={saving} className={premiumFieldClass} /><input name="unit" placeholder="Enhet" aria-label="Materialenhet" disabled={saving} className={premiumFieldClass} /></div><input name="unitCost" type="number" min="0" step="0.01" placeholder="Pris per enhet" aria-label="Pris per materialenhet" disabled={saving} className={premiumFieldClass} /></> : null}
-            {card.fields === "travel" ? <><input name="distanceKm" type="number" min="0" step="0.1" placeholder="Kilometer" aria-label="Ressträcka i kilometer" disabled={saving} className={premiumFieldClass} /><input name="totalAmount" type="number" min="0" step="0.01" placeholder="Resekostnad" aria-label="Resekostnad" disabled={saving} className={premiumFieldClass} /></> : null}
-            {card.fields === "external" ? <><input name="supplier" placeholder="Leverantör" aria-label="Extern leverantör" disabled={saving} className={premiumFieldClass} /><input name="totalAmount" type="number" min="0" step="0.01" required placeholder="Belopp exkl. moms" aria-label="Extern kostnad exklusive moms" disabled={saving} className={premiumFieldClass} /></> : null}
-            <button disabled={saving} className="h-11 w-full rounded-xl border border-petroleum-700 bg-petroleum-700 px-4 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-500 focus-visible:ring-offset-2 disabled:opacity-60">Registrera</button>
+          <div className="space-y-3"><input name="description" required placeholder="Beskrivning" aria-label={`${card.title}: beskrivning`} className={premiumFieldClass} />
+            {card.fields === "time" ? <input name="minutes" type="number" min="1" required placeholder="Minuter" aria-label="Arbetstid i minuter" className={premiumFieldClass} /> : null}
+            {card.fields === "cost" ? <><div className="grid grid-cols-2 gap-2"><input name="quantity" type="number" min="0" step="0.01" defaultValue="1" placeholder="Antal" aria-label="Materialantal" className={premiumFieldClass} /><input name="unit" placeholder="Enhet" aria-label="Materialenhet" className={premiumFieldClass} /></div><input name="unitCost" type="number" min="0" step="0.01" placeholder="Pris per enhet" aria-label="Pris per materialenhet" className={premiumFieldClass} /></> : null}
+            {card.fields === "travel" ? <><input name="distanceKm" type="number" min="0" step="0.1" placeholder="Kilometer" aria-label="Ressträcka i kilometer" className={premiumFieldClass} /><input name="totalAmount" type="number" min="0" step="0.01" placeholder="Resekostnad" aria-label="Resekostnad" className={premiumFieldClass} /></> : null}
+            {card.fields === "external" ? <><input name="supplier" placeholder="Leverantör" aria-label="Extern leverantör" className={premiumFieldClass} /><input name="totalAmount" type="number" min="0" step="0.01" required placeholder="Belopp exkl. moms" aria-label="Extern kostnad exklusive moms" className={premiumFieldClass} /></> : null}
+            <button disabled={formLocked} className="h-11 w-full rounded-xl border border-petroleum-700 bg-petroleum-700 px-4 text-sm font-semibold text-white transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-500 focus-visible:ring-offset-2 disabled:opacity-60">Registrera</button>
           </div>
+          </fieldset>
         </form>; })}
       </div> : <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600">Registreringsformulären är dolda eftersom utförandet är skrivskyddat.</div>}
     </Panel>

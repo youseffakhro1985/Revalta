@@ -27,3 +27,11 @@ describe("work order detail save hash", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-96 animate-pulse rounded-2xl bg-sand-100\" />");
   });
 });
+
+describe("work order execution panel first HTML", () => {
+  it("renders execution while the work order is still loading", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain("workOrder || loading ? <WorkOrderExecutionPanel");
+    expect(source).toContain("workOrder?.id || id");
+  });
+});
