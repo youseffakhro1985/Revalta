@@ -80,6 +80,11 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
     if (window.location.hash !== "#spara-dokument") return;
     document.getElementById("spara-dokument")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, documents]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#dokumentregister") return;
+    document.getElementById("dokumentregister")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, documents]);
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,6 +152,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
           </fieldset>
         </form>
 
+        <div id="dokumentregister" className="scroll-mt-36">
         {loading ? (
           <p className="text-sm text-ink-500">Dokumenten hämtas.</p>
         ) : documents.length === 0 ? (
@@ -179,6 +185,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
             ))}
           </div>
         )}
+        </div>
       </div>
     </Panel>
   );
