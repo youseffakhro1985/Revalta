@@ -98,6 +98,7 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
     if (loading) return;
     if (window.location.hash !== "#spara-komponent") return;
     document.getElementById("spara-komponent")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("komponent-namn")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -178,7 +179,7 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
           <form onSubmit={save} className="space-y-6">
             {saveError ? <InlineAlert>{saveError}</InlineAlert> : null}
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Field autoFocus disabled={formLocked} label="Komponentnamn" required value={form.name} onChange={(value) => updateField("name", value)} />
+              <Field id="komponent-namn" autoFocus disabled={formLocked} label="Komponentnamn" required value={form.name} onChange={(value) => updateField("name", value)} />
               <Field disabled={formLocked} label="Kategori" value={form.category} onChange={(value) => updateField("category", value)} />
               <Field disabled={formLocked} label="Komponentklass" value={form.component_class} onChange={(value) => updateField("component_class", value)} />
               <Field disabled={formLocked} label="Placering" value={form.location} onChange={(value) => updateField("location", value)} />
@@ -247,8 +248,8 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
   );
 }
 
-function Field({ label, value, onChange, required, type = "text", min, max, step, disabled, autoFocus }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; min?: string; max?: string; step?: string; disabled?: boolean; autoFocus?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><input autoFocus={autoFocus} disabled={disabled} type={type} value={value} required={required} min={min} max={max} step={step} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-300 focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50 disabled:opacity-60" aria-label={label} /></label>;
+function Field({ label, value, onChange, required, type = "text", min, max, step, disabled, autoFocus, id }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; min?: string; max?: string; step?: string; disabled?: boolean; autoFocus?: boolean; id?: string }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><input id={id} autoFocus={autoFocus} disabled={disabled} type={type} value={value} required={required} min={min} max={max} step={step} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-300 focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50 disabled:opacity-60" aria-label={label} /></label>;
 }
 
 function SelectField({ label, value, options, onChange, allowEmpty, disabled }: { label: string; value: string; options: Record<string, string>; onChange: (value: string) => void; allowEmpty?: boolean; disabled?: boolean }) {
