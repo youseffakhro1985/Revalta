@@ -79,6 +79,11 @@ export function PreventiveMaintenanceOverview() {
     if (window.location.hash !== "#servicefilter") return;
     document.getElementById("servicefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#serviceoversikt") return;
+    document.getElementById("serviceoversikt")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function runEngine() {
     setRunning(true); setError(""); setMessage("");
@@ -140,6 +145,7 @@ export function PreventiveMaintenanceOverview() {
           {([["all","Alla"],["overdue","Förfallna"],["soon","Inom 30 dagar"],["automatic","Automatik aktiv"]] as const).map(([value,label], index) => <button key={value} type="button" autoFocus={index === 0} disabled={loading} onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
         </div>
 
+        <div id="serviceoversikt" className="scroll-mt-36">
         {loading && !data ? <p className="text-sm text-ink-500">Serviceöversikten hämtas.</p> : null}
         {!loading && rows.length === 0 ? <EmptyState title="Inga servicepunkter i detta urval" description="Ändra filtret eller lägg till nästa servicedatum på komponenterna." /> : null}
         {rows.length > 0 ? (
@@ -156,6 +162,7 @@ export function PreventiveMaintenanceOverview() {
             })}
           </div>
         ) : null}
+        </div>
       </Panel>
     </div>
   );
