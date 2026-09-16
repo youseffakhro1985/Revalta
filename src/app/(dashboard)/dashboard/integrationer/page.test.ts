@@ -15,3 +15,15 @@ describe("integrationer hash targets", () => {
     expect(source).toContain('href="/dashboard/integrationer/fakturaexporter"');
   });
 });
+
+describe("integrationer leftover events first HTML", () => {
+  it("keeps events in the first HTML without stealing fakturaexport", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="handelser"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('hash !== "#handelser"');
+    expect(source).toContain('id="fakturaexport"');
+    expect(source).toContain("Händelserna hämtas.");
+    expect(source).not.toContain('{[1,2,3].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-sand-100" />)}');
+  });
+});
