@@ -65,6 +65,7 @@ export default function ProjectDetailPage() {
     if (loading) return;
     if (window.location.hash !== "#spara-projekt") return;
     document.getElementById("spara-projekt")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("projekt-namn")?.focus(), 0);
   }, [loading, project]);
   useEffect(() => {
     if (loading) return;
@@ -129,7 +130,7 @@ export default function ProjectDetailPage() {
           action={save}
           className="grid gap-4 sm:grid-cols-2"
         >
-          <input autoFocus name="name" defaultValue={project?.name || ""} disabled={saving || loading || !project} className={`${premiumFieldClass} sm:col-span-2`} aria-label="Projektnamn" />
+          <input id="projekt-namn" autoFocus name="name" defaultValue={project?.name || ""} disabled={saving || loading || !project} className={`${premiumFieldClass} sm:col-span-2`} aria-label="Projektnamn" />
           <input name="contractor" defaultValue={project?.contractor || ""} disabled={saving || loading || !project} placeholder="Entreprenör" className={premiumFieldClass} aria-label="Entreprenör" />
           <select name="managerId" defaultValue={project?.manager?.id || ""} disabled={saving || loading || !project} className={premiumFieldClass} aria-label="Projektledare">
             <option value="">Ej tilldelad</option>
