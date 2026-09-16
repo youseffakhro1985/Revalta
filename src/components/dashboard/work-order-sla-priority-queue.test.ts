@@ -11,4 +11,15 @@ describe("work order SLA priority queue", () => {
     expect(source).not.toContain("/api/work-orders/unassigned-queue");
     expect(source).not.toContain("assignedToId");
   });
+
+  it("keeps the SLA queue filter in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./work-order-sla-priority-queue.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="slafilter"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#slafilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("disabled={loading}");
+    expect(source).not.toContain("if (loading) return <div className=\"h-48 animate-pulse rounded-2xl bg-sand-100\" aria-label=\"Laddar SLA-prioritering\" />");
+  });
 });
