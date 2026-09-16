@@ -194,6 +194,11 @@ export function FelanmalanPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#senastearenden") return;
     document.getElementById("senastearenden")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, tickets]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#arendeurval") return;
+    document.getElementById("arendeurval")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, tickets]);
 
   useEffect(() => {
     let active = true;
@@ -342,22 +347,22 @@ export function FelanmalanPage({ initialCreate }: { initialCreate: boolean }) {
           // eslint-disable-next-line @next/next/no-html-link-for-pages
           <a href="/api/tickets/export" className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-xs font-semibold text-ink-650 transition hover:bg-sand-50"><Download className="h-4 w-4" />Exportera</a>
         ) : null}
-        {permissions.canManage ? <button type="button" onClick={() => setCreateOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-petroleum-800"><Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />Nytt ärende</button> : null}
+        {permissions.canManage || loading ? <button type="button" onClick={() => setCreateOpen(true)} className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-petroleum-800"><Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />Nytt ärende</button> : null}
       </div>
     </div>
 
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     <SoftDeleteUndoBanner entityLabel="Ärendet" restoreApiPath={(id) => `/api/tickets/${id}/restore`} detailPath={(id) => `/dashboard/felanmalan/${id}`} />
 
-    <section className="rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm">
+    <section id="arendeurval" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm">
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.6fr)_120px_120px_130px_150px_140px_160px_auto]">
-        <label className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-350" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} aria-label="Sök ärenden" placeholder="Sök ärenden, fastighet, adress..." className={`${premiumFieldClass} h-10 pl-10 text-xs`} /></label>
-        <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} aria-label="Status" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Status</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Kategori" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Kategori</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <select value={priorityFilter} onChange={(event) => { setPriorityFilter(event.target.value); setPage(1); }} aria-label="Prioritet" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Prioritet</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <select value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(1); }} aria-label="Fastighet" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-        <select value={assignmentFilter} onChange={(event) => setAssignmentFilter(event.target.value)} aria-label="Tilldelning" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Tilldelad</option><option value="assigned">Tilldelade</option><option value="unassigned">Ej tilldelade</option></select>
-        <label className="relative"><CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400" /><select value={range} onChange={(event) => setRange(event.target.value as RangeKey)} aria-label="Period" className={`${premiumFieldClass} h-10 pl-9 text-xs`}><option value="30">Senaste 30 dagarna</option><option value="90">Senaste 90 dagarna</option></select></label>
+        <label className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-350" /><input disabled={loading} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} aria-label="Sök ärenden" placeholder="Sök ärenden, fastighet, adress..." className={`${premiumFieldClass} h-10 pl-10 text-xs`} /></label>
+        <select disabled={loading} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} aria-label="Status" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Status</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select disabled={loading} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Kategori" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Kategori</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select disabled={loading} value={priorityFilter} onChange={(event) => { setPriorityFilter(event.target.value); setPage(1); }} aria-label="Prioritet" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Prioritet</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select disabled={loading} value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(1); }} aria-label="Fastighet" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+        <select disabled={loading} value={assignmentFilter} onChange={(event) => setAssignmentFilter(event.target.value)} aria-label="Tilldelning" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Tilldelad</option><option value="assigned">Tilldelade</option><option value="unassigned">Ej tilldelade</option></select>
+        <label className="relative"><CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400" /><select disabled={loading} value={range} onChange={(event) => setRange(event.target.value as RangeKey)} aria-label="Period" className={`${premiumFieldClass} h-10 pl-9 text-xs`}><option value="30">Senaste 30 dagarna</option><option value="90">Senaste 90 dagarna</option></select></label>
         {hasFilters ? <button type="button" onClick={clearFilters} className="h-10 px-2 text-xs font-semibold text-petroleum-700 hover:text-petroleum-900">Rensa filter</button> : <span />}
       </div>
     </section>
