@@ -55,7 +55,15 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
   }, [componentId, propertyId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-underhall") return;
+    document.getElementById("spara-underhall")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, settings]);
+
   const dirty = useMemo(() => settings ? JSON.stringify(form) !== JSON.stringify({ nextServiceAt: dateInput(settings.next_service_at), serviceIntervalMonths: String(settings.service_interval_months), serviceLeadDays: String(settings.service_lead_days), autoCreateServiceWorkOrders: settings.auto_create_service_work_orders }) : false, [form, settings]);
+  const formLocked = saving || loading || !settings;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setError(""); setSaved(false);
@@ -69,30 +77,33 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
     finally { setSaving(false); }
   }
 
-  if (loading) return <div className="h-56 animate-pulse rounded-2xl bg-sand-100" />;
-  if (!settings) return <InlineAlert>{error || "Underhållsinställningarna kunde inte laddas."}</InlineAlert>;
+  if (!loading && !settings) return <InlineAlert>{error || "Underhållsinställningarna kunde inte laddas."}</InlineAlert>;
 
   return (
+    <div id="spara-underhall" className="scroll-mt-36">
     <Panel title="Förebyggande underhåll" description="Styr servicecykel, framförhållning och automatisk skapning av planerade arbetsorder.">
       <form onSubmit={submit} className="space-y-5">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {saved ? <div className="inline-flex items-center gap-2 rounded-full bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-800"><CheckCircle2 className="h-4 w-4" /> Inställningarna är sparade</div> : null}
 
         <div className="grid gap-4 rounded-2xl border border-sand-200 bg-sand-50 p-4 sm:grid-cols-3">
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Senast genomförd service</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings.last_service_completed_at)}</p></div>
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Servicecykel flyttad</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings.maintenance_cycle_advanced_at)}</p></div>
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Nästa service</p><p className="mt-2 text-sm font-semibold text-petroleum-800">{formatDate(settings.next_service_at)}</p></div>
-          {settings.last_service_work_order_id ? <div className="sm:col-span-3 border-t border-sand-200 pt-3"><Link href={`/dashboard/arbetsorder/${settings.last_service_work_order_id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-800 hover:text-petroleum-950">{settings.last_service_work_order_number || "Öppna avslutad arbetsorder"}<ExternalLink className="h-4 w-4" /></Link></div> : null}
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Senast genomförd service</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings?.last_service_completed_at)}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Servicecykel flyttad</p><p className="mt-2 text-sm font-semibold text-ink-900">{formatDate(settings?.maintenance_cycle_advanced_at)}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Nästa service</p><p className="mt-2 text-sm font-semibold text-petroleum-800">{formatDate(settings?.next_service_at)}</p></div>
+          {settings?.last_service_work_order_id ? <div className="sm:col-span-3 border-t border-sand-200 pt-3"><Link href={`/dashboard/arbetsorder/${settings.last_service_work_order_id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-petroleum-800 hover:text-petroleum-950">{settings.last_service_work_order_number || "Öppna avslutad arbetsorder"}<ExternalLink className="h-4 w-4" /></Link></div> : null}
         </div>
 
+        <fieldset disabled={formLocked} className="contents">
         <div className="grid gap-4 sm:grid-cols-3">
-          <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Nästa service</span><input type="date" value={form.nextServiceAt} onChange={(event) => setForm((current) => ({ ...current, nextServiceAt: event.target.value }))} className={premiumFieldClass} /></label>
+          <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Nästa service</span><input autoFocus type="date" value={form.nextServiceAt} onChange={(event) => setForm((current) => ({ ...current, nextServiceAt: event.target.value }))} className={premiumFieldClass} /></label>
           <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Intervall, månader</span><input type="number" min="1" max="120" value={form.serviceIntervalMonths} onChange={(event) => setForm((current) => ({ ...current, serviceIntervalMonths: event.target.value }))} className={premiumFieldClass} /></label>
           <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Framförhållning, dagar</span><input type="number" min="0" max="365" value={form.serviceLeadDays} onChange={(event) => setForm((current) => ({ ...current, serviceLeadDays: event.target.value }))} className={premiumFieldClass} /></label>
         </div>
         <label className="flex items-start gap-3 rounded-2xl border border-sand-200 bg-sand-50 p-4"><input type="checkbox" checked={form.autoCreateServiceWorkOrders} onChange={(event) => setForm((current) => ({ ...current, autoCreateServiceWorkOrders: event.target.checked }))} className="mt-1 h-4 w-4 rounded border-sand-300 text-petroleum-700" /><span><span className="block text-sm font-semibold text-ink-900">Skapa arbetsorder automatiskt</span><span className="mt-1 block text-sm text-ink-500">Revalta skapar en förebyggande arbetsorder när servicedatumet når vald framförhållning. Dubbletter förhindras per servicecykel.</span></span></label>
-        <div className="flex flex-col gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="inline-flex items-center gap-2 text-xs text-ink-500"><CalendarClock className="h-4 w-4" /> Ändringar registreras i revisionsloggen.</p><button type="submit" disabled={saving || !dirty} className={premiumPrimaryButtonClass}><RefreshCw className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} /> {saving ? "Sparar…" : "Spara underhållsplan"}</button></div>
+        <div className="flex flex-col gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="inline-flex items-center gap-2 text-xs text-ink-500"><CalendarClock className="h-4 w-4" /> Ändringar registreras i revisionsloggen.</p><button type="submit" disabled={formLocked || !dirty} className={premiumPrimaryButtonClass}><RefreshCw className={`h-4 w-4 ${saving ? "animate-spin" : ""}`} /> {saving ? "Sparar…" : "Spara underhållsplan"}</button></div>
+        </fieldset>
       </form>
     </Panel>
+    </div>
   );
 }
