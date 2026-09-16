@@ -251,6 +251,12 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-ekonomi") return;
+    document.getElementById("spara-ekonomi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, times]);
+
   async function post(url: string, body: Record<string, unknown>, message: string) {
     setSaving(true);
     setError("");
@@ -304,10 +310,10 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
     }, "Fakturaunderlaget har byggts från attesterade rader.");
   }
 
-  if (loading) return <div className="h-80 animate-pulse rounded-2xl bg-sand-100" aria-label="Laddar arbetsorderekonomi" />;
+  const formLocked = saving || loading;
 
   return (
-    <div className="space-y-6" aria-busy={saving}>
+    <div className="space-y-6" aria-busy={saving || loading}>
       <div aria-live="polite" aria-atomic="true">
         {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
       </div>
@@ -394,6 +400,7 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             ))}
           </div>
           <form
+            id="spara-ekonomi"
             onSubmit={(event) => {
               event.preventDefault();
               const form = event.currentTarget;
@@ -407,15 +414,16 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
                 note: data.get("note"),
               }, "Tidsraden har registrerats.").then(() => form.reset());
             }}
-            className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4"
+            className="grid scroll-mt-36 gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4"
           >
+            <fieldset disabled={formLocked} className="contents">
             <select name="kind" defaultValue="work" className={premiumFieldClass} aria-label="Tidstyp">
               <option value="work">Arbete</option>
               <option value="travel">Resa</option>
               <option value="break">Rast</option>
             </select>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input name="startedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Starttid" />
+              <input autoFocus name="startedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Starttid" />
               <input name="endedAt" type="datetime-local" required className={premiumFieldClass} aria-label="Sluttid" />
             </div>
             <input name="note" placeholder="Anteckning" aria-label="Anteckning" className={premiumFieldClass} />
@@ -423,7 +431,8 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
               <input name="billable" type="checkbox" defaultChecked className="h-4 w-4 rounded border-sand-300" />
               Debiterbar
             </label>
-            <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till tid"}</button>
+            <button disabled={formLocked} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till tid"}</button>
+            </fieldset>
           </form>
           {times.some((entry) => entry.source === "legacy") ? (
             <p className="mt-4 text-xs font-medium text-warning-800">Äldre tidrader – kör backfill till WorkOrderTimeEntry innan attestering.</p>
@@ -610,8 +619,8 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
             <span className="font-semibold text-ink-700">Fast ersättning</span>
             <input name="fixedRevenue" type="number" min="0" step="0.01" defaultValue={settings.fixedRevenue} disabled={!canManage || settings.source === "legacy"} className={premiumFieldClass} />
           </label>
-          {canManage && settings.source !== "legacy" ? (
-            <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2 lg:col-span-5`}>
+          {canManage || loading ? (
+            <button disabled={formLocked || settings.source === "legacy"} className={`${premiumPrimaryButtonClass} sm:col-span-2 lg:col-span-5`}>
               {saving ? "Sparar…" : "Spara lönsamhetsinställningar"}
             </button>
           ) : null}

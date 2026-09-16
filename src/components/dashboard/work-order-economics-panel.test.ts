@@ -16,4 +16,16 @@ describe("work-order economics invoice copy", () => {
     expect(source).toContain('href="/dashboard/ekonomi"');
     expect(source).toContain("eller från kön på");
   });
+
+  it("keeps the time form in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./work-order-economics-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="spara-ekonomi"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#spara-ekonomi"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("saving || loading");
+    expect(source).toContain("canManage || loading");
+    expect(source).not.toContain("if (loading) return <div className=\"h-80 animate-pulse rounded-2xl bg-sand-100\" aria-label=\"Laddar arbetsorderekonomi\" />");
+  });
 });
