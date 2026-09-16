@@ -27,3 +27,16 @@ describe("energi leftover filter first HTML", () => {
     expect(source).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("energi leftover readings first HTML", () => {
+  it("keeps leftover energy readings in the first HTML without stealing create or filter", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="energilista"');
+    expect(source).toContain('window.location.hash !== "#energilista"');
+    expect(source).toContain("Avläsningarna hämtas.");
+    expect(source).toContain('id="ny-avlasning"');
+    expect(source).toContain('id="energifilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("canManage || loading");
+  });
+});
