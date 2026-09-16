@@ -88,6 +88,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#spara-intygande") return;
     document.getElementById("spara-intygande")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("intygande-namn")?.focus(), 0);
   }, [loading, signatures]);
 
   async function post(payload: Record<string, unknown>, message: string, reset?: () => void) {
@@ -150,7 +151,7 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
           }} className="grid scroll-mt-36 gap-4 sm:grid-cols-2">
             <fieldset disabled={formLocked} className="contents">
             <label className="space-y-1.5 text-sm text-ink-600"><span>Roll</span><select name="signerRole" className={premiumFieldClass} defaultValue="executor">{Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label className="space-y-1.5 text-sm text-ink-600"><span>Namn</span><input autoFocus name="signerName" required className={premiumFieldClass} placeholder="För- och efternamn" /></label>
+            <label className="space-y-1.5 text-sm text-ink-600"><span>Namn</span><input id="intygande-namn" autoFocus name="signerName" required className={premiumFieldClass} placeholder="För- och efternamn" /></label>
             <label className="space-y-1.5 text-sm text-ink-600"><span>E-post</span><input name="signerEmail" type="email" className={premiumFieldClass} placeholder="namn@foretag.se" /></label>
             <label className="space-y-1.5 text-sm text-ink-600"><span>Intygandetext</span><input name="confirmationText" className={premiumFieldClass} defaultValue="Jag intygar att uppgifterna är korrekta." /></label>
             <label className="sm:col-span-2 inline-flex items-start gap-3 rounded-xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600"><input type="checkbox" required className="mt-0.5 h-4 w-4 rounded border-sand-300" /><span>Jag bekräftar att intygandet är avsiktligt och får registreras med datum och tid.</span></label>
