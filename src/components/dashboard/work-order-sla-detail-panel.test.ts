@@ -28,3 +28,16 @@ describe("work order SLA detail panel", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-56 animate-pulse rounded-2xl bg-sand-100\" aria-label=\"Laddar SLA-bedömning\" />");
   });
 });
+
+describe("work order SLA leftover assessment first HTML", () => {
+  it("keeps leftover SLA assessment in the first HTML without stealing save", () => {
+    const source = readFileSync(new URL("./work-order-sla-detail-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="slabedomning"');
+    expect(source).toContain('window.location.hash !== "#slabedomning"');
+    expect(source).toContain("SLA-bedömningen hämtas");
+    expect(source).toContain('id="spara-sla"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("canManage || loading");
+  });
+});
