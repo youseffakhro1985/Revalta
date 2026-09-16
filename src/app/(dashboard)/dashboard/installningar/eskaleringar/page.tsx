@@ -125,6 +125,11 @@ export default function EscalationAdminPage() {
     if (window.location.hash !== "#eskaleringslista") return;
     document.getElementById("eskaleringslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#regellista") return;
+    document.getElementById("regellista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   useEffect(() => {
     if (loading) return;
@@ -171,6 +176,7 @@ export default function EscalationAdminPage() {
       <div id="regler" className="scroll-mt-36">
       <Panel title="Aktiva organisationsregler" description="Driftöversikten använder exakt samma regler som den automatiska och manuella eskaleringsmotorn.">
         <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div id="regellista" className="scroll-mt-36">
           {data ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Motor</p><p className={`mt-2 font-semibold ${data.rules.enabled ? "text-success-800" : "text-warning-800"}`}>{data.rules.enabled ? "Aktiverad" : "Pausad"}</p></div>
@@ -179,6 +185,7 @@ export default function EscalationAdminPage() {
               <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Upprepning</p><p className="mt-2 font-semibold text-ink-800">Var {data.rules.repeatDays}:e dag</p></div>
             </div>
           ) : <p className="text-sm text-ink-500">Reglerna hämtas.</p>}
+          </div>
           <Link href="/dashboard/installningar/eskaleringar/regler" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900"><SlidersHorizontal className="h-4 w-4" /> Hantera regler</Link>
         </div>
         {data?.rulesUpdatedAt ? <p className="mt-4 text-sm text-ink-500">Senast ändrad {dateTime.format(new Date(data.rulesUpdatedAt))}.</p> : null}
