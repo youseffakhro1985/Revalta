@@ -101,6 +101,11 @@ export default function InspectionsPage() {
     if (window.location.hash !== "#ny-kontroll") return;
     document.getElementById("ny-kontroll")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#kontrollplan") return;
+    document.getElementById("kontrollplan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, inspections]);
 
   const summary = useMemo(() => ({
     overdue: inspections.filter((i) => i.status !== "completed" && daysUntil(i.due_date) < 0).length,
@@ -258,46 +263,43 @@ export default function InspectionsPage() {
         {canManage || loading ? (
           <div id="ny-kontroll" className="scroll-mt-36">
             <Panel title="Ny kontroll" description="Lägg in förfallodatum, ansvarig och återkommande intervall." className="xl:sticky xl:top-[118px]">
-              {canManage ? (
             <form onSubmit={submit} className="space-y-4">
               <Field label="Fastighet">
-                <select required className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
+                <select required disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
                   <option value="">Välj fastighet</option>
                   {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </Field>
               <Field label="Kontrolltyp">
-                <select className={premiumFieldClass} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <select disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                   {Object.entries(typeLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
               <Field label="Namn">
-                <input required autoFocus className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
+                <input required autoFocus disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
               </Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Förfallodatum"><input required type="date" className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></Field>
-                <Field label="Intervall, månader"><input type="number" min="0" max="240" className={premiumFieldClass} value={form.intervalMonths} onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })} /></Field>
+                <Field label="Förfallodatum"><input required type="date" disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></Field>
+                <Field label="Intervall, månader"><input type="number" min="0" max="240" disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.intervalMonths} onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })} /></Field>
               </div>
-              <Field label="Ansvarig internt"><input className={premiumFieldClass} value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} placeholder="Namn eller funktion" /></Field>
-              <Field label="Besiktningsföretag"><input className={premiumFieldClass} value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Leverantör eller företag" /></Field>
+              <Field label="Ansvarig internt"><input disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.responsible} onChange={(e) => setForm({ ...form, responsible: e.target.value })} placeholder="Namn eller funktion" /></Field>
+              <Field label="Besiktningsföretag"><input disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} placeholder="Leverantör eller företag" /></Field>
               <Field label="Status">
-                <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <select disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                   {Object.entries(statusLabels).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
-              <Field label="Anteckning"><textarea className={premiumTextareaClass} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Anteckning eller krav" /></Field>
-              <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara kontroll"}</button>
+              <Field label="Anteckning"><textarea disabled={saving || loading || !canManage} className={premiumTextareaClass} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="Anteckning eller krav" /></Field>
+              <button disabled={saving || loading || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Spara kontroll"}</button>
             </form>
-              ) : (
-                <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
-              )}
             </Panel>
           </div>
         ) : null}
 
         <Panel title="Kontrollplan" description="Kommande myndighetskrav och kontroller sorterade efter förfallodatum." bodyClassName="p-0">
+          <div id="kontrollplan" className="scroll-mt-36">
           {loading ? (
-            <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div>
+            <p className="p-6 text-sm text-ink-500">Besiktningarna hämtas.</p>
           ) : sorted.length === 0 ? (
             <EmptyState title="Inga besiktningar registrerade" description="Lägg till den första kontrollen för att börja bevaka myndighetskrav." />
           ) : (
@@ -374,6 +376,7 @@ export default function InspectionsPage() {
               })}
             </div>
           )}
+          </div>
         </Panel>
       </section>
     </div>
