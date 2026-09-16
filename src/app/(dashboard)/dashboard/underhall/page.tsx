@@ -89,6 +89,11 @@ export default function MaintenancePage() {
     if (window.location.hash !== "#ny-underhallsatgard") return;
     document.getElementById("ny-underhallsatgard")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, permissions.canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#flerarsplan") return;
+    document.getElementById("flerarsplan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   const year = new Date().getFullYear();
   const debt = useMemo(() => items.filter((item) => item.planned_year < year && !["completed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.estimated_cost || 0), 0), [items, year]);
@@ -245,29 +250,26 @@ export default function MaintenancePage() {
         {permissions.canManage || loading ? (
           <div id="ny-underhallsatgard" className="scroll-mt-36">
             <Panel title="Ny planerad åtgärd" description="Koppla åtgärden till rätt fastighet, år, kostnad och prioritet." className="xl:sticky xl:top-[118px]">
-              {permissions.canManage ? (
             <form onSubmit={submit} className="space-y-4">
-              <Field label="Fastighet"><select required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
-              <Field label="Byggnadsdel"><input required autoFocus className={premiumFieldClass} value={form.component} onChange={(event) => setForm({ ...form, component: event.target.value })} placeholder="Ex. Tak, fasad eller ventilation" /></Field>
-              <Field label="Åtgärd"><textarea required className={premiumTextareaClass} value={form.measure} onChange={(event) => setForm({ ...form, measure: event.target.value })} placeholder="Beskriv planerad åtgärd" /></Field>
+              <Field label="Fastighet"><select required disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
+              <Field label="Byggnadsdel"><input required autoFocus disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.component} onChange={(event) => setForm({ ...form, component: event.target.value })} placeholder="Ex. Tak, fasad eller ventilation" /></Field>
+              <Field label="Åtgärd"><textarea required disabled={saving || loading || !permissions.canManage} className={premiumTextareaClass} value={form.measure} onChange={(event) => setForm({ ...form, measure: event.target.value })} placeholder="Beskriv planerad åtgärd" /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Planerat år"><input required type="number" className={premiumFieldClass} value={form.plannedYear} onChange={(event) => setForm({ ...form, plannedYear: event.target.value })} /></Field>
-                <Field label="Intervall, år"><input type="number" min="0" className={premiumFieldClass} value={form.intervalYears} onChange={(event) => setForm({ ...form, intervalYears: event.target.value })} /></Field>
+                <Field label="Planerat år"><input required type="number" disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.plannedYear} onChange={(event) => setForm({ ...form, plannedYear: event.target.value })} /></Field>
+                <Field label="Intervall, år"><input type="number" min="0" disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.intervalYears} onChange={(event) => setForm({ ...form, intervalYears: event.target.value })} /></Field>
               </div>
-              <Field label="Beräknad kostnad exkl. moms"><input required type="number" min="0" className={premiumFieldClass} value={form.estimatedCost} onChange={(event) => setForm({ ...form, estimatedCost: event.target.value })} placeholder="0" /></Field>
-              <Field label="Prioritet"><select className={premiumFieldClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="critical">Kritisk</option></select></Field>
-              <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Lägg till i planen"}</button>
+              <Field label="Beräknad kostnad exkl. moms"><input required type="number" min="0" disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.estimatedCost} onChange={(event) => setForm({ ...form, estimatedCost: event.target.value })} placeholder="0" /></Field>
+              <Field label="Prioritet"><select disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="critical">Kritisk</option></select></Field>
+              <button disabled={saving || loading || !permissions.canManage} className={`${premiumPrimaryButtonClass} w-full`}>{saving ? "Sparar…" : "Lägg till i planen"}</button>
             </form>
-              ) : (
-                <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
-              )}
             </Panel>
           </div>
         ) : null}
 
+        <div id="flerarsplan" className="scroll-mt-36">
         <Panel title="Flerårsplan" description={`${items.length} åtgärder grupperade efter planerat år.`} bodyClassName="p-0">
           {loading ? (
-            <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div>
+            <p className="p-6 text-sm text-ink-500">Åtgärderna hämtas.</p>
           ) : grouped.length === 0 ? (
             <EmptyState title="Inga planerade åtgärder" description="Lägg till en åtgärd för att bygga en långsiktig underhållsplan." />
           ) : (
@@ -341,6 +343,7 @@ export default function MaintenancePage() {
             </div>
           )}
         </Panel>
+        </div>
       </section>
     </div>
   );
