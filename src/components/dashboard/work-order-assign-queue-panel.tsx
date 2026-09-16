@@ -110,6 +110,11 @@ export function WorkOrderAssignQueuePanel() {
     if (window.location.hash !== "#tilldelafilter") return;
     document.getElementById("tilldelafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#tilldelako") return;
+    document.getElementById("tilldelako")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function assign(item: QueueItem, assigneeId: string) {
     if (!assigneeId) {
@@ -176,8 +181,9 @@ export function WorkOrderAssignQueuePanel() {
             </label>
           </fieldset>
         </form>
-        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
+      <div id="tilldelako" className="scroll-mt-36">
+      {loading ? <p className="px-5 py-4 text-sm text-ink-500">Kön hämtas.</p> : null}
       {!loading && !error && items.length === 0 ? (
         <OverviewEmpty icon={Wrench} title="Inga otilldelade arbetsordrar" description="Kön är tom — alla aktiva arbetsordrar har en ansvarig." />
       ) : null}
@@ -231,6 +237,7 @@ export function WorkOrderAssignQueuePanel() {
           ))}
         </div>
       ) : null}
+      </div>
     </OverviewPanel>
   );
 }

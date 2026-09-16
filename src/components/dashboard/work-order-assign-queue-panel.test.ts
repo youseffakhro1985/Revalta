@@ -29,3 +29,15 @@ describe("work order assign queue filter first HTML", () => {
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
   });
 });
+
+describe("work order assign leftover queue first HTML", () => {
+  it("keeps leftover assign queue in the first HTML without stealing the filter", () => {
+    const source = readFileSync(new URL("./work-order-assign-queue-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="tilldelako"');
+    expect(source).toContain('window.location.hash !== "#tilldelako"');
+    expect(source).toContain("Kön hämtas.");
+    expect(source).toContain('id="tilldelafilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
