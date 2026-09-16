@@ -71,6 +71,13 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
     () => data?.actions.find((action) => action.id === selectedId) || null,
     [data, selectedId],
   );
+  const formLocked = saving || loading || !selected;
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-underhallsatgard") return;
+    document.getElementById("spara-underhallsatgard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,25 +129,30 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
 
   const closedStatuses = new Set(["completed", "cancelled"]);
 
-  if (loading) return <div className="h-72 animate-pulse rounded-2xl bg-sand-100" />;
-  if (!data) return <InlineAlert>{error || "Åtgärderna kunde inte laddas."}</InlineAlert>;
+  if (!loading && !data) return <InlineAlert>{error || "Åtgärderna kunde inte laddas."}</InlineAlert>;
+  if (!loading && data && data.actions.length === 0) {
+    return (
+      <Panel title="Redigera underhållsåtgärder" description="Uppdatera år, kostnad, prioritet, risk och status med full spårbarhet.">
+        {error || success ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
+        <EmptyState title="Inga åtgärder att redigera" description="Lägg först till en åtgärd i underhållsplanen." />
+      </Panel>
+    );
+  }
 
   return (
+    <div id="spara-underhallsatgard" className="scroll-mt-36">
     <Panel
       title="Redigera underhållsåtgärder"
       description="Uppdatera år, kostnad, prioritet, risk och status med full spårbarhet."
     >
       {error || success ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
-      {data.actions.length === 0 ? (
-        <EmptyState title="Inga åtgärder att redigera" description="Lägg först till en åtgärd i underhållsplanen." />
-      ) : (
-        <div className="mt-5 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="mt-5 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="space-y-3">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Välj åtgärd</span>
-              <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} className={premiumFieldClass}>
-                {data.actions.map((action) => (
+              <select disabled={formLocked} aria-label="Välj åtgärd" value={selectedId} onChange={(event) => setSelectedId(event.target.value)} className={premiumFieldClass}>
+                {(data?.actions || []).length === 0 ? <option value="">Laddar åtgärder…</option> : data?.actions.map((action) => (
                   <option key={action.id} value={action.id}>
                     {action.planned_year} · {action.title}
                   </option>
@@ -148,28 +160,27 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
               </select>
             </label>
 
-            {selected ? (
-              <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4">
+            <div className="rounded-2xl border border-sand-200 bg-sand-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Vald åtgärd</p>
-                <p className="mt-2 font-semibold text-ink-900">{selected.title}</p>
+                <p className="mt-2 font-semibold text-ink-900">{selected?.title || "Underhållsåtgärd"}</p>
                 <p className="mt-1 text-sm text-ink-500">
-                  {selected.category}
-                  {selected.building_name ? ` · ${selected.building_name}` : ""}
-                  {selected.technical_asset_name ? ` · ${selected.technical_asset_name}` : ""}
+                  {selected?.category || "Kategori laddas"}
+                  {selected?.building_name ? ` · ${selected.building_name}` : ""}
+                  {selected?.technical_asset_name ? ` · ${selected.technical_asset_name}` : ""}
                 </p>
                 <dl className="mt-4 space-y-2 text-sm">
-                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Nuvarande kostnad</dt><dd className="font-semibold text-ink-900">{money.format(selected.estimated_cost)}</dd></div>
-                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Prioritet</dt><dd className="font-semibold text-ink-900">{priorityLabels[selected.priority] || selected.priority}</dd></div>
-                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Risk</dt><dd className="font-semibold text-ink-900">{riskLabels[selected.risk] || selected.risk}</dd></div>
-                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Status</dt><dd className="font-semibold text-ink-900">{statusLabels[selected.status] || selected.status}</dd></div>
-                  {selected.source_work_order_id ? (
+                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Nuvarande kostnad</dt><dd className="font-semibold text-ink-900">{selected ? money.format(selected.estimated_cost) : "–"}</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Prioritet</dt><dd className="font-semibold text-ink-900">{selected ? (priorityLabels[selected.priority] || selected.priority) : "–"}</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Risk</dt><dd className="font-semibold text-ink-900">{selected ? (riskLabels[selected.risk] || selected.risk) : "–"}</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-ink-500">Status</dt><dd className="font-semibold text-ink-900">{selected ? (statusLabels[selected.status] || selected.status) : "–"}</dd></div>
+                  {selected?.source_work_order_id ? (
                     <div className="pt-2">
                       <Link href={`/dashboard/arbetsorder/${selected.source_work_order_id}`} className={`${premiumSecondaryButtonClass} h-9 px-3 text-xs`}>
                         <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
                         {selected.source_work_order_number || "Öppna arbetsorder"}
                       </Link>
                     </div>
-                  ) : !closedStatuses.has(selected.status) ? (
+                  ) : selected && !closedStatuses.has(selected.status) ? (
                     <div className="pt-2">
                       <button type="button" disabled={creatingWorkOrder} onClick={() => void createWorkOrder()} className={`${premiumPrimaryButtonClass} h-9 px-3 text-xs`}>
                         <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
@@ -178,26 +189,25 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
                     </div>
                   ) : null}
                 </dl>
-              </div>
-            ) : null}
+            </div>
           </div>
 
-          {selected ? (
-            <form key={selected.id} onSubmit={submit} className="space-y-4">
+          <form key={selected?.id || "loading"} onSubmit={submit} className="space-y-4">
+            <fieldset disabled={formLocked} className="contents">
               <Field label="Åtgärdsnamn">
-                <input name="title" required defaultValue={selected.title} className={premiumFieldClass} />
+                <input autoFocus name="title" required defaultValue={selected?.title || ""} className={premiumFieldClass} />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Planerat år">
-                  <input name="plannedYear" required type="number" defaultValue={selected.planned_year} className={premiumFieldClass} />
+                  <input name="plannedYear" required type="number" defaultValue={selected?.planned_year || ""} className={premiumFieldClass} />
                 </Field>
                 <Field label="Kostnad exkl. moms">
-                  <input name="estimatedCost" required type="number" min="0" step="1000" defaultValue={selected.estimated_cost} className={premiumFieldClass} />
+                  <input name="estimatedCost" required type="number" min="0" step="1000" defaultValue={selected?.estimated_cost || ""} className={premiumFieldClass} />
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Prioritet">
-                  <select name="priority" defaultValue={selected.priority} className={premiumFieldClass}>
+                  <select name="priority" defaultValue={selected?.priority || "normal"} className={premiumFieldClass}>
                     <option value="low">Låg</option>
                     <option value="normal">Normal</option>
                     <option value="high">Hög</option>
@@ -205,7 +215,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
                   </select>
                 </Field>
                 <Field label="Risk">
-                  <select name="risk" defaultValue={selected.risk} className={premiumFieldClass}>
+                  <select name="risk" defaultValue={selected?.risk || "medium"} className={premiumFieldClass}>
                     <option value="low">Låg</option>
                     <option value="medium">Medel</option>
                     <option value="high">Hög</option>
@@ -214,7 +224,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
                 </Field>
               </div>
               <Field label="Status">
-                <select name="status" defaultValue={selected.status} className={premiumFieldClass}>
+                <select name="status" defaultValue={selected?.status || "planned"} className={premiumFieldClass}>
                   <option value="planned">Planerad</option>
                   <option value="approved">Godkänd</option>
                   <option value="in_progress">Pågår</option>
@@ -226,15 +236,15 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
               <div className="rounded-xl border border-petroleum-100 bg-petroleum-50 p-3 text-sm text-petroleum-900">
                 <div className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /><p>Alla ändringar sparas i revisionshistoriken med tidigare och nya värden.</p></div>
               </div>
-              <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>
+              <button disabled={formLocked} className={`${premiumPrimaryButtonClass} w-full`}>
                 {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PencilLine className="h-4 w-4" />}
                 {saving ? "Sparar…" : "Spara ändringar"}
               </button>
-            </form>
-          ) : null}
-        </div>
-      )}
+            </fieldset>
+          </form>
+      </div>
     </Panel>
+    </div>
   );
 }
 
