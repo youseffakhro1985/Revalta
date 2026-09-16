@@ -63,6 +63,11 @@ export function PropertyCardOperations({ propertyId }: Props) {
     if (window.location.hash !== "#driftfilter") return;
     document.getElementById("driftfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#driftlista") return;
+    document.getElementById("driftlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const annualAgreementCost = useMemo(() => (data?.agreements || []).reduce((sum, item) => {
     const amount = Number(item.cost_amount || 0); const interval = String(item.cost_interval || "yearly");
@@ -112,6 +117,7 @@ export function PropertyCardOperations({ propertyId }: Props) {
       <MetricCard icon={ShieldCheck} label="Garantier inom 180 dagar" value={metrics.warrantiesExpiring180Days} hint={`Avtal: ${money.format(annualAgreementCost)}/år`} />
     </section>
 
+    <div id="driftlista" className="scroll-mt-36">
     {loading ? <p className="text-sm text-ink-500">Driftkortet hämtas.</p> : <>
 
     <div className="grid gap-6 xl:grid-cols-3">
@@ -139,5 +145,6 @@ export function PropertyCardOperations({ propertyId }: Props) {
 
     {(metrics.criticalAssets > 0 || metrics.inspectionsDue90Days > 0) ? <div className="flex items-start gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm text-warning-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Fastigheten kräver uppmärksamhet</p><p className="mt-1">{metrics.criticalAssets} kritiska installationer och {metrics.inspectionsDue90Days} besiktningar behöver följas upp.</p></div></div> : <div className="flex items-start gap-3 rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5 text-sm text-petroleum-900"><Gauge className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Driftläget ser stabilt ut</p><p className="mt-1">Inga kritiska installationer eller nära förestående besiktningar är registrerade.</p></div></div>}
     </>}
+    </div>
   </div>;
 }
