@@ -25,6 +25,20 @@ describe("offerter create query", () => {
   });
 });
 
+describe("offerter filter first HTML", () => {
+  it("keeps the filter in the first HTML and scrolls after load without stealing create", () => {
+    const form = readFileSync(new URL("./offerter-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="offertfilter"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#offertfilter"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("Ny offert");
+    expect(form).toContain("disabled={loading}");
+    expect(form).toContain("Offerterna hämtas.");
+    expect(form).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-xl bg-sand-100" />)}');
+  });
+});
+
 describe("offerter work-order action", () => {
   it("creates an arbetsorder from an approved quote via the dedicated API", () => {
     const source = readFileSync(new URL("./offerter-page.tsx", import.meta.url), "utf8");
