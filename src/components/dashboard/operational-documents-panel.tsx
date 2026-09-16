@@ -75,6 +75,12 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-dokument") return;
+    document.getElementById("spara-dokument")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, documents]);
+
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -116,29 +122,33 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
     }
   }
 
+  const formLocked = saving || loading;
+
   return (
     <Panel title={title} description={description}>
       <div className="space-y-5">
         {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
 
-        <form onSubmit={upload} className="grid gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_auto]">
+        <form id="spara-dokument" onSubmit={upload} className="grid scroll-mt-36 gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_auto]">
+          <fieldset disabled={formLocked} className="contents">
           <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-sand-300 bg-white px-4 text-sm text-ink-600 transition hover:border-petroleum-400">
             <UploadCloud className="h-4 w-4 text-petroleum-700" />
             <span>Välj dokument, bild eller kalkyl</span>
             <input name="file" type="file" required className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.docx,.xlsx" />
           </label>
-          <select name="category" className={premiumFieldClass} defaultValue="other" aria-label="Dokumentkategori">
+          <select autoFocus name="category" className={premiumFieldClass} defaultValue="other" aria-label="Dokumentkategori">
             {Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <select name="visibility" className={premiumFieldClass} defaultValue="internal" aria-label="Dokumentsynlighet">
             <option value="internal">Endast internt</option>
             <option value="shared">Delat</option>
           </select>
-          <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Laddar upp…" : "Ladda upp"}</button>
+          <button disabled={formLocked} className={premiumPrimaryButtonClass}>{saving ? "Laddar upp…" : "Ladda upp"}</button>
+          </fieldset>
         </form>
 
         {loading ? (
-          <div className="space-y-3">{[0, 1, 2].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-sand-100" />)}</div>
+          <p className="text-sm text-ink-500">Dokumenten hämtas.</p>
         ) : documents.length === 0 ? (
           <EmptyState title="Inga dokument uppladdade" description="Ladda upp det första dokumentet för att samla underlag, beslut och historik." />
         ) : (
