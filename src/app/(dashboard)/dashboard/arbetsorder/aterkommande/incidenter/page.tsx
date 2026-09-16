@@ -93,6 +93,11 @@ export default function RecurringIncidentsPage() {
     if (window.location.hash !== "#kontrollera-eskalering") return;
     document.getElementById("kontrollera-eskalering")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#incidentlista") return;
+    document.getElementById("incidentlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, alerts]);
   const incidentMap = useMemo(() => new Map(incidents.map((item) => [item.notificationKey, item])), [incidents]);
   const open = alerts.filter((item) => incidentMap.get(item.key)?.status !== "resolved").length;
   const acknowledged = alerts.filter((item) => incidentMap.get(item.key)?.status === "acknowledged").length;
@@ -156,8 +161,9 @@ export default function RecurringIncidentsPage() {
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6"><MetricCard icon={AlertTriangle} label="Öppna" value={open} /><MetricCard icon={UserRoundCheck} label="Utan ansvarig" value={unassigned} /><MetricCard icon={Clock3} label="SLA-förfallna" value={slaBreaches} /><MetricCard icon={ShieldCheck} label="Kvitterade" value={acknowledged} /><MetricCard icon={Siren} label="Eskalerade" value={escalated} /><MetricCard icon={CheckCircle2} label="Lösta" value={resolved} /></section>
     {error ? <InlineAlert>{error}</InlineAlert> : null}{message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
     {workload.length ? <Panel title="Ansvarsbelastning" description="Öppna incidenter per ansvarig"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{workload.map((item) => <div key={item.id} className="rounded-xl border border-sand-200 bg-sand-50 p-4"><div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-ink-900">{item.name || item.email}</p><p className="mt-1 text-xs text-ink-500">{item.role}</p></div><span className="flex h-9 min-w-9 items-center justify-center rounded-full bg-petroleum-100 px-2 text-sm font-bold text-petroleum-800">{item.count}</span></div></div>)}</div></Panel> : null}
+    <div id="incidentlista" className="scroll-mt-36">
     <Panel title="Aktiva schemaincidenter" description="Incidenter behåller hela åtgärds-, SLA-, tilldelnings- och eskaleringshistoriken." bodyClassName="p-0">
-      {loading && !alerts.length ? <div className="p-8 text-sm text-ink-500">Hämtar incidenter…</div> : null}
+      {loading && !alerts.length ? <p className="p-8 text-sm text-ink-500">Incidenterna hämtas.</p> : null}
       {!loading && alerts.length === 0 ? <EmptyState title="Inga aktiva schemaincidenter" description="Automatiken fungerar utan kända fel eller kraftigt försenade scheman." /> : null}
       <div className="divide-y divide-sand-100">{alerts.map((alert) => {
         const incident = incidentMap.get(alert.key); const status = incident?.status || "open"; const assigned = incident?.assignedUser; const sla = incident?.sla;
@@ -169,5 +175,6 @@ export default function RecurringIncidentsPage() {
         </article>;
       })}</div>
     </Panel>
+    </div>
   </div>;
 }
