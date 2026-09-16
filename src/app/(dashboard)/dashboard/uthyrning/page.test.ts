@@ -71,3 +71,16 @@ describe("uthyrning leftover objects first HTML", () => {
     expect(form).toContain('get("create") === "1"');
   });
 });
+
+describe("uthyrning leftover lease history first HTML", () => {
+  it("keeps leftover lease history in the first HTML without stealing create", () => {
+    const form = readFileSync(new URL("./uthyrning-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="avtalshistorik"');
+    expect(form).toContain('window.location.hash !== "#avtalshistorik"');
+    expect(form).toContain("Avtalen hämtas.");
+    expect(form).not.toContain("Hämtar avtal…");
+    expect(form).toContain("Nytt avtal");
+    expect(form).toContain('id="lease-editor"');
+    expect(form).toContain('get("create") === "1"');
+  });
+});
