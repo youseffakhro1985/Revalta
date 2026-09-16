@@ -80,6 +80,11 @@ export function AttestationQueuePanel() {
     if (window.location.hash !== "#attestfilter") return;
     document.getElementById("attestfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#attestko") return;
+    document.getElementById("attestko")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function attest(item: QueueItem, action: AttestAction) {
     if (action === "rejectSubmitted") {
@@ -142,8 +147,9 @@ export function AttestationQueuePanel() {
             </label>
           </fieldset>
         </form>
-        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
+      <div id="attestko" className="scroll-mt-36">
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inget att attestera" description="När en arbetsorder slutförs med tid eller material hamnar den här." />
       ) : null}
@@ -193,6 +199,7 @@ export function AttestationQueuePanel() {
           </div>
         </div>
       ) : null}
+      </div>
     </Panel>
   );
 }
