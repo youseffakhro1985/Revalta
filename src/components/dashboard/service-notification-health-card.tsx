@@ -87,36 +87,27 @@ export function ServiceNotificationHealthCard() {
     return () => window.clearInterval(interval);
   }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#leveranshalsa") return;
+    document.getElementById("leveranshalsa")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   const presentation = useMemo(() => healthPresentation[data?.health || "idle"], [data?.health]);
   const Icon = presentation.Icon;
 
-  if (loading && !data) {
-    return <div className="h-44 animate-pulse rounded-2xl border border-sand-200 bg-sand-50" aria-label="Laddar driftstatus" />;
-  }
-
-  if (error && !data) {
-    return (
-      <section className="rounded-2xl border border-danger-200 bg-danger-50 p-5" role="alert">
-        <div className="flex items-start justify-between gap-4">
-          <div><p className="font-semibold text-danger-900">Driftstatus kunde inte hämtas</p><p className="mt-1 text-sm text-danger-700">{error}</p></div>
-          <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-danger-200 bg-white px-3 py-2 text-sm font-semibold text-danger-800"><RefreshCw className="h-4 w-4" />Försök igen</button>
-        </div>
-      </section>
-    );
-  }
-
   return (
-    <section className={`rounded-2xl border p-5 shadow-premium-sm ${presentation.className}`} aria-labelledby="service-health-title">
+    <section id="leveranshalsa" className={`scroll-mt-36 rounded-2xl border p-5 shadow-premium-sm ${error && !data ? "border-danger-200 bg-danger-50 text-danger-950" : presentation.className}`} aria-labelledby="service-health-title">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-start gap-3">
-          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${presentation.iconClassName}`}><Icon className="h-5 w-5" aria-hidden="true" /></div>
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${error && !data ? "bg-danger-100 text-danger-800" : presentation.iconClassName}`}><Icon className="h-5 w-5" aria-hidden="true" /></div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-70">Leveranshälsa</p>
-            <h2 id="service-health-title" className="mt-1 text-lg font-semibold">{presentation.label}</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 opacity-80">{presentation.description}</p>
+            <h2 id="service-health-title" className="mt-1 text-lg font-semibold">{error && !data ? "Driftstatus kunde inte hämtas" : loading && !data ? "Leveranshälsan hämtas" : presentation.label}</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 opacity-80">{error && !data ? error : loading && !data ? "Konfiguration, senaste körning och leveransgrad visas när hälsan är redo." : presentation.description}</p>
           </div>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-current/20 bg-white/70 px-3 py-2 text-sm font-semibold disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Uppdatera</button>
+        <button id="leveranshalsa-uppdatera" type="button" autoFocus disabled={loading} onClick={() => void load()} className="inline-flex scroll-mt-36 items-center justify-center gap-2 rounded-xl border border-current/20 bg-white/70 px-3 py-2 text-sm font-semibold disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Uppdatera</button>
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -129,7 +120,7 @@ export function ServiceNotificationHealthCard() {
 
       {(data?.staleProcessing.length || data?.consecutiveFailures) ? (
         <div className="mt-4 rounded-xl border border-current/10 bg-white/70 px-4 py-3 text-sm font-medium">
-          {data.staleProcessing.length ? `Äldsta fastnade körningen har bearbetats i ${Math.max(...data.staleProcessing.map((item) => item.ageMinutes))} minuter.` : `De ${data.consecutiveFailures} senaste körningarna behöver följas upp.`}
+          {data?.staleProcessing.length ? `Äldsta fastnade körningen har bearbetats i ${Math.max(...data.staleProcessing.map((item) => item.ageMinutes))} minuter.` : `De ${data?.consecutiveFailures} senaste körningarna behöver följas upp.`}
         </div>
       ) : null}
 
