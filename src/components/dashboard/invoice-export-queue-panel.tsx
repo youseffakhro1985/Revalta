@@ -37,6 +37,7 @@ export function InvoiceExportQueuePanel() {
   const [actingId, setActingId] = useState("");
   const [itemError, setItemError] = useState("");
   const [selected, setSelected] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
 
   const applyQueue = useCallback((body: QueuePayload) => {
     const nextProviders = body.providers || [];
@@ -89,6 +90,12 @@ export function InvoiceExportQueuePanel() {
     };
   }, [applyQueue]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#exportkofilter") return;
+    document.getElementById("exportkofilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
+
   async function queueExport(item: QueueItem) {
     const provider = selected[item.id];
     if (!provider) {
@@ -122,6 +129,11 @@ export function InvoiceExportQueuePanel() {
   if (hidden) return null;
 
   const anyConfigured = providers.some((provider) => provider.configured);
+  const needle = query.trim().toLowerCase();
+  const visibleItems = needle
+    ? items.filter((item) => `${item.title} ${item.propertyName} ${item.customerName}`.toLowerCase().includes(needle))
+    : items;
+  const formLocked = Boolean(actingId) || loading;
 
   return (
     <Panel
@@ -129,20 +141,33 @@ export function InvoiceExportQueuePanel() {
       title="Fakturaexport"
       description="Köa HTTP-export till Fortnox, Visma eller en webhook när underlaget är markerat som klart. Inga officiella SDK:er – samma endpoint som på arbetsordern."
     >
-      {error ? <InlineAlert>{error}</InlineAlert> : null}
-      {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
-      {loading ? <div className="h-32 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}
+      <div id="exportkofilter" className="scroll-mt-36 space-y-3">
+        {error ? <InlineAlert>{error}</InlineAlert> : null}
+        {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
+        <form id="exportkofilter-form" onSubmit={(event) => event.preventDefault()}>
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Sök i kön</span>
+              <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} placeholder="Arbetsorder, fastighet eller kund" aria-label="Sök i fakturaexportkön" />
+            </label>
+          </fieldset>
+        </form>
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
+      </div>
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inget att exportera" description="När ett fakturaunderlag är klart och saknar aktivt exportjobb hamnar arbetsordern här." />
       ) : null}
-      {!loading && !error && items.length > 0 ? (
+      {!loading && !error && items.length > 0 && visibleItems.length === 0 ? (
+        <EmptyState title="Inga arbetsordrar matchar sökningen" description="Ändra sökningen för att visa fler poster i exportkön." />
+      ) : null}
+      {!loading && !error && visibleItems.length > 0 ? (
         <div className="space-y-3">
           <p className="text-xs text-ink-500">{summary.workOrders} arbetsorder redo för export</p>
           {!anyConfigured ? (
             <InlineAlert>Ingen exportleverantör är konfigurerad. Sätt webhook- eller Fortnox/Visma-endpoint i miljön.</InlineAlert>
           ) : null}
           <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <div key={item.id} className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold text-ink-950">{item.title}</p>
@@ -156,7 +181,7 @@ export function InvoiceExportQueuePanel() {
                     id={`export-provider-${item.id}`}
                     value={selected[item.id] || ""}
                     onChange={(event) => setSelected((current) => ({ ...current, [item.id]: event.target.value }))}
-                    disabled={Boolean(actingId)}
+                    disabled={formLocked}
                     className={`${premiumFieldClass} h-9 min-w-[12rem] text-sm`}
                   >
                     {providers.map((provider) => (
@@ -167,7 +192,7 @@ export function InvoiceExportQueuePanel() {
                   </select>
                   <button
                     type="button"
-                    disabled={Boolean(actingId) || !anyConfigured}
+                    disabled={formLocked || !anyConfigured}
                     onClick={() => void queueExport(item)}
                     className="inline-flex h-9 items-center justify-center rounded-lg bg-petroleum-800 px-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
