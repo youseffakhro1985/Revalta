@@ -5,9 +5,11 @@ describe("underhall create hash", () => {
   it("keeps the hash target in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="ny-underhallsatgard"');
+    expect(source).toContain('id="underhall-byggnadsdel"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#ny-underhallsatgard"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("underhall-byggnadsdel")?.focus()');
     expect(source).toContain("permissions.canManage || loading");
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="ny-underhallsatgard"');
@@ -21,6 +23,7 @@ describe("underhall leftover plan first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#flerarsplan"');
     expect(source).toContain('id="ny-underhallsatgard"');
+    expect(source).toContain('id="underhall-byggnadsdel"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading || !permissions.canManage");
     expect(source).toContain("Åtgärderna hämtas.");

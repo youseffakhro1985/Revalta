@@ -88,6 +88,7 @@ export default function MaintenancePage() {
     if (loading) return;
     if (window.location.hash !== "#ny-underhallsatgard") return;
     document.getElementById("ny-underhallsatgard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("underhall-byggnadsdel")?.focus(), 0);
   }, [loading, permissions.canManage]);
   useEffect(() => {
     if (loading) return;
@@ -252,7 +253,7 @@ export default function MaintenancePage() {
             <Panel title="Ny planerad åtgärd" description="Koppla åtgärden till rätt fastighet, år, kostnad och prioritet." className="xl:sticky xl:top-[118px]">
             <form onSubmit={submit} className="space-y-4">
               <Field label="Fastighet"><select required disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
-              <Field label="Byggnadsdel"><input required autoFocus disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.component} onChange={(event) => setForm({ ...form, component: event.target.value })} placeholder="Ex. Tak, fasad eller ventilation" /></Field>
+              <Field label="Byggnadsdel"><input id="underhall-byggnadsdel" required autoFocus disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.component} onChange={(event) => setForm({ ...form, component: event.target.value })} placeholder="Ex. Tak, fasad eller ventilation" /></Field>
               <Field label="Åtgärd"><textarea required disabled={saving || loading || !permissions.canManage} className={premiumTextareaClass} value={form.measure} onChange={(event) => setForm({ ...form, measure: event.target.value })} placeholder="Beskriv planerad åtgärd" /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Planerat år"><input required type="number" disabled={saving || loading || !permissions.canManage} className={premiumFieldClass} value={form.plannedYear} onChange={(event) => setForm({ ...form, plannedYear: event.target.value })} /></Field>
