@@ -38,3 +38,17 @@ describe("imd leftover filter first HTML", () => {
     expect(form).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("imd leftover readings first HTML", () => {
+  it("keeps leftover IMD readings in the first HTML without stealing create or filter", () => {
+    const form = readFileSync(new URL("./imd-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="imdlista"');
+    expect(form).toContain('window.location.hash !== "#imdlista"');
+    expect(form).toContain("Avläsningarna hämtas.");
+    expect(form).toContain('id="imdfilter"');
+    expect(form).toContain("Ny avläsning");
+    expect(form).not.toContain('id="energilista"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("disabled={loading}");
+  });
+});
