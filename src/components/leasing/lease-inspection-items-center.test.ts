@@ -15,3 +15,16 @@ describe("lease inspection items save first HTML", () => {
     expect(source).not.toContain('{loading ? <div className="h-48 animate-pulse rounded-xl bg-sand-100" />');
   });
 });
+
+describe("lease inspection leftover first HTML", () => {
+  it("keeps leftover inspection items in the first HTML without stealing save", () => {
+    const source = readFileSync(new URL("./lease-inspection-items-center.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="besiktningslista"');
+    expect(source).toContain('window.location.hash !== "#besiktningslista"');
+    expect(source).toContain("Besiktningspunkterna hämtas.");
+    expect(source).toContain('id="spara-besiktning"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("saving || loading");
+  });
+});
