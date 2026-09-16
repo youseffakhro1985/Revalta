@@ -89,6 +89,11 @@ export function InvoiceBasisQueuePanel() {
     if (window.location.hash !== "#underlagfilter") return;
     document.getElementById("underlagfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#underlagko") return;
+    document.getElementById("underlagko")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function rebuild(item: QueueItem) {
     setActingId(item.id);
@@ -175,8 +180,9 @@ export function InvoiceBasisQueuePanel() {
             </label>
           </fieldset>
         </form>
-        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
+      <div id="underlagko" className="scroll-mt-36">
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inget underlag att bygga" description="När tid eller material är godkänt och utkastet saknas rader, eller utkastet väntar på kundnamn, hamnar arbetsordern här." />
       ) : null}
@@ -242,6 +248,7 @@ export function InvoiceBasisQueuePanel() {
           </div>
         </div>
       ) : null}
+      </div>
     </Panel>
   );
 }
