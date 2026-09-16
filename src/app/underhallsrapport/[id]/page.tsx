@@ -21,12 +21,14 @@ export default function MaintenanceReportPage({params}:{params:Promise<{id:strin
   const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{const response=await fetch(`/api/properties/${id}/maintenance-plan`,{cache:"no-store"});const payload=await readResponseJson(response);if(!response.ok)throw new Error(payload.error||"Kunde inte hämta rapporten");setData(payload);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta rapporten");}finally{setLoading(false);}},[id]);
   useEffect(()=>{void load();},[load]);
   useEffect(()=>{if(window.location.hash!=="#skriv-ut")return;document.getElementById("skriv-ut")?.scrollIntoView({behavior:"smooth",block:"start"});},[loading,data]);
+  useEffect(()=>{if(loading)return;if(window.location.hash!=="#underhallsinnehall")return;document.getElementById("underhallsinnehall")?.scrollIntoView({behavior:"smooth",block:"start"});},[loading,data]);
   const total=useMemo(()=>data?.forecast?.yearly.reduce((sum,item)=>sum+item.amount,0)||0,[data]);
   const plan=data?.activePlan||null;
 
   return <main className="min-h-screen bg-sand-50 px-5 py-8 text-ink-900 print:bg-white print:p-0">
     <article className="mx-auto max-w-[1100px] rounded-2xl border border-sand-200 bg-white p-8 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none sm:p-12">
       <div className="mb-10 flex items-start justify-between gap-6 print:hidden"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-petroleum-700">Revalta · Underhållsrapport</p><h1 className="mt-2 text-3xl font-semibold">{data?.property.name||"Underhållsrapport"}</h1></div><button id="skriv-ut" type="button" autoFocus disabled={loading} onClick={()=>window.print()} className="inline-flex h-11 scroll-mt-36 items-center gap-2 rounded-xl bg-petroleum-700 px-5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><Printer className="h-4 w-4"/>Skriv ut / spara PDF</button></div>
+      <div id="underhallsinnehall" className="scroll-mt-36">
       {loading&&!data?<p className="text-sm text-ink-500">Rapporten hämtas.</p>:null}
       {error&&!data?<p className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-800">{error}</p>:null}
       {!loading&&data&&!plan?<p className="text-sm text-ink-600">Ingen underhållsplan finns för fastigheten.</p>:null}
@@ -43,6 +45,7 @@ export default function MaintenanceReportPage({params}:{params:Promise<{id:strin
 
       <footer className="mt-12 border-t border-sand-200 pt-5 text-xs text-ink-500">Rapport genererad i Revalta · {new Intl.DateTimeFormat("sv-SE",{dateStyle:"long"}).format(new Date())}</footer>
       </>:null}
+      </div>
     </article>
   </main>;
 }
