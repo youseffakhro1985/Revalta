@@ -63,3 +63,19 @@ describe("eskaleringar recipient filter first HTML", () => {
     expect(source).not.toContain("{loading && !data ? <div className=\"h-40 animate-pulse rounded-xl bg-sand-100\" /> : null}");
   });
 });
+
+describe("eskaleringar leftover recipients first HTML", () => {
+  it("keeps leftover recipients in the first HTML without stealing Hantera regler or filters", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="eskmottagarlista"');
+    expect(source).toContain('window.location.hash !== "#eskmottagarlista"');
+    expect(source).toContain("Mottagarna hämtas.");
+    expect(source).toContain('id="mottagarfilter"');
+    expect(source).toContain('id="eskaleringslista"');
+    expect(source).toContain("Hantera regler");
+    expect(source).not.toContain('id="mottagarlista"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("autoFocus");
+  });
+});
