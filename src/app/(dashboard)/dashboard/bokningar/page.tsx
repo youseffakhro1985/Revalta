@@ -5,7 +5,6 @@ import { Ban, Building2, CalendarDays, Clock3, Plus, Search } from "lucide-react
 import {
   EmptyState,
   InlineAlert,
-  LoadingState,
   MetricCard,
   PageHeader,
   Panel,
@@ -90,6 +89,16 @@ export default function BookingsPage() {
     if (window.location.hash !== "#ny-bokning") return;
     document.getElementById("ny-bokning")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#bokningsfilter") return;
+    document.getElementById("bokningsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, bookings]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#bokningslista") return;
+    document.getElementById("bokningslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, bookings]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -241,13 +250,14 @@ export default function BookingsPage() {
         ) : null}
 
         <Panel title="Bokningsöversikt" description="Sök, filtrera och hantera samtliga resurser." bodyClassName="p-0">
-          <div className="grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-[1fr_180px_160px] sm:p-5">
-            <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input aria-label="Sök bokningar" placeholder="Sök boende, resurs, fastighet eller objekt" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
-            <select aria-label="Filtrera resurs" value={resourceFilter} onChange={(event) => setResourceFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla resurser</option>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select>
-            <select aria-label="Filtrera status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={premiumFieldClass}><option value="all">Alla statusar</option><option value="active">Aktiva</option><option value="cancelled">Avbokade</option></select>
+          <div id="bokningsfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-[1fr_180px_160px] sm:p-5">
+            <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input disabled={loading} aria-label="Sök bokningar" placeholder="Sök boende, resurs, fastighet eller objekt" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
+            <select disabled={loading} aria-label="Filtrera resurs" value={resourceFilter} onChange={(event) => setResourceFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla resurser</option>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select>
+            <select disabled={loading} aria-label="Filtrera status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={premiumFieldClass}><option value="all">Alla statusar</option><option value="active">Aktiva</option><option value="cancelled">Avbokade</option></select>
           </div>
 
-          {loading ? <LoadingState label="Hämtar bokningar…" rows={4} /> : filteredBookings.length === 0 ? <EmptyState icon={CalendarDays} title="Inga bokningar hittades" description={bookings.length ? "Justera sökning eller filter för att visa fler bokningar." : "När den första bokningen registreras visas den här."} /> : (
+          <div id="bokningslista" className="scroll-mt-36">
+          {loading ? <p className="p-6 text-sm text-ink-500">Bokningarna hämtas.</p> : filteredBookings.length === 0 ? <EmptyState icon={CalendarDays} title="Inga bokningar hittades" description={bookings.length ? "Justera sökning eller filter för att visa fler bokningar." : "När den första bokningen registreras visas den här."} /> : (
             <div className="divide-y divide-sand-100">
               {filteredBookings.map((booking) => (
                 <article key={booking.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
@@ -280,6 +290,7 @@ export default function BookingsPage() {
               ))}
             </div>
           )}
+          </div>
         </Panel>
       </section>
     </div>
