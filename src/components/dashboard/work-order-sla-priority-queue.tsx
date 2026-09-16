@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Clock3, ShieldAlert, UserRoundX } from "lucide-react";
-import { InlineAlert, Panel } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
 import type { WorkOrderSlaEvaluation } from "@/lib/work-order-sla";
@@ -43,6 +43,7 @@ export function WorkOrderSlaPriorityQueue() {
   const [items, setItems] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [riskFilter, setRiskFilter] = useState("all");
 
   useEffect(() => {
     let mounted = true;
@@ -62,6 +63,12 @@ export function WorkOrderSlaPriorityQueue() {
     return () => { mounted = false; };
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#slafilter") return;
+    document.getElementById("slafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
+
   const queue = useMemo(() => buildSlaPriorityQueue(items.map((item) => ({
     id: item.id,
     status: item.status,
@@ -71,13 +78,38 @@ export function WorkOrderSlaPriorityQueue() {
     payload: item,
   })), 6), [items]);
 
-  if (loading) return <div className="h-48 animate-pulse rounded-2xl bg-sand-100" aria-label="Laddar SLA-prioritering" />;
-  if (error) return <InlineAlert>{error}</InlineAlert>;
-  if (queue.length === 0) return null;
+  const visible = useMemo(() => {
+    if (riskFilter === "unassigned") return queue.filter((item) => !item.assigned);
+    if (riskFilter !== "all") return queue.filter((item) => item.sla.risk === riskFilter);
+    return queue;
+  }, [queue, riskFilter]);
 
-  return <Panel title="Nästa SLA-åtgärder" description="Automatiskt prioriterad kö med passerade, kritiska och snart förfallande arbetsordrar. Otilldelade arbetsordrar tilldelas i Planering eller Dagens förvaltning.">
+  if (!loading && error) return <InlineAlert>{error}</InlineAlert>;
+  if (!loading && queue.length === 0) return null;
+
+  return <div id="slafilter" className="scroll-mt-36">
+  <Panel title="Nästa SLA-åtgärder" description="Automatiskt prioriterad kö med passerade, kritiska och snart förfallande arbetsordrar. Otilldelade arbetsordrar tilldelas i Planering eller Dagens förvaltning.">
+    <form onSubmit={(event) => event.preventDefault()} className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <fieldset disabled={loading} className="contents">
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera kön</span>
+          <select autoFocus value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera SLA-kö">
+            <option value="all">Alla SLA-risker</option>
+            <option value="overdue">Försenade</option>
+            <option value="critical">Kritiska</option>
+            <option value="soon">Snart förfallande</option>
+            <option value="unassigned">Otilldelade</option>
+          </select>
+        </label>
+      </fieldset>
+    </form>
+    {loading ? (
+      <p className="text-sm text-ink-500">SLA-kön hämtas.</p>
+    ) : visible.length === 0 ? (
+      <EmptyState title="Inga poster matchar filtret" description="Ändra filtret för att visa fler SLA-åtgärder, eller tilldela otilldelade ordrar i Planering." />
+    ) : (
     <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-      {queue.map((entry) => {
+      {visible.map((entry) => {
         const workOrder = entry.payload!;
         const sla = workOrder.sla;
         const time = sla.overdueMinutes !== null
@@ -109,5 +141,7 @@ export function WorkOrderSlaPriorityQueue() {
         </article>;
       })}
     </div>
-  </Panel>;
+    )}
+  </Panel>
+  </div>;
 }
