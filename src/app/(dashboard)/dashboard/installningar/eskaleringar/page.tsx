@@ -130,6 +130,11 @@ export default function EscalationAdminPage() {
     if (window.location.hash !== "#regellista") return;
     document.getElementById("regellista")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#eskhistoriklista") return;
+    document.getElementById("eskhistoriklista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   useEffect(() => {
     if (loading) return;
@@ -268,6 +273,8 @@ export default function EscalationAdminPage() {
 
       <div id="historik" className="scroll-mt-36">
       <Panel title="Revisionssäker eskaleringshistorik" description="Varje nytt leveransförsök sparar en oföränderlig ögonblicksbild av regler, kvalificering och faktiska mottagare.">
+        <div id="eskhistoriklista" className="scroll-mt-36">
+        {loading && !data ? <p className="text-sm text-ink-500">Historiken hämtas.</p> : null}
         {!loading && data?.events.length === 0 ? <EmptyState title="Ingen historik ännu" description="När eskaleringsmotorn körs visas resultatet och regelunderlaget här." /> : null}
         {data?.events.length ? <div className="space-y-3">{data.events.map((event) => {
           const payload = event.payload;
@@ -301,6 +308,7 @@ export default function EscalationAdminPage() {
             </details>
           );
         })}</div> : null}
+        </div>
       </Panel>
       </div>
     </div>
