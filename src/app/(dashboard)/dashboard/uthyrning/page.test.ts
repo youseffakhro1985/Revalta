@@ -44,3 +44,16 @@ describe("uthyrning occupancy filter first HTML", () => {
     expect(form).not.toContain('{[1, 2, 3, 4].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("uthyrning leftover occupancy first HTML", () => {
+  it("keeps leftover occupancy in the first HTML without stealing create", () => {
+    const form = readFileSync(new URL("./uthyrning-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="uthyrningslage"');
+    expect(form).toContain('window.location.hash !== "#uthyrningslage"');
+    expect(form).toContain("Uthyrningsläget hämtas.");
+    expect(form).toContain("Nytt avtal");
+    expect(form).toContain('id="lease-editor"');
+    expect(form).toContain('get("create") === "1"');
+    expect(form).toContain("scrollIntoView");
+  });
+});

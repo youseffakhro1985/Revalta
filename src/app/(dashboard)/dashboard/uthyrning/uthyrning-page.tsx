@@ -176,6 +176,11 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#bestandsfilter") return;
     document.getElementById("bestandsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, properties]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#uthyrningslage") return;
+    document.getElementById("uthyrningslage")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, properties]);
 
   const currentLeaseByUnit = useMemo(() => {
     const map = new Map<string, Lease>();
@@ -479,6 +484,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
       {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra avtal.</InlineAlert> : null}
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+        <div id="uthyrningslage" className="scroll-mt-36">
         <Panel title="Uthyrningsläge per fastighet" description="Fastigheter med flest lediga objekt visas först." bodyClassName="p-0">
           {loading ? <p className="p-5 text-sm text-ink-500">Uthyrningsläget hämtas.</p> : propertyOccupancy.length ? (
             <div className="divide-y divide-sand-100">
@@ -500,6 +506,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
             </div>
           ) : <EmptyState title="Inget uthyrningsbestånd ännu" description="Lägg till objekt under Fastigheter för att börja arbeta med uthyrning." />}
         </Panel>
+        </div>
 
         <Panel title="Uthyrningssignal" description="Snabb avläsning av portföljen.">
           <div className="flex flex-col items-center gap-5 sm:flex-row xl:flex-col 2xl:flex-row">
