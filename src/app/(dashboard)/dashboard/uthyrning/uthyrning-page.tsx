@@ -165,6 +165,13 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (new URLSearchParams(window.location.search).get("create") === "1") setShowForm(true);
   }, [canManage, loading]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (!showForm) return;
+    if (window.location.hash !== "#lease-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
+    document.getElementById("lease-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, showForm]);
+
   const currentLeaseByUnit = useMemo(() => {
     const map = new Map<string, Lease>();
     for (const lease of occupyingLeases) if (occupyingStatuses.has(lease.status) && !map.has(lease.unit_id)) map.set(lease.unit_id, lease);
@@ -412,6 +419,8 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     }
   }
 
+  const showCreate = canManage || loading;
+
   return (
     <div className="space-y-5 sm:space-y-6">
       <header className="rounded-[22px] border border-sand-200/90 bg-[#FCFBF7] px-5 py-5 shadow-premium-sm sm:px-6 sm:py-6">
@@ -430,8 +439,8 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
             <Link href="/dashboard/uthyrning/overlamning" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[12px] font-semibold text-ink-700 shadow-premium-sm transition hover:border-petroleum-200 hover:text-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
               <ClipboardSignature className="h-4 w-4" strokeWidth={1.7} /> Överlämning & besiktning
             </Link>
-            {canManage ? (
-              <button type="button" onClick={() => (showForm ? closeForm() : openNewForm())} className={`${premiumPrimaryButtonClass} h-10 px-4 text-[12px]`}>
+            {showCreate ? (
+              <button type="button" disabled={loading && !showForm} onClick={() => (showForm ? closeForm() : openNewForm())} className={`${premiumPrimaryButtonClass} h-10 px-4 text-[12px]`}>
                 <Plus className="mr-2 h-4 w-4" /> {showForm ? "Stäng registrering" : "Nytt avtal"}
               </button>
             ) : null}
@@ -505,10 +514,11 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
         </Panel>
       </section>
 
-      {showForm ? (
-        <section id="lease-editor" className="scroll-mt-24">
+      {showForm && showCreate ? (
+        <section id="lease-editor" className="scroll-mt-36">
           <Panel title={form.id ? "Redigera avtal" : "Nytt avtal"} description={form.id ? `Uppdaterar ${form.leaseNumber}` : "Koppla objekt och hyrespart. Avtalet sparas i den befintliga tenant-säkrade avtalsmotorn."}>
             <form onSubmit={submit} className="space-y-6">
+              <fieldset disabled={saving || loading} className="contents">
               <div className="flex items-center justify-between rounded-xl border border-petroleum-100 bg-petroleum-50 px-3.5 py-3">
                 <div><p className="text-sm font-semibold text-petroleum-900">{form.id ? "Redigeringsläge" : "Avtalseditor"}</p><p className="mt-0.5 text-xs text-petroleum-700/80">{form.id ? "Ändringar loggas via befintligt avtalsflöde." : "Fyll i objekt, hyrespart och villkor."}</p></div>
                 <button type="button" onClick={closeForm} className="rounded-lg p-2 text-petroleum-800 transition hover:bg-white" aria-label="Stäng avtalseditor"><X className="h-4 w-4" /></button>
@@ -558,9 +568,10 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
                 <div>{form.id && softDeletableLeaseStatuses.has(form.status) ? <button type="button" disabled={deletingLease} onClick={() => void softDeleteLease({ id: form.id, lease_number: form.leaseNumber || form.id, status: form.status })} className="text-xs font-semibold text-danger-700 transition hover:text-danger-900 disabled:opacity-60">{deletingLease ? "Tar bort…" : "Ta bort avtal"}</button> : null}</div>
                 <div className="flex gap-2">
                   <button type="button" onClick={closeForm} className="h-10 rounded-xl border border-sand-200 bg-white px-4 text-xs font-semibold text-ink-700 transition hover:bg-sand-50">Avbryt</button>
-                  <button disabled={saving} className={`${premiumPrimaryButtonClass} h-10 px-5 text-xs`}>{saving ? "Sparar…" : form.id ? "Spara ändringar" : "Skapa avtal"}</button>
+                  <button disabled={saving || loading} className={`${premiumPrimaryButtonClass} h-10 px-5 text-xs`}>{saving ? "Sparar…" : form.id ? "Spara ändringar" : "Skapa avtal"}</button>
                 </div>
               </div>
+              </fieldset>
             </form>
           </Panel>
         </section>

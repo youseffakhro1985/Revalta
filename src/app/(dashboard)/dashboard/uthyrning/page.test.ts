@@ -21,6 +21,10 @@ describe("uthyrning create query", () => {
     expect(form).toContain("Nytt avtal");
     expect(form).toContain("autoFocus");
     expect(form).toContain("<Plus");
+    expect(form).toContain("canManage || loading");
+    expect(form).toContain('id="lease-editor"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
   });
 });
