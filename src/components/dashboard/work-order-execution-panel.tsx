@@ -114,6 +114,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#spara-utforande") return;
     document.getElementById("spara-utforande")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("utforande-rubrik")?.focus(), 0);
   }, [loading, checklist]);
 
   async function post(payload: Record<string, unknown>, message: string, reset?: () => void) {
@@ -201,7 +202,7 @@ export function WorkOrderExecutionPanel({ workOrderId }: Props) {
         ) : null}
         <form id="spara-utforande" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); void post({ action: "checklist.create", title: data.get("title"), description: data.get("description"), isRequired: data.get("isRequired") === "on" }, "Kontrollpunkten har lagts till.", () => form.reset()); }} className="grid scroll-mt-36 gap-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4 sm:grid-cols-2">
         <fieldset disabled={formLocked} className="contents">
-        <input autoFocus name="title" required placeholder="Ny kontrollpunkt" aria-label="Rubrik för ny kontrollpunkt" className={premiumFieldClass} />
+        <input id="utforande-rubrik" autoFocus name="title" required placeholder="Ny kontrollpunkt" aria-label="Rubrik för ny kontrollpunkt" className={premiumFieldClass} />
         <input name="description" placeholder="Beskrivning eller krav" aria-label="Beskrivning av kontrollpunkt" className={premiumFieldClass} />
         <label className="inline-flex min-h-11 items-center gap-2 text-sm text-ink-600"><input name="isRequired" type="checkbox" defaultChecked className="h-4 w-4 rounded border-sand-300" />Obligatorisk</label>
         <button disabled={formLocked} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Lägg till"}</button>
