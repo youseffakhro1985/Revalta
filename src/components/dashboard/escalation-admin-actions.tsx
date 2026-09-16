@@ -41,12 +41,12 @@ export function EscalationAdminActions({
   }
 
   return (
-    <div className="space-y-4">
+    <div id="kor-eskalering" className="scroll-mt-36 space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <button type="button" onClick={() => void run("test")} disabled={!canManage || !configured || running !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-3 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50">
           <Send className="h-4 w-4" /> {running === "test" ? "Skickar test…" : "Skicka testutskick"}
         </button>
-        <button type="button" onClick={() => void run("retry")} disabled={!canManage || !configured || running !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="button" id="kor-eskalering-motor" onClick={() => void run("retry")} disabled={!canManage || !configured || running !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50">
           <RefreshCcw className={`h-4 w-4 ${running === "retry" ? "animate-spin" : ""}`} /> {running === "retry" ? "Kör motorn…" : "Kör eskaleringsmotorn nu"}
         </button>
       </div>

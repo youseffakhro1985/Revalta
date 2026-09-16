@@ -146,6 +146,12 @@ export default function EscalationAdminPage() {
     if (window.location.hash !== "#eskmottagarlista") return;
     document.getElementById("eskmottagarlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#kor-eskalering") return;
+    document.getElementById("kor-eskalering")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("kor-eskalering-motor")?.focus(), 0);
+  }, [loading, data]);
 
   const configured = useMemo(() => {
     if (!data) return false;

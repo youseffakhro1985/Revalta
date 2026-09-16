@@ -110,3 +110,18 @@ describe("eskaleringar leftover history first HTML", () => {
     expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
   });
 });
+
+describe("eskaleringar run-engine first HTML", () => {
+  it("keeps Kör eskaleringsmotorn in the first HTML without stealing Hantera regler", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('window.location.hash !== "#kor-eskalering"');
+    expect(source).toContain('document.getElementById("kor-eskalering-motor")?.focus()');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("Hantera regler");
+    expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
+    expect(source).toContain('id="driftkontroll"');
+    expect(source).toContain('id="regellista"');
+    expect(source).toContain("EscalationAdminActions");
+    expect(source).not.toContain('id="kor-motor"');
+  });
+});
