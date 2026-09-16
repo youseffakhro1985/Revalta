@@ -3,7 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, FileBadge2, ShieldCheck, Wrench } from "lucide-react";
-import { EmptyState, InlineAlert, Panel } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 
 type CardData = {
   assets: Record<string, unknown>[];
@@ -43,6 +43,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
   const [data, setData] = useState<CardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [kindFilter, setKindFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +61,12 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
   }, [propertyId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#tidslinjefilter") return;
+    document.getElementById("tidslinjefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const items = useMemo<TimelineItem[]>(() => {
     if (!data) return [];
@@ -85,16 +92,37 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
     return result.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 20);
   }, [data]);
 
-  if (loading) return <div className="h-72 animate-pulse rounded-2xl bg-sand-100" />;
-  if (error) return <InlineAlert>{error}</InlineAlert>;
+  const visible = useMemo(
+    () => (kindFilter === "all" ? items : items.filter((item) => item.kind === kindFilter)),
+    [items, kindFilter],
+  );
+
+  if (!loading && error) return <InlineAlert>{error}</InlineAlert>;
 
   return (
+    <div id="tidslinjefilter" className="scroll-mt-36">
     <Panel title="Kommande händelser" description="Samlad tidslinje för service, besiktningar, garantier och avtal." bodyClassName="p-0">
-      {items.length === 0 ? (
-        <EmptyState title="Inga kommande datum registrerade" description="När service, besiktningar, garantier eller avtal får datum visas de automatiskt här." />
+      <form onSubmit={(event) => event.preventDefault()} className="border-b border-sand-100 p-5 sm:px-6">
+        <fieldset disabled={loading} className="contents">
+          <label className="block max-w-sm">
+            <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera händelser</span>
+            <select autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera livscykelhändelser">
+              <option value="all">Alla händelser</option>
+              <option value="service">Service</option>
+              <option value="inspection">Besiktning</option>
+              <option value="warranty">Garanti</option>
+              <option value="agreement">Avtal</option>
+            </select>
+          </label>
+        </fieldset>
+      </form>
+      {loading ? (
+        <p className="p-5 text-sm text-ink-500 sm:px-6">Tidslinjen hämtas.</p>
+      ) : visible.length === 0 ? (
+        <EmptyState title={items.length === 0 ? "Inga kommande datum registrerade" : "Inga händelser matchar filtret"} description={items.length === 0 ? "När service, besiktningar, garantier eller avtal får datum visas de automatiskt här." : "Ändra filtret för att visa fler händelser i livscykeln."} />
       ) : (
         <div className="divide-y divide-sand-100">
-          {items.map((item) => {
+          {visible.map((item) => {
             const Icon = config[item.kind].icon;
             const overdue = item.date.getTime() < Date.now();
             return (
@@ -118,5 +146,6 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
         </div>
       )}
     </Panel>
+    </div>
   );
 }
