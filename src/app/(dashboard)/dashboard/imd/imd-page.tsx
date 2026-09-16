@@ -107,6 +107,11 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#imdfilter") return;
     document.getElementById("imdfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, readings]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#imdlista") return;
+    document.getElementById("imdlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, readings]);
 
   const availableLeases = useMemo(() => leases.filter((lease) => !propertyId || lease.property_id === propertyId), [leases, propertyId]);
   const propertyNames = useMemo(() => [...new Set(readings.map((item) => item.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [readings]);
@@ -335,6 +340,7 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
     </section>
 
     <Panel title="Avläsningar och debitering" description={`${visibleReadings.length} av ${readings.length} mätvärden i vald vy`} bodyClassName="p-0">
+      <div id="imdlista" className="scroll-mt-36">
       {loading ? <p className="p-6 text-sm text-ink-500">Avläsningarna hämtas.</p> : visibleReadings.length === 0 ? <EmptyState title="Inga avläsningar matchar urvalet" description="Justera filtren eller registrera ett nytt mätvärde." /> : <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
           <thead className="bg-sand-50 text-[10px] uppercase tracking-[0.1em] text-ink-500"><tr>{["Fastighet", "Objekt", "Mätare", "Typ / period", "Förbrukning", "Belopp", "Debitering", "Åtgärder"].map((head) => <th key={head} className="px-5 py-3 font-semibold">{head}</th>)}</tr></thead>
@@ -358,6 +364,7 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
           })}</tbody>
         </table>
       </div>}
+      </div>
       {totals.linked > 0 ? <div className="flex flex-col gap-3 border-t border-sand-100 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between"><p className="text-ink-500">Kopplade debiteringar hanteras vidare i hyresaviseringen.</p><Link href="/dashboard/hyresavisering" className="font-semibold text-petroleum-800 hover:text-petroleum-950">Öppna hyresavisering</Link></div> : null}
     </Panel>
   </div>;
