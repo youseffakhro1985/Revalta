@@ -125,6 +125,11 @@ export default function CalendarPage() {
     if (window.location.hash !== "#kalenderfilter") return;
     document.getElementById("kalenderfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, events]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#aktivitetslista") return;
+    document.getElementById("aktivitetslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, events]);
 
   function startEdit(event: CalendarEvent) {
     if (!isEditableCalendarEvent(event)) return;
@@ -368,6 +373,7 @@ export default function CalendarPage() {
             </select>
           </div>
 
+          <div id="aktivitetslista" className="scroll-mt-36">
           {loading ? (
             <p className="p-6 text-sm text-ink-500">Aktiviteterna hämtas.</p>
           ) : visible.length === 0 ? (
@@ -479,6 +485,7 @@ export default function CalendarPage() {
               ))}
             </div>
           )}
+          </div>
         </Panel>
       </section>
     </div>

@@ -29,3 +29,17 @@ describe("kalender filter first HTML", () => {
     expect(source).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("kalender leftover timeline first HTML", () => {
+  it("keeps leftover calendar events in the first HTML without stealing create or filter", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="aktivitetslista"');
+    expect(source).toContain('window.location.hash !== "#aktivitetslista"');
+    expect(source).toContain("Aktiviteterna hämtas.");
+    expect(source).toContain('id="ny-aktivitet"');
+    expect(source).toContain('id="kalenderfilter"');
+    expect(source).not.toContain('id="aktivitetsfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("canManage || loading");
+  });
+});
