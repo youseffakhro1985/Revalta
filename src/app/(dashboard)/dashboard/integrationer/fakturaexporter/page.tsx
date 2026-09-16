@@ -71,6 +71,11 @@ export default function InvoiceExportOperationsPage() {
     if (window.location.hash !== "#exportfilter") return;
     document.getElementById("exportfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#exportjobb") return;
+    document.getElementById("exportjobb")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function act(job: Job, action: "retry" | "cancel") {
     setSaving(job.jobId);
@@ -137,8 +142,9 @@ export default function InvoiceExportOperationsPage() {
     </div>
 
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div id="exportjobb" className="scroll-mt-36">
       <Panel title="Exportjobb" description={`${data?.jobs.length ?? 0} visade av ${data?.total ?? 0} jobb`}>
-        {loading && !data ? <div className="h-64 animate-pulse rounded-xl bg-sand-100" /> : null}
+        {loading && !data ? <p className="text-sm text-ink-500">Exportjobben hämtas.</p> : null}
         {!loading && data && data.jobs.length === 0 ? <EmptyState title="Inga exportjobb matchar" description="Ändra filtren eller skapa ett exportjobb från ett faktureringsunderlag." /> : null}
         <div className="space-y-3">
           {data?.jobs.map(job => <article key={job.jobId} className="rounded-2xl border border-sand-200 bg-white p-5 shadow-sm">
@@ -160,6 +166,7 @@ export default function InvoiceExportOperationsPage() {
           </article>)}
         </div>
       </Panel>
+      </div>
 
       <Panel title="Integrationsstatus" description="Konfiguration läses säkert från miljövariabler.">
         <div className="space-y-3">{data?.providers.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-sand-200 p-4"><div><p className="font-semibold text-ink-900">{item.name}</p><p className="mt-1 text-xs text-ink-500">{item.configured ? "Redo för export" : "Konfiguration saknas"}</p></div>{item.configured ? <CheckCircle2 className="h-5 w-5 text-success-600" /> : <AlertTriangle className="h-5 w-5 text-warning-600" />}</div>)}</div>
