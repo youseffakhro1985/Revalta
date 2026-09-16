@@ -60,6 +60,11 @@ export function LeaseInspectionItemsCenter() {
     if (window.location.hash !== "#spara-besiktning") return;
     document.getElementById("spara-besiktning")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, detail]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#besiktningslista") return;
+    document.getElementById("besiktningslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, detail]);
 
   const isLegacy = detail?.source === "legacy";
   const canEdit = Boolean(detail?.permissions.canManage) && !isLegacy;
@@ -116,6 +121,7 @@ export function LeaseInspectionItemsCenter() {
         <button type="button" onClick={() => void loadDetail(leaseId)} disabled={!leaseId || loading} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button>
       </div>
       {error ? <InlineAlert>{error}</InlineAlert> : null}{success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
+      <div id="besiktningslista" className="scroll-mt-36">
       {loading ? <p className="text-sm text-ink-500">Besiktningspunkterna hämtas.</p> : !detail ? <EmptyState title="Välj ett avtal" description="Besiktningspunkter registreras separat per avtal och objekt." /> : <>
         {isLegacy ? <InlineAlert tone="warning">{LEGACY_BACKFILL}</InlineAlert> : null}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[["Punkter", summary.total], ["Godkända", summary.approved], ["Öppna åtgärder", summary.actions], ["Valda för arbetsorder", summary.selected]].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-sand-50 p-4"><p className="text-xs text-ink-500">{label}</p><p className="mt-1 text-2xl font-semibold text-ink-900">{value}</p></div>)}</div>
@@ -126,6 +132,7 @@ export function LeaseInspectionItemsCenter() {
           <div className="mt-3 flex flex-wrap gap-4 text-sm text-ink-700"><label className="flex items-center gap-2"><input type="checkbox" checked={item.selectedForWorkOrder} disabled={!canEdit || item.condition !== "action_required"} onChange={(event) => patchItem(item.id, { selectedForWorkOrder: event.target.checked })} className="h-4 w-4 accent-petroleum-700" />Välj för arbetsorder</label><label className="flex items-center gap-2"><input type="checkbox" checked={item.resolved} disabled={!canEdit} onChange={(event) => patchItem(item.id, { resolved: event.target.checked })} className="h-4 w-4 accent-petroleum-700" />Åtgärdad</label></div>
         </article>)}</div>
       </>}
+      </div>
       <div id="spara-besiktning" className="scroll-mt-36 flex flex-col gap-3 sm:flex-row sm:justify-between">
         <button type="button" disabled={saving || loading || !canEdit} onClick={() => setItems([...(detail?.record.items || []), newItem()])} className="inline-flex items-center justify-center rounded-xl border border-petroleum-700 px-4 py-2.5 text-sm font-semibold text-petroleum-800"><Plus className="mr-2 h-4 w-4" />Lägg till besiktningspunkt</button>
         <button type="button" autoFocus disabled={saving || loading || !canEdit} onClick={() => void save()} className={premiumPrimaryButtonClass}><ClipboardCheck className="mr-2 h-4 w-4" />{saving ? "Sparar…" : "Spara besiktning"}</button>
