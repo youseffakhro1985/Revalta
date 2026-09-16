@@ -26,3 +26,16 @@ describe("ticket assign queue filter first HTML", () => {
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
   });
 });
+
+describe("ticket assign leftover queue first HTML", () => {
+  it("keeps leftover ticket queue in the first HTML without stealing the filter", () => {
+    const source = readFileSync(new URL("./ticket-assign-queue-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="arendeko"');
+    expect(source).toContain('window.location.hash !== "#arendeko"');
+    expect(source).toContain("Kön hämtas.");
+    expect(source).toContain('id="arendefilter"');
+    expect(source).not.toContain('id="arendeurval"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
