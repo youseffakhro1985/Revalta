@@ -56,6 +56,7 @@ export function LeaseHandoverCenter() {
   useEffect(() => {
     if (window.location.hash !== "#valj-avtal") return;
     document.getElementById("valj-avtal")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("overlamning-avtal")?.focus(), 0);
   }, [loading]);
   useEffect(() => {
     if (loading) return;
@@ -104,7 +105,7 @@ export function LeaseHandoverCenter() {
 
   return <Panel title="Inflyttning, avflyttning och nycklar" description="Checklista, nyckelkvittens och besiktning med spårbar historik.">
     <div className="space-y-6">
-      <div id="valj-avtal" className="scroll-mt-36 flex flex-col gap-3 md:flex-row md:items-end"><label className="flex-1"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Avtal</span><select autoFocus aria-label="Välj avtal för överlämning" className={premiumFieldClass} value={leaseId} onChange={(event) => setLeaseId(event.target.value)}><option value="">Välj avtal</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.name}</option>)}</select></label><button type="button" onClick={() => void loadDetail(leaseId)} disabled={!leaseId || loading} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button></div>
+      <div id="valj-avtal" className="scroll-mt-36 flex flex-col gap-3 md:flex-row md:items-end"><label className="flex-1"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Avtal</span><select id="overlamning-avtal" autoFocus aria-label="Välj avtal för överlämning" className={premiumFieldClass} value={leaseId} onChange={(event) => setLeaseId(event.target.value)}><option value="">Välj avtal</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.name}</option>)}</select></label><button type="button" onClick={() => void loadDetail(leaseId)} disabled={!leaseId || loading} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button></div>
       {error ? <InlineAlert>{error}</InlineAlert> : null}{success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       <div id="overlamninglista" className="scroll-mt-36">
       {loading ? <p className="text-sm text-ink-500">Överlämningen hämtas.</p> : !detail ? <EmptyState title="Välj ett avtal" description="Pågående och avslutade avtal kan hanteras här." /> : <>
