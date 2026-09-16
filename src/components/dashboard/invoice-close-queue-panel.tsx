@@ -97,6 +97,11 @@ export function InvoiceCloseQueuePanel() {
     if (window.location.hash !== "#fakturafilter") return;
     document.getElementById("fakturafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#fakturako") return;
+    document.getElementById("fakturako")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function markInvoiced(item: QueueItem) {
     setActingId(item.id);
@@ -164,8 +169,9 @@ export function InvoiceCloseQueuePanel() {
             </label>
           </fieldset>
         </form>
-        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
+      <div id="fakturako" className="scroll-mt-36">
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inget att fakturera" description="När en slutförd arbetsorder har ett klart eller exporterat underlag hamnar den här." />
       ) : null}
@@ -202,6 +208,7 @@ export function InvoiceCloseQueuePanel() {
           </div>
         </div>
       ) : null}
+      </div>
     </Panel>
   );
 }
