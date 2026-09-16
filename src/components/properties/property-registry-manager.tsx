@@ -112,6 +112,7 @@ export function PropertyRegistryManager({
   useEffect(() => {
     if (window.location.hash !== "#spara-fastighet") return;
     document.getElementById("spara-fastighet")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("fastighet-namn")?.focus(), 0);
   }, []);
 
   return (
@@ -128,7 +129,7 @@ export function PropertyRegistryManager({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[
             ["name", "Fastighetsnamn"], ["propertyIdentifier", "Fastighetsbeteckning"], ["address", "Adress"], ["postalCode", "Postnummer"], ["city", "Ort"], ["constructionYear", "Byggår"], ["totalArea", "Total area, m²"], ["boa", "BOA, m²"], ["loa", "LOA, m²"], ["managerName", "Ansvarig förvaltare"], ["contactName", "Kontaktperson"], ["contactEmail", "Kontaktens e-post"], ["contactPhone", "Kontaktens telefon"],
-          ].map(([field, label]) => <label key={field} className={labelClass}>{label}<input autoFocus={field === "name"} className={inputClass} value={values[field as keyof PropertyValues]} onChange={(event) => updateValue(field as keyof PropertyValues, event.target.value)} required={["name", "address", "city"].includes(field)} aria-label={label} /></label>)}
+          ].map(([field, label]) => <label key={field} className={labelClass}>{label}<input id={field === "name" ? "fastighet-namn" : undefined} autoFocus={field === "name"} className={inputClass} value={values[field as keyof PropertyValues]} onChange={(event) => updateValue(field as keyof PropertyValues, event.target.value)} required={["name", "address", "city"].includes(field)} aria-label={label} /></label>)}
           <label className={labelClass}>Fastighetstyp<select className={inputClass} value={values.propertyType} onChange={(event) => updateValue("propertyType", event.target.value)}><option value="residential">Bostäder</option><option value="commercial">Kommersiell</option><option value="mixed">Blandfastighet</option><option value="community">Samhällsfastighet</option><option value="industrial">Industri</option><option value="other">Övrig</option></select></label>
           <label className={labelClass}>Status<select className={inputClass} value={values.status} onChange={(event) => updateValue("status", event.target.value)}><option value="active">Aktiv</option><option value="planning">Planering</option><option value="inactive">Inaktiv</option><option value="sold">Avyttrad</option></select></label>
         </div>
