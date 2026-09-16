@@ -37,6 +37,7 @@ export function TicketAssignQueuePanel() {
   const [error, setError] = useState("");
   const [actingId, setActingId] = useState("");
   const [itemError, setItemError] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("all");
 
   const applyQueue = useCallback((body: QueuePayload) => {
     const nextItems = body.tickets || [];
@@ -87,6 +88,12 @@ export function TicketAssignQueuePanel() {
     };
   }, [applyQueue]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#arendefilter") return;
+    document.getElementById("arendefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
+
   async function assign(item: QueueItem, assigneeId: string) {
     if (!assigneeId) {
       setItemError("Välj en ansvarig innan du tilldelar.");
@@ -117,19 +124,36 @@ export function TicketAssignQueuePanel() {
 
   if (hidden) return null;
 
+  const visibleItems = priorityFilter === "all" ? items : items.filter((item) => item.priority === "urgent");
+  const formLocked = Boolean(actingId) || loading;
+
   return (
     <OverviewPanel title="Otilldelade ärenden" description="Tilldela ansvarig här. Samma PATCH som på ärendet — den tilldelade får mejl." bodyClassName="p-0">
-      <div className="space-y-3 px-5 py-4">
+      <div id="arendefilter" className="scroll-mt-36 space-y-3 px-5 py-4">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
-        {loading ? <div className="h-32 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}
+        <form id="arendefilter-form" onSubmit={(event) => event.preventDefault()}>
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera kön</span>
+              <select autoFocus value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera otilldelade ärenden">
+                <option value="all">Alla prioriteringar</option>
+                <option value="urgent">Akut</option>
+              </select>
+            </label>
+          </fieldset>
+        </form>
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
       {!loading && !error && items.length === 0 ? (
         <OverviewEmpty icon={ClipboardList} title="Inga otilldelade ärenden" description="Kön är tom — alla öppna ärenden har en ansvarig." />
       ) : null}
-      {!loading && !error && items.length > 0 ? (
+      {!loading && !error && items.length > 0 && visibleItems.length === 0 ? (
+        <OverviewEmpty icon={ClipboardList} title="Inga ärenden matchar filtret" description="Ändra prioriteringsfiltret för att visa fler otilldelade ärenden." />
+      ) : null}
+      {!loading && !error && visibleItems.length > 0 ? (
         <div className="divide-y divide-sand-100">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <div key={item.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -148,7 +172,7 @@ export function TicketAssignQueuePanel() {
                   id={`ticket-assignee-${item.id}`}
                   value={selected[item.id] || ""}
                   onChange={(event) => setSelected((current) => ({ ...current, [item.id]: event.target.value }))}
-                  disabled={Boolean(actingId)}
+                  disabled={formLocked}
                   className={`${premiumFieldClass} h-9 min-w-[10rem] text-sm`}
                 >
                   <option value="">Välj ansvarig</option>
@@ -160,7 +184,7 @@ export function TicketAssignQueuePanel() {
                 </select>
                 <button
                   type="button"
-                  disabled={Boolean(actingId)}
+                  disabled={formLocked}
                   onClick={() => void assign(item, selected[item.id] || "")}
                   className="inline-flex h-9 items-center justify-center rounded-lg bg-petroleum-800 px-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"
                 >
