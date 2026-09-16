@@ -6,7 +6,6 @@ import { CircleDollarSign, Download, FileWarning, Plus, Search, ShieldAlert, Wal
 import {
   EmptyState,
   InlineAlert,
-  LoadingState,
   MetricCard,
   PageHeader,
   Panel,
@@ -114,6 +113,16 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
     }
     if (new URLSearchParams(window.location.search).get("create") === "1") setCreateOpen(true);
   }, [canManage, loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#skadefilter") return;
+    document.getElementById("skadefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, claims]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#skadelista") return;
+    document.getElementById("skadelista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, claims]);
 
   const openClaims = claims.filter((claim) => !closedStatuses.has(claim.status || "")).length;
   const totalEstimated = useMemo(() => claims.reduce((sum, claim) => sum + Number(claim.estimated_cost || 0), 0), [claims]);
@@ -249,7 +258,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
   }
 
   return <div className="space-y-8">
-    <PageHeader eyebrow="Risk och försäkring" title="Skador och försäkringsärenden" description="Följ händelser, försäkringsdialog, ekonomiska konsekvenser och nästa steg i en samlad riskvy." action={canManage ? <button type="button" onClick={() => (createOpen ? closeCreate() : setCreateOpen(true))} className={`${premiumPrimaryButtonClass} w-full gap-2 sm:w-auto`}>{createOpen ? "Stäng registrering" : <><Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />Nytt skadeärende</>}</button> : undefined} />
+    <PageHeader eyebrow="Risk och försäkring" title="Skador och försäkringsärenden" description="Följ händelser, försäkringsdialog, ekonomiska konsekvenser och nästa steg i en samlad riskvy." action={canManage || loading ? <button type="button" onClick={() => (createOpen ? closeCreate() : setCreateOpen(true))} className={`${premiumPrimaryButtonClass} w-full gap-2 sm:w-auto`}>{createOpen ? "Stäng registrering" : <><Plus className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />Nytt skadeärende</>}</button> : undefined} />
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard icon={ShieldAlert} label="Öppna ärenden" value={openClaims} hint="Pågående försäkrings- eller åtgärdsflöden" />
@@ -301,14 +310,15 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
     ) : null}
 
     <Panel title="Ärendeöversikt" description="Filtrera skadeportföljen och öppna rätt ärende för uppdatering." action={<button type="button" onClick={exportCsv} disabled={!filtered.length} className={`${premiumSecondaryButtonClass} gap-2`}><Download className="h-4 w-4" aria-hidden="true" />CSV</button>} bodyClassName="p-0">
-      <div className="grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-2 xl:grid-cols-[1fr_190px_180px_190px] sm:p-5">
-        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input className={`${premiumFieldClass} pl-9`} placeholder="Sök skada, bolag, nummer eller ansvarig" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök skadeärenden" /></label>
-        <select className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera status"><option value="">Alla statusar</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <select className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera skadetyp"><option value="">Alla skadetyper</option>{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+      <div id="skadefilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-2 xl:grid-cols-[1fr_190px_180px_190px] sm:p-5">
+        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} placeholder="Sök skada, bolag, nummer eller ansvarig" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök skadeärenden" /></label>
+        <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera status"><option value="">Alla statusar</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select disabled={loading} className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera skadetyp"><option value="">Alla skadetyper</option>{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
       </div>
 
-      {loading ? <LoadingState label="Läser skadeärenden…" rows={4} /> : filtered.length === 0 ? <EmptyState icon={ShieldAlert} title="Inga skadeärenden hittades" description={claims.length ? "Justera sökning eller filter för att visa fler ärenden." : "När ett skadeärende registreras visas det här med status och ekonomisk uppföljning."} /> : (
+      <div id="skadelista" className="scroll-mt-36">
+      {loading ? <p className="p-6 text-sm text-ink-500">Skadeärendena hämtas.</p> : filtered.length === 0 ? <EmptyState icon={ShieldAlert} title="Inga skadeärenden hittades" description={claims.length ? "Justera sökning eller filter för att visa fler ärenden." : "När ett skadeärende registreras visas det här med status och ekonomisk uppföljning."} /> : (
         <div className="divide-y divide-sand-100">
           {filtered.map((claim) => {
             const canEditFields = claim.source !== "legacy" && !closedStatuses.has(claim.status || "");
@@ -337,6 +347,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
           })}
         </div>
       )}
+      </div>
     </Panel>
   </div>;
 }
