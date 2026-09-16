@@ -109,6 +109,11 @@ export default function NotificationCenterPage() {
     if (window.location.hash !== "#aviseringsfilter") return;
     document.getElementById("aviseringsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#aviseringslista") return;
+    document.getElementById("aviseringslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function patch(kind: NotificationKind, body: Record<string, unknown>) {
     const response = await fetch(endpointFor(kind), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -198,8 +203,8 @@ export default function NotificationCenterPage() {
 
       <div id="aviseringsfilter" className="scroll-mt-36 flex flex-wrap gap-2 rounded-2xl border border-sand-200 bg-white p-2 shadow-premium-sm">{filters.map((item, index) => <button key={item.id} autoFocus={index === 0} onClick={() => setFilter(item.id)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${filter === item.id ? "bg-petroleum-800 text-white" : "text-ink-600 hover:bg-sand-50"}`}>{item.label}</button>)}</div>
 
-      <section className="overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-premium-sm">
-        {loading && !data ? <div className="h-64 animate-pulse bg-sand-50" /> : null}
+      <section id="aviseringslista" className="scroll-mt-36 overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-premium-sm">
+        {loading && !data ? <p className="p-6 text-sm text-ink-500">Aviseringarna hämtas.</p> : null}
         {!loading && data?.notifications.length === 0 ? <div className="p-12 text-center"><BellRing className="mx-auto h-10 w-10 text-sand-400" /><h2 className="mt-4 text-xl font-semibold text-ink-900">Inga aviseringar i detta filter</h2><p className="mt-2 text-sm text-ink-500">När service, scheman eller SLA kräver åtgärd visas det här.</p></div> : null}
         <div className="divide-y divide-sand-100">
           {data?.notifications.map((item) => {
