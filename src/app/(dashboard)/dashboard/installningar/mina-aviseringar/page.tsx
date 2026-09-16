@@ -42,10 +42,15 @@ export default function MyServiceNotificationsPage() {
   }, []);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash !== "#mina-val") return;
+    if (loading) return;
+    if (window.location.hash !== "#mina-val") return;
     document.getElementById("mina-val")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#minastatus") return;
+    document.getElementById("minastatus")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function save() {
     setSaving(true);
@@ -106,7 +111,12 @@ export default function MyServiceNotificationsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col justify-between gap-3 rounded-xl bg-sand-50 p-4 text-sm text-ink-600 sm:flex-row sm:items-center"><span>{data?.updatedAt ? `Senast ändrad ${dateTime.format(new Date(data.updatedAt))}` : "Standardinställningar används tills du sparar."}</span><button type="button" onClick={() => void save()} disabled={saving} className="rounded-xl bg-petroleum-800 px-5 py-3 font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara mina val"}</button></div>
+            <div className="flex flex-col justify-between gap-3 rounded-xl bg-sand-50 p-4 text-sm text-ink-600 sm:flex-row sm:items-center">
+              <div id="minastatus" className="scroll-mt-36">
+                {loading && !data ? <p>Valen hämtas.</p> : <span>{data?.updatedAt ? `Senast ändrad ${dateTime.format(new Date(data.updatedAt))}` : "Standardinställningar används tills du sparar."}</span>}
+              </div>
+              <button type="button" onClick={() => void save()} disabled={saving} className="rounded-xl bg-petroleum-800 px-5 py-3 font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara mina val"}</button>
+            </div>
         </fieldset>
       </Panel>
       </div>
