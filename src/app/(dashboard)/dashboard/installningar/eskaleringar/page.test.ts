@@ -33,3 +33,17 @@ describe("eskaleringar assignment filter first HTML", () => {
     expect(source).not.toContain("<div className=\"h-24 animate-pulse rounded-xl bg-sand-100\" />");
   });
 });
+
+describe("eskaleringar recipient filter first HTML", () => {
+  it("keeps the recipient role filter in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="mottagarfilter"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#mottagarfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("Hantera regler");
+    expect(source).not.toContain("{loading && !data ? <div className=\"h-40 animate-pulse rounded-xl bg-sand-100\" /> : null}");
+  });
+});

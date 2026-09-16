@@ -90,6 +90,7 @@ export default function EscalationAdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reasonFilter, setReasonFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +121,12 @@ export default function EscalationAdminPage() {
     document.getElementById("eskfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#mottagarfilter") return;
+    document.getElementById("mottagarfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   const configured = useMemo(() => {
     if (!data) return false;
     return data.configuration.cronSecret && data.configuration.emailApiKey && data.configuration.emailFrom;
@@ -127,6 +134,8 @@ export default function EscalationAdminPage() {
 
   const assignments = data?.assignments || [];
   const visibleAssignments = reasonFilter === "all" ? assignments : assignments.filter((item) => item.reason === reasonFilter);
+  const recipients = data?.recipients || [];
+  const visibleRecipients = roleFilter === "all" ? recipients : recipients.filter((item) => item.role === roleFilter);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
@@ -190,12 +199,29 @@ export default function EscalationAdminPage() {
           </div>
         </Panel>
 
+        <div id="mottagarfilter" className="scroll-mt-36">
         <Panel title="Regelstyrda mottagare" description={`Aktiva användare i valda roller${data?.rules.includeAssignee ? ", tillsammans med ansvarig användare för respektive uppgift" : ""}.`}>
+          <form id="mottagarfilter-form" onSubmit={(event) => event.preventDefault()} className="mb-4">
+            <fieldset disabled={loading} className="contents">
+              <label className="block max-w-sm">
+                <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera mottagare</span>
+                <select autoFocus value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera eskaleringsmottagare">
+                  <option value="all">Alla roller</option>
+                  <option value="owner">Ägare</option>
+                  <option value="admin">Administratör</option>
+                  <option value="manager">Förvaltare</option>
+                  <option value="property_manager">Fastighetsförvaltare</option>
+                </select>
+              </label>
+            </fieldset>
+          </form>
           {data?.rules.recipientRoles.length ? <div className="mb-4 flex flex-wrap gap-2">{data.rules.recipientRoles.map((role) => <span key={role} className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-800">{roleLabels[role] || role}</span>)}</div> : null}
-          {loading && !data ? <div className="h-40 animate-pulse rounded-xl bg-sand-100" /> : null}
-          {!loading && data?.recipients.length === 0 ? <EmptyState title="Inga mottagare" description="Inga aktiva användare matchar organisationens valda mottagarroller." /> : null}
-          {data?.recipients.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{data.recipients.map((recipient) => <div key={recipient.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold text-ink-900">{recipient.name || recipient.email}</p><p className="mt-1 truncate text-sm text-ink-500">{recipient.email}</p></div><span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-600"><Users className="h-3.5 w-3.5" />{roleLabels[recipient.role] || recipient.role}</span></div>)}</div> : null}
+          {loading && !data ? <p className="text-sm text-ink-500">Mottagarna hämtas.</p> : null}
+          {!loading && recipients.length === 0 ? <EmptyState title="Inga mottagare" description="Inga aktiva användare matchar organisationens valda mottagarroller." /> : null}
+          {!loading && recipients.length > 0 && visibleRecipients.length === 0 ? <EmptyState title="Inga mottagare matchar filtret" description="Ändra rollfiltret för att visa fler eskaleringsmottagare." /> : null}
+          {visibleRecipients.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{visibleRecipients.map((recipient) => <div key={recipient.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold text-ink-900">{recipient.name || recipient.email}</p><p className="mt-1 truncate text-sm text-ink-500">{recipient.email}</p></div><span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-600"><Users className="h-3.5 w-3.5" />{roleLabels[recipient.role] || recipient.role}</span></div>)}</div> : null}
         </Panel>
+        </div>
       </div>
 
       <div id="eskfilter" className="scroll-mt-36">
