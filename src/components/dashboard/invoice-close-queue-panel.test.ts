@@ -30,3 +30,15 @@ describe("invoice close queue filter first HTML", () => {
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
   });
 });
+
+describe("invoice close leftover queue first HTML", () => {
+  it("keeps leftover invoice close queue in the first HTML without stealing the search", () => {
+    const source = readFileSync(new URL("./invoice-close-queue-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="fakturako"');
+    expect(source).toContain('window.location.hash !== "#fakturako"');
+    expect(source).toContain("Kön hämtas.");
+    expect(source).toContain('id="fakturafilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
