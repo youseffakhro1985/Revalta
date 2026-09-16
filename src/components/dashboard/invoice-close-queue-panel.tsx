@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { BadgeCheck } from "lucide-react";
 import { readResponseJson } from "@/lib/fetch-json";
-import { EmptyState, InlineAlert, Panel, premiumCompactButtonClass } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, Panel, premiumCompactButtonClass, premiumFieldClass } from "@/components/dashboard/premium-ui";
 
 type QueueItem = {
   id: string;
@@ -50,6 +50,7 @@ export function InvoiceCloseQueuePanel() {
   const [error, setError] = useState("");
   const [actingId, setActingId] = useState("");
   const [itemError, setItemError] = useState("");
+  const [query, setQuery] = useState("");
 
   const applyQueue = useCallback((body: QueuePayload) => {
     setItems(body.workOrders || []);
@@ -90,6 +91,12 @@ export function InvoiceCloseQueuePanel() {
       active = false;
     };
   }, [applyQueue]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#fakturafilter") return;
+    document.getElementById("fakturafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function markInvoiced(item: QueueItem) {
     setActingId(item.id);
@@ -134,23 +141,42 @@ export function InvoiceCloseQueuePanel() {
 
   if (hidden) return null;
 
+  const needle = query.trim().toLowerCase();
+  const visibleItems = needle
+    ? items.filter((item) => `${item.title} ${item.propertyName} ${item.customerName} ${item.draftStatusLabel}`.toLowerCase().includes(needle))
+    : items;
+  const formLocked = Boolean(actingId) || loading;
+
   return (
     <Panel
       icon={BadgeCheck}
       title="Fakturera arbetsorder"
       description="Sätt slutförda arbetsordrar till Fakturerad när underlaget är klart eller exporterat. Samma redigeringslås som under Styrning – inget hopp förbi låset."
     >
-      {error ? <InlineAlert>{error}</InlineAlert> : null}
-      {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
-      {loading ? <div className="h-32 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}
+      <div id="fakturafilter" className="scroll-mt-36 space-y-3">
+        {error ? <InlineAlert>{error}</InlineAlert> : null}
+        {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
+        <form id="fakturafilter-form" onSubmit={(event) => event.preventDefault()}>
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Sök i kön</span>
+              <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} placeholder="Arbetsorder, fastighet eller kund" aria-label="Sök i faktureringskön" />
+            </label>
+          </fieldset>
+        </form>
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
+      </div>
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inget att fakturera" description="När en slutförd arbetsorder har ett klart eller exporterat underlag hamnar den här." />
       ) : null}
-      {!loading && !error && items.length > 0 ? (
+      {!loading && !error && items.length > 0 && visibleItems.length === 0 ? (
+        <EmptyState title="Inga arbetsordrar matchar sökningen" description="Ändra sökningen för att visa fler poster i faktureringskön." />
+      ) : null}
+      {!loading && !error && visibleItems.length > 0 ? (
         <div className="space-y-3">
           <p className="text-xs text-ink-500">{summary.workOrders} arbetsorder redo att faktureras</p>
           <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <div key={item.id} className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
                   <p className="font-semibold text-ink-950">{item.title}</p>
@@ -161,7 +187,7 @@ export function InvoiceCloseQueuePanel() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    disabled={Boolean(actingId)}
+                    disabled={formLocked}
                     onClick={() => void markInvoiced(item)}
                     className="inline-flex h-9 items-center justify-center rounded-lg bg-petroleum-800 px-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"
                   >
