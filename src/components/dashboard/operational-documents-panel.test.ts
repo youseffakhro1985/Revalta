@@ -13,3 +13,15 @@ describe("operational documents first HTML", () => {
     expect(source).not.toContain("{[0, 1, 2].map((item) => <div key={item} className=\"h-20 animate-pulse rounded-2xl bg-sand-100\" />)}");
   });
 });
+
+describe("operational documents leftover list first HTML", () => {
+  it("keeps leftover documents in the first HTML without stealing upload", () => {
+    const source = readFileSync(new URL("./operational-documents-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="dokumentregister"');
+    expect(source).toContain('window.location.hash !== "#dokumentregister"');
+    expect(source).toContain("Dokumenten hämtas.");
+    expect(source).toContain('id="spara-dokument"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("saving || loading");
+  });
+});
