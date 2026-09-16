@@ -74,6 +74,12 @@ export function AcceptInviteForm({ token, reason }: { token: string; reason: str
     };
   }, [token]);
 
+  useEffect(() => {
+    if (loadingPreview) return;
+    if (window.location.hash !== "#accept-invite-form") return;
+    document.getElementById("accept-invite-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loadingPreview, preview]);
+
   const residentInvite = isResident(preview?.role || "");
   const copy = useMemo(() => {
     if (residentInvite) {
@@ -155,7 +161,7 @@ export function AcceptInviteForm({ token, reason }: { token: string; reason: str
       ) : null}
       {error ? <AuthAlert>{error}</AuthAlert> : null}
       {message ? <AuthAlert tone="success">{message}</AuthAlert> : null}
-      {loadingPreview ? <div className="mt-6 h-24 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+      {loadingPreview ? <p className="mt-6 text-sm text-ink-500">Inbjudan hämtas.</p> : null}
       {token ? (
         <form
           id="accept-invite-form"
@@ -165,7 +171,7 @@ export function AcceptInviteForm({ token, reason }: { token: string; reason: str
           data-ready={hydrated ? "1" : "0"}
           onSubmit={acceptInvite}
           aria-busy={loading}
-          className="mt-7 space-y-5"
+          className="mt-7 scroll-mt-36 space-y-5"
         >
           <input type="hidden" name="token" value={token} />
           <div>
@@ -177,6 +183,7 @@ export function AcceptInviteForm({ token, reason }: { token: string; reason: str
               type="text"
               maxLength={120}
               autoComplete="name"
+              autoFocus
               defaultValue={preview?.name || ""}
               placeholder="Förnamn Efternamn"
               className={authInputClass}
