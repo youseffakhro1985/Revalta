@@ -38,7 +38,7 @@ export function dashboardPrimaryCreateAction(pathname: string, role: string): Da
   const technicianPlanning = current === `${workOrdersRoot}/planering` || current.startsWith(`${workOrdersRoot}/planering/`);
   const workOrderSegment = current.startsWith(`${workOrdersRoot}/`) ? current.slice(workOrdersRoot.length + 1) : "";
   const workOrderDetail = Boolean(workOrderSegment) && !workOrderSegment.includes("/") && !["ny", "redigeringslas", "aterkommande", "operationsoversikt", "planering"].includes(workOrderSegment);
-  if (canAssignWorkOrders(role) && workOrderDetail) {
+  if (canWriteOperations(role) && workOrderDetail) {
     return { href: `${current}#spara-arbetsorder`, label: "Spara arbetsorder" };
   }
   if (canAssignWorkOrders(role) && (current === "/dashboard" || (inWorkOrders && !creatingWorkOrder && !editLockAdmin && !recurringSchedules && !operationsOverview && !technicianPlanning))) {
