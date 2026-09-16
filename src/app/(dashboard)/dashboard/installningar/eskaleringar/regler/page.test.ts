@@ -16,3 +16,18 @@ describe("eskaleringsregler hash target", () => {
     expect(source).not.toContain("if (loading || !rules)");
   });
 });
+
+describe("eskaleringsregler sticky mutate first HTML", () => {
+  it("scrolls and focuses Spara regler after load", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="eskaleringsregler"');
+    expect(source).toContain('id="eskalering-motor"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain('window.location.hash !== "#eskaleringsregler"');
+    expect(source).toContain('document.getElementById("eskalering-motor")?.focus()');
+    expect(source).toContain("if (loading) return");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("Spara regler");
+    expect(source).toContain("disabled={locked}");
+  });
+});
