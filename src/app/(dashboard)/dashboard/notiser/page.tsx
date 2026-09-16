@@ -74,6 +74,16 @@ export default function NotificationsPage() {
     if (window.location.hash !== "#nytt-meddelande") return;
     document.getElementById("nytt-meddelande")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#notisfilter") return;
+    document.getElementById("notisfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, notifications]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#notislista") return;
+    document.getElementById("notislista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, notifications]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -140,9 +150,9 @@ export default function NotificationsPage() {
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
         {showCreate ? <a href="#nytt-meddelande" className="inline-flex items-center justify-center rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white">Nytt meddelande</a> : null}
-        <div className="flex gap-2 rounded-xl border border-sand-200 bg-white p-1 shadow-premium-sm">
+        <div id="notisfilter" className="scroll-mt-36 flex gap-2 rounded-xl border border-sand-200 bg-white p-1 shadow-premium-sm">
           {([['all', 'Alla'], ['unread', 'Olästa'], ['urgent', 'Brådskande']] as const).map(([value, label]) => (
-            <button key={value} onClick={() => setFilter(value)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === value ? "bg-petroleum-800 text-white" : "text-ink-500 hover:bg-sand-50"}`}>{label}</button>
+            <button type="button" key={value} disabled={loading} onClick={() => setFilter(value)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === value ? "bg-petroleum-800 text-white" : "text-ink-500 hover:bg-sand-50"}`}>{label}</button>
           ))}
         </div>
         </div>
@@ -190,12 +200,14 @@ export default function NotificationsPage() {
         ) : null}
 
         <div className="space-y-6">
-          <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+          <section id="notislista" className="scroll-mt-36 overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
             <div className="border-b border-sand-200 px-5 py-4">
               <h2 className="text-sm font-semibold text-ink-950">Meddelanden</h2>
             </div>
             <div className="divide-y divide-sand-200">
-              {visible.length === 0 ? (
+              {loading ? (
+                <p className="p-8 text-sm text-ink-500">Notiserna hämtas.</p>
+              ) : visible.length === 0 ? (
                 <p className="p-8 text-sm text-ink-500">Inga meddelanden i den valda vyn.</p>
               ) : visible.map((item) => {
                 const priority = item.priority || "normal";
