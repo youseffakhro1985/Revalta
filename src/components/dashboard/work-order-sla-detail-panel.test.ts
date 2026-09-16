@@ -19,9 +19,11 @@ describe("work order SLA detail panel", () => {
   it("keeps the SLA deadline form in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./work-order-sla-detail-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="spara-sla"');
+    expect(source).toContain('id="sla-svar-senast"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#spara-sla"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("sla-svar-senast")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("saving || loading || slaFormLocked");
     expect(source).toContain("canManage || loading");
