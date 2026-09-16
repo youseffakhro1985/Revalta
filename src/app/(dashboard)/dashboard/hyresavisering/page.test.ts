@@ -31,3 +31,17 @@ describe("hyresavisering focus", () => {
     expect(form).not.toContain('<form id="ny-hyresavi"');
   });
 });
+
+describe("hyresavisering leftover list first HTML", () => {
+  it("keeps leftover notices in the first HTML without stealing Ny hyresavi", () => {
+    const form = readFileSync(new URL("./rent-notices-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="avilista"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#avilista"');
+    expect(form).toContain('id="ny-hyresavi"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("Hyresavierna hämtas.");
+    expect(form).not.toContain("Hämtar hyresavier…");
+    expect(form).toContain("canManage || loading");
+  });
+});
