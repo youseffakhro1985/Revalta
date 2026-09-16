@@ -79,6 +79,11 @@ export default function EnergyPage() {
     if (window.location.hash !== "#ny-avlasning") return;
     document.getElementById("ny-avlasning")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#energifilter") return;
+    document.getElementById("energifilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, readings]);
 
   const periods = useMemo(() => [...new Set(readings.map((row) => row.period || "").filter(Boolean))].sort().reverse(), [readings]);
   const propertyNames = useMemo(() => [...new Set(readings.map((row) => row.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [readings]);
@@ -226,12 +231,12 @@ export default function EnergyPage() {
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra avläsningar.</InlineAlert> : null}
 
     <Panel title="Filtrera energiläget" description="Avgränsa fastighet, förbrukningstyp och period utan att ändra registrerade mätvärden.">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_0.8fr_1fr_0.8fr_auto]">
-        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök fastighet eller anteckning" aria-label="Sök energi" /></label>
-        <select className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera förbrukningstyp"><option value="all">Alla typer</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-        <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
-        <select className={premiumFieldClass} value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} aria-label="Filtrera period"><option value="all">Alla perioder</option>{periods.map((period) => <option key={period} value={period}>{period}</option>)}</select>
-        <button type="button" disabled={!hasFilters} onClick={() => { setQuery(""); setTypeFilter("all"); setPropertyFilter("all"); setPeriodFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+      <div id="energifilter" className="scroll-mt-36 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_0.8fr_1fr_0.8fr_auto]">
+        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök fastighet eller anteckning" aria-label="Sök energi" /></label>
+        <select disabled={loading} className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera förbrukningstyp"><option value="all">Alla typer</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+        <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
+        <select disabled={loading} className={premiumFieldClass} value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} aria-label="Filtrera period"><option value="all">Alla perioder</option>{periods.map((period) => <option key={period} value={period}>{period}</option>)}</select>
+        <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setTypeFilter("all"); setPropertyFilter("all"); setPeriodFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
       </div>
     </Panel>
 
@@ -266,7 +271,7 @@ export default function EnergyPage() {
       </Panel></div> : null}
 
       <Panel title="Förbrukningshistorik" description={`${visibleReadings.length} av ${readings.length} avläsningar i vald vy`} bodyClassName="p-0">
-        {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}</div> : visibleReadings.length === 0 ? <EmptyState title="Inga avläsningar matchar urvalet" description="Justera filtren eller registrera en ny avläsning." /> : <div className="divide-y divide-sand-100">{visibleReadings.map((row) => {
+        {loading ? <p className="p-6 text-sm text-ink-500">Avläsningarna hämtas.</p> : visibleReadings.length === 0 ? <EmptyState title="Inga avläsningar matchar urvalet" description="Justera filtren eller registrera en ny avläsning." /> : <div className="divide-y divide-sand-100">{visibleReadings.map((row) => {
           const Icon = icons[row.type as keyof typeof icons] || Gauge;
           return <article key={row.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row">
