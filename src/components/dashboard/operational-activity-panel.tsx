@@ -3,7 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import { Clock3, MessageSquareText, Send } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { EmptyState, InlineAlert, Panel, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, Panel, premiumFieldClass, premiumPrimaryButtonClass } from "@/components/dashboard/premium-ui";
 
 type Actor = { id: string; name: string | null; email: string };
 type CommentItem = {
@@ -53,6 +53,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
   const [success, setSuccess] = useState("");
   const [body, setBody] = useState("");
   const [isInternal, setIsInternal] = useState(true);
+  const [kindFilter, setKindFilter] = useState("all");
 
   const endpoint = useMemo(
     () => entityType === "work_order" ? `/api/work-orders/${entityId}/comments` : `/api/projects/${entityId}/comments`,
@@ -83,6 +84,12 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
     document.getElementById("spara-kommentar")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, comments]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#aktivitetsfilter") return;
+    document.getElementById("aktivitetsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, history]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = body.trim();
@@ -109,6 +116,13 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
   }
 
   const formLocked = saving || loading;
+  const visibleHistory = kindFilter === "all"
+    ? history
+    : history.filter((item) => (
+      kindFilter === "comments" ? item.action.endsWith("comment_added")
+        : kindFilter === "documents" ? item.action === "document.uploaded"
+          : item.action.endsWith(".created") || item.action.endsWith(".updated")
+    ));
 
   return (
     <div className="grid gap-6 xl:grid-cols-2">
@@ -142,7 +156,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
           </form>
 
           {loading ? (
-            <div className="space-y-3">{[0, 1, 2].map((item) => <div key={item} className="h-24 animate-pulse rounded-2xl bg-sand-100" />)}</div>
+            <p className="text-sm text-ink-500">Kommentarerna hämtas.</p>
           ) : comments.length === 0 ? (
             <EmptyState title="Inga kommentarer ännu" description="Lägg till den första kommentaren för att samla dialog och beslut på objektet." />
           ) : (
@@ -169,14 +183,30 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
         </div>
       </Panel>
 
+      <div id="aktivitetsfilter" className="scroll-mt-36">
       <Panel title="Aktivitet och historik" description="Spårbar tidslinje över viktiga ändringar, kommentarer och dokument.">
+        <form id="aktivitetsfilter-form" onSubmit={(event) => event.preventDefault()} className="mb-4">
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera historik</span>
+              <select autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera aktivitetshistorik">
+                <option value="all">Alla händelser</option>
+                <option value="updates">Ändringar</option>
+                <option value="comments">Kommentarer</option>
+                <option value="documents">Dokument</option>
+              </select>
+            </label>
+          </fieldset>
+        </form>
         {loading ? (
-          <div className="space-y-3">{[0, 1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-2xl bg-sand-100" />)}</div>
+          <p className="text-sm text-ink-500">Historiken hämtas.</p>
         ) : history.length === 0 ? (
           <EmptyState title="Ingen historik ännu" description="När objektet uppdateras visas händelserna här i kronologisk ordning." />
+        ) : visibleHistory.length === 0 ? (
+          <EmptyState title="Inga händelser matchar filtret" description="Ändra historikfiltret för att visa fler aktiviteter." />
         ) : (
           <ol className="relative space-y-0 border-l border-sand-200 pl-6">
-            {history.map((item) => (
+            {visibleHistory.map((item) => (
               <li key={item.id} className="relative pb-6 last:pb-0">
                 <span className="absolute -left-[31px] top-0 flex h-5 w-5 items-center justify-center rounded-full border-4 border-white bg-petroleum-700" />
                 <div className="rounded-2xl border border-sand-200 bg-white p-4">
@@ -193,6 +223,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
           </ol>
         )}
       </Panel>
+      </div>
     </div>
   );
 }
