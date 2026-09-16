@@ -17,3 +17,16 @@ describe("audit filter hash", () => {
     expect(center).toContain("autoFocus");
   });
 });
+
+describe("audit leftover events first HTML", () => {
+  it("keeps leftover events in the first HTML without stealing Filtrera logg", () => {
+    const center = readFileSync(new URL("../../../../components/settings/audit-log-center.tsx", import.meta.url), "utf8");
+    expect(center).toContain('id="auditlista"');
+    expect(center).toContain('window.location.hash !== "#auditlista"');
+    expect(center).toContain("Händelserna hämtas.");
+    expect(center).toContain('id="auditfilter"');
+    expect(center).toContain("autoFocus");
+    expect(center).toContain("scrollIntoView");
+    expect(center).toContain("disabled={loading}");
+  });
+});
