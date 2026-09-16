@@ -25,7 +25,6 @@ import {
 import {
   EmptyState,
   InlineAlert,
-  LoadingState,
   MetricCard,
   PageHeader,
   Panel,
@@ -371,6 +370,16 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
     }
     if (new URLSearchParams(window.location.search).get("create") === "1") setRoundModalOpen(true);
   }, [canManage, loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#rondfilter") return;
+    document.getElementById("rondfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, rounds]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#rondurval") return;
+    document.getElementById("rondurval")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, rounds]);
 
   async function createRound(event: React.FormEvent) {
     event.preventDefault();
@@ -598,7 +607,7 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
         eyebrow="Drift · Tillsyn"
         title="Ronder & checklistor"
         description="Planera, genomför och följ upp återkommande ronder och checklistkontroller i hela beståndet."
-        action={canManage ? (
+        action={canManage || loading ? (
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => document.getElementById("kontrollplaner")?.scrollIntoView({ behavior: "smooth" })} className={premiumSecondaryButtonClass}>
               <FileCheck2 className="mr-2 h-4 w-4" aria-hidden="true" /> Kontrollplaner
@@ -627,21 +636,21 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
 
       <section id="rondlista" className="grid scroll-mt-28 gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <Panel title="Rondöversikt" description="Sök, filtrera och öppna rondens kontrollpunkter direkt från planeringen." bodyClassName="p-0">
-          <div className="grid gap-3 border-b border-sand-200 p-4 sm:p-5 lg:grid-cols-[minmax(220px,1.4fr)_180px_160px_150px_150px]">
+          <div id="rondfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:p-5 lg:grid-cols-[minmax(220px,1.4fr)_180px_160px_150px_150px]">
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök rond, fastighet eller adress" aria-label="Sök ronder" />
+              <input disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök rond, fastighet eller adress" aria-label="Sök ronder" />
             </label>
-            <select value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera fastighet">
+            <select disabled={loading} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera fastighet">
               <option value="">Alla fastigheter</option>
               {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
             </select>
-            <select value={intervalFilter} onChange={(event) => setIntervalFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera rondtyp">
+            <select disabled={loading} value={intervalFilter} onChange={(event) => setIntervalFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera rondtyp">
               <option value="">Alla rondtyper</option>
               {Object.entries(intervalLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className={premiumFieldClass} aria-label="Från datum" />
-            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className={premiumFieldClass} aria-label="Till datum" />
+            <input disabled={loading} type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className={premiumFieldClass} aria-label="Från datum" />
+            <input disabled={loading} type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className={premiumFieldClass} aria-label="Till datum" />
           </div>
 
           <div className="border-b border-sand-200 px-4 sm:px-5">
@@ -665,7 +674,8 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
             </div>
           </div>
 
-          {loading ? <LoadingState label="Hämtar ronder…" rows={6} /> : pagedRounds.length === 0 ? (
+          <div id="rondurval" className="scroll-mt-36">
+          {loading ? <p className="p-6 text-sm text-ink-500">Ronderna hämtas.</p> : pagedRounds.length === 0 ? (
             <EmptyState icon={ClipboardCheck} title="Inga ronder hittades" description={rounds.length ? "Justera filter eller välj en annan status." : "Skapa den första ronden för att börja bygga kontrollplanen."} />
           ) : (
             <div className="overflow-x-auto">
@@ -725,6 +735,7 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
               </table>
             </div>
           )}
+          </div>
 
           <div className="flex flex-col gap-3 border-t border-sand-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-ink-500">Visar {filteredRounds.length ? (safePage - 1) * pageSize + 1 : 0}–{Math.min(safePage * pageSize, filteredRounds.length)} av {filteredRounds.length} ronder</p>
