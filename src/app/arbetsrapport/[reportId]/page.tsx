@@ -81,6 +81,11 @@ export default function WorkOrderReportPage() {
     if (window.location.hash !== "#skriv-ut") return;
     document.getElementById("skriv-ut")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, report]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#rapportinnehall") return;
+    document.getElementById("rapportinnehall")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, report]);
 
   const snapshot = report?.snapshot || {};
   const workOrder = snapshot.workOrder;
@@ -100,6 +105,7 @@ export default function WorkOrderReportPage() {
         <button id="skriv-ut" type="button" autoFocus disabled={loading} onClick={() => window.print()} className="inline-flex h-11 scroll-mt-36 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Printer className="h-4 w-4" />Skriv ut / Spara PDF</button>
       </div>
 
+      <div id="rapportinnehall" className="scroll-mt-36">
       {loading && !report ? <p className="mx-auto max-w-5xl text-sm text-ink-500">Rapporten hämtas.</p> : null}
       {!loading && !report ? <p className="mx-auto max-w-5xl rounded-2xl border border-danger-200 bg-danger-50 p-5 text-danger-700">{error || "Rapporten hittades inte"}</p> : null}
       {report ? <article className="mx-auto max-w-5xl rounded-3xl border border-sand-200 bg-white p-7 shadow-premium-sm print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none sm:p-10">
@@ -130,6 +136,7 @@ export default function WorkOrderReportPage() {
 
         <footer className="border-t border-sand-200 pt-6 text-xs leading-5 text-ink-500">Rapporten är en fryst version från Revalta och speglar registrerade uppgifter vid skapandet. Rapport-ID: {report.id}</footer>
       </article> : null}
+      </div>
     </main>
   );
 }
