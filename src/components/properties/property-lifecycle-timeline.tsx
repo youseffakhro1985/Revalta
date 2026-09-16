@@ -67,6 +67,11 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
     if (window.location.hash !== "#tidslinjefilter") return;
     document.getElementById("tidslinjefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#tidslinjelista") return;
+    document.getElementById("tidslinjelista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const items = useMemo<TimelineItem[]>(() => {
     if (!data) return [];
@@ -116,6 +121,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
           </label>
         </fieldset>
       </form>
+      <div id="tidslinjelista" className="scroll-mt-36">
       {loading ? (
         <p className="p-5 text-sm text-ink-500 sm:px-6">Tidslinjen hämtas.</p>
       ) : visible.length === 0 ? (
@@ -145,6 +151,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
           })}
         </div>
       )}
+      </div>
     </Panel>
     </div>
   );
