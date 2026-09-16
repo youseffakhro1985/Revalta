@@ -130,6 +130,11 @@ export function WorkOrderSlaDetailPanel({ workOrderId }: Props) {
     if (window.location.hash !== "#spara-sla") return;
     document.getElementById("spara-sla")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, sla]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#slabedomning") return;
+    document.getElementById("slabedomning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, sla]);
 
   async function saveDeadlines(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -207,7 +212,9 @@ export function WorkOrderSlaDetailPanel({ workOrderId }: Props) {
 
   return <Panel title="SLA och leveranssäkerhet" description="Serverberäknad bedömning med behörighetsstyrda deadlines och oföränderligt historiskt utfall.">
     {(error || success) ? <div className="mb-4" aria-live="polite"><InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert></div> : null}
+    <div id="slabedomning" className="scroll-mt-36">
     <div className={`rounded-2xl border p-5 ${riskClasses(view.risk)}`}><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="flex items-start gap-3"><span className="rounded-xl bg-white/70 p-2"><ActiveIcon className="h-5 w-5" aria-hidden="true" /></span><div><p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-70">Aktuell fas · {phaseLabels[view.phase]}</p><p className="mt-2 text-xl font-semibold">{view.label}</p><p className="mt-1 text-sm font-medium">{activeText || "SLA-bedömningen hämtas"}</p></div></div><div className="text-sm sm:text-right"><p className="font-semibold">{view.dueAt ? dateTime.format(new Date(view.dueAt)) : "Ingen aktiv deadline"}</p>{evaluatedAt ? <p className="mt-1 text-xs opacity-70">Beräknad {dateTime.format(new Date(evaluatedAt))}</p> : null}</div></div></div>
+    </div>
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       <article className={`rounded-2xl border p-5 ${view.response.breached ? "border-danger-200 bg-danger-50" : "border-sand-200 bg-white"}`}><div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-petroleum-700" /><h3 className="font-semibold text-ink-900">Första respons</h3>{governance.responseLocked ? <LockKeyhole className="ml-auto h-4 w-4 text-ink-500" aria-label="Svarstiden är låst" /> : null}</div><p className={`mt-3 text-sm font-semibold ${view.response.breached ? "text-danger-700" : "text-ink-700"}`}>{view.response.achievedAt ? view.response.breached ? "Svarstid överskreds" : "Svarstid uppfylld" : "Inväntar respons"}</p><p className="mt-1 text-sm leading-6 text-ink-500">{checkpointText(view.response, "Svar")}</p>{view.response.achievedAt ? <p className="mt-2 text-xs text-ink-500">Registrerad {dateTime.format(new Date(view.response.achievedAt))}</p> : null}</article>
       <article className={`rounded-2xl border p-5 ${view.resolution.breached ? "border-danger-200 bg-danger-50" : "border-sand-200 bg-white"}`}><div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-petroleum-700" /><h3 className="font-semibold text-ink-900">Lösning</h3>{governance.resolutionLocked ? <LockKeyhole className="ml-auto h-4 w-4 text-ink-500" aria-label="Lösningstiden är låst" /> : null}</div><p className={`mt-3 text-sm font-semibold ${view.resolution.breached ? "text-danger-700" : "text-ink-700"}`}>{view.resolution.achievedAt ? view.resolution.breached ? "Lösningstid överskreds" : "Lösningstid uppfylld" : "Inväntar lösning"}</p><p className="mt-1 text-sm leading-6 text-ink-500">{checkpointText(view.resolution, "Lösning")}</p>{view.resolution.achievedAt ? <p className="mt-2 text-xs text-ink-500">Registrerad {dateTime.format(new Date(view.resolution.achievedAt))}</p> : null}</article>
