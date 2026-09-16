@@ -38,3 +38,17 @@ describe("dokument library filter first HTML", () => {
     expect(form).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("dokument leftover library first HTML", () => {
+  it("keeps leftover documents in the first HTML without stealing create or filter", () => {
+    const form = readFileSync(new URL("./dokument-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="dokumentlista"');
+    expect(form).toContain('window.location.hash !== "#dokumentlista"');
+    expect(form).toContain("Dokumenten hämtas.");
+    expect(form).toContain('id="dokumentfilter"');
+    expect(form).toContain("Nytt dokument");
+    expect(form).not.toContain('id="dokumentregister"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("disabled={loading}");
+  });
+});

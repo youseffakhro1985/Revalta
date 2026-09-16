@@ -394,6 +394,11 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#dokumentfilter") return;
     document.getElementById("dokumentfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data.documents]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#dokumentlista") return;
+    document.getElementById("dokumentlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data.documents]);
 
   const selectedProperty = data.properties.find((property) => property.id === propertyId) || null;
   const availableUnits = selectedProperty?.units || [];
@@ -666,6 +671,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
           {filtersActive ? <button type="button" disabled={loading} onClick={resetFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700"><RotateCcw className="h-4 w-4" /> Nollställ</button> : null}
         </div>
 
+        <div id="dokumentlista" className="scroll-mt-36">
         {loading ? (
           <p className="p-6 text-sm text-ink-500">Dokumenten hämtas.</p>
         ) : data.documents.length === 0 ? (
@@ -710,6 +716,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
             ))}
           </div>
         )}
+        </div>
 
         <nav className="flex flex-col gap-3 border-t border-sand-200 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between" aria-label="Dokumentpaginering">
           <p className="text-ink-500">Sida {data.pagination.page} av {data.pagination.totalPages} · {data.pagination.total} matchande dokument</p>
