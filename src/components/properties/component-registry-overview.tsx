@@ -3,7 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarRange, CircleDollarSign, Gauge, Layers3 } from "lucide-react";
+import { CalendarRange, CircleDollarSign, Gauge, Layers3, RefreshCw } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 
 type Asset = Record<string, unknown>;
@@ -46,6 +46,11 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
     if (window.location.hash !== "#component-registry-heading") return;
     document.getElementById("component-registry-heading")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#uppdatera-register") return;
+    document.getElementById("uppdatera-register")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const replacementSchedule = useMemo(() => {
     if (!data) return [];
@@ -61,18 +66,23 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
 
   return (
     <section className="space-y-6" aria-labelledby="component-registry-heading">
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Teknisk livscykel</p>
-        <h2 id="component-registry-heading" className="mt-2 scroll-mt-36 text-2xl font-semibold tracking-[-0.025em] text-ink-950">Komponentregister</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Samlad kontroll över skick, livslängd, kostnadshistorik och framtida utbytesbehov.</p>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Teknisk livscykel</p>
+          <h2 id="component-registry-heading" className="mt-2 scroll-mt-36 text-2xl font-semibold tracking-[-0.025em] text-ink-950">Komponentregister</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">Samlad kontroll över skick, livslängd, kostnadshistorik och framtida utbytesbehov.</p>
+        </div>
+        <button id="uppdatera-register" type="button" autoFocus disabled={loading} onClick={() => void load()} className="inline-flex scroll-mt-36 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50 disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Uppdatera
+        </button>
       </div>
 
-      {loading ? <div className="h-96 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}
+      {loading && !data ? <p className="text-sm text-ink-500">Registret hämtas.</p> : null}
       {error ? <InlineAlert>{error}</InlineAlert> : null}
       {!loading && !error && (!data || data.assets.length === 0) ? (
         <EmptyState title="Inga komponenter registrerade" description="Komplettera tekniska installationer med livslängd, skick och återanskaffningsvärde." />
       ) : null}
-      {!loading && !error && data && data.assets.length > 0 ? <>
+      {!error && data && data.assets.length > 0 ? <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={Layers3} label="Komponenter" value={data.metrics.total} hint={`${data.metrics.poorCondition} med svagt skick`} />
         <MetricCard icon={CalendarRange} label="Byte inom 5 år" value={data.metrics.replacementDue5Years} />
