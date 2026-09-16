@@ -49,6 +49,11 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
     if (window.location.hash !== "#spara-underhallsplan") return;
     document.getElementById("spara-underhallsplan")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#atgardslista") return;
+    document.getElementById("atgardslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const card = data || { property:{ id:propertyId, name:"", buildings:[] }, plans:[], activePlan:null, actions:[], assets:[], forecast:null };
   const formLocked = saving || loading || !data;
@@ -136,7 +141,9 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
       </div>
 
       <Panel title="Planerade åtgärder" description="Prioriterad åtgärdslista för den valda planversionen. Skapa arbetsorder när åtgärden ska utföras." bodyClassName="p-0">
+        <div id="atgardslista" className="scroll-mt-36">
         {card.actions.length===0?<EmptyState title={loading?"Laddar åtgärder":"Inga åtgärder registrerade"} description="Lägg till den första åtgärden för att bygga underhållsplanen."/>:<div className="divide-y divide-sand-100">{card.actions.map(item=><article key={item.id} className="p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-ink-900">{item.title}</h3><Badge value={item.priority} type="priority"/><Badge value={item.risk} type="risk"/><Badge value={item.status} type="status"/></div><p className="mt-2 text-sm text-ink-500">{item.category}{item.building_name?` · ${item.building_name}`:""}{item.technical_asset_name?` · ${item.technical_asset_name}`:""}</p>{item.scope?<p className="mt-2 text-sm leading-6 text-ink-600">{item.scope}</p>:null}{item.source_work_order_id?<Link href={`/dashboard/arbetsorder/${item.source_work_order_id}`} className={`${premiumSecondaryButtonClass} mt-3 h-9 px-3 text-xs`}><Wrench className="h-3.5 w-3.5" aria-hidden="true"/>{item.source_work_order_number||"Öppna arbetsorder"}</Link>:!["completed","cancelled"].includes(item.status)?<button type="button" disabled={creatingId===item.id} onClick={()=>void createWorkOrder(item)} className={`${premiumPrimaryButtonClass} mt-3 h-9 px-3 text-xs`}><Wrench className="h-3.5 w-3.5" aria-hidden="true"/>{creatingId===item.id?"Skapar…":"Skapa arbetsorder"}</button>:null}</div><div className="shrink-0 text-left sm:text-right"><p className="text-lg font-semibold text-ink-950">{money.format(item.estimated_cost)}</p><p className="mt-1 flex items-center gap-1 text-xs text-ink-500 sm:justify-end"><CalendarRange className="h-3.5 w-3.5"/>{item.planned_year}{item.recurrence_years?` · vart ${item.recurrence_years}:e år`:""}</p></div></div></article>)}</div>}
+        </div>
       </Panel>
     </div>
   </section>;
