@@ -28,3 +28,16 @@ describe("preventive maintenance service filter first HTML", () => {
     expect(source).not.toContain('{loading && !data ? <div className="h-48 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}');
   });
 });
+
+describe("preventive maintenance leftover overview first HTML", () => {
+  it("keeps leftover service rows in the first HTML without stealing run or filter", () => {
+    const source = readFileSync(new URL("./preventive-maintenance-overview.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="serviceoversikt"');
+    expect(source).toContain('window.location.hash !== "#serviceoversikt"');
+    expect(source).toContain("Serviceöversikten hämtas.");
+    expect(source).toContain('id="kor-motor"');
+    expect(source).toContain('id="servicefilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("data?.canRun || loading");
+  });
+});
