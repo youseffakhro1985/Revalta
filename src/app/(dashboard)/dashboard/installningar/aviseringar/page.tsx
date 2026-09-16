@@ -106,6 +106,11 @@ export default function ServiceNotificationsPage() {
     document.getElementById("mottagarfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
   useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#mottagarlista") return;
+    document.getElementById("mottagarlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+  useEffect(() => {
     if (!isDirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
@@ -249,10 +254,12 @@ export default function ServiceNotificationsPage() {
               </label>
             </fieldset>
           </form>
+          <div id="mottagarlista" className="scroll-mt-36">
           {loading && !data ? <p className="text-sm text-ink-500">Mottagarna hämtas.</p> : null}
           {!loading && recipients.length === 0 ? <EmptyState title="Inga systemmottagare" description="Välj roller med aktiva användare eller lägg till extra e-postmottagare." /> : null}
           {!loading && recipients.length > 0 && visibleRecipients.length === 0 ? <EmptyState title="Inga mottagare matchar filtret" description="Ändra rollfiltret för att visa fler systemmottagare." /> : null}
           {visibleRecipients.length ? <div className="overflow-hidden rounded-xl border border-sand-200"><div className="divide-y divide-sand-100">{visibleRecipients.map((recipient) => <div key={recipient.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold text-ink-900">{recipient.name || recipient.email}</p><p className="mt-1 truncate text-sm text-ink-500">{recipient.email}</p></div><span className="shrink-0 rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-600">{roleLabels[recipient.role] || recipient.role}</span></div>)}</div></div> : null}
+          </div>
         </Panel>
         </div>
       </div>

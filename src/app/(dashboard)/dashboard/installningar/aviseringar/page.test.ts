@@ -45,3 +45,18 @@ describe("aviseringar recipient filter first HTML", () => {
     expect(source).not.toContain("{loading && !data ? <div className=\"h-40 animate-pulse rounded-xl bg-sand-100\" /> : null}");
   });
 });
+
+describe("aviseringar leftover recipients first HTML", () => {
+  it("keeps leftover recipients in the first HTML without stealing Aviseringsval or filters", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="mottagarlista"');
+    expect(source).toContain('window.location.hash !== "#mottagarlista"');
+    expect(source).toContain("Mottagarna hämtas.");
+    expect(source).toContain('id="aviseringsinstallningar"');
+    expect(source).toContain('id="mottagarfilter"');
+    expect(source).toContain('id="historikfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("autoFocus");
+  });
+});
