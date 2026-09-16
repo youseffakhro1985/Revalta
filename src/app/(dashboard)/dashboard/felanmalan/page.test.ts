@@ -24,3 +24,17 @@ describe("felanmalan create query", () => {
     expect(form).not.toContain("＋");
   });
 });
+
+describe("felanmalan leftover list first HTML", () => {
+  it("keeps the recent list in the first HTML and scrolls after load without stealing create", () => {
+    const form = readFileSync(new URL("./felanmalan-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="senastearenden"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#senastearenden"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("Nytt ärende");
+    expect(form).toContain('get("create") === "1"');
+    expect(form).toContain("Ärendena hämtas.");
+    expect(form).not.toContain('{[1, 2, 3, 4].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-sand-100" />)}');
+  });
+});
