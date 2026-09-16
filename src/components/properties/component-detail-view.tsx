@@ -99,6 +99,11 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
     if (window.location.hash !== "#spara-komponent") return;
     document.getElementById("spara-komponent")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#komponentnyckeltal") return;
+    document.getElementById("komponentnyckeltal")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const dirty = useMemo(() => data ? JSON.stringify(form) !== JSON.stringify(formFromComponent(data.component)) : false, [data, form]);
 
@@ -156,6 +161,7 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
         </div>
       </div>
 
+      <div id="komponentnyckeltal" className="scroll-mt-36">
       {data && component ? (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={Gauge} label="Teknisk livslängd" value={number(component, "technical_lifetime_years") || "–"} hint="År" />
@@ -164,7 +170,8 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
         <MetricCard icon={ClipboardList} label="Händelser" value={data.metrics.eventCount} hint={`Nästa: ${formatDate(data.metrics.nextDueAt)}`} />
         <MetricCard icon={FolderKanban} label="Kopplade ärenden" value={data.metrics.linkedWorkOrders + data.metrics.linkedProjects} hint={`${data.metrics.linkedWorkOrders} arbetsordrar · ${data.metrics.linkedProjects} projekt`} />
       </div>
-      ) : <div className="h-40 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
+      ) : <p className="text-sm text-ink-500">Nyckeltalen hämtas.</p>}
+      </div>
 
       <div id="spara-komponent" className="scroll-mt-36">
         <Panel title="Redigera teknisk komponent" description="Uppdatera identifiering, livslängd, skick, ansvar och serviceplan.">
