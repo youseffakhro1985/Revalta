@@ -43,6 +43,11 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
   }, [propertyId, componentId]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#exportera-revision") return;
+    document.getElementById("exportera-revision")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   return (
     <div className="space-y-6">
@@ -56,14 +61,14 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
       <Panel title="Revisionshistorik och rapport" description="Spårbar historik över skapande, ändringar och korrigeringar för komponenten.">
         <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <p className="text-sm text-ink-500">Exporten innehåller tekniska grunddata, livscykelhändelser, kostnader, arbetsorder- och projektkopplingar samt revisionsspår.</p>
-          <div className="flex shrink-0 gap-2">
-            <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+          <div id="exportera-revision" className="flex shrink-0 scroll-mt-36 gap-2">
+            <button type="button" autoFocus onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
             <a href={`/api/properties/${propertyId}/components/${componentId}/report?format=csv`} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-900"><Download className="h-4 w-4" /> Exportera CSV</a>
           </div>
         </div>
 
         {error ? <InlineAlert>{error}</InlineAlert> : null}
-        {loading && !data ? <div className="h-40 animate-pulse rounded-xl bg-sand-100" /> : null}
+        {loading && !data ? <p className="text-sm text-ink-500">Historiken hämtas.</p> : null}
         {!loading && data?.audits.length === 0 ? <EmptyState title="Ingen revisionshistorik ännu" description="Ändringar och korrigeringar visas här när komponenten används." /> : null}
         {data?.audits.length ? (
           <div className="overflow-hidden rounded-xl border border-sand-200">
