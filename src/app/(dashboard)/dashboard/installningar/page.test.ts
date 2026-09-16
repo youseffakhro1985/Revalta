@@ -21,3 +21,16 @@ describe("installningar overview hash targets", () => {
     expect(source).not.toContain('<form id="losenord"');
   });
 });
+
+describe("installningar leftover account overview first HTML", () => {
+  it("keeps leftover account overview in the first HTML without stealing Byt lösenord", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="kontooversikt"');
+    expect(source).toContain('window.location.hash !== "#kontooversikt"');
+    expect(source).toContain("Uppgifterna hämtas.");
+    expect(source).toContain('id="losenord"');
+    expect(source).toContain('id="profil"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).not.toContain("Laddar…");
+  });
+});

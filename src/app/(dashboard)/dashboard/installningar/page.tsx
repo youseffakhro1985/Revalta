@@ -190,13 +190,19 @@ export default function SettingsPage() {
   useEffect(() => { void loadSettings(); }, [loadSettings]);
 
   useEffect(() => {
+    if (initialLoading) return;
     const hash = window.location.hash;
     if (hash !== "#profil" && hash !== "#organisation" && hash !== "#losenord") return;
     document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (hash === "#losenord") {
       window.setTimeout(() => document.getElementById("current-password")?.focus(), 0);
     }
-  }, []);
+  }, [initialLoading, profile]);
+  useEffect(() => {
+    if (initialLoading) return;
+    if (window.location.hash !== "#kontooversikt") return;
+    document.getElementById("kontooversikt")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [initialLoading, profile]);
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -317,19 +323,22 @@ export default function SettingsPage() {
             Uppdatera
           </button>
         </div>
-        <div className="grid border-t border-sand-100 sm:grid-cols-3">
+        <div id="kontooversikt" className="scroll-mt-36 grid border-t border-sand-100 sm:grid-cols-3">
+          {initialLoading ? <p className="px-6 py-4 text-sm text-ink-500 sm:col-span-3 sm:px-8">Uppgifterna hämtas.</p> : null}
+          {initialLoading ? null : <>
           <div className="px-6 py-4 sm:px-8">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Inloggad som</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{profile?.email || (initialLoading ? "Laddar…" : "–")}</p>
+            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{profile?.email || "–"}</p>
           </div>
           <div className="border-t border-sand-100 px-6 py-4 sm:border-l sm:border-t-0 sm:px-8">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Organisation</p>
-            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{company?.name || (initialLoading ? "Laddar…" : "–")}</p>
+            <p className="mt-1 truncate text-sm font-semibold text-ink-800">{company?.name || "–"}</p>
           </div>
           <div className="border-t border-sand-100 px-6 py-4 sm:border-l sm:border-t-0 sm:px-8">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-400">Åtkomstnivå</p>
-            <p className="mt-1 text-sm font-semibold text-ink-800">{role ? roleLabels[role] || role : initialLoading ? "Laddar…" : "–"}</p>
+            <p className="mt-1 text-sm font-semibold text-ink-800">{role ? roleLabels[role] || role : "–"}</p>
           </div>
+          </>}
         </div>
       </header>
 
