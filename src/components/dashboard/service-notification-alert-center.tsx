@@ -3,6 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, RefreshCw, ShieldAlert } from "lucide-react";
+import { premiumFieldClass } from "@/components/dashboard/premium-ui";
 
 type AlertItem = {
   id: string;
@@ -31,6 +32,7 @@ export function ServiceNotificationAlertCenter() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,6 +54,12 @@ export function ServiceNotificationAlertCenter() {
     const interval = window.setInterval(() => void load(), 60_000);
     return () => window.clearInterval(interval);
   }, [load]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#driftlarm") return;
+    document.getElementById("driftlarm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function acknowledge(alertId: string) {
     setPending((current) => new Set([...current, alertId]));
@@ -81,17 +89,19 @@ export function ServiceNotificationAlertCenter() {
     }
   }
 
-  if (loading && !data) {
-    return <div className="h-36 animate-pulse rounded-2xl border border-sand-200 bg-sand-50" aria-label="Laddar driftlarm" />;
-  }
-
   const openAlerts = data?.alerts.filter((item) => item.status === "open") || [];
   const recentResolved = data?.alerts.filter((item) => item.status === "resolved").slice(0, 3) || [];
-
-  if (!error && openAlerts.length === 0 && recentResolved.length === 0) return null;
+  const visibleOpen = statusFilter === "all" || statusFilter === "open"
+    ? openAlerts
+    : statusFilter === "critical"
+      ? openAlerts.filter((item) => item.severity === "critical")
+      : statusFilter === "unacknowledged"
+        ? openAlerts.filter((item) => !item.acknowledged)
+        : [];
+  const visibleResolved = statusFilter === "all" || statusFilter === "resolved" ? recentResolved : [];
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm" aria-labelledby="service-alert-center-title">
+    <section id="driftlarm" className="scroll-mt-36 overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm" aria-labelledby="service-alert-center-title">
       <div className="flex flex-col gap-4 border-b border-sand-100 bg-sand-50/70 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${data?.summary.critical ? "bg-danger-100 text-danger-800" : data?.summary.open ? "bg-warning-100 text-warning-800" : "bg-success-100 text-success-800"}`}>
@@ -108,7 +118,23 @@ export function ServiceNotificationAlertCenter() {
         </button>
       </div>
 
+      <form id="driftlarm-form" onSubmit={(event) => event.preventDefault()} className="border-b border-sand-100 px-5 py-4">
+        <fieldset disabled={loading} className="contents">
+          <label className="block max-w-sm">
+            <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera larm</span>
+            <select autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera driftlarm">
+              <option value="all">Alla larm</option>
+              <option value="open">Öppna</option>
+              <option value="critical">Kritiska</option>
+              <option value="unacknowledged">Ej kvitterade</option>
+              <option value="resolved">Lösta</option>
+            </select>
+          </label>
+        </fieldset>
+      </form>
+
       {error ? <div role="alert" className="border-b border-danger-100 bg-danger-50 px-5 py-3 text-sm font-semibold text-danger-800">{error}</div> : null}
+      {loading && !data ? <p className="border-b border-sand-100 px-5 py-4 text-sm text-ink-500">Larmen hämtas.</p> : null}
 
       <div className="grid gap-3 border-b border-sand-100 px-5 py-4 sm:grid-cols-4">
         <div><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Öppna</p><p className="mt-1 text-xl font-semibold text-ink-950">{data?.summary.open || 0}</p></div>
@@ -118,7 +144,10 @@ export function ServiceNotificationAlertCenter() {
       </div>
 
       <div className="divide-y divide-sand-100">
-        {openAlerts.map((item) => (
+        {!loading && visibleOpen.length === 0 && visibleResolved.length === 0 ? (
+          <p className="px-5 py-5 text-sm text-ink-500">{openAlerts.length === 0 && recentResolved.length === 0 ? "Inga driftlarm att visa just nu." : "Inga larm matchar filtret."}</p>
+        ) : null}
+        {visibleOpen.map((item) => (
           <article key={item.id} className={`grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center ${item.severity === "critical" ? "bg-danger-50/35" : "bg-warning-50/35"}`}>
             <div className="flex min-w-0 items-start gap-3">
               <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${item.severity === "critical" ? "bg-danger-100 text-danger-800" : "bg-warning-100 text-warning-800"}`}><AlertTriangle className="h-4 w-4" aria-hidden="true" /></div>
@@ -132,12 +161,12 @@ export function ServiceNotificationAlertCenter() {
               </div>
             </div>
             {item.source === "legacy" ? null : (
-              <button type="button" onClick={() => void acknowledge(item.id)} disabled={item.acknowledged || pending.has(item.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-4 w-4" aria-hidden="true" />{pending.has(item.id) ? "Kvitterar…" : item.acknowledged ? "Kvitterad" : "Kvittera larm"}</button>
+              <button type="button" onClick={() => void acknowledge(item.id)} disabled={loading || item.acknowledged || pending.has(item.id)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:cursor-not-allowed disabled:opacity-45"><Check className="h-4 w-4" aria-hidden="true" />{pending.has(item.id) ? "Kvitterar…" : item.acknowledged ? "Kvitterad" : "Kvittera larm"}</button>
             )}
           </article>
         ))}
 
-        {recentResolved.map((item) => (
+        {visibleResolved.map((item) => (
           <article key={item.id} className="flex items-start gap-3 px-5 py-4">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-success-100 text-success-800"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /></div>
             <div><h3 className="font-semibold text-ink-900">Leveransproblemet är löst</h3><p className="mt-1 text-sm text-ink-500">Systemet registrerade en senare lyckad körning och stängde driftlarmet automatiskt.</p><p className="mt-2 text-xs text-ink-500">Larm skapat {dateTime.format(new Date(item.createdAt))}</p></div>
