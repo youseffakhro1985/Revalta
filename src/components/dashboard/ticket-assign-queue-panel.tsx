@@ -93,6 +93,11 @@ export function TicketAssignQueuePanel() {
     if (window.location.hash !== "#arendefilter") return;
     document.getElementById("arendefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#arendeko") return;
+    document.getElementById("arendeko")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function assign(item: QueueItem, assigneeId: string) {
     if (!assigneeId) {
@@ -143,8 +148,9 @@ export function TicketAssignQueuePanel() {
             </label>
           </fieldset>
         </form>
-        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
+      <div id="arendeko" className="scroll-mt-36">
+      {loading ? <p className="px-5 py-4 text-sm text-ink-500">Kön hämtas.</p> : null}
       {!loading && !error && items.length === 0 ? (
         <OverviewEmpty icon={ClipboardList} title="Inga otilldelade ärenden" description="Kön är tom — alla öppna ärenden har en ansvarig." />
       ) : null}
@@ -198,6 +204,7 @@ export function TicketAssignQueuePanel() {
           ))}
         </div>
       ) : null}
+      </div>
     </OverviewPanel>
   );
 }
