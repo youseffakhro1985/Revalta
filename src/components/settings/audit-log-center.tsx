@@ -122,9 +122,15 @@ export function AuditLogCenter() {
   }, [loadLogs]);
 
   useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#auditfilter") return;
     document.getElementById("auditfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  }, [loading, logs]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#auditlista") return;
+    document.getElementById("auditlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, logs]);
 
   function resetFilters() {
     setEntityType("");
@@ -206,8 +212,9 @@ export function AuditLogCenter() {
       </div>
 
       <Panel title="Händelser" description={`${pagination.total.toLocaleString("sv-SE")} loggade händelser`}>
-        <div className="space-y-4">
+        <div id="auditlista" className="scroll-mt-36 space-y-4">
           {error ? <InlineAlert>{error}</InlineAlert> : null}
+          {loading ? <p className="text-sm text-ink-500">Händelserna hämtas.</p> : null}
           {!loading && !error && logs.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
               <ShieldCheck className="mx-auto h-8 w-8 text-slate-400" />
@@ -216,6 +223,7 @@ export function AuditLogCenter() {
             </div>
           ) : null}
 
+          {!loading && logs.length ? (
           <div className="divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             {logs.map((log) => (
               <article key={log.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[180px_180px_1fr]">
@@ -236,6 +244,7 @@ export function AuditLogCenter() {
               </article>
             ))}
           </div>
+          ) : null}
 
           <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-slate-500">
