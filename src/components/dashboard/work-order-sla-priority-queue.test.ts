@@ -23,3 +23,15 @@ describe("work order SLA priority queue", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-48 animate-pulse rounded-2xl bg-sand-100\" aria-label=\"Laddar SLA-prioritering\" />");
   });
 });
+
+describe("work order SLA leftover queue first HTML", () => {
+  it("keeps leftover SLA queue in the first HTML without stealing the filter", () => {
+    const source = readFileSync(new URL("./work-order-sla-priority-queue.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="slako"');
+    expect(source).toContain('window.location.hash !== "#slako"');
+    expect(source).toContain("SLA-kön hämtas.");
+    expect(source).toContain('id="slafilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});

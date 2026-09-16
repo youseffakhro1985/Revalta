@@ -68,6 +68,11 @@ export function WorkOrderSlaPriorityQueue() {
     if (window.location.hash !== "#slafilter") return;
     document.getElementById("slafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#slako") return;
+    document.getElementById("slako")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   const queue = useMemo(() => buildSlaPriorityQueue(items.map((item) => ({
     id: item.id,
@@ -103,6 +108,7 @@ export function WorkOrderSlaPriorityQueue() {
         </label>
       </fieldset>
     </form>
+    <div id="slako" className="scroll-mt-36">
     {loading ? (
       <p className="text-sm text-ink-500">SLA-kön hämtas.</p>
     ) : visible.length === 0 ? (
@@ -142,6 +148,7 @@ export function WorkOrderSlaPriorityQueue() {
       })}
     </div>
     )}
+    </div>
   </Panel>
   </div>;
 }
