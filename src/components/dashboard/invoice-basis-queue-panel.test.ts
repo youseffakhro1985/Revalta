@@ -31,3 +31,15 @@ describe("invoice basis queue filter first HTML", () => {
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
   });
 });
+
+describe("invoice basis leftover queue first HTML", () => {
+  it("keeps leftover invoice basis queue in the first HTML without stealing the filter", () => {
+    const source = readFileSync(new URL("./invoice-basis-queue-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="underlagko"');
+    expect(source).toContain('window.location.hash !== "#underlagko"');
+    expect(source).toContain("Kön hämtas.");
+    expect(source).toContain('id="underlagfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
