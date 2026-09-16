@@ -16,3 +16,17 @@ describe("work-order lock security alerts first HTML", () => {
     expect(source).not.toContain('{loading && !data ? <div className="h-28 animate-pulse bg-sand-50" aria-label="Laddar säkerhetsaviseringar" /> : null}');
   });
 });
+
+describe("work-order lock leftover first HTML", () => {
+  it("keeps leftover lock alerts in the first HTML without stealing refresh", () => {
+    const source = readFileSync(new URL("./work-order-lock-security-alerts.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="laslista"');
+    expect(source).toContain('window.location.hash !== "#laslista"');
+    expect(source).toContain("Aviseringarna hämtas.");
+    expect(source).toContain('id="lasavisering"');
+    expect(source).toContain('id="lasavisering-uppdatera"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
