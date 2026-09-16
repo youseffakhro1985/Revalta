@@ -13,3 +13,16 @@ describe("property card manager save hash", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-72 animate-pulse rounded-2xl bg-sand-100\" />");
   });
 });
+
+describe("property card leftover records first HTML", () => {
+  it("keeps leftover pärm records in the first HTML without stealing save", () => {
+    const source = readFileSync(new URL("./property-card-manager.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="parmlista"');
+    expect(source).toContain('window.location.hash !== "#parmlista"');
+    expect(source).toContain("Laddar poster");
+    expect(source).toContain('id="spara-fastighetspärm"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("saving || loading || !data");
+  });
+});
