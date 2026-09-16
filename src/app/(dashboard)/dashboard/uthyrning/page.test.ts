@@ -57,3 +57,17 @@ describe("uthyrning leftover occupancy first HTML", () => {
     expect(form).toContain("scrollIntoView");
   });
 });
+
+describe("uthyrning leftover objects first HTML", () => {
+  it("keeps leftover objects in the first HTML without stealing create", () => {
+    const form = readFileSync(new URL("./uthyrning-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="objektlista"');
+    expect(form).toContain('window.location.hash !== "#objektlista"');
+    expect(form).toContain("Objekten hämtas.");
+    expect(form).toContain("Nytt avtal");
+    expect(form).toContain('id="lease-editor"');
+    expect(form).toContain('id="bestandsfilter"');
+    expect(form).toContain('id="uthyrningslage"');
+    expect(form).toContain('get("create") === "1"');
+  });
+});

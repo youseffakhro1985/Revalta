@@ -181,6 +181,11 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#uthyrningslage") return;
     document.getElementById("uthyrningslage")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, properties]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#objektlista") return;
+    document.getElementById("objektlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, properties]);
 
   const currentLeaseByUnit = useMemo(() => {
     const map = new Map<string, Lease>();
@@ -599,6 +604,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
           </fieldset>
         </div>
 
+        <div id="objektlista" className="scroll-mt-36">
         {loading ? (
           <p className="p-6 text-sm text-ink-500">Objekten hämtas.</p>
         ) : visibleRows.length === 0 ? (
@@ -636,6 +642,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
             ))}
           </div>
         )}
+        </div>
       </Panel>
 
       <Panel title="Avtalshistorik" description="Utkast, aktiva, avslutade och makulerade avtal med samma befintliga redigerings- och återställningsflöden." bodyClassName="p-0">
