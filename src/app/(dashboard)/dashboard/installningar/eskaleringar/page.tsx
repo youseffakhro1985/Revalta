@@ -120,6 +120,11 @@ export default function EscalationAdminPage() {
     if (window.location.hash !== "#eskfilter") return;
     document.getElementById("eskfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#eskaleringslista") return;
+    document.getElementById("eskaleringslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   useEffect(() => {
     if (loading) return;
@@ -238,10 +243,12 @@ export default function EscalationAdminPage() {
             </label>
           </fieldset>
         </form>
+        <div id="eskaleringslista" className="scroll-mt-36">
         {loading && !data ? <p className="text-sm text-ink-500">Eskaleringsuppgifterna hämtas.</p> : null}
         {!loading && assignments.length === 0 ? <EmptyState title="Inga aktiva eskaleringar" description={data?.rules.enabled ? "Inga uppgifter matchar de aktiva reglerna." : "Eskaleringsmotorn är pausad i organisationens regler."} /> : null}
         {!loading && assignments.length > 0 && visibleAssignments.length === 0 ? <EmptyState title="Inga uppgifter matchar filtret" description="Ändra orsaksfiltret för att visa fler eskaleringar." /> : null}
         {visibleAssignments.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{visibleAssignments.map((item) => <div key={item.notificationKey} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink-950">{item.componentName}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.reason === "blocked" ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{item.reason === "blocked" ? "Blockerad" : "Deadline passerad"}</span></div><p className="mt-1 text-sm text-ink-500">{item.propertyName}</p>{item.note ? <p className="mt-2 text-sm text-ink-600">{item.note}</p> : null}</div><div className="text-sm text-ink-600"><p><span className="font-semibold text-ink-800">Ansvarig:</span> {item.assigneeName || "Ej angiven"}</p><p className="mt-1"><span className="font-semibold text-ink-800">Deadline:</span> {item.deadline ? dateOnly.format(new Date(item.deadline)) : "Ingen"}</p></div><Link href={item.href} className="rounded-lg bg-petroleum-800 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-petroleum-900">Öppna komponent</Link></div>)}</div> : null}
+        </div>
       </Panel>
       </div>
 
