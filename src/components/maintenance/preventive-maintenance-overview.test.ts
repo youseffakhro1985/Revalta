@@ -13,3 +13,18 @@ describe("preventive maintenance run hash", () => {
     expect(source).not.toContain("if (!data) return null");
   });
 });
+
+describe("preventive maintenance service filter first HTML", () => {
+  it("keeps the service filter in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./preventive-maintenance-overview.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="servicefilter"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#servicefilter"');
+    expect(source).toContain('window.location.hash !== "#kor-motor"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("Kör underhållsmotorn");
+    expect(source).not.toContain('{loading && !data ? <div className="h-48 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}');
+  });
+});
