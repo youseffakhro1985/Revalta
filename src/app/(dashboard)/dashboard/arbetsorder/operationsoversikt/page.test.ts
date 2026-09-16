@@ -11,3 +11,16 @@ describe("work order operations overview filter hash", () => {
     expect(source).toContain("autoFocus");
   });
 });
+
+describe("work order operations leftover queue first HTML", () => {
+  it("keeps leftover queue in the first HTML without stealing filter", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="operativko"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#operativko"');
+    expect(source).toContain('id="oversiktsfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("Arbetsordrarna hämtas.");
+    expect(source).not.toContain("h-56 animate-pulse rounded-xl bg-sand-100");
+  });
+});
