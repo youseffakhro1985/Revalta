@@ -100,6 +100,7 @@ export function PropertyCardManager({ propertyId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#spara-fastighetspärm") return;
     document.getElementById("spara-fastighetspärm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("parm-namn")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -162,7 +163,7 @@ export function PropertyCardManager({ propertyId }: Props) {
           </> : null}
 
           {section === "asset" ? <>
-            <Field label="Namn"><input autoFocus name="name" required defaultValue={fieldValue(selected, "name")} className={premiumFieldClass} placeholder="Ex. Hiss 1" /></Field>
+            <Field label="Namn"><input id="parm-namn" autoFocus name="name" required defaultValue={fieldValue(selected, "name")} className={premiumFieldClass} placeholder="Ex. Hiss 1" /></Field>
             <Field label="Kategori"><select name="category" required defaultValue={fieldValue(selected, "category") || "elevator"} className={premiumFieldClass}>{[['elevator','Hiss'],['ventilation','Ventilation'],['heating','Värme'],['electricity','El'],['water','VA'],['fire','Brandskydd'],['access','Passersystem'],['other','Övrigt']].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></Field>
             <BuildingSelect data={card} selected={fieldValue(selected, "buildingId")} />
             <Field label="Placering"><input name="location" defaultValue={fieldValue(selected, "location")} className={premiumFieldClass} /></Field>
