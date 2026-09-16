@@ -4,7 +4,7 @@ import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, ClipboardCheck, FileBadge2, Gauge, ShieldCheck, Wrench } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 
 type PropertyCardData = {
   property: {
@@ -43,6 +43,7 @@ export function PropertyCardOperations({ propertyId }: Props) {
   const [data, setData] = useState<PropertyCardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -57,6 +58,12 @@ export function PropertyCardOperations({ propertyId }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#driftfilter") return;
+    document.getElementById("driftfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   const annualAgreementCost = useMemo(() => (data?.agreements || []).reduce((sum, item) => {
     const amount = Number(item.cost_amount || 0); const interval = String(item.cost_interval || "yearly");
     if (interval === "monthly") return sum + amount * 12;
@@ -64,41 +71,73 @@ export function PropertyCardOperations({ propertyId }: Props) {
     return sum + amount;
   }, 0), [data]);
 
-  if (loading) return <div className="space-y-4"><div className="h-28 animate-pulse rounded-2xl bg-sand-100"/><div className="grid gap-4 lg:grid-cols-3">{[1,2,3].map(item=><div key={item} className="h-64 animate-pulse rounded-2xl bg-sand-100"/>)}</div></div>;
-  if (!data) return <InlineAlert>{error || "Fastighetskortet kunde inte laddas."}</InlineAlert>;
+  const needle = query.trim().toLowerCase();
+  function matches(...parts: Array<string | null | undefined>) {
+    if (!needle) return true;
+    return parts.some((part) => String(part || "").toLowerCase().includes(needle));
+  }
 
-  return <div className="space-y-6">
+  if (!loading && !data) return <InlineAlert>{error || "Fastighetskortet kunde inte laddas."}</InlineAlert>;
+
+  const metrics = data?.metrics ?? {
+    entrances: 0,
+    technicalAssets: 0,
+    criticalAssets: 0,
+    serviceDue90Days: 0,
+    warrantiesExpiring180Days: 0,
+    inspectionsDue90Days: 0,
+    agreementsEnding180Days: 0,
+  };
+  const assets = (data?.assets || []).filter((item) => matches(value(item, "name"), value(item, "category"), value(item, "location"), value(item, "building_name")));
+  const inspections = (data?.inspections || []).filter((item) => matches(value(item, "title"), value(item, "inspection_type")));
+  const warranties = (data?.warranties || []).filter((item) => matches(value(item, "title"), value(item, "supplier")));
+  const agreements = (data?.agreements || []).filter((item) => matches(value(item, "supplier"), value(item, "service_area")));
+  const workOrders = (data?.property.work_orders || []).filter((item) => matches(item.title, item.status));
+  const projects = (data?.property.projects || []).filter((item) => matches(item.name, item.status, item.risk));
+
+  return <div id="driftfilter" className="scroll-mt-36 space-y-6">
+    <form onSubmit={(event) => event.preventDefault()}>
+      <fieldset disabled={loading} className="contents">
+        <label className="block max-w-lg">
+          <span className="mb-1.5 block text-sm font-medium text-ink-700">Sök i driftkortet</span>
+          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Installation, avtal, besiktning, arbetsorder eller projekt" aria-label="Sök i driftkortet" className={premiumFieldClass} />
+        </label>
+      </fieldset>
+    </form>
     {error ? <InlineAlert>{error}</InlineAlert> : null}
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <MetricCard icon={Wrench} label="Tekniska installationer" value={data.metrics.technicalAssets} hint={`${data.metrics.criticalAssets} kritiska eller ur drift`} />
-      <MetricCard icon={CalendarClock} label="Service inom 90 dagar" value={data.metrics.serviceDue90Days} />
-      <MetricCard icon={ClipboardCheck} label="Besiktningar inom 90 dagar" value={data.metrics.inspectionsDue90Days} />
-      <MetricCard icon={ShieldCheck} label="Garantier inom 180 dagar" value={data.metrics.warrantiesExpiring180Days} hint={`Avtal: ${money.format(annualAgreementCost)}/år`} />
+      <MetricCard icon={Wrench} label="Tekniska installationer" value={metrics.technicalAssets} hint={`${metrics.criticalAssets} kritiska eller ur drift`} />
+      <MetricCard icon={CalendarClock} label="Service inom 90 dagar" value={metrics.serviceDue90Days} />
+      <MetricCard icon={ClipboardCheck} label="Besiktningar inom 90 dagar" value={metrics.inspectionsDue90Days} />
+      <MetricCard icon={ShieldCheck} label="Garantier inom 180 dagar" value={metrics.warrantiesExpiring180Days} hint={`Avtal: ${money.format(annualAgreementCost)}/år`} />
     </section>
+
+    {loading ? <p className="text-sm text-ink-500">Driftkortet hämtas.</p> : <>
 
     <div className="grid gap-6 xl:grid-cols-3">
       <Panel title="Tekniska installationer" description="Driftstatus, service och kritikalitet." bodyClassName="p-0">
-        {data.assets.length === 0 ? <EmptyState title="Inga installationer registrerade" description="Registrera hissar, ventilation, värme, el, VA och brandskydd."/> : <div className="divide-y divide-sand-100">{data.assets.slice(0,8).map((item) => <article key={value(item,"id") || JSON.stringify(item)} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"name")}</p><p className="mt-1 text-sm text-ink-500">{assetLabels[value(item,"category") || "other"] || value(item,"category")}{value(item,"building_name") ? ` · ${value(item,"building_name")}` : ""}</p></div>{badge(item.status)}</div><div className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><p className="text-ink-500">Nästa service</p><p className="mt-1 font-semibold text-ink-700">{formatDate(item.next_service_at)}</p></div><div><p className="text-ink-500">Placering</p><p className="mt-1 font-semibold text-ink-700">{value(item,"location") || "Ej angiven"}</p></div></div></article>)}</div>}
+        {assets.length === 0 ? <EmptyState title={needle ? "Inga installationer matchar sökningen" : "Inga installationer registrerade"} description={needle ? "Ändra sökningen för att visa fler installationer." : "Registrera hissar, ventilation, värme, el, VA och brandskydd."}/> : <div className="divide-y divide-sand-100">{assets.slice(0,8).map((item) => <article key={value(item,"id") || JSON.stringify(item)} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"name")}</p><p className="mt-1 text-sm text-ink-500">{assetLabels[value(item,"category") || "other"] || value(item,"category")}{value(item,"building_name") ? ` · ${value(item,"building_name")}` : ""}</p></div>{badge(item.status)}</div><div className="mt-3 grid grid-cols-2 gap-3 text-xs"><div><p className="text-ink-500">Nästa service</p><p className="mt-1 font-semibold text-ink-700">{formatDate(item.next_service_at)}</p></div><div><p className="text-ink-500">Placering</p><p className="mt-1 font-semibold text-ink-700">{value(item,"location") || "Ej angiven"}</p></div></div></article>)}</div>}
       </Panel>
 
       <Panel title="Besiktningar och garantier" description="Kommande myndighetskrav och garantislut." bodyClassName="p-0">
-        {data.inspections.length === 0 && data.warranties.length === 0 ? <EmptyState title="Inga poster registrerade" description="Besiktningar och garantier visas här när de läggs till."/> : <div className="divide-y divide-sand-100">{data.inspections.slice(0,5).map(item=><article key={value(item,"id")!} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"title")}</p><p className="mt-1 text-sm text-ink-500">Besiktning · {formatDate(item.next_due_at || item.scheduled_at)}</p></div>{badge(item.status)}</div></article>)}{data.warranties.slice(0,5).map(item=><article key={value(item,"id")!} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"title")}</p><p className="mt-1 text-sm text-ink-500">Garanti till {formatDate(item.expires_at)}{value(item,"supplier") ? ` · ${value(item,"supplier")}` : ""}</p></div><FileBadge2 className="h-5 w-5 text-petroleum-700"/></div></article>)}</div>}
+        {inspections.length === 0 && warranties.length === 0 ? <EmptyState title={needle ? "Inga poster matchar sökningen" : "Inga poster registrerade"} description={needle ? "Ändra sökningen för att visa besiktningar och garantier." : "Besiktningar och garantier visas här när de läggs till."}/> : <div className="divide-y divide-sand-100">{inspections.slice(0,5).map(item=><article key={value(item,"id")!} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"title")}</p><p className="mt-1 text-sm text-ink-500">Besiktning · {formatDate(item.next_due_at || item.scheduled_at)}</p></div>{badge(item.status)}</div></article>)}{warranties.slice(0,5).map(item=><article key={value(item,"id")!} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"title")}</p><p className="mt-1 text-sm text-ink-500">Garanti till {formatDate(item.expires_at)}{value(item,"supplier") ? ` · ${value(item,"supplier")}` : ""}</p></div><FileBadge2 className="h-5 w-5 text-petroleum-700"/></div></article>)}</div>}
       </Panel>
 
       <Panel title="Serviceavtal" description="Leverantörer, avtalsperioder och kostnader." bodyClassName="p-0">
-        {data.agreements.length === 0 ? <EmptyState title="Inga serviceavtal registrerade" description="Lägg till avtal för hiss, ventilation, brand, kyla och andra tjänster."/> : <div className="divide-y divide-sand-100">{data.agreements.slice(0,8).map(item=><article key={value(item,"id")!} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"supplier")}</p><p className="mt-1 text-sm text-ink-500">{value(item,"service_area")}</p></div>{badge(item.status)}</div><div className="mt-3 flex items-center justify-between text-xs"><span className="text-ink-500">Slutar {formatDate(item.ends_at)}</span><span className="font-semibold text-ink-800">{Number(item.cost_amount || 0) ? money.format(Number(item.cost_amount)) : "Kostnad saknas"}</span></div></article>)}</div>}
+        {agreements.length === 0 ? <EmptyState title={needle ? "Inga avtal matchar sökningen" : "Inga serviceavtal registrerade"} description={needle ? "Ändra sökningen för att visa fler serviceavtal." : "Lägg till avtal för hiss, ventilation, brand, kyla och andra tjänster."}/> : <div className="divide-y divide-sand-100">{agreements.slice(0,8).map(item=><article key={value(item,"id")!} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{value(item,"supplier")}</p><p className="mt-1 text-sm text-ink-500">{value(item,"service_area")}</p></div>{badge(item.status)}</div><div className="mt-3 flex items-center justify-between text-xs"><span className="text-ink-500">Slutar {formatDate(item.ends_at)}</span><span className="font-semibold text-ink-800">{Number(item.cost_amount || 0) ? money.format(Number(item.cost_amount)) : "Kostnad saknas"}</span></div></article>)}</div>}
       </Panel>
     </div>
 
     <div className="grid gap-6 xl:grid-cols-2">
       <Panel title="Arbetsordrar" description="Senaste operativa arbeten på fastigheten." bodyClassName="p-0">
-        {data.property.work_orders.length === 0 ? <EmptyState title="Inga arbetsordrar" description="Arbetsordrar kopplade till fastigheten visas här."/> : <div className="divide-y divide-sand-100">{data.property.work_orders.map(item=><Link key={item.id} href={`/dashboard/arbetsorder/${item.id}`} className="block p-5 transition hover:bg-sand-50"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{item.title}</p><p className="mt-1 text-sm text-ink-500">Planerat slut {formatDate(item.scheduled_end)}</p></div>{badge(item.status)}</div></Link>)}</div>}
+        {workOrders.length === 0 ? <EmptyState title={needle ? "Inga arbetsordrar matchar sökningen" : "Inga arbetsordrar"} description={needle ? "Ändra sökningen för att visa fler arbetsordrar." : "Arbetsordrar kopplade till fastigheten visas här."}/> : <div className="divide-y divide-sand-100">{workOrders.map(item=><Link key={item.id} href={`/dashboard/arbetsorder/${item.id}`} className="block p-5 transition hover:bg-sand-50"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{item.title}</p><p className="mt-1 text-sm text-ink-500">Planerat slut {formatDate(item.scheduled_end)}</p></div>{badge(item.status)}</div></Link>)}</div>}
       </Panel>
       <Panel title="Projekt" description="Investeringar, budget och risk kopplad till fastigheten." bodyClassName="p-0">
-        {data.property.projects.length === 0 ? <EmptyState title="Inga projekt" description="Projekt kopplade till fastigheten visas här."/> : <div className="divide-y divide-sand-100">{data.property.projects.map(item=><Link key={item.id} href={`/dashboard/projekt/${item.id}`} className="block p-5 transition hover:bg-sand-50"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{item.name}</p><p className="mt-1 text-sm text-ink-500">Utfall {money.format(Number(item.actual || 0))} av budget {money.format(Number(item.budget || 0))}</p></div>{badge(item.risk)}</div></Link>)}</div>}
+        {projects.length === 0 ? <EmptyState title={needle ? "Inga projekt matchar sökningen" : "Inga projekt"} description={needle ? "Ändra sökningen för att visa fler projekt." : "Projekt kopplade till fastigheten visas här."}/> : <div className="divide-y divide-sand-100">{projects.map(item=><Link key={item.id} href={`/dashboard/projekt/${item.id}`} className="block p-5 transition hover:bg-sand-50"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-ink-900">{item.name}</p><p className="mt-1 text-sm text-ink-500">Utfall {money.format(Number(item.actual || 0))} av budget {money.format(Number(item.budget || 0))}</p></div>{badge(item.risk)}</div></Link>)}</div>}
       </Panel>
     </div>
 
-    {(data.metrics.criticalAssets > 0 || data.metrics.inspectionsDue90Days > 0) ? <div className="flex items-start gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm text-warning-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Fastigheten kräver uppmärksamhet</p><p className="mt-1">{data.metrics.criticalAssets} kritiska installationer och {data.metrics.inspectionsDue90Days} besiktningar behöver följas upp.</p></div></div> : <div className="flex items-start gap-3 rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5 text-sm text-petroleum-900"><Gauge className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Driftläget ser stabilt ut</p><p className="mt-1">Inga kritiska installationer eller nära förestående besiktningar är registrerade.</p></div></div>}
+    {(metrics.criticalAssets > 0 || metrics.inspectionsDue90Days > 0) ? <div className="flex items-start gap-3 rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm text-warning-900"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Fastigheten kräver uppmärksamhet</p><p className="mt-1">{metrics.criticalAssets} kritiska installationer och {metrics.inspectionsDue90Days} besiktningar behöver följas upp.</p></div></div> : <div className="flex items-start gap-3 rounded-2xl border border-petroleum-100 bg-petroleum-50 p-5 text-sm text-petroleum-900"><Gauge className="mt-0.5 h-5 w-5 shrink-0"/><div><p className="font-semibold">Driftläget ser stabilt ut</p><p className="mt-1">Inga kritiska installationer eller nära förestående besiktningar är registrerade.</p></div></div>}
+    </>}
   </div>;
 }
