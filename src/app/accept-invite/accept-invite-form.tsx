@@ -78,6 +78,7 @@ export function AcceptInviteForm({ token, reason }: { token: string; reason: str
     if (loadingPreview) return;
     if (window.location.hash !== "#accept-invite-form") return;
     document.getElementById("accept-invite-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("invite-name")?.focus(), 0);
   }, [loadingPreview, preview]);
   useEffect(() => {
     if (loadingPreview) return;
