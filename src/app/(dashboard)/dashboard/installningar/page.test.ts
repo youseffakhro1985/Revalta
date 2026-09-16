@@ -54,3 +54,26 @@ describe("installningar profil mutate first HTML", () => {
     expect(stickyIndex).toBeGreaterThan(profilIndex);
   });
 });
+
+describe("installningar organisation mutate first HTML", () => {
+  it("focuses organisation name after load without stealing Byt lösenord or profil", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="organisation"');
+    expect(source).toContain('id="organisationsnamn"');
+    expect(source).toContain('window.location.hash !== "#organisation"');
+    expect(source).toContain('document.getElementById("organisationsnamn")?.focus()');
+    expect(source).toContain('id="profil-namn"');
+    expect(source).toContain('id="current-password"');
+    expect(source).toContain('document.getElementById("current-password")?.focus()');
+    expect(source).toContain('id="kontooversikt"');
+    expect(source).toContain('id="losenord"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).not.toContain("autoFocus");
+    const orgIndex = source.indexOf('id="organisationsnamn"');
+    const stickyIndex = source.indexOf('id="current-password"');
+    const profilIndex = source.indexOf('id="profil-namn"');
+    expect(orgIndex).toBeGreaterThan(-1);
+    expect(orgIndex).toBeGreaterThan(profilIndex);
+    expect(stickyIndex).toBeGreaterThan(orgIndex);
+  });
+});
