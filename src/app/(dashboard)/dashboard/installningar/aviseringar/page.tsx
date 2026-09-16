@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, Mail, RefreshCw, Save, Send, Settings2, Users } from "lucide-react";
-import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type EventRow = { id: string; type: string; status: string; recipient: string | null; payload: Record<string, unknown> | null; created_at: string };
@@ -56,12 +56,15 @@ export default function ServiceNotificationsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const currentSignature = useMemo(() => signature(preferences, extraEmails), [preferences, extraEmails]);
   const isDirty = currentSignature !== savedSignature;
   const config = useMemo(() => configurationStatus(data), [data]);
   const emailCount = useMemo(() => normalizedEmails(extraEmails).length, [extraEmails]);
   const formValid = preferences.roles.length > 0 && preferences.daysAhead >= 1 && preferences.daysAhead <= 90 && emailCount <= 20;
+  const events = data?.events || [];
+  const visibleEvents = statusFilter === "all" ? events : events.filter((event) => event.status === statusFilter);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +92,11 @@ export default function ServiceNotificationsPage() {
     if (hash !== "#aviseringsinstallningar" && hash !== "#mottagare" && hash !== "#korningshistorik") return;
     document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#historikfilter") return;
+    document.getElementById("historikfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
   useEffect(() => {
     if (!isDirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
@@ -228,9 +236,24 @@ export default function ServiceNotificationsPage() {
 
       <div id="korningshistorik" className="scroll-mt-36">
       <Panel title="Körningshistorik" description="De senaste automatiska och manuella aviseringsförsöken.">
-        {loading && !data ? <div className="h-48 animate-pulse rounded-xl bg-sand-100" /> : null}
-        {!loading && data?.events.length === 0 ? <EmptyState title="Ingen körningshistorik ännu" description="Automatiska utskick och testutskick loggas här." /> : null}
-        {data?.events.length ? <div className="overflow-x-auto rounded-xl border border-sand-200"><table className="min-w-full divide-y divide-sand-100 text-sm"><thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-5 py-3">Tidpunkt</th><th className="px-5 py-3">Typ</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Mottagare / körning</th></tr></thead><tbody className="divide-y divide-sand-100">{data.events.map((event) => <tr key={event.id}><td className="px-5 py-4 font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</td><td className="px-5 py-4 text-ink-600">{event.type === "component_service_test" ? "Testutskick" : "Daglig sammanställning"}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-success-50 text-success-800" : event.status === "failed" ? "bg-danger-50 text-danger-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></td><td className="max-w-md truncate px-5 py-4 text-ink-500">{event.recipient || "–"}</td></tr>)}</tbody></table></div> : null}
+        <form id="historikfilter" onSubmit={(event) => event.preventDefault()} className="mb-4 scroll-mt-36">
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera historik</span>
+              <select autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera körningshistorik">
+                <option value="all">Alla statusar</option>
+                <option value="sent">Skickat</option>
+                <option value="failed">Misslyckat</option>
+                <option value="processing">Bearbetas</option>
+                <option value="skipped">Överhoppat</option>
+              </select>
+            </label>
+          </fieldset>
+        </form>
+        {loading && !data ? <p className="text-sm text-ink-500">Körningshistoriken hämtas.</p> : null}
+        {!loading && events.length === 0 ? <EmptyState title="Ingen körningshistorik ännu" description="Automatiska utskick och testutskick loggas här." /> : null}
+        {!loading && events.length > 0 && visibleEvents.length === 0 ? <EmptyState title="Inga körningar matchar filtret" description="Ändra statusfiltret för att visa fler aviseringsförsök." /> : null}
+        {visibleEvents.length ? <div className="overflow-x-auto rounded-xl border border-sand-200"><table className="min-w-full divide-y divide-sand-100 text-sm"><thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-5 py-3">Tidpunkt</th><th className="px-5 py-3">Typ</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Mottagare / körning</th></tr></thead><tbody className="divide-y divide-sand-100">{visibleEvents.map((event) => <tr key={event.id}><td className="px-5 py-4 font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</td><td className="px-5 py-4 text-ink-600">{event.type === "component_service_test" ? "Testutskick" : "Daglig sammanställning"}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-success-50 text-success-800" : event.status === "failed" ? "bg-danger-50 text-danger-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></td><td className="max-w-md truncate px-5 py-4 text-ink-500">{event.recipient || "–"}</td></tr>)}</tbody></table></div> : null}
       </Panel>
       </div>
     </div>
