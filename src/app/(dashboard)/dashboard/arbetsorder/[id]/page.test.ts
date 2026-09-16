@@ -35,3 +35,11 @@ describe("work order execution panel first HTML", () => {
     expect(source).toContain("workOrder?.id || id");
   });
 });
+
+describe("work order reporting panel first HTML", () => {
+  it("renders reporting while the work order is still loading", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain("workOrder || loading ? <WorkOrderReportingPanel");
+    expect(source).toContain("workOrder?.id || id");
+  });
+});

@@ -84,6 +84,12 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-intygande") return;
+    document.getElementById("spara-intygande")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, signatures]);
+
   async function post(payload: Record<string, unknown>, message: string, reset?: () => void) {
     setSaving(true);
     setError("");
@@ -106,13 +112,12 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
     }
   }
 
-  if (loading) return <div className="h-80 animate-pulse rounded-2xl bg-sand-100" />;
-
+  const formLocked = saving || loading;
   const approvedReports = reports.filter((item) => item.status === "approved").length;
   const approvedInvoices = invoiceBases.filter((item) => item.status === "approved" || item.status === "exported").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={saving || loading}>
       {(error || success) ? <div aria-live="polite"><InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert></div> : null}
 
       <section className="grid gap-4 sm:grid-cols-3">
@@ -129,7 +134,9 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
 
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Panel title="Intygande" description="Registrera en spårbar bekräftelse från utförare, entreprenör eller beställare. Det här är ett loggat intygande i Revalta, inte e-legitimation eller BankID.">
-          <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          <form
+            id="spara-intygande"
+            onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             const form = event.currentTarget;
             const data = new FormData(form);
@@ -140,13 +147,15 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
               signerEmail: data.get("signerEmail"),
               confirmationText: data.get("confirmationText"),
             }, "Intygandet har registrerats.", () => form.reset());
-          }} className="grid gap-4 sm:grid-cols-2">
+          }} className="grid scroll-mt-36 gap-4 sm:grid-cols-2">
+            <fieldset disabled={formLocked} className="contents">
             <label className="space-y-1.5 text-sm text-ink-600"><span>Roll</span><select name="signerRole" className={premiumFieldClass} defaultValue="executor">{Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label className="space-y-1.5 text-sm text-ink-600"><span>Namn</span><input name="signerName" required className={premiumFieldClass} placeholder="För- och efternamn" /></label>
+            <label className="space-y-1.5 text-sm text-ink-600"><span>Namn</span><input autoFocus name="signerName" required className={premiumFieldClass} placeholder="För- och efternamn" /></label>
             <label className="space-y-1.5 text-sm text-ink-600"><span>E-post</span><input name="signerEmail" type="email" className={premiumFieldClass} placeholder="namn@foretag.se" /></label>
             <label className="space-y-1.5 text-sm text-ink-600"><span>Intygandetext</span><input name="confirmationText" className={premiumFieldClass} defaultValue="Jag intygar att uppgifterna är korrekta." /></label>
             <label className="sm:col-span-2 inline-flex items-start gap-3 rounded-xl border border-sand-200 bg-sand-50 p-4 text-sm text-ink-600"><input type="checkbox" required className="mt-0.5 h-4 w-4 rounded border-sand-300" /><span>Jag bekräftar att intygandet är avsiktligt och får registreras med datum och tid.</span></label>
-            <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Registrerar…" : "Registrera intygande"}</button>
+            <button disabled={formLocked} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Registrerar…" : "Registrera intygande"}</button>
+            </fieldset>
           </form>
 
           <div className="mt-5 space-y-3 border-t border-sand-100 pt-5">
@@ -162,14 +171,14 @@ export function WorkOrderReportingPanel({ workOrderId }: Props) {
           <div className="space-y-4">
             <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
               <div className="flex items-start gap-3"><FileText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Arbetsrapport</h3><p className="mt-1 text-sm leading-6 text-ink-500">Fryser arbetsorder, checklista, registreringar, dokument, signaturer och kostnadsuppgifter i en ny version.</p></div></div>
-              <button type="button" disabled={saving} onClick={() => void post({ action: "report.create" }, "En ny arbetsrapport har skapats.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa arbetsrapport"}</button>
+              <button type="button" disabled={formLocked} onClick={() => void post({ action: "report.create" }, "En ny arbetsrapport har skapats.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa arbetsrapport"}</button>
             </div>
             <div className="rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
               <div className="flex items-start gap-3"><ReceiptText className="mt-0.5 h-5 w-5 text-petroleum-700" /><div><h3 className="font-semibold text-ink-900">Fakturaunderlag</h3><p className="mt-1 text-sm leading-6 text-ink-500">{canCreateInvoiceBasis ? "Bygger exportbart underlag från attesterad tid och material (samma källa som Ekonomi och fakturering) och arkiverar en rapportsnapshot." : "Attestera tid eller material under Ekonomi och fakturering innan underlag kan skapas här."}</p></div></div>
-              {canCreateInvoiceBasis ? (
-                <button type="button" disabled={saving} onClick={() => void post({ action: "invoice.create" }, "Exportbart fakturaunderlag har skapats från attesterade rader.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa fakturaunderlag"}</button>
+              {canCreateInvoiceBasis || loading ? (
+                <button type="button" disabled={formLocked || !canCreateInvoiceBasis} onClick={() => void post({ action: "invoice.create" }, "Exportbart fakturaunderlag har skapats från attesterade rader.")} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "Skapar…" : "Skapa fakturaunderlag"}</button>
               ) : (
-                <Link href={`/dashboard/arbetsorder/${workOrderId}#ekonomi`} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>{saving ? "…" : "Öppna Ekonomi och attestera rader"}</Link>
+                <Link href={`/dashboard/arbetsorder/${workOrderId}#ekonomi`} className={`${premiumPrimaryButtonClass} mt-4 w-full`}>Öppna Ekonomi och attestera rader</Link>
               )}
             </div>
           </div>
