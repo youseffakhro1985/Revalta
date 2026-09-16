@@ -19,6 +19,10 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Registrera tid",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/AO-2026-0142", "technician")).toEqual({
+      href: "/dashboard/arbetsorder/AO-2026-0142#spara-arbetsorder",
+      label: "Spara arbetsorder",
+    });
   });
 
   it("behåller arbetsorderåtgärden inne i arbetsordermodulen men inte i admin- eller skapa-vyn", () => {
@@ -39,7 +43,10 @@ describe("dashboardPrimaryCreateAction", () => {
       label: "Spara arbetsorder",
     });
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/AO-2026-0142", "manager")?.label).toBe("Spara arbetsorder");
-    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/AO-2026-0142", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/AO-2026-0142", "technician")).toEqual({
+      href: "/dashboard/arbetsorder/AO-2026-0142#spara-arbetsorder",
+      label: "Spara arbetsorder",
+    });
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder", "admin")?.label).toBe("Ny arbetsorder");
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/ny", "admin")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/arbetsorder/redigeringslas", "admin")).toEqual({
