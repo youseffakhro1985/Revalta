@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertOctagon, CheckCircle2, Clock3, MailWarning, RefreshCw, ShieldCheck, SlidersHorizontal, Users } from "lucide-react";
 import { EscalationAdminActions } from "@/components/dashboard/escalation-admin-actions";
-import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
+import { EmptyState, InlineAlert, MetricCard, Panel, premiumFieldClass } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Assignment = {
@@ -89,6 +89,7 @@ export default function EscalationAdminPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reasonFilter, setReasonFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,10 +114,19 @@ export default function EscalationAdminPage() {
     document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#eskfilter") return;
+    document.getElementById("eskfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   const configured = useMemo(() => {
     if (!data) return false;
     return data.configuration.cronSecret && data.configuration.emailApiKey && data.configuration.emailFrom;
   }, [data]);
+
+  const assignments = data?.assignments || [];
+  const visibleAssignments = reasonFilter === "all" ? assignments : assignments.filter((item) => item.reason === reasonFilter);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 animate-fade-in-soft">
@@ -141,17 +151,17 @@ export default function EscalationAdminPage() {
 
       <div id="regler" className="scroll-mt-36">
       <Panel title="Aktiva organisationsregler" description="Driftöversikten använder exakt samma regler som den automatiska och manuella eskaleringsmotorn.">
-        {data ? (
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          {data ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Motor</p><p className={`mt-2 font-semibold ${data.rules.enabled ? "text-success-800" : "text-warning-800"}`}>{data.rules.enabled ? "Aktiverad" : "Pausad"}</p></div>
               <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Orsaker</p><p className="mt-2 font-semibold text-ink-800">{[data.rules.escalateBlocked && "Blockerad", data.rules.escalateOverdue && "Deadline"].filter(Boolean).join(" + ") || "Inga"}</p></div>
               <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Respittid</p><p className="mt-2 font-semibold text-ink-800">{data.rules.graceDays} dagar</p></div>
               <div className="rounded-xl border border-sand-200 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Upprepning</p><p className="mt-2 font-semibold text-ink-800">Var {data.rules.repeatDays}:e dag</p></div>
             </div>
-            <Link href="/dashboard/installningar/eskaleringar/regler" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900"><SlidersHorizontal className="h-4 w-4" /> Hantera regler</Link>
-          </div>
-        ) : <div className="h-24 animate-pulse rounded-xl bg-sand-100" />}
+          ) : <p className="text-sm text-ink-500">Reglerna hämtas.</p>}
+          <Link href="/dashboard/installningar/eskaleringar/regler" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-3 text-sm font-semibold text-white hover:bg-petroleum-900"><SlidersHorizontal className="h-4 w-4" /> Hantera regler</Link>
+        </div>
         {data?.rulesUpdatedAt ? <p className="mt-4 text-sm text-ink-500">Senast ändrad {dateTime.format(new Date(data.rulesUpdatedAt))}.</p> : null}
       </Panel>
       </div>
@@ -188,11 +198,26 @@ export default function EscalationAdminPage() {
         </Panel>
       </div>
 
+      <div id="eskfilter" className="scroll-mt-36">
       <Panel title="Uppgifter som kräver eskalering" description="Urvalet följer aktiva regler, inklusive respittid och valda eskaleringstyper. Slutförda uppgifter visas inte.">
-        {loading && !data ? <div className="h-52 animate-pulse rounded-xl bg-sand-100" /> : null}
-        {!loading && data?.assignments.length === 0 ? <EmptyState title="Inga aktiva eskaleringar" description={data?.rules.enabled ? "Inga uppgifter matchar de aktiva reglerna." : "Eskaleringsmotorn är pausad i organisationens regler."} /> : null}
-        {data?.assignments.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{data.assignments.map((item) => <div key={item.notificationKey} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink-950">{item.componentName}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.reason === "blocked" ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{item.reason === "blocked" ? "Blockerad" : "Deadline passerad"}</span></div><p className="mt-1 text-sm text-ink-500">{item.propertyName}</p>{item.note ? <p className="mt-2 text-sm text-ink-600">{item.note}</p> : null}</div><div className="text-sm text-ink-600"><p><span className="font-semibold text-ink-800">Ansvarig:</span> {item.assigneeName || "Ej angiven"}</p><p className="mt-1"><span className="font-semibold text-ink-800">Deadline:</span> {item.deadline ? dateOnly.format(new Date(item.deadline)) : "Ingen"}</p></div><Link href={item.href} className="rounded-lg bg-petroleum-800 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-petroleum-900">Öppna komponent</Link></div>)}</div> : null}
+        <form id="eskfilter-form" onSubmit={(event) => event.preventDefault()} className="mb-4">
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera uppgifter</span>
+              <select autoFocus value={reasonFilter} onChange={(event) => setReasonFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera eskaleringsuppgifter">
+                <option value="all">Alla orsaker</option>
+                <option value="blocked">Blockerad</option>
+                <option value="overdue_deadline">Deadline passerad</option>
+              </select>
+            </label>
+          </fieldset>
+        </form>
+        {loading && !data ? <p className="text-sm text-ink-500">Eskaleringsuppgifterna hämtas.</p> : null}
+        {!loading && assignments.length === 0 ? <EmptyState title="Inga aktiva eskaleringar" description={data?.rules.enabled ? "Inga uppgifter matchar de aktiva reglerna." : "Eskaleringsmotorn är pausad i organisationens regler."} /> : null}
+        {!loading && assignments.length > 0 && visibleAssignments.length === 0 ? <EmptyState title="Inga uppgifter matchar filtret" description="Ändra orsaksfiltret för att visa fler eskaleringar." /> : null}
+        {visibleAssignments.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{visibleAssignments.map((item) => <div key={item.notificationKey} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink-950">{item.componentName}</h2><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.reason === "blocked" ? "bg-danger-50 text-danger-700" : "bg-warning-50 text-warning-800"}`}>{item.reason === "blocked" ? "Blockerad" : "Deadline passerad"}</span></div><p className="mt-1 text-sm text-ink-500">{item.propertyName}</p>{item.note ? <p className="mt-2 text-sm text-ink-600">{item.note}</p> : null}</div><div className="text-sm text-ink-600"><p><span className="font-semibold text-ink-800">Ansvarig:</span> {item.assigneeName || "Ej angiven"}</p><p className="mt-1"><span className="font-semibold text-ink-800">Deadline:</span> {item.deadline ? dateOnly.format(new Date(item.deadline)) : "Ingen"}</p></div><Link href={item.href} className="rounded-lg bg-petroleum-800 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-petroleum-900">Öppna komponent</Link></div>)}</div> : null}
       </Panel>
+      </div>
 
       <div id="historik" className="scroll-mt-36">
       <Panel title="Revisionssäker eskaleringshistorik" description="Varje nytt leveransförsök sparar en oföränderlig ögonblicksbild av regler, kvalificering och faktiska mottagare.">

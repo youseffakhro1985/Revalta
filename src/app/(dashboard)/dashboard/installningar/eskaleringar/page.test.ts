@@ -18,3 +18,18 @@ describe("eskaleringar hash targets", () => {
     expect(source).toContain('href="#historik"');
   });
 });
+
+describe("eskaleringar assignment filter first HTML", () => {
+  it("keeps the assignment filter in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="eskfilter"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#eskfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("Hantera regler");
+    expect(source).not.toContain("{loading && !data ? <div className=\"h-52 animate-pulse rounded-xl bg-sand-100\" /> : null}");
+    expect(source).not.toContain("<div className=\"h-24 animate-pulse rounded-xl bg-sand-100\" />");
+  });
+});
