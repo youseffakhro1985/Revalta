@@ -30,4 +30,14 @@ describe("arbetsorder leftover list first HTML", () => {
     expect(source).toContain("Arbetsordrarna hämtas.");
     expect(source).not.toContain('Empty title={loading ? "Läser arbetsordrar…"');
   });
+
+  it("keeps today's planning leftover in the first HTML without stealing create", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="dagensplanering"');
+    expect(source).toContain('window.location.hash !== "#dagensplanering"');
+    expect(source).toContain("Dagens planering hämtas.");
+    expect(source).not.toContain('Empty title={loading ? "Läser dagens planering…"');
+    expect(source).toContain("Ny arbetsorder");
+    expect(source).toContain("/dashboard/arbetsorder/ny");
+  });
 });

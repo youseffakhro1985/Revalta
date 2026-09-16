@@ -199,6 +199,11 @@ export default function WorkOrdersPage() {
     if (window.location.hash !== "#senasteordrar") return;
     document.getElementById("senasteordrar")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, orders]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#dagensplanering") return;
+    document.getElementById("dagensplanering")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, orders]);
 
   const queryValue = query.trim().toLocaleLowerCase("sv-SE");
   const rangeOrders = useMemo(() => {
@@ -381,9 +386,9 @@ export default function WorkOrdersPage() {
         <Link href="/dashboard/arbetsorder/operationsoversikt" className="mt-5 inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">Visa detaljer <ArrowRight className="h-3 w-3" /></Link>
       </article>
 
-      <article className="rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+      <article id="dagensplanering" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
         <SectionHead title="Dagens planering" action={<Link href="/dashboard/arbetsorder/planering" className="inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">Visa alla <ArrowRight className="h-3 w-3" /></Link>} />
-        {todayPlanning.length ? <div className="divide-y divide-sand-100 px-4">{todayPlanning.map((order) => <Link key={order.id} href={`/dashboard/arbetsorder/${order.id}`} className="grid grid-cols-[44px_32px_minmax(0,1fr)_auto] items-center gap-2 py-3 transition hover:bg-petroleum-50/40"><span className="text-xs font-semibold text-ink-500">{timeFmt.format(new Date(order.scheduled_start || ""))}</span><span className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-50 text-xs font-semibold text-petroleum-800">{(order.assigned_to?.name || order.assigned_to?.email || "ET").split(/\s|@/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-xs font-semibold text-ink-850">{order.assigned_to?.name || order.assigned_to?.email || order.vendor_contract?.name || "Ej tilldelad"}</span><span className="mt-0.5 block truncate text-xs text-ink-450">{order.property.name} · {order.title}</span></span><ArrowRight className="h-3.5 w-3.5 text-petroleum-700" /></Link>)}</div> : <Empty title={loading ? "Läser dagens planering…" : "Inga arbetsorder schemalagda idag"} />}
+        {loading ? <p className="p-5 text-sm text-ink-500">Dagens planering hämtas.</p> : todayPlanning.length ? <div className="divide-y divide-sand-100 px-4">{todayPlanning.map((order) => <Link key={order.id} href={`/dashboard/arbetsorder/${order.id}`} className="grid grid-cols-[44px_32px_minmax(0,1fr)_auto] items-center gap-2 py-3 transition hover:bg-petroleum-50/40"><span className="text-xs font-semibold text-ink-500">{timeFmt.format(new Date(order.scheduled_start || ""))}</span><span className="flex h-8 w-8 items-center justify-center rounded-full bg-petroleum-50 text-xs font-semibold text-petroleum-800">{(order.assigned_to?.name || order.assigned_to?.email || "ET").split(/\s|@/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-xs font-semibold text-ink-850">{order.assigned_to?.name || order.assigned_to?.email || order.vendor_contract?.name || "Ej tilldelad"}</span><span className="mt-0.5 block truncate text-xs text-ink-450">{order.property.name} · {order.title}</span></span><ArrowRight className="h-3.5 w-3.5 text-petroleum-700" /></Link>)}</div> : <Empty title="Inga arbetsorder schemalagda idag" />}
         <div className="border-t border-sand-100 px-4 py-3"><Link href="/dashboard/arbetsorder/planering" className="inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">Se hela dagens schema <ArrowRight className="h-3 w-3" /></Link></div>
       </article>
     </section>
