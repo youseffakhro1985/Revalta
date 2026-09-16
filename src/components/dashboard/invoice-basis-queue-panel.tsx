@@ -34,6 +34,7 @@ export function InvoiceBasisQueuePanel() {
   const [actingId, setActingId] = useState("");
   const [itemError, setItemError] = useState("");
   const [names, setNames] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const applyQueue = useCallback((body: QueuePayload) => {
     const nextItems = body.workOrders || [];
@@ -82,6 +83,12 @@ export function InvoiceBasisQueuePanel() {
       active = false;
     };
   }, [applyQueue]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#underlagfilter") return;
+    document.getElementById("underlagfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function rebuild(item: QueueItem) {
     setActingId(item.id);
@@ -143,25 +150,46 @@ export function InvoiceBasisQueuePanel() {
 
   if (hidden) return null;
 
+  const visibleItems = statusFilter === "all" ? items : items.filter((item) => item.draftStatus === statusFilter);
+  const formLocked = Boolean(actingId) || loading;
+
   return (
     <Panel
       icon={ReceiptText}
       title="Fakturaunderlag"
       description="Bygg utkast från attesterad tid och material, ange kundnamn och markera underlaget som klart här."
     >
-      {error ? <InlineAlert>{error}</InlineAlert> : null}
-      {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
-      {loading ? <div className="h-32 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" /> : null}
+      <div id="underlagfilter" className="scroll-mt-36 space-y-3">
+        {error ? <InlineAlert>{error}</InlineAlert> : null}
+        {itemError ? <InlineAlert>{itemError}</InlineAlert> : null}
+        <form id="underlagfilter-form" onSubmit={(event) => event.preventDefault()}>
+          <fieldset disabled={loading} className="contents">
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera underlag</span>
+              <select autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera fakturaunderlag">
+                <option value="all">Alla utkaststatusar</option>
+                <option value="missing">Saknas</option>
+                <option value="empty">Tomt</option>
+                <option value="built">Byggt</option>
+              </select>
+            </label>
+          </fieldset>
+        </form>
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
+      </div>
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inget underlag att bygga" description="När tid eller material är godkänt och utkastet saknas rader, eller utkastet väntar på kundnamn, hamnar arbetsordern här." />
       ) : null}
-      {!loading && !error && items.length > 0 ? (
+      {!loading && !error && items.length > 0 && visibleItems.length === 0 ? (
+        <EmptyState title="Inga underlag matchar filtret" description="Ändra utkastfiltret för att visa fler arbetsordrar." />
+      ) : null}
+      {!loading && !error && visibleItems.length > 0 ? (
         <div className="space-y-3">
           <p className="text-xs text-ink-500">
             {summary.workOrders} arbetsorder · {summary.approvedTime} attesterade tidrader · {summary.approvedMaterial} attesterade materialrader
           </p>
           <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <div key={item.id} className="flex flex-col gap-3 p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
@@ -174,7 +202,7 @@ export function InvoiceBasisQueuePanel() {
                     {item.draftStatus !== "built" ? (
                       <button
                         type="button"
-                        disabled={Boolean(actingId)}
+                        disabled={formLocked}
                         onClick={() => void rebuild(item)}
                         className="inline-flex h-9 items-center justify-center rounded-lg bg-petroleum-800 px-3 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -196,11 +224,12 @@ export function InvoiceBasisQueuePanel() {
                         placeholder="Kundnamn"
                         maxLength={200}
                         className={premiumFieldClass}
+                        disabled={formLocked}
                       />
                     </label>
                     <button
                       type="button"
-                      disabled={Boolean(actingId) || !(names[item.id] || "").trim()}
+                      disabled={formLocked || !(names[item.id] || "").trim()}
                       onClick={() => void markReady(item)}
                       className="inline-flex h-11 items-center justify-center rounded-xl bg-petroleum-800 px-4 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"
                     >
