@@ -88,6 +88,11 @@ export default function VendorsPage() {
     if (window.location.hash !== "#leverantorfilter") return;
     document.getElementById("leverantorfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, vendors]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#leverantorlista") return;
+    document.getElementById("leverantorlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, vendors]);
 
   function startEdit(vendor: Vendor) {
     setEditingId(vendor.id);
@@ -255,6 +260,7 @@ export default function VendorsPage() {
             <p className="mt-2 text-xs text-ink-500">{visible.length} av {vendors.length} leverantörer visas</p>
           </div>
 
+          <div id="leverantorlista" className="scroll-mt-36">
           {loading ? (
             <p className="p-6 text-sm text-ink-500">Leverantörerna hämtas.</p>
           ) : visible.length === 0 ? (
@@ -336,6 +342,7 @@ export default function VendorsPage() {
               })}
             </div>
           )}
+          </div>
         </Panel>
       </section>
     </div>
