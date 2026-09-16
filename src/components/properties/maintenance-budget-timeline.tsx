@@ -97,6 +97,12 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#budgetfilter") return;
+    document.getElementById("budgetfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   const filterOptions = useMemo(() => {
     const actions = data?.actions || [];
     return {
@@ -168,10 +174,11 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
   const peak = yearly.reduce((best, item) => (item.amount > best.amount ? item : best), { year: 0, amount: 0 });
   const maxYearAmount = Math.max(1, ...yearly.map((item) => item.amount));
   const hasFilters = Object.values(filters).some((value) => value !== "all");
+  const formLocked = loading || !data?.activePlan;
+  const plan = data?.activePlan || null;
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-  if (error) return <InlineAlert>{error}</InlineAlert>;
-  if (!data?.activePlan) return <EmptyState title="Ingen aktiv underhållsplan" description="Aktivera en planversion för att visa budgetmotor och tidslinje." />;
+  if (!loading && error && !data) return <InlineAlert>{error}</InlineAlert>;
+  if (!loading && !plan) return <EmptyState title="Ingen aktiv underhållsplan" description="Aktivera en planversion för att visa budgetmotor och tidslinje." />;
 
   return (
     <section className="space-y-6" aria-labelledby="maintenance-budget-timeline-heading">
@@ -186,8 +193,9 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
             <button
               key={yearsOption}
               type="button"
+              disabled={formLocked}
               onClick={() => setZoom(yearsOption as 5 | 10 | 20 | 30)}
-              className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${zoom === yearsOption ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500 hover:text-ink-800"}`}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition disabled:opacity-50 ${zoom === yearsOption ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500 hover:text-ink-800"}`}
             >
               {yearsOption} år
             </button>
@@ -195,9 +203,11 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
         </div>
       </div>
 
+      <div id="budgetfilter" className="scroll-mt-36">
       <Panel title="Filtrera beslutsunderlaget" description="Alla nyckeltal, tabeller och tidslinjer räknas om efter valda filter.">
+        <fieldset disabled={formLocked} className="contents">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <FilterField label="Kategori" value={filters.category} onChange={(value) => setFilters((current) => ({ ...current, category: value }))}>
+          <FilterField autoFocus label="Kategori" value={filters.category} onChange={(value) => setFilters((current) => ({ ...current, category: value }))}>
             <option value="all">Alla kategorier</option>
             {filterOptions.categories.map((value) => <option key={value} value={value}>{value}</option>)}
           </FilterField>
@@ -213,22 +223,24 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
             <option value="all">Alla statusar</option>
             {filterOptions.statuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}
           </FilterField>
-          <button type="button" disabled={!hasFilters} onClick={() => setFilters(initialFilters)} className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" disabled={formLocked || !hasFilters} onClick={() => setFilters(initialFilters)} className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40">
             <RotateCcw className="h-4 w-4" /> Nollställ
           </button>
         </div>
-        <div className="mt-4 flex items-center gap-2 text-xs text-ink-500"><Filter className="h-3.5 w-3.5" />{filteredActions.length} av {data.actions.length} åtgärder ingår i analysen.</div>
+        <div className="mt-4 flex items-center gap-2 text-xs text-ink-500"><Filter className="h-3.5 w-3.5" />{filteredActions.length} av {data?.actions.length || 0} åtgärder ingår i analysen.</div>
+        </fieldset>
       </Panel>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={BarChart3} label={`${Math.min(zoom, data.activePlan.horizon_years)}-årsbudget`} value={money.format(total)} hint="Indexerad kostnad, exklusive avbrutet" />
+        <MetricCard icon={BarChart3} label={`${Math.min(zoom, plan?.horizon_years || zoom)}-årsbudget`} value={money.format(total)} hint="Indexerad kostnad, exklusive avbrutet" />
         <MetricCard icon={CalendarRange} label="Toppår" value={peak.year || "–"} hint={peak.amount ? money.format(peak.amount) : "Inga kostnader"} />
         <MetricCard icon={CheckCircle2} label="Genomförd planvolym" value={money.format(completed)} hint="Planvärde för slutförda åtgärder" />
         <MetricCard icon={Layers3} label="Aktiv planvolym" value={money.format(active)} hint="Planerad, godkänd och pågående" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <Panel title="Årsvis investeringsprofil" description={`Visar ${years[0]}–${years.at(-1)} i aktiv planversion.`}>
+        <Panel title="Årsvis investeringsprofil" description={years.length ? `Visar ${years[0]}–${years.at(-1)} i aktiv planversion.` : "Laddar årsvis investeringsprofil för aktiv planversion."}>
           <div className="space-y-3">
             {yearly.map((item) => (
               <div key={item.year} className="grid grid-cols-[54px_1fr_auto] items-center gap-3">
@@ -283,8 +295,8 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
   );
 }
 
-function FilterField({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
+function FilterField({ label, value, onChange, children, autoFocus }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; autoFocus?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select autoFocus={autoFocus} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
 }
 
 function BudgetRow({ name, amount, total }: { name: string; amount: number; total: number }) {
