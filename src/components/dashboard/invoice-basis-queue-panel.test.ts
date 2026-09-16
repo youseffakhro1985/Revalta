@@ -12,10 +12,22 @@ describe("invoice basis queue panel", () => {
     expect(source).toContain("Markera som klar");
     expect(source).toContain("Kundnamn");
     expect(source).toContain("Inget underlag att bygga");
-    expect(source).toContain("animate-pulse");
     expect(source).toContain("Öppna");
     expect(source).toContain("status === 403");
     expect(source).not.toContain('status: "ready"');
     expect(source).not.toContain("Kundnamn och Markera som klar görs på arbetsordern.");
+  });
+});
+
+describe("invoice basis queue filter first HTML", () => {
+  it("keeps the queue filter in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./invoice-basis-queue-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="underlagfilter"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#underlagfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("disabled={loading}");
+    expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
   });
 });
