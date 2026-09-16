@@ -20,9 +20,11 @@ describe("work-order economics invoice copy", () => {
   it("keeps the time form in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./work-order-economics-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="spara-ekonomi"');
+    expect(source).toContain('id="ekonomi-starttid"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#spara-ekonomi"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("ekonomi-starttid")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("saving || loading");
     expect(source).toContain("canManage || loading");
