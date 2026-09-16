@@ -38,3 +38,17 @@ describe("projekt portfolio filter first HTML", () => {
     expect(form).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("projekt leftover portfolio first HTML", () => {
+  it("keeps leftover projects in the first HTML without stealing create or filter", () => {
+    const form = readFileSync(new URL("./projekt-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="projektlista"');
+    expect(form).toContain('window.location.hash !== "#projektlista"');
+    expect(form).toContain("Projekten hämtas.");
+    expect(form).toContain('id="projektfilter"');
+    expect(form).toContain("Nytt projekt");
+    expect(form).toContain("autoFocus");
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("disabled={loading}");
+  });
+});
