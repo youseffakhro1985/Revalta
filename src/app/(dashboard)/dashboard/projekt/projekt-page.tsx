@@ -113,6 +113,11 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("create") === "1") setShowCreate(true);
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#projektfilter") return;
+    document.getElementById("projektfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, projects]);
 
   const visibleProjects = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -220,11 +225,11 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
 
     <section className="grid gap-6 xl:grid-cols-[1fr_0.7fr]">
       <Panel title="Portföljfilter" description="Filtrerar den aktuella projektsidan. Serverpagineringen ligger kvar för stora bestånd.">
-        <div className="grid gap-3 md:grid-cols-[1.4fr_0.8fr_0.8fr_auto]">
-          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök projekt, fastighet eller entreprenör" aria-label="Sök projekt" /></label>
-          <select className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera projektstatus"><option value="all">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select className={premiumFieldClass} value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} aria-label="Filtrera risk"><option value="all">Alla risker</option>{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
-          <button type="button" disabled={!hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setRiskFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+        <div id="projektfilter" className="scroll-mt-36 grid gap-3 md:grid-cols-[1.4fr_0.8fr_0.8fr_auto]">
+          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök projekt, fastighet eller entreprenör" aria-label="Sök projekt" /></label>
+          <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera projektstatus"><option value="all">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select disabled={loading} className={premiumFieldClass} value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} aria-label="Filtrera risk"><option value="all">Alla risker</option>{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
+          <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setRiskFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
         </div>
       </Panel>
 
@@ -234,7 +239,7 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
     </section>
 
     <Panel title="Projektportfölj" description={`${visibleProjects.length} projekt visas på sida ${pagination.page} av ${pagination.totalPages}`} bodyClassName="p-0">
-      {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-xl bg-sand-100" />)}</div> : visibleProjects.length === 0 ? <EmptyState title="Inga projekt matchar urvalet" description="Justera filtren, byt sida eller skapa ett nytt projekt." /> : <>
+      {loading ? <p className="p-6 text-sm text-ink-500">Projekten hämtas.</p> : visibleProjects.length === 0 ? <EmptyState title="Inga projekt matchar urvalet" description="Justera filtren, byt sida eller skapa ett nytt projekt." /> : <>
         <div className="divide-y divide-sand-100">{visibleProjects.map((project) => {
           const timeline = timelinePercent(project);
           return <article key={project.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
