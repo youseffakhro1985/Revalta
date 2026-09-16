@@ -49,6 +49,11 @@ export function WorkOrderLockSecurityAlerts() {
     if (window.location.hash !== "#lasavisering") return;
     document.getElementById("lasavisering")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#laslista") return;
+    document.getElementById("laslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const applyReadOptimistically = useCallback((keys?: string[]) => {
     setData((current) => {
@@ -110,6 +115,7 @@ export function WorkOrderLockSecurityAlerts() {
       </div>
 
       {error ? <div role="alert" className="border-b border-danger-100 bg-danger-50 px-6 py-4 text-sm font-semibold text-danger-700">{error}</div> : null}
+      <div id="laslista" className="scroll-mt-36">
       {loading && !data ? <p className="border-b border-danger-100 px-6 py-4 text-sm text-ink-500">Aviseringarna hämtas.</p> : null}
       <div className="divide-y divide-sand-100">
         {!loading && !error && !data?.notifications.length ? (
@@ -128,6 +134,7 @@ export function WorkOrderLockSecurityAlerts() {
             </div>
           </article>
         ))}
+      </div>
       </div>
     </section>
   );
