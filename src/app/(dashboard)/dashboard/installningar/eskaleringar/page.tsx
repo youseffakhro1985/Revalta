@@ -131,6 +131,11 @@ export default function EscalationAdminPage() {
     if (window.location.hash !== "#mottagarfilter") return;
     document.getElementById("mottagarfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#eskmottagarlista") return;
+    document.getElementById("eskmottagarlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   const configured = useMemo(() => {
     if (!data) return false;
@@ -221,10 +226,12 @@ export default function EscalationAdminPage() {
             </fieldset>
           </form>
           {data?.rules.recipientRoles.length ? <div className="mb-4 flex flex-wrap gap-2">{data.rules.recipientRoles.map((role) => <span key={role} className="rounded-full bg-petroleum-50 px-3 py-1 text-xs font-semibold text-petroleum-800">{roleLabels[role] || role}</span>)}</div> : null}
+          <div id="eskmottagarlista" className="scroll-mt-36">
           {loading && !data ? <p className="text-sm text-ink-500">Mottagarna hämtas.</p> : null}
           {!loading && recipients.length === 0 ? <EmptyState title="Inga mottagare" description="Inga aktiva användare matchar organisationens valda mottagarroller." /> : null}
           {!loading && recipients.length > 0 && visibleRecipients.length === 0 ? <EmptyState title="Inga mottagare matchar filtret" description="Ändra rollfiltret för att visa fler eskaleringsmottagare." /> : null}
           {visibleRecipients.length ? <div className="divide-y divide-sand-100 overflow-hidden rounded-xl border border-sand-200">{visibleRecipients.map((recipient) => <div key={recipient.id} className="flex items-center justify-between gap-4 p-4"><div className="min-w-0"><p className="truncate font-semibold text-ink-900">{recipient.name || recipient.email}</p><p className="mt-1 truncate text-sm text-ink-500">{recipient.email}</p></div><span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-sand-100 px-2.5 py-1 text-xs font-semibold text-ink-600"><Users className="h-3.5 w-3.5" />{roleLabels[recipient.role] || recipient.role}</span></div>)}</div> : null}
+          </div>
         </Panel>
         </div>
       </div>
