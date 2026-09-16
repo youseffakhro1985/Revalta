@@ -389,6 +389,11 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
     }
     if (new URLSearchParams(window.location.search).get("create") === "1") setShowUpload(true);
   }, [data.canManageLifecycle, loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#dokumentfilter") return;
+    document.getElementById("dokumentfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data.documents]);
 
   const selectedProperty = data.properties.find((property) => property.id === propertyId) || null;
   const availableUnits = selectedProperty?.units || [];
@@ -651,18 +656,18 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
       </section>
 
       <Panel title="Dokumentbibliotek" description="Serverfiltrerat och paginerat för stabil prestanda även när arkivet växer." bodyClassName="p-0">
-        <div className="grid gap-3 border-b border-sand-200 p-5 lg:grid-cols-2 xl:grid-cols-[1.3fr_150px_170px_160px_170px_150px]">
-          <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input maxLength={200} value={search} onChange={(event) => setSearch(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, fastighet eller uppladdare" /></label>
-          <select value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select value={visibilityFilter} onChange={(event) => { setVisibilityFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select value={lifecycleFilter} onChange={(event) => { setLifecycleFilter(event.target.value); setFocus("all"); setPage(1); }} className={premiumFieldClass}><option value="">Alla statusar</option>{Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla fastigheter</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-          <select value={sort} onChange={(event) => { setSort(event.target.value as SortKey); setPage(1); }} className={premiumFieldClass}><option value="newest">Nyast först</option><option value="oldest">Äldst först</option><option value="name">Namn A–Ö</option><option value="expiry">Giltighetstid</option></select>
-          {filtersActive ? <button type="button" onClick={resetFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700"><RotateCcw className="h-4 w-4" /> Nollställ</button> : null}
+        <div id="dokumentfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-5 lg:grid-cols-2 xl:grid-cols-[1.3fr_150px_170px_160px_170px_150px]">
+          <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input disabled={loading} maxLength={200} value={search} onChange={(event) => setSearch(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, fastighet eller uppladdare" /></label>
+          <select disabled={loading} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select disabled={loading} value={visibilityFilter} onChange={(event) => { setVisibilityFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select disabled={loading} value={lifecycleFilter} onChange={(event) => { setLifecycleFilter(event.target.value); setFocus("all"); setPage(1); }} className={premiumFieldClass}><option value="">Alla statusar</option>{Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select disabled={loading} value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla fastigheter</option>{data.properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+          <select disabled={loading} value={sort} onChange={(event) => { setSort(event.target.value as SortKey); setPage(1); }} className={premiumFieldClass}><option value="newest">Nyast först</option><option value="oldest">Äldst först</option><option value="name">Namn A–Ö</option><option value="expiry">Giltighetstid</option></select>
+          {filtersActive ? <button type="button" disabled={loading} onClick={resetFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700"><RotateCcw className="h-4 w-4" /> Nollställ</button> : null}
         </div>
 
         {loading ? (
-          <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}</div>
+          <p className="p-6 text-sm text-ink-500">Dokumenten hämtas.</p>
         ) : data.documents.length === 0 ? (
           <EmptyState title="Inga dokument matchar" description="Justera filtreringen eller lägg till ett nytt dokument." />
         ) : (
