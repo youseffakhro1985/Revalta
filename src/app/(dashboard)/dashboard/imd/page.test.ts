@@ -24,3 +24,17 @@ describe("imd create query", () => {
     expect(form).not.toContain("＋");
   });
 });
+
+describe("imd leftover filter first HTML", () => {
+  it("keeps the filter in the first HTML and scrolls after load without stealing create", () => {
+    const form = readFileSync(new URL("./imd-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="imdfilter"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#imdfilter"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("Ny avläsning");
+    expect(form).toContain("disabled={loading}");
+    expect(form).toContain("Avläsningarna hämtas.");
+    expect(form).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-sand-100" />)}');
+  });
+});
