@@ -13,3 +13,16 @@ describe("maintenance budget timeline filter hash", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-96 animate-pulse rounded-2xl bg-sand-100\" />");
   });
 });
+
+describe("maintenance budget leftover yearly profile first HTML", () => {
+  it("keeps leftover yearly investment profile in the first HTML without stealing filter", () => {
+    const source = readFileSync(new URL("./maintenance-budget-timeline.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="arsprofil"');
+    expect(source).toContain('window.location.hash !== "#arsprofil"');
+    expect(source).toContain("Laddar årsvis investeringsprofil för aktiv planversion.");
+    expect(source).toContain('id="budgetfilter"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("loading || !data?.activePlan");
+  });
+});
