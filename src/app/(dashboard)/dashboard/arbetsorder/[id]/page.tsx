@@ -134,7 +134,8 @@ export default function WorkOrderDetailPage() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (loading || !workOrder || !capabilities.canViewFinance) return;
+    if (loading) return;
+    if (!capabilities.canViewFinance) return;
     if (window.location.hash !== "#ekonomi") return;
     const node = document.getElementById("ekonomi");
     if (!node) return;
@@ -346,12 +347,12 @@ export default function WorkOrderDetailPage() {
     ) : null}
 
     {workOrder ? <WorkOrderExecutionPanel workOrderId={workOrder.id} /> : null}
-    {workOrder && capabilities.canViewFinance ? <section id="ekonomi" aria-label="Ekonomi och fakturering" className="space-y-3">
+    {capabilities.canViewFinance || loading ? <section id="ekonomi" aria-label="Ekonomi och fakturering" className="scroll-mt-36 space-y-3">
       <div>
         <h2 className="text-lg font-semibold text-ink-950">Ekonomi och fakturering</h2>
         <p className="mt-1 text-sm text-ink-500">Här samlas attesterad tid, material, lönsamhet och exportbart fakturaunderlag mot er Fortnox-/Visma-HTTP-endpoint. Fältregistreringen ovan är driftunderlag, inte fakturarader.</p>
       </div>
-      <WorkOrderEconomicsPanel workOrderId={workOrder.id} />
+      <WorkOrderEconomicsPanel workOrderId={workOrder?.id || id} />
     </section> : null}
     {workOrder ? <WorkOrderReportingPanel workOrderId={workOrder.id} /> : null}
     {workOrder ? <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} /> : null}

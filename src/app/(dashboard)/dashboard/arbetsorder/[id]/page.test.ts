@@ -8,6 +8,9 @@ describe("work-order detail ekonomi hash", () => {
     expect(source).toContain('window.location.hash !== "#ekonomi"');
     expect(source).toContain('getElementById("ekonomi")');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain("capabilities.canViewFinance || loading");
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain("workOrder?.id || id");
   });
 });
 
