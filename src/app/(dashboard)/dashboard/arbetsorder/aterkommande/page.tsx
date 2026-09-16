@@ -77,6 +77,11 @@ export default function RecurringWorkOrdersPage() {
     if (window.location.hash !== "#nytt-schema") return;
     document.getElementById("nytt-schema")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#schemalista") return;
+    document.getElementById("schemalista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, schedules]);
   const paused = schedules.filter((item) => !item.active).length;
   const dueSoon = useMemo(() => {
     const limit = Date.now() + 7 * 24 * 60 * 60 * 1000;
@@ -197,8 +202,9 @@ export default function RecurringWorkOrdersPage() {
         </form>
       </Panel>
       </div>
+      <div id="schemalista" className="scroll-mt-36">
       <Panel title="Scheman" description={`${schedules.length} återkommande arbetsflöden`} bodyClassName="p-0">
-        {loading && !schedules.length ? <div className="p-8 text-sm text-ink-500">Hämtar scheman…</div> : null}
+        {loading && !schedules.length ? <p className="p-8 text-sm text-ink-500">Schemana hämtas.</p> : null}
         {!loading && schedules.length === 0 ? <EmptyState title="Inga återkommande scheman" description="Skapa ett schema för att automatisera återkommande drift och underhåll." /> : null}
         <div className="divide-y divide-sand-100">{schedules.map((item) => {
           const isLegacy = item.source === "legacy";
@@ -209,6 +215,7 @@ export default function RecurringWorkOrdersPage() {
         </article>;
         })}</div>
       </Panel>
+      </div>
     </section>
     <Panel title="Körhistorik" description="De senaste automatiska och manuella företagskörningarna" bodyClassName="p-0">
       {!loading && runs.length === 0 ? <EmptyState title="Ingen körhistorik" description="När schemamotorn körs visas resultat och eventuella fel här." /> : <div className="divide-y divide-sand-100">{runs.map((run) => <article key={run.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><History className="mt-0.5 h-5 w-5 text-ink-500" /><div><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${runBadge(run.status)}`}>{runLabel(run.status)}</span><span className="text-sm font-medium text-ink-700">{dateTime.format(new Date(run.created_at))}</span></div><p className="mt-2 text-sm text-ink-500">{run.payload?.error || `${run.payload?.generated || 0} skapade · ${run.payload?.skipped || 0} hoppade över · ${run.payload?.locked || 0} låsta · ${run.payload?.failed || 0} misslyckade`}</p></div></div></article>)}</div>}
