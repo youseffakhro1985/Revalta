@@ -11,3 +11,17 @@ describe("work-order execution completion copy", () => {
     expect(source).toContain("spara utkast skapar inte rader");
   });
 });
+
+describe("work-order execution first HTML", () => {
+  it("keeps the checklist create form in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./work-order-execution-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="spara-utforande"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#spara-utforande"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("saving || loading");
+    expect(source).toContain("canMutate || loading");
+    expect(source).not.toContain("if (loading) return <div className=\"h-96 animate-pulse rounded-2xl bg-sand-100\" aria-label=\"Laddar arbetsorderutförande\" />");
+  });
+});
