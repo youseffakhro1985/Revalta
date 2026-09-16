@@ -5,9 +5,11 @@ describe("lease inspection items save first HTML", () => {
   it("keeps save actions in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./lease-inspection-items-center.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="spara-besiktning"');
+    expect(source).toContain('id="besiktning-spara"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#spara-besiktning"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("besiktning-spara")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("saving || loading");
     expect(source).toContain("Spara besiktning");
@@ -23,6 +25,7 @@ describe("lease inspection leftover first HTML", () => {
     expect(source).toContain('window.location.hash !== "#besiktningslista"');
     expect(source).toContain("Besiktningspunkterna hämtas.");
     expect(source).toContain('id="spara-besiktning"');
+    expect(source).toContain('id="besiktning-spara"');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading");

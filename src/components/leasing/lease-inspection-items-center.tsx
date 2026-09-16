@@ -59,6 +59,7 @@ export function LeaseInspectionItemsCenter() {
     if (loading) return;
     if (window.location.hash !== "#spara-besiktning") return;
     document.getElementById("spara-besiktning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("besiktning-spara")?.focus(), 0);
   }, [loading, detail]);
   useEffect(() => {
     if (loading) return;
@@ -135,7 +136,7 @@ export function LeaseInspectionItemsCenter() {
       </div>
       <div id="spara-besiktning" className="scroll-mt-36 flex flex-col gap-3 sm:flex-row sm:justify-between">
         <button type="button" disabled={saving || loading || !canEdit} onClick={() => setItems([...(detail?.record.items || []), newItem()])} className="inline-flex items-center justify-center rounded-xl border border-petroleum-700 px-4 py-2.5 text-sm font-semibold text-petroleum-800"><Plus className="mr-2 h-4 w-4" />Lägg till besiktningspunkt</button>
-        <button type="button" autoFocus disabled={saving || loading || !canEdit} onClick={() => void save()} className={premiumPrimaryButtonClass}><ClipboardCheck className="mr-2 h-4 w-4" />{saving ? "Sparar…" : "Spara besiktning"}</button>
+        <button type="button" id="besiktning-spara" autoFocus disabled={saving || loading || !canEdit} onClick={() => void save()} className={premiumPrimaryButtonClass}><ClipboardCheck className="mr-2 h-4 w-4" />{saving ? "Sparar…" : "Spara besiktning"}</button>
       </div>
       {!loading && detail && !detail.permissions.canManage ? <InlineAlert tone="info">Du har läsbehörighet.</InlineAlert> : null}
     </div>
