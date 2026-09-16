@@ -5,9 +5,11 @@ describe("inspection work-order center first HTML", () => {
   it("keeps the create action in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./inspection-work-order-center.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="skapa-besiktningsorder"');
+    expect(source).toContain('id="besiktningsorder-avtal"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#skapa-besiktningsorder"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("besiktningsorder-avtal")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={formLocked}");
     expect(source).toContain("Skapa arbetsorder");
@@ -22,6 +24,7 @@ describe("inspection work-order leftover first HTML", () => {
     expect(source).toContain('window.location.hash !== "#punktlista"');
     expect(source).toContain("Punkterna hämtas.");
     expect(source).toContain('id="skapa-besiktningsorder"');
+    expect(source).toContain('id="besiktningsorder-avtal"');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={formLocked}");

@@ -55,6 +55,7 @@ export function InspectionWorkOrderCenter() {
     if (loading) return;
     if (window.location.hash !== "#skapa-besiktningsorder") return;
     document.getElementById("skapa-besiktningsorder")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("besiktningsorder-avtal")?.focus(), 0);
   }, [loading, record]);
   useEffect(() => {
     if (loading) return;
@@ -88,7 +89,7 @@ export function InspectionWorkOrderCenter() {
   return <Panel title="Arbetsorder från besiktningspunkter" description="Skapa en separat, spårbar arbetsorder för varje vald åtgärdspunkt.">
     <form id="skapa-besiktningsorder" onSubmit={(event) => { event.preventDefault(); void create(); }} className="scroll-mt-36 space-y-5">
       <fieldset disabled={formLocked} className="contents">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end"><label className="flex-1"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Avtal</span><select autoFocus className={premiumFieldClass} value={leaseId} onChange={(event) => setLeaseId(event.target.value)} aria-label="Välj avtal för besiktningsarbetsorder"><option value="">Välj avtal</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.name}</option>)}</select></label><button type="button" onClick={() => void load(leaseId)} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button></div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end"><label className="flex-1"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Avtal</span><select id="besiktningsorder-avtal" autoFocus className={premiumFieldClass} value={leaseId} onChange={(event) => setLeaseId(event.target.value)} aria-label="Välj avtal för besiktningsarbetsorder"><option value="">Välj avtal</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.name}</option>)}</select></label><button type="button" onClick={() => void load(leaseId)} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button></div>
       </fieldset>
       {error ? <InlineAlert>{error}</InlineAlert> : null}{success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       {isLegacy ? <InlineAlert tone="warning">{LEGACY_BACKFILL}</InlineAlert> : null}
