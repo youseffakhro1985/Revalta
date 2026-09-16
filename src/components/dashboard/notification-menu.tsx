@@ -116,7 +116,7 @@ export function NotificationMenu() {
           </div>
 
           <div className="max-h-[460px] overflow-y-auto">
-            {loading && !data ? <div className="h-32 animate-pulse bg-sand-50" /> : null}
+            {loading && !data ? <p className="px-5 py-6 text-sm text-ink-500">Aviseringarna hämtas.</p> : null}
             {!loading && preview.length === 0 ? <div className="px-6 py-10 text-center"><BellRing className="mx-auto h-8 w-8 text-sand-400" /><p className="mt-3 font-semibold text-ink-800">Inga olästa aviseringar</p><p className="mt-1 text-sm text-ink-500">Du är uppdaterad.</p></div> : null}
             <div className="divide-y divide-sand-100">
               {preview.map((item) => {
@@ -128,7 +128,7 @@ export function NotificationMenu() {
                     <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold text-ink-900">{item.title}</p><span className="shrink-0 rounded-full bg-sand-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-500">{label}</span></div><p className="mt-1 line-clamp-2 text-xs leading-5 text-ink-500">{item.description}</p><p className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink-500">{dateFormat.format(new Date(item.dueAt))}</p></div>
                   </div>
                   <div className="mt-3 flex items-center justify-end gap-2">
-                    <button type="button" onClick={() => void markRead(item)} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-ink-500 hover:bg-white hover:text-ink-800"><Check className="h-3.5 w-3.5" /> Läst</button>
+                    <button type="button" onClick={() => void markRead(item)} disabled={loading} className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-ink-500 hover:bg-white hover:text-ink-800 disabled:opacity-50"><Check className="h-3.5 w-3.5" /> Läst</button>
                     <Link href={item.href} onClick={() => { void markRead(item); setOpen(false); }} className="inline-flex items-center gap-1 rounded-lg bg-petroleum-800 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-petroleum-900">Öppna <ChevronRight className="h-3.5 w-3.5" /></Link>
                   </div>
                 </div>;
