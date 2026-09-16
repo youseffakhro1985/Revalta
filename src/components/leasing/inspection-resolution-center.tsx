@@ -47,8 +47,14 @@ export function InspectionResolutionCenter() {
     void loadLeases().catch((c) => setError(c instanceof Error ? c.message : "Kunde inte hämta avtal"));
   }, []);
   useEffect(() => { void load(leaseId); }, [leaseId]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#synkronisera-besiktning") return;
+    document.getElementById("synkronisera-besiktning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, record]);
 
   const isLegacy = source === "legacy";
+  const formLocked = syncing || loading;
 
   async function reconcile() {
     if (!record || !leaseId) return;
@@ -79,41 +85,39 @@ export function InspectionResolutionCenter() {
 
   return (
     <Panel title="Återkoppla slutförda arbetsorder" description="Synkronisera arbetsorderstatus tillbaka till rätt besiktningspunkt.">
-      <div className="space-y-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <select className={premiumFieldClass} aria-label="Välj avtal" value={leaseId} onChange={(e) => setLeaseId(e.target.value)}>
-            <option value="">Välj avtal</option>
-            {leases.map((l) => (
-              <option key={l.id} value={l.id}>{l.lease_number} · {l.property.name} · {l.unit.designation} · {l.lease_holder.name}</option>
-            ))}
-          </select>
-          <button type="button" onClick={() => void load(leaseId)} className="inline-flex h-11 items-center rounded-xl border border-sand-200 px-4 text-sm font-semibold">
-            <RefreshCw className="mr-2 h-4 w-4" />Uppdatera
-          </button>
-        </div>
+      <form id="synkronisera-besiktning" onSubmit={(event) => { event.preventDefault(); void reconcile(); }} className="scroll-mt-36 space-y-5">
+        <fieldset disabled={formLocked} className="contents">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <select autoFocus className={premiumFieldClass} aria-label="Välj avtal för besiktningssynk" value={leaseId} onChange={(e) => setLeaseId(e.target.value)}>
+              <option value="">Välj avtal</option>
+              {leases.map((l) => (
+                <option key={l.id} value={l.id}>{l.lease_number} · {l.property.name} · {l.unit.designation} · {l.lease_holder.name}</option>
+              ))}
+            </select>
+            <button type="button" onClick={() => void load(leaseId)} className="inline-flex h-11 items-center rounded-xl border border-sand-200 px-4 text-sm font-semibold">
+              <RefreshCw className="mr-2 h-4 w-4" />Uppdatera
+            </button>
+          </div>
+        </fieldset>
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {message ? <InlineAlert tone="success">{message}</InlineAlert> : null}
         {isLegacy ? <InlineAlert tone="warning">{LEGACY_BACKFILL}</InlineAlert> : null}
         {loading ? (
-          <div className="h-28 animate-pulse rounded-xl bg-sand-100" />
+          <p className="text-sm text-ink-500">Besiktningen hämtas.</p>
         ) : !record ? (
           <EmptyState title="Välj ett avtal" description="Sparade besiktningspunkter visas här." />
         ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Stat label="Öppna arbetsorderpunkter" value={open} />
-              <Stat label="Åtgärdade punkter" value={resolved} />
-            </div>
-            {!isLegacy ? (
-              <div className="flex justify-end">
-                <button type="button" disabled={syncing} onClick={() => void reconcile()} className={premiumPrimaryButtonClass}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />{syncing ? "Synkroniserar…" : "Synkronisera slutförda arbetsorder"}
-                </button>
-              </div>
-            ) : null}
-          </>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Stat label="Öppna arbetsorderpunkter" value={open} />
+            <Stat label="Åtgärdade punkter" value={resolved} />
+          </div>
         )}
-      </div>
+        <div className="flex justify-end">
+          <button type="submit" disabled={formLocked || isLegacy || !record} className={premiumPrimaryButtonClass}>
+            <CheckCircle2 className="mr-2 h-4 w-4" />{syncing ? "Synkroniserar…" : "Synkronisera slutförda arbetsorder"}
+          </button>
+        </div>
+      </form>
     </Panel>
   );
 }
