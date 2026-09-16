@@ -129,6 +129,11 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     }
     if (new URLSearchParams(window.location.search).get("create") === "1") setShowCreate(true);
   }, [canManage, loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#offertfilter") return;
+    document.getElementById("offertfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, quotes]);
 
   const propertyNames = useMemo(() => [...new Set(quotes.map((quote) => quote.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [quotes]);
   const visibleQuotes = useMemo(() => {
@@ -335,11 +340,11 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
 
     <section className="grid gap-6 xl:grid-cols-[1fr_0.72fr]">
       <Panel title="Offertfilter" description="Sök och avgränsa beslutsunderlaget.">
-        <div className="grid gap-3 md:grid-cols-[1.4fr_0.9fr_1fr_auto]">
-          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök offert, leverantör eller fastighet" aria-label="Sök offerter" /></label>
-          <select className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera offertstatus"><option value="all">Alla statusar</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
-          <button type="button" disabled={!hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setPropertyFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+        <div id="offertfilter" className="scroll-mt-36 grid gap-3 md:grid-cols-[1.4fr_0.9fr_1fr_auto]">
+          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök offert, leverantör eller fastighet" aria-label="Sök offerter" /></label>
+          <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera offertstatus"><option value="all">Alla statusar</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
+          <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setPropertyFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
         </div>
       </Panel>
 
@@ -352,7 +357,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     </section>
 
     <Panel title="Offertöversikt" description={`${visibleQuotes.length} av ${quotes.length} offerter i vald vy`} bodyClassName="p-0">
-      {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-32 animate-pulse rounded-xl bg-sand-100" />)}</div> : visibleQuotes.length === 0 ? <EmptyState title="Inga offerter matchar urvalet" description="Justera filtren eller skapa en ny offert." /> : <div className="divide-y divide-sand-100">{visibleQuotes.map((quote) => {
+      {loading ? <p className="p-6 text-sm text-ink-500">Offerterna hämtas.</p> : visibleQuotes.length === 0 ? <EmptyState title="Inga offerter matchar urvalet" description="Justera filtren eller skapa en ny offert." /> : <div className="divide-y divide-sand-100">{visibleQuotes.map((quote) => {
         const days = daysUntil(quote.valid_until);
         const history = (quote.history || []).slice(0, 3);
         return <article key={quote.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
