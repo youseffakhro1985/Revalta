@@ -62,6 +62,7 @@ export function LeaseHandoverCenter() {
     if (loading) return;
     if (window.location.hash !== "#spara-overlamning") return;
     document.getElementById("spara-overlamning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("overlamning-spara")?.focus(), 0);
   }, [loading, detail]);
   useEffect(() => {
     if (loading) return;
@@ -119,7 +120,7 @@ export function LeaseHandoverCenter() {
       </>}
       </div>
       <div id="spara-overlamning" className="scroll-mt-36 flex flex-col gap-3 sm:flex-row sm:justify-end">
-        <button type="button" disabled={saving || loading || !canEdit} onClick={() => void save(false)} className="rounded-xl border border-petroleum-700 px-4 py-2.5 text-sm font-semibold text-petroleum-800">Spara utkast</button>
+        <button type="button" id="overlamning-spara" disabled={saving || loading || !canEdit} onClick={() => void save(false)} className="rounded-xl border border-petroleum-700 px-4 py-2.5 text-sm font-semibold text-petroleum-800">Spara utkast</button>
         <button type="button" disabled={saving || loading || !canEdit || Boolean(detail?.handover.completedAt)} onClick={() => void save(true)} className={premiumPrimaryButtonClass}>{detail?.handover.completedAt ? "Överlämning slutförd" : "Slutför överlämning"}</button>
       </div>
       {!loading && detail && !detail.permissions.canManage ? <InlineAlert tone="info">Du har läsbehörighet.</InlineAlert> : null}
