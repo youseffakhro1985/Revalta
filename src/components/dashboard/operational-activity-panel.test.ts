@@ -27,3 +27,16 @@ describe("operational activity history filter first HTML", () => {
     expect(source).not.toContain("{[0, 1, 2, 3].map((item) => <div key={item} className=\"h-20 animate-pulse rounded-2xl bg-sand-100\" />)}");
   });
 });
+
+describe("operational activity leftover comments first HTML", () => {
+  it("keeps leftover comments in the first HTML without stealing save or history filter", () => {
+    const source = readFileSync(new URL("./operational-activity-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="kommentarlista"');
+    expect(source).toContain('window.location.hash !== "#kommentarlista"');
+    expect(source).toContain("Kommentarerna hämtas.");
+    expect(source).toContain('id="spara-kommentar"');
+    expect(source).toContain('id="aktivitetsfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("saving || loading");
+  });
+});

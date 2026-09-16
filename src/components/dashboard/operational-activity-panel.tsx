@@ -83,6 +83,11 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
     if (window.location.hash !== "#spara-kommentar") return;
     document.getElementById("spara-kommentar")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, comments]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#kommentarlista") return;
+    document.getElementById("kommentarlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, comments]);
 
   useEffect(() => {
     if (loading) return;
@@ -155,6 +160,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
             </fieldset>
           </form>
 
+          <div id="kommentarlista" className="scroll-mt-36">
           {loading ? (
             <p className="text-sm text-ink-500">Kommentarerna hämtas.</p>
           ) : comments.length === 0 ? (
@@ -180,6 +186,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
               ))}
             </div>
           )}
+          </div>
         </div>
       </Panel>
 
