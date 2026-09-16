@@ -60,6 +60,11 @@ export function ServiceNotificationAlertCenter() {
     if (window.location.hash !== "#driftlarm") return;
     document.getElementById("driftlarm")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#larmlista") return;
+    document.getElementById("larmlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function acknowledge(alertId: string) {
     setPending((current) => new Set([...current, alertId]));
@@ -134,6 +139,7 @@ export function ServiceNotificationAlertCenter() {
       </form>
 
       {error ? <div role="alert" className="border-b border-danger-100 bg-danger-50 px-5 py-3 text-sm font-semibold text-danger-800">{error}</div> : null}
+      <div id="larmlista" className="scroll-mt-36">
       {loading && !data ? <p className="border-b border-sand-100 px-5 py-4 text-sm text-ink-500">Larmen hämtas.</p> : null}
 
       <div className="grid gap-3 border-b border-sand-100 px-5 py-4 sm:grid-cols-4">
@@ -172,6 +178,7 @@ export function ServiceNotificationAlertCenter() {
             <div><h3 className="font-semibold text-ink-900">Leveransproblemet är löst</h3><p className="mt-1 text-sm text-ink-500">Systemet registrerade en senare lyckad körning och stängde driftlarmet automatiskt.</p><p className="mt-2 text-xs text-ink-500">Larm skapat {dateTime.format(new Date(item.createdAt))}</p></div>
           </article>
         ))}
+      </div>
       </div>
     </section>
   );

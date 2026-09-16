@@ -15,3 +15,17 @@ describe("service notification alert center first HTML", () => {
     expect(source).not.toContain('return <div className="h-36 animate-pulse rounded-2xl border border-sand-200 bg-sand-50" aria-label="Laddar driftlarm" />');
   });
 });
+
+describe("service notification leftover first HTML", () => {
+  it("keeps leftover alerts in the first HTML without stealing the filter", () => {
+    const source = readFileSync(new URL("./service-notification-alert-center.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="larmlista"');
+    expect(source).toContain('window.location.hash !== "#larmlista"');
+    expect(source).toContain("Larmen hämtas.");
+    expect(source).toContain('id="driftlarm"');
+    expect(source).toContain('id="driftlarm-form"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
