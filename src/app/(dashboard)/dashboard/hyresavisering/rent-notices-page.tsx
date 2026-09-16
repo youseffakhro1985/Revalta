@@ -71,6 +71,11 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
     if (window.location.hash !== "#ny-hyresavi") return;
     document.getElementById("ny-hyresavi")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#avilista") return;
+    document.getElementById("avilista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, notices]);
 
   const summary = useMemo(() => ({
     total: notices.reduce((sum, item) => sum + Number(item.total || 0), 0),
@@ -227,8 +232,9 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
       </Panel>
       </div>
       ) : null}
+      <div id="avilista" className="scroll-mt-36">
       <Panel title="Avier och manuell status" description="Status sätts manuellt i Revalta. Det finns ingen automatisk koppling till bankgiro eller inbetalningar." bodyClassName="p-0">
-        {loading ? <p className="p-6 text-sm text-ink-500">Hämtar hyresavier…</p> : notices.length === 0 ? (
+        {loading ? <p className="p-6 text-sm text-ink-500">Hyresavierna hämtas.</p> : notices.length === 0 ? (
           <EmptyState title="Inga hyresavier registrerade" description="Skapa den första hyresavin för att börja följa avisering och manuell aviestatus." />
         ) : (
           <div className="divide-y divide-sand-100">
@@ -311,6 +317,7 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
           </div>
         )}
       </Panel>
+      </div>
     </section>
   </div>;
 }
