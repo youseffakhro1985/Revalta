@@ -55,6 +55,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
     if (loading) return;
     if (window.location.hash !== "#godkann-plan") return;
     document.getElementById("godkann-plan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("godkann-version")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -105,7 +106,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
               <p className="mt-2 text-sm text-ink-500">Laddar versionshistorik, godkännanden och arkivering.</p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
-              <button type="button" disabled autoFocus className={premiumPrimaryButtonClass}>
+              <button type="button" id="godkann-version" disabled autoFocus className={premiumPrimaryButtonClass}>
                 <CheckCircle2 className="h-4 w-4" /> Godkänn version
               </button>
               <button type="button" disabled className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-60">
@@ -139,7 +140,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {plan.status !== "active" ? (
-                    <button type="button" autoFocus={index === 0} disabled={formLocked} onClick={() => void mutate(plan.id, "plan.approve")} className={premiumPrimaryButtonClass}>
+                    <button type="button" id={index === 0 ? "godkann-version" : undefined} autoFocus={index === 0} disabled={formLocked} onClick={() => void mutate(plan.id, "plan.approve")} className={premiumPrimaryButtonClass}>
                       <CheckCircle2 className="h-4 w-4" /> Godkänn version
                     </button>
                   ) : null}
