@@ -26,3 +26,16 @@ describe("leverantorer search filter first HTML", () => {
     expect(source).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("leverantorer leftover register first HTML", () => {
+  it("keeps leftover vendors in the first HTML without stealing create or filter", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="leverantorlista"');
+    expect(source).toContain('window.location.hash !== "#leverantorlista"');
+    expect(source).toContain("Leverantörerna hämtas.");
+    expect(source).toContain('id="ny-leverantor"');
+    expect(source).toContain('id="leverantorfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("saving || loading");
+  });
+});
