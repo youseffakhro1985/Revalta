@@ -79,3 +79,20 @@ describe("eskaleringar leftover recipients first HTML", () => {
     expect(source).toContain("autoFocus");
   });
 });
+
+describe("eskaleringar leftover rules first HTML", () => {
+  it("keeps leftover rules in the first HTML without stealing Hantera regler", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="regellista"');
+    expect(source).toContain('window.location.hash !== "#regellista"');
+    expect(source).toContain("Reglerna hämtas.");
+    expect(source).toContain('id="regler"');
+    expect(source).toContain("Hantera regler");
+    expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
+    expect(source).toContain("scrollIntoView");
+    const leftoverIndex = source.indexOf('id="regellista"');
+    const stickyIndex = source.indexOf("Hantera regler");
+    expect(leftoverIndex).toBeGreaterThan(-1);
+    expect(stickyIndex).toBeGreaterThan(leftoverIndex);
+  });
+});
