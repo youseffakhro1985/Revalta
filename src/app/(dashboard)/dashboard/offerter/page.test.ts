@@ -39,6 +39,19 @@ describe("offerter filter first HTML", () => {
   });
 });
 
+describe("offerter leftover list first HTML", () => {
+  it("keeps leftover quotes in the first HTML without stealing create or filter", () => {
+    const form = readFileSync(new URL("./offerter-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="offertlista"');
+    expect(form).toContain('window.location.hash !== "#offertlista"');
+    expect(form).toContain("Offerterna hämtas.");
+    expect(form).toContain('id="offertfilter"');
+    expect(form).toContain("Ny offert");
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("disabled={loading}");
+  });
+});
+
 describe("offerter work-order action", () => {
   it("creates an arbetsorder from an approved quote via the dedicated API", () => {
     const source = readFileSync(new URL("./offerter-page.tsx", import.meta.url), "utf8");

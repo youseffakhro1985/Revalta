@@ -134,6 +134,11 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#offertfilter") return;
     document.getElementById("offertfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, quotes]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#offertlista") return;
+    document.getElementById("offertlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, quotes]);
 
   const propertyNames = useMemo(() => [...new Set(quotes.map((quote) => quote.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [quotes]);
   const visibleQuotes = useMemo(() => {
@@ -357,6 +362,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     </section>
 
     <Panel title="Offertöversikt" description={`${visibleQuotes.length} av ${quotes.length} offerter i vald vy`} bodyClassName="p-0">
+      <div id="offertlista" className="scroll-mt-36">
       {loading ? <p className="p-6 text-sm text-ink-500">Offerterna hämtas.</p> : visibleQuotes.length === 0 ? <EmptyState title="Inga offerter matchar urvalet" description="Justera filtren eller skapa en ny offert." /> : <div className="divide-y divide-sand-100">{visibleQuotes.map((quote) => {
         const days = daysUntil(quote.valid_until);
         const history = (quote.history || []).slice(0, 3);
@@ -392,6 +398,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
           {(quote.decision_by || history.length > 0) ? <div className="mt-5 border-t border-sand-100 pt-4"><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500">Beslutshistorik</p>{quote.decision_by ? <p className="mt-2 text-xs leading-5 text-ink-600"><strong>{labels[quote.status || "draft"]}</strong> av {quote.decision_by}{quote.decision_at ? ` · ${date.format(new Date(quote.decision_at))}` : ""}{quote.decision_comment ? ` · ${quote.decision_comment}` : ""}</p> : null}{history.length ? <div className="mt-3 space-y-2">{history.map((item) => <p key={item.id} className="text-xs leading-5 text-ink-500">{item.previous_status ? `${labels[item.previous_status] || item.previous_status} → ` : ""}<strong className="text-ink-700">{labels[item.status || ""] || item.status}</strong>{item.actor_name ? ` · ${item.actor_name}` : ""}{item.comment ? ` · ${item.comment}` : ""}</p>)}</div> : null}</div> : null}
         </article>;
       })}</div>}
+      </div>
     </Panel>
   </div>;
 }
