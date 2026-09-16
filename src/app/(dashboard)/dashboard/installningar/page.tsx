@@ -209,6 +209,12 @@ export default function SettingsPage() {
     document.getElementById("profil")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("profil-namn")?.focus(), 0);
   }, [initialLoading, profile]);
+  useEffect(() => {
+    if (initialLoading) return;
+    if (window.location.hash !== "#organisation") return;
+    document.getElementById("organisation")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("organisationsnamn")?.focus(), 0);
+  }, [initialLoading, profile]);
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -408,7 +414,7 @@ export default function SettingsPage() {
             <fieldset disabled={!canManageOrganisation || initialLoading || Boolean(saving)} className="space-y-4 disabled:opacity-60">
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold text-ink-700">Organisationsnamn</span>
-                <input required maxLength={180} value={companyName} onChange={(event) => setCompanyName(event.target.value)} className={premiumFieldClass} aria-label="Organisationsnamn" />
+                <input id="organisationsnamn" required maxLength={180} value={companyName} onChange={(event) => setCompanyName(event.target.value)} className={premiumFieldClass} aria-label="Organisationsnamn" />
               </label>
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold text-ink-700">Organisationsnummer</span>
