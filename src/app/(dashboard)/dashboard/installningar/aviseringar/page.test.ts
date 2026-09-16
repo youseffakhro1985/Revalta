@@ -60,3 +60,19 @@ describe("aviseringar leftover recipients first HTML", () => {
     expect(source).toContain("autoFocus");
   });
 });
+
+describe("aviseringar leftover run history first HTML", () => {
+  it("keeps leftover run history in the first HTML without stealing Aviseringsval or filters", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="korninglista"');
+    expect(source).toContain('window.location.hash !== "#korninglista"');
+    expect(source).toContain("Körningshistoriken hämtas.");
+    expect(source).toContain('id="aviseringsinstallningar"');
+    expect(source).toContain('id="historikfilter"');
+    expect(source).toContain('id="korningshistorik"');
+    expect(source).toContain('id="mottagarlista"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("autoFocus");
+  });
+});

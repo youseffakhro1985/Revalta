@@ -102,6 +102,11 @@ export default function ServiceNotificationsPage() {
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
+    if (window.location.hash !== "#korninglista") return;
+    document.getElementById("korninglista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#mottagarfilter") return;
     document.getElementById("mottagarfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
@@ -280,10 +285,12 @@ export default function ServiceNotificationsPage() {
             </label>
           </fieldset>
         </form>
+        <div id="korninglista" className="scroll-mt-36">
         {loading && !data ? <p className="text-sm text-ink-500">Körningshistoriken hämtas.</p> : null}
         {!loading && events.length === 0 ? <EmptyState title="Ingen körningshistorik ännu" description="Automatiska utskick och testutskick loggas här." /> : null}
         {!loading && events.length > 0 && visibleEvents.length === 0 ? <EmptyState title="Inga körningar matchar filtret" description="Ändra statusfiltret för att visa fler aviseringsförsök." /> : null}
         {visibleEvents.length ? <div className="overflow-x-auto rounded-xl border border-sand-200"><table className="min-w-full divide-y divide-sand-100 text-sm"><thead className="bg-sand-50 text-left text-xs uppercase tracking-wide text-ink-500"><tr><th className="px-5 py-3">Tidpunkt</th><th className="px-5 py-3">Typ</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Mottagare / körning</th></tr></thead><tbody className="divide-y divide-sand-100">{visibleEvents.map((event) => <tr key={event.id}><td className="px-5 py-4 font-medium text-ink-700">{dateTime.format(new Date(event.created_at))}</td><td className="px-5 py-4 text-ink-600">{event.type === "component_service_test" ? "Testutskick" : "Daglig sammanställning"}</td><td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${event.status === "sent" ? "bg-success-50 text-success-800" : event.status === "failed" ? "bg-danger-50 text-danger-700" : "bg-sand-100 text-ink-600"}`}>{statusLabels[event.status] || event.status}</span></td><td className="max-w-md truncate px-5 py-4 text-ink-500">{event.recipient || "–"}</td></tr>)}</tbody></table></div> : null}
+        </div>
       </Panel>
       </div>
     </div>
