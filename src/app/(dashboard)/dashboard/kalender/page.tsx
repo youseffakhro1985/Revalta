@@ -120,6 +120,11 @@ export default function CalendarPage() {
     if (window.location.hash !== "#ny-aktivitet") return;
     document.getElementById("ny-aktivitet")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#kalenderfilter") return;
+    document.getElementById("kalenderfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, events]);
 
   function startEdit(event: CalendarEvent) {
     if (!isEditableCalendarEvent(event)) return;
@@ -323,6 +328,7 @@ export default function CalendarPage() {
           >
             {canManage ? (
             <form onSubmit={submit} className="space-y-4">
+              <fieldset disabled={saving || loading} className="contents">
               <input required autoFocus placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={premiumFieldClass} />
               <div className="grid grid-cols-2 gap-3">
                 <input required type="date" aria-label="Datum" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className={premiumFieldClass} />
@@ -334,12 +340,13 @@ export default function CalendarPage() {
               <input placeholder="Fastighet" aria-label="Fastighet" value={form.propertyName} onChange={(event) => setForm({ ...form, propertyName: event.target.value })} className={premiumFieldClass} />
               <input placeholder="Ansvarig" aria-label="Ansvarig" value={form.responsible} onChange={(event) => setForm({ ...form, responsible: event.target.value })} className={premiumFieldClass} />
               <textarea placeholder="Anteckning" aria-label="Anteckning" value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} className={premiumTextareaClass} />
-              <button disabled={saving} className={`${premiumPrimaryButtonClass} w-full`}>
+              <button className={`${premiumPrimaryButtonClass} w-full`}>
                 {saving ? "Sparar…" : "Spara aktivitet"}
               </button>
+              </fieldset>
             </form>
             ) : (
-              <div className="h-64 animate-pulse rounded-xl bg-sand-100" aria-hidden="true" />
+              <p className="text-sm text-ink-500">Formuläret hämtas.</p>
             )}
           </Panel>
           </div>
@@ -350,21 +357,19 @@ export default function CalendarPage() {
           description="Aktiviteter grupperade efter när de ska genomföras. Schemalagda arbetsorder, ronder, besiktningar, underhåll och avtalsdatum hämtas från respektive register."
           bodyClassName="p-0"
         >
-          <div className="flex flex-col gap-3 border-b border-sand-200 bg-sand-50/55 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div id="kalenderfilter" className="scroll-mt-36 flex flex-col gap-3 border-b border-sand-200 bg-sand-50/55 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 text-xs text-ink-500">
               <CalendarCheck2 className="h-4 w-4 text-petroleum-700" strokeWidth={1.7} aria-hidden="true" />
               <span>{visible.length} aktiviteter i aktuell vy</span>
             </div>
-            <select value={filter} onChange={(event) => setFilter(event.target.value)} className={`${premiumFieldClass} sm:w-48`} aria-label="Filtrera efter typ">
+            <select disabled={loading} value={filter} onChange={(event) => setFilter(event.target.value)} className={`${premiumFieldClass} sm:w-48`} aria-label="Filtrera efter typ">
               <option>Alla</option>
               {filterTypeOptions.map((type) => <option key={type}>{type}</option>)}
             </select>
           </div>
 
           {loading ? (
-            <div className="space-y-3 p-6">
-              {[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}
-            </div>
+            <p className="p-6 text-sm text-ink-500">Aktiviteterna hämtas.</p>
           ) : visible.length === 0 ? (
             <EmptyState title="Inga aktiviteter i den här vyn" description="Ändra filtret eller planera en ny aktivitet för att börja bygga kalendern." />
           ) : (
