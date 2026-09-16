@@ -27,3 +27,17 @@ describe("budget leftover filter first HTML", () => {
     expect(source).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}');
   });
 });
+
+describe("budget leftover rows first HTML", () => {
+  it("keeps leftover budget rows in the first HTML without stealing create or filter", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="budgetlista"');
+    expect(source).toContain('window.location.hash !== "#budgetlista"');
+    expect(source).toContain("Budgetraderna hämtas.");
+    expect(source).toContain('id="ny-budgetrad"');
+    expect(source).toContain('id="budgetfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("canManage || loading");
+    expect(source).toContain("autoFocus");
+  });
+});
