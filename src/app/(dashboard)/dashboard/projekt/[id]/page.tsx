@@ -160,6 +160,6 @@ export default function ProjectDetailPage() {
       {project || loading ? <OperationalActivityPanel entityType="project" entityId={project?.id || id} /> : null}
     </section>
 
-    {project ? <OperationalDocumentsPanel entityType="project" entityId={project.id} /> : null}
+    {project || loading ? <OperationalDocumentsPanel entityType="project" entityId={project?.id || id} /> : null}
   </div>;
 }

@@ -22,3 +22,11 @@ describe("project activity panel first HTML", () => {
     expect(source).not.toContain("h-64 animate-pulse rounded-2xl bg-sand-100");
   });
 });
+
+describe("project documents panel first HTML", () => {
+  it("renders documents while the project is still loading", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain("project || loading ? <OperationalDocumentsPanel");
+    expect(source).toContain("project?.id || id");
+  });
+});

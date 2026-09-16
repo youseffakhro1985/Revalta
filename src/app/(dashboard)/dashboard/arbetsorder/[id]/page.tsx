@@ -355,6 +355,6 @@ export default function WorkOrderDetailPage() {
       <WorkOrderEconomicsPanel workOrderId={workOrder?.id || id} />
     </section> : null}
     {workOrder || loading ? <WorkOrderReportingPanel workOrderId={workOrder?.id || id} /> : null}
-    {workOrder ? <OperationalDocumentsPanel entityType="work_order" entityId={workOrder.id} /> : null}
+    {workOrder || loading ? <OperationalDocumentsPanel entityType="work_order" entityId={workOrder?.id || id} /> : null}
   </div>;
 }
