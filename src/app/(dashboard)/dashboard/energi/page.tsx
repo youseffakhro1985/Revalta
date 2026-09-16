@@ -84,6 +84,11 @@ export default function EnergyPage() {
     if (window.location.hash !== "#energifilter") return;
     document.getElementById("energifilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, readings]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#energilista") return;
+    document.getElementById("energilista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, readings]);
 
   const periods = useMemo(() => [...new Set(readings.map((row) => row.period || "").filter(Boolean))].sort().reverse(), [readings]);
   const propertyNames = useMemo(() => [...new Set(readings.map((row) => row.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [readings]);
@@ -271,6 +276,7 @@ export default function EnergyPage() {
       </Panel></div> : null}
 
       <Panel title="Förbrukningshistorik" description={`${visibleReadings.length} av ${readings.length} avläsningar i vald vy`} bodyClassName="p-0">
+        <div id="energilista" className="scroll-mt-36">
         {loading ? <p className="p-6 text-sm text-ink-500">Avläsningarna hämtas.</p> : visibleReadings.length === 0 ? <EmptyState title="Inga avläsningar matchar urvalet" description="Justera filtren eller registrera en ny avläsning." /> : <div className="divide-y divide-sand-100">{visibleReadings.map((row) => {
           const Icon = icons[row.type as keyof typeof icons] || Gauge;
           return <article key={row.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
@@ -282,6 +288,7 @@ export default function EnergyPage() {
             {canManage && editingId === row.id && row.source !== "legacy" ? <div className="mt-5 space-y-3 rounded-2xl border border-sand-200 bg-sand-50/60 p-4"><div className="grid gap-3 sm:grid-cols-3"><input className={premiumFieldClass} type="month" aria-label="Period" value={editForm.period} onChange={(e) => setEditForm({ ...editForm, period: e.target.value })} /><input className={premiumFieldClass} type="number" min="0" step="0.01" placeholder="Förbrukning" aria-label="Förbrukning" value={editForm.value} onChange={(e) => setEditForm({ ...editForm, value: e.target.value })} /><input className={premiumFieldClass} type="number" min="0" placeholder="Kostnad" aria-label="Kostnad" value={editForm.cost} onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })} /></div><textarea className={premiumTextareaClass} placeholder="Anteckning" aria-label="Anteckning" value={editForm.note} onChange={(e) => setEditForm({ ...editForm, note: e.target.value })} /><button type="button" disabled={updatingId === row.id} onClick={() => void saveEdit(row)} className={`${premiumPrimaryButtonClass} sm:w-auto`}>{updatingId === row.id ? "Sparar…" : "Spara ändringar"}</button></div> : null}
           </article>;
         })}</div>}
+        </div>
       </Panel>
     </section>
   </div>;
