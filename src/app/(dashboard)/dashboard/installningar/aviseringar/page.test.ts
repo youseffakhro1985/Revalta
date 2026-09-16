@@ -76,3 +76,22 @@ describe("aviseringar leftover run history first HTML", () => {
     expect(source).toContain("autoFocus");
   });
 });
+
+describe("aviseringar sticky mutate first HTML", () => {
+  it("keeps Aviseringsval focused after load without leftover hashes stealing the sticky", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="aviseringsinstallningar"');
+    expect(source).toContain('id="days-ahead"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain('window.location.hash !== "#aviseringsinstallningar"');
+    expect(source).toContain('document.getElementById("days-ahead")?.focus()');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('id="mottagarlista"');
+    expect(source).toContain('id="korninglista"');
+    expect(source).toContain("disabled={loading}");
+    const stickyIndex = source.indexOf('id="days-ahead"');
+    const leftoverIndex = source.indexOf('id="mottagarlista"');
+    expect(stickyIndex).toBeGreaterThan(-1);
+    expect(leftoverIndex).toBeGreaterThan(stickyIndex);
+  });
+});
