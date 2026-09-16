@@ -26,3 +26,16 @@ describe("component registry refresh first HTML", () => {
     expect(source).not.toContain('{loading ? <div className="h-96 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" /> : null}');
   });
 });
+
+describe("component registry leftover first HTML", () => {
+  it("keeps leftover registry copy in the first HTML without stealing refresh", () => {
+    const source = readFileSync(new URL("./component-registry-overview.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="registerlista"');
+    expect(source).toContain('window.location.hash !== "#registerlista"');
+    expect(source).toContain("Registret hämtas.");
+    expect(source).toContain('id="uppdatera-register"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
