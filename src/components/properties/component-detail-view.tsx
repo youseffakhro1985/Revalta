@@ -3,7 +3,7 @@
 import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarClock, Check, CircleDollarSign, ClipboardList, FolderKanban, Gauge, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, CalendarClock, Check, CircleDollarSign, ClipboardList, FolderKanban, Gauge, Save, X } from "lucide-react";
 import { EmptyState, InlineAlert, MetricCard, Panel } from "@/components/dashboard/premium-ui";
 import { OperationalDocumentsPanel } from "@/components/dashboard/operational-documents-panel";
 
@@ -64,15 +64,21 @@ function formFromComponent(component: Row): ComponentForm {
   };
 }
 
+const emptyForm: ComponentForm = {
+  name: "", category: "", component_class: "", location: "", status: "active", criticality: "normal",
+  manufacturer: "", model: "", serial_number: "", installation_year: "", commissioned_at: "",
+  technical_lifetime_years: "", economic_lifetime_years: "", expected_replacement_year: "", condition_grade: "",
+  replacement_value: "", responsible_supplier: "", next_service_at: "",
+};
+
 export function ComponentDetailView({ propertyId, componentId }: { propertyId: string; componentId: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saved, setSaved] = useState(false);
-  const [form, setForm] = useState<ComponentForm | null>(null);
+  const [form, setForm] = useState<ComponentForm>(emptyForm);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -88,22 +94,27 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
 
   useEffect(() => { void load(); }, [load]);
 
-  const dirty = useMemo(() => data && form ? JSON.stringify(form) !== JSON.stringify(formFromComponent(data.component)) : false, [data, form]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-komponent") return;
+    document.getElementById("spara-komponent")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
+  const dirty = useMemo(() => data ? JSON.stringify(form) !== JSON.stringify(formFromComponent(data.component)) : false, [data, form]);
 
   function updateField<K extends keyof ComponentForm>(key: K, value: ComponentForm[K]) {
-    setForm((current) => current ? { ...current, [key]: value } : current);
+    setForm((current) => ({ ...current, [key]: value }));
     setSaved(false);
     setSaveError("");
   }
 
   function cancelEdit() {
     if (data) setForm(formFromComponent(data.component));
-    setEditing(false); setSaveError(""); setSaved(false);
+    setSaveError(""); setSaved(false);
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form) return;
     setSaving(true); setSaveError(""); setSaved(false);
     try {
       const response = await fetch(`/api/properties/${propertyId}/components/${componentId}`, {
@@ -115,18 +126,18 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
       if (!response.ok) throw new Error(payload.error || "Kunde inte spara komponenten");
       setData((current) => current ? { ...current, component: { ...current.component, ...payload.component } } : current);
       setForm(formFromComponent(payload.component));
-      setEditing(false); setSaved(true);
+      setSaved(true);
       window.setTimeout(() => setSaved(false), 4000);
     } catch (value) { setSaveError(value instanceof Error ? value.message : "Kunde inte spara komponenten"); }
     finally { setSaving(false); }
   }
 
-  if (loading) return <div className="h-96 animate-pulse rounded-2xl bg-sand-100" />;
-  if (error || !data || !form) return <InlineAlert>{error || "Komponenten kunde inte laddas."}</InlineAlert>;
+  if (!loading && (error || !data)) return <InlineAlert>{error || "Komponenten kunde inte laddas."}</InlineAlert>;
 
-  const component = data.component;
-  const condition = number(component, "condition_grade");
+  const component = data?.component;
+  const condition = component ? number(component, "condition_grade") : 0;
   const warning = condition >= 4;
+  const formLocked = saving || loading || !data;
 
   return (
     <div className="space-y-6">
@@ -135,17 +146,17 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
         <div className="mt-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Komponentdetalj</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-ink-950">{text(component, "name")}</h1>
-            <p className="mt-2 text-sm text-ink-500">{data.property.name}{text(component, "building_name") ? ` · ${text(component, "building_name")}` : ""}{text(component, "location") ? ` · ${text(component, "location")}` : ""}</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.035em] text-ink-950">{component ? text(component, "name") : "Komponent"}</h1>
+            <p className="mt-2 text-sm text-ink-500">{data ? `${data.property.name}${text(component || {}, "building_name") ? ` · ${text(component || {}, "building_name")}` : ""}${text(component || {}, "location") ? ` · ${text(component || {}, "location")}` : ""}` : "Identifiering, livslängd, skick och serviceplan."}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {saved ? <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-800"><Check className="h-3.5 w-3.5" /> Sparad</span> : null}
             <span className={`w-fit rounded-full px-3 py-1.5 text-xs font-semibold ${warning ? "bg-warning-50 text-warning-800" : "bg-petroleum-50 text-petroleum-800"}`}>{condition ? `Skick ${condition}/5` : "Skick ej bedömt"}</span>
-            {!editing ? <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-800 shadow-sm transition hover:border-petroleum-200 hover:text-petroleum-800"><Pencil className="h-4 w-4" /> Redigera</button> : null}
           </div>
         </div>
       </div>
 
+      {data && component ? (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard icon={Gauge} label="Teknisk livslängd" value={number(component, "technical_lifetime_years") || "–"} hint="År" />
         <MetricCard icon={CalendarClock} label="Beräknat byte" value={number(component, "expected_replacement_year") || "–"} />
@@ -153,42 +164,45 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
         <MetricCard icon={ClipboardList} label="Händelser" value={data.metrics.eventCount} hint={`Nästa: ${formatDate(data.metrics.nextDueAt)}`} />
         <MetricCard icon={FolderKanban} label="Kopplade ärenden" value={data.metrics.linkedWorkOrders + data.metrics.linkedProjects} hint={`${data.metrics.linkedWorkOrders} arbetsordrar · ${data.metrics.linkedProjects} projekt`} />
       </div>
+      ) : <div className="h-40 animate-pulse rounded-2xl bg-sand-100" aria-hidden="true" />}
 
-      {editing ? (
+      <div id="spara-komponent" className="scroll-mt-36">
         <Panel title="Redigera teknisk komponent" description="Uppdatera identifiering, livslängd, skick, ansvar och serviceplan.">
           <form onSubmit={save} className="space-y-6">
             {saveError ? <InlineAlert>{saveError}</InlineAlert> : null}
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Field label="Komponentnamn" required value={form.name} onChange={(value) => updateField("name", value)} />
-              <Field label="Kategori" value={form.category} onChange={(value) => updateField("category", value)} />
-              <Field label="Komponentklass" value={form.component_class} onChange={(value) => updateField("component_class", value)} />
-              <Field label="Placering" value={form.location} onChange={(value) => updateField("location", value)} />
-              <SelectField label="Status" value={form.status} options={statusLabels} onChange={(value) => updateField("status", value)} />
-              <SelectField label="Kritikalitet" value={form.criticality} options={criticalityLabels} onChange={(value) => updateField("criticality", value)} />
-              <Field label="Tillverkare" value={form.manufacturer} onChange={(value) => updateField("manufacturer", value)} />
-              <Field label="Modell" value={form.model} onChange={(value) => updateField("model", value)} />
-              <Field label="Serienummer" value={form.serial_number} onChange={(value) => updateField("serial_number", value)} />
-              <Field label="Installationsår" type="number" min="1800" max="2200" value={form.installation_year} onChange={(value) => updateField("installation_year", value)} />
-              <Field label="Driftsatt" type="date" value={form.commissioned_at} onChange={(value) => updateField("commissioned_at", value)} />
-              <Field label="Nästa service" type="date" value={form.next_service_at} onChange={(value) => updateField("next_service_at", value)} />
-              <Field label="Teknisk livslängd, år" type="number" min="0" max="500" value={form.technical_lifetime_years} onChange={(value) => updateField("technical_lifetime_years", value)} />
-              <Field label="Ekonomisk livslängd, år" type="number" min="0" max="500" value={form.economic_lifetime_years} onChange={(value) => updateField("economic_lifetime_years", value)} />
-              <Field label="Beräknat bytesår" type="number" min="1800" max="2500" value={form.expected_replacement_year} onChange={(value) => updateField("expected_replacement_year", value)} />
-              <SelectField label="Skick" value={form.condition_grade} allowEmpty options={{ "1": "1 – Mycket gott", "2": "2 – Gott", "3": "3 – Acceptabelt", "4": "4 – Dåligt", "5": "5 – Kritiskt" }} onChange={(value) => updateField("condition_grade", value)} />
-              <Field label="Återanskaffningsvärde, SEK" type="number" min="0" step="0.01" value={form.replacement_value} onChange={(value) => updateField("replacement_value", value)} />
-              <Field label="Ansvarig leverantör" value={form.responsible_supplier} onChange={(value) => updateField("responsible_supplier", value)} />
+              <Field autoFocus disabled={formLocked} label="Komponentnamn" required value={form.name} onChange={(value) => updateField("name", value)} />
+              <Field disabled={formLocked} label="Kategori" value={form.category} onChange={(value) => updateField("category", value)} />
+              <Field disabled={formLocked} label="Komponentklass" value={form.component_class} onChange={(value) => updateField("component_class", value)} />
+              <Field disabled={formLocked} label="Placering" value={form.location} onChange={(value) => updateField("location", value)} />
+              <SelectField disabled={formLocked} label="Status" value={form.status} options={statusLabels} onChange={(value) => updateField("status", value)} />
+              <SelectField disabled={formLocked} label="Kritikalitet" value={form.criticality} options={criticalityLabels} onChange={(value) => updateField("criticality", value)} />
+              <Field disabled={formLocked} label="Tillverkare" value={form.manufacturer} onChange={(value) => updateField("manufacturer", value)} />
+              <Field disabled={formLocked} label="Modell" value={form.model} onChange={(value) => updateField("model", value)} />
+              <Field disabled={formLocked} label="Serienummer" value={form.serial_number} onChange={(value) => updateField("serial_number", value)} />
+              <Field disabled={formLocked} label="Installationsår" type="number" min="1800" max="2200" value={form.installation_year} onChange={(value) => updateField("installation_year", value)} />
+              <Field disabled={formLocked} label="Driftsatt" type="date" value={form.commissioned_at} onChange={(value) => updateField("commissioned_at", value)} />
+              <Field disabled={formLocked} label="Nästa service" type="date" value={form.next_service_at} onChange={(value) => updateField("next_service_at", value)} />
+              <Field disabled={formLocked} label="Teknisk livslängd, år" type="number" min="0" max="500" value={form.technical_lifetime_years} onChange={(value) => updateField("technical_lifetime_years", value)} />
+              <Field disabled={formLocked} label="Ekonomisk livslängd, år" type="number" min="0" max="500" value={form.economic_lifetime_years} onChange={(value) => updateField("economic_lifetime_years", value)} />
+              <Field disabled={formLocked} label="Beräknat bytesår" type="number" min="1800" max="2500" value={form.expected_replacement_year} onChange={(value) => updateField("expected_replacement_year", value)} />
+              <SelectField disabled={formLocked} label="Skick" value={form.condition_grade} allowEmpty options={{ "1": "1 – Mycket gott", "2": "2 – Gott", "3": "3 – Acceptabelt", "4": "4 – Dåligt", "5": "5 – Kritiskt" }} onChange={(value) => updateField("condition_grade", value)} />
+              <Field disabled={formLocked} label="Återanskaffningsvärde, SEK" type="number" min="0" step="0.01" value={form.replacement_value} onChange={(value) => updateField("replacement_value", value)} />
+              <Field disabled={formLocked} label="Ansvarig leverantör" value={form.responsible_supplier} onChange={(value) => updateField("responsible_supplier", value)} />
             </div>
             <div className="flex flex-col-reverse justify-between gap-3 border-t border-sand-100 pt-5 sm:flex-row sm:items-center">
               <p className="text-xs text-ink-500">Alla ändringar registreras i revisionsloggen.</p>
               <div className="flex gap-2">
-                <button type="button" onClick={cancelEdit} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><X className="h-4 w-4" /> Avbryt</button>
-                <button type="submit" disabled={saving || !dirty || form.name.trim().length < 2} className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" /> {saving ? "Sparar…" : "Spara ändringar"}</button>
+                <button type="button" onClick={cancelEdit} disabled={formLocked} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><X className="h-4 w-4" /> Avbryt</button>
+                <button type="submit" disabled={formLocked || !dirty || form.name.trim().length < 2} className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Save className="h-4 w-4" /> {saving ? "Sparar…" : "Spara ändringar"}</button>
               </div>
             </div>
           </form>
         </Panel>
-      ) : null}
+      </div>
 
+      {data && component ? (
+        <>
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <Panel title="Teknisk grunddata" description="Identifiering, livslängd och ansvar.">
           <dl className="grid gap-4 sm:grid-cols-2">
@@ -220,16 +234,18 @@ export function ComponentDetailView({ propertyId, componentId }: { propertyId: s
 
       <div className="grid gap-6 xl:grid-cols-2"><LinkedPanel title="Kopplade arbetsordrar" rows={data.linkedWorkOrders} kind="work_order" /><LinkedPanel title="Kopplade projekt" rows={data.linkedProjects} kind="project" /></div>
       <OperationalDocumentsPanel entityType="technical_asset" entityId={componentId} title="Komponentdokument" description="Ladda upp manualer, driftinstruktioner, garantier, protokoll, ritningar och bilder direkt mot komponenten." />
+        </>
+      ) : null}
     </div>
   );
 }
 
-function Field({ label, value, onChange, required, type = "text", min, max, step }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; min?: string; max?: string; step?: string }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><input type={type} value={value} required={required} min={min} max={max} step={step} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-300 focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50" /></label>;
+function Field({ label, value, onChange, required, type = "text", min, max, step, disabled, autoFocus }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; type?: string; min?: string; max?: string; step?: string; disabled?: boolean; autoFocus?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><input autoFocus={autoFocus} disabled={disabled} type={type} value={value} required={required} min={min} max={max} step={step} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-300 focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50 disabled:opacity-60" aria-label={label} /></label>;
 }
 
-function SelectField({ label, value, options, onChange, allowEmpty }: { label: string; value: string; options: Record<string, string>; onChange: (value: string) => void; allowEmpty?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50">{allowEmpty ? <option value="">Ej satt</option> : null}{Object.entries(options).map(([key, title]) => <option key={key} value={key}>{title}</option>)}</select></label>;
+function SelectField({ label, value, options, onChange, allowEmpty, disabled }: { label: string; value: string; options: Record<string, string>; onChange: (value: string) => void; allowEmpty?: boolean; disabled?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50 disabled:opacity-60" aria-label={label}>{allowEmpty ? <option value="">Ej satt</option> : null}{Object.entries(options).map(([key, title]) => <option key={key} value={key}>{title}</option>)}</select></label>;
 }
 
 function Detail({ label, value }: { label: string; value: React.ReactNode }) { return <div><dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</dt><dd className="mt-1 text-sm font-semibold text-ink-800">{value}</dd></div>; }

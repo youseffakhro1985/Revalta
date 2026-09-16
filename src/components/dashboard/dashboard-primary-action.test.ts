@@ -70,6 +70,12 @@ describe("dashboardPrimaryCreateAction", () => {
     });
     expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1", "owner")?.label).toBe("Spara fastighet");
     expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1", "technician")).toBeNull();
+    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1/komponenter/comp-1", "manager")).toEqual({
+      href: "/dashboard/fastigheter/fastighet-1/komponenter/comp-1#spara-komponent",
+      label: "Spara komponent",
+    });
+    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1/komponenter/comp-1", "owner")?.label).toBe("Spara komponent");
+    expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1/komponenter/comp-1", "technician")).toBeNull();
     expect(dashboardPrimaryCreateAction("/dashboard/fastigheter/ny", "manager")).toBeNull();
   });
 
