@@ -73,6 +73,12 @@ export function InvoiceExportReconciliationPanel({ workOrderId }: Props) {
   }, [workOrderId]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#avstamma-export") return;
+    document.getElementById("avstamma-export")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("avstamma-notering")?.focus(), 0);
+  }, [loading, jobs, error, success]);
 
   const visible = useMemo(() => jobs.length > 0, [jobs]);
 
@@ -114,9 +120,10 @@ export function InvoiceExportReconciliationPanel({ workOrderId }: Props) {
     }
   }
 
-  if (loading || (!visible && !error && !success)) return null;
+  if (!loading && !visible && !error && !success) return null;
 
   return (
+    <div id="avstamma-export" className="scroll-mt-36">
     <Panel
       title="Avstämning av fakturaexport"
       description="Visas endast när en export har varit låst i bearbetning och Revalta inte säkert kan avgöra leverantörens utfall. Ingen faktura skickas om automatiskt härifrån."
@@ -126,8 +133,16 @@ export function InvoiceExportReconciliationPanel({ workOrderId }: Props) {
           {error ? <InlineAlert tone="error">{error}</InlineAlert> : null}
           {!error && success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
         </div>
+        {loading && !visible ? (
+          <ReconciliationMutateFields
+            noteId="avstamma-notering"
+            draft={{ note: "", externalId: "" }}
+            locked
+            saving={false}
+          />
+        ) : null}
         {visible ? <div className="space-y-4">
-          {jobs.map((job) => {
+          {jobs.map((job, index) => {
             const draft = drafts[job.jobId] || { note: "", externalId: "" };
             const saving = savingJobId === job.jobId;
             return <article key={job.jobId} className="rounded-2xl border border-warning-200 bg-warning-50/60 p-5">
@@ -143,46 +158,82 @@ export function InvoiceExportReconciliationPanel({ workOrderId }: Props) {
                 </div>
                 <span className="rounded-full border border-warning-200 bg-white px-3 py-1 text-xs font-semibold text-warning-900">Bearbetas · avstämning krävs</span>
               </div>
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                <label className="space-y-2 text-sm lg:col-span-2">
-                  <span className="font-semibold text-ink-700">Avstämningsnotering</span>
-                  <textarea
-                    value={draft.note}
-                    onChange={(event) => setDrafts((current) => ({ ...current, [job.jobId]: { ...draft, note: event.target.value } }))}
-                    minLength={10}
-                    maxLength={1000}
-                    rows={3}
-                    placeholder="Exempel: Kontrollerad i Fortnox. Fakturan finns med externt nummer ..."
-                    className={premiumFieldClass}
-                    disabled={saving}
-                  />
-                </label>
-                <label className="space-y-2 text-sm">
-                  <span className="font-semibold text-ink-700">Externt ID / fakturanummer <span className="font-normal text-ink-500">(valfritt)</span></span>
-                  <input
-                    value={draft.externalId}
-                    onChange={(event) => setDrafts((current) => ({ ...current, [job.jobId]: { ...draft, externalId: event.target.value } }))}
-                    maxLength={200}
-                    placeholder="Till exempel FTX-12345"
-                    className={premiumFieldClass}
-                    disabled={saving}
-                  />
-                </label>
-                <div className="flex flex-wrap items-end gap-2">
-                  <button type="button" disabled={saving || draft.note.trim().length < 10} onClick={() => void reconcile(job, "sent")} className={premiumPrimaryButtonClass}>
-                    {saving ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
-                    Bekräfta skickad
-                  </button>
-                  <button type="button" disabled={saving || draft.note.trim().length < 10} onClick={() => void reconcile(job, "failed")} className="inline-flex items-center gap-2 rounded-xl border border-danger-200 bg-white px-4 py-2.5 text-sm font-semibold text-danger-700 hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50">
-                    <XCircle className="h-4 w-4" aria-hidden="true" />
-                    Bekräfta misslyckad
-                  </button>
-                </div>
-              </div>
+              <ReconciliationMutateFields
+                noteId={index === 0 ? "avstamma-notering" : undefined}
+                draft={draft}
+                locked={false}
+                saving={saving}
+                onNote={(note) => setDrafts((current) => ({ ...current, [job.jobId]: { ...draft, note } }))}
+                onExternalId={(externalId) => setDrafts((current) => ({ ...current, [job.jobId]: { ...draft, externalId } }))}
+                onSent={() => void reconcile(job, "sent")}
+                onFailed={() => void reconcile(job, "failed")}
+              />
             </article>;
           })}
         </div> : null}
       </div>
     </Panel>
+    </div>
+  );
+}
+
+function ReconciliationMutateFields({
+  noteId,
+  draft,
+  locked,
+  saving,
+  onNote,
+  onExternalId,
+  onSent,
+  onFailed,
+}: {
+  noteId?: string;
+  draft: Draft;
+  locked: boolean;
+  saving: boolean;
+  onNote?: (value: string) => void;
+  onExternalId?: (value: string) => void;
+  onSent?: () => void;
+  onFailed?: () => void;
+}) {
+  const formLocked = locked || saving;
+  return (
+    <div className="mt-4 grid gap-3 lg:grid-cols-2">
+      <label className="space-y-2 text-sm lg:col-span-2">
+        <span className="font-semibold text-ink-700">Avstämningsnotering</span>
+        <textarea
+          id={noteId}
+          value={draft.note}
+          onChange={(event) => onNote?.(event.target.value)}
+          minLength={10}
+          maxLength={1000}
+          rows={3}
+          placeholder="Exempel: Kontrollerad i Fortnox. Fakturan finns med externt nummer ..."
+          className={premiumFieldClass}
+          disabled={formLocked}
+        />
+      </label>
+      <label className="space-y-2 text-sm">
+        <span className="font-semibold text-ink-700">Externt ID / fakturanummer <span className="font-normal text-ink-500">(valfritt)</span></span>
+        <input
+          value={draft.externalId}
+          onChange={(event) => onExternalId?.(event.target.value)}
+          maxLength={200}
+          placeholder="Till exempel FTX-12345"
+          className={premiumFieldClass}
+          disabled={formLocked}
+        />
+      </label>
+      <div className="flex flex-wrap items-end gap-2">
+        <button type="button" disabled={formLocked || draft.note.trim().length < 10} onClick={onSent} className={premiumPrimaryButtonClass}>
+          {saving ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+          Bekräfta skickad
+        </button>
+        <button type="button" disabled={formLocked || draft.note.trim().length < 10} onClick={onFailed} className="inline-flex items-center gap-2 rounded-xl border border-danger-200 bg-white px-4 py-2.5 text-sm font-semibold text-danger-700 hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-50">
+          <XCircle className="h-4 w-4" aria-hidden="true" />
+          Bekräfta misslyckad
+        </button>
+      </div>
+    </div>
   );
 }
