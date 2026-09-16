@@ -18,6 +18,15 @@ type CardData = {
 type SectionKey = "entrance" | "asset" | "warranty" | "inspection" | "agreement";
 type Props = { propertyId: string };
 
+const emptyCard: CardData = {
+  property: { buildings: [] },
+  entrances: [],
+  assets: [],
+  warranties: [],
+  inspections: [],
+  agreements: [],
+};
+
 const sections: { key: SectionKey; label: string; icon: typeof Wrench }[] = [
   { key: "entrance", label: "Entré / trapphus", icon: Building2 },
   { key: "asset", label: "Installation", icon: Wrench },
@@ -84,6 +93,14 @@ export function PropertyCardManager({ propertyId }: Props) {
   }, [data, section]);
 
   const selected = items.find((item) => String(item.id) === selectedId);
+  const card = data || emptyCard;
+  const formLocked = saving || loading || !data;
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#spara-fastighetspärm") return;
+    document.getElementById("spara-fastighetspärm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,28 +126,28 @@ export function PropertyCardManager({ propertyId }: Props) {
     }
   }
 
-  if (loading) return <div className="h-72 animate-pulse rounded-2xl bg-sand-100" />;
-  if (!data) return <InlineAlert>{error || "Administrationen kunde inte laddas."}</InlineAlert>;
+  if (!loading && !data) return <InlineAlert>{error || "Administrationen kunde inte laddas."}</InlineAlert>;
 
-  return <Panel title="Administrera fastighetspärmen" description="Lägg till nya poster eller välj en befintlig post för att uppdatera den.">
+  return <div id="spara-fastighetspärm" className="scroll-mt-36"><Panel title="Administrera fastighetspärmen" description="Lägg till nya poster eller välj en befintlig post för att uppdatera den.">
     <div className="space-y-6">
       {(error || success) ? <div aria-live="polite"><InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert></div> : null}
 
       <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Registertyp">
-        {sections.map((item) => { const Icon = item.icon; const active = section === item.key; return <button key={item.key} type="button" onClick={() => { setSection(item.key); setSelectedId(""); setError(""); setSuccess(""); }} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${active ? "border-petroleum-200 bg-petroleum-50 text-petroleum-900" : "border-sand-200 bg-white text-ink-600 hover:bg-sand-50"}`}><Icon className="h-4 w-4" />{item.label}</button>; })}
+        {sections.map((item) => { const Icon = item.icon; const active = section === item.key; return <button key={item.key} type="button" disabled={formLocked} onClick={() => { setSection(item.key); setSelectedId(""); setError(""); setSuccess(""); }} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${active ? "border-petroleum-200 bg-petroleum-50 text-petroleum-900" : "border-sand-200 bg-white text-ink-600 hover:bg-sand-50"}`}><Icon className="h-4 w-4" />{item.label}</button>; })}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
         <div className="rounded-2xl border border-sand-200 bg-sand-50/60 p-4">
-          <div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-ink-900">Befintliga poster</p><p className="mt-1 text-xs text-ink-500">Välj en post för redigering.</p></div><button type="button" onClick={() => setSelectedId("")} className="inline-flex items-center gap-1.5 text-sm font-semibold text-petroleum-700"><Plus className="h-4 w-4" />Ny</button></div>
-          {items.length === 0 ? <div className="mt-4"><EmptyState title="Inga poster" description="Skapa den första posten i formuläret." /></div> : <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{items.map((item) => <button key={String(item.id)} type="button" onClick={() => setSelectedId(String(item.id))} className={`w-full rounded-xl border p-3 text-left transition ${selectedId === String(item.id) ? "border-petroleum-200 bg-white shadow-sm" : "border-transparent bg-white/70 hover:border-sand-200"}`}><p className="font-semibold text-ink-900">{label(item, section)}</p><p className="mt-1 text-xs text-ink-500">{String(item.status || item.category || item.inspection_type || "Registrerad")}</p></button>)}</div>}
+          <div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-ink-900">Befintliga poster</p><p className="mt-1 text-xs text-ink-500">Välj en post för redigering.</p></div><button type="button" disabled={formLocked} onClick={() => setSelectedId("")} className="inline-flex items-center gap-1.5 text-sm font-semibold text-petroleum-700 disabled:opacity-50"><Plus className="h-4 w-4" />Ny</button></div>
+          {items.length === 0 ? <div className="mt-4"><EmptyState title={loading ? "Laddar poster" : "Inga poster"} description="Skapa den första posten i formuläret." /></div> : <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{items.map((item) => <button key={String(item.id)} type="button" disabled={formLocked} onClick={() => setSelectedId(String(item.id))} className={`w-full rounded-xl border p-3 text-left transition disabled:opacity-50 ${selectedId === String(item.id) ? "border-petroleum-200 bg-white shadow-sm" : "border-transparent bg-white/70 hover:border-sand-200"}`}><p className="font-semibold text-ink-900">{label(item, section)}</p><p className="mt-1 text-xs text-ink-500">{String(item.status || item.category || item.inspection_type || "Registrerad")}</p></button>)}</div>}
         </div>
 
         <form key={`${section}-${selectedId}`} onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+          <fieldset disabled={formLocked} className="contents">
           <input type="hidden" name="recordId" value={selectedId} />
           {section === "entrance" ? <>
-            <Field label="Namn"><input name="name" required defaultValue={fieldValue(selected, "name")} className={premiumFieldClass} placeholder="Ex. Trapphus A" /></Field>
-            <BuildingSelect data={data} selected={fieldValue(selected, "buildingId")} />
+            <Field label="Namn"><input autoFocus name="name" required defaultValue={fieldValue(selected, "name")} className={premiumFieldClass} placeholder="Ex. Trapphus A" /></Field>
+            <BuildingSelect data={card} selected={fieldValue(selected, "buildingId")} />
             <Field label="Adress"><input name="address" defaultValue={fieldValue(selected, "address")} className={premiumFieldClass} /></Field>
             <Field label="Antal våningar"><input name="floors" type="number" min="0" defaultValue={fieldValue(selected, "floors")} className={premiumFieldClass} /></Field>
             <Field label="Tillgänglighet"><input name="accessibility" defaultValue={fieldValue(selected, "accessibility")} className={premiumFieldClass} placeholder="Hiss, ramp, automatisk dörr" /></Field>
@@ -138,9 +155,9 @@ export function PropertyCardManager({ propertyId }: Props) {
           </> : null}
 
           {section === "asset" ? <>
-            <Field label="Namn"><input name="name" required defaultValue={fieldValue(selected, "name")} className={premiumFieldClass} placeholder="Ex. Hiss 1" /></Field>
+            <Field label="Namn"><input autoFocus name="name" required defaultValue={fieldValue(selected, "name")} className={premiumFieldClass} placeholder="Ex. Hiss 1" /></Field>
             <Field label="Kategori"><select name="category" required defaultValue={fieldValue(selected, "category") || "elevator"} className={premiumFieldClass}>{[['elevator','Hiss'],['ventilation','Ventilation'],['heating','Värme'],['electricity','El'],['water','VA'],['fire','Brandskydd'],['access','Passersystem'],['other','Övrigt']].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></Field>
-            <BuildingSelect data={data} selected={fieldValue(selected, "buildingId")} />
+            <BuildingSelect data={card} selected={fieldValue(selected, "buildingId")} />
             <Field label="Placering"><input name="location" defaultValue={fieldValue(selected, "location")} className={premiumFieldClass} /></Field>
             <Field label="Fabrikat"><input name="manufacturer" defaultValue={fieldValue(selected, "manufacturer")} className={premiumFieldClass} /></Field>
             <Field label="Modell"><input name="model" defaultValue={fieldValue(selected, "model")} className={premiumFieldClass} /></Field>
@@ -152,8 +169,8 @@ export function PropertyCardManager({ propertyId }: Props) {
           </> : null}
 
           {section === "warranty" ? <>
-            <Field label="Titel"><input name="title" required defaultValue={fieldValue(selected, "title")} className={premiumFieldClass} /></Field>
-            <AssetSelect data={data} selected={fieldValue(selected, "technicalAssetId")} />
+            <Field label="Titel"><input autoFocus name="title" required defaultValue={fieldValue(selected, "title")} className={premiumFieldClass} /></Field>
+            <AssetSelect data={card} selected={fieldValue(selected, "technicalAssetId")} />
             <Field label="Leverantör"><input name="supplier" defaultValue={fieldValue(selected, "supplier")} className={premiumFieldClass} /></Field>
             <Field label="Gäller från"><input name="startsAt" type="date" defaultValue={fieldValue(selected, "startsAt")} className={premiumFieldClass} /></Field>
             <Field label="Gäller till"><input name="expiresAt" type="date" defaultValue={fieldValue(selected, "expiresAt")} className={premiumFieldClass} /></Field>
@@ -162,9 +179,9 @@ export function PropertyCardManager({ propertyId }: Props) {
           </> : null}
 
           {section === "inspection" ? <>
-            <Field label="Titel"><input name="title" required defaultValue={fieldValue(selected, "title")} className={premiumFieldClass} /></Field>
+            <Field label="Titel"><input autoFocus name="title" required defaultValue={fieldValue(selected, "title")} className={premiumFieldClass} /></Field>
             <Field label="Besiktningstyp"><input name="inspectionType" required defaultValue={fieldValue(selected, "inspectionType")} className={premiumFieldClass} placeholder="Ex. OVK" /></Field>
-            <AssetSelect data={data} selected={fieldValue(selected, "technicalAssetId")} />
+            <AssetSelect data={card} selected={fieldValue(selected, "technicalAssetId")} />
             <Field label="Besiktningsföretag"><input name="provider" defaultValue={fieldValue(selected, "provider")} className={premiumFieldClass} /></Field>
             <Field label="Planerat datum"><input name="scheduledAt" type="date" defaultValue={fieldValue(selected, "scheduledAt")} className={premiumFieldClass} /></Field>
             <Field label="Nästa förfallodatum"><input name="nextDueAt" type="date" defaultValue={fieldValue(selected, "nextDueAt")} className={premiumFieldClass} /></Field>
@@ -173,9 +190,9 @@ export function PropertyCardManager({ propertyId }: Props) {
           </> : null}
 
           {section === "agreement" ? <>
-            <Field label="Leverantör"><input name="supplier" required defaultValue={fieldValue(selected, "supplier")} className={premiumFieldClass} /></Field>
+            <Field label="Leverantör"><input autoFocus name="supplier" required defaultValue={fieldValue(selected, "supplier")} className={premiumFieldClass} /></Field>
             <Field label="Tjänsteområde"><input name="serviceArea" required defaultValue={fieldValue(selected, "serviceArea")} className={premiumFieldClass} placeholder="Ex. Hissservice" /></Field>
-            <AssetSelect data={data} selected={fieldValue(selected, "technicalAssetId")} />
+            <AssetSelect data={card} selected={fieldValue(selected, "technicalAssetId")} />
             <Field label="Avtalsnummer"><input name="agreementNumber" defaultValue={fieldValue(selected, "agreementNumber")} className={premiumFieldClass} /></Field>
             <Field label="Startdatum"><input name="startsAt" type="date" defaultValue={fieldValue(selected, "startsAt")} className={premiumFieldClass} /></Field>
             <Field label="Slutdatum"><input name="endsAt" type="date" defaultValue={fieldValue(selected, "endsAt")} className={premiumFieldClass} /></Field>
@@ -186,11 +203,12 @@ export function PropertyCardManager({ propertyId }: Props) {
           </> : null}
 
           {section !== "warranty" && section !== "inspection" && section !== "agreement" ? <Field label="Anteckningar" wide><textarea name="notes" rows={3} defaultValue={fieldValue(selected, "notes")} className={premiumFieldClass} /></Field> : null}
-          <button disabled={saving} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : selectedId ? "Uppdatera post" : "Lägg till post"}</button>
+          <button disabled={formLocked} className={`${premiumPrimaryButtonClass} sm:col-span-2`}>{saving ? "Sparar…" : selectedId ? "Uppdatera post" : "Lägg till post"}</button>
+          </fieldset>
         </form>
       </div>
     </div>
-  </Panel>;
+  </Panel></div>;
 }
 
 function Field({ label, children, wide = false }: { label: string; children: React.ReactNode; wide?: boolean }) { return <label className={`space-y-1.5 text-sm text-ink-600 ${wide ? "sm:col-span-2" : ""}`}><span>{label}</span>{children}</label>; }
