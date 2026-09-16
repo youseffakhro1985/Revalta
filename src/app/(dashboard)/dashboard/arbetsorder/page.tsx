@@ -189,6 +189,16 @@ export default function WorkOrdersPage() {
     void load();
     return () => { active = false; };
   }, [router]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#orderfilter") return;
+    document.getElementById("orderfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, orders]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#senasteordrar") return;
+    document.getElementById("senasteordrar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, orders]);
 
   const queryValue = query.trim().toLocaleLowerCase("sv-SE");
   const rangeOrders = useMemo(() => {
@@ -292,20 +302,20 @@ export default function WorkOrdersPage() {
       <div className="flex flex-wrap gap-2">
         <label className="relative">
           <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <select value={range} onChange={(event) => setRange(event.target.value as RangeKey)} aria-label="Period" className="h-10 rounded-xl border border-sand-200 bg-white pl-9 pr-8 text-xs font-semibold text-ink-650 shadow-premium-sm">
+          <select disabled={loading} value={range} onChange={(event) => setRange(event.target.value as RangeKey)} aria-label="Period" className="h-10 rounded-xl border border-sand-200 bg-white pl-9 pr-8 text-xs font-semibold text-ink-650 shadow-premium-sm disabled:opacity-60">
             <option value="30">Senaste 30 dagarna</option>
             <option value="90">Senaste 90 dagarna</option>
             <option value="all">Alla perioder</option>
           </select>
         </label>
-        {canManage ? <Link href="/dashboard/arbetsorder/ny" className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-xs font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300"><Wrench className="h-4 w-4" />Ny arbetsorder</Link> : null}
+        {canManage || loading ? <Link href="/dashboard/arbetsorder/ny" className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-xs font-semibold text-white shadow-premium-sm transition hover:bg-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300"><Wrench className="h-4 w-4" />Ny arbetsorder</Link> : null}
       </div>
     </div>
 
-    <section className="rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm">
+    <section id="orderfilter" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm">
       <label className="relative block max-w-2xl">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök arbetsorder" placeholder="Sök arbetsorder, fastighet, adress, tekniker eller status ..." className="h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-10 pr-4 text-[12px] text-ink-800 outline-none transition focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+        <input disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök arbetsorder" placeholder="Sök arbetsorder, fastighet, adress, tekniker eller status ..." className="h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-10 pr-4 text-[12px] text-ink-800 outline-none transition focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100 disabled:opacity-60" />
       </label>
     </section>
 
@@ -359,9 +369,9 @@ export default function WorkOrdersPage() {
     </section>
 
     <section className="grid gap-4 xl:grid-cols-[1.24fr_0.78fr_0.86fr]">
-      <article className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+      <article id="senasteordrar" className="scroll-mt-36 overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
         <SectionHead title="Senaste arbetsorder" action={<button type="button" onClick={() => { setFocus("all"); setQuery(""); }} className="inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">Visa alla <ArrowRight className="h-3 w-3" /></button>} />
-        {recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left"><thead><tr className="bg-surface-subtle text-xs text-ink-400"><th className="px-4 py-2.5">Ärendenr</th><th className="px-3">Fastighet</th><th className="px-3">Kategori</th><th className="px-3">Prioritet</th><th className="px-3">Status</th><th className="px-3">Ansvarig</th><th className="px-3">Datum</th><th className="px-3" /></tr></thead><tbody className="divide-y divide-sand-100">{recent.map((order) => <tr key={order.id} className="text-xs text-ink-600 transition hover:bg-petroleum-50/40"><td className="px-4 py-3 font-semibold text-ink-850"><Link href={`/dashboard/arbetsorder/${order.id}`}>{workOrderNumber(order)}</Link></td><td className="px-3"><Link href={`/dashboard/fastigheter/${order.property.id}`} className="hover:text-petroleum-800">{order.property.name}</Link></td><td className="px-3">{typeLabels[order.enterprise?.work_type || ""] || "Arbetsorder"}</td><td className="px-3"><span className={`rounded-full px-2 py-1 font-semibold ring-1 ${priorityTone(order.priority)}`}>{priorityLabels[order.priority] || order.priority}</span></td><td className="px-3"><span className={`rounded-full px-2 py-1 font-semibold ring-1 ${statusTone(order.status)}`}>{statusLabels[order.status] || order.status}</span></td><td className="max-w-[160px] truncate px-3">{order.assigned_to?.name || order.assigned_to?.email || "Ej tilldelad"}{order.vendor_contract?.name ? ` · ${order.vendor_contract.name}` : ""}</td><td className="px-3">{dateFmt.format(new Date(order.created_at))}</td><td className="px-3"><Link href={`/dashboard/arbetsorder/${order.id}`} aria-label={`Öppna ${workOrderNumber(order)}`}><ArrowRight className="h-3.5 w-3.5 text-petroleum-700" /></Link></td></tr>)}</tbody></table></div> : <Empty title={loading ? "Läser arbetsordrar…" : "Inga arbetsordrar i filtret"} />}
+        {loading ? <p className="p-5 text-sm text-ink-500">Arbetsordrarna hämtas.</p> : recent.length ? <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left"><thead><tr className="bg-surface-subtle text-xs text-ink-400"><th className="px-4 py-2.5">Ärendenr</th><th className="px-3">Fastighet</th><th className="px-3">Kategori</th><th className="px-3">Prioritet</th><th className="px-3">Status</th><th className="px-3">Ansvarig</th><th className="px-3">Datum</th><th className="px-3" /></tr></thead><tbody className="divide-y divide-sand-100">{recent.map((order) => <tr key={order.id} className="text-xs text-ink-600 transition hover:bg-petroleum-50/40"><td className="px-4 py-3 font-semibold text-ink-850"><Link href={`/dashboard/arbetsorder/${order.id}`}>{workOrderNumber(order)}</Link></td><td className="px-3"><Link href={`/dashboard/fastigheter/${order.property.id}`} className="hover:text-petroleum-800">{order.property.name}</Link></td><td className="px-3">{typeLabels[order.enterprise?.work_type || ""] || "Arbetsorder"}</td><td className="px-3"><span className={`rounded-full px-2 py-1 font-semibold ring-1 ${priorityTone(order.priority)}`}>{priorityLabels[order.priority] || order.priority}</span></td><td className="px-3"><span className={`rounded-full px-2 py-1 font-semibold ring-1 ${statusTone(order.status)}`}>{statusLabels[order.status] || order.status}</span></td><td className="max-w-[160px] truncate px-3">{order.assigned_to?.name || order.assigned_to?.email || "Ej tilldelad"}{order.vendor_contract?.name ? ` · ${order.vendor_contract.name}` : ""}</td><td className="px-3">{dateFmt.format(new Date(order.created_at))}</td><td className="px-3"><Link href={`/dashboard/arbetsorder/${order.id}`} aria-label={`Öppna ${workOrderNumber(order)}`}><ArrowRight className="h-3.5 w-3.5 text-petroleum-700" /></Link></td></tr>)}</tbody></table></div> : <Empty title="Inga arbetsordrar i filtret" />}
         <div className="border-t border-sand-100 px-4 py-3"><button type="button" onClick={() => { setFocus("all"); setQuery(""); }} className="inline-flex items-center gap-1 text-xs font-semibold text-petroleum-700">Visa alla arbetsorder <ArrowRight className="h-3 w-3" /></button></div>
       </article>
 
