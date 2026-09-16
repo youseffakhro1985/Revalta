@@ -14,3 +14,16 @@ describe("maintenance plan governance hash", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-56 animate-pulse rounded-2xl bg-sand-100\" />");
   });
 });
+
+describe("maintenance plan leftover versions first HTML", () => {
+  it("keeps leftover version history in the first HTML without stealing approve", () => {
+    const source = readFileSync(new URL("./maintenance-plan-governance.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="versionslista"');
+    expect(source).toContain('window.location.hash !== "#versionslista"');
+    expect(source).toContain("Laddar versionshistorik, godkännanden och arkivering.");
+    expect(source).toContain('id="godkann-plan"');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("saving || loading || !data");
+  });
+});

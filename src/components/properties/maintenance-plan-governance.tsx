@@ -56,6 +56,11 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
     if (window.location.hash !== "#godkann-plan") return;
     document.getElementById("godkann-plan")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, data]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#versionslista") return;
+    document.getElementById("versionslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
 
   async function mutate(planId: string, action: "plan.approve" | "plan.archive") {
     setSaving(true);
@@ -88,6 +93,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
     <div id="godkann-plan" className="scroll-mt-36">
     <Panel title="Godkännande och versionshistorik" description="Spårbar styrning av underhållsplanens planversioner, godkännanden och arkivering." bodyClassName="p-0">
       {(error || success) ? <div className="p-5 pb-0"><InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert></div> : null}
+      <div id="versionslista" className="scroll-mt-36">
       {showPlaceholder ? (
         <article className="p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -148,6 +154,7 @@ export function MaintenancePlanGovernance({ propertyId }: { propertyId: string }
           ))}
         </div>
       )}
+      </div>
     </Panel>
     </div>
   );
