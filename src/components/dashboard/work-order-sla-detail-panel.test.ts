@@ -15,4 +15,16 @@ describe("work order SLA detail panel", () => {
     expect(source).toContain("status === 423");
     expect(source).toContain("samma redigeringslås som arbetsordern");
   });
+
+  it("keeps the SLA deadline form in the first HTML and scrolls after load", () => {
+    const source = readFileSync(new URL("./work-order-sla-detail-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="spara-sla"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#spara-sla"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("saving || loading || slaFormLocked");
+    expect(source).toContain("canManage || loading");
+    expect(source).not.toContain("if (loading) return <div className=\"h-56 animate-pulse rounded-2xl bg-sand-100\" aria-label=\"Laddar SLA-bedömning\" />");
+  });
 });
