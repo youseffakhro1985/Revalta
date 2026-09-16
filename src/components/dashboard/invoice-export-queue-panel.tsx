@@ -95,6 +95,11 @@ export function InvoiceExportQueuePanel() {
     if (window.location.hash !== "#exportkofilter") return;
     document.getElementById("exportkofilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#exportko") return;
+    document.getElementById("exportko")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function queueExport(item: QueueItem) {
     const provider = selected[item.id];
@@ -152,8 +157,9 @@ export function InvoiceExportQueuePanel() {
             </label>
           </fieldset>
         </form>
-        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
+      <div id="exportko" className="scroll-mt-36">
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inget att exportera" description="När ett fakturaunderlag är klart och saknar aktivt exportjobb hamnar arbetsordern här." />
       ) : null}
@@ -207,6 +213,7 @@ export function InvoiceExportQueuePanel() {
           </div>
         </div>
       ) : null}
+      </div>
     </Panel>
   );
 }
