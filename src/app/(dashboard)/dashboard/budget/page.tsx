@@ -84,6 +84,11 @@ export default function BudgetPage() {
     if (window.location.hash !== "#ny-budgetrad") return;
     document.getElementById("ny-budgetrad")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, canManage]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#budgetfilter") return;
+    document.getElementById("budgetfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, entries]);
 
   const years = useMemo(
     () => [...new Set(entries.map((item) => String(item.year || "")).filter(Boolean))].sort((a, b) => Number(b) - Number(a)),
@@ -264,26 +269,26 @@ export default function BudgetPage() {
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra budgetrader.</InlineAlert> : null}
 
     <Panel title="Styrningsfilter" description="Avgränsa portföljen utan att ändra underliggande data.">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_0.7fr_1fr_0.9fr_auto]">
+      <div id="budgetfilter" className="scroll-mt-36 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_0.7fr_1fr_0.9fr_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" />
-          <input className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök konto, fastighet eller kommentar" aria-label="Sök budgetrader" />
+          <input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök konto, fastighet eller kommentar" aria-label="Sök budgetrader" />
         </label>
-        <select className={premiumFieldClass} value={yearFilter} onChange={(event) => setYearFilter(event.target.value)} aria-label="Filtrera år">
+        <select disabled={loading} className={premiumFieldClass} value={yearFilter} onChange={(event) => setYearFilter(event.target.value)} aria-label="Filtrera år">
           <option value="all">Alla år</option>
           {years.map((year) => <option key={year} value={year}>{year}</option>)}
         </select>
-        <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet">
+        <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet">
           <option value="all">Alla fastigheter</option>
           {propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
-        <select className={premiumFieldClass} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Filtrera kategori">
+        <select disabled={loading} className={premiumFieldClass} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Filtrera kategori">
           <option value="all">Alla kategorier</option>
           {Object.entries(categories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <button
           type="button"
-          disabled={!hasFilters}
+          disabled={loading || !hasFilters}
           onClick={() => { setQuery(""); setYearFilter("all"); setPropertyFilter("all"); setCategoryFilter("all"); }}
           className={premiumSecondaryButtonClass}
         >
@@ -346,7 +351,7 @@ export default function BudgetPage() {
       ) : null}
 
       <Panel title="Ekonomiskt utfall" description={`${visibleEntries.length} av ${entries.length} budgetrader i vald vy`} bodyClassName="p-0">
-        {loading ? <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}</div> : visibleEntries.length === 0 ? <EmptyState title="Inga budgetrader matchar urvalet" description="Justera filtren eller lägg till en ny budgetrad." /> : (
+        {loading ? <p className="p-6 text-sm text-ink-500">Budgetraderna hämtas.</p> : visibleEntries.length === 0 ? <EmptyState title="Inga budgetrader matchar urvalet" description="Justera filtren eller lägg till en ny budgetrad." /> : (
           <div className="divide-y divide-sand-100">{visibleEntries.map((item) => {
             const itemVariance = Number(item.actual || 0) - Number(item.budget || 0);
             return <article key={item.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
