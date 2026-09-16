@@ -51,6 +51,7 @@ export function InspectionResolutionCenter() {
     if (loading) return;
     if (window.location.hash !== "#synkronisera-besiktning") return;
     document.getElementById("synkronisera-besiktning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("besiktningssynk-avtal")?.focus(), 0);
   }, [loading, record]);
   useEffect(() => {
     if (loading) return;
@@ -93,7 +94,7 @@ export function InspectionResolutionCenter() {
       <form id="synkronisera-besiktning" onSubmit={(event) => { event.preventDefault(); void reconcile(); }} className="scroll-mt-36 space-y-5">
         <fieldset disabled={formLocked} className="contents">
           <div className="flex flex-col gap-3 md:flex-row md:items-end">
-            <select autoFocus className={premiumFieldClass} aria-label="Välj avtal för besiktningssynk" value={leaseId} onChange={(e) => setLeaseId(e.target.value)}>
+            <select id="besiktningssynk-avtal" autoFocus className={premiumFieldClass} aria-label="Välj avtal för besiktningssynk" value={leaseId} onChange={(e) => setLeaseId(e.target.value)}>
               <option value="">Välj avtal</option>
               {leases.map((l) => (
                 <option key={l.id} value={l.id}>{l.lease_number} · {l.property.name} · {l.unit.designation} · {l.lease_holder.name}</option>
