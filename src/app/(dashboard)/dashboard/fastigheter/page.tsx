@@ -186,6 +186,11 @@ export default function PropertiesPage() {
     if (window.location.hash !== "#fastighetsfilter") return;
     document.getElementById("fastighetsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, properties]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#fastighetslista") return;
+    document.getElementById("fastighetslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, properties]);
 
   const nextMaintenanceByProperty = useMemo(() => {
     const activeItems = maintenanceItems
@@ -340,6 +345,7 @@ export default function PropertiesPage() {
             </button>
           </div>
 
+          <div id="fastighetslista" className="scroll-mt-36">
           {loading ? (
             <p className="p-5 text-sm text-ink-500">Fastigheterna hämtas.</p>
           ) : properties.length === 0 ? (
@@ -407,6 +413,7 @@ export default function PropertiesPage() {
               </table>
             </div>
           )}
+          </div>
 
           <div className="flex flex-col gap-3 border-t border-sand-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-ink-500">Visar {firstVisible}–{lastVisible} av {pagination.total.toLocaleString("sv-SE")} fastigheter</p>

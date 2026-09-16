@@ -25,3 +25,17 @@ describe("fastigheter leftover filter first HTML", () => {
     expect(source).not.toContain('className="h-12 animate-pulse rounded-xl bg-sand-100"');
   });
 });
+
+describe("fastigheter leftover list first HTML", () => {
+  it("keeps leftover properties in the first HTML without stealing create or filter", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="fastighetslista"');
+    expect(source).toContain('window.location.hash !== "#fastighetslista"');
+    expect(source).toContain("Fastigheterna hämtas.");
+    expect(source).toContain('id="fastighetsfilter"');
+    expect(source).toContain('href="/dashboard/fastigheter/ny"');
+    expect(source).toContain("Ny fastighet");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
