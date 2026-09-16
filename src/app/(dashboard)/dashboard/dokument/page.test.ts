@@ -24,3 +24,17 @@ describe("dokument create query", () => {
     expect(form).not.toContain("＋");
   });
 });
+
+describe("dokument library filter first HTML", () => {
+  it("keeps the filter in the first HTML and scrolls after load without stealing create", () => {
+    const form = readFileSync(new URL("./dokument-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="dokumentfilter"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#dokumentfilter"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("Nytt dokument");
+    expect(form).toContain("disabled={loading}");
+    expect(form).toContain("Dokumenten hämtas.");
+    expect(form).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-28 animate-pulse rounded-xl bg-sand-100" />)}');
+  });
+});
