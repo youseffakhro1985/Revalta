@@ -28,3 +28,19 @@ describe("uthyrning create query", () => {
     expect(form).not.toContain("＋");
   });
 });
+
+describe("uthyrning occupancy filter first HTML", () => {
+  it("keeps the vacancy filter in the first HTML and scrolls after load", () => {
+    const form = readFileSync(new URL("./uthyrning-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="bestandsfilter"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#bestandsfilter"');
+    expect(form).toContain('id="lease-editor"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("autoFocus");
+    expect(form).toContain("disabled={loading}");
+    expect(form).toContain("Nytt avtal");
+    expect(form).not.toContain('{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-sand-100" />)}');
+    expect(form).not.toContain('{[1, 2, 3, 4].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}');
+  });
+});

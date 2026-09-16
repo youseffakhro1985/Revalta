@@ -171,6 +171,11 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (window.location.hash !== "#lease-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
     document.getElementById("lease-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, showForm]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#bestandsfilter") return;
+    document.getElementById("bestandsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, properties]);
 
   const currentLeaseByUnit = useMemo(() => {
     const map = new Map<string, Lease>();
@@ -475,7 +480,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <Panel title="Uthyrningsläge per fastighet" description="Fastigheter med flest lediga objekt visas först." bodyClassName="p-0">
-          {loading ? <div className="space-y-3 p-5">{[1, 2, 3].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-sand-100" />)}</div> : propertyOccupancy.length ? (
+          {loading ? <p className="p-5 text-sm text-ink-500">Uthyrningsläget hämtas.</p> : propertyOccupancy.length ? (
             <div className="divide-y divide-sand-100">
               {propertyOccupancy.slice(0, 6).map((property) => (
                 <Link key={property.id} href={`/dashboard/fastigheter/${property.id}`} className="group grid gap-3 px-5 py-4 transition hover:bg-sand-50/60 sm:grid-cols-[minmax(0,1fr)_190px_95px] sm:items-center">
@@ -578,15 +583,17 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
       ) : null}
 
       <Panel title="Bestånd och vakans" description="Sök och arbeta direkt från objektet. Reserverade, aktiva och uppsagda avtal räknas som beläggning." bodyClassName="p-0">
-        <div className="grid gap-3 border-b border-sand-200 bg-surface-subtle p-4 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_190px_170px_auto]">
-          <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input aria-label="Sök objekt eller hyrespart" placeholder="Sök objekt, adress, hyrespart eller avtal" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
+        <div id="bestandsfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 bg-surface-subtle p-4 sm:p-5 lg:grid-cols-[minmax(260px,1fr)_190px_170px_auto]">
+          <fieldset disabled={loading} className="contents">
+          <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input autoFocus aria-label="Sök objekt eller hyrespart" placeholder="Sök objekt, adress, hyrespart eller avtal" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
           <select aria-label="Filtrera fastighet" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           <select aria-label="Filtrera beläggning" value={occupancyFilter} onChange={(event) => setOccupancyFilter(event.target.value)} className={premiumFieldClass}><option value="all">Alla objekt</option><option value="occupied">Belagda</option><option value="vacant">Lediga</option><option value="notice">Uppsagda</option></select>
           <button type="button" disabled={!hasFilters} onClick={clearFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-45"><SlidersHorizontal className="h-4 w-4" /> Rensa</button>
+          </fieldset>
         </div>
 
         {loading ? (
-          <div className="space-y-3 p-6">{[1, 2, 3, 4].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}</div>
+          <p className="p-6 text-sm text-ink-500">Objekten hämtas.</p>
         ) : visibleRows.length === 0 ? (
           <EmptyState title={unitRows.length ? "Inga objekt matchar filtret" : "Inga uthyrningsbara objekt"} description={unitRows.length ? "Justera sökningen eller återställ filtren." : "Lägg först till lägenheter, lokaler eller parkeringsobjekt i fastighetsregistret."} />
         ) : (
