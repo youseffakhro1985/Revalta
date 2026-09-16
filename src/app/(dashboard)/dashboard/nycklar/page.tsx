@@ -5,7 +5,6 @@ import { Download, KeyRound, Search, ShieldCheck, TriangleAlert, Undo2 } from "l
 import {
   EmptyState,
   InlineAlert,
-  LoadingState,
   MetricCard,
   PageHeader,
   Panel,
@@ -89,6 +88,16 @@ export default function KeysPage() {
     if (window.location.hash !== "#ny-nyckel") return;
     document.getElementById("ny-nyckel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#nyckelfilter") return;
+    document.getElementById("nyckelfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, credentials]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#nyckellista") return;
+    document.getElementById("nyckellista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, credentials]);
 
   const summary = useMemo(() => ({
     total: credentials.length,
@@ -234,13 +243,14 @@ export default function KeysPage() {
         </div>
 
         <Panel title="Nyckelregister" description="Spårbar översikt över samtliga behörigheter och återlämningar." bodyClassName="p-0">
-          <div className="grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-[1fr_190px_170px] sm:p-5">
-            <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input className={`${premiumFieldClass} pl-9`} placeholder="Sök nummer, mottagare eller fastighet" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök nummer, mottagare eller fastighet" /></label>
-            <select className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-            <select className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera status"><option value="">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+          <div id="nyckelfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-[1fr_190px_170px] sm:p-5">
+            <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} placeholder="Sök nummer, mottagare eller fastighet" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök nummer, mottagare eller fastighet" /></label>
+            <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+            <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera status"><option value="">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           </div>
 
-          {loading ? <LoadingState label="Hämtar nyckelregister…" rows={4} /> : filtered.length === 0 ? <EmptyState icon={KeyRound} title="Inga poster hittades" description={credentials.length ? "Justera sökning eller filter för att visa fler behörigheter." : "Registrera den första nyckeln, taggen eller passagebehörigheten."} /> : (
+          <div id="nyckellista" className="scroll-mt-36">
+          {loading ? <p className="p-6 text-sm text-ink-500">Nycklarna hämtas.</p> : filtered.length === 0 ? <EmptyState icon={KeyRound} title="Inga poster hittades" description={credentials.length ? "Justera sökning eller filter för att visa fler behörigheter." : "Registrera den första nyckeln, taggen eller passagebehörigheten."} /> : (
             <div className="divide-y divide-sand-100">
               {filtered.map((item) => (
                 <article key={item.id} className="p-5 transition hover:bg-sand-50/60 sm:p-6">
@@ -267,6 +277,7 @@ export default function KeysPage() {
               ))}
             </div>
           )}
+          </div>
         </Panel>
       </section>
     </div>
