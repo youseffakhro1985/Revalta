@@ -20,6 +20,7 @@ describe("component registry refresh first HTML", () => {
     expect(source).toContain('window.location.hash !== "#uppdatera-register"');
     expect(source).toContain('window.location.hash !== "#component-registry-heading"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("uppdatera-register")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Uppdatera");
@@ -34,6 +35,7 @@ describe("component registry leftover first HTML", () => {
     expect(source).toContain('window.location.hash !== "#registerlista"');
     expect(source).toContain("Registret hämtas.");
     expect(source).toContain('id="uppdatera-register"');
+    expect(source).toContain('document.getElementById("uppdatera-register")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
