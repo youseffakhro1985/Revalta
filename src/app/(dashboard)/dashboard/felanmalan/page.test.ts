@@ -37,4 +37,16 @@ describe("felanmalan leftover list first HTML", () => {
     expect(form).toContain("Ärendena hämtas.");
     expect(form).not.toContain('{[1, 2, 3, 4].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-sand-100" />)}');
   });
+
+  it("keeps the list filter hash in the first HTML without stealing create or #arendefilter", () => {
+    const form = readFileSync(new URL("./felanmalan-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="arendeurval"');
+    expect(form).toContain('window.location.hash !== "#arendeurval"');
+    expect(form).toContain("disabled={loading}");
+    expect(form).toContain("permissions.canManage || loading");
+    expect(form).toContain("Nytt ärende");
+    expect(form).toContain('get("create") === "1"');
+    expect(form).not.toContain('id="arendefilter"');
+    expect(form).not.toContain("#arendefilter");
+  });
 });
