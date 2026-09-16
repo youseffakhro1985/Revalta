@@ -181,6 +181,11 @@ export default function PropertiesPage() {
     void loadMaintenance();
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#fastighetsfilter") return;
+    document.getElementById("fastighetsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, properties]);
 
   const nextMaintenanceByProperty = useMemo(() => {
     const activeItems = maintenanceItems
@@ -291,19 +296,19 @@ export default function PropertiesPage() {
       <SoftDeleteUndoBanner entityLabel="Fastigheten" restoreApiPath={(id) => `/api/properties/${id}/restore`} detailPath={(id) => `/dashboard/fastigheter/${id}`} />
 
       <section className="rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm sm:p-4">
-        <div className="grid gap-2 xl:grid-cols-[minmax(260px,1.5fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_auto_auto]">
+        <div id="fastighetsfilter" className="scroll-mt-36 grid gap-2 xl:grid-cols-[minmax(260px,1.5fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_auto_auto]">
           <label className="relative block">
             <span className="sr-only">Sök fastighet</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} maxLength={160} placeholder="Sök namn, adress, ort eller objektsnummer" className="h-10 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-9 pr-3 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+            <input disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} maxLength={160} placeholder="Sök namn, adress, ort eller objektsnummer" className="h-10 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-9 pr-3 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
           </label>
           <label>
             <span className="sr-only">Filtrera ort</span>
-            <input value={city} onChange={(event) => setCity(event.target.value)} maxLength={160} placeholder="Ort" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+            <input disabled={loading} value={city} onChange={(event) => setCity(event.target.value)} maxLength={160} placeholder="Ort" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
           </label>
           <label>
             <span className="sr-only">Filtrera status</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100">
+            <select disabled={loading} value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100">
               <option value="all">Alla statusar</option>
               <option value="active">Aktiv</option>
               <option value="inactive">Inaktiv</option>
@@ -314,9 +319,9 @@ export default function PropertiesPage() {
           </label>
           <label>
             <span className="sr-only">Filtrera ansvarig</span>
-            <input value={manager} onChange={(event) => setManager(event.target.value)} maxLength={160} placeholder="Ansvarig" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+            <input disabled={loading} value={manager} onChange={(event) => setManager(event.target.value)} maxLength={160} placeholder="Ansvarig" className="h-10 w-full rounded-xl border border-sand-200 bg-white px-3 text-xs text-ink-700 outline-none focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
           </label>
-          <button type="button" onClick={resetFilters} disabled={!hasFilters} className="h-10 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-600 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-45">Rensa</button>
+          <button type="button" onClick={resetFilters} disabled={loading || !hasFilters} className="h-10 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-600 transition hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-45">Rensa</button>
           <button type="button" onClick={() => void exportCsv()} disabled={!pagination.total || exporting} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-petroleum-800 transition hover:bg-petroleum-50 disabled:cursor-not-allowed disabled:opacity-45">
             <Download className="h-3.5 w-3.5" /> {exporting ? "Exporterar…" : "Exportera"}
           </button>
@@ -336,7 +341,7 @@ export default function PropertiesPage() {
           </div>
 
           {loading ? (
-            <div className="space-y-2 p-5">{Array.from({ length: Math.min(pageSize, 6) }, (_, index) => <div key={index} className="h-12 animate-pulse rounded-xl bg-sand-100" />)}</div>
+            <p className="p-5 text-sm text-ink-500">Fastigheterna hämtas.</p>
           ) : properties.length === 0 ? (
             <div className="px-6 py-14 text-center">
               <Building2 className="mx-auto h-8 w-8 text-sand-400" />
