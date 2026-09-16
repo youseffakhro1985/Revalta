@@ -34,6 +34,22 @@ describe("eskaleringar assignment filter first HTML", () => {
   });
 });
 
+describe("eskaleringar leftover assignments first HTML", () => {
+  it("keeps leftover assignments in the first HTML without stealing Hantera regler or filters", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="eskaleringslista"');
+    expect(source).toContain('window.location.hash !== "#eskaleringslista"');
+    expect(source).toContain("Eskaleringsuppgifterna hämtas.");
+    expect(source).toContain('id="eskfilter"');
+    expect(source).toContain('id="regler"');
+    expect(source).toContain("Hantera regler");
+    expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain("autoFocus");
+  });
+});
+
 describe("eskaleringar recipient filter first HTML", () => {
   it("keeps the recipient role filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
