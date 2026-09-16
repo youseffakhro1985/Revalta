@@ -96,3 +96,17 @@ describe("eskaleringar leftover rules first HTML", () => {
     expect(stickyIndex).toBeGreaterThan(leftoverIndex);
   });
 });
+
+describe("eskaleringar leftover history first HTML", () => {
+  it("keeps leftover history in the first HTML without stealing Hantera regler or #historik", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="eskhistoriklista"');
+    expect(source).toContain('window.location.hash !== "#eskhistoriklista"');
+    expect(source).toContain("Historiken hämtas.");
+    expect(source).toContain('id="historik"');
+    expect(source).toContain("Hantera regler");
+    expect(source).not.toContain('id="aktivitetsfilter"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
+  });
+});
