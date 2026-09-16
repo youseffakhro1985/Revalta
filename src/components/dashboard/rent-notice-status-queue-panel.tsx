@@ -85,6 +85,11 @@ export function RentNoticeStatusQueuePanel() {
     if (window.location.hash !== "#avikofilter") return;
     document.getElementById("avikofilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading, items]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#aviko") return;
+    document.getElementById("aviko")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, items]);
 
   async function updateStatus(item: QueueItem, status: string) {
     setActingKey(`${item.id}:${status}`);
@@ -141,8 +146,9 @@ export function RentNoticeStatusQueuePanel() {
             </label>
           </fieldset>
         </form>
-        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       </div>
+      <div id="aviko" className="scroll-mt-36">
+        {loading ? <p className="text-sm text-ink-500">Kön hämtas.</p> : null}
       {!loading && !error && items.length === 0 ? (
         <EmptyState title="Inga avier att hantera" description="När ett utkast, en skickad avi eller en förfallen avi väntar på nästa status hamnar den här." />
       ) : null}
@@ -191,6 +197,7 @@ export function RentNoticeStatusQueuePanel() {
           </div>
         </div>
       ) : null}
+      </div>
     </Panel>
   );
 }

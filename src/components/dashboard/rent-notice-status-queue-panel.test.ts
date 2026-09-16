@@ -30,3 +30,16 @@ describe("rent notice queue filter first HTML", () => {
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
   });
 });
+
+describe("rent notice leftover queue first HTML", () => {
+  it("keeps leftover rent notice queue in the first HTML without stealing the filter", () => {
+    const source = readFileSync(new URL("./rent-notice-status-queue-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="aviko"');
+    expect(source).toContain('window.location.hash !== "#aviko"');
+    expect(source).toContain("Kön hämtas.");
+    expect(source).toContain('id="avikofilter"');
+    expect(source).not.toContain('id="avilista"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={loading}");
+  });
+});
