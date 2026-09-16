@@ -50,6 +50,7 @@ export function ComponentRegistryOverview({ propertyId }: { propertyId: string }
     if (loading) return;
     if (window.location.hash !== "#uppdatera-register") return;
     document.getElementById("uppdatera-register")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("uppdatera-register")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
