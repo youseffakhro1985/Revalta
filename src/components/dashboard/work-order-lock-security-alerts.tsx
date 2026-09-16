@@ -44,6 +44,12 @@ export function WorkOrderLockSecurityAlerts() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#lasavisering") return;
+    document.getElementById("lasavisering")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, data]);
+
   const applyReadOptimistically = useCallback((keys?: string[]) => {
     setData((current) => {
       if (!current) return current;
@@ -90,24 +96,25 @@ export function WorkOrderLockSecurityAlerts() {
     }
   }
 
-  if (!loading && !error && !data?.notifications.length) return null;
-
   return (
-    <section className="overflow-hidden rounded-2xl border border-danger-200 bg-white shadow-premium-sm" aria-labelledby="work-order-lock-alerts-title">
+    <section id="lasavisering" className="scroll-mt-36 overflow-hidden rounded-2xl border border-danger-200 bg-white shadow-premium-sm" aria-labelledby="work-order-lock-alerts-title">
       <div className="flex flex-col gap-4 border-b border-danger-100 bg-danger-50/70 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger-100 text-danger-800"><ShieldAlert className="h-5 w-5" aria-hidden="true" /></div>
           <div><h2 id="work-order-lock-alerts-title" className="font-semibold text-ink-950">Säkerhetsaviseringar för redigeringslås</h2><p className="mt-1 text-sm text-ink-600">Visar när en administratör har frigjort ett arbetsorderlås som tillhörde dig.</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-danger-200 bg-white px-3 py-2 text-sm font-semibold text-danger-800 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />Uppdatera</button>
-          <button type="button" onClick={() => void markRead()} disabled={!data?.summary.unread || pendingKeys.size > 0} className="inline-flex items-center gap-2 rounded-xl bg-danger-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><CheckCheck className="h-4 w-4" aria-hidden="true" />Markera alla lästa</button>
+          <button id="lasavisering-uppdatera" type="button" autoFocus onClick={() => void load()} disabled={loading} className="inline-flex scroll-mt-36 items-center gap-2 rounded-xl border border-danger-200 bg-white px-3 py-2 text-sm font-semibold text-danger-800 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />Uppdatera</button>
+          <button type="button" onClick={() => void markRead()} disabled={loading || !data?.summary.unread || pendingKeys.size > 0} className="inline-flex items-center gap-2 rounded-xl bg-danger-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"><CheckCheck className="h-4 w-4" aria-hidden="true" />Markera alla lästa</button>
         </div>
       </div>
 
       {error ? <div role="alert" className="border-b border-danger-100 bg-danger-50 px-6 py-4 text-sm font-semibold text-danger-700">{error}</div> : null}
-      {loading && !data ? <div className="h-28 animate-pulse bg-sand-50" aria-label="Laddar säkerhetsaviseringar" /> : null}
+      {loading && !data ? <p className="border-b border-danger-100 px-6 py-4 text-sm text-ink-500">Aviseringarna hämtas.</p> : null}
       <div className="divide-y divide-sand-100">
+        {!loading && !error && !data?.notifications.length ? (
+          <p className="px-6 py-5 text-sm text-ink-500">Inga säkerhetsaviseringar just nu.</p>
+        ) : null}
         {data?.notifications.map((item) => (
           <article key={item.key} className={`grid gap-4 px-6 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center ${item.read ? "bg-white" : "bg-danger-50/30"}`}>
             <div className="min-w-0">
@@ -116,7 +123,7 @@ export function WorkOrderLockSecurityAlerts() {
               <time dateTime={item.dueAt} className="mt-2 block text-xs font-semibold uppercase tracking-wide text-ink-500">{dateTime.format(new Date(item.dueAt))}</time>
             </div>
             <div className="flex flex-wrap gap-2 lg:justify-end">
-              <button type="button" onClick={() => void markRead(item.key)} disabled={item.read || pendingKeys.has(item.key)} className="rounded-xl border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-600 disabled:opacity-40">Markera läst</button>
+              <button type="button" onClick={() => void markRead(item.key)} disabled={loading || item.read || pendingKeys.has(item.key)} className="rounded-xl border border-sand-200 px-3 py-2 text-sm font-semibold text-ink-600 disabled:opacity-40">Markera läst</button>
               <Link href={item.href} onClick={() => { if (!item.read) void markRead(item.key, { navigate: true }); }} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-3 py-2 text-sm font-semibold text-white"><ExternalLink className="h-4 w-4" aria-hidden="true" />Öppna arbetsorder</Link>
             </div>
           </article>
