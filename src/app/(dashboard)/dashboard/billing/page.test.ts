@@ -29,3 +29,17 @@ describe("billing checkout return", () => {
     expect(form).toContain("Byt plan");
   });
 });
+
+describe("billing leftover plans first HTML", () => {
+  it("keeps leftover plan cards in the first HTML without stealing Byt plan", () => {
+    const form = readFileSync(new URL("./billing-page.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="planuppgifter"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#planuppgifter"');
+    expect(form).toContain('id="planer"');
+    expect(form).toContain("Byt plan");
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain("Planerna hämtas.");
+    expect(form).not.toContain("h-64 animate-pulse rounded-2xl bg-sand-100");
+  });
+});
