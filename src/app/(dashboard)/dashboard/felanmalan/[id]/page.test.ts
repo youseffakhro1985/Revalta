@@ -14,9 +14,11 @@ describe("ticket detail save hash", () => {
   it("keeps the steering form in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="spara-arende"');
+    expect(source).toContain('id="arende-status"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#spara-arende"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("arende-status")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("saving || loading || !ticket");
     expect(source).toContain("formLocked || !permissions.canManage");
