@@ -62,6 +62,12 @@ export default function EscalationRulesPage() {
     if (hash !== "#eskaleringsregler") return;
     document.getElementById("eskaleringsregler")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#eskaleringsregler") return;
+    document.getElementById("eskaleringsregler")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("eskalering-motor")?.focus(), 0);
+  }, [loading, data]);
 
   async function save() {
     setSaving(true); setError(""); setMessage("");
@@ -98,7 +104,7 @@ export default function EscalationRulesPage() {
 
       <section id="eskaleringsregler" className="scroll-mt-36 space-y-6 rounded-2xl border border-sand-200 bg-white p-7 shadow-premium-sm">
         <fieldset disabled={locked} className="space-y-6 disabled:opacity-60">
-        <label className="flex items-center justify-between gap-4 rounded-xl border border-sand-200 p-4"><span><strong className="block text-ink-900">Automatiska eskaleringar</strong><span className="text-sm text-ink-500">Pausa eller aktivera hela motorn.</span></span><input type="checkbox" checked={rules.enabled} autoFocus onChange={(e) => setRules({ ...rules, enabled: e.target.checked })} /></label>
+        <label className="flex items-center justify-between gap-4 rounded-xl border border-sand-200 p-4"><span><strong className="block text-ink-900">Automatiska eskaleringar</strong><span className="text-sm text-ink-500">Pausa eller aktivera hela motorn.</span></span><input id="eskalering-motor" type="checkbox" checked={rules.enabled} autoFocus onChange={(e) => setRules({ ...rules, enabled: e.target.checked })} /></label>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.escalateBlocked} onChange={(e) => setRules({ ...rules, escalateBlocked: e.target.checked })} /><span className="font-semibold text-ink-800">Eskalera blockerade uppgifter</span></label>
           <label className="flex items-center gap-3 rounded-xl border border-sand-200 p-4"><input type="checkbox" checked={rules.escalateOverdue} onChange={(e) => setRules({ ...rules, escalateOverdue: e.target.checked })} /><span className="font-semibold text-ink-800">Eskalera passerade deadlines</span></label>
