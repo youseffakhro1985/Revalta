@@ -34,3 +34,23 @@ describe("installningar leftover account overview first HTML", () => {
     expect(source).not.toContain("Laddar…");
   });
 });
+
+describe("installningar profil mutate first HTML", () => {
+  it("focuses profil name after load without stealing Byt lösenord or leftover overview", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="profil"');
+    expect(source).toContain('id="profil-namn"');
+    expect(source).toContain('window.location.hash !== "#profil"');
+    expect(source).toContain('document.getElementById("profil-namn")?.focus()');
+    expect(source).toContain('id="current-password"');
+    expect(source).toContain('document.getElementById("current-password")?.focus()');
+    expect(source).toContain('id="kontooversikt"');
+    expect(source).toContain('id="losenord"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).not.toContain("autoFocus");
+    const profilIndex = source.indexOf('id="profil-namn"');
+    const stickyIndex = source.indexOf('id="current-password"');
+    expect(profilIndex).toBeGreaterThan(-1);
+    expect(stickyIndex).toBeGreaterThan(profilIndex);
+  });
+});

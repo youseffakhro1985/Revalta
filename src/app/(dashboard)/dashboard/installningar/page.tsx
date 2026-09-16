@@ -203,6 +203,12 @@ export default function SettingsPage() {
     if (window.location.hash !== "#kontooversikt") return;
     document.getElementById("kontooversikt")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [initialLoading, profile]);
+  useEffect(() => {
+    if (initialLoading) return;
+    if (window.location.hash !== "#profil") return;
+    document.getElementById("profil")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("profil-namn")?.focus(), 0);
+  }, [initialLoading, profile]);
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -373,7 +379,7 @@ export default function SettingsPage() {
           <form onSubmit={saveProfile} className="space-y-5">
             <label className="block space-y-1.5">
               <span className="text-xs font-semibold text-ink-700">Namn</span>
-              <input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} aria-label="Namn" placeholder="För- och efternamn" />
+              <input id="profil-namn" required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} aria-label="Namn" placeholder="För- och efternamn" />
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-sand-200 bg-sand-50/70 p-4">
