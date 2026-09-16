@@ -191,6 +191,7 @@ export default function TicketDetailPage() {
     if (loading) return;
     if (window.location.hash !== "#spara-arende") return;
     document.getElementById("spara-arende")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("arende-status")?.focus(), 0);
   }, [loading, ticket]);
   useEffect(() => {
     if (loading) return;
@@ -520,7 +521,7 @@ export default function TicketDetailPage() {
         <div id="spara-arende" className="scroll-mt-36">
         <Panel title="Styr ärendet" description="Status, prioritet och ansvarig." bodyClassName="p-6">
           <form onSubmit={updateTicket} className="space-y-4">
-            <SelectField autoFocus disabled={formLocked} label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} />
+            <SelectField id="arende-status" autoFocus disabled={formLocked} label="Status" value={status} onChange={setStatus} options={Object.entries(statusLabels).filter(([value]) => ["new", "received", "in_progress", "waiting", "completed", "closed"].includes(value))} />
             <SelectField disabled={formLocked} label="Prioritet" value={priority} onChange={setPriority} options={Object.entries(priorityLabels)} />
             <label className="block"><span className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink-600"><UserRound className="h-4 w-4" />Ansvarig</span><select disabled={formLocked || !permissions.canAssign} value={assignedToId} onChange={(event) => setAssignedToId(event.target.value)} className={premiumFieldClass} aria-label="Ansvarig"><option value="">Ej tilldelad</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>{!permissions.canAssign && !loading ? <span className="mt-2 block text-xs text-ink-500">Endast förvaltare och administratörer kan ändra ansvarig.</span> : null}</label>
             <button disabled={formLocked || !permissions.canManage} className={`${premiumPrimaryButtonClass} w-full justify-center`}>{saving ? "Sparar…" : "Spara ändringar"}</button>
@@ -672,6 +673,6 @@ function Info({ label, value }: { label: string; value: string }) {
 function Insight({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl bg-sand-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">{label}</p><p className="mt-2 text-sm leading-6 text-ink-700">{value}</p></div>;
 }
-function SelectField({ label, value, onChange, options, disabled, autoFocus }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]>; disabled?: boolean; autoFocus?: boolean }) {
-  return <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">{label}</span><select autoFocus={autoFocus} disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass} aria-label={label}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>;
+function SelectField({ label, value, onChange, options, disabled, autoFocus, id }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]>; disabled?: boolean; autoFocus?: boolean; id?: string }) {
+  return <label className="block"><span className="mb-2 block text-xs font-semibold text-ink-600">{label}</span><select id={id} autoFocus={autoFocus} disabled={disabled} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass} aria-label={label}>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>;
 }
