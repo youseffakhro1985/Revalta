@@ -77,10 +77,12 @@ export default function WorkOrderReportPage() {
     return () => { active = false; };
   }, [reportId, router]);
 
-  if (loading) return <div className="mx-auto mt-16 h-[760px] max-w-4xl animate-pulse rounded-3xl bg-sand-100" />;
-  if (!report) return <main className="mx-auto max-w-3xl p-8"><p className="rounded-2xl border border-danger-200 bg-danger-50 p-5 text-danger-700">{error || "Rapporten hittades inte"}</p></main>;
+  useEffect(() => {
+    if (window.location.hash !== "#skriv-ut") return;
+    document.getElementById("skriv-ut")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, report]);
 
-  const snapshot = report.snapshot || {};
+  const snapshot = report?.snapshot || {};
   const workOrder = snapshot.workOrder;
   const checklist = snapshot.checklist || [];
   const entries = snapshot.entries || [];
@@ -94,11 +96,13 @@ export default function WorkOrderReportPage() {
   return (
     <main className="min-h-screen bg-sand-50 px-4 py-8 text-ink-950 print:bg-white print:p-0">
       <div className="mx-auto mb-5 flex max-w-5xl items-center justify-between gap-4 print:hidden">
-        <Link href={`/dashboard/arbetsorder/${report.work_order_id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-ink-600 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordern</Link>
-        <button type="button" onClick={() => window.print()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-5 text-sm font-semibold text-white hover:bg-petroleum-900"><Printer className="h-4 w-4" />Skriv ut / Spara PDF</button>
+        <Link href={report ? `/dashboard/arbetsorder/${report.work_order_id}` : "/dashboard/arbetsorder"} className="inline-flex items-center gap-2 text-sm font-semibold text-ink-600 hover:text-petroleum-800"><ArrowLeft className="h-4 w-4" />Till arbetsordern</Link>
+        <button id="skriv-ut" type="button" autoFocus disabled={loading} onClick={() => window.print()} className="inline-flex h-11 scroll-mt-36 items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Printer className="h-4 w-4" />Skriv ut / Spara PDF</button>
       </div>
 
-      <article className="mx-auto max-w-5xl rounded-3xl border border-sand-200 bg-white p-7 shadow-premium-sm print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none sm:p-10">
+      {loading && !report ? <p className="mx-auto max-w-5xl text-sm text-ink-500">Rapporten hämtas.</p> : null}
+      {!loading && !report ? <p className="mx-auto max-w-5xl rounded-2xl border border-danger-200 bg-danger-50 p-5 text-danger-700">{error || "Rapporten hittades inte"}</p> : null}
+      {report ? <article className="mx-auto max-w-5xl rounded-3xl border border-sand-200 bg-white p-7 shadow-premium-sm print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none sm:p-10">
         <header className="flex flex-col gap-8 border-b border-sand-200 pb-8 sm:flex-row sm:items-start sm:justify-between">
           <div><p className="text-sm font-semibold uppercase tracking-[0.22em] text-petroleum-700">Revalta</p><h1 className="mt-3 text-3xl font-semibold tracking-tight">{report.title}</h1><p className="mt-2 text-sm text-ink-500">Version {report.version} · skapad {dateTime.format(new Date(report.created_at))}</p></div>
           <div className="rounded-2xl border border-sand-200 bg-sand-50 px-5 py-4 text-sm"><p className="text-ink-500">Status</p><p className="mt-1 font-semibold text-ink-900">{report.status === "approved" ? "Godkänd" : "Utkast"}</p>{report.approved_at ? <p className="mt-1 text-xs text-ink-500">{dateTime.format(new Date(report.approved_at))}</p> : null}</div>
@@ -125,7 +129,7 @@ export default function WorkOrderReportPage() {
         <section className="py-8"><h2 className="text-lg font-semibold">Signaturer</h2>{signatures.length === 0 ? <p className="mt-4 text-sm text-ink-500">Inga signaturer registrerade i denna rapportversion.</p> : <div className="mt-4 grid gap-4 sm:grid-cols-3">{signatures.map((signature, index) => <div key={`${signature.signer_role}-${index}`} className="rounded-2xl border border-sand-200 p-5"><p className="text-xs uppercase tracking-wide text-ink-500">{roleLabels[signature.signer_role] || signature.signer_role}</p><p className="mt-3 font-semibold">{signature.signer_name}</p><p className="mt-1 text-xs text-ink-500">{signature.signer_email || ""}</p><p className="mt-4 text-xs leading-5 text-ink-500">{signature.confirmation_text}</p><p className="mt-3 text-xs text-ink-500">{dateTime.format(new Date(signature.signed_at))}</p></div>)}</div>}</section>
 
         <footer className="border-t border-sand-200 pt-6 text-xs leading-5 text-ink-500">Rapporten är en fryst version från Revalta och speglar registrerade uppgifter vid skapandet. Rapport-ID: {report.id}</footer>
-      </article>
+      </article> : null}
     </main>
   );
 }
