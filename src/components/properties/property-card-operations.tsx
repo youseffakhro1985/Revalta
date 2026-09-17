@@ -62,6 +62,7 @@ export function PropertyCardOperations({ propertyId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#driftfilter") return;
     document.getElementById("driftfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("driftkort-sok")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -105,7 +106,7 @@ export function PropertyCardOperations({ propertyId }: Props) {
       <fieldset disabled={loading} className="contents">
         <label className="block max-w-lg">
           <span className="mb-1.5 block text-sm font-medium text-ink-700">Sök i driftkortet</span>
-          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Installation, avtal, besiktning, arbetsorder eller projekt" aria-label="Sök i driftkortet" className={premiumFieldClass} />
+          <input id="driftkort-sok" autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Installation, avtal, besiktning, arbetsorder eller projekt" aria-label="Sök i driftkortet" className={premiumFieldClass} />
         </label>
       </fieldset>
     </form>
