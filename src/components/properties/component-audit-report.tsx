@@ -47,6 +47,7 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
     if (loading) return;
     if (window.location.hash !== "#exportera-revision") return;
     document.getElementById("exportera-revision")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("revision-uppdatera")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -67,7 +68,7 @@ export function ComponentAuditReport({ propertyId, componentId }: { propertyId: 
         <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <p className="text-sm text-ink-500">Exporten innehåller tekniska grunddata, livscykelhändelser, kostnader, arbetsorder- och projektkopplingar samt revisionsspår.</p>
           <div id="exportera-revision" className="flex shrink-0 scroll-mt-36 gap-2">
-            <button type="button" autoFocus onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+            <button type="button" id="revision-uppdatera" autoFocus onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
             <a href={`/api/properties/${propertyId}/components/${componentId}/report?format=csv`} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-petroleum-900"><Download className="h-4 w-4" /> Exportera CSV</a>
           </div>
         </div>
