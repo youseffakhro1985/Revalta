@@ -82,6 +82,7 @@ export default function VendorsPage() {
     if (loading) return;
     if (window.location.hash !== "#ny-leverantor") return;
     document.getElementById("ny-leverantor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("leverantor-namn")?.focus(), 0);
   }, [loading]);
   useEffect(() => {
     if (loading) return;
@@ -239,7 +240,7 @@ export default function VendorsPage() {
         <Panel title="Lägg till leverantör" description="Registrera kontakt, kategori och avtalsbevakning." className="scroll-mt-36 xl:sticky xl:top-[118px]">
           <form id="ny-leverantor" onSubmit={submit} className="space-y-4">
             <fieldset disabled={saving || loading} className="contents">
-            <input required autoFocus placeholder="Företagsnamn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={premiumFieldClass} aria-label="Företagsnamn" />
+            <input id="leverantor-namn" required autoFocus placeholder="Företagsnamn" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={premiumFieldClass} aria-label="Företagsnamn" />
             <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={premiumFieldClass} aria-label="Kategori">{categories.map((item) => <option key={item}>{item}</option>)}</select>
             <input placeholder="Kontaktperson" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} className={premiumFieldClass} aria-label="Kontaktperson" />
             <div className="grid gap-3 sm:grid-cols-2"><input type="email" placeholder="E-post" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={premiumFieldClass} aria-label="E-post" /><input placeholder="Telefon" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={premiumFieldClass} aria-label="Telefon" /></div>
