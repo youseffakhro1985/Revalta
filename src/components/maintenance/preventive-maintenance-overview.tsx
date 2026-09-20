@@ -144,7 +144,8 @@ export function PreventiveMaintenanceOverview() {
 
       <Panel title="Serviceöversikt" description="Filtrera och öppna komponenter eller deras senaste planerade arbetsorder.">
         <div id="servicefilter" className="mb-5 flex scroll-mt-36 flex-wrap gap-2">
-          {([["all","Alla"],["overdue","Förfallna"],["soon","Inom 30 dagar"],["automatic","Automatik aktiv"]] as const).map(([value,label], index) => <button key={value} id={index === 0 ? "service-alla" : undefined} type="button" autoFocus={index === 0} disabled={loading} onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
+          <button id="service-alla" type="button" autoFocus disabled={loading} onClick={() => setFilter("all")} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${filter === "all" ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>Alla</button>
+          {([["overdue","Förfallna"],["soon","Inom 30 dagar"],["automatic","Automatik aktiv"]] as const).map(([value,label]) => <button key={value} type="button" disabled={loading} onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${filter === value ? "bg-petroleum-800 text-white" : "bg-sand-100 text-ink-600 hover:bg-sand-200"}`}>{label}</button>)}
         </div>
 
         <div id="serviceoversikt" className="scroll-mt-36">
