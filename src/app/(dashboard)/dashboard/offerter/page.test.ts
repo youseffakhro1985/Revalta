@@ -29,9 +29,11 @@ describe("offerter filter first HTML", () => {
   it("keeps the filter in the first HTML and scrolls after load without stealing create", () => {
     const form = readFileSync(new URL("./offerter-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="offertfilter"');
+    expect(form).toContain('id="offert-sok"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#offertfilter"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("offert-sok")?.focus()');
     expect(form).toContain("Ny offert");
     expect(form).toContain("disabled={loading}");
     expect(form).toContain("Offerterna hämtas.");
@@ -46,6 +48,7 @@ describe("offerter leftover list first HTML", () => {
     expect(form).toContain('window.location.hash !== "#offertlista"');
     expect(form).toContain("Offerterna hämtas.");
     expect(form).toContain('id="offertfilter"');
+    expect(form).toContain('id="offert-sok"');
     expect(form).toContain("Ny offert");
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("disabled={loading}");
