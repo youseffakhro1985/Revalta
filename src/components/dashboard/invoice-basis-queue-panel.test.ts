@@ -23,9 +23,11 @@ describe("invoice basis queue filter first HTML", () => {
   it("keeps the queue filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./invoice-basis-queue-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="underlagfilter"');
+    expect(source).toContain('id="underlag-status"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#underlagfilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("underlag-status")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
@@ -39,6 +41,7 @@ describe("invoice basis leftover queue first HTML", () => {
     expect(source).toContain('window.location.hash !== "#underlagko"');
     expect(source).toContain("Kön hämtas.");
     expect(source).toContain('id="underlagfilter"');
+    expect(source).toContain('id="underlag-status"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
   });
