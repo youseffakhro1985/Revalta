@@ -82,6 +82,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#spara-kommentar") return;
     document.getElementById("spara-kommentar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("kommentar-text")?.focus(), 0);
   }, [loading, comments]);
   useEffect(() => {
     if (loading) return;
@@ -138,6 +139,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
           <form id="spara-kommentar" onSubmit={submit} className="scroll-mt-36 space-y-3 rounded-2xl border border-sand-200 bg-sand-50/70 p-4">
             <fieldset disabled={formLocked} className="contents">
             <textarea
+              id="kommentar-text"
               autoFocus
               value={body}
               onChange={(event) => setBody(event.target.value)}
