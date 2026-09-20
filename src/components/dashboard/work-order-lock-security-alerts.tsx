@@ -48,6 +48,7 @@ export function WorkOrderLockSecurityAlerts() {
     if (loading) return;
     if (window.location.hash !== "#lasavisering") return;
     document.getElementById("lasavisering")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("lasavisering-uppdatera")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;

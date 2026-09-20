@@ -5,9 +5,11 @@ describe("work-order lock security alerts first HTML", () => {
   it("keeps refresh and mark-read in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./work-order-lock-security-alerts.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="lasavisering"');
+    expect(source).toContain('id="lasavisering-uppdatera"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#lasavisering"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("lasavisering-uppdatera")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Uppdatera");
