@@ -80,6 +80,7 @@ export default function WorkOrderReportPage() {
   useEffect(() => {
     if (window.location.hash !== "#skriv-ut") return;
     document.getElementById("skriv-ut")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("skriv-ut")?.focus(), 0);
   }, [loading, report]);
   useEffect(() => {
     if (loading) return;
