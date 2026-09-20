@@ -73,6 +73,7 @@ export function PreventiveMaintenanceOverview() {
     if (loading) return;
     if (window.location.hash !== "#kor-motor") return;
     document.getElementById("kor-motor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("kor-motor-knapp")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -124,7 +125,7 @@ export function PreventiveMaintenanceOverview() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50"><RefreshCw className="h-4 w-4" /> Uppdatera</button>
-          {showRun ? <span id="kor-motor" className="scroll-mt-36"><button type="button" onClick={() => void runEngine()} disabled={running || !data?.canRun} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-petroleum-900 disabled:opacity-50"><Play className="h-4 w-4" /> {running ? "Kör..." : "Kör underhållsmotorn"}</button></span> : null}
+          {showRun ? <span id="kor-motor" className="scroll-mt-36"><button id="kor-motor-knapp" type="button" autoFocus onClick={() => void runEngine()} disabled={running || !data?.canRun} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-petroleum-900 disabled:opacity-50"><Play className="h-4 w-4" /> {running ? "Kör..." : "Kör underhållsmotorn"}</button></span> : null}
         </div>
       </div>
 
