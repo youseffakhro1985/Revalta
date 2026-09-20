@@ -5,9 +5,11 @@ describe("property lifecycle timeline first HTML", () => {
   it("keeps the timeline filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./property-lifecycle-timeline.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="tidslinjefilter"');
+    expect(source).toContain('id="tidslinje-typ"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#tidslinjefilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("tidslinje-typ")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).not.toContain("if (loading) return <div className=\"h-72 animate-pulse rounded-2xl bg-sand-100\" />");
@@ -21,6 +23,7 @@ describe("property lifecycle leftover events first HTML", () => {
     expect(source).toContain('window.location.hash !== "#tidslinjelista"');
     expect(source).toContain("Tidslinjen hämtas.");
     expect(source).toContain('id="tidslinjefilter"');
+    expect(source).toContain('id="tidslinje-typ"');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
