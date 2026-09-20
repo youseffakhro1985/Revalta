@@ -9,6 +9,8 @@ describe("bokningar create hash", () => {
     expect(source).toContain('window.location.hash !== "#ny-bokning"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
+    expect(source).toContain('id="bokning-boende"');
+    expect(source).toContain('document.getElementById("bokning-boende")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="ny-bokning"');
   });
@@ -35,6 +37,7 @@ describe("bokningar leftover list first HTML", () => {
     expect(source).toContain('window.location.hash !== "#bokningsfilter"');
     expect(source).toContain('window.location.hash !== "#bokningslista"');
     expect(source).toContain('id="ny-bokning"');
+    expect(source).toContain('id="bokning-boende"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Bokningarna hämtas.");
