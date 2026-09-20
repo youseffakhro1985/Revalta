@@ -5,9 +5,11 @@ describe("service notification alert center first HTML", () => {
   it("keeps the alert filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./service-notification-alert-center.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="driftlarm"');
+    expect(source).toContain('id="driftlarm-status"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#driftlarm"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("driftlarm-status")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Kvittera larm");
@@ -24,6 +26,7 @@ describe("service notification leftover first HTML", () => {
     expect(source).toContain("Larmen hämtas.");
     expect(source).toContain('id="driftlarm"');
     expect(source).toContain('id="driftlarm-form"');
+    expect(source).toContain('id="driftlarm-status"');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
