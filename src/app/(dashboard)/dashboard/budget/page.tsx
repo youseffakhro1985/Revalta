@@ -88,6 +88,7 @@ export default function BudgetPage() {
     if (loading) return;
     if (window.location.hash !== "#budgetfilter") return;
     document.getElementById("budgetfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("budget-sok")?.focus(), 0);
   }, [loading, entries]);
   useEffect(() => {
     if (loading) return;
@@ -277,7 +278,7 @@ export default function BudgetPage() {
       <div id="budgetfilter" className="scroll-mt-36 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_0.7fr_1fr_0.9fr_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" />
-          <input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök konto, fastighet eller kommentar" aria-label="Sök budgetrader" />
+          <input id="budget-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök konto, fastighet eller kommentar" aria-label="Sök budgetrader" />
         </label>
         <select disabled={loading} className={premiumFieldClass} value={yearFilter} onChange={(event) => setYearFilter(event.target.value)} aria-label="Filtrera år">
           <option value="all">Alla år</option>
