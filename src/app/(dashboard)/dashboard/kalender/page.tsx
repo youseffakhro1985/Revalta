@@ -119,6 +119,7 @@ export default function CalendarPage() {
     if (loading) return;
     if (window.location.hash !== "#ny-aktivitet") return;
     document.getElementById("ny-aktivitet")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("aktivitet-rubrik")?.focus(), 0);
   }, [loading, canManage]);
   useEffect(() => {
     if (loading) return;
@@ -334,7 +335,7 @@ export default function CalendarPage() {
             {canManage ? (
             <form onSubmit={submit} className="space-y-4">
               <fieldset disabled={saving || loading} className="contents">
-              <input required autoFocus placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={premiumFieldClass} />
+              <input id="aktivitet-rubrik" required autoFocus placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={premiumFieldClass} />
               <div className="grid grid-cols-2 gap-3">
                 <input required type="date" aria-label="Datum" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} className={premiumFieldClass} />
                 <input type="time" aria-label="Tid" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} className={premiumFieldClass} />
