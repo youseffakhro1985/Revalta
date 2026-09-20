@@ -117,6 +117,7 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#projektfilter") return;
     document.getElementById("projektfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("projekt-sok")?.focus(), 0);
   }, [loading, projects]);
   useEffect(() => {
     if (loading) return;
@@ -231,7 +232,7 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
     <section className="grid gap-6 xl:grid-cols-[1fr_0.7fr]">
       <Panel title="Portföljfilter" description="Filtrerar den aktuella projektsidan. Serverpagineringen ligger kvar för stora bestånd.">
         <div id="projektfilter" className="scroll-mt-36 grid gap-3 md:grid-cols-[1.4fr_0.8fr_0.8fr_auto]">
-          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök projekt, fastighet eller entreprenör" aria-label="Sök projekt" /></label>
+          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input id="projekt-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök projekt, fastighet eller entreprenör" aria-label="Sök projekt" /></label>
           <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera projektstatus"><option value="all">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <select disabled={loading} className={premiumFieldClass} value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} aria-label="Filtrera risk"><option value="all">Alla risker</option>{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
           <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setRiskFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>

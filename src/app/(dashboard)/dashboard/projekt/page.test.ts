@@ -29,9 +29,11 @@ describe("projekt portfolio filter first HTML", () => {
   it("keeps the filter in the first HTML and scrolls after load without stealing create", () => {
     const form = readFileSync(new URL("./projekt-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="projektfilter"');
+    expect(form).toContain('id="projekt-sok"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#projektfilter"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("projekt-sok")?.focus()');
     expect(form).toContain("Nytt projekt");
     expect(form).toContain("disabled={loading}");
     expect(form).toContain("Projekten hämtas.");
@@ -46,6 +48,7 @@ describe("projekt leftover portfolio first HTML", () => {
     expect(form).toContain('window.location.hash !== "#projektlista"');
     expect(form).toContain("Projekten hämtas.");
     expect(form).toContain('id="projektfilter"');
+    expect(form).toContain('id="projekt-sok"');
     expect(form).toContain("Nytt projekt");
     expect(form).toContain("autoFocus");
     expect(form).toContain("scrollIntoView");
