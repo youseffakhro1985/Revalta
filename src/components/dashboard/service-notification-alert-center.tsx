@@ -59,6 +59,7 @@ export function ServiceNotificationAlertCenter() {
     if (loading) return;
     if (window.location.hash !== "#driftlarm") return;
     document.getElementById("driftlarm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("driftlarm-status")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -127,7 +128,7 @@ export function ServiceNotificationAlertCenter() {
         <fieldset disabled={loading} className="contents">
           <label className="block max-w-sm">
             <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera larm</span>
-            <select autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera driftlarm">
+            <select id="driftlarm-status" autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera driftlarm">
               <option value="all">Alla larm</option>
               <option value="open">Öppna</option>
               <option value="critical">Kritiska</option>
