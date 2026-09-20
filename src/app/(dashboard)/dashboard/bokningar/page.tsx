@@ -88,6 +88,7 @@ export default function BookingsPage() {
     if (loading) return;
     if (window.location.hash !== "#ny-bokning") return;
     document.getElementById("ny-bokning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("bokning-boende")?.focus(), 0);
   }, [loading, canManage]);
   useEffect(() => {
     if (loading) return;
@@ -235,7 +236,7 @@ export default function BookingsPage() {
               <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Fastighet</span><select required disabled={saving || loading || !canManage} aria-label="Välj fastighet" value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.city}</option>)}</select></label>
               <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Resurs</span><select disabled={saving || loading || !canManage} aria-label="Resurstyp" value={form.resource} onChange={(event) => setForm({ ...form, resource: event.target.value })} className={premiumFieldClass}>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select></label>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Boende</span><input required autoFocus disabled={saving || loading || !canManage} aria-label="Boendes namn" placeholder="Namn" value={form.residentName} onChange={(event) => setForm({ ...form, residentName: event.target.value })} className={premiumFieldClass} /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Boende</span><input id="bokning-boende" required autoFocus disabled={saving || loading || !canManage} aria-label="Boendes namn" placeholder="Namn" value={form.residentName} onChange={(event) => setForm({ ...form, residentName: event.target.value })} className={premiumFieldClass} /></label>
                 <label className="block space-y-1.5"><span className="text-xs font-semibold text-ink-700">Lägenhet/lokal</span><input disabled={saving || loading || !canManage} aria-label="Lägenhet/lokal" placeholder="Exempel: 1203" value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} className={premiumFieldClass} /></label>
               </div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
