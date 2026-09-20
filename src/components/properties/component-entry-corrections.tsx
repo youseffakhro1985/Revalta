@@ -48,6 +48,7 @@ export function ComponentEntryCorrections({ propertyId, componentId }: { propert
     if (loading) return;
     if (window.location.hash !== "#korrigera-historik") return;
     document.getElementById("korrigera-historik")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("historik-datum")?.focus(), 0);
   }, [loading, events, costs]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -99,7 +100,7 @@ function CorrectionForm({ editing, workOrders, projects, saving, onSubmit, onCan
     {editing.kind === "event" ? <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Select name="event_type" label="Händelsetyp" options={eventTypes} defaultValue={text(row, "event_type")} required />
-        <Field autoFocus name="event_date" label="Händelsedatum" type="date" defaultValue={dateValue(row.event_date)} required />
+        <Field id="historik-datum" autoFocus name="event_date" label="Händelsedatum" type="date" defaultValue={dateValue(row.event_date)} required />
         <Field name="next_due_at" label="Nästa planerade datum" type="date" defaultValue={dateValue(row.next_due_at)} />
         <Field name="title" label="Rubrik" defaultValue={text(row, "title")} required maxLength={180} />
         <Field name="provider" label="Leverantör eller utförare" defaultValue={text(row, "provider")} maxLength={200} />
@@ -111,7 +112,7 @@ function CorrectionForm({ editing, workOrders, projects, saving, onSubmit, onCan
     </> : <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Select name="cost_type" label="Kostnadstyp" options={costTypes} defaultValue={text(row, "cost_type")} required />
-        <Field autoFocus name="cost_date" label="Kostnadsdatum" type="date" defaultValue={dateValue(row.cost_date)} required />
+        <Field id="historik-datum" autoFocus name="cost_date" label="Kostnadsdatum" type="date" defaultValue={dateValue(row.cost_date)} required />
         <Field name="supplier" label="Leverantör" defaultValue={text(row, "supplier")} maxLength={200} />
         <Field name="amount_ex_vat" label="Belopp exklusive moms" type="number" min="0" step="0.01" defaultValue={text(row, "amount_ex_vat")} required />
         <Field name="vat_rate" label="Momssats, procent" type="number" min="0" max="100" step="0.01" defaultValue={text(row, "vat_rate") || "25"} required />
@@ -124,7 +125,7 @@ function CorrectionForm({ editing, workOrders, projects, saving, onSubmit, onCan
   </form>;
 }
 
-function Field({ name, label, type = "text", required, min, max, step, defaultValue, maxLength, autoFocus }: { name: string; label: string; type?: string; required?: boolean; min?: string; max?: string; step?: string; defaultValue?: string; maxLength?: number; autoFocus?: boolean }) { return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><input autoFocus={autoFocus} name={name} type={type} required={required} min={min} max={max} step={step} defaultValue={defaultValue} maxLength={maxLength} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50" /></label>; }
+function Field({ name, label, type = "text", required, min, max, step, defaultValue, maxLength, autoFocus, id }: { name: string; label: string; type?: string; required?: boolean; min?: string; max?: string; step?: string; defaultValue?: string; maxLength?: number; autoFocus?: boolean; id?: string }) { return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><input id={id} autoFocus={autoFocus} name={name} type={type} required={required} min={min} max={max} step={step} defaultValue={defaultValue} maxLength={maxLength} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50" /></label>; }
 function Select({ name, label, options, defaultValue, required }: { name: string; label: string; options: Record<string, string>; defaultValue: string; required?: boolean }) { return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select name={name} defaultValue={defaultValue} required={required} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900">{Object.entries(options).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>; }
 function LinkSelect({ name, label, options, defaultValue, kind }: { name: string; label: string; options: Option[]; defaultValue: string; kind: "workOrder" | "project" }) { return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select name={name} defaultValue={defaultValue} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900"><option value="">Ingen koppling</option>{options.map((option) => <option key={option.id} value={option.id}>{kind === "workOrder" ? option.title : option.name}{option.status ? ` · ${option.status}` : ""}</option>)}</select></label>; }
 function Textarea({ name, label, defaultValue, maxLength }: { name: string; label: string; defaultValue: string; maxLength: number }) { return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><textarea name={name} rows={4} defaultValue={defaultValue} maxLength={maxLength} className="w-full resize-y rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50" /></label>; }
