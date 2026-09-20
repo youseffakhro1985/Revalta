@@ -67,6 +67,7 @@ export function WorkOrderSlaPriorityQueue() {
     if (loading) return;
     if (window.location.hash !== "#slafilter") return;
     document.getElementById("slafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("sla-risk")?.focus(), 0);
   }, [loading, items]);
   useEffect(() => {
     if (loading) return;
@@ -98,7 +99,7 @@ export function WorkOrderSlaPriorityQueue() {
       <fieldset disabled={loading} className="contents">
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera kön</span>
-          <select autoFocus value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera SLA-kö">
+          <select id="sla-risk" autoFocus value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera SLA-kö">
             <option value="all">Alla SLA-risker</option>
             <option value="overdue">Försenade</option>
             <option value="critical">Kritiska</option>
