@@ -9,6 +9,8 @@ describe("energi create hash", () => {
     expect(source).toContain('window.location.hash !== "#ny-avlasning"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
+    expect(source).toContain('id="energi-fastighet"');
+    expect(source).toContain('document.getElementById("energi-fastighet")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="ny-avlasning"');
   });
@@ -35,6 +37,7 @@ describe("energi leftover readings first HTML", () => {
     expect(source).toContain('window.location.hash !== "#energilista"');
     expect(source).toContain("Avläsningarna hämtas.");
     expect(source).toContain('id="ny-avlasning"');
+    expect(source).toContain('id="energi-fastighet"');
     expect(source).toContain('id="energifilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
