@@ -79,6 +79,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
     if (loading) return;
     if (window.location.hash !== "#spara-dokument") return;
     document.getElementById("spara-dokument")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("dokument-kategori")?.focus(), 0);
   }, [loading, documents]);
   useEffect(() => {
     if (loading) return;
@@ -141,7 +142,7 @@ export function OperationalDocumentsPanel({ entityType, entityId, title = "Dokum
             <span>Välj dokument, bild eller kalkyl</span>
             <input name="file" type="file" required className="sr-only" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.docx,.xlsx" />
           </label>
-          <select autoFocus name="category" className={premiumFieldClass} defaultValue="other" aria-label="Dokumentkategori">
+          <select id="dokument-kategori" autoFocus name="category" className={premiumFieldClass} defaultValue="other" aria-label="Dokumentkategori">
             {Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
           <select name="visibility" className={premiumFieldClass} defaultValue="internal" aria-label="Dokumentsynlighet">
