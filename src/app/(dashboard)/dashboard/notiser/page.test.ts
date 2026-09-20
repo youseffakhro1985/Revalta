@@ -9,6 +9,8 @@ describe("notiser create hash", () => {
     expect(source).toContain('window.location.hash !== "#nytt-meddelande"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
+    expect(source).toContain('id="notis-rubrik"');
+    expect(source).toContain('document.getElementById("notis-rubrik")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("fieldset");
     expect(source).not.toContain('<form id="nytt-meddelande"');
@@ -38,6 +40,7 @@ describe("notiser leftover activity first HTML", () => {
     expect(source).toContain('window.location.hash !== "#notisaktivitet"');
     expect(source).toContain("Aktiviteten hämtas.");
     expect(source).toContain('id="nytt-meddelande"');
+    expect(source).toContain('id="notis-rubrik"');
     expect(source).toContain('id="notisfilter"');
     expect(source).toContain('id="notislista"');
     expect(source).toContain("canManage || loading");
