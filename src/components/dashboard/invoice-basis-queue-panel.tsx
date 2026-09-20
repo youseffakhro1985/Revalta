@@ -88,6 +88,7 @@ export function InvoiceBasisQueuePanel() {
     if (loading) return;
     if (window.location.hash !== "#underlagfilter") return;
     document.getElementById("underlagfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("underlag-status")?.focus(), 0);
   }, [loading, items]);
   useEffect(() => {
     if (loading) return;
@@ -171,7 +172,7 @@ export function InvoiceBasisQueuePanel() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera underlag</span>
-              <select autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera fakturaunderlag">
+              <select id="underlag-status" autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera fakturaunderlag">
                 <option value="all">Alla utkaststatusar</option>
                 <option value="missing">Saknas</option>
                 <option value="empty">Tomt</option>
