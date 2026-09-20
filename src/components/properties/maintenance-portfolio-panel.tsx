@@ -83,8 +83,10 @@ export function MaintenancePortfolioPanel() {
   }, []);
 
   useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#portfoljfilter") return;
     document.getElementById("portfoljfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("portfolj-fastighet")?.focus(), 0);
   }, [loading, rows]);
   useEffect(() => {
     if (loading) return;
@@ -153,7 +155,7 @@ export function MaintenancePortfolioPanel() {
       <div id="portfoljfilter" className="scroll-mt-36">
       <Panel title="Filtrera portföljen" description="Alla nyckeltal och diagram räknas om efter valda filter.">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <FilterField autoFocus label="Fastighet" value={filters.property} onChange={(value) => setFilters((current) => ({ ...current, property: value }))}>
+          <FilterField id="portfolj-fastighet" autoFocus label="Fastighet" value={filters.property} onChange={(value) => setFilters((current) => ({ ...current, property: value }))}>
             <option value="all">Alla fastigheter</option>
             {options.properties.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
           </FilterField>
@@ -224,8 +226,8 @@ export function MaintenancePortfolioPanel() {
   );
 }
 
-function FilterField({ label, value, onChange, children, autoFocus = false }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; autoFocus?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select autoFocus={autoFocus} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
+function FilterField({ id, label, value, onChange, children, autoFocus = false }: { id?: string; label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; autoFocus?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select id={id} autoFocus={autoFocus} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
 }
 
 function SummaryRow({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
