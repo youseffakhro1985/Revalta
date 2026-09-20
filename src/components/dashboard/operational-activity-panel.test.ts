@@ -19,9 +19,11 @@ describe("operational activity history filter first HTML", () => {
   it("keeps the history filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./operational-activity-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="aktivitetsfilter"');
+    expect(source).toContain('id="aktivitet-typ"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#aktivitetsfilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("aktivitet-typ")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain('id="spara-kommentar"');
@@ -39,6 +41,7 @@ describe("operational activity leftover comments first HTML", () => {
     expect(source).toContain('id="spara-kommentar"');
     expect(source).toContain('id="kommentar-text"');
     expect(source).toContain('id="aktivitetsfilter"');
+    expect(source).toContain('id="aktivitet-typ"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading");
   });
