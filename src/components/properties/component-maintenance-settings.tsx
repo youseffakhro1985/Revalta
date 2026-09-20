@@ -60,6 +60,7 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
     if (loading) return;
     if (window.location.hash !== "#spara-underhall") return;
     document.getElementById("spara-underhall")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("underhall-nasta")?.focus(), 0);
   }, [loading, settings]);
 
   const dirty = useMemo(() => settings ? JSON.stringify(form) !== JSON.stringify({ nextServiceAt: dateInput(settings.next_service_at), serviceIntervalMonths: String(settings.service_interval_months), serviceLeadDays: String(settings.service_lead_days), autoCreateServiceWorkOrders: settings.auto_create_service_work_orders }) : false, [form, settings]);
@@ -95,7 +96,7 @@ export function ComponentMaintenanceSettings({ propertyId, componentId }: { prop
 
         <fieldset disabled={formLocked} className="contents">
         <div className="grid gap-4 sm:grid-cols-3">
-          <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Nästa service</span><input autoFocus type="date" value={form.nextServiceAt} onChange={(event) => setForm((current) => ({ ...current, nextServiceAt: event.target.value }))} className={premiumFieldClass} /></label>
+          <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Nästa service</span><input id="underhall-nasta" autoFocus type="date" value={form.nextServiceAt} onChange={(event) => setForm((current) => ({ ...current, nextServiceAt: event.target.value }))} className={premiumFieldClass} /></label>
           <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Intervall, månader</span><input type="number" min="1" max="120" value={form.serviceIntervalMonths} onChange={(event) => setForm((current) => ({ ...current, serviceIntervalMonths: event.target.value }))} className={premiumFieldClass} /></label>
           <label><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Framförhållning, dagar</span><input type="number" min="0" max="365" value={form.serviceLeadDays} onChange={(event) => setForm((current) => ({ ...current, serviceLeadDays: event.target.value }))} className={premiumFieldClass} /></label>
         </div>
