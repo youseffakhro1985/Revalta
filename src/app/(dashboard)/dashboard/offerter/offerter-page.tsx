@@ -133,6 +133,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#offertfilter") return;
     document.getElementById("offertfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("offert-sok")?.focus(), 0);
   }, [loading, quotes]);
   useEffect(() => {
     if (loading) return;
@@ -346,7 +347,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     <section className="grid gap-6 xl:grid-cols-[1fr_0.72fr]">
       <Panel title="Offertfilter" description="Sök och avgränsa beslutsunderlaget.">
         <div id="offertfilter" className="scroll-mt-36 grid gap-3 md:grid-cols-[1.4fr_0.9fr_1fr_auto]">
-          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök offert, leverantör eller fastighet" aria-label="Sök offerter" /></label>
+          <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input id="offert-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök offert, leverantör eller fastighet" aria-label="Sök offerter" /></label>
           <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera offertstatus"><option value="all">Alla statusar</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
           <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setPropertyFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
