@@ -73,6 +73,7 @@ export default function NotificationsPage() {
     if (loading) return;
     if (window.location.hash !== "#nytt-meddelande") return;
     document.getElementById("nytt-meddelande")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("notis-rubrik")?.focus(), 0);
   }, [loading, canManage]);
   useEffect(() => {
     if (loading) return;
@@ -183,7 +184,7 @@ export default function NotificationsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-petroleum-700">Nytt meddelande</p>
               <h2 className="mt-2 text-lg font-semibold text-ink-950">Publicera intern information</h2>
             </div>
-            <input autoFocus required maxLength={120} placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
+            <input id="notis-rubrik" autoFocus required maxLength={120} placeholder="Rubrik" aria-label="Rubrik" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="w-full rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
             <textarea required maxLength={2000} rows={6} placeholder="Meddelande" aria-label="Meddelande" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} className="w-full resize-none rounded-xl border border-sand-200 px-4 py-3 text-sm outline-none focus:border-petroleum-500" />
             <div className="grid grid-cols-2 gap-3">
               <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} aria-label="Prioritet" className="rounded-xl border border-sand-200 px-4 py-3 text-sm">
