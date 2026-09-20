@@ -79,6 +79,7 @@ export default function TeamPage() {
   useEffect(() => {
     if (window.location.hash !== "#bjud-in") return;
     document.getElementById("bjud-in")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("team-namn")?.focus(), 0);
   }, [loading]);
   useEffect(() => {
     if (loading) return;
@@ -137,7 +138,7 @@ export default function TeamPage() {
       <Panel title="Bjud in teammedlem" description="Skapa en säker inbjudan och välj rätt roll från början.">
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset disabled={!canManage} className="space-y-4 disabled:opacity-60">
-            <input placeholder="Namn" aria-label="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} autoFocus />
+            <input id="team-namn" placeholder="Namn" aria-label="Namn" value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} autoFocus />
             <input type="email" required placeholder="E-post" aria-label="E-post" value={email} onChange={(event) => setEmail(event.target.value)} className={premiumFieldClass} />
             <select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Roll" className={premiumFieldClass}><option value="admin">Admin</option><option value="manager">Förvaltare</option><option value="technician">Tekniker</option><option value="viewer">Läsbehörig</option><option value="resident">Boende</option></select>
             <button disabled={submitting || !canManage} className={`${premiumPrimaryButtonClass} w-full`}>{submitting ? "Skickar…" : "Skicka inbjudan"}</button>
