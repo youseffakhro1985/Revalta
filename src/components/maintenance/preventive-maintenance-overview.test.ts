@@ -21,10 +21,12 @@ describe("preventive maintenance service filter first HTML", () => {
   it("keeps the service filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./preventive-maintenance-overview.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="servicefilter"');
+    expect(source).toContain('id="service-alla"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#servicefilter"');
     expect(source).toContain('window.location.hash !== "#kor-motor"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("service-alla")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Kör underhållsmotorn");
@@ -41,6 +43,7 @@ describe("preventive maintenance leftover overview first HTML", () => {
     expect(source).toContain('id="kor-motor"');
     expect(source).toContain('id="kor-motor-knapp"');
     expect(source).toContain('id="servicefilter"');
+    expect(source).toContain('id="service-alla"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("data?.canRun || loading");
   });
