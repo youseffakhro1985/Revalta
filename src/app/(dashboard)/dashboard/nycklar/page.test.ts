@@ -8,6 +8,8 @@ describe("nycklar create hash", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#ny-nyckel"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('id="nyckel-fastighet"');
+    expect(source).toContain('document.getElementById("nyckel-fastighet")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="ny-nyckel"');
   });
@@ -22,6 +24,7 @@ describe("nycklar leftover register first HTML", () => {
     expect(source).toContain('window.location.hash !== "#nyckelfilter"');
     expect(source).toContain('window.location.hash !== "#nyckellista"');
     expect(source).toContain('id="ny-nyckel"');
+    expect(source).toContain('id="nyckel-fastighet"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Nycklarna hämtas.");

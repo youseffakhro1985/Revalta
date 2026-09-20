@@ -87,6 +87,7 @@ export default function KeysPage() {
   useEffect(() => {
     if (window.location.hash !== "#ny-nyckel") return;
     document.getElementById("ny-nyckel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("nyckel-fastighet")?.focus(), 0);
   }, [loading]);
   useEffect(() => {
     if (loading) return;
@@ -230,7 +231,7 @@ export default function KeysPage() {
         <div id="ny-nyckel" className="scroll-mt-36">
         <Panel title="Registrera behörighet" description="Dokumentera lager, utlämning, återlämning och spärrning." className="h-fit xl:sticky xl:top-[112px]">
           <form onSubmit={submit} className="space-y-4">
-            <select className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required aria-label="Välj fastighet" autoFocus><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
+            <select id="nyckel-fastighet" className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} required aria-label="Välj fastighet" autoFocus><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
             <div className="grid grid-cols-2 gap-3"><input className={premiumFieldClass} placeholder="Nyckel-/taggnummer" value={form.identifier} onChange={(event) => setForm({ ...form, identifier: event.target.value })} required aria-label="Nyckel-/taggnummer" /><select className={premiumFieldClass} value={form.credentialType} onChange={(event) => setForm({ ...form, credentialType: event.target.value })} aria-label="Typ av behörighet">{Object.entries(typeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
             <select className={premiumFieldClass} value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} aria-label="Status">{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             <input className={premiumFieldClass} placeholder="Mottagare eller innehavare" value={form.holder} onChange={(event) => setForm({ ...form, holder: event.target.value })} aria-label="Mottagare eller innehavare" />
