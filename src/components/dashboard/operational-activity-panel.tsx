@@ -94,6 +94,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#aktivitetsfilter") return;
     document.getElementById("aktivitetsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("aktivitet-typ")?.focus(), 0);
   }, [loading, history]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -198,7 +199,7 @@ export function OperationalActivityPanel({ entityType, entityId }: Props) {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera historik</span>
-              <select autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera aktivitetshistorik">
+              <select id="aktivitet-typ" autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera aktivitetshistorik">
                 <option value="all">Alla händelser</option>
                 <option value="updates">Ändringar</option>
                 <option value="comments">Kommentarer</option>
