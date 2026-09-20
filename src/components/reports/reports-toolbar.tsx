@@ -48,6 +48,7 @@ export function ReportsToolbar({ period, propertyId, properties, rows, generated
   useEffect(() => {
     if (window.location.hash !== "#rapportfilter") return;
     document.getElementById("rapportfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("rapport-period")?.focus(), 0);
   }, []);
 
   function updateFilter(name: "period" | "property", value: string) {
@@ -84,6 +85,7 @@ export function ReportsToolbar({ period, propertyId, properties, rows, generated
         <label className="flex items-center gap-2 rounded-xl border border-sand-200 bg-surface-subtle px-3">
           <span className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-400">Period</span>
           <select
+            id="rapport-period"
             aria-label="Välj rapportperiod"
             value={period}
             onChange={(event) => updateFilter("period", event.target.value)}
