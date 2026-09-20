@@ -77,6 +77,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
     if (loading) return;
     if (window.location.hash !== "#spara-underhallsatgard") return;
     document.getElementById("spara-underhallsatgard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("atgard-namn")?.focus(), 0);
   }, [loading, data]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -195,7 +196,7 @@ export function MaintenanceActionManager({ propertyId }: { propertyId: string })
           <form key={selected?.id || "loading"} onSubmit={submit} className="space-y-4">
             <fieldset disabled={formLocked} className="contents">
               <Field label="Åtgärdsnamn">
-                <input autoFocus name="title" required defaultValue={selected?.title || ""} className={premiumFieldClass} />
+                <input id="atgard-namn" autoFocus name="title" required defaultValue={selected?.title || ""} className={premiumFieldClass} />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Planerat år">
