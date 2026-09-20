@@ -9,6 +9,8 @@ describe("kalender create hash", () => {
     expect(source).toContain('window.location.hash !== "#ny-aktivitet"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
+    expect(source).toContain('id="aktivitet-rubrik"');
+    expect(source).toContain('document.getElementById("aktivitet-rubrik")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="ny-aktivitet"');
   });
@@ -37,6 +39,7 @@ describe("kalender leftover timeline first HTML", () => {
     expect(source).toContain('window.location.hash !== "#aktivitetslista"');
     expect(source).toContain("Aktiviteterna hämtas.");
     expect(source).toContain('id="ny-aktivitet"');
+    expect(source).toContain('id="aktivitet-rubrik"');
     expect(source).toContain('id="kalenderfilter"');
     expect(source).not.toContain('id="aktivitetsfilter"');
     expect(source).toContain("scrollIntoView");
