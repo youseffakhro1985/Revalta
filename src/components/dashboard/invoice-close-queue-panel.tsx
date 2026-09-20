@@ -96,6 +96,7 @@ export function InvoiceCloseQueuePanel() {
     if (loading) return;
     if (window.location.hash !== "#fakturafilter") return;
     document.getElementById("fakturafilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("faktura-sok")?.focus(), 0);
   }, [loading, items]);
   useEffect(() => {
     if (loading) return;
@@ -165,7 +166,7 @@ export function InvoiceCloseQueuePanel() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Sök i kön</span>
-              <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} placeholder="Arbetsorder, fastighet eller kund" aria-label="Sök i faktureringskön" />
+              <input id="faktura-sok" autoFocus value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} placeholder="Arbetsorder, fastighet eller kund" aria-label="Sök i faktureringskön" />
             </label>
           </fieldset>
         </form>
