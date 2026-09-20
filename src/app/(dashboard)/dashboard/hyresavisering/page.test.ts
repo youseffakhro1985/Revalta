@@ -27,6 +27,8 @@ describe("hyresavisering focus", () => {
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#ny-hyresavi"');
     expect(form).toContain("canManage || loading");
+    expect(form).toContain('id="avi-avtal"');
+    expect(form).toContain('document.getElementById("avi-avtal")?.focus()');
     expect(form).toContain("autoFocus");
     expect(form).not.toContain('<form id="ny-hyresavi"');
   });
@@ -39,6 +41,7 @@ describe("hyresavisering leftover list first HTML", () => {
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#avilista"');
     expect(form).toContain('id="ny-hyresavi"');
+    expect(form).toContain('id="avi-avtal"');
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("Hyresavierna hämtas.");
     expect(form).not.toContain("Hämtar hyresavier…");
