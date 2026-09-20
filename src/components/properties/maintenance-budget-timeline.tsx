@@ -101,6 +101,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
     if (loading) return;
     if (window.location.hash !== "#budgetfilter") return;
     document.getElementById("budgetfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("budget-kategori")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -212,7 +213,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
       <Panel title="Filtrera beslutsunderlaget" description="Alla nyckeltal, tabeller och tidslinjer räknas om efter valda filter.">
         <fieldset disabled={formLocked} className="contents">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <FilterField autoFocus label="Kategori" value={filters.category} onChange={(value) => setFilters((current) => ({ ...current, category: value }))}>
+          <FilterField id="budget-kategori" autoFocus label="Kategori" value={filters.category} onChange={(value) => setFilters((current) => ({ ...current, category: value }))}>
             <option value="all">Alla kategorier</option>
             {filterOptions.categories.map((value) => <option key={value} value={value}>{value}</option>)}
           </FilterField>
@@ -302,8 +303,8 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
   );
 }
 
-function FilterField({ label, value, onChange, children, autoFocus }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; autoFocus?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select autoFocus={autoFocus} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
+function FilterField({ id, label, value, onChange, children, autoFocus }: { id?: string; label: string; value: string; onChange: (value: string) => void; children: React.ReactNode; autoFocus?: boolean }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select id={id} autoFocus={autoFocus} value={value} onChange={(event) => onChange(event.target.value)} className={premiumFieldClass}>{children}</select></label>;
 }
 
 function BudgetRow({ name, amount, total }: { name: string; amount: number; total: number }) {
