@@ -92,6 +92,7 @@ export function TicketAssignQueuePanel() {
     if (loading) return;
     if (window.location.hash !== "#arendefilter") return;
     document.getElementById("arendefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("arende-prio")?.focus(), 0);
   }, [loading, items]);
   useEffect(() => {
     if (loading) return;
@@ -141,7 +142,7 @@ export function TicketAssignQueuePanel() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera kön</span>
-              <select autoFocus value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera otilldelade ärenden">
+              <select id="arende-prio" autoFocus value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera otilldelade ärenden">
                 <option value="all">Alla prioriteringar</option>
                 <option value="urgent">Akut</option>
               </select>
