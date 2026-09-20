@@ -25,6 +25,8 @@ describe("nycklar leftover register first HTML", () => {
     expect(source).toContain('window.location.hash !== "#nyckellista"');
     expect(source).toContain('id="ny-nyckel"');
     expect(source).toContain('id="nyckel-fastighet"');
+    expect(source).toContain('id="nyckel-sok"');
+    expect(source).toContain('document.getElementById("nyckel-sok")?.focus()');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Nycklarna hämtas.");
