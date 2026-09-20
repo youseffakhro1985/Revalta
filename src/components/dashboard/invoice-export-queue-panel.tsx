@@ -94,6 +94,7 @@ export function InvoiceExportQueuePanel() {
     if (loading) return;
     if (window.location.hash !== "#exportkofilter") return;
     document.getElementById("exportkofilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("exportko-sok")?.focus(), 0);
   }, [loading, items]);
   useEffect(() => {
     if (loading) return;
@@ -153,7 +154,7 @@ export function InvoiceExportQueuePanel() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Sök i kön</span>
-              <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} placeholder="Arbetsorder, fastighet eller kund" aria-label="Sök i fakturaexportkön" />
+              <input id="exportko-sok" autoFocus value={query} onChange={(event) => setQuery(event.target.value)} className={premiumFieldClass} placeholder="Arbetsorder, fastighet eller kund" aria-label="Sök i fakturaexportkön" />
             </label>
           </fieldset>
         </form>

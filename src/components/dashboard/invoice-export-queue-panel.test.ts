@@ -20,9 +20,11 @@ describe("invoice export queue filter first HTML", () => {
   it("keeps the queue search in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./invoice-export-queue-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="exportkofilter"');
+    expect(source).toContain('id="exportko-sok"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#exportkofilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("exportko-sok")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
@@ -36,6 +38,7 @@ describe("invoice export leftover queue first HTML", () => {
     expect(source).toContain('window.location.hash !== "#exportko"');
     expect(source).toContain("Kön hämtas.");
     expect(source).toContain('id="exportkofilter"');
+    expect(source).toContain('id="exportko-sok"');
     expect(source).not.toContain('id="exportfilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
