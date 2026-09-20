@@ -20,7 +20,7 @@ export default function MaintenanceReportPage({params}:{params:Promise<{id:strin
   useEffect(()=>{void params.then(value=>setId(value.id));},[params]);
   const load=useCallback(async()=>{if(!id)return;setLoading(true);setError("");try{const response=await fetch(`/api/properties/${id}/maintenance-plan`,{cache:"no-store"});const payload=await readResponseJson(response);if(!response.ok)throw new Error(payload.error||"Kunde inte hämta rapporten");setData(payload);}catch(e){setError(e instanceof Error?e.message:"Kunde inte hämta rapporten");}finally{setLoading(false);}},[id]);
   useEffect(()=>{void load();},[load]);
-  useEffect(()=>{if(window.location.hash!=="#skriv-ut")return;document.getElementById("skriv-ut")?.scrollIntoView({behavior:"smooth",block:"start"});},[loading,data]);
+  useEffect(()=>{if(window.location.hash!=="#skriv-ut")return;document.getElementById("skriv-ut")?.scrollIntoView({behavior:"smooth",block:"start"});window.setTimeout(()=>document.getElementById("skriv-ut")?.focus(),0);},[loading,data]);
   useEffect(()=>{if(loading)return;if(window.location.hash!=="#underhallsinnehall")return;document.getElementById("underhallsinnehall")?.scrollIntoView({behavior:"smooth",block:"start"});},[loading,data]);
   const total=useMemo(()=>data?.forecast?.yearly.reduce((sum,item)=>sum+item.amount,0)||0,[data]);
   const plan=data?.activePlan||null;

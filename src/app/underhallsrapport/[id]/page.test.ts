@@ -8,6 +8,7 @@ describe("public underhallsrapport print first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash!=="#skriv-ut"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("skriv-ut")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).not.toContain('if(!data)return <main className="mx-auto max-w-5xl p-10"><div className="h-96 animate-pulse rounded-2xl bg-sand-100"/></main>');
@@ -21,6 +22,7 @@ describe("public underhallsrapport leftover body first HTML", () => {
     expect(source).toContain('window.location.hash!=="#underhallsinnehall"');
     expect(source).toContain("Rapporten hämtas.");
     expect(source).toContain('id="skriv-ut"');
+    expect(source).toContain('document.getElementById("skriv-ut")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
