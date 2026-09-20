@@ -52,6 +52,7 @@ export function ComponentRegistryManager({ propertyId }: { propertyId: string })
     if (loading) return;
     if (window.location.hash !== "#spara-komponentregister") return;
     document.getElementById("spara-komponentregister")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("register-klass")?.focus(), 0);
   }, [loading, assets]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -105,7 +106,7 @@ export function ComponentRegistryManager({ propertyId }: { propertyId: string })
 
 function UpdateFields({ asset, disabled }: { asset?: Asset; disabled: boolean }) {
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-    <Field autoFocus disabled={disabled} label="Komponentklass" name="componentClass" defaultValue={text(asset, "component_class")} />
+    <Field id="register-klass" autoFocus disabled={disabled} label="Komponentklass" name="componentClass" defaultValue={text(asset, "component_class")} />
     <Field disabled={disabled} label="Installationsår" name="installationYear" type="number" defaultValue={text(asset, "installation_year")} />
     <Field disabled={disabled} label="Driftsatt" name="commissionedAt" type="date" defaultValue={dateInput(asset?.commissioned_at)} />
     <Field disabled={disabled} label="Teknisk livslängd, år" name="technicalLifetimeYears" type="number" defaultValue={text(asset, "technical_lifetime_years")} />
@@ -141,8 +142,8 @@ function CostFields({ disabled }: { disabled: boolean }) {
   </div>;
 }
 
-function Field({ label, name, type = "text", defaultValue = "", required = false, disabled = false, autoFocus = false }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean; disabled?: boolean; autoFocus?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><input autoFocus={autoFocus} disabled={disabled} name={name} type={type} defaultValue={defaultValue} required={required} min={type === "number" ? 0 : undefined} step={type === "number" ? "any" : undefined} className={premiumFieldClass} /></label>;
+function Field({ label, name, type = "text", defaultValue = "", required = false, disabled = false, autoFocus = false, id }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean; disabled?: boolean; autoFocus?: boolean; id?: string }) {
+  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><input id={id} autoFocus={autoFocus} disabled={disabled} name={name} type={type} defaultValue={defaultValue} required={required} min={type === "number" ? 0 : undefined} step={type === "number" ? "any" : undefined} className={premiumFieldClass} /></label>;
 }
 
 function ModeButton({ active, onClick, icon: Icon, children, disabled }: { active: boolean; onClick: () => void; icon: typeof Settings2; children: React.ReactNode; disabled?: boolean }) {
