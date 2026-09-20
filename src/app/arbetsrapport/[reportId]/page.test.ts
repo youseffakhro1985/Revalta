@@ -8,6 +8,7 @@ describe("public arbetsrapport print first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#skriv-ut"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("skriv-ut")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).not.toContain("if (loading) return <div className=\"mx-auto mt-16 h-[760px] max-w-4xl animate-pulse rounded-3xl bg-sand-100\" />");
@@ -21,6 +22,7 @@ describe("public arbetsrapport leftover body first HTML", () => {
     expect(source).toContain('window.location.hash !== "#rapportinnehall"');
     expect(source).toContain("Rapporten hämtas.");
     expect(source).toContain('id="skriv-ut"');
+    expect(source).toContain('document.getElementById("skriv-ut")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
