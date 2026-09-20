@@ -70,6 +70,7 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
     if (loading) return;
     if (window.location.hash !== "#ny-hyresavi") return;
     document.getElementById("ny-hyresavi")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("avi-avtal")?.focus(), 0);
   }, [loading, canManage]);
   useEffect(() => {
     if (loading) return;
@@ -197,7 +198,7 @@ export function RentNoticesPage({ initialFocusedId }: { initialFocusedId: string
       <div id="ny-hyresavi" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start">
       <Panel title="Ny hyresavi" description="Utgå från ett aktivt kontrakt eller registrera uppgifterna manuellt.">
         <form onSubmit={submit} className="space-y-4">
-          <select className={premiumFieldClass} value={form.leaseId} onChange={(e) => selectLease(e.target.value)} aria-label="Avtal" autoFocus>
+          <select id="avi-avtal" className={premiumFieldClass} value={form.leaseId} onChange={(e) => selectLease(e.target.value)} aria-label="Avtal" autoFocus>
             <option value="">Välj kontrakt</option>
             {leases.filter((lease) => lease.status === "active" || lease.status === "notice").map((lease) => (
               <option key={lease.id} value={lease.id}>{lease.property_name} · {lease.unit} · {lease.tenant_name || "Ingen hyresgäst"}</option>
