@@ -117,6 +117,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
     if (loading) return;
     if (window.location.hash !== "#skadefilter") return;
     document.getElementById("skadefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("skada-sok")?.focus(), 0);
   }, [loading, claims]);
   useEffect(() => {
     if (loading) return;
@@ -311,7 +312,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
 
     <Panel title="Ärendeöversikt" description="Filtrera skadeportföljen och öppna rätt ärende för uppdatering." action={<button type="button" onClick={exportCsv} disabled={!filtered.length} className={`${premiumSecondaryButtonClass} gap-2`}><Download className="h-4 w-4" aria-hidden="true" />CSV</button>} bodyClassName="p-0">
       <div id="skadefilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-2 xl:grid-cols-[1fr_190px_180px_190px] sm:p-5">
-        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} placeholder="Sök skada, bolag, nummer eller ansvarig" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök skadeärenden" /></label>
+        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input id="skada-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} placeholder="Sök skada, bolag, nummer eller ansvarig" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök skadeärenden" /></label>
         <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera status"><option value="">Alla statusar</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select disabled={loading} className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera skadetyp"><option value="">Alla skadetyper</option>{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
