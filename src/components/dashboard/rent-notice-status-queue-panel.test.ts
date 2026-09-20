@@ -22,9 +22,11 @@ describe("rent notice queue filter first HTML", () => {
   it("keeps the queue filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./rent-notice-status-queue-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="avikofilter"');
+    expect(source).toContain('id="avi-status"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#avikofilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("avi-status")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
@@ -38,6 +40,7 @@ describe("rent notice leftover queue first HTML", () => {
     expect(source).toContain('window.location.hash !== "#aviko"');
     expect(source).toContain("Kön hämtas.");
     expect(source).toContain('id="avikofilter"');
+    expect(source).toContain('id="avi-status"');
     expect(source).not.toContain('id="avilista"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");

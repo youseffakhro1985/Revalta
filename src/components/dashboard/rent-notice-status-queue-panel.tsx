@@ -84,6 +84,7 @@ export function RentNoticeStatusQueuePanel() {
     if (loading) return;
     if (window.location.hash !== "#avikofilter") return;
     document.getElementById("avikofilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("avi-status")?.focus(), 0);
   }, [loading, items]);
   useEffect(() => {
     if (loading) return;
@@ -137,7 +138,7 @@ export function RentNoticeStatusQueuePanel() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera kön</span>
-              <select autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera hyresavier i kön">
+              <select id="avi-status" autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera hyresavier i kön">
                 <option value="all">Alla avier</option>
                 <option value="sent">Nästa: skickad</option>
                 <option value="paid">Nästa: betald</option>
