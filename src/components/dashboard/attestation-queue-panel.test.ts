@@ -22,9 +22,11 @@ describe("attestation queue filter first HTML", () => {
   it("keeps the queue filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./attestation-queue-panel.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="attestfilter"');
+    expect(source).toContain('id="attest-typ"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#attestfilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("attest-typ")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).not.toContain("{loading ? <div className=\"h-32 animate-pulse rounded-xl bg-sand-100\" aria-hidden=\"true\" /> : null}");
@@ -38,6 +40,7 @@ describe("attestation leftover queue first HTML", () => {
     expect(source).toContain('window.location.hash !== "#attestko"');
     expect(source).toContain("Kön hämtas.");
     expect(source).toContain('id="attestfilter"');
+    expect(source).toContain('id="attest-typ"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("disabled={loading}");
   });

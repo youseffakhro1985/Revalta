@@ -79,6 +79,7 @@ export function AttestationQueuePanel() {
     if (loading) return;
     if (window.location.hash !== "#attestfilter") return;
     document.getElementById("attestfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("attest-typ")?.focus(), 0);
   }, [loading, items]);
   useEffect(() => {
     if (loading) return;
@@ -139,7 +140,7 @@ export function AttestationQueuePanel() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera kön</span>
-              <select autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera attesteringskön">
+              <select id="attest-typ" autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={`${premiumFieldClass} text-sm`} aria-label="Filtrera attesteringskön">
                 <option value="all">Alla rader</option>
                 <option value="time">Tid väntar</option>
                 <option value="material">Material väntar</option>
