@@ -91,6 +91,7 @@ export function ServiceNotificationHealthCard() {
     if (loading) return;
     if (window.location.hash !== "#leveranshalsa") return;
     document.getElementById("leveranshalsa")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("leveranshalsa-uppdatera")?.focus(), 0);
   }, [loading, data]);
 
   const presentation = useMemo(() => healthPresentation[data?.health || "idle"], [data?.health]);
