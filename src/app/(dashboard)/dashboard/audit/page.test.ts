@@ -11,9 +11,11 @@ describe("audit filter hash", () => {
   it("scrolls to the system log filters after load", () => {
     const center = readFileSync(new URL("../../../../components/settings/audit-log-center.tsx", import.meta.url), "utf8");
     expect(center).toContain('id="auditfilter"');
+    expect(center).toContain('id="audit-handelse"');
     expect(center).toContain("scroll-mt-36");
     expect(center).toContain('window.location.hash !== "#auditfilter"');
     expect(center).toContain("scrollIntoView");
+    expect(center).toContain('document.getElementById("audit-handelse")?.focus()');
     expect(center).toContain("autoFocus");
   });
 });
@@ -25,6 +27,7 @@ describe("audit leftover events first HTML", () => {
     expect(center).toContain('window.location.hash !== "#auditlista"');
     expect(center).toContain("Händelserna hämtas.");
     expect(center).toContain('id="auditfilter"');
+    expect(center).toContain('id="audit-handelse"');
     expect(center).toContain("autoFocus");
     expect(center).toContain("scrollIntoView");
     expect(center).toContain("disabled={loading}");
