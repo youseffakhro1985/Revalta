@@ -32,10 +32,12 @@ describe("skador leftover list first HTML", () => {
     const form = readFileSync(new URL("./skador-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="skadefilter"');
     expect(form).toContain('id="skadelista"');
+    expect(form).toContain('id="skada-sok"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#skadefilter"');
     expect(form).toContain('window.location.hash !== "#skadelista"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("skada-sok")?.focus()');
     expect(form).toContain("Nytt skadeärende");
     expect(form).toContain("canManage || loading");
     expect(form).toContain("disabled={loading}");
