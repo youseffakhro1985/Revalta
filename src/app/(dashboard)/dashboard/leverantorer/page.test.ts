@@ -8,6 +8,8 @@ describe("leverantorer create hash", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#ny-leverantor"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('id="leverantor-namn"');
+    expect(source).toContain('document.getElementById("leverantor-namn")?.focus()');
     expect(source).toContain("autoFocus");
   });
 });
@@ -34,6 +36,7 @@ describe("leverantorer leftover register first HTML", () => {
     expect(source).toContain('window.location.hash !== "#leverantorlista"');
     expect(source).toContain("Leverantörerna hämtas.");
     expect(source).toContain('id="ny-leverantor"');
+    expect(source).toContain('id="leverantor-namn"');
     expect(source).toContain('id="leverantorfilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading");
