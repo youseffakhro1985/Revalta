@@ -125,6 +125,7 @@ export function AuditLogCenter() {
     if (loading) return;
     if (window.location.hash !== "#auditfilter") return;
     document.getElementById("auditfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("audit-handelse")?.focus(), 0);
   }, [loading, logs]);
   useEffect(() => {
     if (loading) return;
@@ -150,6 +151,7 @@ export function AuditLogCenter() {
           <label className="space-y-2 text-sm font-medium text-slate-700">
             Händelsetyp
             <select
+              id="audit-handelse"
               autoFocus
               aria-label="Filtrera efter händelsetyp"
               className={premiumFieldClass}
