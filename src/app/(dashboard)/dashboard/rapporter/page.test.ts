@@ -12,6 +12,8 @@ describe("rapporter filter hash", () => {
     const toolbar = readFileSync(new URL("../../../../components/reports/reports-toolbar.tsx", import.meta.url), "utf8");
     expect(toolbar).toContain('window.location.hash !== "#rapportfilter"');
     expect(toolbar).toContain("scrollIntoView");
+    expect(toolbar).toContain('id="rapport-period"');
+    expect(toolbar).toContain('document.getElementById("rapport-period")?.focus()');
     expect(toolbar).toContain("autoFocus");
   });
 });
