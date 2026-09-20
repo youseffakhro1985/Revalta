@@ -66,6 +66,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
     if (loading) return;
     if (window.location.hash !== "#tidslinjefilter") return;
     document.getElementById("tidslinjefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("tidslinje-typ")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -111,7 +112,7 @@ export function PropertyLifecycleTimeline({ propertyId }: { propertyId: string }
         <fieldset disabled={loading} className="contents">
           <label className="block max-w-sm">
             <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera händelser</span>
-            <select autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera livscykelhändelser">
+            <select id="tidslinje-typ" autoFocus value={kindFilter} onChange={(event) => setKindFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera livscykelhändelser">
               <option value="all">Alla händelser</option>
               <option value="service">Service</option>
               <option value="inspection">Besiktning</option>
