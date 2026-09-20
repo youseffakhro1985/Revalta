@@ -8,6 +8,8 @@ describe("handover report print hash", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#skriv-ut"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("skriv-ut")?.focus()');
+    expect(source).toContain("autoFocus");
     expect(source).toContain("window.print()");
   });
 });
