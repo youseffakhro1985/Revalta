@@ -80,6 +80,7 @@ export default function RecurringIncidentSlaReportPage() {
     if (loading) return;
     if (window.location.hash !== "#sladetaljer") return;
     document.getElementById("sladetaljer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("sladetaljer-uppdatera")?.focus(), 0);
   }, [loading, rows]);
 
   return <div className="space-y-8">
@@ -90,7 +91,7 @@ export default function RecurringIncidentSlaReportPage() {
       action={<div className="flex flex-wrap gap-2">
         <Link href="/dashboard/arbetsorder/aterkommande/incidenter" className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><ChevronLeft className="h-4 w-4" /> Till incidenter</Link>
         <a id="exportera-csv" autoFocus href={`/api/work-orders/recurring/incidents/sla-report?days=${days}&format=csv`} className="scroll-mt-36 inline-flex h-11 items-center gap-2 rounded-xl bg-petroleum-700 px-4 text-sm font-semibold text-white"><Download className="h-4 w-4" /> Exportera CSV</a>
-        <button type="button" onClick={() => void load(days)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+        <button id="sladetaljer-uppdatera" type="button" onClick={() => void load(days)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
       </div>}
     />
 
