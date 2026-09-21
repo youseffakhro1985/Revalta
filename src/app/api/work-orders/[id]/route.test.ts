@@ -54,7 +54,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, DELETE } from "./route";
 
 const params = Promise.resolve({ id: "wo-1" });
 
@@ -207,5 +207,37 @@ describe("work-orders/[id] finance gates", () => {
     expect(body.code).toBe("invoice_draft_not_ready");
     expect(getLatestInvoiceDraftMock).toHaveBeenCalledWith("company-1", "wo-1");
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order detail staff scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+      status: "active",
+    });
+  });
+
+  it("rejects resident GET before loading work orders or the company user roster", async () => {
+    const response = await GET(new Request("http://localhost/api/work-orders/wo-1"), { params });
+    expect(response.status).toBe(403);
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects resident PATCH and DELETE", async () => {
+    const patch = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "in_progress" }),
+    }), { params });
+    const del = await DELETE(new Request("http://localhost/api/work-orders/wo-1", { method: "DELETE" }), { params });
+    expect(patch.status).toBe(403);
+    expect(del.status).toBe(403);
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
   });
 });
