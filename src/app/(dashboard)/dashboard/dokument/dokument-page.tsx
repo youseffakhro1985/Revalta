@@ -406,6 +406,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#dokumentlista") return;
     document.getElementById("dokumentlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("dokumentlista-csv")?.focus(), 0);
   }, [loading, data.documents]);
 
   const selectedProperty = data.properties.find((property) => property.id === propertyId) || null;
@@ -576,7 +577,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
           <span className="inline-flex h-10 items-center gap-2 rounded-xl border border-success-100 bg-success-50 px-3 text-[11px] font-semibold text-success-800">
             <span className="h-1.5 w-1.5 rounded-full bg-success-600" /> Live-data
           </span>
-          <button type="button" onClick={() => void exportMetadata()} disabled={exporting || data.pagination.total === 0} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[11px] font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-50">
+          <button id="dokumentlista-csv" type="button" onClick={() => void exportMetadata()} disabled={exporting || data.pagination.total === 0} className="inline-flex h-10 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[11px] font-semibold text-ink-700 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-50">
             <Download className="h-4 w-4" /> {exporting ? "Exporterar…" : "Exportera filtrerad CSV"}
           </button>
           {data.canManageLifecycle || showUpload ? (
