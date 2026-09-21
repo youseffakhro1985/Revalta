@@ -107,8 +107,26 @@ describe("team/invites route", () => {
       getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
 
       const response = await GET();
+      const body = await response.json();
 
       expect(response.status).toBe(403);
+      expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+      expect(teamInviteFindManyMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects residents before listing invite emails", async () => {
+      getCurrentUserMock.mockResolvedValue({
+        id: "resident-1",
+        role: "resident",
+        company_id: "company-1",
+        email: "boende@exempel.se",
+      });
+
+      const response = await GET();
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
       expect(teamInviteFindManyMock).not.toHaveBeenCalled();
     });
 

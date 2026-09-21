@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageLeases, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
+import { canManageLeases, canViewLeasingData, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { emptyInspectionRecord, parseInspectionRecord, type LeaseInspectionRecord } from "@/lib/lease-inspection-items";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -68,9 +68,10 @@ async function loadRecordForMutation(companyId: string, leaseId: string, actor: 
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewLeasingData(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa leasingdata" }, { status: 403 });
     }

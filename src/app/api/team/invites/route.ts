@@ -2,7 +2,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { getPublicAppUrl } from "@/lib/app-url";
 import { createResetToken, hashResetToken } from "@/lib/auth";
-import { canManageTeam, getCurrentUser } from "@/lib/current-user";
+import { canManageTeam, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { queueTicketNotification } from "@/lib/integrations";
 import { NextResponse } from "next/server";
 import { isValidEmail, normalizeEmail } from "@/lib/security";
@@ -14,9 +14,11 @@ const logger = createLogger({ route: "/api/team/invites" });
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id || !canManageTeam(user.role)) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    if (!canManageTeam(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa inbjudningar" }, { status: 403 });
     }
 

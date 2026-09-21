@@ -59,6 +59,21 @@ describe("access credentials route", () => {
     const response = await GET();
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa nycklar och passage");
+    expect(accessCredentialFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing access credentials", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(accessCredentialFindManyMock).not.toHaveBeenCalled();
     expect(auditFindManyMock).not.toHaveBeenCalled();
   });

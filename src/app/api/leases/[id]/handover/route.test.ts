@@ -92,6 +92,29 @@ describe("leases/[id]/handover route", () => {
     expect(handoverFindUniqueMock).not.toHaveBeenCalled();
   });
 
+  it("GET denies technicians from reading handover holder emails", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET(new Request("http://localhost/api/leases/lease-1/handover"), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa leasingdata");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("GET rejects residents before looking up a handover or holder email", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(new Request("http://localhost/api/leases/lease-1/handover"), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("PUT requires active property filter on lease findFirst", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "user-1",
