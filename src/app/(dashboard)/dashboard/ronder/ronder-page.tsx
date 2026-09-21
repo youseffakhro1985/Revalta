@@ -374,6 +374,7 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#rondfilter") return;
     document.getElementById("rondfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("rond-sok")?.focus(), 0);
   }, [loading, rounds]);
   useEffect(() => {
     if (loading) return;
@@ -639,7 +640,7 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
           <div id="rondfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:p-5 lg:grid-cols-[minmax(220px,1.4fr)_180px_160px_150px_150px]">
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" />
-              <input disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök rond, fastighet eller adress" aria-label="Sök ronder" />
+              <input id="rond-sok" disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök rond, fastighet eller adress" aria-label="Sök ronder" />
             </label>
             <select disabled={loading} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera fastighet">
               <option value="">Alla fastigheter</option>
