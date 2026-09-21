@@ -189,6 +189,23 @@ describe("work-orders GET role scoping", () => {
     expect(body.resultScope).toBe("active");
   });
 
+  it("returns a correlated 403 when a resident tries to list staff work orders", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+      status: "active",
+    });
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(workOrderFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("returns a correlated safe 401 without querying work orders", async () => {
     getCurrentUserMock.mockResolvedValue(null);
 
