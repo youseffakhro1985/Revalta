@@ -199,7 +199,7 @@ describe("work-order vendor contract assignment", () => {
     const response = await POST(request(validBody({ vendorContractId: "foreign-vendor" })));
     const body = await response.json();
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(body.error).toBe("Leverantören hittades inte");
     expect(transactionMock).not.toHaveBeenCalled();
   });

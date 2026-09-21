@@ -450,8 +450,23 @@ export async function POST(request: Request) {
     }
 
     if (unitId) {
-      const unit = await db.unit.findFirst({ where: { id: unitId, property_id: propertyId }, select: { id: true } });
-      if (!unit) return validationFailure("Enheten tillhör inte fastigheten", "unit_property_mismatch");
+      const unit = await db.unit.findFirst({
+        where: {
+          id: unitId,
+          property_id: propertyId,
+          property: { company_id: user.company_id, deleted_at: null },
+        },
+        select: { id: true },
+      });
+      if (!unit) {
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Enheten hittades inte",
+          event: "work_orders.create.unit_not_found",
+          context: { userId: user.id, companyId: user.company_id },
+        });
+      }
     }
     let assigneeEmail: string | null = null;
     if (assignedToId) {
@@ -459,7 +474,15 @@ export async function POST(request: Request) {
         where: { id: assignedToId, company_id: user.company_id, status: "active" },
         select: { id: true, email: true },
       });
-      if (!assignee) return validationFailure("Ansvarig användare hittades inte", "assignee_not_found");
+      if (!assignee) {
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Ansvarig användare hittades inte",
+          event: "work_orders.create.assignee_not_found",
+          context: { userId: user.id, companyId: user.company_id },
+        });
+      }
       assigneeEmail = assignee.email;
     }
     const persistVendor = await hasWorkOrderVendorContractColumn();
@@ -479,7 +502,15 @@ export async function POST(request: Request) {
         vendorContractId,
         propertyId,
       });
-      if (!vendor) return validationFailure("Leverantören hittades inte", "vendor_not_found");
+      if (!vendor) {
+        return reject(observability, {
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Leverantören hittades inte",
+          event: "work_orders.create.vendor_not_found",
+          context: { userId: user.id, companyId: user.company_id },
+        });
+      }
       vendorEmail = vendor.email;
     }
     if (ticketId) {

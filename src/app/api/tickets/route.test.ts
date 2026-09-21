@@ -7,6 +7,7 @@ const {
   loggerInfoMock,
   loggerWarnMock,
   userFindFirstMock,
+  propertyFindFirstMock,
   ticketCreateMock,
   ticketFindManyMock,
   ticketCountMock,
@@ -18,6 +19,7 @@ const {
   loggerInfoMock: vi.fn(),
   loggerWarnMock: vi.fn(),
   userFindFirstMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
   ticketCreateMock: vi.fn(),
   ticketFindManyMock: vi.fn(),
   ticketCountMock: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 vi.mock("@/lib/db", () => ({
   default: {
     user: { findFirst: userFindFirstMock },
+    property: { findFirst: propertyFindFirstMock },
     ticket: { create: ticketCreateMock, findMany: ticketFindManyMock, count: ticketCountMock },
     $transaction: transactionMock,
   },
@@ -47,6 +50,9 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 import { GET, POST } from "./route";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
+const TENANT_A = "company-1";
+const TENANT_B_PROPERTY = "property-tenant-b";
+const TENANT_B_USER = "user-tenant-b";
 
 function request(overrides: Record<string, unknown> = {}) {
   return new Request("https://www.revalta.se/api/tickets", {
@@ -125,6 +131,50 @@ describe("POST /api/tickets", () => {
     expect(priorityResponse.status).toBe(400);
     expect((await categoryResponse.json()).errorCode).toBe("VALIDATION_FAILED");
     expect((await priorityResponse.json()).errorCode).toBe("VALIDATION_FAILED");
+    expect(ticketCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a ticket on Tenant B property_id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: TENANT_A, role: "manager" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request({ propertyId: TENANT_B_PROPERTY }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({
+      error: "Vald fastighet hittades inte",
+      errorCode: "NOT_FOUND",
+      requestId,
+    });
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: TENANT_B_PROPERTY,
+        company_id: TENANT_A,
+        deleted_at: null,
+      }),
+    }));
+    expect(ticketCreateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A assigns a Tenant B user", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: TENANT_A, role: "manager" });
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request({ assignedToId: TENANT_B_USER }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({
+      error: "Vald ansvarig hittades inte",
+      errorCode: "NOT_FOUND",
+      requestId,
+    });
+    expect(userFindFirstMock).toHaveBeenCalledWith({
+      where: { id: TENANT_B_USER, company_id: TENANT_A },
+      select: { id: true },
+    });
     expect(ticketCreateMock).not.toHaveBeenCalled();
   });
 
@@ -270,6 +320,24 @@ describe("GET /api/tickets pagination", () => {
       "ticket list rejected",
       expect.objectContaining({ event: "tickets.list.unauthorized" }),
     );
+  });
+
+  it("keeps Tenant B propertyId inside Tenant A company_id so the list cannot leak", async () => {
+    const response = await GET(getRequest(`?propertyId=${TENANT_B_PROPERTY}`));
+
+    expect(response.status).toBe(200);
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: TENANT_A,
+        property_id: TENANT_B_PROPERTY,
+      }),
+    }));
+    expect(ticketCountMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: TENANT_A,
+        property_id: TENANT_B_PROPERTY,
+      }),
+    }));
   });
 });
 

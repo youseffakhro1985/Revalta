@@ -134,7 +134,7 @@ export async function POST(request: Request) {
         select: { id: true, name: true, address: true, city: true },
       });
       if (!property) {
-        return fail(400, "Vald fastighet hittades inte", "invalid", companySlug);
+        return fail(404, "Vald fastighet hittades inte", "invalid", companySlug);
       }
     }
 

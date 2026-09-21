@@ -205,6 +205,32 @@ describe("vendors route", () => {
     );
   });
 
+  it("returns tenant-safe 404 when Tenant A posts a vendor against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/vendors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Städ AB",
+        contractValue: 50000,
+        noticeMonths: 3,
+        propertyId: "property-tenant-b",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", company_id: "company-1", deleted_at: null },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(vendorCreateMock).not.toHaveBeenCalled();
+  });
+
   it("returns 500 when mandatory update audit fails inside the transaction", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     vendorFindFirstMock.mockResolvedValue(vendor);

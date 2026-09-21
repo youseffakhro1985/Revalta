@@ -255,4 +255,20 @@ describe("POST /api/public/tickets", () => {
     expect(analyzeTicketMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when a public ticket uses a property outside the portal tenant", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(publicTicketRequest({ propertyId: "property-tenant-b" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Vald fastighet hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", company_id: "company-1", status: "active", deleted_at: null },
+      select: { id: true, name: true, address: true, city: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(ticketCreateMock).not.toHaveBeenCalled();
+  });
 });

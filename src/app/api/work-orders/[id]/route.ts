@@ -252,7 +252,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           },
           select: { id: true },
         });
-        if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
+        if (!assignee) return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 404 });
       }
       data.assigned_to_id = assignedToId;
     }
@@ -273,7 +273,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           vendorContractId,
           propertyId: existing.property_id,
         });
-        if (!vendor) return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 400 });
+        if (!vendor) return NextResponse.json({ error: "Leverantören hittades inte" }, { status: 404 });
         assignedVendorEmail = vendor.email;
       }
       data.vendor_contract_id = vendorContractId;

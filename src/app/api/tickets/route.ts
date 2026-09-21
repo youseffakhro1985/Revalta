@@ -15,6 +15,7 @@ import {
 } from "@/lib/schema-readiness";
 import { NextResponse } from "next/server";
 import { createRouteObservability } from "@/lib/route-observability";
+import { findCompanyOwned } from "@/lib/tenant-relations";
 import { normalizeTicketStatus, ticketStatusFilterValues } from "@/lib/ticket-lifecycle";
 
 const ROUTE = "/api/tickets";
@@ -316,14 +317,13 @@ export async function POST(request: Request) {
 
     if (normalizedPropertyId) {
       const propertyActive = await notDeletedFilter("Property");
-      const property = await db.property.findFirst({
-        where: {
-          id: normalizedPropertyId,
-          ...propertyActive,
-          ...tenantWhere(user),
-        },
-        select: { id: true },
-      });
+      const property = await findCompanyOwned(
+        (args) => db.property.findFirst({
+          where: { ...args.where, ...propertyActive },
+          select: { id: true },
+        }),
+        { id: normalizedPropertyId, companyId: user.company_id! },
+      );
 
       if (!property) {
         observability.logger.warn("ticket create property rejected", observability.elapsed({
@@ -332,8 +332,8 @@ export async function POST(request: Request) {
           companyId: user.company_id,
         }));
         return apiErrorResponse({
-          status: 400,
-          code: API_ERROR_CODES.validationFailed,
+          status: 404,
+          code: API_ERROR_CODES.notFound,
           message: "Vald fastighet hittades inte",
           requestId: observability.requestId,
         });
@@ -341,10 +341,13 @@ export async function POST(request: Request) {
     }
 
     if (normalizedAssignedToId) {
-      const assignee = await db.user.findFirst({
-        where: { id: normalizedAssignedToId, company_id: user.company_id },
-        select: { id: true },
-      });
+      const assignee = await findCompanyOwned(
+        (args) => db.user.findFirst({
+          where: args.where,
+          select: { id: true },
+        }),
+        { id: normalizedAssignedToId, companyId: user.company_id! },
+      );
 
       if (!assignee || assignee.id !== normalizedAssignedToId) {
         observability.logger.warn("ticket create assignee rejected", observability.elapsed({
@@ -353,8 +356,8 @@ export async function POST(request: Request) {
           companyId: user.company_id,
         }));
         return apiErrorResponse({
-          status: 400,
-          code: API_ERROR_CODES.validationFailed,
+          status: 404,
+          code: API_ERROR_CODES.notFound,
           message: "Vald ansvarig hittades inte",
           requestId: observability.requestId,
         });

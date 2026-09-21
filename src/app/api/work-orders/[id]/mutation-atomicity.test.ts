@@ -381,7 +381,7 @@ describe("core work-order mutation atomicity", () => {
     const response = await PATCH(patchRequest({ vendorContractId: "foreign-vendor" }), params);
     const body = await response.json();
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(body.error).toBe("Leverantören hittades inte");
     expect(transactionMock).not.toHaveBeenCalled();
   });
