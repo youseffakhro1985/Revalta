@@ -96,6 +96,7 @@ export default function IntegrationsPage() {
     if (loading) return;
     if (window.location.hash !== "#handelser") return;
     document.getElementById("handelser")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("handelser-lank")?.focus(), 0);
   }, [loading]);
 
   const summary = useMemo(() => ({
@@ -111,7 +112,7 @@ export default function IntegrationsPage() {
       <PageHeader eyebrow="System och anslutningar" title="Integrationer" description="Samlad status för externa tjänster, ekonomisystem, tekniska krav och senaste integrationshändelser." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Hemligheter skyddas i miljövariabler</div>} />
       <nav aria-label="Hoppa till integrationsavsnitt" className="flex flex-wrap gap-2">
         <a href="#fakturaexport" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Fakturaexport</a>
-        <a href="#handelser" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Händelser</a>
+        <a id="handelser-lank" href="#handelser" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Händelser</a>
       </nav>
 
       {error ? <InlineAlert>{error}</InlineAlert> : null}
