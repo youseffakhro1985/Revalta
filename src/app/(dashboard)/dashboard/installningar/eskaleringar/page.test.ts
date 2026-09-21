@@ -143,16 +143,29 @@ describe("eskaleringar leftover rules first HTML", () => {
 });
 
 describe("eskaleringar leftover history first HTML", () => {
-  it("keeps leftover history in the first HTML without stealing Hantera regler or #historik", () => {
+  it("keeps leftover history in the first HTML and focuses nav after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="eskhistoriklista"');
+    expect(source).toContain('id="eskhistoriklista-lank"');
     expect(source).toContain('window.location.hash !== "#eskhistoriklista"');
     expect(source).toContain("Historiken hämtas.");
     expect(source).toContain('id="historik"');
     expect(source).toContain("Hantera regler");
     expect(source).not.toContain('id="aktivitetsfilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("eskhistoriklista-lank")?.focus()');
     expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
+    expect(source).not.toContain('id="eskhistoriklista-lank" autoFocus');
+    expect(source).toContain('href="#historik"');
+    expect(source).toContain('id="regellista-uppdatera"');
+    expect(source).toContain('document.getElementById("regellista-uppdatera")?.focus()');
+    expect(sticky).toContain('href: "/dashboard/installningar/eskaleringar/regler"');
+    expect(sticky).not.toContain("#eskhistoriklista");
+    expect(sticky).not.toContain("#eskhistoriklista-lank");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
 

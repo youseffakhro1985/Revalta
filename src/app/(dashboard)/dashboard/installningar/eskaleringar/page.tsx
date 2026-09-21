@@ -136,6 +136,7 @@ export default function EscalationAdminPage() {
     if (loading) return;
     if (window.location.hash !== "#eskhistoriklista") return;
     document.getElementById("eskhistoriklista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("eskhistoriklista-lank")?.focus(), 0);
   }, [loading, data]);
 
   useEffect(() => {
@@ -177,7 +178,7 @@ export default function EscalationAdminPage() {
           <nav aria-label="Hoppa till eskaleringsavsnitt" className="mt-4 flex flex-wrap gap-2">
             <a href="#regler" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Regler</a>
             <a href="#driftkontroll" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Driftkontroll</a>
-            <a href="#historik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
+            <a id="eskhistoriklista-lank" href="#historik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
           </nav>
         </div>
         <button id="regellista-uppdatera" type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50">
