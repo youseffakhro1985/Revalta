@@ -104,7 +104,25 @@ describe("work-order profitability route", () => {
     const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/profitability"), params);
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa lönsamhet");
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before loading profitability settings", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/profitability"), params);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
   });
 
   it("allows managers to read profitability", async () => {

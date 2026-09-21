@@ -48,7 +48,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH } from "./route";
+import { GET, PATCH } from "./route";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const existingUpdatedAt = new Date("2026-09-15T09:00:00.000Z");
@@ -194,5 +194,29 @@ describe("work-order SLA PATCH lock", () => {
     expect(response.status).toBe(409);
     expect(body.code).toBe("lock_lost");
     expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order SLA GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading SLA deadlines or audit actors", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/sla"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(getEnterpriseMock).not.toHaveBeenCalled();
+    expect(auditLogFindManyMock).not.toHaveBeenCalled();
   });
 });
