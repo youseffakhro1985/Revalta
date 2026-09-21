@@ -15,9 +15,12 @@ describe("fastigheter leftover filter first HTML", () => {
   it("keeps the filter in the first HTML and scrolls after load without stealing create", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="fastighetsfilter"');
+    expect(source).toContain('id="fastighet-sok"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#fastighetsfilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("fastighet-sok")?.focus()');
+    expect(source).toContain("autoFocus");
     expect(source).toContain('href="/dashboard/fastigheter/ny"');
     expect(source).toContain("Ny fastighet");
     expect(source).toContain("disabled={loading}");
@@ -33,6 +36,7 @@ describe("fastigheter leftover list first HTML", () => {
     expect(source).toContain('window.location.hash !== "#fastighetslista"');
     expect(source).toContain("Fastigheterna hämtas.");
     expect(source).toContain('id="fastighetsfilter"');
+    expect(source).toContain('id="fastighet-sok"');
     expect(source).toContain('href="/dashboard/fastigheter/ny"');
     expect(source).toContain("Ny fastighet");
     expect(source).toContain("scrollIntoView");

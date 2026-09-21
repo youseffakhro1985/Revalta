@@ -185,6 +185,7 @@ export default function PropertiesPage() {
     if (loading) return;
     if (window.location.hash !== "#fastighetsfilter") return;
     document.getElementById("fastighetsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("fastighet-sok")?.focus(), 0);
   }, [loading, properties]);
   useEffect(() => {
     if (loading) return;
@@ -305,7 +306,7 @@ export default function PropertiesPage() {
           <label className="relative block">
             <span className="sr-only">Sök fastighet</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-            <input disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} maxLength={160} placeholder="Sök namn, adress, ort eller objektsnummer" className="h-10 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-9 pr-3 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
+            <input id="fastighet-sok" autoFocus disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} maxLength={160} placeholder="Sök namn, adress, ort eller objektsnummer" className="h-10 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-9 pr-3 text-[12px] text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100" />
           </label>
           <label>
             <span className="sr-only">Filtrera ort</span>
