@@ -39,4 +39,28 @@ describe("ekonomi leftover notices first HTML", () => {
     expect(source).toContain("Avierna hämtas.");
     expect(source).not.toContain("h-8 animate-pulse rounded-lg bg-sand-100");
   });
+
+  it("keeps recent notices leftover in the first HTML and focuses Visa alla after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(source).toContain('id="senasteavier"');
+    expect(source).toContain('id="senasteavier-alla"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash!=="#senasteavier"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("senasteavier-alla")?.focus()');
+    expect(source).toContain("Avierna hämtas.");
+    expect(source).toContain('id="ekonomi-sok"');
+    expect(source).toContain('document.getElementById("ekonomi-sok")?.focus()');
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="senasteavier-alla" autoFocus');
+    expect(source).toContain("canManage||loading");
+    expect(source).toContain('href="/dashboard/ekonomi/ny-utbetalning"');
+    expect(sticky).toContain('href: "/dashboard/ekonomi/ny-utbetalning"');
+    expect(sticky).not.toContain("#senasteavier");
+    expect(sticky).not.toContain("#senasteavier-alla");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/ekonomi/ny-utbetalning", "owner")).toBeNull()');
+  });
 });
