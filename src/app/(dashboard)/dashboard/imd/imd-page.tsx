@@ -104,6 +104,13 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
   }, [canManage, loading]);
   useEffect(() => {
     if (loading) return;
+    if (!showCreate) return;
+    if (window.location.hash !== "#imd-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
+    document.getElementById("imd-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("imd-enhet")?.focus(), 0);
+  }, [loading, showCreate]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#imdfilter") return;
     document.getElementById("imdfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("imd-sok")?.focus(), 0);
@@ -306,12 +313,12 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra mätvärden.</InlineAlert> : null}
 
-    {showCreate ? <Panel title="Registrera avläsning" description="Förbrukning och belopp beräknas från mätvärdena. En öppen debiteringsrad sparas som underlag och kopplas till hyresavi när du gör det manuellt.">
+    {showCreate ? <section id="imd-editor" className="scroll-mt-36"><Panel title="Registrera avläsning" description="Förbrukning och belopp beräknas från mätvärdena. En öppen debiteringsrad sparas som underlag och kopplas till hyresavi när du gör det manuellt.">
       <form key={formKey} action={submit} className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <select required value={propertyId} onChange={(event) => { setPropertyId(event.target.value); setLeaseId(""); }} className={premiumFieldClass} aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           <select value={leaseId} onChange={(event) => setLeaseId(event.target.value)} className={premiumFieldClass} aria-label="Valfritt hyresavtal"><option value="">Valfritt hyresavtal</option>{availableLeases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.unit} · {lease.tenant_name}</option>)}</select>
-          <input name="unit" required autoFocus placeholder="Lägenhet eller lokal" className={premiumFieldClass} aria-label="Lägenhet eller lokal" />
+          <input id="imd-enhet" name="unit" required autoFocus placeholder="Lägenhet eller lokal" className={premiumFieldClass} aria-label="Lägenhet eller lokal" />
           <input name="meterId" required placeholder="Mätar-ID" className={premiumFieldClass} aria-label="Mätar-ID" />
           <select name="type" className={premiumFieldClass} aria-label="Mätartyp">{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <input name="period" required type="month" className={premiumFieldClass} aria-label="Period" />
@@ -322,7 +329,7 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
           <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Spara avläsning"}</button>
         </div>
       </form>
-    </Panel> : null}
+    </Panel></section> : null}
 
     <section className="grid gap-6 xl:grid-cols-[1fr_0.75fr]">
       <Panel title="Mätarfilter" description="Sök och avgränsa mätvärden utan att påverka debiteringen.">
