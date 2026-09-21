@@ -96,6 +96,13 @@ export default function NewWorkOrderPage() {
     };
   }, [router]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash && window.location.hash !== "#order-editor") return;
+    document.getElementById("order-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("order-rubrik")?.focus(), 0);
+  }, [loading]);
+
   const selectedProperty = useMemo(
     () => properties.find((property) => property.id === form.propertyId) || null,
     [form.propertyId, properties],
@@ -260,10 +267,10 @@ export default function NewWorkOrderPage() {
         </Panel>
 
         <Panel title="Arbetsbeskrivning" description="Beskriv uppdraget tydligt så att utföraren kan agera utan kompletterande frågor.">
-          <div className="space-y-5">
+          <div id="order-editor" className="scroll-mt-36 space-y-5">
             <label className="space-y-2 text-sm font-medium text-ink-700">
               Rubrik <span className="text-danger-600">*</span>
-              <input className={premiumFieldClass} maxLength={180} required value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Exempel: Åtgärda läckande blandare i lägenhet 1203" />
+              <input id="order-rubrik" autoFocus className={premiumFieldClass} maxLength={180} required value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Exempel: Åtgärda läckande blandare i lägenhet 1203" />
             </label>
             <label className="space-y-2 text-sm font-medium text-ink-700">
               Beskrivning <span className="text-danger-600">*</span>
