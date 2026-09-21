@@ -62,7 +62,24 @@ describe("energy route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET();
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa energidata");
     expect(energyFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing energy readings", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(energyFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 
   it("updates modern energy fields and scopes active properties", async () => {

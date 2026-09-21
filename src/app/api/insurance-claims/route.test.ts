@@ -44,7 +44,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH } from "./route";
+import { GET, PATCH } from "./route";
 
 describe("insurance-claims route", () => {
   beforeEach(() => {
@@ -135,5 +135,29 @@ describe("insurance-claims route", () => {
     expect(response.status).toBe(409);
     expect(body.error).toMatch(/backfill/i);
     expect(claimUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians from reading insurance claims", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa skadeärenden");
+    expect(claimFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing insurance claims", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(claimFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 });

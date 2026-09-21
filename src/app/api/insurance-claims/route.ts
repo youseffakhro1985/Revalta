@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
 import {
@@ -46,8 +46,10 @@ async function listInsuranceClaimRows(companyId: string, propertyRelation: Recor
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewFinanceData(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa skadeärenden" }, { status: 403 });
     }
@@ -57,7 +59,7 @@ export async function GET() {
       activePropertyRelationFilter(),
     ]);
     const [rows, logs, workOrderLogs, properties] = await Promise.all([
-      user.company_id ? listInsuranceClaimRows(user.company_id, propertyRelation) : Promise.resolve([]),
+      listInsuranceClaimRows(user.company_id, propertyRelation),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "desc" },

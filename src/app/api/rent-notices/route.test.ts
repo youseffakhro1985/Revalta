@@ -52,7 +52,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH, POST } from "./route";
+import { GET, PATCH, POST } from "./route";
 
 describe("rent-notices route", () => {
   beforeEach(() => {
@@ -189,4 +189,27 @@ describe("rent-notices route", () => {
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("denies technicians from reading rent notices", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa hyresaviseringar");
+    expect(noticeFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing rent notices or lease holders", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(noticeFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
 });

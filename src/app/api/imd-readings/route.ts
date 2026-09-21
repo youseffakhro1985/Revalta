@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, mergeByCreatedAt, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
@@ -11,15 +11,16 @@ const action = "imd.reading.created";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewFinanceData(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa IMD-mätvärden" }, { status: 403 });
     }
 
     const [rows, logs, properties, leases] = await Promise.all([
-      user.company_id
-        ? db.imdReading.findMany({
+      db.imdReading.findMany({
             where: { company_id: user.company_id, voided_at: null, property: { deleted_at: null } },
             orderBy: { created_at: "desc" },
             take: 500,
@@ -34,8 +35,7 @@ export async function GET() {
                 },
               },
             },
-          })
-        : Promise.resolve([]),
+          }),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "desc" },
@@ -47,8 +47,7 @@ export async function GET() {
         orderBy: { name: "asc" },
         select: { id: true, name: true, address: true, city: true },
       }),
-      user.company_id
-        ? db.lease.findMany({
+      db.lease.findMany({
             where: { company_id: user.company_id, deleted_at: null, status: { in: ["active", "notice"] }, property: { deleted_at: null } },
             orderBy: { updated_at: "desc" },
             take: 500,
@@ -59,8 +58,7 @@ export async function GET() {
               unit: { select: { designation: true } },
               lease_holder: { select: { name: true } },
             },
-          })
-        : Promise.resolve([]),
+          }),
     ]);
 
     const modern = rows.map((row) => ({

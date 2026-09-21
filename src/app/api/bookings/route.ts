@@ -8,6 +8,7 @@ import {
   canManageTickets,
   canViewLeasingData,
   getCurrentUser,
+  requireCompanyUser,
   tenantWhere,
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -21,9 +22,10 @@ const action = "booking.created";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role) && !canViewLeasingData(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa bokningar" }, { status: 403 });
     }

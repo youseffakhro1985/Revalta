@@ -90,7 +90,7 @@ describe("bookings route", () => {
     const response = await GET();
     const body = await response.json();
     expect(response.status).toBe(403);
-    expect(body.error).toBe("Du saknar behörighet att visa bokningar");
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(bookingFindManyMock).not.toHaveBeenCalled();
   });
 

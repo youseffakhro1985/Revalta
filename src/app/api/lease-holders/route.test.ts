@@ -60,6 +60,29 @@ describe("lease-holders GET pagination", () => {
     expect(body.pagination.pageSize).toBe(100);
   });
 
+  it("denies technicians from listing lease holders", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET(new Request("https://www.revalta.se/api/lease-holders"));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa hyresparter");
+    expect(holderFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing holder emails", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(new Request("https://www.revalta.se/api/lease-holders"));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(holderFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("rejects an inaccessible property before reading contacts", async () => {
     propertyFindFirstMock.mockResolvedValue(null);
 
