@@ -99,6 +99,7 @@ export default function KeysPage() {
     if (loading) return;
     if (window.location.hash !== "#nyckellista") return;
     document.getElementById("nyckellista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("nyckellista-csv")?.focus(), 0);
   }, [loading, credentials]);
 
   const summary = useMemo(() => ({
@@ -216,7 +217,7 @@ export default function KeysPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Säkerhet och åtkomst" title="Nycklar och passage" description="Samla nycklar, taggar, passerkort och utlämningar i ett spårbart register per fastighet." action={<button type="button" onClick={exportCsv} disabled={!filtered.length} className={`${premiumSecondaryButtonClass} w-full gap-2 sm:w-auto`}><Download className="h-4 w-4" aria-hidden="true" />Exportera CSV</button>} />
+      <PageHeader eyebrow="Säkerhet och åtkomst" title="Nycklar och passage" description="Samla nycklar, taggar, passerkort och utlämningar i ett spårbart register per fastighet." action={<button id="nyckellista-csv" type="button" onClick={exportCsv} disabled={!filtered.length} className={`${premiumSecondaryButtonClass} w-full gap-2 sm:w-auto`}><Download className="h-4 w-4" aria-hidden="true" />Exportera CSV</button>} />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={KeyRound} label="Totalt registrerade" value={summary.total} hint="Samtliga aktiva registerposter" />
