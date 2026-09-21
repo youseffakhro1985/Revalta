@@ -41,6 +41,7 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   hasTicketAiSourceColumn: vi.fn(async () => true),
+  hasWorkOrderVendorContractColumn: vi.fn(async () => false),
 }));
 
 vi.mock("@/lib/work-order-enterprise-core", () => ({
@@ -127,6 +128,7 @@ describe("ticket work-order creation authorization", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "Du saknar behörighet att tilldela arbetsorder till andra",
+      errorCode: "FORBIDDEN",
     });
     expect(userFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
@@ -138,6 +140,7 @@ describe("ticket work-order creation authorization", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "Du saknar behörighet att sätta arbetsorderkostnader",
+      errorCode: "FORBIDDEN",
     });
     expect(transactionMock).not.toHaveBeenCalled();
   });
@@ -150,6 +153,7 @@ describe("ticket work-order creation authorization", () => {
 
     expect(response.status).toBe(404);
     expect(body.error).toBe("Enheten hittades inte");
+    expect(body.errorCode).toBe("NOT_FOUND");
     expect(unitFindFirstMock).toHaveBeenCalledWith({
       where: {
         id: "unit-tenant-b",
@@ -222,5 +226,42 @@ describe("ticket work-order creation schema failures", () => {
       errorCode: "INTERNAL_ERROR",
     });
     expect(loggerErrorMock).toHaveBeenCalled();
+  });
+
+  it("maps a WorkOrder lookup schema gap before create to 503 JSON", async () => {
+    workOrderFindFirstMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Column not found", {
+        code: "P2022",
+        clientVersion: "test",
+        meta: { column: "WorkOrder.deleted_at" },
+      }),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.workOrderId).toBeUndefined();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("reuses an existing work order only when it belongs to the caller company", async () => {
+    const txFindFirst = vi.fn().mockResolvedValue({ id: "wo-1", deleted_at: null });
+    const txCreate = vi.fn();
+    transactionMock.mockImplementation(async (callback: (tx: { workOrder: { findFirst: typeof txFindFirst; create: typeof txCreate } }) => unknown) =>
+      callback({ workOrder: { findFirst: txFindFirst, create: txCreate } }),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ workOrderId: "wo-1", created: false });
+    expect(txFindFirst).toHaveBeenCalledWith({
+      where: { ticket_id: "ticket-1", company_id: "company-1" },
+      select: { id: true, deleted_at: true },
+    });
+    expect(txCreate).not.toHaveBeenCalled();
   });
 });

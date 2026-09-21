@@ -22,10 +22,12 @@ import { notifyAssignee } from "@/lib/assignee-notify";
 import { API_ERROR_CODES } from "@/lib/api-error-response";
 import {
   hasTicketAiSourceColumn,
+  hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   isMissingTableError,
   schemaMismatchUserMessage,
   ticketAiSourceWrite,
+  workOrderVendorWrite,
 } from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
@@ -113,77 +115,93 @@ export async function POST(
     return NextResponse.json({ error: "Ogiltig beräknad kostnad" }, { status: 400 });
   }
 
-  const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-    select: {
-      id: true,
-      property_id: true,
-      assigned_to_id: true,
-      status: true,
-      title: true,
-      description: true,
-      priority: true,
-      ai_summary: true,
-      ai_recommended_action: true,
-      ai_processed_at: true,
-    },
-  });
-  if (!ticket) return notFoundTicket();
-  if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
-  if (!ticket.property_id) {
-    return NextResponse.json(
-      { error: "Ärendet måste kopplas till en fastighet innan en arbetsorder kan skapas" },
-      { status: 409 },
-    );
-  }
-  const activeWorkOrder = await db.workOrder.findFirst({
-    where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
-    select: { id: true },
-  });
-  if (activeWorkOrder) {
-    return NextResponse.json({ workOrderId: activeWorkOrder.id, created: false });
-  }
-
-  if (assignedToId && assignedToId !== ticket.assigned_to_id && !canAssignWorkOrders(user.role)) {
-    return NextResponse.json(
-      { error: "Du saknar behörighet att tilldela arbetsorder till andra" },
-      { status: 403 },
-    );
-  }
-  if (estimatedCostSupplied && !canManageWorkOrderFinance(user.role)) {
-    return NextResponse.json(
-      { error: "Du saknar behörighet att sätta arbetsorderkostnader" },
-      { status: 403 },
-    );
-  }
-
-  if (unitId) {
-    const unit = await db.unit.findFirst({
-      where: {
-        id: unitId,
-        property_id: ticket.property_id,
-        property: { company_id: user.company_id, deleted_at: null },
+  try {
+    const ticket = await db.ticket.findFirst({
+      where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+      select: {
+        id: true,
+        property_id: true,
+        assigned_to_id: true,
+        status: true,
+        title: true,
+        description: true,
+        priority: true,
+        ai_summary: true,
+        ai_recommended_action: true,
+        ai_processed_at: true,
       },
+    });
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
+    if (!ticket.property_id) {
+      return NextResponse.json(
+        {
+          error: "Ärendet måste kopplas till en fastighet innan en arbetsorder kan skapas",
+          errorCode: API_ERROR_CODES.conflict,
+        },
+        { status: 409 },
+      );
+    }
+    const activeWorkOrder = await db.workOrder.findFirst({
+      where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
       select: { id: true },
     });
-    if (!unit) {
-      return NextResponse.json({ error: "Enheten hittades inte" }, { status: 404 });
+    if (activeWorkOrder) {
+      return NextResponse.json({ workOrderId: activeWorkOrder.id, created: false });
     }
-  }
 
-  let assigneeEmail: string | null = null;
-  if (assignedToId) {
-    const assignee = await db.user.findFirst({
-      where: { id: assignedToId, company_id: user.company_id, status: "active" },
-      select: { id: true, email: true },
-    });
-    if (!assignee) {
-      return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 404 });
+    if (assignedToId && assignedToId !== ticket.assigned_to_id && !canAssignWorkOrders(user.role)) {
+      return NextResponse.json(
+        {
+          error: "Du saknar behörighet att tilldela arbetsorder till andra",
+          errorCode: API_ERROR_CODES.forbidden,
+        },
+        { status: 403 },
+      );
     }
-    assigneeEmail = assignee.email;
-  }
+    if (estimatedCostSupplied && !canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json(
+        {
+          error: "Du saknar behörighet att sätta arbetsorderkostnader",
+          errorCode: API_ERROR_CODES.forbidden,
+        },
+        { status: 403 },
+      );
+    }
 
-  try {
+    if (unitId) {
+      const unit = await db.unit.findFirst({
+        where: {
+          id: unitId,
+          property_id: ticket.property_id,
+          property: { company_id: user.company_id, deleted_at: null },
+        },
+        select: { id: true },
+      });
+      if (!unit) {
+        return NextResponse.json(
+          { error: "Enheten hittades inte", errorCode: API_ERROR_CODES.notFound },
+          { status: 404 },
+        );
+      }
+    }
+
+    let assigneeEmail: string | null = null;
+    if (assignedToId) {
+      const assignee = await db.user.findFirst({
+        where: { id: assignedToId, company_id: user.company_id, status: "active" },
+        select: { id: true, email: true },
+      });
+      if (!assignee) {
+        return NextResponse.json(
+          { error: "Ansvarig användare hittades inte", errorCode: API_ERROR_CODES.notFound },
+          { status: 404 },
+        );
+      }
+      assigneeEmail = assignee.email;
+    }
+
+    const persistVendor = await hasWorkOrderVendorContractColumn();
     const analysis = ticket.ai_processed_at
       ? null
       : await analyzeTicket(`${ticket.title}. ${ticket.description}`);
@@ -193,19 +211,21 @@ export async function POST(
     const sla = calculateWorkOrderSla(createdAt, priority);
 
     const result = await db.$transaction(async (tx) => {
-      const existing = await tx.workOrder.findUnique({
-        where: { ticket_id: ticket.id },
+      const existing = await tx.workOrder.findFirst({
+        where: { ticket_id: ticket.id, company_id: user.company_id! },
         select: { id: true, deleted_at: true },
       });
       if (existing && !existing.deleted_at) {
         return { id: existing.id, created: false, workOrderNumber: null };
       }
       if (existing?.deleted_at) {
-        // Free unique ticket_id so a new work order can be created after soft-delete.
-        await tx.workOrder.update({
-          where: { id: existing.id },
+        const unlinked = await tx.workOrder.updateMany({
+          where: { id: existing.id, company_id: user.company_id! },
           data: { ticket_id: null },
         });
+        if (unlinked.count !== 1) {
+          throw new Error("Kunde inte frisläppa ärendekopplingen");
+        }
       }
 
       const workOrderNumber = await allocateWorkOrderNumber(tx, user.company_id!, createdAt);
@@ -227,6 +247,7 @@ export async function POST(
           scheduled_end: scheduledEnd,
           estimated_cost: estimatedCost,
           created_at: createdAt,
+          ...workOrderVendorWrite(persistVendor, null),
         },
         select: { id: true },
       });
@@ -320,12 +341,16 @@ export async function POST(
       { status: result.created ? 201 : 200 },
     );
   } catch (error) {
-    const concurrent = await db.workOrder.findFirst({
-      where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
-      select: { id: true },
-    });
-    if (concurrent) {
-      return NextResponse.json({ workOrderId: concurrent.id, created: false });
+    try {
+      const concurrent = await db.workOrder.findFirst({
+        where: { ticket_id: id, company_id: user.company_id, deleted_at: null },
+        select: { id: true },
+      });
+      if (concurrent) {
+        return NextResponse.json({ workOrderId: concurrent.id, created: false });
+      }
+    } catch {
+      // Concurrent lookup can fail for the same schema gap as create.
     }
     logger.error("Create work order from ticket error", error);
     if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
