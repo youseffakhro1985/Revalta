@@ -16,12 +16,25 @@ describe("component activity first HTML", () => {
     expect((source.match(/autoFocus/g) || []).length).toBe(1);
   });
 
+  it("keeps the leftover cost tab in the first HTML and focuses the type after load", () => {
+    const source = readFileSync(new URL("./component-activity-forms.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="komponent-kostnad"');
+    expect(source).toContain('id="komponent-kostnadstyp"');
+    expect(source).toContain('window.location.hash !== "#komponent-kostnad"');
+    expect(source).toContain('document.getElementById("komponent-kostnad")?.scrollIntoView');
+    expect(source).toContain('document.getElementById("komponent-kostnadstyp")?.focus()');
+    expect(source).toContain("disabled={saving}");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
   it("does not steal Spara komponent or add a boendeportal sticky", () => {
     const sticky = readFileSync(new URL("../dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     const source = readFileSync(new URL("./component-activity-forms.tsx", import.meta.url), "utf8");
     expect(sticky).toContain("#spara-komponent");
     expect(sticky).not.toContain("#komponent-aktivitet");
     expect(sticky).not.toContain("#komponent-handelse-typ");
+    expect(sticky).not.toContain("#komponent-kostnad");
+    expect(sticky).not.toContain("#komponent-kostnadstyp");
     expect(sticky).not.toContain("/dashboard/boendeportal");
     expect(source).toContain("Laddar…");
   });

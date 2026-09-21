@@ -53,6 +53,17 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
     window.setTimeout(() => document.getElementById("komponent-handelse-typ")?.focus(), 0);
   }, [saving]);
 
+  useEffect(() => {
+    if (saving) return;
+    if (window.location.hash !== "#komponent-kostnad") return;
+    if (tab !== "cost") {
+      setTab("cost");
+      return;
+    }
+    document.getElementById("komponent-kostnad")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("komponent-kostnadstyp")?.focus(), 0);
+  }, [saving, tab]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true); setError(""); setSuccess("");
@@ -76,7 +87,7 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
     <Panel title="Registrera komponentaktivitet" description="Lägg till tekniska händelser och kostnader med full historik och revisionsspår.">
       <div className="mb-5 flex w-fit rounded-xl border border-sand-200 bg-sand-50 p-1">
         <button type="button" onClick={() => { setTab("event"); setError(""); setSuccess(""); }} className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "event" ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500"}`}>Händelse</button>
-        <button type="button" onClick={() => { setTab("cost"); setError(""); setSuccess(""); }} className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "cost" ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500"}`}>Kostnad</button>
+        <button id="komponent-kostnad" type="button" onClick={() => { setTab("cost"); setError(""); setSuccess(""); }} className={`scroll-mt-36 rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "cost" ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500"}`}>Kostnad</button>
       </div>
 
       <form id="komponent-aktivitet" method="post" action={`/api/properties/${propertyId}/components/${componentId}/actions`} onSubmit={submit} className="scroll-mt-36 space-y-5">
@@ -109,7 +120,12 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Select name="cost_type" label="Kostnadstyp" options={costTypes} required />
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Kostnadstyp *</span>
+                <select id="komponent-kostnadstyp" name="cost_type" required disabled={saving} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50">
+                  {Object.entries(costTypes).map(([value, title]) => <option key={value} value={value}>{title}</option>)}
+                </select>
+              </label>
               <Field name="cost_date" label="Kostnadsdatum" type="date" defaultValue={today()} required />
               <Field name="supplier" label="Leverantör" maxLength={200} />
               <Field name="amount_ex_vat" label="Belopp exklusive moms" type="number" min="0" step="0.01" required />
@@ -135,9 +151,6 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
 
 function Field({ name, label, type = "text", required, min, max, step, defaultValue, maxLength }: { name: string; label: string; type?: string; required?: boolean; min?: string; max?: string; step?: string; defaultValue?: string; maxLength?: number }) {
   return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><input name={name} type={type} required={required} min={min} max={max} step={step} defaultValue={defaultValue} maxLength={maxLength} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50" /></label>;
-}
-function Select({ name, label, options, required }: { name: string; label: string; options: Record<string, string>; required?: boolean }) {
-  return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}{required ? " *" : ""}</span><select name={name} required={required} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50">{Object.entries(options).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>;
 }
 function LinkSelect({ name, label, loading, options }: { name: string; label: string; loading: boolean; options: Array<{ value: string; label: string }> }) {
   return <label className="block"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span><select name={name} disabled={loading} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50 disabled:bg-sand-50 disabled:text-ink-500"><option value="">{loading ? "Laddar…" : "Ingen koppling"}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
