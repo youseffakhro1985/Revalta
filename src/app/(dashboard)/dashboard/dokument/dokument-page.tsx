@@ -393,6 +393,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#dokumentfilter") return;
     document.getElementById("dokumentfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("dokument-sok")?.focus(), 0);
   }, [loading, data.documents]);
   useEffect(() => {
     if (loading) return;
@@ -662,7 +663,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
 
       <Panel title="Dokumentbibliotek" description="Serverfiltrerat och paginerat för stabil prestanda även när arkivet växer." bodyClassName="p-0">
         <div id="dokumentfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-5 lg:grid-cols-2 xl:grid-cols-[1.3fr_150px_170px_160px_170px_150px]">
-          <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input disabled={loading} maxLength={200} value={search} onChange={(event) => setSearch(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, fastighet eller uppladdare" /></label>
+          <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input id="dokument-sok" disabled={loading} maxLength={200} value={search} onChange={(event) => setSearch(event.target.value)} className={`${premiumFieldClass} pl-9`} placeholder="Sök dokument, fastighet eller uppladdare" /></label>
           <select disabled={loading} value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla kategorier</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <select disabled={loading} value={visibilityFilter} onChange={(event) => { setVisibilityFilter(event.target.value); setPage(1); }} className={premiumFieldClass}><option value="">Alla synligheter</option>{Object.entries(visibilityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <select disabled={loading} value={lifecycleFilter} onChange={(event) => { setLifecycleFilter(event.target.value); setFocus("all"); setPage(1); }} className={premiumFieldClass}><option value="">Alla statusar</option>{Object.entries(lifecycleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
