@@ -59,10 +59,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const companyId = user.company_id;
 
   const body = await request.json().catch(() => null);
@@ -161,10 +162,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const companyId = user.company_id;
 
   const { id } = await params;

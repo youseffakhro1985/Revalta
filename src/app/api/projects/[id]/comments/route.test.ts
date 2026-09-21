@@ -25,7 +25,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 const params = Promise.resolve({ id: "project-1" });
 
@@ -72,5 +72,34 @@ describe("GET /api/projects/[id]/comments", () => {
     expect(commentFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: { company_id: "company-1", project_id: "project-1" },
     }));
+  });
+
+  it("POST denies residents before writing a project comment", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/projects/project-1/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: "Hej" }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("http://localhost/api/projects/project-1/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: "Hej" }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
   });
 });

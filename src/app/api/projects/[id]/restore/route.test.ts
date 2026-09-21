@@ -95,4 +95,25 @@ describe("projects/[id]/restore", () => {
     expect(response.status).toBe(500);
     expect(transactionMock).toHaveBeenCalledTimes(1);
   });
+
+  it("POST denies residents before looking up a project", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/projects/project-1/restore", { method: "POST" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the project-restore copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("http://localhost/api/projects/project-1/restore", { method: "POST" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att återställa projekt");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
 });

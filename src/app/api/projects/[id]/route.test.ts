@@ -127,8 +127,35 @@ describe("projects/[id] route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await PATCH(patchRequest({ name: "Nytt namn" }), { params });
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(projectFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies residents before looking up a project", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PATCH(patchRequest({ name: "Nytt namn" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("DELETE denies residents before looking up a project", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await DELETE(new Request("http://localhost/api/projects/project-1", { method: "DELETE" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
   });
 
   it("GET returns 404 when project is missing or on a soft-deleted property", async () => {

@@ -126,6 +126,29 @@ describe("projects GET pagination", () => {
     expect(projectFindManyMock).not.toHaveBeenCalled();
     expect(userFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("POST denies residents before creating a project", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(projectRequest({ propertyId: "property-1", name: "Tak" }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(projectRequest({ propertyId: "property-1", name: "Tak" }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("projects POST reliability", () => {
