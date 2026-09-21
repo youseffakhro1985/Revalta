@@ -125,6 +125,7 @@ export default function EscalationAdminPage() {
     if (loading) return;
     if (window.location.hash !== "#eskaleringslista") return;
     document.getElementById("eskaleringslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("eskaleringslista-lank")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -176,7 +177,7 @@ export default function EscalationAdminPage() {
           <h1 className="mt-2 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Serviceeskaleringar</h1>
           <p className="mt-3 max-w-3xl text-ink-600">Övervaka blockerade uppgifter, passerade deadlines, mottagare och den automatiska eskaleringsmotorns leveranshistorik.</p>
           <nav aria-label="Hoppa till eskaleringsavsnitt" className="mt-4 flex flex-wrap gap-2">
-            <a href="#regler" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Regler</a>
+            <a id="eskaleringslista-lank" href="#regler" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Regler</a>
             <a href="#driftkontroll" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Driftkontroll</a>
             <a id="eskhistoriklista-lank" href="#historik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
           </nav>
