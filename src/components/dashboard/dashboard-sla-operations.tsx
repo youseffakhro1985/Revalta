@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Clock3, ShieldCheck, UserRoundX } from "lucide-react";
 import db from "@/lib/db";
-import { getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser, shouldScopeToAssignedWork } from "@/lib/current-user";
 import {
   isMissingSchemaColumnError,
   notDeletedFilter,
@@ -43,8 +43,8 @@ function riskStyle(risk: string) {
 }
 
 export async function DashboardSlaOperations() {
-  const user = await getCurrentUser();
-  if (!user?.company_id) return null;
+  const user = requireCompanyUser(await getCurrentUser());
+  if (!user) return null;
 
   let workOrders: Array<{
     id: string;

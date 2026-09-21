@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser, shouldScopeToAssignedWork } from "@/lib/current-user";
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { buildSlaPriorityQueue } from "@/lib/work-order-sla-priority";
 import {
@@ -101,9 +101,10 @@ async function notificationsFor(companyId: string, assignedToId?: string | null)
 }
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const filter = new URL(request.url).searchParams.get("filter") || "all";
   const assignedScope = shouldScopeToAssignedWork(user.role) ? user.id : null;
@@ -132,9 +133,10 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const body = await request.json().catch(() => ({})) as { key?: unknown; all?: unknown; action?: unknown; snoozedUntil?: unknown };
   const action = typeof body.action === "string" ? body.action : "read";

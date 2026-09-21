@@ -69,7 +69,7 @@ describe("global search tenant isolation", () => {
     }));
   });
 
-  it("does not use open company filters for users without organisation", async () => {
+  it("rejects users without organisation before querying search indexes", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "user-solo",
       company_id: null,
@@ -77,12 +77,28 @@ describe("global search tenant isolation", () => {
     });
 
     const response = await GET(new Request("https://www.revalta.se/api/search?q=port"));
-    expect(response.status).toBe(200);
-    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ company_id: { in: [] } }),
-    }));
+    expect(response.status).toBe(403);
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(ticketFindManyMock).not.toHaveBeenCalled();
     expect(workOrderFindManyMock).not.toHaveBeenCalled();
     expect(leaseHolderFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before querying properties, tickets or work orders", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende@exempel.se",
+      status: "active",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/search?q=port"));
+    expect(response.status).toBe(403);
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(ticketFindManyMock).not.toHaveBeenCalled();
+    expect(workOrderFindManyMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
   });
 
   it("keeps technicians on assigned ticket and work-order search without directory hits", async () => {

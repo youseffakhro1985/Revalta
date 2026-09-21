@@ -9,4 +9,11 @@ describe("dashboard SLA operations", () => {
     expect(source).toContain("Tilldela i Planering");
     expect(source).not.toContain("/api/work-orders/unassigned-queue");
   });
+
+  it("requires staff before loading work orders or assignee emails", () => {
+    const source = readFileSync(new URL("./dashboard-sla-operations.tsx", import.meta.url), "utf8");
+    expect(source).toContain("requireCompanyUser");
+    expect(source.indexOf("requireCompanyUser")).toBeLessThan(source.indexOf("workOrder.findMany"));
+    expect(source).toContain("if (!user) return null");
+  });
 });

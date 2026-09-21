@@ -3,6 +3,7 @@ import {
   canViewLeasingData,
   companyUserWhere,
   getCurrentUser,
+  requireCompanyUser,
   shouldScopeToAssignedWork,
   tenantWhere,
 } from "@/lib/current-user";
@@ -20,8 +21,10 @@ function searchResponse(body: unknown, status = 200) {
 
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return searchResponse({ error: "Obehörig" }, 401);
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return searchResponse({ error: "Obehörig" }, 401);
+    const user = requireCompanyUser(rawUser);
+    if (!user) return searchResponse({ error: "En aktiv organisation och personalbehörighet krävs" }, 403);
 
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get("q") || "").trim();
