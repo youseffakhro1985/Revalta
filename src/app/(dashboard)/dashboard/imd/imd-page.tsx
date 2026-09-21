@@ -119,6 +119,7 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#imdlista") return;
     document.getElementById("imdlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("imdlista-rensa")?.focus(), 0);
   }, [loading, readings]);
 
   const availableLeases = useMemo(() => leases.filter((lease) => !propertyId || lease.property_id === propertyId), [leases, propertyId]);
@@ -338,7 +339,7 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
           <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
           <select disabled={loading} className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera mätartyp"><option value="all">Alla typer</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <select disabled={loading} className={premiumFieldClass} value={debitFilter} onChange={(event) => setDebitFilter(event.target.value)} aria-label="Filtrera debitering"><option value="all">Alla debiteringar</option><option value="open">Öppna</option><option value="linked">Kopplade</option><option value="none">Utan debitering</option></select>
-          <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setPropertyFilter("all"); setTypeFilter("all"); setDebitFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+          <button id="imdlista-rensa" type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setPropertyFilter("all"); setTypeFilter("all"); setDebitFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
         </div>
       </Panel>
 
