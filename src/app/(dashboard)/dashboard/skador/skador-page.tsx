@@ -115,6 +115,13 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
   }, [canManage, loading]);
   useEffect(() => {
     if (loading) return;
+    if (!createOpen) return;
+    if (window.location.hash !== "#skade-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
+    document.getElementById("skade-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("skade-rubrik")?.focus(), 0);
+  }, [loading, createOpen]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#skadefilter") return;
     document.getElementById("skadefilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("skada-sok")?.focus(), 0);
@@ -274,7 +281,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
 
     {createOpen ? (
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/25 p-3 backdrop-blur-[2px] sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="new-claim-title">
-        <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-sand-200 bg-surface-card shadow-premium-lg">
+        <div id="skade-editor" className="scroll-mt-36 max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-sand-200 bg-surface-card shadow-premium-lg">
           <div className="flex items-start justify-between border-b border-sand-100 px-6 py-5">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-petroleum-700">Risk / Försäkring</p>
@@ -288,7 +295,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
           <form onSubmit={submit} className="space-y-4 p-6">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-650">Fastighet</span><select name="propertyId" required className={premiumFieldClass} aria-label="Fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></label>
-              <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-650">Rubrik</span><input name="title" required autoFocus placeholder="Exempel: Vattenskada i tvättstuga" className={premiumFieldClass} aria-label="Rubrik" /></label>
+              <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-650">Rubrik</span><input id="skade-rubrik" name="title" required autoFocus placeholder="Exempel: Vattenskada i tvättstuga" className={premiumFieldClass} aria-label="Rubrik" /></label>
               <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-650">Skadetyp</span><select name="damageType" className={premiumFieldClass} aria-label="Skadetyp">{Object.entries(typeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-650">Skadedatum</span><input name="incidentDate" type="date" className={premiumFieldClass} aria-label="Skadedatum" /></label>
               <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-650">Skadeplats</span><input name="location" placeholder="Byggnad, lägenhet eller utrymme" className={premiumFieldClass} aria-label="Skadeplats" /></label>

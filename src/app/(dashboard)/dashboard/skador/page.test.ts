@@ -21,6 +21,11 @@ describe("skador create query", () => {
     expect(form).toContain("Nytt skadeärende");
     expect(form).toContain("autoFocus");
     expect(form).toContain("<Plus");
+    expect(form).toContain('id="skade-editor"');
+    expect(form).toContain('id="skade-rubrik"');
+    expect(form).toContain('document.getElementById("skade-rubrik")?.focus()');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
     expect(form).toContain("Skapa arbetsorder");
     expect(form).toContain("/api/insurance-claims/${claim.id}/work-order");
@@ -33,6 +38,8 @@ describe("skador leftover list first HTML", () => {
     expect(form).toContain('id="skadefilter"');
     expect(form).toContain('id="skadelista"');
     expect(form).toContain('id="skada-sok"');
+    expect(form).toContain('id="skade-editor"');
+    expect(form).toContain('id="skade-rubrik"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#skadefilter"');
     expect(form).toContain('window.location.hash !== "#skadelista"');
