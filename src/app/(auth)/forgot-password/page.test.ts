@@ -33,3 +33,25 @@ describe("forgot-password form", () => {
     expect(form).not.toContain("useSearchParams");
   });
 });
+
+describe("forgot-password form first HTML focus", () => {
+  it("keeps the leftover form in the first HTML and focuses the email after load", () => {
+    const form = readFileSync(new URL("./forgot-password-form.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="forgot-password-form"');
+    expect(form).toContain('id="forgot-password-email"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#forgot-password-form"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("forgot-password-email")?.focus()');
+    expect(form).toContain("autoFocus");
+    expect(form).toContain("disabled={loading}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a dashboard sticky for public password reset request", () => {
+    const sticky = readFileSync(new URL("../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("#forgot-password-form");
+    expect(sticky).not.toContain("#forgot-password-email");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+  });
+});

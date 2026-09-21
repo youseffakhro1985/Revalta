@@ -17,6 +17,12 @@ export function ForgotPasswordForm({ sent }: { sent: boolean }) {
   useEffect(() => {
     setHydrated(true);
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#forgot-password-form") return;
+    document.getElementById("forgot-password-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("forgot-password-email")?.focus(), 0);
+  }, [loading]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,7 +73,7 @@ export function ForgotPasswordForm({ sent }: { sent: boolean }) {
         noValidate
         data-ready={hydrated ? "1" : "0"}
         onSubmit={submit}
-        className="mt-7 space-y-5"
+        className="scroll-mt-36 mt-7 space-y-5"
       >
         <div>
           <label htmlFor="forgot-password-email" className="block text-sm font-medium text-ink-700">
@@ -81,6 +87,7 @@ export function ForgotPasswordForm({ sent }: { sent: boolean }) {
             maxLength={254}
             autoComplete="email"
             autoFocus
+            disabled={loading}
             className={authInputClass}
             defaultValue=""
             placeholder="namn@exempel.se"
