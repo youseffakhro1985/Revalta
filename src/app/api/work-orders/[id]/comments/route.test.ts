@@ -4,12 +4,16 @@ const {
   getCurrentUserMock,
   findAccessibleWorkOrderMock,
   commentCreateMock,
+  commentFindManyMock,
+  auditFindManyMock,
   transactionMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   findAccessibleWorkOrderMock: vi.fn(),
   commentCreateMock: vi.fn(),
+  commentFindManyMock: vi.fn(),
+  auditFindManyMock: vi.fn(),
   transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
@@ -28,13 +32,13 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 
 vi.mock("@/lib/db", () => ({
   default: {
-    workOrderComment: { findMany: vi.fn() },
-    auditLog: { findMany: vi.fn() },
+    workOrderComment: { findMany: commentFindManyMock },
+    auditLog: { findMany: auditFindManyMock },
     $transaction: transactionMock,
   },
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const tx = { workOrderComment: { create: commentCreateMock } };
@@ -117,5 +121,29 @@ describe("work-order comment mutation reliability", () => {
     expect(transactionMock).not.toHaveBeenCalled();
     expect(commentCreateMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order comments GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading comments or audit history", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/comments"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+    expect(commentFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 });

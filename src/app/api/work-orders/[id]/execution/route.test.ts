@@ -44,6 +44,11 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
   canViewFinanceData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 vi.mock("@/lib/assigned-work-access", () => ({
   isAssignedWorkAccessible: (user: { role: string; id: string }, assignedToId: string | null) => user.role !== "technician" || user.id === assignedToId,
@@ -231,6 +236,22 @@ describe("work-order execution lifecycle boundaries", () => {
     expect(body.entries[0].unit_cost).toBeNull();
     expect(body.entries[0].total_amount).toBeNull();
     expect(body.completion).toEqual({ status: "in_progress", required_incomplete: 0, before_photo_count: 1, after_photo_count: 1 });
+  });
+
+  it("rejects residents before loading execution checklist, costs or SLA", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/execution"), params);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 
   it("finalizes in-progress work through the canonical completion helper inside one transaction", async () => {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getModernTimeEntry,
@@ -19,11 +19,12 @@ async function ensureOrder(user: CompanyUser, id: string) {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   const { id } = await params;
-  if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
+  if (!await ensureOrder(user, id)) return notFoundWorkOrder();
 
   const rows = (await listTimeEntries(user.company_id, id))
     .sort((a, b) => String(b.startedAt ?? b.createdAt).localeCompare(String(a.startedAt ?? a.createdAt)));
