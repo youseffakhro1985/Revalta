@@ -84,6 +84,7 @@ export default function EnergyPage() {
     if (loading) return;
     if (window.location.hash !== "#energifilter") return;
     document.getElementById("energifilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("energi-sok")?.focus(), 0);
   }, [loading, readings]);
   useEffect(() => {
     if (loading) return;
@@ -238,7 +239,7 @@ export default function EnergyPage() {
 
     <Panel title="Filtrera energiläget" description="Avgränsa fastighet, förbrukningstyp och period utan att ändra registrerade mätvärden.">
       <div id="energifilter" className="scroll-mt-36 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_0.8fr_1fr_0.8fr_auto]">
-        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök fastighet eller anteckning" aria-label="Sök energi" /></label>
+        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input id="energi-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök fastighet eller anteckning" aria-label="Sök energi" /></label>
         <select disabled={loading} className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera förbrukningstyp"><option value="all">Alla typer</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
         <select disabled={loading} className={premiumFieldClass} value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} aria-label="Filtrera period"><option value="all">Alla perioder</option>{periods.map((period) => <option key={period} value={period}>{period}</option>)}</select>
