@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canExportTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canExportTickets, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 import { normalizeTicketStatus } from "@/lib/ticket-lifecycle";
@@ -13,8 +13,10 @@ function csvCell(value: unknown) {
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canExportTickets(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att exportera ärenden" }, { status: 403 });
     }

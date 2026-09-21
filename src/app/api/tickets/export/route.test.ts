@@ -53,6 +53,22 @@ describe("ticket export tenant isolation", () => {
 
     const response = await GET();
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att exportera ärenden");
+    expect(ticketFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before exporting reporter or assignee emails", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-a",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(ticketFindManyMock).not.toHaveBeenCalled();
   });
 });

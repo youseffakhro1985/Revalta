@@ -40,7 +40,7 @@ export async function GET(
     const rawUser = await getCurrentUser();
     if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     const user = requireCompanyUser(rawUser);
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 403 });
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     const { id } = await params;
     const persistAiSource = await hasTicketAiSourceColumn();
 

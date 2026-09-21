@@ -172,6 +172,7 @@ describe("tickets/[id] GET", () => {
     const response = await GET(makeRequest("GET"), { params });
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 
