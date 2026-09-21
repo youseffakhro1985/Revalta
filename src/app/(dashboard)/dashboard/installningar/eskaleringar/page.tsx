@@ -119,6 +119,7 @@ export default function EscalationAdminPage() {
     if (loading) return;
     if (window.location.hash !== "#eskfilter") return;
     document.getElementById("eskfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("esk-orsak")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -260,7 +261,7 @@ export default function EscalationAdminPage() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera uppgifter</span>
-              <select autoFocus value={reasonFilter} onChange={(event) => setReasonFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera eskaleringsuppgifter">
+              <select id="esk-orsak" autoFocus value={reasonFilter} onChange={(event) => setReasonFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera eskaleringsuppgifter">
                 <option value="all">Alla orsaker</option>
                 <option value="blocked">Blockerad</option>
                 <option value="overdue_deadline">Deadline passerad</option>
