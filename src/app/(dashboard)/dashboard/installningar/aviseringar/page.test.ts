@@ -92,9 +92,11 @@ describe("aviseringar leftover recipients first HTML", () => {
 });
 
 describe("aviseringar leftover run history first HTML", () => {
-  it("keeps leftover run history in the first HTML without stealing Aviseringsval or filters", () => {
+  it("keeps leftover run history in the first HTML and focuses refresh after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="korninglista"');
+    expect(source).toContain('id="korninglista-uppdatera"');
     expect(source).toContain('window.location.hash !== "#korninglista"');
     expect(source).toContain("Körningshistoriken hämtas.");
     expect(source).toContain('id="aviseringsinstallningar"');
@@ -102,8 +104,21 @@ describe("aviseringar leftover run history first HTML", () => {
     expect(source).toContain('id="korningshistorik"');
     expect(source).toContain('id="mottagarlista"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("korninglista-uppdatera")?.focus()');
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("autoFocus");
+    expect(source).not.toContain('id="korninglista-uppdatera" autoFocus');
+    expect(source).toContain('id="days-ahead"');
+    expect(source).toContain('document.getElementById("days-ahead")?.focus()');
+    expect(source).toContain('id="historik-status"');
+    expect(source).toContain('document.getElementById("historik-status")?.focus()');
+    expect(source).toContain('id="avi-roll"');
+    expect(sticky).toContain('href: "/dashboard/installningar/aviseringar#aviseringsinstallningar"');
+    expect(sticky).not.toContain("#korninglista");
+    expect(sticky).not.toContain("#korninglista-uppdatera");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
 

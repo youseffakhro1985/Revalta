@@ -111,6 +111,7 @@ export default function ServiceNotificationsPage() {
     if (loading) return;
     if (window.location.hash !== "#korninglista") return;
     document.getElementById("korninglista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("korninglista-uppdatera")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -190,7 +191,7 @@ export default function ServiceNotificationsPage() {
           </nav>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => void load()} disabled={loading || isDirty} title={isDirty ? "Spara eller återställ ändringarna innan du uppdaterar" : undefined} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+          <button id="korninglista-uppdatera" type="button" onClick={() => void load()} disabled={loading || isDirty} title={isDirty ? "Spara eller återställ ändringarna innan du uppdaterar" : undefined} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:cursor-not-allowed disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
           <button type="button" onClick={() => void sendTest()} disabled={sending || !data?.canManage || !config.ready} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:cursor-not-allowed disabled:opacity-50"><Send className="h-4 w-4" /> {sending ? "Skickar…" : "Skicka test"}</button>
         </div>
       </div>
