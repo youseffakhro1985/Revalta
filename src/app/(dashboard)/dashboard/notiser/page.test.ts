@@ -21,12 +21,14 @@ describe("notiser leftover filter first HTML", () => {
   it("keeps leftover notifications in the first HTML without stealing Nytt meddelande", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="notisfilter"');
+    expect(source).toContain('id="notis-alla"');
     expect(source).toContain('id="notislista"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#notisfilter"');
     expect(source).toContain('window.location.hash !== "#notislista"');
     expect(source).toContain('id="nytt-meddelande"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("notis-alla")?.focus()');
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Notiserna hämtas.");
     expect(source).toContain("canManage || loading");
@@ -42,6 +44,7 @@ describe("notiser leftover activity first HTML", () => {
     expect(source).toContain('id="nytt-meddelande"');
     expect(source).toContain('id="notis-rubrik"');
     expect(source).toContain('id="notisfilter"');
+    expect(source).toContain('id="notis-alla"');
     expect(source).toContain('id="notislista"');
     expect(source).toContain("canManage || loading");
   });
