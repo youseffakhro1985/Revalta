@@ -18,7 +18,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
+import { GET, PUT } from "./route";
 
 const params = Promise.resolve({ id: "lease-1" });
 
@@ -47,6 +47,35 @@ describe("GET /api/leases/[id]/inspection-items", () => {
     const response = await GET(new Request("http://localhost/api/leases/lease-1/inspection-items"), { params });
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PUT rejects residents before writing inspection items", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PUT(new Request("http://localhost/api/leases/lease-1/inspection-items", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [] }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PUT denies technicians with the inspection-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PUT(new Request("http://localhost/api/leases/lease-1/inspection-items", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [] }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att hantera besiktningar");
     expect(leaseFindFirstMock).not.toHaveBeenCalled();
   });
 });

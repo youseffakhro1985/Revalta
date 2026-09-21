@@ -1,0 +1,55 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { getCurrentUserMock, reconcileInspectionRecordMock } = vi.hoisted(() => ({
+  getCurrentUserMock: vi.fn(),
+  reconcileInspectionRecordMock: vi.fn(),
+}));
+
+vi.mock("@/lib/current-user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/current-user")>()),
+  getCurrentUser: getCurrentUserMock,
+}));
+
+vi.mock("@/lib/reconcile-inspection-record", () => ({
+  reconcileInspectionRecord: reconcileInspectionRecordMock,
+  InspectionRecordSyncError: class InspectionRecordSyncError extends Error {},
+}));
+
+import { POST } from "./route";
+
+const params = Promise.resolve({ id: "lease-1" });
+
+describe("POST /api/leases/[id]/inspection-work-orders/reconcile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("rejects residents before reconciling inspection work orders", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/leases/lease-1/inspection-work-orders/reconcile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: 1 }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(reconcileInspectionRecordMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the inspection-update copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("http://localhost/api/leases/lease-1/inspection-work-orders/reconcile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version: 1 }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att uppdatera besiktningen");
+    expect(reconcileInspectionRecordMock).not.toHaveBeenCalled();
+  });
+});

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageLeases, getCurrentUser } from "@/lib/current-user";
+import { canManageLeases, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { isOccupyingLeaseStatus } from "@/lib/leasing";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -12,13 +12,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageLeases(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att återställa avtal" }, { status: 403 });
-    }
-    if (!user.company_id) {
-      return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
     }
     const companyId = user.company_id;
 

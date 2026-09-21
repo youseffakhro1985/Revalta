@@ -31,7 +31,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 describe("leases route", () => {
   beforeEach(() => {
@@ -106,5 +106,32 @@ describe("leases route", () => {
     }));
     expect(body.pagination).toEqual({ page: 2, pageSize: 25, total: 125, totalPages: 5 });
     expect(body.summary).toEqual({ activeHolders: 2, annualRent: 600_000 });
+  });
+
+  it("POST denies residents before creating a lease", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ holderName: "Anna" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+  });
+
+  it("POST denies technicians with the lease-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ holderName: "Anna" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att hantera avtal");
   });
 });

@@ -100,4 +100,25 @@ describe("leases/[id]/restore", () => {
     expect(response.status).toBe(500);
     expect(transactionMock).toHaveBeenCalledTimes(1);
   });
+
+  it("POST denies residents before looking up a lease", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/leases/lease-1/restore", { method: "POST" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the lease-restore copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("http://localhost/api/leases/lease-1/restore", { method: "POST" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att återställa avtal");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
 });

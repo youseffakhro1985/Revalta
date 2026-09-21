@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { createInspectionWorkOrders, InspectionWorkOrderError } from "@/lib/create-inspection-work-orders";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -7,10 +7,11 @@ const logger = createLogger({ route: "/api/leases/[id]/inspection-work-orders" }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att skapa arbetsorder" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null) as { version?: unknown; itemIds?: unknown } | null;
     if (!body || !Array.isArray(body.itemIds)) return NextResponse.json({ error: "Välj besiktningspunkter" }, { status: 400 });

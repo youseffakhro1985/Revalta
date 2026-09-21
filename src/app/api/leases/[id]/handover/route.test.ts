@@ -161,4 +161,35 @@ describe("leases/[id]/handover route", () => {
     expect(body.error).toMatch(/backfill/i);
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("PUT rejects residents before looking up a handover", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PUT(new Request("http://localhost/api/leases/lease-1/handover", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "move_in" }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("PUT denies technicians with the handover-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PUT(new Request("http://localhost/api/leases/lease-1/handover", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "move_in" }),
+    }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att hantera överlämningar");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

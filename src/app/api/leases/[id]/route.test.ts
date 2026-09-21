@@ -105,7 +105,7 @@ describe("leases/[id] route", () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body.error).toBe("Du saknar behörighet att hantera avtal");
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(leaseFindFirstMock).not.toHaveBeenCalled();
   });
 
@@ -123,7 +123,31 @@ describe("leases/[id] route", () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body.error).toBe("Du saknar behörighet att ta bort avtal");
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians with the lease-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await PATCH(new Request("http://localhost/api/leases/lease-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "draft" }),
+    }), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att hantera avtal");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("DELETE denies technicians with the lease-delete copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await DELETE(new Request("http://localhost/api/leases/lease-1"), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att ta bort avtal");
     expect(leaseFindFirstMock).not.toHaveBeenCalled();
   });
 });
