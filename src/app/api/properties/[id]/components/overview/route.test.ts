@@ -140,6 +140,26 @@ describe("property component overview GET", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before loading the component overview", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request(), { params: Promise.resolve({ id: "property-1" }) });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
   it("returns a safe correlated 500 for raw-query failures", async () => {
     getCurrentUserMock.mockResolvedValue(owner);
     queryRawMock.mockRejectedValue(new Error("postgres://user:secret@db.internal/revalta"));

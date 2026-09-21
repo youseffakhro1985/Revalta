@@ -7,6 +7,7 @@ import {
   canCreateProperties,
   canViewFinanceData,
   getCurrentUser,
+  requireCompanyUser,
   tenantWhere,
 } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -91,12 +92,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const observability = createRouteObservability(request, CARD_ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return rejectCard(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "property.card.read.unauthorized" });
     }
-    if (!user.company_id) {
-      return rejectCard(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "property.card.read.missing_company", context: { userId: user.id } });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return rejectCard(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "property.card.read.forbidden",
+        context: { userId: rawUser.id },
+      });
     }
 
     const { id } = await params;

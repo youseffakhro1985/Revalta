@@ -26,6 +26,11 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canViewLeasingData: (role: string) => role === "owner" || role === "admin" || role === "manager",
   tenantWhere: (user: { company_id: string | null }) => ({ company_id: user.company_id }),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -116,9 +121,31 @@ describe("documents/library GET — tenant and pagination contract", () => {
   it("fails closed when an authenticated user has no company", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "manager", company_id: null });
     const response = await GET(new Request("https://www.revalta.se/api/documents/library"));
-    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(body.errorCode).toBe("FORBIDDEN");
     expect(managedCountMock).not.toHaveBeenCalled();
     expect(managedFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing the document library", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-a",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(new Request("https://www.revalta.se/api/documents/library"));
+    const body = await response.json();
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(managedCountMock).not.toHaveBeenCalled();
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 
   it("scopes every document query to the session company and applies bounded server pagination", async () => {

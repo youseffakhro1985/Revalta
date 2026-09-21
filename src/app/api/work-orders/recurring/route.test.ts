@@ -37,7 +37,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH } from "./route";
+import { GET, PATCH } from "./route";
 
 describe("work-orders/recurring route", () => {
   beforeEach(() => {
@@ -100,6 +100,29 @@ describe("work-orders/recurring route", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       action: "work_order.recurring.schedule_updated",
     }));
+  });
+
+  it("rejects residents before listing recurring schedules", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects callers without organisation before listing recurring schedules", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
   });
 
   it("fail-closes legacy recurring schedule updates with Swedish 409", async () => {
