@@ -99,6 +99,8 @@ export function BillingPage({ checkout }: { checkout: string }) {
   useEffect(() => {
     if (window.location.hash !== "#planer") return;
     document.getElementById("planer")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (loading) return;
+    window.setTimeout(() => document.getElementById("plan-byt")?.focus(), 0);
   }, [loading, billing]);
   useEffect(() => {
     if (loading) return;
@@ -200,7 +202,7 @@ export function BillingPage({ checkout }: { checkout: string }) {
               Se aktiv plan, kapacitetsgränser och betalningsstatus. Planbyten i produktion genomförs säkert via Stripe Checkout.
             </p>
           </div>
-          <a href="#planer" className={premiumPrimaryButtonClass}>Byt plan</a>
+          <a id="plan-byt" autoFocus href="#planer" className={premiumPrimaryButtonClass}>Byt plan</a>
         </div>
       </header>
 

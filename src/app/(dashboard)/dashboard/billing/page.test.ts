@@ -22,9 +22,12 @@ describe("billing checkout return", () => {
 
   it("keeps the plan hash target in the first HTML and scrolls after load", () => {
     expect(form).toContain('id="planer"');
+    expect(form).toContain('id="plan-byt"');
+    expect(form).toContain("autoFocus");
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#planer"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("plan-byt")?.focus()');
     expect(form).toContain('href="#planer"');
     expect(form).toContain("Byt plan");
   });
@@ -37,6 +40,7 @@ describe("billing leftover plans first HTML", () => {
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#planuppgifter"');
     expect(form).toContain('id="planer"');
+    expect(form).toContain('id="plan-byt"');
     expect(form).toContain("Byt plan");
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("Planerna hämtas.");
