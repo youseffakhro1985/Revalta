@@ -16,15 +16,25 @@ describe("mina aviseringar hash target", () => {
 });
 
 describe("mina aviseringar leftover status first HTML", () => {
-  it("keeps leftover status in the first HTML without stealing Mina val", () => {
+  it("keeps leftover status in the first HTML and focuses save after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="minastatus"');
+    expect(source).toContain('id="mina-spara"');
     expect(source).toContain('window.location.hash !== "#minastatus"');
+    expect(source).toContain('document.getElementById("mina-spara")?.focus()');
     expect(source).toContain("Valen hämtas.");
     expect(source).toContain('id="mina-val"');
+    expect(source).toContain('id="mina-val-toggle"');
     expect(source).toContain("Spara mina val");
     expect(source).toContain("scrollIntoView");
-    expect(source).toContain("disabled={loading || saving}");
+    expect(source).toContain("disabled={saving || loading}");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="mina-spara" autoFocus');
+    expect(sticky).toContain('href: "/dashboard/installningar/mina-aviseringar#mina-val"');
+    expect(sticky).not.toContain("#minastatus");
+    expect(sticky).not.toContain("#mina-spara");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
   });
 });
 
