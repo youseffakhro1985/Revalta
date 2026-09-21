@@ -65,6 +65,7 @@ export function LeaseInspectionItemsCenter() {
     if (loading) return;
     if (window.location.hash !== "#besiktningslista") return;
     document.getElementById("besiktningslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("besiktningslista-uppdatera")?.focus(), 0);
   }, [loading, detail]);
 
   const isLegacy = detail?.source === "legacy";
@@ -119,7 +120,7 @@ export function LeaseInspectionItemsCenter() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-end">
         <label className="flex-1"><span className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-ink-500">Avtal</span><select className={premiumFieldClass} value={leaseId} onChange={(event) => setLeaseId(event.target.value)}><option value="">Välj avtal</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.lease_number} · {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.name}</option>)}</select></label>
-        <button type="button" onClick={() => void loadDetail(leaseId)} disabled={!leaseId || loading} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button>
+        <button id="besiktningslista-uppdatera" type="button" onClick={() => void loadDetail(leaseId)} disabled={!leaseId || loading} className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 px-4 text-sm font-semibold text-ink-700"><RefreshCw className="mr-2 h-4 w-4" />Uppdatera</button>
       </div>
       {error ? <InlineAlert>{error}</InlineAlert> : null}{success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       <div id="besiktningslista" className="scroll-mt-36">
