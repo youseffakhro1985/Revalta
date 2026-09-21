@@ -161,6 +161,47 @@ describe("resident-portal notices route", () => {
     } }));
   });
 
+  it("scopes notices to Tenant A matched leases and never Tenant B", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    listResidentMatchedLeasesMock.mockResolvedValue([
+      { id: "lease-a", property_id: "property-a", unit: { designation: "1201" } },
+    ]);
+
+    await GET(request());
+
+    expect(listResidentMatchedLeasesMock).toHaveBeenCalledWith("company-a", "boende-a@exempel.se");
+    expect(listResidentMatchedLeasesMock).not.toHaveBeenCalledWith("company-b", expect.anything());
+    expect(rentNoticeFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-a",
+        lease_id: { in: ["lease-a"] },
+      }),
+    }));
+    expect(JSON.stringify(rentNoticeFindManyMock.mock.calls[0][0].where)).not.toContain("company-b");
+  });
+
+  it("does not query notices for Resident B lease ids when only Resident A matched", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    listResidentMatchedLeasesMock.mockResolvedValue([
+      { id: "lease-a", property_id: "property-a", unit: { designation: "1101" } },
+    ]);
+
+    await GET(request());
+
+    expect(rentNoticeFindManyMock.mock.calls[0][0].where.lease_id.in).toEqual(["lease-a"]);
+    expect(rentNoticeFindManyMock.mock.calls[0][0].where.lease_id.in).not.toContain("lease-resident-b");
+  });
+
   it("denies staff from the resident-only notices API with a stable correlated 403", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "manager-1",

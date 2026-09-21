@@ -4,6 +4,7 @@ const {
   createLoggerMock,
   getCurrentUserMock,
   listResidentMatchedLeasesMock,
+  findResidentMatchedLeaseMock,
   bookingFindManyMock,
   bookingFindFirstMock,
   bookingCreateMock,
@@ -19,6 +20,7 @@ const {
   createLoggerMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
   listResidentMatchedLeasesMock: vi.fn(),
+  findResidentMatchedLeaseMock: vi.fn(),
   bookingFindManyMock: vi.fn(),
   bookingFindFirstMock: vi.fn(),
   bookingCreateMock: vi.fn(),
@@ -39,6 +41,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 
 vi.mock("@/lib/resident-portal-leases", () => ({
   listResidentMatchedLeases: listResidentMatchedLeasesMock,
+  findResidentMatchedLease: findResidentMatchedLeaseMock,
 }));
 
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
@@ -78,7 +81,26 @@ const lease = {
   unit_id: "unit-1",
   property: { id: "property-1", name: "Storgatan 1", address: "Storgatan 1", city: "Stockholm" },
   unit: { id: "unit-1", designation: "1201" },
-  lease_holder: { name: "Boende Test", contact_name: null },
+  lease_holder: {
+    id: "holder-1",
+    name: "Boende Test",
+    contact_name: null,
+    email: "boende@exempel.se",
+    phone: null,
+  },
+};
+
+const residentB = {
+  ...residentUser,
+  id: "user-resident-b",
+  email: "boende-b@exempel.se",
+  name: "Boende B",
+};
+
+const tenantBLease = {
+  ...lease,
+  id: "lease-tenant-b",
+  property_id: "property-b",
 };
 
 function request(method = "GET", body?: Record<string, unknown>) {
@@ -140,6 +162,7 @@ describe("resident-portal bookings route", () => {
     });
     checkRateLimitMock.mockResolvedValue({ allowed: true, remaining: 10, resetAt: new Date() });
     listResidentMatchedLeasesMock.mockResolvedValue([lease]);
+    findResidentMatchedLeaseMock.mockResolvedValue(lease);
     bookingFindManyMock.mockResolvedValue([]);
     bookingFindFirstMock.mockResolvedValue(null);
     executeRawMock.mockResolvedValue(1);
@@ -278,12 +301,13 @@ describe("resident-portal bookings route", () => {
       requestId,
     });
     expect(listResidentMatchedLeasesMock).not.toHaveBeenCalled();
+    expect(findResidentMatchedLeaseMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("does not log an unverified submitted lease id when no matched lease exists", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
-    listResidentMatchedLeasesMock.mockResolvedValue([]);
+    findResidentMatchedLeaseMock.mockResolvedValue(null);
 
     const response = await POST(request("POST", {
       leaseId: "external-secret-lease",
@@ -293,8 +317,97 @@ describe("resident-portal bookings route", () => {
     }));
 
     expect(response.status).toBe(404);
+    expect(findResidentMatchedLeaseMock).toHaveBeenCalledWith(
+      "company-1",
+      "boende@exempel.se",
+      "external-secret-lease",
+    );
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-lease");
     expect(transactionMock).not.toHaveBeenCalled();
+    expect(bookingCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 without creating when Resident A submits Tenant B lease id", async () => {
+    getCurrentUserMock.mockResolvedValue({ ...residentUser, company_id: "company-a" });
+    findResidentMatchedLeaseMock.mockResolvedValue(null);
+
+    const response = await POST(request("POST", {
+      ...bookingInput(),
+      leaseId: tenantBLease.id,
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({
+      error: "Hyresavtalet hittades inte",
+      errorCode: "NOT_FOUND",
+      requestId,
+    });
+    expect(findResidentMatchedLeaseMock).toHaveBeenCalledWith(
+      "company-a",
+      "boende@exempel.se",
+      "lease-tenant-b",
+    );
+    expect(findResidentMatchedLeaseMock).not.toHaveBeenCalledWith(
+      "company-b",
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(bookingCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 without creating when Resident A submits Resident B lease id in the same company", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    findResidentMatchedLeaseMock.mockResolvedValue(null);
+
+    const response = await POST(request("POST", {
+      ...bookingInput(),
+      leaseId: "lease-resident-b",
+    }));
+
+    expect(response.status).toBe(404);
+    expect(findResidentMatchedLeaseMock).toHaveBeenCalledWith(
+      "company-1",
+      "boende@exempel.se",
+      "lease-resident-b",
+    );
+    expect(findResidentMatchedLeaseMock.mock.calls[0][1]).not.toBe(residentB.email);
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 without mutating when cancelling Tenant B booking id", async () => {
+    getCurrentUserMock.mockResolvedValue({ ...residentUser, company_id: "company-a" });
+    bookingFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(request("PATCH", {
+      bookingId: "booking-tenant-b",
+      status: "cancelled",
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.errorCode).toBe("NOT_FOUND");
+    expect(bookingFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "booking-tenant-b",
+        company_id: "company-a",
+        created_by_id: "user-resident",
+      }),
+    }));
+    expect(bookingFindFirstMock.mock.calls[0][0].where.company_id).not.toBe("company-b");
+    expect(bookingUpdateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("booking-tenant-b");
+  });
+
+  it("lists leases for the signed-in company and email, never Tenant B", async () => {
+    getCurrentUserMock.mockResolvedValue({ ...residentUser, company_id: "company-a" });
+    await GET(request());
+    expect(listResidentMatchedLeasesMock).toHaveBeenCalledWith("company-a", "boende@exempel.se");
+    expect(listResidentMatchedLeasesMock).not.toHaveBeenCalledWith("company-b", expect.anything());
+    expect(bookingFindManyMock.mock.calls[0][0].where.company_id).toBe("company-a");
+    expect(bookingFindManyMock.mock.calls[0][0].where.created_by_id).toBe("user-resident");
   });
 
   it("returns correlated 409 after the serialized conflict recheck", async () => {

@@ -13,6 +13,7 @@ import { generatePublicReference } from "@/lib/public-portal";
 import { getPublicAppUrl } from "@/lib/app-url";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { loadLegacyRows } from "@/lib/dual-list";
+import { findResidentMatchedLease } from "@/lib/resident-portal-leases";
 import { leaseHolderEmailMatch, reporterEmailMatch } from "@/lib/resident-portal-scope";
 import { normalizeEmail } from "@/lib/security";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -416,23 +417,24 @@ export async function POST(request: Request) {
     if (subject.length > 200 || message.length > 5000) return validationFailure("Ämnet eller beskrivningen är för lång", "field_too_long");
     if (!allowedCategories.has(category) || !allowedPriorities.has(priority)) return validationFailure("Ogiltig kategori eller prioritet", "invalid_category_or_priority");
 
-    const lease = await db.lease.findFirst({
-      where: {
-        id: leaseId,
-        company_id: user.company_id,
-        deleted_at: null,
-        status: { in: activeLeaseStatuses },
-        property: { deleted_at: null },
-        ...(residentView ? { lease_holder: leaseHolderEmailMatch(user.email) } : {}),
-      },
-      select: {
-        id: true,
-        lease_number: true,
-        property_id: true,
-        unit: { select: { designation: true } },
-        lease_holder: { select: { id: true, name: true, contact_name: true, email: true, phone: true } },
-      },
-    });
+    const lease = residentView
+      ? await findResidentMatchedLease(user.company_id, user.email, leaseId)
+      : await db.lease.findFirst({
+          where: {
+            id: leaseId,
+            company_id: user.company_id,
+            deleted_at: null,
+            status: { in: activeLeaseStatuses },
+            property: { deleted_at: null },
+          },
+          select: {
+            id: true,
+            lease_number: true,
+            property_id: true,
+            unit: { select: { designation: true } },
+            lease_holder: { select: { id: true, name: true, contact_name: true, email: true, phone: true } },
+          },
+        });
     if (!lease) {
       if (nativeForm) return nativeRedirect(`${HOME_PATH}?reason=missing`);
       return reject(observability, {

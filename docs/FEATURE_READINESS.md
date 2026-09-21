@@ -1,8 +1,8 @@
 # Revalta Feature Readiness
 
-Verified baseline: `ec95b376e6e692defb6c252bcb16986bcd6921f4` (21 Sep 2026)
+Verified baseline: `89e9a50b9ac94020f21c4275985933b1a9aa8aae` (21 Sep 2026, `#936` on `main`). Production `/api/health` at that SHA: `schemaReady: true`, dataplane `e51d9599…`, isolated from Preview `6237f010…`.
 
-This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `92adc33dfd224c698f8a31d0ce59a808faed355e` (Inställningar #933) and `b7b08793` (31 Aug 2026) are not current-main evidence.
+This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `ec95b376e6e692defb6c252bcb16986bcd6921f4` (`#934`), `92adc33dfd224c698f8a31d0ce59a808faed355e` (Inställningar `#933`) and `b7b08793` (31 Aug 2026) are not current-main evidence.
 
 ## Status contract
 
@@ -47,10 +47,10 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Besiktningar | PARTIAL | Module exists. | Observation-to-work-order linkage and tenant/security/readiness audit. |
 | Underhåll | PARTIAL | Module exists. | Maintenance-plan-to-work-order lifecycle, query and tenant evidence. |
 | Skador & försäkring | PARTIAL | Module exists. | Claim relation/security/audit and work-order/project linkage verification. |
-| Boendeportal | PARTIAL | Resident auth/navigation and several resident APIs exist. Public portal is fail-closed to an explicit tenant (no first-company or foreign UUID slug). | Full resident-vs-company isolation matrix, owner confirmation of portal company id, and production-path review. |
-| Uthyrning | PARTIAL | Module exists. | Contract/lifecycle/tenant/search/error/mobile readiness review. |
+| Boendeportal | PARTIAL | Resident auth/navigation and several resident APIs exist. Public portal is fail-closed to an explicit tenant (no first-company or foreign UUID slug). Unit negatives: Resident A cannot read Tenant B/Resident B tickets/docs; comments/attachments/blob 404; lease lookup is email+company; booking create/cancel 404 on foreign lease/booking; staff lease/booking APIs 403. | Exact-SHA Preview golden-path E2E (resident + staff), owner confirmation of portal company id. |
+| Uthyrning | PARTIAL | Module exists. Staff `/api/leases` 403 for residents. | Contract/lifecycle/tenant/search/error/mobile readiness review. |
 | Hyresavisering | PARTIAL | Billing/economy surfaces exist. | Truthful invoice/payment lifecycle and financial-data authorization audit. |
-| Bokningar | PARTIAL | Module exists. | Conflict/concurrency/resident isolation and mobile/error verification. |
+| Bokningar | PARTIAL | Module exists. Resident self-service create is lease-identity scoped; list/cancel is creator+company scoped. Staff list 403 for residents. | Conflict/concurrency and exact-SHA Preview browser evidence. |
 | Nycklar & passage | PARTIAL | Module exists. | Custody/history/security/role/audit lifecycle verification. |
 | Ekonomi | PARTIAL | Economy views/APIs exist. | Financial authorization, data truth, audit and query/load verification. |
 | Budget & prognos | PARTIAL | Module exists. | Calculation/data-source/query/permission verification. |

@@ -5,6 +5,7 @@ const {
   getCurrentUserMock,
   leaseFindManyMock,
   leaseFindFirstMock,
+  findResidentMatchedLeaseMock,
   ticketFindManyMock,
   ticketCreateMock,
   managedDocumentFindManyMock,
@@ -21,6 +22,7 @@ const {
   getCurrentUserMock: vi.fn(),
   leaseFindManyMock: vi.fn(),
   leaseFindFirstMock: vi.fn(),
+  findResidentMatchedLeaseMock: vi.fn(),
   ticketFindManyMock: vi.fn(),
   ticketCreateMock: vi.fn(),
   managedDocumentFindManyMock: vi.fn(),
@@ -37,6 +39,10 @@ const {
 vi.mock("@/lib/current-user", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/current-user")>()),
   getCurrentUser: getCurrentUserMock,
+}));
+
+vi.mock("@/lib/resident-portal-leases", () => ({
+  findResidentMatchedLease: findResidentMatchedLeaseMock,
 }));
 
 vi.mock("@/lib/audit", () => ({
@@ -106,6 +112,7 @@ describe("resident-portal route", () => {
     });
     getDocumentLifecycleMapMock.mockResolvedValue(new Map());
     writeAuditLogMock.mockResolvedValue(undefined);
+    findResidentMatchedLeaseMock.mockResolvedValue(null);
     leaseFindManyMock.mockResolvedValue([]);
     ticketFindManyMock.mockResolvedValue([]);
     managedDocumentFindManyMock.mockResolvedValue([]);
@@ -157,6 +164,30 @@ describe("resident-portal route", () => {
       }),
     );
     expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("boende@exempel.se");
+  });
+
+  it("never lists Tenant B leases for Resident A", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+
+    await GET(getRequest());
+
+    expect(leaseFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-a",
+        lease_holder: {
+          deleted_at: null,
+          email: { equals: "boende-a@exempel.se", mode: "insensitive" },
+        },
+      }),
+    }));
+    expect(leaseFindManyMock.mock.calls[0][0].where.company_id).not.toBe("company-b");
+    expect(ticketFindManyMock.mock.calls[0][0].where.company_id).toBe("company-a");
+    expect(ticketFindManyMock.mock.calls[0][0].where.reporter_email.equals).toBe("boende-a@exempel.se");
   });
 
   it("keeps company-wide leases for staff GET", async () => {
@@ -218,11 +249,13 @@ describe("resident-portal route", () => {
       role: "resident",
       email: "boende@exempel.se",
     });
-    leaseFindFirstMock.mockResolvedValue({
+    findResidentMatchedLeaseMock.mockResolvedValue({
       id: "lease-1",
       lease_number: "AVT-1",
       property_id: "property-1",
-      unit: { designation: "1101" },
+      unit_id: "unit-1",
+      property: { id: "property-1", name: "Storgatan 1", address: "Storgatan 1", city: "Stockholm" },
+      unit: { id: "unit-1", designation: "1101" },
       lease_holder: {
         id: "holder-1",
         name: "Ada Boende",
@@ -252,14 +285,12 @@ describe("resident-portal route", () => {
     expect(response.headers.get("x-request-id")).toBe(requestId);
     expect(response.headers.get("cache-control")).toContain("private");
     expect(response.headers.get("cache-control")).toContain("no-store");
-    expect(leaseFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        lease_holder: {
-          deleted_at: null,
-          email: { equals: "boende@exempel.se", mode: "insensitive" },
-        },
-      }),
-    }));
+    expect(findResidentMatchedLeaseMock).toHaveBeenCalledWith(
+      "company-1",
+      "boende@exempel.se",
+      "lease-1",
+    );
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
     expect(ticketCreateMock).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         reporter_email: "boende@exempel.se",
@@ -287,7 +318,7 @@ describe("resident-portal route", () => {
       role: "resident",
       email: "boende@exempel.se",
     });
-    leaseFindFirstMock.mockResolvedValue(null);
+    findResidentMatchedLeaseMock.mockResolvedValue(null);
 
     const response = await POST(postRequest({
       leaseId: "external-secret-lease",
@@ -304,8 +335,120 @@ describe("resident-portal route", () => {
       errorCode: "NOT_FOUND",
       requestId,
     });
+    expect(findResidentMatchedLeaseMock).toHaveBeenCalledWith(
+      "company-1",
+      "boende@exempel.se",
+      "external-secret-lease",
+    );
     expect(transactionMock).not.toHaveBeenCalled();
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-lease");
+  });
+
+  it("returns 404 without creating when Resident A submits Tenant B lease id", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    findResidentMatchedLeaseMock.mockResolvedValue(null);
+
+    const response = await POST(postRequest({
+      leaseId: "lease-tenant-b",
+      subject: "Läckage",
+      message: "Det droppar under diskbänken sedan igår.",
+      category: "plumbing",
+      priority: "high",
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.errorCode).toBe("NOT_FOUND");
+    expect(findResidentMatchedLeaseMock).toHaveBeenCalledWith(
+      "company-a",
+      "boende-a@exempel.se",
+      "lease-tenant-b",
+    );
+    expect(findResidentMatchedLeaseMock).not.toHaveBeenCalledWith(
+      "company-b",
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let a resident inherit staff company-wide lease lookup", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    findResidentMatchedLeaseMock.mockResolvedValue(null);
+
+    await POST(postRequest({
+      leaseId: "lease-resident-b",
+      subject: "Läckage",
+      message: "Det droppar under diskbänken sedan igår.",
+      category: "plumbing",
+      priority: "high",
+    }));
+
+    expect(findResidentMatchedLeaseMock).toHaveBeenCalledTimes(1);
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("lets leasing staff look up a lease by company without resident email match", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      company_id: "company-a",
+      role: "manager",
+      email: "forvaltare@exempel.se",
+    });
+    leaseFindFirstMock.mockResolvedValue({
+      id: "lease-1",
+      lease_number: "AVT-1",
+      property_id: "property-1",
+      unit: { designation: "1101" },
+      lease_holder: {
+        id: "holder-1",
+        name: "Ada Boende",
+        contact_name: null,
+        email: "boende-a@exempel.se",
+        phone: null,
+      },
+    });
+    transactionMock.mockImplementation(async (callback: (tx: {
+      ticket: { create: typeof ticketCreateMock };
+      auditLog: { create: typeof auditLogCreateMock };
+    }) => Promise<unknown>) => callback({
+      ticket: { create: ticketCreateMock },
+      auditLog: { create: auditLogCreateMock },
+    }));
+    ticketCreateMock.mockResolvedValue({ id: "ticket-1", public_reference: "RV-TEST-1" });
+
+    const response = await POST(postRequest({
+      leaseId: "lease-1",
+      subject: "Läckage",
+      message: "Det droppar under diskbänken sedan igår.",
+      category: "plumbing",
+      priority: "high",
+    }));
+
+    expect(response.status).toBe(201);
+    expect(findResidentMatchedLeaseMock).not.toHaveBeenCalled();
+    expect(leaseFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: "lease-1",
+        company_id: "company-a",
+        deleted_at: null,
+        status: { in: ["active", "notice"] },
+        property: { deleted_at: null },
+      },
+    }));
+    expect(leaseFindFirstMock.mock.calls[0][0].where.lease_holder).toBeUndefined();
+    expect(leaseFindFirstMock.mock.calls[0][0].where.company_id).not.toBe("company-b");
   });
 
   it("accepts a native form post and redirects to boendeportal without putting the description in the URL", async () => {
@@ -315,11 +458,13 @@ describe("resident-portal route", () => {
       role: "resident",
       email: "boende@exempel.se",
     });
-    leaseFindFirstMock.mockResolvedValue({
+    findResidentMatchedLeaseMock.mockResolvedValue({
       id: "lease-1",
       lease_number: "AVT-1",
       property_id: "property-1",
-      unit: { designation: "1101" },
+      unit_id: "unit-1",
+      property: { id: "property-1", name: "Storgatan 1", address: "Storgatan 1", city: "Stockholm" },
+      unit: { id: "unit-1", designation: "1101" },
       lease_holder: {
         id: "holder-1",
         name: "Ada Boende",

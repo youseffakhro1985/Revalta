@@ -12,7 +12,7 @@ describe("resident portal booking mapping", () => {
       unit_id: "unit-1",
       property,
       unit: { id: "unit-1", designation: "1201" },
-      lease_holder: { name: "Boende Test", contact_name: "Ada Boende" },
+      lease_holder: { id: "holder-1", name: "Boende Test", contact_name: "Ada Boende", email: "boende@exempel.se", phone: null },
     })).toEqual({
       id: "lease-1",
       leaseNumber: "L-1",

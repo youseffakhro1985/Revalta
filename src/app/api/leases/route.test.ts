@@ -68,6 +68,20 @@ describe("leases route", () => {
     expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
+  it("GET denies residents from the staff leasing dump", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    const response = await GET(new Request("https://www.revalta.se/api/leases"));
+    const body = await response.json();
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att visa uthyrningsdata");
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("GET allows viewers to read leasing data", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
     const response = await GET(new Request("https://www.revalta.se/api/leases"));

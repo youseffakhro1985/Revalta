@@ -1,8 +1,12 @@
 # P0/P1 gap report — 2026-09-21
 
-Verified start SHA: `92adc33dfd224c698f8a31d0ce59a808faed355e` (`style(settings): premium polish for Inställningar (#933)`).
+Verified baseline: `89e9a50b9ac94020f21c4275985933b1a9aa8aae` (21 Sep 2026, `#936` on `main`). Subsequent P0 work in this branch adds Resident A/B lease/booking negatives; statuses stay PARTIAL until golden-path Preview E2E is green.
 
 This report is current-main evidence, not a historical audit copy. Unverified items are marked `BLOCKED / NOT VERIFIED`.
+
+## SUPERSEDED START SHA
+
+The SHA `92adc33…` below was true when this file was first written (`#933`). It is **not** current `main`. Current verified `main` at the lease/booking isolation pass: `89e9a50b9ac94020f21c4275985933b1a9aa8aae`. Production `/api/health` matched that SHA (`dpl_54mBKgUsNkgktUd7D8izAtopjeWB`), `schemaReady: true`, dataplane `e51d9599…`.
 
 ## VERIFIED START STATE
 
