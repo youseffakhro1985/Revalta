@@ -129,6 +129,24 @@ describe("bookings route", () => {
       body: JSON.stringify({ bookingId: "booking-1", status: "cancelled" }),
     }));
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(bookingFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies residents before looking up a booking", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    const response = await PATCH(new Request("http://localhost/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "booking-1", status: "cancelled" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(bookingFindFirstMock).not.toHaveBeenCalled();
   });
 
