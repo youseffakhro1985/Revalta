@@ -88,6 +88,7 @@ export default function VendorsPage() {
     if (loading) return;
     if (window.location.hash !== "#leverantorfilter") return;
     document.getElementById("leverantorfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("leverantor-sok")?.focus(), 0);
   }, [loading, vendors]);
   useEffect(() => {
     if (loading) return;
@@ -256,7 +257,7 @@ export default function VendorsPage() {
           <div id="leverantorfilter" className="scroll-mt-36 border-b border-sand-200 bg-sand-50/55 p-5">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" />
-              <input disabled={loading} placeholder="Sök leverantör, kategori, avtal eller kontaktperson" value={query} onChange={(e) => setQuery(e.target.value)} className={`${premiumFieldClass} pl-10`} aria-label="Sök leverantör, kategori, avtal eller kontaktperson" />
+              <input id="leverantor-sok" disabled={loading} placeholder="Sök leverantör, kategori, avtal eller kontaktperson" value={query} onChange={(e) => setQuery(e.target.value)} className={`${premiumFieldClass} pl-10`} aria-label="Sök leverantör, kategori, avtal eller kontaktperson" />
             </div>
             <p className="mt-2 text-xs text-ink-500">{visible.length} av {vendors.length} leverantörer visas</p>
           </div>

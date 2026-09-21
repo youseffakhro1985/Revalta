@@ -18,10 +18,12 @@ describe("leverantorer search filter first HTML", () => {
   it("keeps the search filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="leverantorfilter"');
+    expect(source).toContain('id="leverantor-sok"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#leverantorfilter"');
     expect(source).toContain('id="ny-leverantor"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("leverantor-sok")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("saving || loading");
@@ -38,6 +40,7 @@ describe("leverantorer leftover register first HTML", () => {
     expect(source).toContain('id="ny-leverantor"');
     expect(source).toContain('id="leverantor-namn"');
     expect(source).toContain('id="leverantorfilter"');
+    expect(source).toContain('id="leverantor-sok"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading");
   });
