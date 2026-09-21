@@ -35,3 +35,25 @@ describe("reset-password form", () => {
     expect(form).not.toContain("useSearchParams");
   });
 });
+
+describe("reset-password form first HTML focus", () => {
+  it("keeps the leftover form in the first HTML and focuses the new password after load", () => {
+    const form = readFileSync(new URL("./reset-password-form.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="reset-password-form"');
+    expect(form).toContain('id="reset-password"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#reset-password-form"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("reset-password")?.focus()');
+    expect(form).toContain("autoFocus");
+    expect(form).toContain("disabled={loading || !token}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a dashboard sticky for public password reset", () => {
+    const sticky = readFileSync(new URL("../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("#reset-password-form");
+    expect(sticky).not.toContain("#reset-password");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+  });
+});
