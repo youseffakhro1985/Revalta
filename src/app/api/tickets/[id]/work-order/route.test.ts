@@ -71,7 +71,7 @@ vi.mock("@/lib/ai", () => ({
   })),
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 function request(body: Record<string, unknown>) {
   return new Request("https://www.revalta.se/api/tickets/ticket-1/work-order", {
@@ -163,6 +163,23 @@ describe("ticket work-order creation authorization", () => {
       select: { id: true },
     });
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects resident GET before loading tickets or work orders", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/tickets/ticket-1/work-order"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
   });
 });
 

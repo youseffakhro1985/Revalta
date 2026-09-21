@@ -47,7 +47,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { DELETE } from "./route";
+import { DELETE, GET, PATCH } from "./route";
 
 describe("notifications route", () => {
   beforeEach(() => {
@@ -57,6 +57,42 @@ describe("notifications route", () => {
     auditFindManyMock.mockResolvedValue([]);
     notificationUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("rejects resident GET and PATCH before loading company notifications", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const getResponse = await GET();
+    const patchResponse = await PATCH(new Request("http://localhost/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-1" }),
+    }));
+
+    expect(getResponse.status).toBe(403);
+    expect(patchResponse.status).toBe(403);
+    expect(notificationFindManyMock).not.toHaveBeenCalled();
+    expect(notificationFindFirstMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("lets technicians list company notifications without audit events", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(notificationFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { company_id: "company-1", deleted_at: null },
+    }));
   });
 
   it("soft-deletes modern notifications and writes delete audit", async () => {

@@ -5,6 +5,7 @@ import {
   canManageTeam,
   canViewLeasingData,
   getCurrentUser,
+  requireCompanyUser,
 } from "@/lib/current-user";
 import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
@@ -18,8 +19,12 @@ const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
 
     const canSeeFullRoster =
       canManageTeam(user.role) || canAssignWorkOrders(user.role) || canViewLeasingData(user.role);

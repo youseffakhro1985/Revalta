@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { getNotificationUxState, markNotificationsRead } from "@/lib/notification-ux-state";
 
 export const dynamic = "force-dynamic";
@@ -125,9 +125,10 @@ async function listNotifications(companyId: string, userId: string, readKeys: Se
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const ux = await getNotificationUxState(user.company_id, user.id, "work_order_lock");
   const notifications = await listNotifications(user.company_id, user.id, ux.read);
@@ -143,9 +144,10 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const body = await request.json().catch(() => ({})) as { key?: unknown; all?: unknown };
   const ux = await getNotificationUxState(user.company_id, user.id, "work_order_lock");

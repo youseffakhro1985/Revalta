@@ -152,37 +152,34 @@ describe("team route", () => {
       expect(userFindManyMock.mock.calls[0][0].select.email).toBeUndefined();
     });
 
-    it("returns a limited roster without emails for a resident (no full-roster permission)", async () => {
+    it("rejects residents before loading the staff roster", async () => {
       getCurrentUserMock.mockResolvedValue({
         id: "user-3",
         company_id: "company-1",
         role: "resident",
+        email: "boende@exempel.se",
         company: { name: "Testfastigheter AB" },
       });
-      userFindManyMock.mockResolvedValue([]);
 
       const response = await GET();
       const body = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(body.canManage).toBe(false);
-      expect(body.permissions.canSeeEmails).toBe(false);
+      expect(response.status).toBe(403);
+      expect(body.error).toMatch(/personalbehörighet/i);
+      expect(userFindManyMock).not.toHaveBeenCalled();
     });
 
-    it("scopes to self only when the caller has no company_id", async () => {
+    it("rejects callers without organisation before querying users", async () => {
       getCurrentUserMock.mockResolvedValue({
         id: "user-orphan",
         company_id: null,
         role: "technician",
         company: null,
       });
-      userFindManyMock.mockResolvedValue([]);
 
-      await GET();
-
-      expect(userFindManyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "user-orphan" } }),
-      );
+      const response = await GET();
+      expect(response.status).toBe(403);
+      expect(userFindManyMock).not.toHaveBeenCalled();
     });
 
     it("returns 500 when the database call fails", async () => {
