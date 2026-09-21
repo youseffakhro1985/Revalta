@@ -51,6 +51,12 @@ export function LoginForm(props: LoginFormProps) {
   useEffect(() => {
     setHydrated(true);
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#login-form") return;
+    document.getElementById("login-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("login-email")?.focus(), 0);
+  }, [loading]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -184,7 +190,7 @@ export function LoginForm(props: LoginFormProps) {
         noValidate
         data-ready={hydrated ? "1" : "0"}
         onSubmit={handleLogin}
-        className="mt-7 space-y-5"
+        className="scroll-mt-36 mt-7 space-y-5"
       >
         {props.nextPath ? <input type="hidden" name="next" value={props.nextPath} /> : null}
         <div>
@@ -198,6 +204,7 @@ export function LoginForm(props: LoginFormProps) {
             required
             autoComplete="email"
             autoFocus
+            disabled={loading}
             className={authInputClass}
             defaultValue=""
             placeholder="namn@exempel.se"
