@@ -130,6 +130,7 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#projektlista") return;
     document.getElementById("projektlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("projektlista-rensa")?.focus(), 0);
   }, [loading, projects]);
 
   const visibleProjects = useMemo(() => {
@@ -242,7 +243,7 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
           <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input id="projekt-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök projekt, fastighet eller entreprenör" aria-label="Sök projekt" /></label>
           <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera projektstatus"><option value="all">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <select disabled={loading} className={premiumFieldClass} value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} aria-label="Filtrera risk"><option value="all">Alla risker</option>{Object.entries(riskLabels).map(([value, label]) => <option key={value} value={value}>{label} risk</option>)}</select>
-          <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setRiskFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+          <button id="projektlista-rensa" type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setRiskFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
         </div>
       </Panel>
 
