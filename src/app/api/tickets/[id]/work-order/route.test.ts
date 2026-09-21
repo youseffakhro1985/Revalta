@@ -181,6 +181,34 @@ describe("ticket work-order creation authorization", () => {
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
   });
+
+  it("rejects resident POST before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the work-order create copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(request({}), params);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att skapa arbetsordrar");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("ticket work-order creation schema failures", () => {

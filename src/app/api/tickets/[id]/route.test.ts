@@ -312,6 +312,22 @@ describe("tickets/[id] PATCH", () => {
     const response = await PATCH(makeRequest("PATCH", { status: "planned" }), { params });
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att uppdatera ärenden");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(makeRequest("PATCH", { status: "planned" }), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 
@@ -735,17 +751,33 @@ describe("tickets/[id] DELETE", () => {
     const response = await DELETE(makeRequest("DELETE"), { params });
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att ta bort ärenden");
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 
-  it("returns 400 when the user has no company_id", async () => {
+  it("rejects residents before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await DELETE(makeRequest("DELETE"), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing company with the staff copy", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
 
     const response = await DELETE(makeRequest("DELETE"), { params });
     const body = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(body.error).toBe("Användaren saknar organisation");
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 

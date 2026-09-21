@@ -87,13 +87,17 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) {
+    return NextResponse.json(
+      { error: "En aktiv organisation och personalbehörighet krävs", errorCode: API_ERROR_CODES.forbidden },
+      { status: 403 },
+    );
+  }
   if (!canManageTickets(user.role)) {
     return NextResponse.json({ error: "Du saknar behörighet att skapa arbetsordrar" }, { status: 403 });
-  }
-  if (!user.company_id) {
-    return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   }
 
   const { id } = await params;

@@ -41,7 +41,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { DELETE, GET, PATCH } from "./route";
+import { DELETE, GET, PATCH, POST } from "./route";
 
 describe("ticket operations route", () => {
   beforeEach(() => {
@@ -241,5 +241,71 @@ describe("ticket operations GET staff-scope", () => {
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
     expect(operationFindManyMock).not.toHaveBeenCalled();
     expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/tickets/ticket-1/operations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "note", description: "Intern notering" }),
+      }),
+      { params: Promise.resolve({ id: "ticket-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(
+      new Request("https://www.revalta.se/api/tickets/ticket-1/operations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId: "op-1", description: "Uppdaterad" }),
+      }),
+      { params: Promise.resolve({ id: "ticket-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("DELETE rejects residents before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await DELETE(
+      new Request("https://www.revalta.se/api/tickets/ticket-1/operations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId: "op-1" }),
+      }),
+      { params: Promise.resolve({ id: "ticket-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 });
