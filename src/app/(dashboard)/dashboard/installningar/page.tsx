@@ -202,6 +202,7 @@ export default function SettingsPage() {
     if (initialLoading) return;
     if (window.location.hash !== "#kontooversikt") return;
     document.getElementById("kontooversikt")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("konto-uppdatera")?.focus(), 0);
   }, [initialLoading, profile]);
   useEffect(() => {
     if (initialLoading) return;
@@ -326,6 +327,7 @@ export default function SettingsPage() {
             </nav>
           </div>
           <button
+            id="konto-uppdatera"
             type="button"
             onClick={() => void loadSettings()}
             disabled={initialLoading || Boolean(saving)}
