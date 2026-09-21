@@ -9,6 +9,8 @@ describe("besiktningar create hash", () => {
     expect(source).toContain('window.location.hash !== "#ny-kontroll"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
+    expect(source).toContain('id="kontroll-titel"');
+    expect(source).toContain('document.getElementById("kontroll-titel")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="ny-kontroll"');
   });
@@ -21,6 +23,7 @@ describe("besiktningar leftover plan first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#kontrollplan"');
     expect(source).toContain('id="ny-kontroll"');
+    expect(source).toContain('id="kontroll-titel"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("saving || loading || !canManage");
     expect(source).toContain("Besiktningarna hämtas.");

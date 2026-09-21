@@ -100,6 +100,7 @@ export default function InspectionsPage() {
     if (loading) return;
     if (window.location.hash !== "#ny-kontroll") return;
     document.getElementById("ny-kontroll")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("kontroll-titel")?.focus(), 0);
   }, [loading, canManage]);
   useEffect(() => {
     if (loading) return;
@@ -276,7 +277,7 @@ export default function InspectionsPage() {
                 </select>
               </Field>
               <Field label="Namn">
-                <input required autoFocus disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
+                <input id="kontroll-titel" required autoFocus disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Kontroll eller besiktning" />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Förfallodatum"><input required type="date" disabled={saving || loading || !canManage} className={premiumFieldClass} value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></Field>
