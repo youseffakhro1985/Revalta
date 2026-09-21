@@ -100,6 +100,8 @@ export default function OperationsPage() {
   useEffect(() => {
     if (window.location.hash !== "#kritiska-secrets") return;
     document.getElementById("kritiska-secrets")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (loading) return;
+    window.setTimeout(() => document.getElementById("kritiska-lank")?.focus(), 0);
   }, [loading, health]);
   useEffect(() => {
     if (loading) return;
@@ -123,7 +125,7 @@ export default function OperationsPage() {
           </p>
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
-          <a href="#kritiska-secrets" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white">Kritiska secrets</a>
+          <a id="kritiska-lank" autoFocus href="#kritiska-secrets" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white">Kritiska secrets</a>
           <button
             type="button"
             onClick={() => void loadHealth()}
