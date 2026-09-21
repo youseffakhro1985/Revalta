@@ -2,6 +2,7 @@ import { validateRelease, validateTarget } from "./target-policy.mjs";
 
 export const REQUIRED_STEPS = Object.freeze([
   "verified-login-and-profile", "dashboard", "desktop-navigation", "properties-api",
+  "golden-path-ticket-to-invoice", "golden-path-mobile-work-order",
   "command-center-api", "mobile-navigation-and-command-center",
   "logout-and-protected-redirect", "public-auth-verification",
 ]);

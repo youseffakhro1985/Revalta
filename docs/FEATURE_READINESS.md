@@ -1,6 +1,6 @@
 # Revalta Feature Readiness
 
-Verified baseline: `89e9a50b9ac94020f21c4275985933b1a9aa8aae` (21 Sep 2026, `#936` on `main`). Production `/api/health` at that SHA: `schemaReady: true`, dataplane `e51d9599…`, isolated from Preview `6237f010…`.
+Verified baseline: `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (21 Sep 2026, `#937` on `main`). Production `/api/health` at that SHA: `schemaReady: true`, dataplane `e51d9599…`, isolated from Preview `6237f010…`. This branch adds staff golden-path Preview E2E; modules stay PARTIAL until that job is green on the merged SHA.
 
 This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `ec95b376e6e692defb6c252bcb16986bcd6921f4` (`#934`), `92adc33dfd224c698f8a31d0ce59a808faed355e` (Inställningar `#933`) and `b7b08793` (31 Aug 2026) are not current-main evidence.
 
@@ -40,8 +40,8 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | --- | --- | --- | --- |
 | Översikt | PARTIAL | Canonical dashboard exists and dashboard-integrity gate is green. Full tenant/query/runtime review not yet recorded. | Tenant-safe KPI/query audit + responsive/a11y/browser evidence. |
 | Fastigheter | PARTIAL | Substantial current UI/API implementation exists. | Full CRUD/relations/tenant-negative/pagination audit. |
-| Ärenden | PARTIAL | Core ticket flows exist and are part of product golden path. | End-to-end tenant/SLA/search/pagination/audit/browser verification. |
-| Arbetsordrar | PARTIAL | Significant operational UI/API exists. | Golden-path linkage, tenant relation checks, mobile technician flow, cost/time/material evidence. |
+| Ärenden | PARTIAL | Core ticket flows exist and are part of product golden path. Preview E2E now creates a property-backed ticket and asserts staff ticket→WO sync. | Resident golden-path Preview E2E still needs a resident fixture (`OWNER` / extra E2E secrets). |
+| Arbetsordrar | PARTIAL | Significant operational UI/API exists. Preview E2E covers planned→in_progress→completed→invoiced with lock, time/material attest, invoice basis and illegal reverse transition. | Technician-role mobile fixture still missing; current mobile pass uses the owner fixture on 390 px. |
 | Kalender | PARTIAL | Current module exists. | Prove calendar reflects canonical operational events rather than parallel truth. |
 | Ronder | BLOCKED | Current UI/API/checklist implementation exists, but Production status of `20260822010000_inspection_checklist_templates` is unverified. | Read-only Production migration status, restore evidence, checklist tenant smoke. |
 | Besiktningar | PARTIAL | Module exists. | Observation-to-work-order linkage and tenant/security/readiness audit. |
@@ -83,6 +83,8 @@ Required relationship proofs:
 - kalender → representation of canonical operational records, not duplicated source of truth
 - leverantör → assignment
 - arbetsorder → time/material/cost/invoice basis
+
+Staff Preview evidence for `felanmälan → arbetsorder → tid/material/attest → fakturaunderlag → invoiced` is implemented in `e2e/golden-path.mjs` and required inside `node e2e/auth-navigation.mjs`. Resident and dedicated technician-role fixtures remain `BLOCKED / NOT VERIFIED` without extra E2E secrets.
 
 ## Promotion rule
 

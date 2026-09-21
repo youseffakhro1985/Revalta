@@ -2,6 +2,7 @@
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { runVerifiedPreview } from "./preview-runner.mjs";
+import { runStaffGoldenPath, assertTicketHiddenAfterLogout } from "./golden-path.mjs";
 import { isPaginatedPropertiesRequest, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
@@ -125,7 +126,10 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         headers: bypass ? { "x-vercel-protection-bypass": bypass } : {},
         maxRedirects: 0, timeout: 15_000,
       });
-      validateFixtureProfile(profile.status(), await profile.json(), { email: fixtureEmail, companyId: fixtureCompany });
+      const profileBody = await profile.json();
+      validateFixtureProfile(profile.status(), profileBody, { email: fixtureEmail, companyId: fixtureCompany });
+      const staffUserId = String(profileBody?.user?.id || "");
+      if (!staffUserId) fail("Fixture profile did not include a user id");
       complete("verified-login-and-profile");
       await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
       complete("dashboard");
@@ -153,6 +157,17 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       const properties = await propertiesPromise;
       validatePropertiesResponse(properties.status(), await properties.json());
       complete("properties-api");
+
+      const golden = await runStaffGoldenPath({
+        page,
+        fail,
+        expectVisible,
+        expectPath,
+        runId,
+        staffUserId,
+      });
+      complete("golden-path-ticket-to-invoice");
+      complete("golden-path-mobile-work-order");
 
       // Command Center must be the single global search surface.
       await page.keyboard.press("Control+K");
@@ -203,6 +218,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       await expectPath(page, "/login");
       await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after protected redirect");
       complete("logout-and-protected-redirect");
+      await assertTicketHiddenAfterLogout(page, golden.ticketId);
       // Password reset does not depend on registration. Prove the issue #265 path first
       // so a separate registration-navigation flake cannot hide reset latency evidence.
       await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
