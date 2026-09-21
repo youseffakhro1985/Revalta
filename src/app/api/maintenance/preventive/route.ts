@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { runPreventiveMaintenanceEngine } from "@/lib/preventive-maintenance-engine";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
@@ -30,9 +30,10 @@ type OverviewRow = {
 };
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const [propertyGuard, workOrderGuard] = await Promise.all([
     sqlSoftDeleteGuard(db, "Property", "p"),

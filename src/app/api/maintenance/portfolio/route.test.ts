@@ -1,0 +1,56 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { getCurrentUserMock, queryRawMock, sqlSoftDeleteGuardMock } = vi.hoisted(() => ({
+  getCurrentUserMock: vi.fn(),
+  queryRawMock: vi.fn(),
+  sqlSoftDeleteGuardMock: vi.fn(),
+}));
+
+vi.mock("@/lib/current-user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/current-user")>()),
+  getCurrentUser: getCurrentUserMock,
+}));
+
+vi.mock("@/lib/db", () => ({
+  default: { $queryRaw: queryRawMock },
+}));
+
+vi.mock("@/lib/soft-delete-compat", () => ({
+  sqlSoftDeleteGuard: sqlSoftDeleteGuardMock,
+}));
+
+import { GET } from "./route";
+
+describe("maintenance portfolio staff scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryRawMock.mockResolvedValue([]);
+    sqlSoftDeleteGuardMock.mockResolvedValue("");
+  });
+
+  it("rejects residents before exposing planned maintenance costs", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(sqlSoftDeleteGuardMock).not.toHaveBeenCalled();
+  });
+
+  it("lets technicians load active maintenance plans", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(queryRawMock).toHaveBeenCalled();
+  });
+});

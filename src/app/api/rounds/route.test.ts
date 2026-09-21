@@ -28,7 +28,7 @@ describe("rounds route", () => {
   });
 
   it("uses company-scoped table + legacy audit rows", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1" });
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     const response = await GET();
 
     expect(response.status).toBe(200);
@@ -40,11 +40,25 @@ describe("rounds route", () => {
     }));
   });
 
-  it("requires organisation for rounds", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null });
+  it("rejects callers without organisation before listing rounds", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
     const response = await GET();
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
     expect(inspectionRoundFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing inspection rounds", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect(inspectionRoundFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 });
