@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   InlineAlert,
   PageHeader,
@@ -49,6 +49,12 @@ export function ResidentAccount({ initial, saved, passwordChanged, reason }: Pro
   );
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    if (window.location.hash && window.location.hash !== "#resident-name") return;
+    document.getElementById("resident-name")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("resident-name")?.focus(), 0);
+  }, []);
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -130,11 +136,13 @@ export function ResidentAccount({ initial, saved, passwordChanged, reason }: Pro
               <label htmlFor="resident-name" className="block text-sm font-medium text-ink-700">Namn</label>
               <input
                 id="resident-name"
+                autoFocus
                 name="name"
                 maxLength={120}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className={`mt-1 ${premiumFieldClass}`}
+                disabled={savingProfile}
+                className={`mt-1 scroll-mt-36 ${premiumFieldClass}`}
                 autoComplete="name"
               />
             </div>

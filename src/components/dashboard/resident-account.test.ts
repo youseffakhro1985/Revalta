@@ -17,5 +17,18 @@ describe("resident account native profile and password", () => {
     expect(account).toContain('name="newPassword"');
     expect(account).toContain('name="confirmPassword"');
     expect(account).toContain("event.preventDefault()");
+    expect(account).toContain('id="resident-name"');
+    expect(account).toContain("autoFocus");
+    expect(account).toContain("scroll-mt-36");
+    expect(account).toContain("scrollIntoView");
+    expect(account).toContain('document.getElementById("resident-name")?.focus()');
+    expect(account).toContain("disabled={savingProfile}");
+  });
+
+  it("does not add a boendeportal page sticky", () => {
+    const sticky = readFileSync(new URL("./dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal/konto");
+    expect(sticky).not.toContain("#resident-name");
+    expect(sticky).not.toContain("Boendeportal");
   });
 });
