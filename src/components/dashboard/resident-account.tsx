@@ -55,6 +55,11 @@ export function ResidentAccount({ initial, saved, passwordChanged, reason }: Pro
     document.getElementById("resident-name")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("resident-name")?.focus(), 0);
   }, []);
+  useEffect(() => {
+    if (window.location.hash !== "#resident-losenord") return;
+    document.getElementById("resident-losenord")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("resident-current-password")?.focus(), 0);
+  }, []);
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -167,7 +172,7 @@ export function ResidentAccount({ initial, saved, passwordChanged, reason }: Pro
           title="Lösenord och sessioner"
           description="Välj ett starkt lösenord. Tidigare sessioner avslutas automatiskt."
         >
-          <form method="post" action="/api/settings/password" onSubmit={changePassword} className="space-y-4">
+          <form id="resident-losenord" method="post" action="/api/settings/password" onSubmit={changePassword} className="scroll-mt-36 space-y-4">
             <div>
               <label htmlFor="resident-current-password" className="block text-sm font-medium text-ink-700">
                 Nuvarande lösenord
@@ -181,6 +186,7 @@ export function ResidentAccount({ initial, saved, passwordChanged, reason }: Pro
                 maxLength={512}
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
+                disabled={savingPassword}
                 className={`mt-1 ${premiumFieldClass}`}
               />
             </div>
