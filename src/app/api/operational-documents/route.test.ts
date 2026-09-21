@@ -94,6 +94,38 @@ describe("operational-documents root route", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before listing operational documents", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(operationalDocumentFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects callers without organisation before listing operational documents", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: null, role: "owner" });
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(403);
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
   it("returns a correlated stable 401 for POST before parsing form data", async () => {
     getCurrentUserMock.mockResolvedValue(null);
 

@@ -97,6 +97,27 @@ describe("operational-documents/[id]/download", () => {
     expect(operationalDocumentFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before loading an operational document download", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request(), { params });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(operationalDocumentFindFirstMock).not.toHaveBeenCalled();
+    expect(isOperationalDocumentAccessibleMock).not.toHaveBeenCalled();
+    expect(blobGetMock).not.toHaveBeenCalled();
+  });
+
   it("tenant-scopes the lookup and returns a stable correlated 404 without logging an unverified id", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "manager" });
     operationalDocumentFindFirstMock.mockResolvedValue(null);

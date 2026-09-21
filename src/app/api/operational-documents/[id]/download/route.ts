@@ -1,7 +1,7 @@
 import { get } from "@vercel/blob";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { isOperationalDocumentAccessible } from "@/lib/operational-document-access";
 import { getStorageToken } from "@/lib/storage";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -51,8 +51,8 @@ export async function GET(
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return unavailable(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -60,13 +60,14 @@ export async function GET(
         event: "operational_documents.download.unauthorized",
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return unavailable(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "operational_documents.download.missing_company",
-        context: { userId: user.id },
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "operational_documents.download.forbidden",
+        context: { userId: rawUser.id },
       });
     }
 
@@ -93,7 +94,7 @@ export async function GET(
         context: { userId: user.id, companyId: user.company_id },
       });
     }
-    if (!(await isOperationalDocumentAccessible(user as CompanyUser, document))) {
+    if (!(await isOperationalDocumentAccessible(user, document))) {
       return unavailable(observability, {
         status: 404,
         code: API_ERROR_CODES.notFound,
