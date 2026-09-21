@@ -24,6 +24,12 @@ export function ResetPasswordForm({ token, reason }: { token: string; reason: st
   useEffect(() => {
     setHydrated(true);
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#reset-password-form") return;
+    document.getElementById("reset-password-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("reset-password")?.focus(), 0);
+  }, [loading]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -80,7 +86,7 @@ export function ResetPasswordForm({ token, reason }: { token: string; reason: st
         data-ready={hydrated ? "1" : "0"}
         onSubmit={submit}
         aria-busy={loading}
-        className="mt-7 space-y-5"
+        className="scroll-mt-36 mt-7 space-y-5"
       >
         <input type="hidden" name="token" value={token} />
         <div>
@@ -89,6 +95,7 @@ export function ResetPasswordForm({ token, reason }: { token: string; reason: st
           </label>
           <input
             id="reset-password"
+            autoFocus
             name="password"
             type="password"
             required
@@ -96,6 +103,7 @@ export function ResetPasswordForm({ token, reason }: { token: string; reason: st
             maxLength={128}
             autoComplete="new-password"
             defaultValue=""
+            disabled={loading || !token}
             className={authInputClass}
           />
         </div>
