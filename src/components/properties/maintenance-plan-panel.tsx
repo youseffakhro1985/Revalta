@@ -54,6 +54,7 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
     if (loading) return;
     if (window.location.hash !== "#atgardslista") return;
     document.getElementById("atgardslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("atgardslista-plan")?.focus(), 0);
   }, [loading, data]);
 
   const card = data || { property:{ id:propertyId, name:"", buildings:[] }, plans:[], activePlan:null, actions:[], assets:[], forecast:null };
@@ -112,7 +113,7 @@ export function MaintenancePlanPanel({propertyId}:{propertyId:string}){
     <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
       <div id="spara-underhallsplan" className="scroll-mt-36">
       <Panel title="Administrera plan" description="Skapa planversioner och registrera nya underhållsåtgärder.">
-        <div className="mb-5 grid grid-cols-2 rounded-xl bg-sand-50 p-1"><button type="button" disabled={formLocked} onClick={()=>setMode("action")} className={`rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-50 ${mode==="action"?"bg-white text-petroleum-800 shadow-sm":"text-ink-500"}`}>Ny åtgärd</button><button type="button" disabled={formLocked} onClick={()=>setMode("plan")} className={`rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-50 ${mode==="plan"?"bg-white text-petroleum-800 shadow-sm":"text-ink-500"}`}>Ny planversion</button></div>
+        <div className="mb-5 grid grid-cols-2 rounded-xl bg-sand-50 p-1"><button type="button" disabled={formLocked} onClick={()=>setMode("action")} className={`rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-50 ${mode==="action"?"bg-white text-petroleum-800 shadow-sm":"text-ink-500"}`}>Ny åtgärd</button><button id="atgardslista-plan" type="button" disabled={formLocked} onClick={()=>setMode("plan")} className={`rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-50 ${mode==="plan"?"bg-white text-petroleum-800 shadow-sm":"text-ink-500"}`}>Ny planversion</button></div>
         <form onSubmit={submit} className="space-y-4">
           <fieldset disabled={formLocked} className="contents">
           {mode==="plan"?<>
