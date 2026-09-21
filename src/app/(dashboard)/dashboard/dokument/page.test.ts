@@ -49,18 +49,32 @@ describe("dokument library filter first HTML", () => {
 });
 
 describe("dokument leftover library first HTML", () => {
-  it("keeps leftover documents in the first HTML without stealing create or filter", () => {
+  it("keeps leftover documents in the first HTML and focuses export after load without a second autoFocus", () => {
     const form = readFileSync(new URL("./dokument-page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(form).toContain('id="dokumentlista"');
+    expect(form).toContain('id="dokumentlista-csv"');
     expect(form).toContain('window.location.hash !== "#dokumentlista"');
     expect(form).toContain("Dokumenten hämtas.");
-    expect(form).toContain('id="dokumentfilter"');
-    expect(form).toContain('id="dokument-sok"');
+    expect(form).toContain("Nytt dokument");
     expect(form).toContain('id="dokument-editor"');
     expect(form).toContain('id="dokument-namn"');
-    expect(form).toContain("Nytt dokument");
+    expect(form).toContain('document.getElementById("dokument-namn")?.focus()');
+    expect(form).toContain('document.getElementById("dokumentlista-csv")?.focus()');
+    expect(form).toContain('id="dokumentfilter"');
+    expect(form).toContain('id="dokument-sok"');
+    expect(form).toContain('document.getElementById("dokument-sok")?.focus()');
     expect(form).not.toContain('id="dokumentregister"');
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("disabled={loading}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+    expect(form).not.toContain('id="dokumentlista-csv" autoFocus');
+    expect(sticky).toContain('href: "/dashboard/dokument?create=1"');
+    expect(sticky).not.toContain("#dokumentlista");
+    expect(sticky).not.toContain("#dokumentlista-csv");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/dokument", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
