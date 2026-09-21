@@ -33,16 +33,30 @@ describe("energi leftover filter first HTML", () => {
 });
 
 describe("energi leftover readings first HTML", () => {
-  it("keeps leftover energy readings in the first HTML without stealing create or filter", () => {
+  it("keeps leftover energy readings in the first HTML and focuses clear after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="energilista"');
+    expect(source).toContain('id="energilista-rensa"');
     expect(source).toContain('window.location.hash !== "#energilista"');
     expect(source).toContain("Avläsningarna hämtas.");
     expect(source).toContain('id="ny-avlasning"');
     expect(source).toContain('id="energi-fastighet"');
+    expect(source).toContain('document.getElementById("energi-fastighet")?.focus()');
+    expect(source).toContain('document.getElementById("energilista-rensa")?.focus()');
     expect(source).toContain('id="energifilter"');
     expect(source).toContain('id="energi-sok"');
+    expect(source).toContain('document.getElementById("energi-sok")?.focus()');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="energilista-rensa" autoFocus');
+    expect(sticky).toContain('href: "/dashboard/energi#ny-avlasning"');
+    expect(sticky).not.toContain("#energilista");
+    expect(sticky).not.toContain("#energilista-rensa");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/energi", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });

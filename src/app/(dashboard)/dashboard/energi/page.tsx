@@ -90,6 +90,7 @@ export default function EnergyPage() {
     if (loading) return;
     if (window.location.hash !== "#energilista") return;
     document.getElementById("energilista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("energilista-rensa")?.focus(), 0);
   }, [loading, readings]);
 
   const periods = useMemo(() => [...new Set(readings.map((row) => row.period || "").filter(Boolean))].sort().reverse(), [readings]);
@@ -243,7 +244,7 @@ export default function EnergyPage() {
         <select disabled={loading} className={premiumFieldClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} aria-label="Filtrera förbrukningstyp"><option value="all">Alla typer</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
         <select disabled={loading} className={premiumFieldClass} value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} aria-label="Filtrera period"><option value="all">Alla perioder</option>{periods.map((period) => <option key={period} value={period}>{period}</option>)}</select>
-        <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setTypeFilter("all"); setPropertyFilter("all"); setPeriodFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+        <button id="energilista-rensa" type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setTypeFilter("all"); setPropertyFilter("all"); setPeriodFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
       </div>
     </Panel>
 
