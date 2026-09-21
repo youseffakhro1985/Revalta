@@ -31,3 +31,31 @@ describe("component audit leftover first HTML", () => {
     expect(source).not.toContain('id="auditlista"');
   });
 });
+
+describe("component audit leftover list focus first HTML", () => {
+  it("keeps leftover revision history in the first HTML and focuses export after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./component-audit-report.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(source).toContain('id="revisionslista"');
+    expect(source).toContain('id="revisionslista-csv"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#revisionslista"');
+    expect(source).toContain('id="exportera-revision"');
+    expect(source).toContain('id="revision-uppdatera"');
+    expect(source).toContain('document.getElementById("revision-uppdatera")?.focus()');
+    expect(source).toContain('document.getElementById("revisionslista-csv")?.focus()');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("Historiken hämtas.");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="revisionslista-csv" autoFocus');
+    expect(source).not.toContain('id="auditlista"');
+    expect(sticky).toContain("#spara-komponent");
+    expect(sticky).toContain("Spara komponent");
+    expect(sticky).not.toContain("#revisionslista");
+    expect(sticky).not.toContain("#revisionslista-csv");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1/komponenter/comp-1", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
+  });
+});
