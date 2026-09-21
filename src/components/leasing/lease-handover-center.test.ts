@@ -36,3 +36,32 @@ describe("lease handover leftover first HTML", () => {
     expect(source).toContain("saving || loading");
   });
 });
+
+describe("lease handover leftover list focus first HTML", () => {
+  it("keeps leftover handover copy in the first HTML and focuses refresh after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./lease-handover-center.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(source).toContain('id="overlamninglista"');
+    expect(source).toContain('id="overlamninglista-uppdatera"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#overlamninglista"');
+    expect(source).toContain('id="valj-avtal"');
+    expect(source).toContain('id="overlamning-avtal"');
+    expect(source).toContain('document.getElementById("overlamning-avtal")?.focus()');
+    expect(source).toContain('document.getElementById("overlamninglista-uppdatera")?.focus()');
+    expect(source).toContain('id="spara-overlamning"');
+    expect(source).toContain('id="overlamning-spara"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain("Överlämningen hämtas.");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="overlamninglista-uppdatera" autoFocus');
+    expect(sticky).toContain('href: "/dashboard/uthyrning/overlamning#valj-avtal"');
+    expect(sticky).toContain("Välj avtal");
+    expect(sticky).not.toContain("#overlamninglista");
+    expect(sticky).not.toContain("#overlamninglista-uppdatera");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/uthyrning/overlamning", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
+  });
+});
