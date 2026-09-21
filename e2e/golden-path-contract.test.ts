@@ -45,15 +45,21 @@ describe("golden-path contract", () => {
     expect(() => validateCreatedProperty(200, { property: { id: "property-1" } })).toThrow(/did not persist/);
     expect(() => validateTicketStatus(200, { ticket: { status: "closed", property: { id: "property-1" } } }, "in_progress", "property-1")).toThrow(/expected synced status/);
     expect(() => validateWorkOrderStatus(200, { workOrder: { status: "in_progress", ticket: { id: "other" } } }, "in_progress", "ticket-1")).toThrow(/lifecycle status/);
-    expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500:none\)/);
-    expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE" }, true)).toThrow(
-      /did not resolve to a work order \(503:SERVICE_UNAVAILABLE\)/,
+    expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500:none;existing=unchecked\)/);
+    expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE" }, true, { probed: true, existing: false })).toThrow(
+      /did not resolve to a work order \(503:SERVICE_UNAVAILABLE;existing=no\)/,
     );
     expect(() => validateWorkOrderFromTicket(500, { errorCode: "INTERNAL_ERROR" }, true)).toThrow(
-      /did not resolve to a work order \(500:INTERNAL_ERROR\)/,
+      /did not resolve to a work order \(500:INTERNAL_ERROR;existing=unchecked\)/,
     );
     expect(() => validateWorkOrderFromTicket(500, { errorCode: "drop table tickets" }, true)).toThrow(
-      /did not resolve to a work order \(500:none\)/,
+      /did not resolve to a work order \(500:none;existing=unchecked\)/,
+    );
+    expect(() => validateWorkOrderFromTicket(200, { workOrder: null, canCreate: true }, true, { probed: true, existing: false })).toThrow(
+      /did not resolve to a work order \(200:get_payload;existing=no\)/,
+    );
+    expect(() => validateWorkOrderFromTicket(307, null, true, { probed: true, existing: true })).toThrow(
+      /did not resolve to a work order \(307:redirect;existing=yes\)/,
     );
     expect(() => validateUnauthenticatedTicket(200)).toThrow(/after logout/);
     expect(() => validateForbiddenReplay(200)).toThrow(/illegal in_progress/);
@@ -78,6 +84,7 @@ describe("golden-path is wired into the required Preview browser job", () => {
     const golden = readFileSync(new URL("./golden-path.mjs", import.meta.url), "utf8");
     expect(golden).toContain("hoursAgo");
     expect(golden).toContain("/locked-update");
+    expect(golden).toContain('redirect: "manual"');
     expect(golden).not.toContain("page.route");
     expect(runner).toContain("staffUserId");
   });

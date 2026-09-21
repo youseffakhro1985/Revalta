@@ -29,11 +29,15 @@ async function api(page, method, path, body) {
     const response = await fetch(path, {
       method,
       credentials: "same-origin",
+      redirect: "manual",
       headers: body === undefined
         ? { Accept: "application/json" }
         : { Accept: "application/json", "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      return { status: response.status || 0, body: null };
+    }
     let json = null;
     try {
       json = await response.json();
@@ -111,7 +115,14 @@ export async function runStaffGoldenPath({
   validateTicketStatus(ticketAfterCreate.status, ticketAfterCreate.body, "new", propertyId);
 
   const linked = await api(page, "POST", `/api/tickets/${ticketId}/work-order`, {});
-  validateWorkOrderFromTicket(linked.status, linked.body, true);
+  let existingWorkOrder = null;
+  if (!linked.body?.workOrderId) {
+    existingWorkOrder = await api(page, "GET", `/api/tickets/${ticketId}/work-order`);
+  }
+  validateWorkOrderFromTicket(linked.status, linked.body, true, {
+    existing: Boolean(existingWorkOrder?.body?.workOrder?.id),
+    probed: Boolean(existingWorkOrder),
+  });
   const workOrderId = linked.body.workOrderId;
 
   const planned = await api(page, "GET", `/api/work-orders/${workOrderId}`);

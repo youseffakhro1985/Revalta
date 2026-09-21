@@ -44,14 +44,25 @@ export function allowlistedWorkOrderCreateErrorCode(value) {
   return typeof value === "string" && allowed.has(value) ? value : "none";
 }
 
-export function validateWorkOrderFromTicket(status, body, created) {
-  if (!hasId(body?.workOrderId)) {
-    const code = allowlistedWorkOrderCreateErrorCode(body?.errorCode);
-    throw new Error(`Ticket did not resolve to a work order (${status}:${code})`);
+export function validateWorkOrderFromTicket(status, body, created, probe) {
+  if (hasId(body?.workOrderId)) {
+    if (created && status !== 201) {
+      throw new Error(`Work order create from ticket did not return 201 (${status})`);
+    }
+    return;
   }
-  if (created && status !== 201) {
-    throw new Error(`Work order create from ticket did not return 201 (${status})`);
-  }
+  const redirected = Number.isInteger(status) && ((status >= 300 && status < 400) || status === 0);
+  const getPayload = Boolean(
+    body
+    && typeof body === "object"
+    && ("workOrder" in body || "canCreate" in body || "suggestedAssignedToId" in body),
+  );
+  const code = allowlistedWorkOrderCreateErrorCode(body?.errorCode);
+  const shape = redirected ? "redirect" : getPayload ? "get_payload" : code;
+  const existing = probe?.probed
+    ? (probe.existing ? "yes" : "no")
+    : "unchecked";
+  throw new Error(`Ticket did not resolve to a work order (${status}:${shape};existing=${existing})`);
 }
 
 export function validateWorkOrderStatus(status, body, expectedStatus, ticketId) {
