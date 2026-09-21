@@ -193,6 +193,7 @@ export default function WorkOrdersPage() {
     if (loading) return;
     if (window.location.hash !== "#orderfilter") return;
     document.getElementById("orderfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("order-sok")?.focus(), 0);
   }, [loading, orders]);
   useEffect(() => {
     if (loading) return;
@@ -320,7 +321,7 @@ export default function WorkOrdersPage() {
     <section id="orderfilter" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm">
       <label className="relative block max-w-2xl">
         <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-        <input disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök arbetsorder" placeholder="Sök arbetsorder, fastighet, adress, tekniker eller status ..." className="h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-10 pr-4 text-[12px] text-ink-800 outline-none transition focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100 disabled:opacity-60" />
+        <input id="order-sok" autoFocus disabled={loading} value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök arbetsorder" placeholder="Sök arbetsorder, fastighet, adress, tekniker eller status ..." className="h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-10 pr-4 text-[12px] text-ink-800 outline-none transition focus:border-petroleum-300 focus:ring-2 focus:ring-petroleum-100 disabled:opacity-60" />
       </label>
     </section>
 
