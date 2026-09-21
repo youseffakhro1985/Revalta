@@ -21,6 +21,11 @@ describe("dokument create query", () => {
     expect(form).toContain("Nytt dokument");
     expect(form).toContain("autoFocus");
     expect(form).toContain("<Plus");
+    expect(form).toContain('id="dokument-editor"');
+    expect(form).toContain('id="dokument-namn"');
+    expect(form).toContain('document.getElementById("dokument-namn")?.focus()');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
   });
 });
@@ -30,6 +35,8 @@ describe("dokument library filter first HTML", () => {
     const form = readFileSync(new URL("./dokument-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="dokumentfilter"');
     expect(form).toContain('id="dokument-sok"');
+    expect(form).toContain('id="dokument-editor"');
+    expect(form).toContain('id="dokument-namn"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#dokumentfilter"');
     expect(form).toContain("scrollIntoView");
@@ -49,6 +56,8 @@ describe("dokument leftover library first HTML", () => {
     expect(form).toContain("Dokumenten hämtas.");
     expect(form).toContain('id="dokumentfilter"');
     expect(form).toContain('id="dokument-sok"');
+    expect(form).toContain('id="dokument-editor"');
+    expect(form).toContain('id="dokument-namn"');
     expect(form).toContain("Nytt dokument");
     expect(form).not.toContain('id="dokumentregister"');
     expect(form).toContain("scrollIntoView");

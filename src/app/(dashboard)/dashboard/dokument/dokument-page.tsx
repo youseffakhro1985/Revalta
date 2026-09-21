@@ -391,6 +391,13 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
   }, [data.canManageLifecycle, loading]);
   useEffect(() => {
     if (loading) return;
+    if (!showUpload) return;
+    if (window.location.hash !== "#dokument-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
+    document.getElementById("dokument-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("dokument-namn")?.focus(), 0);
+  }, [loading, showUpload]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#dokumentfilter") return;
     document.getElementById("dokumentfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("dokument-sok")?.focus(), 0);
@@ -600,11 +607,12 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
       </section>
 
       {showUpload ? (
+        <section id="dokument-editor" className="scroll-mt-36">
         <Panel title="Lägg till dokument" description="PDF, bild, Word eller Excel. Max 2 MB. Åtkomsten kontrolleras vid varje nedladdning.">
           <form onSubmit={uploadDocument} className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label><FieldLabel>Dokumentnamn</FieldLabel><input required autoFocus maxLength={200} value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} placeholder="Exempel: Energideklaration 2026" /></label>
+                <label><FieldLabel>Dokumentnamn</FieldLabel><input id="dokument-namn" required autoFocus maxLength={200} value={name} onChange={(event) => setName(event.target.value)} className={premiumFieldClass} placeholder="Exempel: Energideklaration 2026" /></label>
                 <label><FieldLabel>Kategori</FieldLabel><select value={category} onChange={(event) => setCategory(event.target.value)} className={premiumFieldClass}>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -637,6 +645,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
             </div>
           </form>
         </Panel>
+        </section>
       ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
