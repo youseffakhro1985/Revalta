@@ -31,18 +31,36 @@ describe("felanmalan create query", () => {
 });
 
 describe("felanmalan leftover list first HTML", () => {
-  it("keeps the recent list in the first HTML and scrolls after load without stealing create", () => {
+  it("keeps the recent list in the first HTML and focuses Visa alla after load without a second autoFocus", () => {
     const form = readFileSync(new URL("./felanmalan-page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(form).toContain('id="senastearenden"');
+    expect(form).toContain('id="senastearenden-alla"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#senastearenden"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("senastearenden-alla")?.focus()');
     expect(form).toContain("Nytt ärende");
     expect(form).toContain('id="arende-editor"');
     expect(form).toContain('id="arende-titel"');
+    expect(form).toContain('document.getElementById("arende-titel")?.focus()');
+    expect(form).toContain('id="arendeurval"');
+    expect(form).toContain('id="arende-sok"');
+    expect(form).toContain('document.getElementById("arende-sok")?.focus()');
     expect(form).toContain('get("create") === "1"');
     expect(form).toContain("Ärendena hämtas.");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+    expect(form).not.toContain('id="senastearenden-alla" autoFocus');
     expect(form).not.toContain('{[1, 2, 3, 4].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-sand-100" />)}');
+    expect(sticky).toContain('const ticketsRoot = "/dashboard/felanmalan"');
+    expect(sticky).toContain("Nytt ärende");
+    expect(sticky).not.toContain("#senastearenden");
+    expect(sticky).not.toContain("#senastearenden-alla");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('href: "/dashboard/felanmalan?create=1"');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/felanmalan", "viewer")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 
   it("keeps the list filter hash in the first HTML and focuses search after load without a second autoFocus", () => {
