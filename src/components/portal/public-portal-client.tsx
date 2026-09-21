@@ -179,6 +179,12 @@ export function PublicPortalClient({
     document.getElementById("public-track-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("portal-ref")?.focus(), 0);
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#public-comment-form") return;
+    document.getElementById("public-comment-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("portal-kommentar")?.focus(), 0);
+  }, [loading, trackedTicket]);
 
   async function loadTrackedTicket(nextReference: string, nextEmail: string, nextToken: string) {
     const normalizedReference = nextReference.trim().toUpperCase();
@@ -614,19 +620,21 @@ export function PublicPortalClient({
                     method="post"
                     action={`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/comments`}
                     onSubmit={addResidentComment}
-                    className="mt-6 border-t border-sand-100 pt-5"
+                    className="scroll-mt-36 mt-6 border-t border-sand-100 pt-5"
                   >
                     {companySlug ? <input type="hidden" name="companySlug" value={companySlug} /> : null}
                     {trackingToken ? <input type="hidden" name="token" value={trackingToken} /> : null}
                     {trackEmail ? <input type="hidden" name="email" value={trackEmail} /> : null}
                     <p className="text-sm font-semibold text-ink-900">Skicka kommentar</p>
                     <textarea
+                      id="portal-kommentar"
                       required
                       name="body"
                       rows={3}
                       maxLength={5_000}
                       value={residentComment}
                       onChange={(event) => setResidentComment(event.target.value)}
+                      disabled={loading}
                       className="mt-3 w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-900 outline-none transition-all focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500"
                       placeholder="Skriv en komplettering eller fråga till förvaltningen..."
                       aria-label="Skicka kommentar"
