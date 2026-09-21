@@ -144,6 +144,40 @@ describe("eskaleringar leftover recipients first HTML", () => {
   });
 });
 
+describe("eskaleringar leftover recipient list focus first HTML", () => {
+  it("keeps leftover recipients in the first HTML and focuses nav after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(source).toContain('id="eskmottagarlista"');
+    expect(source).toContain('id="eskmottagarlista-lank"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#eskmottagarlista"');
+    expect(source).toContain("Mottagarna hämtas.");
+    expect(source).toContain('id="mottagarfilter"');
+    expect(source).toContain('id="esk-roll"');
+    expect(source).toContain("Hantera regler");
+    expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("eskmottagarlista-lank")?.focus()');
+    expect(source).not.toContain('id="eskmottagarlista-lank" autoFocus');
+    expect(source).toContain('href="#driftkontroll"');
+    expect(source).toContain('id="eskaleringslista-lank"');
+    expect(source).toContain('document.getElementById("eskaleringslista-lank")?.focus()');
+    expect(source).toContain('id="eskhistoriklista-lank"');
+    expect(source).toContain('document.getElementById("eskhistoriklista-lank")?.focus()');
+    expect(source).toContain('document.getElementById("esk-roll")?.focus()');
+    expect(source).toContain('document.getElementById("kor-eskalering-motor")?.focus()');
+    expect(source).not.toContain('id="mottagarlista"');
+    expect(sticky).toContain('href: "/dashboard/installningar/eskaleringar/regler"');
+    expect(sticky).toContain("Hantera regler");
+    expect(sticky).not.toContain("#eskmottagarlista");
+    expect(sticky).not.toContain("#eskmottagarlista-lank");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
+  });
+});
+
 describe("eskaleringar leftover rules first HTML", () => {
   it("keeps leftover rules in the first HTML and focuses refresh after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
