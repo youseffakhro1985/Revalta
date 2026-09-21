@@ -34,16 +34,26 @@ describe("billing checkout return", () => {
 });
 
 describe("billing leftover plans first HTML", () => {
-  it("keeps leftover plan cards in the first HTML without stealing Byt plan", () => {
+  it("keeps leftover plan cards in the first HTML and focuses the portal after load without a second autoFocus", () => {
     const form = readFileSync(new URL("./billing-page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(form).toContain('id="planuppgifter"');
+    expect(form).toContain('id="plan-kundportal"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#planuppgifter"');
+    expect(form).toContain('document.getElementById("plan-kundportal")?.focus()');
     expect(form).toContain('id="planer"');
     expect(form).toContain('id="plan-byt"');
     expect(form).toContain("Byt plan");
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("Planerna hämtas.");
+    expect(form).toContain("disabled={openingPortal || !billing?.canManage || !billing?.stripePortalReady}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+    expect(form).not.toContain('id="plan-kundportal" autoFocus');
     expect(form).not.toContain("h-64 animate-pulse rounded-2xl bg-sand-100");
+    expect(sticky).toContain('href: "/dashboard/billing#planer"');
+    expect(sticky).not.toContain("#planuppgifter");
+    expect(sticky).not.toContain("#plan-kundportal");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
   });
 });
