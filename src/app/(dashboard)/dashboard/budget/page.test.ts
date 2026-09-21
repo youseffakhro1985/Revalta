@@ -9,6 +9,8 @@ describe("budget create hash", () => {
     expect(source).toContain('window.location.hash !== "#ny-budgetrad"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
+    expect(source).toContain('id="budget-fastighet"');
+    expect(source).toContain('document.getElementById("budget-fastighet")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="ny-budgetrad"');
   });
@@ -37,6 +39,7 @@ describe("budget leftover rows first HTML", () => {
     expect(source).toContain('window.location.hash !== "#budgetlista"');
     expect(source).toContain("Budgetraderna hämtas.");
     expect(source).toContain('id="ny-budgetrad"');
+    expect(source).toContain('id="budget-fastighet"');
     expect(source).toContain('id="budgetfilter"');
     expect(source).toContain('id="budget-sok"');
     expect(source).toContain("scrollIntoView");
