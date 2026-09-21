@@ -170,6 +170,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (!showForm) return;
     if (window.location.hash !== "#lease-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
     document.getElementById("lease-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("lease-namn")?.focus(), 0);
   }, [loading, showForm]);
   useEffect(() => {
     if (loading) return;
@@ -561,7 +562,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
                   <label><FieldLabel>Befintlig hyrespart</FieldLabel><select className={premiumFieldClass} value={form.holderId} onChange={(event) => selectHolder(event.target.value)}><option value="">Skapa ny hyrespart</option>{holders.map((holder) => <option key={holder.id} value={holder.id}>{holder.name}{holder.organization_number ? ` · ${holder.organization_number}` : ""}</option>)}</select></label>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                     <label><FieldLabel>Typ</FieldLabel><select className={premiumFieldClass} value={form.holderType} onChange={(event) => setForm({ ...form, holderType: event.target.value })}>{Object.entries(holderTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                    <label><FieldLabel>Namn / firma</FieldLabel><input required autoFocus className={premiumFieldClass} value={form.holderName} onChange={(event) => setForm({ ...form, holderName: event.target.value })} /></label>
+                    <label><FieldLabel>Namn / firma</FieldLabel><input id="lease-namn" required autoFocus className={premiumFieldClass} value={form.holderName} onChange={(event) => setForm({ ...form, holderName: event.target.value })} /></label>
                     <label><FieldLabel>Kontaktperson</FieldLabel><input className={premiumFieldClass} value={form.holderContactName} onChange={(event) => setForm({ ...form, holderContactName: event.target.value })} /></label>
                     <label><FieldLabel>Org.nr</FieldLabel><input className={premiumFieldClass} value={form.holderOrganizationNumber} onChange={(event) => setForm({ ...form, holderOrganizationNumber: event.target.value })} /></label>
                     <label><FieldLabel>E-post</FieldLabel><input type="email" className={premiumFieldClass} value={form.holderEmail} onChange={(event) => setForm({ ...form, holderEmail: event.target.value })} /></label>

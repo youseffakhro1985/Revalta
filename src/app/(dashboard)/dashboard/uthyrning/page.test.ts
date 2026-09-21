@@ -23,6 +23,8 @@ describe("uthyrning create query", () => {
     expect(form).toContain("<Plus");
     expect(form).toContain("canManage || loading");
     expect(form).toContain('id="lease-editor"');
+    expect(form).toContain('id="lease-namn"');
+    expect(form).toContain('document.getElementById("lease-namn")?.focus()');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
@@ -37,6 +39,7 @@ describe("uthyrning occupancy filter first HTML", () => {
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#bestandsfilter"');
     expect(form).toContain('id="lease-editor"');
+    expect(form).toContain('id="lease-namn"');
     expect(form).toContain("scrollIntoView");
     expect(form).toContain('document.getElementById("bestand-sok")?.focus()');
     expect(form).toContain("autoFocus");
