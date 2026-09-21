@@ -20,5 +20,19 @@ describe("resident bookings native create and cancel", () => {
     expect(bookings).toContain('value="cancel"');
     expect(bookings).toContain('name="bookingId"');
     expect(bookings).toContain("event.preventDefault()");
+    expect(bookings).toContain('id="boende-bokning"');
+    expect(bookings).toContain('id="boende-resurs"');
+    expect(bookings).toContain("autoFocus");
+    expect(bookings).toContain("scroll-mt-36");
+    expect(bookings).toContain("scrollIntoView");
+    expect(bookings).toContain('document.getElementById("boende-resurs")?.focus()');
+    expect(bookings).toContain("disabled={saving || loading}");
+  });
+
+  it("does not add a boendeportal page sticky", () => {
+    const sticky = readFileSync(new URL("./dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#boende-bokning");
+    expect(sticky).not.toContain("#boende-resurs");
   });
 });

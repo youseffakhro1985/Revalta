@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarCheck2, RefreshCw } from "lucide-react";
 import {
   EmptyState,
@@ -75,6 +75,13 @@ export function ResidentBookings({ initial, created, cancelled, reason }: Props)
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#boende-bokning") return;
+    document.getElementById("boende-bokning")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("boende-resurs")?.focus(), 0);
+  }, [loading]);
 
   const upcomingCount = useMemo(
     () => bookings.filter((booking) => booking.status !== "cancelled" && new Date(booking.end) >= new Date()).length,
@@ -164,11 +171,11 @@ export function ResidentBookings({ initial, created, cancelled, reason }: Props)
               description="När ditt avtal är kopplat till din e-post kan du boka resurser här."
             />
           ) : (
-            <form method="post" action="/api/resident-portal/bookings" onSubmit={createBooking} className="space-y-4">
+            <form id="boende-bokning" method="post" action="/api/resident-portal/bookings" onSubmit={createBooking} className="scroll-mt-36 space-y-4">
               <input type="hidden" name="intent" value="create" />
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-ink-700">Hyresavtal</span>
-                <select required name="leaseId" value={leaseId} onChange={(event) => setLeaseId(event.target.value)} className={premiumFieldClass}>
+                <select required name="leaseId" value={leaseId} onChange={(event) => setLeaseId(event.target.value)} disabled={saving || loading} className={premiumFieldClass}>
                   {leases.map((lease) => (
                     <option key={lease.id} value={lease.id}>
                       {lease.property.name} · {lease.unit.designation}
@@ -178,7 +185,7 @@ export function ResidentBookings({ initial, created, cancelled, reason }: Props)
               </label>
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-ink-700">Resurs</span>
-                <input required name="resource" maxLength={120} value={resource} onChange={(event) => setResource(event.target.value)} className={premiumFieldClass} placeholder="Tvättstuga" />
+                <input id="boende-resurs" autoFocus required name="resource" maxLength={120} value={resource} onChange={(event) => setResource(event.target.value)} disabled={saving || loading} className={premiumFieldClass} placeholder="Tvättstuga" />
               </label>
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-ink-700">Start</span>
