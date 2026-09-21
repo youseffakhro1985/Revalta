@@ -242,6 +242,29 @@ describe("resident document download route", () => {
     }));
   });
 
+  it("returns tenant-safe 404 when a resident-facing document belongs to another lease", async () => {
+    getCurrentUserMock.mockResolvedValue(residentUser);
+    managedDocumentFindFirstMock.mockResolvedValue({
+      ...modernDocument,
+      visibility: "resident_lease",
+      lease_id: "lease-resident-b",
+      unit_id: "unit-resident-b",
+      property_id: "property-resident-b",
+    });
+
+    const response = await GET(downloadRequest(), { params: Promise.resolve({ id: "doc-resident-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({
+      error: "Dokumentet hittades inte",
+      errorCode: "NOT_FOUND",
+      requestId,
+    });
+    expect(blobGetMock).not.toHaveBeenCalled();
+    expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("doc-resident-b");
+  });
+
   it("blocks download when visibility is not resident-facing", async () => {
     getCurrentUserMock.mockResolvedValue(residentUser);
     managedDocumentFindFirstMock.mockResolvedValue({
@@ -251,10 +274,10 @@ describe("resident document download route", () => {
 
     const response = await GET(downloadRequest(), { params: Promise.resolve({ id: "doc-1" }) });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({
-      error: "Du saknar behörighet till dokumentet",
-      errorCode: "FORBIDDEN",
+      error: "Dokumentet hittades inte",
+      errorCode: "NOT_FOUND",
       requestId,
     });
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("doc-1");
