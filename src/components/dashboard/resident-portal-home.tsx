@@ -3,7 +3,7 @@
 import type { ResidentPortalHomeState } from "@/lib/resident-portal-home";
 import { readResponseJson } from "@/lib/fetch-json";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, FileText, Inbox, MessageSquareText, RefreshCw, UsersRound } from "lucide-react";
 import {
   EmptyState,
@@ -86,6 +86,13 @@ export function ResidentPortalHome({ initial, createdReference, reason }: Props)
     }
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#boende-editor") return;
+    document.getElementById("boende-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("boende-avtal")?.focus(), 0);
+  }, [loading]);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -166,10 +173,10 @@ export function ResidentPortalHome({ initial, createdReference, reason }: Props)
                 : "Skapa eller aktivera ett hyresavtal i uthyrningsmodulen innan ett avtalskopplat boendeärende registreras."}
             />
           ) : (
-            <form method="post" action="/api/resident-portal" onSubmit={submit} className="space-y-4">
+            <form id="boende-editor" method="post" action="/api/resident-portal" onSubmit={submit} className="scroll-mt-36 space-y-4">
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold text-ink-700">Hyresavtal och objekt</span>
-                <select required name="leaseId" value={form.leaseId} onChange={(event) => setForm({ ...form, leaseId: event.target.value })} className={premiumFieldClass}>
+                <select id="boende-avtal" autoFocus required name="leaseId" value={form.leaseId} onChange={(event) => setForm({ ...form, leaseId: event.target.value })} disabled={saving || loading} className={premiumFieldClass}>
                   {data.leases.map((lease) => (
                     <option key={lease.id} value={lease.id}>
                       {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.name}
