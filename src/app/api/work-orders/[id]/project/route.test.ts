@@ -23,6 +23,11 @@ const {
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageWorkOrderFinance: () => true,
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/audit", () => ({
@@ -178,6 +183,26 @@ describe("work-orders/[id]/project POST", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Ogiltigt innehåll" });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-orders/[id]/project POST staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request(JSON.stringify({})), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 });

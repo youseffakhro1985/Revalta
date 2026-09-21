@@ -272,4 +272,20 @@ describe("work-order reports GET staff-scope", () => {
     expect(listTimeEntriesMock).not.toHaveBeenCalled();
     expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
   });
+
+  it("POST rejects residents before looking up reports", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({ action: "report.create" }), context);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

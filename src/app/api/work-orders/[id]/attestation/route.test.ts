@@ -23,6 +23,11 @@ const {
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -137,6 +142,24 @@ describe("POST /api/work-orders/[id]/attestation", () => {
 
     const response = await POST(request({ action: "approveSubmitted" }), params);
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att attestera tid och material");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up submitted rows", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({ action: "approveSubmitted" }), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
     expect(listTimeEntriesMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
