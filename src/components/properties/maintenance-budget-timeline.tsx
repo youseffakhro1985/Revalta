@@ -107,6 +107,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
     if (loading) return;
     if (window.location.hash !== "#arsprofil") return;
     document.getElementById("arsprofil")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("arsprofil-rensa")?.focus(), 0);
   }, [loading, data]);
 
   const filterOptions = useMemo(() => {
@@ -229,7 +230,7 @@ export function MaintenanceBudgetTimeline({ propertyId }: { propertyId: string }
             <option value="all">Alla statusar</option>
             {filterOptions.statuses.map((value) => <option key={value} value={value}>{statusLabels[value] || value}</option>)}
           </FilterField>
-          <button type="button" disabled={formLocked || !hasFilters} onClick={() => setFilters(initialFilters)} className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40">
+          <button id="arsprofil-rensa" type="button" disabled={formLocked || !hasFilters} onClick={() => setFilters(initialFilters)} className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40">
             <RotateCcw className="h-4 w-4" /> Nollställ
           </button>
         </div>
