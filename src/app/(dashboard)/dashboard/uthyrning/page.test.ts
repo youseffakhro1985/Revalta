@@ -33,10 +33,12 @@ describe("uthyrning occupancy filter first HTML", () => {
   it("keeps the vacancy filter in the first HTML and scrolls after load", () => {
     const form = readFileSync(new URL("./uthyrning-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="bestandsfilter"');
+    expect(form).toContain('id="bestand-sok"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#bestandsfilter"');
     expect(form).toContain('id="lease-editor"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("bestand-sok")?.focus()');
     expect(form).toContain("autoFocus");
     expect(form).toContain("disabled={loading}");
     expect(form).toContain("Nytt avtal");
@@ -67,6 +69,7 @@ describe("uthyrning leftover objects first HTML", () => {
     expect(form).toContain("Nytt avtal");
     expect(form).toContain('id="lease-editor"');
     expect(form).toContain('id="bestandsfilter"');
+    expect(form).toContain('id="bestand-sok"');
     expect(form).toContain('id="uthyrningslage"');
     expect(form).toContain('get("create") === "1"');
   });
