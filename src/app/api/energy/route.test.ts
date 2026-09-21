@@ -45,7 +45,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { DELETE, GET, PATCH } from "./route";
+import { DELETE, GET, PATCH, POST } from "./route";
 
 describe("energy route", () => {
   beforeEach(() => {
@@ -193,5 +193,67 @@ describe("energy route", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       action: "energy.reading.deleted",
     }));
+  });
+
+  it("POST denies residents before creating an energy reading", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/energy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", type: "electricity", period: "2026-07", unit: "kWh", value: 10 }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+  });
+
+  it("PATCH denies residents before looking up an energy reading", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PATCH(new Request("http://localhost/api/energy", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-1", value: 10 }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(energyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("DELETE denies residents before looking up an energy reading", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await DELETE(new Request("http://localhost/api/energy", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-1" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(energyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/energy", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-1", value: 10 }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(energyFindFirstMock).not.toHaveBeenCalled();
   });
 });
