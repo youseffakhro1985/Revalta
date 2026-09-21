@@ -21,6 +21,11 @@ describe("ronder create query", () => {
     expect(form).toContain("Ny rond");
     expect(form).toContain("autoFocus");
     expect(form).toContain("<Plus");
+    expect(form).toContain('id="rond-editor"');
+    expect(form).toContain('id="rond-namn"');
+    expect(form).toContain('document.getElementById("rond-namn")?.focus()');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
   });
 });
@@ -31,6 +36,8 @@ describe("ronder leftover list first HTML", () => {
     expect(form).toContain('id="rondfilter"');
     expect(form).toContain('id="rond-sok"');
     expect(form).toContain('id="rondurval"');
+    expect(form).toContain('id="rond-editor"');
+    expect(form).toContain('id="rond-namn"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#rondfilter"');
     expect(form).toContain('window.location.hash !== "#rondurval"');

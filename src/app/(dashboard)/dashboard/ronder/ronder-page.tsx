@@ -372,6 +372,13 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
   }, [canManage, loading]);
   useEffect(() => {
     if (loading) return;
+    if (!roundModalOpen) return;
+    if (window.location.hash !== "#rond-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
+    document.getElementById("rond-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("rond-namn")?.focus(), 0);
+  }, [loading, roundModalOpen]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#rondfilter") return;
     document.getElementById("rondfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("rond-sok")?.focus(), 0);
@@ -840,9 +847,10 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
 
       {roundModalOpen ? (
         <Modal title="Ny rond" description="Lägg in en ny kontroll i Revaltas rondplan." onClose={closeCreate} maxWidth="max-w-2xl">
+          <section id="rond-editor" className="scroll-mt-36">
           <form onSubmit={createRound} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Rondens namn"><input required maxLength={200} autoFocus value={roundForm.title} onChange={(event) => setRoundForm({ ...roundForm, title: event.target.value })} className={premiumFieldClass} placeholder="Exempel: Daglig tillsyn" /></Field>
+              <Field label="Rondens namn"><input id="rond-namn" required maxLength={200} autoFocus value={roundForm.title} onChange={(event) => setRoundForm({ ...roundForm, title: event.target.value })} className={premiumFieldClass} placeholder="Exempel: Daglig tillsyn" /></Field>
               <Field label="Fastighet"><select required value={roundForm.propertyId} onChange={(event) => setRoundForm({ ...roundForm, propertyId: event.target.value })} className={premiumFieldClass}><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name} · {property.city}</option>)}</select></Field>
               <Field label="Rondtyp"><select value={roundForm.interval} onChange={(event) => setRoundForm({ ...roundForm, interval: event.target.value })} className={premiumFieldClass}>{Object.entries(intervalLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
               <Field label="Nästa datum"><input type="date" value={roundForm.nextDue} onChange={(event) => setRoundForm({ ...roundForm, nextDue: event.target.value })} className={premiumFieldClass} /><span className="mt-1.5 block text-xs text-ink-500">Om datum lämnas tomt räknas det automatiskt från intervallet.</span></Field>
@@ -856,6 +864,7 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
             ) : <Field label="Kontrollpunkter"><textarea rows={7} value={roundForm.checklistText} onChange={(event) => setRoundForm({ ...roundForm, checklistText: event.target.value })} className={premiumTextareaClass} placeholder="En kontrollpunkt per rad" /><span className="mt-1.5 block text-xs text-ink-500">En kontrollpunkt per rad. Checklistan sparas i ronden.</span></Field>}
             <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end"><button type="button" onClick={closeCreate} className={premiumSecondaryButtonClass}>Avbryt</button><button disabled={savingRound} className={premiumPrimaryButtonClass}>{savingRound ? "Skapar rond…" : "Skapa rond"}</button></div>
           </form>
+          </section>
         </Modal>
       ) : null}
 
