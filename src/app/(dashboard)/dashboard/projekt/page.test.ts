@@ -21,6 +21,11 @@ describe("projekt create query", () => {
     expect(form).toContain("Nytt projekt");
     expect(form).toContain("autoFocus");
     expect(form).toContain("<Plus");
+    expect(form).toContain('id="projekt-editor"');
+    expect(form).toContain('id="projekt-titel"');
+    expect(form).toContain('document.getElementById("projekt-titel")?.focus()');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
   });
 });
@@ -30,6 +35,8 @@ describe("projekt portfolio filter first HTML", () => {
     const form = readFileSync(new URL("./projekt-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="projektfilter"');
     expect(form).toContain('id="projekt-sok"');
+    expect(form).toContain('id="projekt-editor"');
+    expect(form).toContain('id="projekt-titel"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#projektfilter"');
     expect(form).toContain("scrollIntoView");
@@ -49,6 +56,8 @@ describe("projekt leftover portfolio first HTML", () => {
     expect(form).toContain("Projekten hämtas.");
     expect(form).toContain('id="projektfilter"');
     expect(form).toContain('id="projekt-sok"');
+    expect(form).toContain('id="projekt-editor"');
+    expect(form).toContain('id="projekt-titel"');
     expect(form).toContain("Nytt projekt");
     expect(form).toContain("autoFocus");
     expect(form).toContain("scrollIntoView");
