@@ -106,6 +106,20 @@ describe("projects/[id] route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET(new Request("http://localhost/api/projects/project-1"), { params });
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa projekt");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a project or manager email", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(new Request("http://localhost/api/projects/project-1"), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(projectFindFirstMock).not.toHaveBeenCalled();
   });
 

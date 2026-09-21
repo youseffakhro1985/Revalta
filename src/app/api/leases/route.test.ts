@@ -65,6 +65,7 @@ describe("leases route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET(new Request("https://www.revalta.se/api/leases"));
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa uthyrningsdata");
     expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
@@ -78,7 +79,7 @@ describe("leases route", () => {
     const response = await GET(new Request("https://www.revalta.se/api/leases"));
     const body = await response.json();
     expect(response.status).toBe(403);
-    expect(body.error).toBe("Du saknar behörighet att visa uthyrningsdata");
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
