@@ -108,7 +108,8 @@ export default function NotificationCenterPage() {
   useEffect(() => {
     if (window.location.hash !== "#aviseringsfilter") return;
     document.getElementById("aviseringsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+    window.setTimeout(() => document.getElementById("avisering-alla")?.focus(), 0);
+  }, [loading]);
   useEffect(() => {
     if (loading) return;
     if (window.location.hash !== "#aviseringslista") return;
@@ -201,7 +202,7 @@ export default function NotificationCenterPage() {
         ].map(({ label, value, icon: Icon }) => <div key={label} className="rounded-2xl border border-sand-200/80 bg-white p-5 shadow-premium-sm"><div className="flex items-center justify-between"><p className="text-sm font-medium text-ink-500">{label}</p><Icon className="h-5 w-5 text-petroleum-700" /></div><p className="mt-4 text-3xl font-semibold text-ink-950">{value}</p></div>)}
       </div>
 
-      <div id="aviseringsfilter" className="scroll-mt-36 flex flex-wrap gap-2 rounded-2xl border border-sand-200 bg-white p-2 shadow-premium-sm">{filters.map((item, index) => <button key={item.id} autoFocus={index === 0} onClick={() => setFilter(item.id)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${filter === item.id ? "bg-petroleum-800 text-white" : "text-ink-600 hover:bg-sand-50"}`}>{item.label}</button>)}</div>
+      <div id="aviseringsfilter" className="scroll-mt-36 flex flex-wrap gap-2 rounded-2xl border border-sand-200 bg-white p-2 shadow-premium-sm"><button id="avisering-alla" type="button" autoFocus onClick={() => setFilter("all")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${filter === "all" ? "bg-petroleum-800 text-white" : "text-ink-600 hover:bg-sand-50"}`}>Alla</button>{filters.filter((item) => item.id !== "all").map((item) => <button key={item.id} type="button" onClick={() => setFilter(item.id)} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${filter === item.id ? "bg-petroleum-800 text-white" : "text-ink-600 hover:bg-sand-50"}`}>{item.label}</button>)}</div>
 
       <section id="aviseringslista" className="scroll-mt-36 overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-premium-sm">
         {loading && !data ? <p className="p-6 text-sm text-ink-500">Aviseringarna hämtas.</p> : null}
