@@ -137,6 +137,41 @@ describe("aviseringar leftover run history first HTML", () => {
   });
 });
 
+describe("aviseringar leftover run history section focus first HTML", () => {
+  it("keeps leftover run history in the first HTML and focuses nav after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(source).toContain('id="korningshistorik"');
+    expect(source).toContain('id="korningshistorik-lank"');
+    expect(source).toContain('window.location.hash !== "#korningshistorik"');
+    expect(source).toContain("Körningshistoriken hämtas.");
+    expect(source).toContain('id="aviseringsinstallningar"');
+    expect(source).toContain('id="historikfilter"');
+    expect(source).toContain('id="korninglista"');
+    expect(source).toContain('id="mottagarlista"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("korningshistorik-lank")?.focus()');
+    expect(source).not.toContain('id="korningshistorik-lank" autoFocus');
+    expect(source).toContain('href="#korningshistorik"');
+    expect(source).toContain('id="days-ahead"');
+    expect(source).toContain('document.getElementById("days-ahead")?.focus()');
+    expect(source).toContain('id="korninglista-uppdatera"');
+    expect(source).toContain('document.getElementById("korninglista-uppdatera")?.focus()');
+    expect(source).toContain('id="historik-status"');
+    expect(source).toContain('document.getElementById("historik-status")?.focus()');
+    expect(source).toContain('id="mottagarlista-lank"');
+    expect(source).toContain('document.getElementById("mottagarlista-lank")?.focus()');
+    expect(sticky).toContain('href: "/dashboard/installningar/aviseringar#aviseringsinstallningar"');
+    expect(sticky).toContain("Aviseringsval");
+    expect(sticky).not.toContain("#korningshistorik-lank");
+    expect(sticky).not.toContain("#korninglista");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/installningar/aviseringar", "technician")?.label).toBe("Aviseringsval")');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
+  });
+});
+
 describe("aviseringar sticky mutate first HTML", () => {
   it("keeps Aviseringsval focused after load without leftover hashes stealing the sticky", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
