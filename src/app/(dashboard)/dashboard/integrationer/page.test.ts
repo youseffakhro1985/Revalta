@@ -23,17 +23,26 @@ describe("integrationer hash targets", () => {
     expect(sticky).toContain('current === "/dashboard/integrationer"');
     expect(sticky).toContain('href: "/dashboard/integrationer/fakturaexporter"');
     expect(sticky).not.toContain("#fakturaexport");
+    expect(sticky).not.toContain("#handelser");
+    expect(sticky).not.toContain("#handelser-lank");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
   });
 });
 
 describe("integrationer leftover events first HTML", () => {
-  it("keeps events in the first HTML without stealing fakturaexport", () => {
+  it("keeps leftover events in the first HTML and focuses the section after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="handelser"');
+    expect(source).toContain('id="handelser-lank"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('hash !== "#handelser"');
+    expect(source).toContain('document.getElementById("handelser-lank")?.focus()');
     expect(source).toContain('id="fakturaexport"');
+    expect(source).toContain('document.getElementById("fakturaexport")?.focus()');
     expect(source).toContain("Händelserna hämtas.");
+    expect(source).toContain("autoFocus");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="handelser-lank" autoFocus');
     expect(source).not.toContain('{[1,2,3].map((item) => <div key={item} className="h-16 animate-pulse rounded-2xl bg-sand-100" />)}');
   });
 });
