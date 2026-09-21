@@ -24,6 +24,12 @@ export function RegisterForm({ reason }: { reason: string }) {
   useEffect(() => {
     setHydrated(true);
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#register-form") return;
+    document.getElementById("register-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("register-name")?.focus(), 0);
+  }, [loading]);
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -93,16 +99,18 @@ export function RegisterForm({ reason }: { reason: string }) {
         data-ready={hydrated ? "1" : "0"}
         onSubmit={handleRegister}
         aria-busy={loading}
-        className="mt-7 space-y-5"
+        className="scroll-mt-36 mt-7 space-y-5"
       >
         <div>
           <label htmlFor="register-name" className="block text-sm font-medium text-ink-700">Namn</label>
           <input
             id="register-name"
+            autoFocus
             name="name"
             type="text"
             autoComplete="name"
             maxLength={120}
+            disabled={loading}
             className={authInputClass}
             defaultValue=""
             placeholder="Förnamn Efternamn"

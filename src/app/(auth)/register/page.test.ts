@@ -37,3 +37,25 @@ describe("register form", () => {
     expect(form).not.toContain("useSearchParams");
   });
 });
+
+describe("register form first HTML focus", () => {
+  it("keeps the register form in the first HTML and focuses the name after load", () => {
+    const form = readFileSync(new URL("./register-form.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="register-form"');
+    expect(form).toContain('id="register-name"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#register-form"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("register-name")?.focus()');
+    expect(form).toContain("autoFocus");
+    expect(form).toContain("disabled={loading}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a dashboard sticky for public register", () => {
+    const sticky = readFileSync(new URL("../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("#register-form");
+    expect(sticky).not.toContain("#register-name");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+  });
+});
