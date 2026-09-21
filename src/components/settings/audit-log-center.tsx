@@ -131,6 +131,7 @@ export function AuditLogCenter() {
     if (loading) return;
     if (window.location.hash !== "#auditlista") return;
     document.getElementById("auditlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("auditlista-csv")?.focus(), 0);
   }, [loading, logs]);
 
   function resetFilters() {
@@ -200,7 +201,7 @@ export function AuditLogCenter() {
               <Filter className="mr-2 h-4 w-4" />
               Rensa
             </button>
-            <a className={premiumSecondaryButtonClass} href={exportUrl}>
+            <a id="auditlista-csv" className={premiumSecondaryButtonClass} href={exportUrl}>
               <Download className="mr-2 h-4 w-4" />
               Exportera CSV
             </a>
