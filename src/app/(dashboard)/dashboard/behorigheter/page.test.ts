@@ -26,6 +26,27 @@ describe("behorigheter hash targets", () => {
     expect(sticky).toContain('href: "/dashboard/team#bjud-in"');
     expect(sticky).not.toContain("#hantera-roller");
     expect(sticky).not.toContain("#anvandare");
+    expect(sticky).not.toContain("#behorighetsmatris");
+    expect(sticky).not.toContain("#behorighetsmatris-lank");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
     expect(page).toContain('id="behorighetsmatris"');
+  });
+});
+
+describe("behorigheter leftover matrix first HTML", () => {
+  it("keeps leftover matrix in the first HTML and focuses the section after load without a second autoFocus", () => {
+    const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const scroll = readFileSync(new URL("./hash-scroll.tsx", import.meta.url), "utf8");
+    expect(page).toContain('id="behorighetsmatris"');
+    expect(page).toContain('id="behorighetsmatris-lank"');
+    expect(page).toContain("scroll-mt-36");
+    expect(scroll).toContain('hash === "#behorighetsmatris"');
+    expect(scroll).toContain('document.getElementById("behorighetsmatris-lank")?.focus()');
+    expect(scroll).toContain('hash === "#anvandare"');
+    expect(scroll).toContain('document.getElementById("hantera-roller")?.focus()');
+    expect(page).toContain('id="hantera-roller"');
+    expect(page).toContain("autoFocus");
+    expect((page.match(/autoFocus/g) || []).length).toBe(1);
+    expect(page).not.toContain('id="behorighetsmatris-lank" autoFocus');
   });
 });

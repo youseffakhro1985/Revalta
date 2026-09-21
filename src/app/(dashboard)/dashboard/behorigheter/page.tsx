@@ -39,7 +39,7 @@ export default async function PermissionsPage() {
       <PageHeader eyebrow="Organisation" title="Roller och behörigheter" description="Tydlig ansvarsfördelning för säker och professionell fastighetsförvaltning." action={<div className="inline-flex items-center gap-2 rounded-xl border border-petroleum-100 bg-petroleum-50 px-4 py-3 text-sm font-semibold text-petroleum-800"><ShieldCheck className="h-5 w-5" />Säker rollstyrning</div>} />
       <HashScroll ids={["behorighetsmatris", "anvandare"]} />
       <nav aria-label="Hoppa till behörighetsavsnitt" className="flex flex-wrap gap-2">
-        <a href="#behorighetsmatris" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Behörighetsmatris</a>
+        <a id="behorighetsmatris-lank" href="#behorighetsmatris" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Behörighetsmatris</a>
         <a href="#anvandare" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Användare</a>
       </nav>
 

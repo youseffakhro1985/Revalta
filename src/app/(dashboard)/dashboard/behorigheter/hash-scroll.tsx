@@ -10,6 +10,9 @@ export function HashScroll({ ids }: { ids: string[] }) {
     if (hash === "#anvandare") {
       window.setTimeout(() => document.getElementById("hantera-roller")?.focus(), 0);
     }
+    if (hash === "#behorighetsmatris") {
+      window.setTimeout(() => document.getElementById("behorighetsmatris-lank")?.focus(), 0);
+    }
   }, [ids]);
   return null;
 }
