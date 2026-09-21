@@ -107,3 +107,32 @@ describe("public portal create post-load", () => {
     expect(source).not.toContain('id="portal-namn" autoFocus');
   });
 });
+
+describe("public portal track leftover first HTML", () => {
+  it("keeps the track form in the first HTML and focuses the reference after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./public-portal-client.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="public-track-form"');
+    expect(source).toContain('id="portal-ref"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#public-track-form"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("portal-ref")?.focus()');
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain('id="portal-namn"');
+    expect(source).toContain('document.getElementById("portal-namn")?.focus()');
+    expect(source).toContain('id="boende-aterkoppling-kommentar"');
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a boendeportal page sticky or steal create or feedback", () => {
+    const sticky = readFileSync(new URL("../dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    const source = readFileSync(new URL("./public-portal-client.tsx", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#public-track-form");
+    expect(sticky).not.toContain("#portal-ref");
+    expect(sticky).not.toContain("#portal-namn");
+    expect(sticky).not.toContain("#boende-aterkoppling");
+    expect(source).toContain("autoFocus");
+    expect(source).not.toContain('id="portal-ref" autoFocus');
+  });
+});
