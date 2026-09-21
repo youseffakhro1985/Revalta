@@ -138,7 +138,7 @@ export async function POST(request: Request) {
         where: { id: leaseId, company_id: user.company_id, deleted_at: null },
         include: { lease_holder: { select: { name: true } }, unit: { select: { designation: true } } },
       });
-      if (!lease) return NextResponse.json({ error: "Kontraktet hittades inte" }, { status: 400 });
+      if (!lease) return NextResponse.json({ error: "Kontraktet hittades inte" }, { status: 404 });
       resolvedPropertyId = lease.property_id;
       tenantName = lease.lease_holder.name;
       unit = lease.unit.designation;

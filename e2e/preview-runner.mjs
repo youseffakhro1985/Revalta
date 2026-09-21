@@ -31,14 +31,30 @@ export async function runVerifiedPreview(env, runBrowser, readHealth = readPrevi
   validateRelease(initialHealth, target);
   const completed = new Set();
   let gateFailed = false;
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const assertRelease = async () => {
     if (gateFailed) throw new Error("BLOCKED: release verification previously failed");
-    try {
-      validateRelease(await readHealth(target, env), target, initialHealth);
-    } catch {
-      gateFailed = true;
-      throw new Error("BLOCKED: release identity changed or became unverifiable");
+    let lastTransportError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      let health;
+      try {
+        health = await readHealth(target, env);
+      } catch (error) {
+        lastTransportError = error;
+        await delay(250 * (attempt + 1));
+        continue;
+      }
+      try {
+        validateRelease(health, target, initialHealth);
+        return;
+      } catch {
+        gateFailed = true;
+        throw new Error("BLOCKED: release identity changed or became unverifiable");
+      }
     }
+    throw lastTransportError instanceof Error
+      ? lastTransportError
+      : new Error("BLOCKED: release identity became unverifiable");
   };
   await runBrowser({
     target, assertRelease,

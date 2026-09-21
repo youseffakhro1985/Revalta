@@ -412,7 +412,7 @@ describe("tickets/[id] PATCH", () => {
       where: { id: "tech-in-other-company", company_id: "company-1" },
       select: { id: true },
     });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(body.error).toBe("Vald ansvarig hittades inte");
     expect(ticketUpdateManyMock).not.toHaveBeenCalled();
   });

@@ -1,8 +1,8 @@
 # Revalta Feature Readiness
 
-Verified baseline: `92adc33dfd224c698f8a31d0ce59a808faed355e` (21 Sep 2026)
+Verified baseline: `ec95b376e6e692defb6c252bcb16986bcd6921f4` (21 Sep 2026)
 
-This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `b7b08793` (31 Aug 2026) are not current-main evidence.
+This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `92adc33dfd224c698f8a31d0ce59a808faed355e` (Inställningar #933) and `b7b08793` (31 Aug 2026) are not current-main evidence.
 
 ## Status contract
 

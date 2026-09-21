@@ -2,6 +2,7 @@ import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
 import { auditScopedWhere, canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { asNumber, isModernStorageMirror, loadLegacyRows, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
+import { findCompanyOwned } from "@/lib/tenant-relations";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -91,10 +92,13 @@ export async function POST(request: Request) {
 
     const propertyId = body.propertyId ? String(body.propertyId).trim() : "";
     if (propertyId) {
-      const property = await db.property.findFirst({
-        where: { id: propertyId, company_id: user.company_id, deleted_at: null },
-        select: { id: true },
-      });
+      const property = await findCompanyOwned(
+        (args) => db.property.findFirst({
+          where: { ...args.where, deleted_at: null },
+          select: { id: true },
+        }),
+        { id: propertyId, companyId: user.company_id },
+      );
       if (!property) return NextResponse.json({ error: "Fastigheten hittades inte" }, { status: 404 });
     }
 

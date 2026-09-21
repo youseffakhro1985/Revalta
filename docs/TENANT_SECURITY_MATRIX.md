@@ -18,19 +18,19 @@ Negative tests must use two companies (Tenant A / Tenant B). A mocked `findFirst
 | Domain | Direct company scope | Related-object scope | Current automated evidence | Residual risk |
 | --- | --- | --- | --- | --- |
 | Properties / buildings / units | Yes on property APIs | Building/asset checks in work-order asset links | Property route 404 tests; `validateWorkOrderAssetLinks` | Full unit/building matrix incomplete |
-| Tickets / comments / attachments | `company_id` on ticket routes | Property active/deleted guards | Ticket route tenant tests | Comment/attachment related-id matrix incomplete |
-| Work orders / execution / time / material | `company_id` + property join | Asset/property validation on create | Transition and invoice-basis isolation tests | Golden-path + related-id negative still P1 |
+| Tickets / comments / attachments | `company_id` on ticket routes | Property and assignee re-read via `findCompanyOwned`; GET propertyId stays inside `tenantWhere` | Ticket POST Tenant B property/assignee 404; GET propertyId still `company_id` of caller; ticket PATCH foreign assignee 404 | Comment/attachment related-id matrix incomplete |
+| Work orders / execution / time / material | `company_id` + property join | Property/ticket 404; unit via property.company_id; assignee/vendor related-id 404 | Create tenant atomicity + vendor assignment + mutation atomicity | Golden-path E2E still P1 |
 | Projects / maintenance / components | Company filters present | Property joins in several engines | Partial | Needs dedicated Tenant B tests |
 | Rounds / inspections | Company filters present | Lease/property joins in inspection helpers | Partial | Production schema of checklist templates unverified |
-| Leases / holders / handover / rent notices | Company + property deleted_at | Lease lookup helpers | Partial | Resident vs staff matrix incomplete |
+| Leases / holders / handover / rent notices | Company + property deleted_at | Lease lookup helpers; rent notice create 404s Tenant B `leaseId` | Rent notice POST Tenant B lease test | Resident vs staff matrix incomplete |
 | Bookings / access credentials | Company filters present | Property/unit | Partial | Resident isolation incomplete |
 | Documents / operational documents | Company filters; parent constraint migration exists | Parent must be same company | Partial | Blob URL negative tests still P1 |
-| Quotes / vendors / insurance | Company filters present | Property/vendor relations | Partial | Export/search negatives incomplete |
+| Quotes / vendors / insurance | Company filters present | Vendor create property via `findCompanyOwned` | Vendor POST Tenant B propertyId 404 | Export/search negatives incomplete |
 | Energy / IMD / budget / calendar | Company filters present | Property | Partial | Query/tenant audit incomplete |
 | Notifications / audit / integrations | Company scoped lists | — | Partial | Export CSV injection still P1 |
 | Invoice export / billing | Company on work-order finance routes | Work order ownership | Invoice tenant-isolation tests | Provider readiness still P1 |
 | Search / export | Company where clauses | — | Search + ticket export tests | Bounded export + formula injection P1 |
-| Public portal | Explicit portal company | Property must belong to that company | `public-portal-tenant.test.ts` | Commercial tenant id is owner decision |
+| Public portal | Explicit portal company | Property must belong to that company; foreign property 404 | `public-portal-tenant.test.ts`; public ticket property 404 | Commercial tenant id is owner decision |
 | Resident portal | Must be stricter than staff | Ticket/lease ownership | Partial | Dedicated Resident A/B tests still P1 |
 
 ## Two-tenant negative cases (minimum)

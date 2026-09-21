@@ -199,7 +199,7 @@ describe("work-order create tenant and atomicity boundaries", () => {
     const response = await POST(request(validBody({ assignedToId: "foreign-user" })));
     const body = await response.json();
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(body.error).toBe("Ansvarig användare hittades inte");
     expect(userFindFirstMock).toHaveBeenCalledWith({
       where: { id: "foreign-user", company_id: "company-1", status: "active" },
@@ -224,10 +224,14 @@ describe("work-order create tenant and atomicity boundaries", () => {
     const response = await POST(request(validBody({ unitId: "foreign-unit" })));
     const body = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(body.error).toBe("Enheten tillhör inte fastigheten");
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Enheten hittades inte");
     expect(unitFindFirstMock).toHaveBeenCalledWith({
-      where: { id: "foreign-unit", property_id: "property-1" },
+      where: {
+        id: "foreign-unit",
+        property_id: "property-1",
+        property: { company_id: "company-1", deleted_at: null },
+      },
       select: { id: true },
     });
     expect(transactionMock).not.toHaveBeenCalled();

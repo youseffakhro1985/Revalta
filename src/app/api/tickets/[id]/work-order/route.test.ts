@@ -128,4 +128,23 @@ describe("ticket work-order creation authorization", () => {
     });
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when the unit is not owned through the ticket company property", async () => {
+    unitFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request({ unitId: "unit-tenant-b" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Enheten hittades inte");
+    expect(unitFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        id: "unit-tenant-b",
+        property_id: "property-1",
+        property: { company_id: "company-1", deleted_at: null },
+      },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

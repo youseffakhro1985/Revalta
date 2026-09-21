@@ -208,7 +208,7 @@ export async function PATCH(
       });
 
       if (!assignee || assignee.id !== normalizedAssignedToId) {
-        return NextResponse.json({ error: "Vald ansvarig hittades inte" }, { status: 400 });
+        return NextResponse.json({ error: "Vald ansvarig hittades inte" }, { status: 404 });
       }
     }
 

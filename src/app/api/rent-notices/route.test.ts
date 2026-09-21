@@ -8,6 +8,7 @@ const {
   auditFindManyMock,
   auditFindFirstMock,
   leaseFindManyMock,
+  leaseFindFirstMock,
   propertyFindManyMock,
   propertyFindFirstMock,
   writeAuditLogMock,
@@ -20,6 +21,7 @@ const {
   auditFindManyMock: vi.fn(),
   auditFindFirstMock: vi.fn(),
   leaseFindManyMock: vi.fn(),
+  leaseFindFirstMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   propertyFindFirstMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
@@ -44,13 +46,13 @@ vi.mock("@/lib/db", () => ({
       updateMany: noticeUpdateManyMock,
       create: vi.fn(),
     },
-    lease: { findMany: leaseFindManyMock, findFirst: vi.fn() },
+    lease: { findMany: leaseFindManyMock, findFirst: leaseFindFirstMock },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
     property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
   },
 }));
 
-import { PATCH } from "./route";
+import { PATCH, POST } from "./route";
 
 describe("rent-notices route", () => {
   beforeEach(() => {
@@ -161,6 +163,30 @@ describe("rent-notices route", () => {
     writeAuditLogMock.mockRejectedValue(new Error("audit failed"));
     const response = await PATCH(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ noticeId: "notice-1", status: "sent" }) }));
     expect(response.status).toBe(500);
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a rent notice against Tenant B leaseId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    leaseFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/rent-notices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leaseId: "lease-tenant-b",
+        period: "2026-09",
+        dueDate: "2026-09-30",
+        status: "draft",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Kontraktet hittades inte");
+    expect(leaseFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "lease-tenant-b", company_id: "company-1", deleted_at: null },
+    }));
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 
 });

@@ -152,11 +152,15 @@ export async function POST(
 
   if (unitId) {
     const unit = await db.unit.findFirst({
-      where: { id: unitId, property_id: ticket.property_id },
+      where: {
+        id: unitId,
+        property_id: ticket.property_id,
+        property: { company_id: user.company_id, deleted_at: null },
+      },
       select: { id: true },
     });
     if (!unit) {
-      return NextResponse.json({ error: "Enheten tillhör inte ärendets fastighet" }, { status: 400 });
+      return NextResponse.json({ error: "Enheten hittades inte" }, { status: 404 });
     }
   }
 
@@ -167,7 +171,7 @@ export async function POST(
       select: { id: true, email: true },
     });
     if (!assignee) {
-      return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 400 });
+      return NextResponse.json({ error: "Ansvarig användare hittades inte" }, { status: 404 });
     }
     assigneeEmail = assignee.email;
   }
