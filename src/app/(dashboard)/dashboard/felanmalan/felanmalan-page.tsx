@@ -205,6 +205,7 @@ export function FelanmalanPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#arendeurval") return;
     document.getElementById("arendeurval")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("arende-sok")?.focus(), 0);
   }, [loading, tickets]);
 
   useEffect(() => {
@@ -363,7 +364,7 @@ export function FelanmalanPage({ initialCreate }: { initialCreate: boolean }) {
 
     <section id="arendeurval" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm">
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.6fr)_120px_120px_130px_150px_140px_160px_auto]">
-        <label className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-350" /><input disabled={loading} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} aria-label="Sök ärenden" placeholder="Sök ärenden, fastighet, adress..." className={`${premiumFieldClass} h-10 pl-10 text-xs`} /></label>
+        <label className="relative"><Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-350" /><input id="arende-sok" disabled={loading} value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} aria-label="Sök ärenden" placeholder="Sök ärenden, fastighet, adress..." className={`${premiumFieldClass} h-10 pl-10 text-xs`} /></label>
         <select disabled={loading} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }} aria-label="Status" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Status</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select disabled={loading} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Kategori" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Kategori</option>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <select disabled={loading} value={priorityFilter} onChange={(event) => { setPriorityFilter(event.target.value); setPage(1); }} aria-label="Prioritet" className={`${premiumFieldClass} h-10 text-xs`}><option value="">Prioritet</option>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
