@@ -161,6 +161,13 @@ export function PublicPortalClient({
     void loadProperties();
   }, [companySlug, initialCatalog]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#boende-aterkoppling") return;
+    document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("boende-aterkoppling-kommentar")?.focus(), 0);
+  }, [loading, trackedTicket]);
+
   async function loadTrackedTicket(nextReference: string, nextEmail: string, nextToken: string) {
     const normalizedReference = nextReference.trim().toUpperCase();
     const params = new URLSearchParams();
@@ -217,6 +224,7 @@ export function PublicPortalClient({
         if (!created && !commented && !attached && !feedback) setSuccess("Ärendet hittades.");
         if (params.get("feedback") === "1") {
           document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.setTimeout(() => document.getElementById("boende-aterkoppling-kommentar")?.focus(), 0);
         }
       } catch (loadError) {
         if (!created) {
@@ -529,7 +537,7 @@ export function PublicPortalClient({
                   )}
 
                   {closedTicket ? (
-                    <div id="boende-aterkoppling" className="mt-6 border-t border-sand-100 pt-5">
+                    <div id="boende-aterkoppling" className="scroll-mt-36 mt-6 border-t border-sand-100 pt-5">
                       {trackedTicket.residentFeedback ? (
                         <div className="rounded-xl border border-petroleum-100 bg-petroleum-50 p-4">
                           <p className="text-xs font-semibold uppercase tracking-wide text-petroleum-700">Din återkoppling</p>
@@ -569,11 +577,14 @@ export function PublicPortalClient({
                             ))}
                           </div>
                           <textarea
+                            id="boende-aterkoppling-kommentar"
+                            autoFocus
                             name="comment"
                             rows={3}
                             maxLength={1000}
                             value={feedbackComment}
                             onChange={(event) => setFeedbackComment(event.target.value)}
+                            disabled={loading}
                             className="mt-3 w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-900 outline-none transition-all focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500"
                             placeholder="Valfri kommentar till förvaltningen..."
                             aria-label="Valfri kommentar"

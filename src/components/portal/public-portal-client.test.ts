@@ -53,3 +53,29 @@ describe("public portal ticket form", () => {
     expect(source).not.toContain("searchParams.set(\"email\"");
   });
 });
+
+describe("public portal feedback post-load", () => {
+  it("keeps closed-ticket feedback in the first HTML and focuses the comment after load", () => {
+    const source = readFileSync(new URL("./public-portal-client.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="boende-aterkoppling"');
+    expect(source).toContain('id="boende-aterkoppling-kommentar"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#boende-aterkoppling"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("boende-aterkoppling-kommentar")?.focus()');
+    expect(source).toContain("autoFocus");
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain('id="public-ticket-form"');
+    expect(source).toContain('id="public-feedback-form"');
+  });
+
+  it("does not add a boendeportal page sticky or steal the public create form", () => {
+    const sticky = readFileSync(new URL("../dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    const source = readFileSync(new URL("./public-portal-client.tsx", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#boende-aterkoppling");
+    expect(sticky).not.toContain("#boende-aterkoppling-kommentar");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="public-ticket-form" autoFocus');
+  });
+});
