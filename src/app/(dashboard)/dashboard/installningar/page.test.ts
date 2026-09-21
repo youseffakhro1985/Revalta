@@ -23,15 +23,26 @@ describe("installningar overview hash targets", () => {
 });
 
 describe("installningar leftover account overview first HTML", () => {
-  it("keeps leftover account overview in the first HTML without stealing Byt lösenord", () => {
+  it("keeps leftover account overview in the first HTML and focuses refresh after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="kontooversikt"');
+    expect(source).toContain('id="konto-uppdatera"');
     expect(source).toContain('window.location.hash !== "#kontooversikt"');
+    expect(source).toContain('document.getElementById("konto-uppdatera")?.focus()');
     expect(source).toContain("Uppgifterna hämtas.");
     expect(source).toContain('id="losenord"');
+    expect(source).toContain('id="current-password"');
+    expect(source).toContain('document.getElementById("current-password")?.focus()');
     expect(source).toContain('id="profil"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain("disabled={initialLoading || Boolean(saving)}");
+    expect(source).not.toContain("autoFocus");
     expect(source).not.toContain("Laddar…");
+    expect(sticky).toContain('href: "/dashboard/installningar#losenord"');
+    expect(sticky).not.toContain("#kontooversikt");
+    expect(sticky).not.toContain("#konto-uppdatera");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
   });
 });
 
