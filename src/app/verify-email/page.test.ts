@@ -30,3 +30,25 @@ describe("verify-email form", () => {
     expect(form).not.toContain("useSearchParams");
   });
 });
+
+describe("verify-email form first HTML focus", () => {
+  it("keeps the leftover form in the first HTML and focuses the action after load", () => {
+    const form = readFileSync(new URL("./verify-email-form.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="verify-email-form"');
+    expect(form).toContain('id="verify-email"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#verify-email-form"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("verify-email")?.focus()');
+    expect(form).toContain("autoFocus");
+    expect(form).toContain("disabled={loading || !token || Boolean(message)}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a dashboard sticky for public email verification", () => {
+    const sticky = readFileSync(new URL("../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("#verify-email-form");
+    expect(sticky).not.toContain("#verify-email");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+  });
+});

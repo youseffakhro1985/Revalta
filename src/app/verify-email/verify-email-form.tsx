@@ -20,6 +20,12 @@ export function VerifyEmailForm({ token, reason }: { token: string; reason: stri
   useEffect(() => {
     setHydrated(true);
   }, []);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#verify-email-form") return;
+    document.getElementById("verify-email-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("verify-email")?.focus(), 0);
+  }, [loading]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -70,10 +76,10 @@ export function VerifyEmailForm({ token, reason }: { token: string; reason: stri
         data-ready={hydrated ? "1" : "0"}
         onSubmit={submit}
         aria-busy={loading}
-        className="mt-7"
+        className="scroll-mt-36 mt-7"
       >
         <input type="hidden" name="token" value={token} />
-        <button type="submit" disabled={loading || !token || Boolean(message)} className={authButtonClass}>
+        <button id="verify-email" autoFocus type="submit" disabled={loading || !token || Boolean(message)} className={authButtonClass}>
           {loading ? "Verifierar..." : message ? "Verifierad" : "Verifiera e-post"}
         </button>
       </form>
