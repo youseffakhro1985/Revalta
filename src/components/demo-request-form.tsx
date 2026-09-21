@@ -55,6 +55,12 @@ export function DemoRequestForm({
     const reasonCopy = demoReasonCopy(params.get("reason"));
     if (reasonCopy) setError(reasonCopy);
   }, []);
+  useEffect(() => {
+    if (submitting) return;
+    if (window.location.hash !== "#demo-request-form") return;
+    document.getElementById("demo-request-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("demo-namn")?.focus(), 0);
+  }, [submitting]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,7 +106,7 @@ export function DemoRequestForm({
       method="post"
       action="/api/demo-request"
       onSubmit={submit}
-      className="relative rounded-[24px] border border-sand-200 bg-white p-5 shadow-premium-lg sm:p-7 lg:p-8"
+      className="relative scroll-mt-36 rounded-[24px] border border-sand-200 bg-white p-5 shadow-premium-lg sm:p-7 lg:p-8"
     >
       <div className="mb-7">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-petroleum-700">Boka demo</p>
@@ -128,7 +134,7 @@ export function DemoRequestForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-xs font-semibold text-ink-700">
           Namn *
-          <input required name="name" autoComplete="name" maxLength={120} value={form.name} onChange={(event) => update("name", event.target.value)} className={fieldClass} placeholder="För- och efternamn" />
+          <input id="demo-namn" autoFocus required name="name" autoComplete="name" maxLength={120} value={form.name} onChange={(event) => update("name", event.target.value)} disabled={submitting} className={fieldClass} placeholder="För- och efternamn" />
         </label>
         <label className="block text-xs font-semibold text-ink-700">
           E-post *
