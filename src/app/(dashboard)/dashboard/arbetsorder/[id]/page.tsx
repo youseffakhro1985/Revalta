@@ -140,6 +140,7 @@ export default function WorkOrderDetailPage() {
     const node = document.getElementById("ekonomi");
     if (!node) return;
     node.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("ekonomi-starta")?.focus(), 0);
   }, [loading, workOrder, capabilities.canViewFinance]);
 
   useEffect(() => {
