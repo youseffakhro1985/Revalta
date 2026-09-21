@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { ArrowLeft, Building2, CheckCircle2, MapPin } from "lucide-react";
 import { readResponseJson } from "@/lib/fetch-json";
 
@@ -18,6 +18,12 @@ export default function NewPropertyPage() {
   const [form, setForm] = useState({ name: "", address: "", postalCode: "", city: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (window.location.hash && window.location.hash !== "#fastighet-editor") return;
+    document.getElementById("fastighet-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("fastighet-namn")?.focus(), 0);
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,11 +65,11 @@ export default function NewPropertyPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px]">
-        <section className="rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm sm:p-6">
+        <section id="fastighet-editor" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white p-5 shadow-premium-sm sm:p-6">
           <form onSubmit={submit} className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Fastighetsnamn" description="Det namn som används i Revalta.">
-                <input required minLength={2} maxLength={160} className={fieldClass} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ex. Kvarnen 7" />
+                <input id="fastighet-namn" required autoFocus minLength={2} maxLength={160} className={fieldClass} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Ex. Kvarnen 7" />
               </Field>
               <Field label="Ort" description="Ort där fastigheten är belägen.">
                 <input required minLength={2} maxLength={120} className={fieldClass} value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} placeholder="Göteborg" />
