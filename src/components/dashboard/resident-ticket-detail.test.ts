@@ -15,5 +15,18 @@ describe("resident ticket detail native comments", () => {
     expect(detail).toContain("event.preventDefault()");
     expect(detail).not.toContain("disabled={saving || !commentBody.trim()}");
     expect(detail).toContain("disabled={saving}");
+    expect(detail).toContain('id="boende-kommentar"');
+    expect(detail).toContain('id="resident-ticket-comment"');
+    expect(detail).toContain("autoFocus");
+    expect(detail).toContain("scroll-mt-36");
+    expect(detail).toContain("scrollIntoView");
+    expect(detail).toContain('document.getElementById("resident-ticket-comment")?.focus()');
+  });
+
+  it("does not add a boendeportal page sticky", () => {
+    const sticky = readFileSync(new URL("./dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#boende-kommentar");
+    expect(sticky).not.toContain("#resident-ticket-comment");
   });
 });

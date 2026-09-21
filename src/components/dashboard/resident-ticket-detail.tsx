@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, MessageSquareText, Send } from "lucide-react";
 import {
   EmptyState,
@@ -80,6 +80,12 @@ export function ResidentTicketDetailView({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(reasonCopy(reason));
   const [success, setSuccess] = useState(commented ? "Kommentaren är skickad." : "");
+
+  useEffect(() => {
+    if (window.location.hash !== "#boende-kommentar") return;
+    document.getElementById("boende-kommentar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("resident-ticket-comment")?.focus(), 0);
+  }, []);
 
   async function submitComment(event: React.FormEvent) {
     event.preventDefault();
@@ -207,10 +213,11 @@ export function ResidentTicketDetailView({
 
             {initialCanComment ? (
               <form
+                id="boende-kommentar"
                 method="post"
                 action={`/api/resident-portal/tickets/${ticketId}/comments`}
                 onSubmit={submitComment}
-                className="mt-6 space-y-3 border-t border-sand-200 pt-6"
+                className="mt-6 scroll-mt-36 space-y-3 border-t border-sand-200 pt-6"
               >
                 <label htmlFor="resident-ticket-comment" className="flex items-center gap-2 text-sm font-medium text-ink-700">
                   <MessageSquareText className="h-4 w-4 text-petroleum-700" aria-hidden="true" />
@@ -218,6 +225,7 @@ export function ResidentTicketDetailView({
                 </label>
                 <textarea
                   id="resident-ticket-comment"
+                  autoFocus
                   name="body"
                   required
                   minLength={2}
@@ -225,6 +233,7 @@ export function ResidentTicketDetailView({
                   rows={4}
                   value={commentBody}
                   onChange={(event) => setCommentBody(event.target.value)}
+                  disabled={saving}
                   placeholder="Beskriv till exempel om felet kvarstår eller om du har kompletterande information…"
                   className={premiumTextareaClass}
                 />
