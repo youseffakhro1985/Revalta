@@ -34,13 +34,26 @@ describe("arbetsorder leftover list first HTML", () => {
     expect(source).not.toContain('Empty title={loading ? "Läser arbetsordrar…"');
   });
 
-  it("keeps today's planning leftover in the first HTML without stealing create", () => {
+  it("keeps today's planning leftover in the first HTML and focuses Visa alla after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="dagensplanering"');
+    expect(source).toContain('id="dagensplanering-alla"');
     expect(source).toContain('window.location.hash !== "#dagensplanering"');
+    expect(source).toContain('document.getElementById("dagensplanering-alla")?.focus()');
     expect(source).toContain("Dagens planering hämtas.");
     expect(source).not.toContain('Empty title={loading ? "Läser dagens planering…"');
     expect(source).toContain("Ny arbetsorder");
     expect(source).toContain("/dashboard/arbetsorder/ny");
+    expect(source).toContain('id="order-sok"');
+    expect(source).toContain('document.getElementById("order-sok")?.focus()');
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="dagensplanering-alla" autoFocus');
+    expect(sticky).toContain('href: `${workOrdersRoot}/ny`');
+    expect(sticky).not.toContain("#dagensplanering");
+    expect(sticky).not.toContain("#dagensplanering-alla");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/arbetsorder", "technician")).toBeNull()');
   });
 });
