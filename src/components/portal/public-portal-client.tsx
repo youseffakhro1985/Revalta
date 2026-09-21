@@ -173,6 +173,12 @@ export function PublicPortalClient({
     document.getElementById("public-ticket-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("portal-namn")?.focus(), 0);
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#public-track-form") return;
+    document.getElementById("public-track-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("portal-ref")?.focus(), 0);
+  }, [loading]);
 
   async function loadTrackedTicket(nextReference: string, nextEmail: string, nextToken: string) {
     const normalizedReference = nextReference.trim().toUpperCase();
@@ -493,10 +499,10 @@ export function PublicPortalClient({
                 method="get"
                 action={companySlug ? `/portal/${encodeURIComponent(companySlug)}` : "/portal"}
                 onSubmit={trackTicket}
-                className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]"
+                className="scroll-mt-36 mt-5 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]"
               >
                 {trackingToken ? <input type="hidden" name="token" value={trackingToken} /> : null}
-                <label><span className="sr-only">Ärendets referensnummer</span><input required name="ref" autoComplete="off" maxLength={32} value={reference} onChange={(event) => setReference(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="RV-2026-XXXXXX" /></label>
+                <label><span className="sr-only">Ärendets referensnummer</span><input id="portal-ref" required name="ref" autoComplete="off" maxLength={32} value={reference} onChange={(event) => setReference(event.target.value)} disabled={loading} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="RV-2026-XXXXXX" /></label>
                 <label><span className="sr-only">E-post som användes för ärendet</span><input required={!trackingToken} name="email" type="email" autoComplete="email" maxLength={254} value={trackEmail} onChange={(event) => setTrackEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 bg-white p-3 text-sm text-ink-950 focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none" placeholder="Din e-post" /></label>
                 <button type="submit" disabled={loading} className="rounded-xl border border-sand-200 bg-white px-5 py-3 text-sm font-semibold text-ink-900 shadow-sm transition-colors hover:bg-sand-100 disabled:opacity-70">
                   Följ
