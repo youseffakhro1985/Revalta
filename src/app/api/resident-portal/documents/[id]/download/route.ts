@@ -221,9 +221,9 @@ export async function GET(
         }, lease)
       ) {
         return reject(observability, {
-          status: 403,
-          code: API_ERROR_CODES.forbidden,
-          message: "Du saknar behörighet till dokumentet",
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet hittades inte",
           event: "resident_documents.download.scope_forbidden",
           context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
         });
@@ -301,9 +301,9 @@ export async function GET(
       };
       if (!residentDocumentVisibilities.has(visibility) || !documentAccessibleToLease(visibility, scope, lease)) {
         return reject(observability, {
-          status: 403,
-          code: API_ERROR_CODES.forbidden,
-          message: "Du saknar behörighet till dokumentet",
+          status: 404,
+          code: API_ERROR_CODES.notFound,
+          message: "Dokumentet hittades inte",
           event: "resident_documents.download.scope_forbidden",
           context: { userId: user.id, companyId: user.company_id, leaseId: lease.id },
         });

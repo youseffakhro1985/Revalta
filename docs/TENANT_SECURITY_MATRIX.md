@@ -18,7 +18,8 @@ Negative tests must use two companies (Tenant A / Tenant B). A mocked `findFirst
 | Domain | Direct company scope | Related-object scope | Current automated evidence | Residual risk |
 | --- | --- | --- | --- | --- |
 | Properties / buildings / units | Yes on property APIs | Building/asset checks in work-order asset links | Property route 404 tests; `validateWorkOrderAssetLinks` | Full unit/building matrix incomplete |
-| Tickets / comments / attachments | `company_id` on ticket routes | Property and assignee re-read via `findCompanyOwned`; GET propertyId stays inside `tenantWhere` | Ticket POST Tenant B property/assignee 404; GET propertyId still `company_id` of caller; ticket PATCH foreign assignee 404 | Comment/attachment related-id matrix incomplete |
+| Tickets / comments / attachments | `company_id` on ticket routes | Property and assignee re-read via `findCompanyOwned`; comments/attachments require parent ticket in session company before blob write | Ticket POST Tenant B property/assignee 404; comment/attachment Tenant B 404; blob GET scoped through parent ticket | Internal comment body still listed only after parent 404 |
+| Resident portal | Must be stricter than staff | Ticket/lease ownership via reporter/lease-holder email; staff APIs 403 for residents | Resident helper email+company tests; resident cannot use staff comment/attachment APIs; document wrong-lease 404 | Full lease/booking Resident A/B matrix still P1 |
 | Work orders / execution / time / material | `company_id` + property join | Property/ticket 404; unit via property.company_id; assignee/vendor related-id 404 | Create tenant atomicity + vendor assignment + mutation atomicity | Golden-path E2E still P1 |
 | Projects / maintenance / components | Company filters present | Property joins in several engines | Partial | Needs dedicated Tenant B tests |
 | Rounds / inspections | Company filters present | Lease/property joins in inspection helpers | Partial | Production schema of checklist templates unverified |
@@ -31,7 +32,6 @@ Negative tests must use two companies (Tenant A / Tenant B). A mocked `findFirst
 | Invoice export / billing | Company on work-order finance routes | Work order ownership | Invoice tenant-isolation tests | Provider readiness still P1 |
 | Search / export | Company where clauses | — | Search + ticket export tests | Bounded export + formula injection P1 |
 | Public portal | Explicit portal company | Property must belong to that company; foreign property 404 | `public-portal-tenant.test.ts`; public ticket property 404 | Commercial tenant id is owner decision |
-| Resident portal | Must be stricter than staff | Ticket/lease ownership | Partial | Dedicated Resident A/B tests still P1 |
 
 ## Two-tenant negative cases (minimum)
 

@@ -58,4 +58,28 @@ describe("GET /api/attachments/[id]", () => {
       }),
     }));
   });
+
+  it("looks up Tenant B attachment ids only inside Tenant A company_id and 404s without streaming blob", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-a",
+      role: "manager",
+      company_id: "company-a",
+    });
+    attachmentFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/attachments/attachment-tenant-b"),
+      { params: Promise.resolve({ id: "attachment-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Bilagan hittades inte");
+    expect(attachmentFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "attachment-tenant-b",
+        ticket: expect.objectContaining({ company_id: "company-a", deleted_at: null }),
+      }),
+    }));
+  });
 });
