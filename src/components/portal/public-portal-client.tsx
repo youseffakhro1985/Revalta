@@ -185,6 +185,12 @@ export function PublicPortalClient({
     document.getElementById("public-comment-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("portal-kommentar")?.focus(), 0);
   }, [loading, trackedTicket]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#public-attachment-form") return;
+    document.getElementById("public-attachment-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("portal-bilaga")?.focus(), 0);
+  }, [loading, trackedTicket]);
 
   async function loadTrackedTicket(nextReference: string, nextEmail: string, nextToken: string) {
     const normalizedReference = nextReference.trim().toUpperCase();
@@ -650,7 +656,7 @@ export function PublicPortalClient({
                     action={`/api/public/tickets/${encodeURIComponent(reference.trim().toUpperCase())}/attachments`}
                     encType="multipart/form-data"
                     onSubmit={uploadAttachment}
-                    className="mt-6 border-t border-sand-100 pt-5"
+                    className="scroll-mt-36 mt-6 border-t border-sand-100 pt-5"
                   >
                     <input type="hidden" name="native" value="1" />
                     {companySlug ? <input type="hidden" name="companySlug" value={companySlug} /> : null}
@@ -659,12 +665,14 @@ export function PublicPortalClient({
                     <p className="text-sm font-semibold text-ink-900">Lägg till bilaga</p>
                     <p className="mt-1 text-xs text-ink-500">Bifoga bild eller dokument (PNG, JPG, PDF) upp till 1 MB.</p>
                     <input
+                      id="portal-bilaga"
                       type="file"
                       name="file"
                       required
                       aria-label="Lägg till bilaga"
                       accept="image/png,image/jpeg,image/webp,application/pdf,text/plain"
                       onChange={(event) => setAttachmentFile(event.target.files?.[0] || null)}
+                      disabled={loading}
                       className="mt-3 block w-full rounded-xl border border-sand-200 bg-sand-50/30 p-2.5 text-sm text-ink-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-petroleum-50 file:text-petroleum-700 hover:file:bg-petroleum-100 transition-all cursor-pointer"
                     />
                     <button type="submit" disabled={loading} className="mt-3 rounded-lg bg-white border border-sand-200 px-4 py-2 text-xs font-semibold text-ink-800 shadow-sm disabled:opacity-50 hover:bg-sand-50 transition-colors">

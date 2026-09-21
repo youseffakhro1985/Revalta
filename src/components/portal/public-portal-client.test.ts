@@ -165,3 +165,32 @@ describe("public portal comment leftover first HTML", () => {
     expect(source).not.toContain('id="portal-kommentar" autoFocus');
   });
 });
+
+describe("public portal attachment leftover first HTML", () => {
+  it("keeps the attachment form and focuses the file input after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./public-portal-client.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="public-attachment-form"');
+    expect(source).toContain('id="portal-bilaga"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#public-attachment-form"');
+    expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("portal-bilaga")?.focus()');
+    expect(source).toContain("disabled={loading}");
+    expect(source).toContain('id="portal-kommentar"');
+    expect(source).toContain('document.getElementById("portal-kommentar")?.focus()');
+    expect(source).toContain('id="boende-aterkoppling-kommentar"');
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a boendeportal page sticky or steal comment or feedback", () => {
+    const sticky = readFileSync(new URL("../dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    const source = readFileSync(new URL("./public-portal-client.tsx", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#public-attachment-form");
+    expect(sticky).not.toContain("#portal-bilaga");
+    expect(sticky).not.toContain("#public-comment-form");
+    expect(sticky).not.toContain("#boende-aterkoppling");
+    expect(source).toContain("autoFocus");
+    expect(source).not.toContain('id="portal-bilaga" autoFocus');
+  });
+});
