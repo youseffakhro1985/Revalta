@@ -49,18 +49,32 @@ describe("offerter filter first HTML", () => {
 });
 
 describe("offerter leftover list first HTML", () => {
-  it("keeps leftover quotes in the first HTML without stealing create or filter", () => {
+  it("keeps leftover quotes in the first HTML and focuses clear after load without a second autoFocus", () => {
     const form = readFileSync(new URL("./offerter-page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(form).toContain('id="offertlista"');
+    expect(form).toContain('id="offertlista-rensa"');
     expect(form).toContain('window.location.hash !== "#offertlista"');
     expect(form).toContain("Offerterna hämtas.");
-    expect(form).toContain('id="offertfilter"');
-    expect(form).toContain('id="offert-sok"');
+    expect(form).toContain("Ny offert");
     expect(form).toContain('id="offert-editor"');
     expect(form).toContain('id="offert-namn"');
-    expect(form).toContain("Ny offert");
+    expect(form).toContain('document.getElementById("offert-namn")?.focus()');
+    expect(form).toContain('document.getElementById("offertlista-rensa")?.focus()');
+    expect(form).toContain('id="offertfilter"');
+    expect(form).toContain('id="offert-sok"');
+    expect(form).toContain('document.getElementById("offert-sok")?.focus()');
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("disabled={loading}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+    expect(form).not.toContain('id="offertlista-rensa" autoFocus');
+    expect(sticky).toContain('href: "/dashboard/offerter?create=1"');
+    expect(sticky).not.toContain("#offertlista");
+    expect(sticky).not.toContain("#offertlista-rensa");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/offerter", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
 
