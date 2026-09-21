@@ -53,6 +53,7 @@ export default function EconomyPage(){
     if(loading) return;
     if(window.location.hash!=="#ekonomifilter") return;
     document.getElementById("ekonomifilter")?.scrollIntoView({behavior:"smooth",block:"start"});
+    window.setTimeout(() => document.getElementById("ekonomi-sok")?.focus(), 0);
   },[loading,notices]);
   useEffect(()=>{
     if(loading) return;
@@ -102,7 +103,7 @@ export default function EconomyPage(){
 
   return <div className="space-y-4 sm:space-y-5">
     <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-petroleum-700">Ekonomi & analys / Översikt</p><h1 className="mt-1 font-display text-[30px] font-semibold tracking-[-0.045em] text-ink-950 sm:text-[34px]">Ekonomi</h1><p className="mt-1 text-sm text-ink-500">Hyresintäkter, budget, utfall och manuell aviestatus i en samlad ekonomisk arbetsyta.</p></div><div className="flex gap-2"><select value={range} onChange={e=>setRange(e.target.value as RangeKey)} aria-label="Period" className="h-10 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-650"><option value="quarter">Senaste kvartalet</option><option value="year">Detta år</option><option value="all">Alla perioder</option></select>{canManage||loading?<Link href="/dashboard/ekonomi/ny-utbetalning" className="inline-flex h-10 items-center gap-2 rounded-xl bg-petroleum-900 px-4 text-xs font-semibold text-white"><CircleDollarSign className="h-4 w-4"/>Ny utbetalning</Link>:null}</div></div>
-    <section id="ekonomifilter" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm"><label className="relative block max-w-2xl"><Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"/><input disabled={loading} value={query} onChange={e=>setQuery(e.target.value)} aria-label="Sök i ekonomin" placeholder="Sök avier, hyresgäster, konton, budget ..." className="h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-10 pr-4 text-[12px] outline-none focus:ring-2 focus:ring-petroleum-100"/></label></section>
+    <section id="ekonomifilter" className="scroll-mt-36 rounded-2xl border border-sand-200 bg-white p-3 shadow-premium-sm"><label className="relative block max-w-2xl"><Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"/><input id="ekonomi-sok" autoFocus disabled={loading} value={query} onChange={e=>setQuery(e.target.value)} aria-label="Sök i ekonomin" placeholder="Sök avier, hyresgäster, konton, budget ..." className="h-11 w-full rounded-xl border border-sand-200 bg-surface-subtle pl-10 pr-4 text-[12px] outline-none focus:ring-2 focus:ring-petroleum-100"/></label></section>
     {error?<div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">{error}</div>:null}
     <AttestationQueuePanel />
     <InvoiceBasisQueuePanel />

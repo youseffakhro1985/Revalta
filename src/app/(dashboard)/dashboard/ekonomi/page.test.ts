@@ -25,11 +25,14 @@ describe("ekonomi leftover notices first HTML", () => {
   it("keeps search and recent notices in the first HTML without stealing create", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="ekonomifilter"');
+    expect(source).toContain('id="ekonomi-sok"');
     expect(source).toContain('id="senasteavier"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash!=="#ekonomifilter"');
     expect(source).toContain('window.location.hash!=="#senasteavier"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("ekonomi-sok")?.focus()');
+    expect(source).toContain("autoFocus");
     expect(source).toContain("canManage||loading");
     expect(source).toContain('href="/dashboard/ekonomi/ny-utbetalning"');
     expect(source).toContain("disabled={loading}");
