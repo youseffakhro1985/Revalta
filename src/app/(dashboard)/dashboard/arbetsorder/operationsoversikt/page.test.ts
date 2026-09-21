@@ -9,6 +9,8 @@ describe("work order operations overview filter hash", () => {
     expect(source).toContain('window.location.hash !== "#oversiktsfilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("autoFocus");
+    expect(source).toContain('id="oversikt-oppna"');
+    expect(source).toContain('document.getElementById("oversikt-oppna")?.focus()');
   });
 });
 
@@ -19,6 +21,7 @@ describe("work order operations leftover queue first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#operativko"');
     expect(source).toContain('id="oversiktsfilter"');
+    expect(source).toContain('id="oversikt-oppna"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("Arbetsordrarna hämtas.");
     expect(source).not.toContain("h-56 animate-pulse rounded-xl bg-sand-100");

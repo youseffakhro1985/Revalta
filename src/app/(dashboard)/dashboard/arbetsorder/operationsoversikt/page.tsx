@@ -18,6 +18,7 @@ export default function WorkOrderOperationsPage() {
   useEffect(() => {
     if (window.location.hash !== "#oversiktsfilter") return;
     document.getElementById("oversiktsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("oversikt-oppna")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -30,7 +31,7 @@ export default function WorkOrderOperationsPage() {
     {error?<InlineAlert>{error}</InlineAlert>:null}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6"><MetricCard icon={Wrench} label="Totalt" value={data?.summary.total??"–"}/><MetricCard icon={Clock3} label="Öppna" value={data?.summary.open??"–"}/><MetricCard icon={AlertTriangle} label="Försenade" value={data?.summary.overdue??"–"}/><MetricCard icon={AlertTriangle} label="Kritiska" value={data?.summary.critical??"–"}/><MetricCard icon={Clock3} label="SLA snart" value={data?.summary.dueSoon??"–"}/><MetricCard icon={UserRoundX} label="Ej tilldelade" value={data?.summary.unassigned??"–"}/></div>
     <Panel title="Operativ kö" description="SLA räknas från planerat slutdatum eller från prioritetens standardtid: akut 4 h, hög 24 h, normal 72 h och låg 7 dagar.">
-      <div id="oversiktsfilter" className="mb-4 flex scroll-mt-36 flex-wrap gap-2">{[["open","Öppna"],["risk","Risk"],["unassigned","Ej tilldelade"],["all","Alla"]].map(([v,l], index)=><button key={v} type="button" autoFocus={index===0} onClick={()=>setFilter(v)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter===v?"bg-petroleum-800 text-white":"bg-sand-100 text-ink-700 hover:bg-sand-200"}`}>{l}</button>)}</div>
+      <div id="oversiktsfilter" className="mb-4 flex scroll-mt-36 flex-wrap gap-2"><button id="oversikt-oppna" type="button" autoFocus onClick={()=>setFilter("open")} className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter==="open"?"bg-petroleum-800 text-white":"bg-sand-100 text-ink-700 hover:bg-sand-200"}`}>Öppna</button>{[["risk","Risk"],["unassigned","Ej tilldelade"],["all","Alla"]].map(([v,l])=><button key={v} type="button" onClick={()=>setFilter(v)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${filter===v?"bg-petroleum-800 text-white":"bg-sand-100 text-ink-700 hover:bg-sand-200"}`}>{l}</button>)}</div>
       <div id="operativko" className="scroll-mt-36">
       {loading&&!data?<p className="text-sm text-ink-500">Arbetsordrarna hämtas.</p>:null}
       {!loading&&items.length===0?<EmptyState title="Inga arbetsorder i filtret" description="När arbetsorder matchar filtret visas de här."/>:null}
