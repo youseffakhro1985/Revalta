@@ -8,6 +8,8 @@ describe("aterkommande create hash", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#nytt-schema"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('id="schema-fastighet"');
+    expect(source).toContain('document.getElementById("schema-fastighet")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).not.toContain('<form id="nytt-schema"');
   });
@@ -20,6 +22,7 @@ describe("aterkommande leftover list first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#schemalista"');
     expect(source).toContain('id="nytt-schema"');
+    expect(source).toContain('id="schema-fastighet"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("Schemana hämtas.");
     expect(source).not.toContain("Hämtar scheman…");

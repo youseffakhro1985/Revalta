@@ -76,6 +76,7 @@ export default function RecurringWorkOrdersPage() {
   useEffect(() => {
     if (window.location.hash !== "#nytt-schema") return;
     document.getElementById("nytt-schema")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("schema-fastighet")?.focus(), 0);
   }, [loading]);
   useEffect(() => {
     if (loading) return;
@@ -197,7 +198,7 @@ export default function RecurringWorkOrdersPage() {
       <div id="nytt-schema" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start">
       <Panel title="Nytt återkommande schema" description="Definiera vad som ska skapas och när nästa arbetsorder ska planeras.">
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Fastighet"><select required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} autoFocus><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
+          <Field label="Fastighet"><select id="schema-fastighet" required className={premiumFieldClass} value={form.propertyId} onChange={(event) => setForm({ ...form, propertyId: event.target.value })} autoFocus><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select></Field>
           <Field label="Rubrik"><input required maxLength={180} className={premiumFieldClass} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Ex. Månadsvis kontroll av undercentral" /></Field>
           <Field label="Arbetsbeskrivning"><textarea required className={premiumTextareaClass} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Beskriv moment, kontrollpunkter och förväntat resultat" /></Field>
           <div className="grid grid-cols-2 gap-3"><Field label="Frekvens"><select className={premiumFieldClass} value={form.frequency} onChange={(event) => setForm({ ...form, frequency: event.target.value })}><option value="weekly">Vecka</option><option value="monthly">Månad</option><option value="quarterly">Kvartal</option><option value="yearly">År</option></select></Field><Field label="Prioritet"><select className={premiumFieldClass} value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option value="low">Låg</option><option value="normal">Normal</option><option value="high">Hög</option><option value="urgent">Akut</option></select></Field></div>
