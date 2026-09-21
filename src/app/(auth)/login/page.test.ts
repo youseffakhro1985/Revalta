@@ -50,3 +50,26 @@ describe("login form", () => {
     expect(form).not.toContain("useSearchParams");
   });
 });
+
+describe("login form first HTML focus", () => {
+  it("keeps the login form in the first HTML and focuses the email after load", () => {
+    const form = readFileSync(new URL("./login-form.tsx", import.meta.url), "utf8");
+    expect(form).toContain('id="login-form"');
+    expect(form).toContain('id="login-email"');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain('window.location.hash !== "#login-form"');
+    expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("login-email")?.focus()');
+    expect(form).toContain("autoFocus");
+    expect(form).toContain("disabled={loading}");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+    expect(form).toContain('id="resend-verification-form"');
+  });
+
+  it("does not add a dashboard sticky for public login", () => {
+    const sticky = readFileSync(new URL("../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("#login-form");
+    expect(sticky).not.toContain("#login-email");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+  });
+});
