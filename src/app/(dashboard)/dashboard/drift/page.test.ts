@@ -22,17 +22,28 @@ describe("drift secrets hash", () => {
 });
 
 describe("drift leftover health first HTML", () => {
-  it("keeps leftover health in the first HTML without stealing secrets", () => {
+  it("keeps leftover health in the first HTML and focuses refresh after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="systemhalsa"');
+    expect(source).toContain('id="systemhalsa-uppdatera"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#systemhalsa"');
+    expect(source).toContain('document.getElementById("systemhalsa-uppdatera")?.focus()');
     expect(source).toContain('id="kritiska-secrets"');
     expect(source).toContain('id="kritiska-lank"');
+    expect(source).toContain('document.getElementById("kritiska-lank")?.focus()');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("Systemhälsan hämtas.");
     expect(source).toContain("Kritiska secrets hämtas.");
+    expect(source).toContain("disabled={loading}");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="systemhalsa-uppdatera" autoFocus');
     expect(source).not.toContain("h-64 animate-pulse rounded-2xl bg-sand-100");
     expect(source).not.toContain("h-24 animate-pulse rounded-2xl border border-sand-100 bg-sand-50");
+    expect(sticky).toContain('href: "/dashboard/drift#kritiska-secrets"');
+    expect(sticky).not.toContain("#systemhalsa");
+    expect(sticky).not.toContain("#systemhalsa-uppdatera");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
   });
 });
