@@ -57,6 +57,7 @@ export function InspectionResolutionCenter() {
     if (loading) return;
     if (window.location.hash !== "#synklista") return;
     document.getElementById("synklista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("synklista-uppdatera")?.focus(), 0);
   }, [loading, record]);
 
   const isLegacy = source === "legacy";
@@ -100,7 +101,7 @@ export function InspectionResolutionCenter() {
                 <option key={l.id} value={l.id}>{l.lease_number} · {l.property.name} · {l.unit.designation} · {l.lease_holder.name}</option>
               ))}
             </select>
-            <button type="button" onClick={() => void load(leaseId)} className="inline-flex h-11 items-center rounded-xl border border-sand-200 px-4 text-sm font-semibold">
+            <button id="synklista-uppdatera" type="button" onClick={() => void load(leaseId)} className="inline-flex h-11 items-center rounded-xl border border-sand-200 px-4 text-sm font-semibold">
               <RefreshCw className="mr-2 h-4 w-4" />Uppdatera
             </button>
           </div>
