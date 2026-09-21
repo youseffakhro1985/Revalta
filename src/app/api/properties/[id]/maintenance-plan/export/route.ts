@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canViewFinanceData, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 
 type PlanRow = { id: string; name: string; version: number; base_year: number; horizon_years: number; annual_index_rate: number };
 type ActionRow = { category: string; title: string; planned_year: number; recurrence_years: number | null; estimated_cost: number; annual_index_rate: number | null; priority: string; risk: string; status: string; contractor: string | null; building_name: string | null; technical_asset_name: string | null };
@@ -16,9 +16,10 @@ function indexedCost(action: ActionRow, plan: PlanRow, year: number) {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const { id } = await params;
   const property = await db.property.findFirst({ where: { id, deleted_at: null, ...tenantWhere(user) }, select: { id: true, name: true } });
