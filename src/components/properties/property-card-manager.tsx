@@ -106,6 +106,7 @@ export function PropertyCardManager({ propertyId }: Props) {
     if (loading) return;
     if (window.location.hash !== "#parmlista") return;
     document.getElementById("parmlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("parmlista-ny")?.focus(), 0);
   }, [loading, data]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -144,7 +145,7 @@ export function PropertyCardManager({ propertyId }: Props) {
 
       <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
         <div className="rounded-2xl border border-sand-200 bg-sand-50/60 p-4">
-          <div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-ink-900">Befintliga poster</p><p className="mt-1 text-xs text-ink-500">Välj en post för redigering.</p></div><button type="button" disabled={formLocked} onClick={() => setSelectedId("")} className="inline-flex items-center gap-1.5 text-sm font-semibold text-petroleum-700 disabled:opacity-50"><Plus className="h-4 w-4" />Ny</button></div>
+          <div className="flex items-center justify-between gap-3"><div><p className="font-semibold text-ink-900">Befintliga poster</p><p className="mt-1 text-xs text-ink-500">Välj en post för redigering.</p></div><button id="parmlista-ny" type="button" disabled={formLocked} onClick={() => setSelectedId("")} className="inline-flex items-center gap-1.5 text-sm font-semibold text-petroleum-700 disabled:opacity-50"><Plus className="h-4 w-4" />Ny</button></div>
           <div id="parmlista" className="scroll-mt-36">
           {items.length === 0 ? <div className="mt-4"><EmptyState title={loading ? "Laddar poster" : "Inga poster"} description="Skapa den första posten i formuläret." /></div> : <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{items.map((item) => <button key={String(item.id)} type="button" disabled={formLocked} onClick={() => setSelectedId(String(item.id))} className={`w-full rounded-xl border p-3 text-left transition disabled:opacity-50 ${selectedId === String(item.id) ? "border-petroleum-200 bg-white shadow-sm" : "border-transparent bg-white/70 hover:border-sand-200"}`}><p className="font-semibold text-ink-900">{label(item, section)}</p><p className="mt-1 text-xs text-ink-500">{String(item.status || item.category || item.inspection_type || "Registrerad")}</p></button>)}</div>}
           </div>
