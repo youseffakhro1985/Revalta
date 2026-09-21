@@ -8,12 +8,17 @@ import {
 } from "@/lib/current-user";
 import { loadResidentPortalNotices } from "@/lib/resident-portal-notices";
 
-export default async function ResidentNoticesPage() {
+export default async function ResidentNoticesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const member = requireCompanyMember(user);
   if (!member || !canAccessResidentPortal(member.role) || !isResident(member.role)) notFound();
 
   const initial = await loadResidentPortalNotices(member);
-  return <ResidentNotices initial={initial} />;
+  const query = await searchParams;
+  return <ResidentNotices initial={initial} status={query.status?.trim() || ""} />;
 }

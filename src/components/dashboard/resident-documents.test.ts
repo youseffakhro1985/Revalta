@@ -65,3 +65,32 @@ describe("resident document leftover search first HTML", () => {
     expect(sticky).not.toContain("#boende-dokument-avtal");
   });
 });
+
+describe("resident notices leftover status filter first HTML", () => {
+  it("keeps the leftover status filter in the first HTML and focuses it after load", () => {
+    const page = readFileSync(new URL("../../app/(dashboard)/dashboard/boendeportal/avier/page.tsx", import.meta.url), "utf8");
+    const notices = readFileSync(new URL("./resident-notices.tsx", import.meta.url), "utf8");
+    expect(page).toContain("searchParams");
+    expect(page).toContain("status={query.status");
+    expect(notices).toContain('id="boende-avifilter"');
+    expect(notices).toContain('id="boende-avistatus"');
+    expect(notices).toContain('name="status"');
+    expect(notices).toContain('method="get"');
+    expect(notices).toContain('action="/dashboard/boendeportal/avier"');
+    expect(notices).toContain("scroll-mt-36");
+    expect(notices).toContain('window.location.hash !== "#boende-avifilter"');
+    expect(notices).toContain("scrollIntoView");
+    expect(notices).toContain('document.getElementById("boende-avistatus")?.focus()');
+    expect(notices).toContain("autoFocus");
+    expect(notices).toContain("disabled={loading}");
+    expect(notices).toContain("h-24 animate-pulse");
+    expect((notices.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a boendeportal page sticky for leftover avis", () => {
+    const sticky = readFileSync(new URL("./dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#boende-avifilter");
+    expect(sticky).not.toContain("#boende-avistatus");
+  });
+});
