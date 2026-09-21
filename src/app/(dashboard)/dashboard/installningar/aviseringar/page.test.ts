@@ -48,16 +48,31 @@ describe("aviseringar history filter first HTML", () => {
 });
 
 describe("aviseringar recipient filter first HTML", () => {
-  it("keeps the recipient role filter in the first HTML and scrolls after load", () => {
-    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+  const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+  const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+
+  it("keeps the recipient role filter in the first HTML and focuses the role after load", () => {
     expect(source).toContain('id="mottagarfilter"');
+    expect(source).toContain('id="avi-roll"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#mottagarfilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("avi-roll")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain('id="aviseringsinstallningar"');
     expect(source).not.toContain("{loading && !data ? <div className=\"h-40 animate-pulse rounded-xl bg-sand-100\" /> : null}");
+  });
+
+  it("does not steal Aviseringsval, #historik-status or leftover hashes", () => {
+    expect(sticky).toContain('current === "/dashboard/installningar/aviseringar"');
+    expect(sticky).toContain('href: "/dashboard/installningar/aviseringar#aviseringsinstallningar"');
+    expect(sticky).not.toContain("#mottagarfilter");
+    expect(sticky).not.toContain("#avi-roll");
+    expect(source).toContain('id="days-ahead"');
+    expect(source).toContain('document.getElementById("days-ahead")?.focus()');
+    expect(source).toContain('id="historik-status"');
+    expect(source).toContain('id="mottagarlista"');
   });
 });
 
