@@ -388,7 +388,16 @@ export function WorkOrderEconomicsPanel({ workOrderId }: Props) {
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel title="Attesterbar tid" description="Tid som ska godkännas innan den ingår i lönsamhet och faktura.">
           <div className="mb-4 flex flex-wrap gap-2">
-            {(["work", "travel", "break"] as const).map((kind) => (
+            <button
+              id="ekonomi-starta"
+              type="button"
+              disabled={saving || times.some((entry) => entry.status === "running" && entry.source !== "legacy")}
+              onClick={() => void post(`/api/work-orders/${workOrderId}/time-entries`, { action: "start", kind: "work" }, "Timern har startats.")}
+              className="rounded-lg border border-petroleum-200 bg-petroleum-50 px-3 py-2 text-xs font-semibold text-petroleum-900 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Starta {kindLabels.work}
+            </button>
+            {(["travel", "break"] as const).map((kind) => (
               <button
                 key={kind}
                 type="button"

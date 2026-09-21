@@ -31,3 +31,18 @@ describe("work-order economics invoice copy", () => {
     expect(source).not.toContain("if (loading) return <div className=\"h-80 animate-pulse rounded-2xl bg-sand-100\" aria-label=\"Laddar arbetsorderekonomi\" />");
   });
 });
+
+describe("work-order leftover ekonomi start first HTML", () => {
+  it("keeps leftover start work in the first HTML without a second autoFocus or stealing time form", () => {
+    const source = readFileSync(new URL("./work-order-economics-panel.tsx", import.meta.url), "utf8");
+    expect(source).toContain('id="ekonomi-starta"');
+    expect(source).toContain("Starta {kindLabels.work}");
+    expect(source).toContain('kind: "work"');
+    expect(source).toContain('id="spara-ekonomi"');
+    expect(source).toContain('id="ekonomi-starttid"');
+    expect(source).toContain('document.getElementById("ekonomi-starttid")?.focus()');
+    expect(source).not.toContain('id="ekonomi-starta" autoFocus');
+    expect(source).not.toContain('id={kind === "work" ? "ekonomi-starta" : undefined}');
+    expect(source).toContain("saving || loading");
+  });
+});
