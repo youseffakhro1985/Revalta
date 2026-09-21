@@ -76,6 +76,7 @@ export default function InvoiceExportOperationsPage() {
     if (loading) return;
     if (window.location.hash !== "#exportjobb") return;
     document.getElementById("exportjobb")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("exportjobb-uppdatera")?.focus(), 0);
   }, [loading, data]);
 
   async function act(job: Job, action: "retry" | "cancel") {
@@ -115,7 +116,7 @@ export default function InvoiceExportOperationsPage() {
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
           <a href="#exportfilter" className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm">Filtrera export</a>
-          <button onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm disabled:opacity-50">
+          <button id="exportjobb-uppdatera" type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-800 shadow-sm disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />Uppdatera
           </button>
         </div>
