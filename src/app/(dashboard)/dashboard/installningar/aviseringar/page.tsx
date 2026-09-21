@@ -123,6 +123,7 @@ export default function ServiceNotificationsPage() {
     if (loading) return;
     if (window.location.hash !== "#mottagarlista") return;
     document.getElementById("mottagarlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("mottagarlista-lank")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (!isDirty) return;
@@ -186,7 +187,7 @@ export default function ServiceNotificationsPage() {
           <p className="mt-3 max-w-3xl text-ink-600">Styr mottagare och aviseringsperiod, övervaka den dagliga rutinen och verifiera e-postleveransen.</p>
           <nav aria-label="Hoppa till aviseringsavsnitt" className="mt-4 flex flex-wrap gap-2">
             <a href="#aviseringsinstallningar" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Aviseringsval</a>
-            <a href="#mottagare" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Mottagare</a>
+            <a id="mottagarlista-lank" href="#mottagare" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Mottagare</a>
             <a href="#korningshistorik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
           </nav>
         </div>
