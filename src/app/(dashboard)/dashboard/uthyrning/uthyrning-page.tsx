@@ -182,6 +182,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#uthyrningslage") return;
     document.getElementById("uthyrningslage")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("uthyrningslage-overlamning")?.focus(), 0);
   }, [loading, properties]);
   useEffect(() => {
     if (loading) return;
@@ -458,7 +459,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
             <p className="mt-1.5 max-w-xl text-sm leading-6 text-ink-500">Vakans, hyresparter och avtal samlat i en lugn arbetsyta med tydliga vägar från bestånd till kontrakt och överlämning.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/dashboard/uthyrning/overlamning" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[12px] font-semibold text-ink-700 shadow-premium-sm transition hover:border-petroleum-200 hover:text-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
+            <Link id="uthyrningslage-overlamning" href="/dashboard/uthyrning/overlamning" className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-[12px] font-semibold text-ink-700 shadow-premium-sm transition hover:border-petroleum-200 hover:text-petroleum-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-300">
               <ClipboardSignature className="h-4 w-4" strokeWidth={1.7} /> Överlämning & besiktning
             </Link>
             {showCreate ? (
