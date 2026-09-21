@@ -81,6 +81,19 @@ describe("mandatory flow completion and mutation order", () => {
     }, async () => ++calls === 2 ? { ...health, release: { ...health.release, deploymentId: "changed" } } : health)).rejects.toThrow();
     expect(mutation).not.toHaveBeenCalled();
   });
+  it("retries a transient health transport error without latching a false identity failure", async () => {
+    let calls = 0;
+    const evidence = await runVerifiedPreview(env, async (gate: Gate) => {
+      await gate.assertRelease();
+      await completeAll(gate);
+    }, async () => {
+      calls += 1;
+      if (calls === 2) throw new Error("timeout");
+      return health;
+    });
+    expect(calls).toBe(4);
+    expect(evidence.status).toBe("PASS");
+  });
   it("rejects a deployment change at final verification", async () => {
     let calls = 0;
     await expect(runVerifiedPreview(env, completeAll, async () => ++calls === 1 ? health : {
