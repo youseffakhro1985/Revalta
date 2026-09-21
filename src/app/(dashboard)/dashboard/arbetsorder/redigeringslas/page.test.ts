@@ -9,6 +9,8 @@ describe("redigeringslas filter hash", () => {
     expect(source).toContain('window.location.hash !== "#lasfilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("autoFocus");
+    expect(source).toContain('id="las-sok"');
+    expect(source).toContain('document.getElementById("las-sok")?.focus()');
     expect(source).toContain('href="#lasfilter"');
     expect(source).not.toContain("if (loading) return <div className=\"h-96 animate-pulse");
   });
