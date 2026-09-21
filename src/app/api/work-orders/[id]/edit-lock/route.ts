@@ -28,10 +28,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageTickets(user.role)) return noStore({ error: "Du saknar behörighet att redigera arbetsordrar" }, { status: 403 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
   if (!await findAccessibleWorkOrder(user as CompanyUser, id)) return notFoundWorkOrder();
