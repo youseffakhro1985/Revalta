@@ -65,6 +65,7 @@ export function ServiceNotificationAlertCenter() {
     if (loading) return;
     if (window.location.hash !== "#larmlista") return;
     document.getElementById("larmlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("larmlista-uppdatera")?.focus(), 0);
   }, [loading, data]);
 
   async function acknowledge(alertId: string) {
@@ -119,7 +120,7 @@ export function ServiceNotificationAlertCenter() {
             <p className="mt-1 text-sm text-ink-600">Kvittera leveransproblem och följ när systemet automatiskt har återhämtat sig.</p>
           </div>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50">
+        <button id="larmlista-uppdatera" type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3 py-2 text-sm font-semibold text-ink-700 disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" /> Uppdatera
         </button>
       </div>
