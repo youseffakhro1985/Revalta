@@ -54,13 +54,15 @@ describe("GET /api/work-orders/[id]/transitions", () => {
     expect(userFindManyMock).not.toHaveBeenCalled();
   });
 
-  it("returns 400 when the user has no company", async () => {
+  it("returns 403 when the user is not staff in a company", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: null });
 
     const response = await GET(makeRequest(), { params });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the work order does not exist for the caller's company (tenant isolation)", async () => {
@@ -282,5 +284,25 @@ describe("GET /api/work-orders/[id]/transitions", () => {
     const response = await GET(makeRequest(), { params });
 
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+});
+
+describe("work-order transitions GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading work orders or company user emails", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(makeRequest(), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
   });
 });

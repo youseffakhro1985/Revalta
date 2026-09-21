@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import {
   acquireWorkOrderEditLock,
   getWorkOrderEditLock,
@@ -16,12 +16,13 @@ function noStore(body: unknown, init?: ResponseInit) {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const { id } = await params;
-  if (!await findAccessibleWorkOrder(user as CompanyUser, id)) return notFoundWorkOrder();
+  if (!await findAccessibleWorkOrder(user, id)) return notFoundWorkOrder();
   const lock = await getWorkOrderEditLock(user.company_id, id);
   return noStore({ lock, ownedByCurrentUser: lock?.userId === user.id });
 }

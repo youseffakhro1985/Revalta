@@ -35,6 +35,11 @@ const {
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: canManageTicketsMock,
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -241,5 +246,30 @@ describe("work-order reports route atomicity", () => {
 
     expect(response.status).toBe(200);
     expect(body.canCreateInvoiceBasis).toBe(false);
+  });
+});
+
+describe("work-order reports GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading reports, signatures or invoice basis", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-1/reports"),
+      context,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(directQueryRawMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
   });
 });
