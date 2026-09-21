@@ -29,11 +29,13 @@ describe("ronder leftover list first HTML", () => {
   it("keeps leftover rounds in the first HTML without stealing create", () => {
     const form = readFileSync(new URL("./ronder-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="rondfilter"');
+    expect(form).toContain('id="rond-sok"');
     expect(form).toContain('id="rondurval"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#rondfilter"');
     expect(form).toContain('window.location.hash !== "#rondurval"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("rond-sok")?.focus()');
     expect(form).toContain("Ny rond");
     expect(form).toContain("canManage || loading");
     expect(form).toContain("disabled={loading}");
