@@ -105,18 +105,21 @@ function SettingsLink({
   return (
     <Link
       href={href}
-      className="group flex min-h-[154px] flex-col justify-between rounded-2xl border border-sand-200/80 bg-white p-5 shadow-premium-sm outline-none transition-[transform,border-color,box-shadow,background-color] hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-premium-md focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2"
+      className="group relative flex min-h-[148px] flex-col justify-between overflow-hidden rounded-[22px] border border-sand-200/80 bg-white p-5 shadow-premium-sm outline-none transition-[transform,border-color,box-shadow,background-color] hover:-translate-y-0.5 hover:border-petroleum-200 hover:bg-sand-50/40 hover:shadow-premium-md focus-visible:ring-2 focus-visible:ring-petroleum-300 focus-visible:ring-offset-2"
     >
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-petroleum-200/70 to-transparent opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
       <div className="flex items-start justify-between gap-4">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-sand-200 bg-sand-50 text-petroleum-700">
-          <Icon className="h-4.5 w-4.5" strokeWidth={1.8} aria-hidden="true" />
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-sand-200 bg-sand-50 text-petroleum-800 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+          <Icon className="h-[18px] w-[18px]" strokeWidth={1.7} aria-hidden="true" />
         </span>
-        <ArrowRight className="h-4 w-4 text-ink-300 transition-transform group-hover:translate-x-0.5 group-hover:text-petroleum-700" aria-hidden="true" />
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-ink-300 transition-[transform,border-color,background-color,color] group-hover:translate-x-0.5 group-hover:border-petroleum-100 group-hover:bg-white group-hover:text-petroleum-700">
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </span>
       </div>
       <div className="mt-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">{eyebrow}</p>
-        <h3 className="mt-1.5 text-[15px] font-semibold text-ink-950">{title}</h3>
-        <p className="mt-1.5 text-sm leading-5 text-ink-500">{description}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">{eyebrow}</p>
+        <h3 className="mt-1.5 text-[15px] font-semibold tracking-[-0.01em] text-ink-950">{title}</h3>
+        <p className="mt-1.5 max-w-[34rem] text-sm leading-5 text-ink-500">{description}</p>
       </div>
     </Link>
   );
@@ -295,22 +298,44 @@ export default function SettingsPage() {
     }
   }
 
-  const settingsLinks = [
-    { href: "/dashboard/installningar/aviseringar", title: "Serviceaviseringar", description: "Styr automatiska servicepåminnelser, mottagare och leveransstatus.", icon: BellRing, eyebrow: "Aviseringar", visible: true },
-    { href: "/dashboard/installningar/mina-aviseringar", title: "Mina aviseringar", description: "Anpassa vilka personliga händelser och uppdateringar du vill få.", icon: UserRound, eyebrow: "Personligt", visible: true },
-    { href: "/dashboard/installningar/eskaleringar", title: "Eskaleringar", description: "Följ operativa eskaleringar och gå vidare till regelhanteringen.", icon: Siren, eyebrow: "Drift", visible: true },
-    { href: "/dashboard/team", title: "Team", description: "Hantera användare och organisationens arbetsgrupp.", icon: UsersRound, eyebrow: "Organisation", visible: canOpenTeam },
-    { href: "/dashboard/behorigheter", title: "Behörigheter", description: "Kontrollera roller och åtkomst till känsliga delar av systemet.", icon: ShieldCheck, eyebrow: "Åtkomst", visible: canManageOrganisation },
-    { href: "/dashboard/integrationer", title: "Integrationer", description: "Hantera systemkopplingar och befintliga integrationsflöden.", icon: Plug, eyebrow: "System", visible: canOpenIntegrations },
-    { href: "/dashboard/audit", title: "Händelselogg", description: "Granska spårbara ändringar och administrativa händelser.", icon: FileClock, eyebrow: "Säkerhet", visible: canOpenAudit },
-    { href: "/dashboard/drift", title: "Driftstatus", description: "Kontrollera teknisk status och operativa systemsignaler.", icon: Activity, eyebrow: "System", visible: canOpenOperationsAdmin },
-    { href: "/dashboard/billing", title: "Abonnemang", description: "Öppna Revaltas befintliga abonnemangs- och betalningshantering.", icon: CreditCard, eyebrow: "Abonnemang", visible: canOpenBilling },
-  ].filter((item) => item.visible);
+  const settingsGroups = [
+    {
+      label: "Konto & aviseringar",
+      description: "Personliga val och hur Revalta håller dig uppdaterad.",
+      items: [
+        { href: "/dashboard/installningar/aviseringar", title: "Serviceaviseringar", description: "Styr automatiska servicepåminnelser, mottagare och leveransstatus.", icon: BellRing, eyebrow: "Aviseringar", visible: true },
+        { href: "/dashboard/installningar/mina-aviseringar", title: "Mina aviseringar", description: "Anpassa vilka personliga händelser och uppdateringar du vill få.", icon: UserRound, eyebrow: "Personligt", visible: true },
+        { href: "/dashboard/installningar/eskaleringar", title: "Eskaleringar", description: "Följ operativa eskaleringar och gå vidare till regelhanteringen.", icon: Siren, eyebrow: "Drift", visible: true },
+      ],
+    },
+    {
+      label: "Organisation & åtkomst",
+      description: "Människor, roller och kopplingar som formar arbetsytan.",
+      items: [
+        { href: "/dashboard/team", title: "Team", description: "Hantera användare och organisationens arbetsgrupp.", icon: UsersRound, eyebrow: "Organisation", visible: canOpenTeam },
+        { href: "/dashboard/behorigheter", title: "Behörigheter", description: "Kontrollera roller och åtkomst till känsliga delar av systemet.", icon: ShieldCheck, eyebrow: "Åtkomst", visible: canManageOrganisation },
+        { href: "/dashboard/integrationer", title: "Integrationer", description: "Hantera systemkopplingar och befintliga integrationsflöden.", icon: Plug, eyebrow: "System", visible: canOpenIntegrations },
+      ],
+    },
+    {
+      label: "System & säkerhet",
+      description: "Kontroll, spårbarhet och kommersiell administration.",
+      items: [
+        { href: "/dashboard/audit", title: "Händelselogg", description: "Granska spårbara ändringar och administrativa händelser.", icon: FileClock, eyebrow: "Säkerhet", visible: canOpenAudit },
+        { href: "/dashboard/drift", title: "Driftstatus", description: "Kontrollera teknisk status och operativa systemsignaler.", icon: Activity, eyebrow: "System", visible: canOpenOperationsAdmin },
+        { href: "/dashboard/billing", title: "Abonnemang", description: "Öppna Revaltas befintliga abonnemangs- och betalningshantering.", icon: CreditCard, eyebrow: "Abonnemang", visible: canOpenBilling },
+      ],
+    },
+  ]
+    .map((group) => ({ ...group, items: group.items.filter((item) => item.visible) }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <div className="mx-auto max-w-7xl animate-fade-in-soft space-y-6">
-      <header className="overflow-hidden rounded-2xl border border-sand-200/80 bg-white shadow-premium-sm">
-        <div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+      <header className="relative overflow-hidden rounded-[26px] border border-sand-200/80 bg-white shadow-premium-sm">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full border border-petroleum-100/70 bg-petroleum-50/40" aria-hidden="true" />
+        <div className="pointer-events-none absolute -right-4 top-8 h-28 w-28 rounded-full border border-sand-200/80" aria-hidden="true" />
+        <div className="relative flex flex-col gap-7 p-6 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Administration</p>
@@ -318,8 +343,8 @@ export default function SettingsPage() {
                 <span className="h-1.5 w-1.5 rounded-full bg-success-500" aria-hidden="true" /> Live-data
               </span>
             </div>
-            <h1 className="mt-3 text-[32px] font-semibold leading-tight tracking-[-0.04em] text-ink-950 sm:text-[38px]">Inställningar</h1>
-            <p className="mt-3 max-w-3xl text-[15px] leading-6 text-ink-600">Ett samlat nav för konto, organisation, säkerhet, aviseringar och de administrationsområden din roll har tillgång till.</p>
+            <h1 className="mt-3 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em] text-ink-950 sm:text-[42px]">Inställningar</h1>
+            <p className="mt-3 max-w-2xl text-[15px] leading-6 text-ink-600">Din samlade kontrollpunkt för konto, organisation, säkerhet och systemadministration — med endast de områden din roll har tillgång till.</p>
             <nav aria-label="Hoppa till inställningsavsnitt" className="mt-4 flex flex-wrap gap-2">
               <a href="#profil" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Profil</a>
               <a href="#organisation" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Organisation</a>
@@ -361,23 +386,35 @@ export default function SettingsPage() {
         {success ? <InlineAlert tone="success">{success}</InlineAlert> : null}
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={BadgeCheck} label="Kontostatus" value={initialLoading ? "–" : friendlyStatus(profile?.status)} hint={profile?.email_verified_at ? "E-post verifierad" : "Verifiering saknas"} />
-        <MetricCard icon={Building2} label="Organisation" value={initialLoading ? "–" : friendlyStatus(company?.status)} hint={company?.org_number || "Organisationsnummer ej angivet"} />
-        <MetricCard icon={WalletCards} label="Abonnemang" value={initialLoading ? "–" : company?.plan ? planLabels[company.plan] || company.plan : "–"} hint={canOpenBilling ? "Du kan hantera abonnemanget" : "Administreras av organisationens admin"} />
-        <MetricCard icon={ShieldCheck} label="Säkerhet" value={profile?.email_verified_at ? "Verifierad" : initialLoading ? "–" : "Kontrollera"} hint="Lösenordsbyte avslutar äldre sessioner" />
+      <section className="rounded-[24px] border border-sand-200/80 bg-sand-50/45 p-3 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset]">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard icon={BadgeCheck} label="Kontostatus" value={initialLoading ? "–" : friendlyStatus(profile?.status)} hint={profile?.email_verified_at ? "E-post verifierad" : "Verifiering saknas"} />
+          <MetricCard icon={Building2} label="Organisation" value={initialLoading ? "–" : friendlyStatus(company?.status)} hint={company?.org_number || "Organisationsnummer ej angivet"} />
+          <MetricCard icon={WalletCards} label="Abonnemang" value={initialLoading ? "–" : company?.plan ? planLabels[company.plan] || company.plan : "–"} hint={canOpenBilling ? "Du kan hantera abonnemanget" : "Administreras av organisationens admin"} />
+          <MetricCard icon={ShieldCheck} label="Säkerhet" value={profile?.email_verified_at ? "Verifierad" : initialLoading ? "–" : "Kontrollera"} hint="Lösenordsbyte avslutar äldre sessioner" />
+        </div>
       </section>
 
-      <section>
-        <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+      <section className="space-y-5">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-petroleum-600">Snabb åtkomst</p>
-            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink-950">Administrationsområden</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Administration</p>
+            <h2 className="mt-1 text-[22px] font-semibold tracking-[-0.025em] text-ink-950">Dina inställningsområden</h2>
           </div>
-          <p className="text-sm text-ink-500">Visar endast områden som din nuvarande roll får öppna.</p>
+          <p className="max-w-xl text-sm leading-5 text-ink-500">Strukturen följer hur du arbetar: personligt först, sedan organisation och sist systemkontroll.</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {settingsLinks.map((item) => <SettingsLink key={item.href} {...item} />)}
+        <div className="space-y-4">
+          {settingsGroups.map((group) => (
+            <div key={group.label} className="rounded-[24px] border border-sand-200/80 bg-sand-50/35 p-4 sm:p-5">
+              <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <h3 className="text-sm font-semibold tracking-[-0.01em] text-ink-900">{group.label}</h3>
+                <p className="text-xs leading-5 text-ink-500">{group.description}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {group.items.map((item) => <SettingsLink key={item.href} {...item} />)}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
