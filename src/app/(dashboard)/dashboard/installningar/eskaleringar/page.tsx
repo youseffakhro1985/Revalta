@@ -150,6 +150,7 @@ export default function EscalationAdminPage() {
     if (loading) return;
     if (window.location.hash !== "#eskmottagarlista") return;
     document.getElementById("eskmottagarlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("eskmottagarlista-lank")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -178,7 +179,7 @@ export default function EscalationAdminPage() {
           <p className="mt-3 max-w-3xl text-ink-600">Övervaka blockerade uppgifter, passerade deadlines, mottagare och den automatiska eskaleringsmotorns leveranshistorik.</p>
           <nav aria-label="Hoppa till eskaleringsavsnitt" className="mt-4 flex flex-wrap gap-2">
             <a id="eskaleringslista-lank" href="#regler" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Regler</a>
-            <a href="#driftkontroll" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Driftkontroll</a>
+            <a id="eskmottagarlista-lank" href="#driftkontroll" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Driftkontroll</a>
             <a id="eskhistoriklista-lank" href="#historik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
           </nav>
         </div>
