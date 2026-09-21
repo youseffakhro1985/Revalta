@@ -115,6 +115,13 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
   }, []);
   useEffect(() => {
     if (loading) return;
+    if (!showCreate) return;
+    if (window.location.hash !== "#projekt-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
+    document.getElementById("projekt-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("projekt-titel")?.focus(), 0);
+  }, [loading, showCreate]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#projektfilter") return;
     document.getElementById("projektfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("projekt-sok")?.focus(), 0);
@@ -212,10 +219,10 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     <SoftDeleteUndoBanner entityLabel="Projektet" restoreApiPath={(id) => `/api/projects/${id}/restore`} detailPath={(id) => `/dashboard/projekt/${id}`} />
 
-    {showCreate ? <Panel title="Nytt projekt" description="Registrera ansvar, entreprenör, tidsplan, risk och ekonomiska ramar. Projektet kan därefter öppnas för mer detaljerad styrning.">
+    {showCreate ? <section id="projekt-editor" className="scroll-mt-36"><Panel title="Nytt projekt" description="Registrera ansvar, entreprenör, tidsplan, risk och ekonomiska ramar. Projektet kan därefter öppnas för mer detaljerad styrning.">
       <form action={createProject} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <select name="propertyId" required className={premiumFieldClass} aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-        <input name="name" required autoFocus placeholder="Projektnamn" className={premiumFieldClass} aria-label="Projektnamn" />
+        <input id="projekt-titel" name="name" required autoFocus placeholder="Projektnamn" className={premiumFieldClass} aria-label="Projektnamn" />
         <select name="managerId" className={premiumFieldClass} aria-label="Välj projektledare"><option value="">Välj projektledare</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name || member.email}</option>)}</select>
         <input name="contractor" placeholder="Entreprenör" className={premiumFieldClass} aria-label="Entreprenör" />
         <input name="startDate" type="date" className={premiumFieldClass} aria-label="Startdatum" />
@@ -227,7 +234,7 @@ export function ProjectsPage({ initialCreate }: { initialCreate: boolean }) {
         <input name="actual" type="number" min="0" step="0.01" placeholder="Utfall" className={premiumFieldClass} aria-label="Utfall" />
         <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Skapa projekt"}</button>
       </form>
-    </Panel> : null}
+    </Panel></section> : null}
 
     <section className="grid gap-6 xl:grid-cols-[1fr_0.7fr]">
       <Panel title="Portföljfilter" description="Filtrerar den aktuella projektsidan. Serverpagineringen ligger kvar för stora bestånd.">
