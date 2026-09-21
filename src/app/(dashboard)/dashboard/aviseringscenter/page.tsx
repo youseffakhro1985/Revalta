@@ -114,6 +114,7 @@ export default function NotificationCenterPage() {
     if (loading) return;
     if (window.location.hash !== "#aviseringslista") return;
     document.getElementById("aviseringslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("aviseringslista-uppdatera")?.focus(), 0);
   }, [loading, data]);
 
   async function patch(kind: NotificationKind, body: Record<string, unknown>) {
@@ -182,7 +183,7 @@ export default function NotificationCenterPage() {
         <div><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-petroleum-600">Drift och leveranssäkerhet</p><h1 className="mt-3 text-[32px] font-semibold tracking-[-0.035em] text-ink-950 sm:text-[36px]">Aviseringscenter</h1><p className="mt-3 max-w-2xl text-ink-600">Prioritera service, schemakörningar och SLA-risker, markera läst och hantera aviseringar med full spårbarhet.</p></div>
         <div className="flex flex-wrap gap-2">
           <a href="#aviseringsfilter" className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50">Filtrera</a>
-          <button onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
+          <button id="aviseringslista-uppdatera" type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-sand-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Uppdatera</button>
           <button onClick={() => void markAllRead()} disabled={!data?.summary.unread} className="inline-flex items-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50"><CheckCheck className="h-4 w-4" /> Markera alla som lästa</button>
         </div>
       </header>
