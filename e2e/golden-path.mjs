@@ -110,9 +110,7 @@ export async function runStaffGoldenPath({
   const ticketAfterCreate = await api(page, "GET", `/api/tickets/${ticketId}`);
   validateTicketStatus(ticketAfterCreate.status, ticketAfterCreate.body, "new", propertyId);
 
-  const linked = await api(page, "POST", `/api/tickets/${ticketId}/work-order`, {
-    assignedToId: staffUserId,
-  });
+  const linked = await api(page, "POST", `/api/tickets/${ticketId}/work-order`, {});
   validateWorkOrderFromTicket(linked.status, linked.body, true);
   const workOrderId = linked.body.workOrderId;
 

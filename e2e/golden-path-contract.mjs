@@ -33,10 +33,10 @@ export function validateTicketStatus(status, body, expectedStatus, propertyId) {
 
 export function validateWorkOrderFromTicket(status, body, created) {
   if (!hasId(body?.workOrderId)) {
-    throw new Error("Ticket did not resolve to a work order");
+    throw new Error(`Ticket did not resolve to a work order (${status})`);
   }
   if (created && status !== 201) {
-    throw new Error("Work order create from ticket did not return 201");
+    throw new Error(`Work order create from ticket did not return 201 (${status})`);
   }
 }
 
