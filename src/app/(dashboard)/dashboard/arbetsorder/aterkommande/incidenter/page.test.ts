@@ -9,6 +9,8 @@ describe("recurring incident escalation hash", () => {
     expect(source).toContain('window.location.hash !== "#kontrollera-eskalering"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("autoFocus");
+    expect(source).toContain('id="kontrollera-eskalering-knapp"');
+    expect(source).toContain('document.getElementById("kontrollera-eskalering-knapp")?.focus()');
   });
 });
 
@@ -19,6 +21,7 @@ describe("recurring incident leftover list first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#incidentlista"');
     expect(source).toContain('id="kontrollera-eskalering"');
+    expect(source).toContain('id="kontrollera-eskalering-knapp"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("Incidenterna hämtas.");
     expect(source).not.toContain("Hämtar incidenter…");
