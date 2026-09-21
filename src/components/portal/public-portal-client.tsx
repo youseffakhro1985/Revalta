@@ -167,6 +167,12 @@ export function PublicPortalClient({
     document.getElementById("boende-aterkoppling")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("boende-aterkoppling-kommentar")?.focus(), 0);
   }, [loading, trackedTicket]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#public-ticket-form") return;
+    document.getElementById("public-ticket-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("portal-namn")?.focus(), 0);
+  }, [loading]);
 
   async function loadTrackedTicket(nextReference: string, nextEmail: string, nextToken: string) {
     const normalizedReference = nextReference.trim().toUpperCase();
@@ -454,11 +460,11 @@ export function PublicPortalClient({
                 method="post"
                 action={withCompanySlug("/api/public/tickets", companySlug)}
                 onSubmit={createTicket}
-                className="mt-6 space-y-4"
+                className="scroll-mt-36 mt-6 space-y-4"
               >
                 {companySlug ? <input type="hidden" name="companySlug" value={companySlug} /> : null}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <label><span className="sr-only">Ditt namn</span><input required name="reporterName" autoComplete="name" maxLength={120} value={reporterName} onChange={(event) => setReporterName(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Ditt namn" /></label>
+                  <label><span className="sr-only">Ditt namn</span><input id="portal-namn" required name="reporterName" autoComplete="name" maxLength={120} value={reporterName} onChange={(event) => setReporterName(event.target.value)} disabled={loading} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Ditt namn" /></label>
                   <label><span className="sr-only">E-post</span><input required name="reporterEmail" type="email" autoComplete="email" maxLength={254} value={reporterEmail} onChange={(event) => setReporterEmail(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="E-post" /></label>
                   <label><span className="sr-only">Telefon</span><input name="reporterPhone" type="tel" autoComplete="tel" maxLength={40} value={reporterPhone} onChange={(event) => setReporterPhone(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Telefon" /></label>
                   <label><span className="sr-only">Lägenhet eller lokal</span><input name="reporterUnit" autoComplete="address-line2" maxLength={80} value={reporterUnit} onChange={(event) => setReporterUnit(event.target.value)} className="w-full rounded-xl border border-sand-200 p-3 text-sm focus:border-petroleum-500 focus:ring-1 focus:ring-petroleum-500 outline-none transition-all" placeholder="Lägenhet/lokal" /></label>
