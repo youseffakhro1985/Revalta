@@ -46,6 +46,13 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
     return () => { cancelled = true; };
   }, [propertyId, componentId]);
 
+  useEffect(() => {
+    if (saving) return;
+    if (window.location.hash !== "#komponent-aktivitet") return;
+    document.getElementById("komponent-aktivitet")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("komponent-handelse-typ")?.focus(), 0);
+  }, [saving]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true); setError(""); setSuccess("");
@@ -72,7 +79,7 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
         <button type="button" onClick={() => { setTab("cost"); setError(""); setSuccess(""); }} className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === "cost" ? "bg-white text-petroleum-800 shadow-sm" : "text-ink-500"}`}>Kostnad</button>
       </div>
 
-      <form onSubmit={submit} className="space-y-5">
+      <form id="komponent-aktivitet" method="post" action={`/api/properties/${propertyId}/components/${componentId}/actions`} onSubmit={submit} className="scroll-mt-36 space-y-5">
         {error ? <InlineAlert>{error}</InlineAlert> : null}
         {linkError ? <InlineAlert>{linkError}</InlineAlert> : null}
         {success ? <div role="status" className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm font-semibold text-success-800">{success}</div> : null}
@@ -80,7 +87,12 @@ export function ComponentActivityForms({ propertyId, componentId }: { propertyId
         {tab === "event" ? (
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Select name="event_type" label="Händelsetyp" options={eventTypes} required />
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink-500">Händelsetyp *</span>
+                <select id="komponent-handelse-typ" autoFocus name="event_type" required disabled={saving} className="w-full rounded-xl border border-sand-200 bg-white px-3.5 py-2.5 text-sm text-ink-900 outline-none transition focus:border-petroleum-400 focus:ring-4 focus:ring-petroleum-50">
+                  {Object.entries(eventTypes).map(([value, title]) => <option key={value} value={value}>{title}</option>)}
+                </select>
+              </label>
               <Field name="event_date" label="Händelsedatum" type="date" defaultValue={today()} required />
               <Field name="next_due_at" label="Nästa planerade datum" type="date" />
               <Field name="title" label="Rubrik" required maxLength={180} />
