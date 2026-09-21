@@ -130,6 +130,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
     if (loading) return;
     if (window.location.hash !== "#skadelista") return;
     document.getElementById("skadelista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("skadelista-csv")?.focus(), 0);
   }, [loading, claims]);
 
   const openClaims = claims.filter((claim) => !closedStatuses.has(claim.status || "")).length;
@@ -317,7 +318,7 @@ export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean 
       </div>
     ) : null}
 
-    <Panel title="Ärendeöversikt" description="Filtrera skadeportföljen och öppna rätt ärende för uppdatering." action={<button type="button" onClick={exportCsv} disabled={!filtered.length} className={`${premiumSecondaryButtonClass} gap-2`}><Download className="h-4 w-4" aria-hidden="true" />CSV</button>} bodyClassName="p-0">
+    <Panel title="Ärendeöversikt" description="Filtrera skadeportföljen och öppna rätt ärende för uppdatering." action={<button id="skadelista-csv" type="button" onClick={exportCsv} disabled={!filtered.length} className={`${premiumSecondaryButtonClass} gap-2`}><Download className="h-4 w-4" aria-hidden="true" />CSV</button>} bodyClassName="p-0">
       <div id="skadefilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-2 xl:grid-cols-[1fr_190px_180px_190px] sm:p-5">
         <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input id="skada-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} placeholder="Sök skada, bolag, nummer eller ansvarig" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Sök skadeärenden" /></label>
         <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera status"><option value="">Alla statusar</option>{Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>

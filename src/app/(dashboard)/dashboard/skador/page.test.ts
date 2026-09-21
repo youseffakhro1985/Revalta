@@ -33,10 +33,12 @@ describe("skador create query", () => {
 });
 
 describe("skador leftover list first HTML", () => {
-  it("keeps leftover claims in the first HTML without stealing create", () => {
+  it("keeps leftover claims in the first HTML and focuses export after load without a second autoFocus", () => {
     const form = readFileSync(new URL("./skador-page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(form).toContain('id="skadefilter"');
     expect(form).toContain('id="skadelista"');
+    expect(form).toContain('id="skadelista-csv"');
     expect(form).toContain('id="skada-sok"');
     expect(form).toContain('id="skade-editor"');
     expect(form).toContain('id="skade-rubrik"');
@@ -45,11 +47,23 @@ describe("skador leftover list first HTML", () => {
     expect(form).toContain('window.location.hash !== "#skadelista"');
     expect(form).toContain("scrollIntoView");
     expect(form).toContain('document.getElementById("skada-sok")?.focus()');
+    expect(form).toContain('document.getElementById("skadelista-csv")?.focus()');
     expect(form).toContain("Nytt skadeärende");
     expect(form).toContain("canManage || loading");
     expect(form).toContain("disabled={loading}");
     expect(form).toContain("Skadeärendena hämtas.");
+    expect((form.match(/autoFocus/g) || []).length).toBe(1);
+    expect(form).not.toContain('id="skadelista-csv" autoFocus');
     expect(form).not.toContain("LoadingState");
     expect(form).not.toContain("Läser skadeärenden…");
+    expect(sticky).toContain('const claimsRoot = "/dashboard/skador"');
+    expect(sticky).toContain("Nytt skadeärende");
+    expect(sticky).not.toContain("#skadelista");
+    expect(sticky).not.toContain("#skadelista-csv");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('href: "/dashboard/skador?create=1"');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/skador", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
