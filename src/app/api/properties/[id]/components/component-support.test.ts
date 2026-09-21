@@ -237,6 +237,28 @@ describe("component support security contracts", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before generating a component report", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await getReport(reportRequest(), componentParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("does not log unverified cross-tenant identifiers in link options", async () => {
     propertyFindFirstMock.mockResolvedValueOnce(null);
 

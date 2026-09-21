@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canCreateProperties, canViewFinanceData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, canViewFinanceData, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
@@ -64,9 +64,10 @@ function reject(
 }
 
 async function resolveContext(params: Promise<{ id: string; componentId: string }>) {
-  const user = await getCurrentUser();
-  if (!user) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) };
-  if (!user.company_id) return { error: NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 }) };
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return { error: NextResponse.json({ error: "Obehörig" }, { status: 401 }) };
+  const user = requireCompanyUser(rawUser);
+  if (!user) return { error: NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 }) };
 
   const { id: propertyId, componentId } = await params;
   const property = await db.property.findFirst({

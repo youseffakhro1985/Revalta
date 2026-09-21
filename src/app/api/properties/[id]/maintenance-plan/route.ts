@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { canViewFinanceData, canViewOperations, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canViewFinanceData, canViewOperations, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { createRouteObservability } from "@/lib/route-observability";
 
@@ -151,12 +151,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return rejectRequest(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "maintenance_plan.read.unauthorized" });
     }
-    if (!user.company_id) {
-      return rejectRequest(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "maintenance_plan.read.missing_company", context: { userId: user.id } });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return rejectRequest(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "maintenance_plan.read.forbidden",
+        context: { userId: rawUser.id },
+      });
     }
 
     const { id } = await params;

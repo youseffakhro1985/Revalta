@@ -45,9 +45,9 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH as patchComponent } from "./[componentId]/route";
+import { PATCH as patchComponent, GET as getComponent } from "./[componentId]/route";
 import { POST as postComponentAction } from "./[componentId]/actions/route";
-import { PATCH as patchMaintenance } from "./[componentId]/maintenance-settings/route";
+import { PATCH as patchMaintenance, GET as getMaintenance } from "./[componentId]/maintenance-settings/route";
 import { POST as postComponentManage } from "./manage/route";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
@@ -264,5 +264,51 @@ describe("secure component write contracts", () => {
     expect(failed.status).toBe(500);
     expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
     expect(JSON.stringify(body)).not.toContain("db.internal");
+  });
+
+  it("rejects residents before loading component detail", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await getComponent(
+      new Request("https://www.revalta.se/api/properties/property-1/components/asset-1", {
+        headers: { "x-request-id": requestId },
+      }),
+      componentParams(),
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before loading maintenance settings", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await getMaintenance(
+      new Request("https://www.revalta.se/api/properties/property-1/components/asset-1/maintenance-settings", {
+        headers: { "x-request-id": requestId },
+      }),
+      componentParams(),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 });
