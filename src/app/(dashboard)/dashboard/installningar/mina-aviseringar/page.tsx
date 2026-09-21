@@ -55,6 +55,7 @@ export default function MyServiceNotificationsPage() {
     if (loading) return;
     if (window.location.hash !== "#minastatus") return;
     document.getElementById("minastatus")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("mina-spara")?.focus(), 0);
   }, [loading, data]);
 
   async function save() {
@@ -120,7 +121,7 @@ export default function MyServiceNotificationsPage() {
               <div id="minastatus" className="scroll-mt-36">
                 {loading && !data ? <p>Valen hämtas.</p> : <span>{data?.updatedAt ? `Senast ändrad ${dateTime.format(new Date(data.updatedAt))}` : "Standardinställningar används tills du sparar."}</span>}
               </div>
-              <button type="button" onClick={() => void save()} disabled={saving || loading} className="rounded-xl bg-petroleum-800 px-5 py-3 font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara mina val"}</button>
+              <button type="button" id="mina-spara" onClick={() => void save()} disabled={saving || loading} className="rounded-xl bg-petroleum-800 px-5 py-3 font-semibold text-white hover:bg-petroleum-900 disabled:opacity-50">{saving ? "Sparar…" : "Spara mina val"}</button>
             </div>
         </fieldset>
       </Panel>
