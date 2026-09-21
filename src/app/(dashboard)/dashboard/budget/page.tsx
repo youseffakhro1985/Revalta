@@ -83,6 +83,7 @@ export default function BudgetPage() {
     if (loading) return;
     if (window.location.hash !== "#ny-budgetrad") return;
     document.getElementById("ny-budgetrad")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("budget-fastighet")?.focus(), 0);
   }, [loading, canManage]);
   useEffect(() => {
     if (loading) return;
@@ -345,7 +346,7 @@ export default function BudgetPage() {
         <div id="ny-budgetrad" className="scroll-mt-36 xl:sticky xl:top-24 xl:self-start">
           <Panel title="Ny budgetrad" description="Registrera budget, prognos och verkligt utfall per kostnadsslag.">
             <form onSubmit={submit} className="space-y-4">
-              <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Välj fastighet" autoFocus><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+              <select id="budget-fastighet" className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Välj fastighet" autoFocus><option value="">Välj fastighet</option>{properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
               <div className="grid gap-3 sm:grid-cols-2"><input className={premiumFieldClass} type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} aria-label="År" /><select className={premiumFieldClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} aria-label="Kategori">{Object.entries(categories).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
               <input className={premiumFieldClass} placeholder="Konto eller kostnadsslag" value={form.account} onChange={(e) => setForm({ ...form, account: e.target.value })} required aria-label="Konto eller kostnadsslag" />
               <div className="grid gap-3 sm:grid-cols-3"><input className={premiumFieldClass} type="number" placeholder="Budget" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} aria-label="Budget" /><input className={premiumFieldClass} type="number" placeholder="Prognos" value={form.forecast} onChange={(e) => setForm({ ...form, forecast: e.target.value })} aria-label="Prognos" /><input className={premiumFieldClass} type="number" placeholder="Utfall" value={form.actual} onChange={(e) => setForm({ ...form, actual: e.target.value })} aria-label="Utfall" /></div>
