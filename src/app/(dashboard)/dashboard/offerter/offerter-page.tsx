@@ -146,6 +146,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#offertlista") return;
     document.getElementById("offertlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("offertlista-rensa")?.focus(), 0);
   }, [loading, quotes]);
 
   const propertyNames = useMemo(() => [...new Set(quotes.map((quote) => quote.property_name || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "sv")), [quotes]);
@@ -357,7 +358,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
           <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-400" aria-hidden="true" /><input id="offert-sok" disabled={loading} className={`${premiumFieldClass} pl-9`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök offert, leverantör eller fastighet" aria-label="Sök offerter" /></label>
           <select disabled={loading} className={premiumFieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filtrera offertstatus"><option value="all">Alla statusar</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <select disabled={loading} className={premiumFieldClass} value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} aria-label="Filtrera fastighet"><option value="all">Alla fastigheter</option>{propertyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select>
-          <button type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setPropertyFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
+          <button id="offertlista-rensa" type="button" disabled={loading || !hasFilters} onClick={() => { setQuery(""); setStatusFilter("all"); setPropertyFilter("all"); }} className={premiumSecondaryButtonClass}>Rensa</button>
         </div>
       </Panel>
 
