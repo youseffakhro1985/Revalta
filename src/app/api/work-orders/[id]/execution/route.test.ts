@@ -254,6 +254,41 @@ describe("work-order execution lifecycle boundaries", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("POST rejects residents before looking up execution state", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/execution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "checklist.create" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies viewers with the ticket-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/execution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "checklist.create" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("finalizes in-progress work through the canonical completion helper inside one transaction", async () => {
     workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
     queryRawMock.mockResolvedValue([{ required_incomplete: 0, before_photos: 1, after_photos: 1 }]);
