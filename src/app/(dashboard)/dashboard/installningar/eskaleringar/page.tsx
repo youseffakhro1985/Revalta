@@ -141,6 +141,7 @@ export default function EscalationAdminPage() {
     if (loading) return;
     if (window.location.hash !== "#mottagarfilter") return;
     document.getElementById("mottagarfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("esk-roll")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -234,7 +235,7 @@ export default function EscalationAdminPage() {
             <fieldset disabled={loading} className="contents">
               <label className="block max-w-sm">
                 <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera mottagare</span>
-                <select autoFocus value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera eskaleringsmottagare">
+                <select id="esk-roll" autoFocus value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera eskaleringsmottagare">
                   <option value="all">Alla roller</option>
                   <option value="owner">Ägare</option>
                   <option value="admin">Administratör</option>
