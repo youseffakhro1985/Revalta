@@ -44,7 +44,7 @@ describe("eskaleringar assignment filter first HTML", () => {
     expect(sticky).not.toContain("#esk-orsak");
     expect(source).toContain('id="eskaleringslista"');
     expect(source).toContain('id="mottagarfilter"');
-    expect(source).toContain('id="kor-eskalering"');
+    expect(source).toContain('window.location.hash !== "#kor-eskalering"');
     expect(source).toContain('document.getElementById("kor-eskalering-motor")?.focus()');
   });
 });
