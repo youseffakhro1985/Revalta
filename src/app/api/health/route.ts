@@ -1,11 +1,14 @@
 import db from "@/lib/db";
 import { canViewOperations, getCurrentUser } from "@/lib/current-user";
 import { isModernStorageOnly } from "@/lib/dual-list";
-import { getSchemaReadiness } from "@/lib/schema-readiness";
+import { getCachedSchemaReadiness } from "@/lib/schema-readiness";
 import { getStorageToken, hasStorageConfig } from "@/lib/storage";
 import { createLogger } from "@/lib/structured-logger";
 import { isStripeBillingReady } from "@/lib/stripe";
-import { previewDataPlaneIdentity } from "@/lib/database-target-identity";
+import {
+  evaluateDataPlaneIsolation,
+  runtimeDataPlaneIdentity,
+} from "@/lib/database-target-identity";
 import { NextRequest, NextResponse } from "next/server";
 
 function buildEnvSnapshot() {
@@ -87,11 +90,8 @@ export async function GET(request: NextRequest) {
   const isPublic = !user;
   const startedAt = Date.now();
   const release = buildReleaseSnapshot();
-  const previewDataPlane = previewDataPlaneIdentity(
-    release.environment,
-    process.env.DATABASE_URL,
-    process.env.DIRECT_URL,
-  );
+  const dataPlane = runtimeDataPlaneIdentity(process.env.DATABASE_URL, process.env.DIRECT_URL);
+  const dataPlaneIsolation = evaluateDataPlaneIsolation(release.environment, dataPlane);
   const modernStorageOnly = isModernStorageOnly();
   const env = buildEnvSnapshot();
   const logger = createLogger({
@@ -109,23 +109,41 @@ export async function GET(request: NextRequest) {
         audience: isPublic ? "public" : "operations",
       });
     }
+
+    const schema = await getCachedSchemaReadiness();
+    const schemaReady = schema.ready;
+    const components = {
+      database: "ok" as const,
+      schema: schemaReady ? "ok" as const : "missing" as const,
+      dataPlane: dataPlaneIsolation.ok ? "ok" as const : "mismatch" as const,
+    };
+
     if (isPublic) {
+      const publicReady = schemaReady && dataPlaneIsolation.ok;
+      if (!publicReady) {
+        logger.warn("health public readiness degraded", {
+          latencyMs: Date.now() - startedAt,
+          schemaReady,
+          dataPlaneOk: dataPlaneIsolation.ok,
+        });
+      }
       return healthResponse({
-        status: "ok",
-        ok: true,
+        status: publicReady ? "ok" : "degraded",
+        ok: publicReady,
         database: "ok",
+        schemaReady,
         latencyMs: Date.now() - startedAt,
         release,
-        ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
+        dataPlane,
+        components,
         modernStorageOnly,
         checkedAt: new Date().toISOString(),
-      }, 200, release);
+      }, publicReady ? 200 : 503, release);
     }
     if (!canViewOperations(user.role)) {
       return healthResponse({ error: "Du saknar behörighet att visa driftstatus" }, 403, release);
     }
 
-    const schema = await getSchemaReadiness();
     const missingOperationalConfig = [
       !env.databaseUrl && "DATABASE_URL",
       !env.directUrl && "DIRECT_URL",
@@ -135,6 +153,7 @@ export async function GET(request: NextRequest) {
       !env.storage && "STORAGE",
       !env.cronSecret && "CRON_SECRET",
       !schema.ready && "DATABASE_SCHEMA",
+      !dataPlaneIsolation.ok && "DATA_PLANE_ISOLATION",
     ].filter((item): item is string => Boolean(item));
     const criticalReady = missingOperationalConfig.length === 0;
     const demoLeadDeliveryReady = Boolean(
@@ -146,6 +165,12 @@ export async function GET(request: NextRequest) {
       logger.warn("health schema readiness degraded", {
         latencyMs: Date.now() - startedAt,
         missingSchemaItems: schema.missing,
+      });
+    }
+    if (!dataPlaneIsolation.ok) {
+      logger.warn("health data-plane isolation degraded", {
+        latencyMs: Date.now() - startedAt,
+        reason: dataPlaneIsolation.reason,
       });
     }
     if (!criticalReady) {
@@ -160,9 +185,12 @@ export async function GET(request: NextRequest) {
       ok: criticalReady,
       database: "ok",
       schema,
+      schemaReady,
       latencyMs: Date.now() - startedAt,
       release,
-      ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
+      dataPlane,
+      dataPlaneIsolation,
+      components,
       modernStorageOnly,
       env,
       readiness: {
@@ -184,9 +212,15 @@ export async function GET(request: NextRequest) {
       status: "error",
       ok: false,
       database: "error",
+      schemaReady: false,
       latencyMs: Date.now() - startedAt,
       release,
-      ...(previewDataPlane ? { dataPlane: previewDataPlane } : {}),
+      dataPlane,
+      components: {
+        database: "error",
+        schema: "unknown",
+        dataPlane: dataPlaneIsolation.ok ? "unknown" : "mismatch",
+      },
       modernStorageOnly,
       ...(isPublic ? {} : { env }),
       checkedAt: new Date().toISOString(),

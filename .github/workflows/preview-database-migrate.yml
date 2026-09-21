@@ -1,28 +1,31 @@
-name: Database Status
+name: Preview Database Migrate
 
 on:
   workflow_dispatch:
     inputs:
       commit_sha:
-        description: Exact verified commit SHA from main to inspect
+        description: Exact verified commit SHA from main to migrate Preview
+        required: true
+        type: string
+      confirmation:
+        description: Type PREVIEW_MIGRATE to confirm
         required: true
         type: string
 
 permissions:
   contents: read
 
-# Share the production database release lock so a read-only status inspection
-# cannot race an active migration release.
 concurrency:
-  group: revalta-production-database-release
+  group: revalta-preview-database
   cancel-in-progress: false
 
 jobs:
-  status:
-    name: Inspect production migration status
+  migrate:
+    if: ${{ inputs.confirmation == 'PREVIEW_MIGRATE' }}
+    name: Apply preview migrations
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: Production
+    environment: Preview
 
     steps:
       - name: Check out approved revision
@@ -49,29 +52,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate required secrets
+      - name: Validate required Preview secrets
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
           missing=0
           if [ -z "$DATABASE_URL" ]; then
-            echo "::error::DATABASE_URL saknas i GitHub Environment 'Production'."
+            echo "::error::DATABASE_URL saknas i GitHub Environment 'Preview'."
             missing=1
           fi
           if [ -z "$DIRECT_URL" ]; then
-            echo "::error::DIRECT_URL saknas i GitHub Environment 'Production'."
+            echo "::error::DIRECT_URL saknas i GitHub Environment 'Preview'."
             missing=1
           fi
           if [ "$missing" -ne 0 ]; then
+            echo "Kopiera Preview DATABASE_URL och DIRECT_URL från Vercel Preview. Använd aldrig Production-värden."
             exit 1
           fi
 
-      - name: Assert Production data-plane identity
+      - name: Assert Preview data-plane identity
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
-        run: node scripts/assert-database-target.mjs --target production
+        run: node scripts/assert-database-target.mjs --target preview
 
       - name: Generate Prisma client
         env:
@@ -79,10 +83,27 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: npx prisma generate
 
-      - name: Inspect migration status (read-only)
+      - name: Show migration status before Preview release
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: |
-          echo "::notice::Read-only production schema inspection. This workflow must never apply migrations."
+          set +e
           npx prisma migrate status
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::notice::Pending Preview migrations are expected here; prisma migrate deploy remains the Preview gate."
+          fi
+
+      - name: Apply Preview migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy
+
+      - name: Verify Preview migration status after release
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate status

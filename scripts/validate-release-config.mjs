@@ -11,6 +11,12 @@ const paths = {
   databaseRelease: new URL(".github/workflows/database-release.yml", root),
   databaseStatus: new URL(".github/workflows/database-status.yml", root),
   e2ePreview: new URL(".github/workflows/e2e-preview.yml", root),
+  productionUptime: new URL(".github/workflows/production-uptime.yml", root),
+  productionReleaseMonitor: new URL(".github/workflows/production-release-monitor.yml", root),
+  previewDatabaseStatus: new URL(".github/workflows/preview-database-status.yml", root),
+  previewDatabaseMigrate: new URL(".github/workflows/preview-database-migrate.yml", root),
+  dataPlaneAttestations: new URL("src/lib/data-plane-attestations.json", root),
+  assertDatabaseTarget: new URL("scripts/assert-database-target.mjs", root),
 };
 
 const CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"; // actions/checkout v7.0.1
@@ -83,6 +89,12 @@ const [
   databaseRelease,
   databaseStatus,
   e2ePreview,
+  productionUptime,
+  productionReleaseMonitor,
+  previewDatabaseStatus,
+  previewDatabaseMigrate,
+  dataPlaneAttestations,
+  assertDatabaseTarget,
 ] = await Promise.all([
   readJson(paths.vercel, "vercel.json"),
   readJson(paths.package, "package.json"),
@@ -93,6 +105,12 @@ const [
   readFile(paths.databaseRelease, "utf8"),
   readFile(paths.databaseStatus, "utf8"),
   readFile(paths.e2ePreview, "utf8"),
+  readFile(paths.productionUptime, "utf8"),
+  readFile(paths.productionReleaseMonitor, "utf8"),
+  readFile(paths.previewDatabaseStatus, "utf8"),
+  readFile(paths.previewDatabaseMigrate, "utf8"),
+  readJson(paths.dataPlaneAttestations, "data-plane-attestations.json"),
+  readFile(paths.assertDatabaseTarget, "utf8"),
 ]);
 
 if (vercel.framework !== "nextjs") fail("vercel.json framework must remain nextjs");
@@ -178,8 +196,66 @@ for (const [fragment, message] of [
 if (databaseStatus.includes("prisma migrate deploy") || databaseStatus.includes("prisma db push")) {
   fail("Database Status must never contain a mutating Prisma migration command");
 }
+requireText(databaseStatus, "node scripts/assert-database-target.mjs --target production", "Database Status must assert the Production data-plane identity");
 requireOrder(databaseStatus, "git merge-base --is-ancestor", "npx prisma migrate status", "Database Status must verify the approved main commit before inspecting Production");
 validateActionPins(databaseStatus, "Database Status", { checkout: true, setupNode: true });
+
+requireText(databaseRelease, "node scripts/assert-database-target.mjs --target production", "Database Release must assert the Production data-plane identity");
+requireOrder(databaseRelease, "node scripts/assert-database-target.mjs --target production", "npx prisma migrate deploy", "Database Release must verify data-plane identity before migrating Production");
+if (databaseRelease.includes("environment: Preview")) fail("Database Release must never target the Preview environment");
+
+const productionId = String(dataPlaneAttestations?.production || "");
+const previewId = String(dataPlaneAttestations?.preview || "");
+if (!/^[a-f0-9]{64}$/.test(productionId) || !/^[a-f0-9]{64}$/.test(previewId) || productionId === previewId) {
+  fail("Data-plane attestations must be distinct 64-character hex digests");
+}
+requireText(assertDatabaseTarget, "--target production|preview", "assert-database-target must require an explicit production or preview target");
+requireText(assertDatabaseTarget, "BLOCKED: DATABASE_URL and DIRECT_URL are required", "assert-database-target must fail closed without connection configuration");
+if (assertDatabaseTarget.includes("postgresql://") && /postgresql:\/\/[^\"'\s]+:[^\"'\s]+@/.test(assertDatabaseTarget)) {
+  fail("assert-database-target must not embed credentials");
+}
+
+for (const [fragment, message] of [
+  ["name: Preview Database Status", "Preview Database Status workflow name changed unexpectedly"],
+  ["environment: Preview", "Preview Database Status must use the Preview environment"],
+  ["node scripts/assert-database-target.mjs --target preview", "Preview Database Status must assert the Preview data-plane identity"],
+  ["Read-only Preview schema inspection. This workflow must never apply migrations.", "Preview Database Status must declare its read-only invariant"],
+  ["npx prisma migrate status", "Preview Database Status must inspect migration status"],
+]) requireText(previewDatabaseStatus, fragment, message);
+if (previewDatabaseStatus.includes("prisma migrate deploy") || previewDatabaseStatus.includes("environment: Production")) {
+  fail("Preview Database Status must never migrate or use the Production environment");
+}
+validateActionPins(previewDatabaseStatus, "Preview Database Status", { checkout: true, setupNode: true });
+
+for (const [fragment, message] of [
+  ["name: Preview Database Migrate", "Preview Database Migrate workflow name changed unexpectedly"],
+  ["PREVIEW_MIGRATE", "Preview Database Migrate must require PREVIEW_MIGRATE confirmation"],
+  ["environment: Preview", "Preview Database Migrate must use the Preview environment"],
+  ["node scripts/assert-database-target.mjs --target preview", "Preview Database Migrate must assert the Preview data-plane identity"],
+  ["npx prisma migrate deploy", "Preview Database Migrate must apply Preview migrations after identity checks"],
+]) requireText(previewDatabaseMigrate, fragment, message);
+if (previewDatabaseMigrate.includes("environment: Production") || previewDatabaseMigrate.includes("MIGRATE_PRODUCTION")) {
+  fail("Preview Database Migrate must never accept Production confirmation or the Production environment");
+}
+requireOrder(
+  previewDatabaseMigrate,
+  "node scripts/assert-database-target.mjs --target preview",
+  "npx prisma migrate deploy",
+  "Preview Database Migrate must verify data-plane identity before migrating Preview",
+);
+validateActionPins(previewDatabaseMigrate, "Preview Database Migrate", { checkout: true, setupNode: true });
+
+requireText(productionUptime, "schemaReady", "Production Uptime must require semantic schema readiness");
+requireText(productionUptime, productionId, "Production Uptime must pin the reviewed Production data-plane identity");
+requireText(productionUptime, previewId, "Production Uptime must reject the Preview data-plane identity");
+requireText(productionUptime, "https://www.revalta.se/api/health", "Production Uptime must probe Production health");
+
+requireText(productionReleaseMonitor, "schemaReady == true", "Production Release Monitor must require schemaReady");
+requireText(productionReleaseMonitor, productionId, "Production Release Monitor must pin the reviewed Production data-plane identity");
+requireText(productionReleaseMonitor, previewId, "Production Release Monitor must reject the Preview data-plane identity");
+if (productionReleaseMonitor.includes("main_age_seconds < 600")) {
+  fail("Production Release Monitor must not treat a SHA mismatch as green during a grace window");
+}
 
 validateActionPins(cronSmoke, "Cron Smoke", { checkout: true, setupNode: true });
 validateActionPins(databaseRelease, "Database Release", { checkout: true, setupNode: true });
@@ -187,6 +263,7 @@ validateActionPins(e2ePreview, "Preview Browser E2E", { checkout: true, setupNod
 
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");
+if (scripts["assert:database-target"] !== "node scripts/assert-database-target.mjs") fail("package.json must expose assert:database-target");
 if (scripts["audit:ui-interactions"] !== "node scripts/audit-ui-interactions.mjs") fail("package.json must expose audit:ui-interactions");
 if (scripts["audit:dashboard-integrity"] !== "node scripts/audit-dashboard-integrity.mjs") fail("package.json must expose audit:dashboard-integrity");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must validate release configuration first");

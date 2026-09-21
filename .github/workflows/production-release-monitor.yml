@@ -53,11 +53,24 @@ jobs:
             exit 1
           fi
 
-          jq -e '.ok == true and .status == "ok" and .database == "ok"' "$body_file" >/dev/null
+          jq -e '.ok == true and .status == "ok" and .database == "ok" and .schemaReady == true' "$body_file" >/dev/null
           jq -e '.release.environment == "production"' "$body_file" >/dev/null
           jq -e '.release.commitSha | test("^[0-9a-f]{40}$")' "$body_file" >/dev/null
           jq -e '.release.shortCommitSha | test("^[0-9a-f]{7}$")' "$body_file" >/dev/null
           jq -e '.release.branch == "main"' "$body_file" >/dev/null
+          jq -e '.dataPlane.directMatches == true' "$body_file" >/dev/null
+          jq -e '.dataPlane.identity | test("^[a-f0-9]{64}$")' "$body_file" >/dev/null
+          jq -e '.components.database == "ok" and .components.schema == "ok" and .components.dataPlane == "ok"' "$body_file" >/dev/null
+
+          production_identity="$(jq -r '.dataPlane.identity' "$body_file")"
+          if [[ "$production_identity" == "6237f01010de725a8e35dcdb90b4f1b933bb009aa2d822155d6efe18f61ede3f" ]]; then
+            echo "::error title=PRODUCTION_SHARES_PREVIEW_DATAPLANE::Production health is attached to the Preview data plane"
+            exit 1
+          fi
+          if [[ "$production_identity" != "e51d9599fa4b3c03898d33a44d3fb5973987e8fd3569896aa3c005fc5673ba2a" ]]; then
+            echo "::error title=PRODUCTION_DATAPLANE_MISMATCH::Production health data-plane identity does not match the reviewed attestation"
+            exit 1
+          fi
 
           curl \
             --silent \
@@ -94,19 +107,7 @@ jobs:
           fi
 
           if [[ "$production_sha" != "$expected_sha" ]]; then
-            now_epoch="$(date -u +%s)"
-            main_epoch="$(date -u -d "$main_committed_at" +%s)"
-            main_age_seconds="$((now_epoch - main_epoch))"
-
-            # A fresh merge can briefly precede Vercel alias propagation. Keep the
-            # monitor quiet only during a bounded ten-minute grace window; the next
-            # scheduled run must then observe the exact current main SHA or fail.
-            if (( main_age_seconds >= 0 && main_age_seconds < 600 )); then
-              echo "::notice title=Production deployment propagation::Production is healthy but has not reached current main yet. main=$expected_sha production=$production_sha age=${main_age_seconds}s"
-              exit 0
-            fi
-
-            echo "::error title=PRODUCTION_RELEASE_STALE::Production is healthy but does not run current main. expected=$expected_sha production=$production_sha"
+            echo "::error title=PRODUCTION_RELEASE_STALE::Production does not run current main. expected=$expected_sha production=$production_sha committed_at=$main_committed_at"
             exit 1
           fi
 

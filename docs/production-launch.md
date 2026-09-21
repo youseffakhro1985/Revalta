@@ -38,7 +38,7 @@ Migrationen `20260713190000_add_work_orders_and_projects` är idempotent. Builds
 
 - `JWT_SECRET`: minst 32 slumpmässiga byte.
 - `DATABASE_URL` och `DIRECT_URL`: produktionsdatabasen.
-- `PUBLIC_PORTAL_COMPANY_ID`: organisationen som får visas i den gemensamma boendeportalen. Revaltas Vercel-projekt har en versionsstyrd publik standard; sätt variabeln för att överstyra den i andra flerorganisationsmiljöer. En installation med exakt ett aktivt företag kan identifieras säkert automatiskt.
+- `PUBLIC_PORTAL_COMPANY_ID`: organisationen som får visas i den gemensamma boendeportalen. Utan explicit tenant (env eller den versionsstyrda Vercel-standarden) ska portalen faila stängt. Första aktiva bolag eller främmande company-UUID är inte giltig fallback.
 - `EMAIL_PROVIDER_API_KEY` och `EMAIL_FROM`: transaktionsmail.
 - `BLOB_READ_WRITE_TOKEN`: privat Vercel Blob-token. `STORAGE_PROVIDER_KEY` stöds endast som övergångsreserv.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` och pris-id:n om betalning är aktiverad.
@@ -105,8 +105,8 @@ När releasen innehåller schema cutover (moderna tabeller / soft-delete / `Cron
 
 ## 6. Verifiering efter driftsättning
 
-- `GET /api/health` svarar utan serverfel (`status=ok`, `database=ok`, gärna `modernStorageOnly=true` i production).
-- Inloggad ops: `GET /api/health` visar `schema.ready: true` och `env`-flaggor för kritiska secrets (annars saknas soft-delete-migrationer / env).
+- `GET /api/health` svarar utan serverfel (`status=ok`, `database=ok`, `schemaReady=true`, `components.dataPlane=ok`, gärna `modernStorageOnly=true` i production). Publikt svar får innehålla commit SHA, deployment-id, environment, schemaReady och dataplan-fingerprint — aldrig credentials.
+- Inloggad ops: `GET /api/health` visar `schema.ready: true`, `dataPlaneIsolation.ok: true` och `env`-flaggor för kritiska secrets (annars saknas soft-delete-migrationer / env / fel dataplan).
 - Drift-UI: `/dashboard/drift` visar schema, modern storage, kritiska secrets och cron-lista.
 - Snabb rök: `BASE_URL=https://www.revalta.se npm run smoke:auth`
 - Ops-rök (secrets + schema): `BASE_URL=https://www.revalta.se npm run smoke:ops`
@@ -115,7 +115,7 @@ När releasen innehåller schema cutover (moderna tabeller / soft-delete / `Cron
 - Extern övervakning: GitHub Actions-workflow **Production Uptime** pingar `/api/health` var 15:e minut. Komplettera gärna med UptimeRobot/Better Stack för SMS/e-post.
 - Registrering, inloggning, utloggning och lösenordsåterställning fungerar.
 - En användare kan endast se den egna organisationens fastigheter och ärenden.
-- Boendeportalen visar endast fastigheter för `PUBLIC_PORTAL_COMPANY_ID`.
+- Boendeportalen visar endast fastigheter för den explicita portaltenanten (`PUBLIC_PORTAL_COMPANY_ID` eller versionsstyrd Vercel-standard). Ändra inte tenant-id genom gissning.
 - Skapa ett testärende, tilldela det, kommentera och ladda upp/ladda ned en bilaga.
 - Kontrollera att `/dashboard` och `/api/*` skickar `Cache-Control: private, no-store`.
 - Kontrollera CSP, HSTS och övriga säkerhetsheaders på `https://www.revalta.se`.

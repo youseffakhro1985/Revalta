@@ -22,18 +22,40 @@ jobs:
       - name: Check production health
         env:
           HEALTH_URL: https://www.revalta.se/api/health
+          PRODUCTION_DATA_PLANE_ID: e51d9599fa4b3c03898d33a44d3fb5973987e8fd3569896aa3c005fc5673ba2a
+          PREVIEW_DATA_PLANE_ID: 6237f01010de725a8e35dcdb90b4f1b933bb009aa2d822155d6efe18f61ede3f
         run: |
           set -euo pipefail
           response="$(curl -sS -f --max-time 20 -H 'accept: application/json' "$HEALTH_URL")"
           HEALTH_RESPONSE="$response" python3 - <<'PY'
-          import json, os
-          body = os.environ["HEALTH_RESPONSE"]
-          data = json.loads(body)
+          import json, os, re
+          data = json.loads(os.environ["HEALTH_RESPONSE"])
+          production = os.environ["PRODUCTION_DATA_PLANE_ID"]
+          preview = os.environ["PREVIEW_DATA_PLANE_ID"]
           status = data.get("status")
           database = data.get("database")
-          sha = (data.get("release") or {}).get("commitSha")
-          modern = data.get("modernStorageOnly")
-          print(f"status={status} database={database} sha={sha} modernStorageOnly={modern}")
-          if status != "ok" or database != "ok":
-              raise SystemExit("Production health is not ok")
+          schema_ready = data.get("schemaReady")
+          release = data.get("release") or {}
+          data_plane = data.get("dataPlane") or {}
+          components = data.get("components") or {}
+          identity = data_plane.get("identity")
+          sha = release.get("commitSha")
+          print(
+              f"status={status} database={database} schemaReady={schema_ready} "
+              f"sha={sha} dataPlane={identity} components={components}"
+          )
+          if status != "ok" or database != "ok" or schema_ready is not True:
+              raise SystemExit("Production health is not semantically ready")
+          if release.get("environment") != "production":
+              raise SystemExit("Production health is not reporting environment=production")
+          if not re.fullmatch(r"[0-9a-f]{40}", str(sha or "")):
+              raise SystemExit("Production health is missing a full commit SHA")
+          if data_plane.get("directMatches") is not True:
+              raise SystemExit("Production DATABASE_URL and DIRECT_URL identities do not match")
+          if identity == preview:
+              raise SystemExit("Production health is attached to the Preview data plane")
+          if identity != production:
+              raise SystemExit("Production health data-plane identity does not match the reviewed attestation")
+          if components.get("database") != "ok" or components.get("schema") != "ok" or components.get("dataPlane") != "ok":
+              raise SystemExit("Production health components are not all ok")
           PY

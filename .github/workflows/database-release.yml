@@ -80,6 +80,12 @@ jobs:
             exit 1
           fi
 
+      - name: Assert Production data-plane identity
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: node scripts/assert-database-target.mjs --target production
+
       - name: Generate Prisma client
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
