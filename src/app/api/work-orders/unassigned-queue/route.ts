@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canAssignWorkOrders, getCurrentUser } from "@/lib/current-user";
+import { canAssignWorkOrders, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import {
   WORK_ORDER_PRIORITY_LABELS,
   WORK_ORDER_STATUS_LABELS,
@@ -11,9 +11,10 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canAssignWorkOrders(user.role)) {
     return NextResponse.json({ error: "Du saknar behörighet att tilldela arbetsordrar" }, { status: 403 });
   }

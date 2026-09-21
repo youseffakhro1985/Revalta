@@ -99,6 +99,7 @@ describe("work-orders/edit-locks", () => {
       const response = await GET();
 
       expect(response.status).toBe(403);
+      expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
       expect(queryRawMock).not.toHaveBeenCalled();
     });
 

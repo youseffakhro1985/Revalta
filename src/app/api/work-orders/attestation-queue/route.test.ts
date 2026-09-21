@@ -28,6 +28,20 @@ describe("GET /api/work-orders/attestation-queue", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET();
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att attestera tid och material");
+    expect(workOrderFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing attestation rows", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(workOrderFindManyMock).not.toHaveBeenCalled();
   });
 

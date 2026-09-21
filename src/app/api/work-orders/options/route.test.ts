@@ -34,6 +34,23 @@ describe("GET /api/work-orders/options", () => {
     vendorFindManyMock.mockResolvedValue([{ id: "vendor-1", name: "Städ AB", category: "Städ", property_id: null, status: "active" }]);
   });
 
+  it("rejects residents before listing properties, users or vendors", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+    expect(vendorFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("does not disclose the company user directory to technicians", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
 
