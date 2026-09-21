@@ -217,6 +217,24 @@ describe("quotes/[id]/work-order route", () => {
     });
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(quoteFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a quote", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/quotes/quote-1/work-order", { method: "POST" }), {
+      params: Promise.resolve({ id: "quote-1" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(quoteFindFirstMock).not.toHaveBeenCalled();
   });
 });

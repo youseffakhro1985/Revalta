@@ -315,4 +315,64 @@ describe("quotes route", () => {
     expect(propertyFindManyMock).not.toHaveBeenCalled();
     expect(auditFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("POST denies residents before creating a quote", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/quotes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", title: "Tak" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(quoteCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("http://localhost/api/quotes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", title: "Tak" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(quoteCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies residents before looking up a quote", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PATCH(new Request("http://localhost/api/quotes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quoteId: "quote-1", status: "sent" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(quoteFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/quotes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quoteId: "quote-1", status: "sent" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(quoteFindFirstMock).not.toHaveBeenCalled();
+  });
 });
