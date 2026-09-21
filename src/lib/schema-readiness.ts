@@ -180,14 +180,23 @@ export async function hasWorkOrderVendorContractColumn(): Promise<boolean> {
   return value;
 }
 
+const SCHEMA_READINESS_TTL_MS = 15_000;
+let schemaReadinessCache: { value: SchemaReadiness; expiresAt: number } | null = null;
+
 export function resetSchemaReadinessCache() {
   resetSoftDeleteCompatCache();
   featureColumnCache = null;
   workOrderVendorColumnCache = null;
+  schemaReadinessCache = null;
 }
 
 export async function getCachedSchemaReadiness(): Promise<SchemaReadiness> {
-  return getSchemaReadiness();
+  if (schemaReadinessCache && schemaReadinessCache.expiresAt > Date.now()) {
+    return schemaReadinessCache.value;
+  }
+  const value = await getSchemaReadiness();
+  schemaReadinessCache = { value, expiresAt: Date.now() + SCHEMA_READINESS_TTL_MS };
+  return value;
 }
 
 export async function hasSoftDeleteColumn(table: SoftDeleteTable): Promise<boolean> {

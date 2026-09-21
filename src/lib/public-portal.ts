@@ -64,35 +64,32 @@ async function getCompanyById(companyId: string, propertyId?: string | null) {
   return wrapCompany(company, propertyId);
 }
 
+export function getConfiguredPortalCompanyId() {
+  const configured = process.env.PUBLIC_PORTAL_COMPANY_ID?.trim();
+  if (configured) return configured;
+  if (process.env.VERCEL === "1") return REVALTA_PORTAL_COMPANY_ID;
+  return null;
+}
+
+const PORTAL_COMPANY_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function getPublicPortalCompanyBySlug(companySlug: string, propertyId?: string | null) {
   const slug = companySlug.trim().toLowerCase();
   if (!slug) return null;
 
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(slug)) {
-    return getCompanyById(slug, propertyId);
+  const configuredCompanyId = getConfiguredPortalCompanyId();
+  if (!configuredCompanyId) return null;
+
+  if (PORTAL_COMPANY_UUID.test(slug)) {
+    if (slug !== configuredCompanyId.toLowerCase()) return null;
+    return getCompanyById(configuredCompanyId, propertyId);
   }
 
-  const configuredCompanyId =
-    process.env.PUBLIC_PORTAL_COMPANY_ID?.trim() ||
-    (process.env.VERCEL === "1" ? REVALTA_PORTAL_COMPANY_ID : undefined);
-
-  if (configuredCompanyId) {
-    const configured = await getCompanyById(configuredCompanyId, propertyId);
-    if (!configured) return null;
-    if (toPortalSlug(configured.company.name, configured.company.id) !== slug) return null;
-    return configured;
-  }
-
-  const companies = await db.company.findMany({
-    where: { status: "active", users: { some: { status: "active" } } },
-    orderBy: { created_at: "asc" },
-    take: 200,
-    select: companySelect,
-  });
-
-  const matches = companies.filter((company) => toPortalSlug(company.name, company.id) === slug);
-  if (matches.length !== 1) return null;
-  return wrapCompany(matches[0], propertyId);
+  const configured = await getCompanyById(configuredCompanyId, propertyId);
+  if (!configured) return null;
+  if (toPortalSlug(configured.company.name, configured.company.id) !== slug) return null;
+  return configured;
 }
 
 export async function resolvePublicPortalCompany(options?: {
@@ -106,44 +103,9 @@ export async function resolvePublicPortalCompany(options?: {
 }
 
 export async function getPublicPortalCompany(propertyId?: string | null) {
-  const configuredCompanyId =
-    process.env.PUBLIC_PORTAL_COMPANY_ID?.trim() ||
-    (process.env.VERCEL === "1" ? REVALTA_PORTAL_COMPANY_ID : undefined);
-
-  if (configuredCompanyId) {
-    return getCompanyById(configuredCompanyId, propertyId);
-  }
-
-  if (propertyId) {
-    const property = await db.property.findFirst({
-      where: { id: propertyId, status: "active", deleted_at: null, company: { status: "active" } },
-      select: {
-        company: {
-          select: companySelect,
-        },
-      },
-    });
-
-    if (property?.company?.users[0]) {
-      return { company: property.company, owner: property.company.users[0] };
-    }
-  }
-
-  const companies = await db.company.findMany({
-    where: { status: "active", users: { some: { status: "active" } } },
-    orderBy: { created_at: "asc" },
-    take: 2,
-    select: companySelect,
-  });
-
-  if (companies.length === 1 && companies[0].users[0]) {
-    return { company: companies[0], owner: companies[0].users[0] };
-  }
-
-  // Never guess between tenants. A shared portal may auto-resolve only while the
-  // installation has exactly one active company; multi-tenant installations must
-  // configure PUBLIC_PORTAL_COMPANY_ID or provide a company slug / property id.
-  return null;
+  const configuredCompanyId = getConfiguredPortalCompanyId();
+  if (!configuredCompanyId) return null;
+  return getCompanyById(configuredCompanyId, propertyId);
 }
 
 export function generatePublicReference() {

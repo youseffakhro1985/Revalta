@@ -1,8 +1,8 @@
 # Revalta Feature Readiness
 
-Verified baseline: `b7b08793ccde1baef7a1c210ad9238ad72332df5` (31 Aug 2026)
+Verified baseline: `92adc33dfd224c698f8a31d0ce59a808faed355e` (21 Sep 2026)
 
-This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready.
+This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `b7b08793` (31 Aug 2026) are not current-main evidence.
 
 ## Status contract
 
@@ -47,7 +47,7 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Besiktningar | PARTIAL | Module exists. | Observation-to-work-order linkage and tenant/security/readiness audit. |
 | Underhåll | PARTIAL | Module exists. | Maintenance-plan-to-work-order lifecycle, query and tenant evidence. |
 | Skador & försäkring | PARTIAL | Module exists. | Claim relation/security/audit and work-order/project linkage verification. |
-| Boendeportal | PARTIAL | Resident auth/navigation and several resident APIs exist. | Full resident-vs-company isolation matrix and production-path review. |
+| Boendeportal | PARTIAL | Resident auth/navigation and several resident APIs exist. Public portal is fail-closed to an explicit tenant (no first-company or foreign UUID slug). | Full resident-vs-company isolation matrix, owner confirmation of portal company id, and production-path review. |
 | Uthyrning | PARTIAL | Module exists. | Contract/lifecycle/tenant/search/error/mobile readiness review. |
 | Hyresavisering | PARTIAL | Billing/economy surfaces exist. | Truthful invoice/payment lifecycle and financial-data authorization audit. |
 | Bokningar | PARTIAL | Module exists. | Conflict/concurrency/resident isolation and mobile/error verification. |

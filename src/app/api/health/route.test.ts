@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 const {
   getCurrentUserMock,
   queryRawMock,
-  getSchemaReadinessMock,
+  getCachedSchemaReadinessMock,
   isModernStorageOnlyMock,
   hasStorageConfigMock,
   getStorageTokenMock,
@@ -15,7 +15,7 @@ const {
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   queryRawMock: vi.fn(),
-  getSchemaReadinessMock: vi.fn(),
+  getCachedSchemaReadinessMock: vi.fn(),
   isModernStorageOnlyMock: vi.fn(),
   hasStorageConfigMock: vi.fn(),
   getStorageTokenMock: vi.fn(),
@@ -35,7 +35,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/schema-readiness", () => ({
-  getSchemaReadiness: getSchemaReadinessMock,
+  getCachedSchemaReadiness: getCachedSchemaReadinessMock,
+  getSchemaReadiness: getCachedSchemaReadinessMock,
 }));
 
 vi.mock("@/lib/dual-list", () => ({
@@ -80,7 +81,7 @@ describe("health route", () => {
     hasStorageConfigMock.mockReturnValue(true);
     getStorageTokenMock.mockReturnValue("blob-token");
     isStripeBillingReadyMock.mockReturnValue(false);
-    getSchemaReadinessMock.mockResolvedValue({ ready: true, missing: [], checkedAt: new Date().toISOString() });
+    getCachedSchemaReadinessMock.mockResolvedValue({ ready: true, missing: [], checkedAt: new Date().toISOString() });
     createLoggerMock.mockReturnValue({
       debug: vi.fn(),
       info: vi.fn(),
@@ -98,9 +99,13 @@ describe("health route", () => {
       status: "ok",
       ok: true,
       database: "ok",
+      schemaReady: true,
       modernStorageOnly: true,
+      components: { database: "ok", schema: "ok", dataPlane: "ok" },
     });
     expect(body.env).toBeUndefined();
+    expect(body.schema).toBeUndefined();
+    expect(body.dataPlaneIsolation).toBeUndefined();
   });
 
   it("publishes immutable release provenance with cache-safe headers", async () => {
@@ -196,7 +201,7 @@ describe("health route", () => {
 
   it("logs degraded schema readiness with correlation context", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
-    getSchemaReadinessMock.mockResolvedValue({
+    getCachedSchemaReadinessMock.mockResolvedValue({
       ready: false,
       missing: ["AuditLog.module"],
       checkedAt: new Date().toISOString(),
@@ -256,5 +261,50 @@ describe("health route", () => {
       expect.objectContaining({ audience: "public" }),
     );
     expect(loggerErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("public GET returns 503 without leaking schema gaps when the schema is not ready", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+    getCachedSchemaReadinessMock.mockResolvedValue({
+      ready: false,
+      missing: [{ table: "Ticket", column: "deleted_at" }],
+      checkedAt: new Date().toISOString(),
+    });
+
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({
+      status: "degraded",
+      ok: false,
+      database: "ok",
+      schemaReady: false,
+      components: { database: "ok", schema: "missing", dataPlane: "ok" },
+    });
+    expect(body.env).toBeUndefined();
+    expect(body.schema).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("deleted_at");
+    expect(JSON.stringify(body)).not.toContain("Ticket");
+  });
+
+  it("public GET returns 503 when Production is attached to a non-attested dataplane", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+    vi.stubEnv("VERCEL_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "postgresql://user:secret@ep-wrong.eu-central-1.aws.neon.tech/neondb");
+    vi.stubEnv("DIRECT_URL", "postgresql://user:secret@ep-wrong.eu-central-1.aws.neon.tech/neondb");
+
+    const response = await GET(healthRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.ok).toBe(false);
+    expect(body.schemaReady).toBe(true);
+    expect(body.components.dataPlane).toBe("mismatch");
+    expect(body.dataPlane.directMatches).toBe(true);
+    expect(body.dataPlane.identity).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.dataPlaneIsolation).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("ep-wrong");
+    expect(JSON.stringify(body)).not.toContain("secret");
   });
 });

@@ -11,6 +11,8 @@ const paths = {
   databaseRelease: new URL(".github/workflows/database-release.yml", root),
   databaseStatus: new URL(".github/workflows/database-status.yml", root),
   e2ePreview: new URL(".github/workflows/e2e-preview.yml", root),
+  dataPlaneAttestations: new URL("src/lib/data-plane-attestations.json", root),
+  assertDatabaseTarget: new URL("scripts/assert-database-target.mjs", root),
 };
 
 const CHECKOUT_SHA = "3d3c42e5aac5ba805825da76410c181273ba90b1"; // actions/checkout v7.0.1
@@ -83,6 +85,8 @@ const [
   databaseRelease,
   databaseStatus,
   e2ePreview,
+  dataPlaneAttestations,
+  assertDatabaseTarget,
 ] = await Promise.all([
   readJson(paths.vercel, "vercel.json"),
   readJson(paths.package, "package.json"),
@@ -93,6 +97,8 @@ const [
   readFile(paths.databaseRelease, "utf8"),
   readFile(paths.databaseStatus, "utf8"),
   readFile(paths.e2ePreview, "utf8"),
+  readJson(paths.dataPlaneAttestations, "data-plane-attestations.json"),
+  readFile(paths.assertDatabaseTarget, "utf8"),
 ]);
 
 if (vercel.framework !== "nextjs") fail("vercel.json framework must remain nextjs");
@@ -181,12 +187,24 @@ if (databaseStatus.includes("prisma migrate deploy") || databaseStatus.includes(
 requireOrder(databaseStatus, "git merge-base --is-ancestor", "npx prisma migrate status", "Database Status must verify the approved main commit before inspecting Production");
 validateActionPins(databaseStatus, "Database Status", { checkout: true, setupNode: true });
 
+const productionId = String(dataPlaneAttestations?.production || "");
+const previewId = String(dataPlaneAttestations?.preview || "");
+if (!/^[a-f0-9]{64}$/.test(productionId) || !/^[a-f0-9]{64}$/.test(previewId) || productionId === previewId) {
+  fail("Data-plane attestations must be distinct 64-character hex digests");
+}
+requireText(assertDatabaseTarget, "--target production|preview", "assert-database-target must require an explicit production or preview target");
+requireText(assertDatabaseTarget, "BLOCKED: DATABASE_URL and DIRECT_URL are required", "assert-database-target must fail closed without connection configuration");
+if (assertDatabaseTarget.includes("postgresql://") && /postgresql:\/\/[^\"'\s]+:[^\"'\s]+@/.test(assertDatabaseTarget)) {
+  fail("assert-database-target must not embed credentials");
+}
+
 validateActionPins(cronSmoke, "Cron Smoke", { checkout: true, setupNode: true });
 validateActionPins(databaseRelease, "Database Release", { checkout: true, setupNode: true });
 validateActionPins(e2ePreview, "Preview Browser E2E", { checkout: true, setupNode: true });
 
 const scripts = packageJson?.scripts ?? {};
 if (scripts["validate:release-config"] !== "node scripts/validate-release-config.mjs") fail("package.json must expose validate:release-config");
+if (scripts["assert:database-target"] !== "node scripts/assert-database-target.mjs") fail("package.json must expose assert:database-target");
 if (scripts["audit:ui-interactions"] !== "node scripts/audit-ui-interactions.mjs") fail("package.json must expose audit:ui-interactions");
 if (scripts["audit:dashboard-integrity"] !== "node scripts/audit-dashboard-integrity.mjs") fail("package.json must expose audit:dashboard-integrity");
 if (typeof scripts.quality !== "string" || !scripts.quality.startsWith("npm run validate:release-config &&")) fail("The quality command must validate release configuration first");

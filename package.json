@@ -19,6 +19,7 @@
     "test": "vitest",
     "test:ci": "vitest run",
     "validate:release-config": "node scripts/validate-release-config.mjs",
+    "assert:database-target": "node scripts/assert-database-target.mjs",
     "audit:prod": "npm audit --omit=dev",
     "audit:ui-interactions": "node scripts/audit-ui-interactions.mjs",
     "audit:dashboard-integrity": "node scripts/audit-dashboard-integrity.mjs",
