@@ -90,7 +90,18 @@ describe("IMD debit attachment", () => {
   });
   it("requires a company", async () => {
     mocks.user.mockResolvedValue({ id: "owner-a", role: "owner", company_id: null });
-    expect((await request()).status).toBe(400);
+    const response = await request();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a reading or notice", async () => {
+    mocks.user.mockResolvedValue({ id: "resident-a", role: "resident", company_id: "company-a" });
+    const response = await request();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
   it.each([null, [], {}, { createNotice: true, rentNoticeId: "notice-a" }, { createNotice: true, dueDate: "2026-02-31" }])("rejects invalid input %j", async (body) => {
     expect((await request(body)).status).toBe(400);

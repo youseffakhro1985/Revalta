@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { auditScopedWhere, canManageLeases, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, canManageLeases, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { parseDateOnly } from "@/lib/dual-list";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -17,10 +17,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     headers: { "Cache-Control": "private, no-store", "Vercel-CDN-Cache-Control": "no-store" },
   }));
   try {
-    const user = await getCurrentUser();
-    if (!user) return respond({ error: "Obehörig" }, 401);
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return respond({ error: "Obehörig" }, 401);
+    const user = requireCompanyUser(rawUser);
+    if (!user) return respond({ error: "En aktiv organisation och personalbehörighet krävs" }, 403);
     if (!canManageLeases(user.role)) return respond({ error: "Du saknar behörighet" }, 403);
-    if (!user.company_id) return respond({ error: "Användaren saknar organisation" }, 400);
     const companyId = user.company_id;
     const { id } = await params;
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
