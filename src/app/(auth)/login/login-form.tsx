@@ -57,6 +57,12 @@ export function LoginForm(props: LoginFormProps) {
     document.getElementById("login-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("login-email")?.focus(), 0);
   }, [loading]);
+  useEffect(() => {
+    if (resending) return;
+    if (window.location.hash !== "#resend-verification-form") return;
+    document.getElementById("resend-verification-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("resend-verification-email")?.focus(), 0);
+  }, [resending, verificationRequired]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -158,7 +164,7 @@ export function LoginForm(props: LoginFormProps) {
             noValidate
             data-ready={hydrated ? "1" : "0"}
             onSubmit={handleResendVerification}
-            className="mt-3 space-y-3"
+            className="scroll-mt-36 mt-3 space-y-3"
           >
             <input
               id="resend-verification-email"
@@ -169,6 +175,7 @@ export function LoginForm(props: LoginFormProps) {
               autoComplete="email"
               defaultValue={email}
               placeholder="namn@exempel.se"
+              disabled={resending}
               className={authInputClass}
             />
             <button
