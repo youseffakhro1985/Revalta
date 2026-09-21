@@ -19,11 +19,14 @@ describe("arbetsorder leftover list first HTML", () => {
   it("keeps search and recent orders in the first HTML without stealing create", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="orderfilter"');
+    expect(source).toContain('id="order-sok"');
     expect(source).toContain('id="senasteordrar"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#orderfilter"');
     expect(source).toContain('window.location.hash !== "#senasteordrar"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("order-sok")?.focus()');
+    expect(source).toContain("autoFocus");
     expect(source).toContain("canManage || loading");
     expect(source).toContain("Ny arbetsorder");
     expect(source).toContain("disabled={loading}");
