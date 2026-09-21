@@ -105,6 +105,7 @@ export default function ServiceNotificationsPage() {
     if (loading) return;
     if (window.location.hash !== "#historikfilter") return;
     document.getElementById("historikfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("historik-status")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
     if (loading) return;
@@ -281,7 +282,7 @@ export default function ServiceNotificationsPage() {
           <fieldset disabled={loading} className="contents">
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-sm font-medium text-ink-700">Filtrera historik</span>
-              <select autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera körningshistorik">
+              <select id="historik-status" autoFocus value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={premiumFieldClass} aria-label="Filtrera körningshistorik">
                 <option value="all">Alla statusar</option>
                 <option value="sent">Skickat</option>
                 <option value="failed">Misslyckat</option>
