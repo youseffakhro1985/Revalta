@@ -87,10 +87,15 @@ export default function IntegrationsPage() {
   }, [router]);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash !== "#fakturaexport" && hash !== "#handelser") return;
-    if (hash === "#handelser" && loading) return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (loading) return;
+    if (window.location.hash !== "#fakturaexport") return;
+    document.getElementById("fakturaexport")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("fakturaexport")?.focus(), 0);
+  }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#handelser") return;
+    document.getElementById("handelser")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [loading]);
 
   const summary = useMemo(() => ({
@@ -123,7 +128,7 @@ export default function IntegrationsPage() {
         <MetricCard icon={Send} label="Slutförda händelser" value={loading ? "—" : summary.successfulEvents} />
       </section>
 
-      <Link id="fakturaexport" href="/dashboard/integrationer/fakturaexporter" className="scroll-mt-36 group block rounded-2xl border border-petroleum-100 bg-gradient-to-br from-white to-petroleum-50/50 p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)] transition hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-lg">
+      <Link id="fakturaexport" autoFocus href="/dashboard/integrationer/fakturaexporter" className="scroll-mt-36 group block rounded-2xl border border-petroleum-100 bg-gradient-to-br from-white to-petroleum-50/50 p-6 shadow-[0_1px_2px_rgba(17,34,31,0.04)] transition hover:-translate-y-0.5 hover:border-petroleum-200 hover:shadow-lg">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-petroleum-800 text-white"><ReceiptText className="h-6 w-6" /></div>
