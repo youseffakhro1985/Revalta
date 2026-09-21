@@ -107,6 +107,7 @@ export default function OperationsPage() {
     if (loading) return;
     if (window.location.hash !== "#systemhalsa") return;
     document.getElementById("systemhalsa")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("systemhalsa-uppdatera")?.focus(), 0);
   }, [loading, health]);
 
   const env = health?.env || {};
@@ -127,6 +128,7 @@ export default function OperationsPage() {
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
           <a id="kritiska-lank" autoFocus href="#kritiska-secrets" className="inline-flex items-center justify-center gap-2 rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white">Kritiska secrets</a>
           <button
+            id="systemhalsa-uppdatera"
             type="button"
             onClick={() => void loadHealth()}
             disabled={loading}
