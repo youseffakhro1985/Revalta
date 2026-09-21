@@ -52,8 +52,13 @@ Never run destructive SQL against Production to “test backup”.
 
 ## Owner action required for Preview schema
 
-GitHub Environment `Preview` currently has no `DATABASE_URL` / `DIRECT_URL`. Copy those values from **Vercel Preview**, never from Production, then:
+GitHub Environment `Preview` currently has no `DATABASE_URL` / `DIRECT_URL`. Copy those values from **Vercel Preview**, never from Production.
 
-1. Run **Preview Database Status** on current `main` SHA.
-2. If pending migrations exist and identity is Preview, run **Preview Database Migrate** with `PREVIEW_MIGRATE`.
-3. Re-run Preview Browser E2E on a later PR.
+Workflow YAML that would run Preview status/migrate could not be pushed in the same PR (`workflow` scope missing). See `docs/OWNER_WORKFLOW_UPDATES.md`. Until that is applied, run:
+
+```bash
+DATABASE_URL=... DIRECT_URL=... npm run assert:database-target -- --target preview
+npx prisma migrate status
+```
+
+only against Preview URLs. Never against Production.

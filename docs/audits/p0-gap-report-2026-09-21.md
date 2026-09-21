@@ -32,6 +32,7 @@ This report is current-main evidence, not a historical audit copy. Unverified it
 | Emergency bypass | Ruleset bypass actor is repository owner, mode `always` | Policy documented; GitHub account settings not changed from code |
 | Public portal tenant | UUID slug and first-company/property discovery could select a non-portal tenant | Fail-closed in this change; commercial correctness of `REVALTA_PORTAL_COMPANY_ID` is `OWNER DECISION REQUIRED` |
 | Vercel Hobby Preview quota | Preview still unpublished for many PR checks historically | `BLOCKED / PREVIEW NOT VERIFIED` remains a merge blocker; no `--admin` |
+| GitHub Actions YAML | OAuth token lacks `workflow` scope so Uptime/Monitor/Preview migrate files could not be pushed | `OWNER DECISION REQUIRED` — apply `docs/OWNER_WORKFLOW_UPDATES.md` |
 
 ## P1
 
