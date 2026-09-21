@@ -95,6 +95,7 @@ export default function BudgetPage() {
     if (loading) return;
     if (window.location.hash !== "#budgetlista") return;
     document.getElementById("budgetlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("budgetlista-rensa")?.focus(), 0);
   }, [loading, entries]);
 
   const years = useMemo(
@@ -294,6 +295,7 @@ export default function BudgetPage() {
           {Object.entries(categories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <button
+          id="budgetlista-rensa"
           type="button"
           disabled={loading || !hasFilters}
           onClick={() => { setQuery(""); setYearFilter("all"); setPropertyFilter("all"); setCategoryFilter("all"); }}

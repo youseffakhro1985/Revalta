@@ -33,17 +33,30 @@ describe("budget leftover filter first HTML", () => {
 });
 
 describe("budget leftover rows first HTML", () => {
-  it("keeps leftover budget rows in the first HTML without stealing create or filter", () => {
+  it("keeps leftover budget rows in the first HTML and focuses clear after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="budgetlista"');
+    expect(source).toContain('id="budgetlista-rensa"');
     expect(source).toContain('window.location.hash !== "#budgetlista"');
     expect(source).toContain("Budgetraderna hämtas.");
     expect(source).toContain('id="ny-budgetrad"');
     expect(source).toContain('id="budget-fastighet"');
+    expect(source).toContain('document.getElementById("budget-fastighet")?.focus()');
+    expect(source).toContain('document.getElementById("budgetlista-rensa")?.focus()');
     expect(source).toContain('id="budgetfilter"');
     expect(source).toContain('id="budget-sok"');
+    expect(source).toContain('document.getElementById("budget-sok")?.focus()');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");
-    expect(source).toContain("autoFocus");
+    expect((source.match(/autoFocus/g) || []).length).toBe(1);
+    expect(source).not.toContain('id="budgetlista-rensa" autoFocus');
+    expect(sticky).toContain('href: "/dashboard/budget#ny-budgetrad"');
+    expect(sticky).not.toContain("#budgetlista");
+    expect(sticky).not.toContain("#budgetlista-rensa");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/budget", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
