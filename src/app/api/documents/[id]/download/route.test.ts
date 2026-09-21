@@ -93,6 +93,28 @@ describe("documents/[id]/download", () => {
     expect(managedDocumentFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before looking up document bytes", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request(), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(managedDocumentFindFirstMock).not.toHaveBeenCalled();
+    expect(auditLogFindFirstMock).not.toHaveBeenCalled();
+    expect(blobGetMock).not.toHaveBeenCalled();
+  });
+
   it("streams a document owned by the requesting user's company with correlation", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "owner" });
     managedDocumentFindFirstMock.mockResolvedValue({
@@ -174,19 +196,17 @@ describe("documents/[id]/download", () => {
     expect(response.status).toBe(404);
   });
 
-  it("denies former-company legacy documents when membership is removed", async () => {
+  it("rejects callers without organisation before looking up document bytes", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
-    auditLogFindFirstMock.mockResolvedValue(null);
 
     const response = await GET(request(), { params });
+    const body = await response.json();
 
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(body.errorCode).toBe("FORBIDDEN");
     expect(managedDocumentFindFirstMock).not.toHaveBeenCalled();
-    expect(auditLogFindFirstMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ company_id: { in: [] } }),
-      }),
-    );
-    expect(response.status).toBe(404);
+    expect(auditLogFindFirstMock).not.toHaveBeenCalled();
     expect(blobGetMock).not.toHaveBeenCalled();
   });
 

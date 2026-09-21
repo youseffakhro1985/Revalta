@@ -1,7 +1,7 @@
 import { get } from "@vercel/blob";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { auditScopedWhere, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { safeDocumentFileName } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -95,8 +95,8 @@ export async function GET(
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       observability.logger.warn("document download rejected", observability.elapsed({
         event: "documents.download.unauthorized",
       }));
@@ -104,6 +104,19 @@ export async function GET(
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
+        requestId: observability.requestId,
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      observability.logger.warn("document download rejected", observability.elapsed({
+        event: "documents.download.forbidden",
+        userId: rawUser.id,
+      }));
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
         requestId: observability.requestId,
       });
     }
@@ -116,41 +129,39 @@ export async function GET(
       source: "modern",
     };
 
-    if (user.company_id) {
-      const modern = await db.managedDocument.findFirst({
-        where: { id, company_id: user.company_id },
-        select: {
-          file_name: true,
-          content_type: true,
-          storage_url: true,
-          data_url: true,
-        },
-      });
-      if (modern) {
-        const headers = {
-          "Content-Type": modern.content_type,
-          "Content-Disposition": contentDisposition(safeDocumentFileName(modern.file_name)),
-          "Cache-Control": "private, no-store, max-age=0",
-          "CDN-Cache-Control": "no-store",
-          "Vercel-CDN-Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-        };
-        if (modern.storage_url) return streamFromStorage(modern.storage_url, headers, observability, context);
-        if (modern.data_url?.startsWith("data:")) {
-          const match = /^data:([^;]+);base64,([\s\S]+)$/.exec(modern.data_url);
-          if (!match) return notFound(observability, "Dokumentfilen är ogiltig", "documents.download.invalid_data", context);
-          const bytes = Buffer.from(match[2], "base64");
-          observability.logger.info("document download completed", observability.elapsed({
-            event: "documents.download.completed",
-            ...context,
-            storage: "inline_data",
-          }));
-          return observability.correlate(new Response(bytes, {
-            headers: { ...headers, "Content-Length": String(bytes.length) },
-          }));
-        }
-        return notFound(observability, "Dokumentfilen saknas", "documents.download.file_missing", context);
+    const modern = await db.managedDocument.findFirst({
+      where: { id, company_id: user.company_id },
+      select: {
+        file_name: true,
+        content_type: true,
+        storage_url: true,
+        data_url: true,
+      },
+    });
+    if (modern) {
+      const headers = {
+        "Content-Type": modern.content_type,
+        "Content-Disposition": contentDisposition(safeDocumentFileName(modern.file_name)),
+        "Cache-Control": "private, no-store, max-age=0",
+        "CDN-Cache-Control": "no-store",
+        "Vercel-CDN-Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      };
+      if (modern.storage_url) return streamFromStorage(modern.storage_url, headers, observability, context);
+      if (modern.data_url?.startsWith("data:")) {
+        const match = /^data:([^;]+);base64,([\s\S]+)$/.exec(modern.data_url);
+        if (!match) return notFound(observability, "Dokumentfilen är ogiltig", "documents.download.invalid_data", context);
+        const bytes = Buffer.from(match[2], "base64");
+        observability.logger.info("document download completed", observability.elapsed({
+          event: "documents.download.completed",
+          ...context,
+          storage: "inline_data",
+        }));
+        return observability.correlate(new Response(bytes, {
+          headers: { ...headers, "Content-Length": String(bytes.length) },
+        }));
       }
+      return notFound(observability, "Dokumentfilen saknas", "documents.download.file_missing", context);
     }
 
     const log = await db.auditLog.findFirst({
