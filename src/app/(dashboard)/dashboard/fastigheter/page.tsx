@@ -191,6 +191,7 @@ export default function PropertiesPage() {
     if (loading) return;
     if (window.location.hash !== "#fastighetslista") return;
     document.getElementById("fastighetslista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("fastighetslista-sortera")?.focus(), 0);
   }, [loading, properties]);
 
   const nextMaintenanceByProperty = useMemo(() => {
@@ -341,7 +342,7 @@ export default function PropertiesPage() {
               <h2 className="text-[16px] font-semibold text-ink-950">Fastigheter ({pagination.total.toLocaleString("sv-SE")})</h2>
               <p className="mt-0.5 text-xs text-ink-500">Resultatet hämtas sida för sida med tenant-säker serversökning.</p>
             </div>
-            <button type="button" onClick={() => setSortAscending((value) => !value)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-650 transition hover:bg-sand-50" aria-label={sortAscending ? "Sortera fastighetsnamn fallande" : "Sortera fastighetsnamn stigande"}>
+            <button id="fastighetslista-sortera" type="button" onClick={() => setSortAscending((value) => !value)} className="inline-flex h-9 items-center gap-2 rounded-xl border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-650 transition hover:bg-sand-50" aria-label={sortAscending ? "Sortera fastighetsnamn fallande" : "Sortera fastighetsnamn stigande"}>
               <ArrowDownUp className="h-3.5 w-3.5" /> {sortAscending ? "A–Ö" : "Ö–A"}
             </button>
           </div>
