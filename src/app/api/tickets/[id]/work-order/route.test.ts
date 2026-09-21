@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const {
   getCurrentUserMock,
@@ -54,7 +56,18 @@ vi.mock("@/lib/work-order-workflow", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/structured-logger", () => ({
-  createLogger: () => ({ error: loggerErrorMock }),
+  createLogger: () => ({ error: loggerErrorMock, warn: vi.fn() }),
+}));
+
+vi.mock("@/lib/ai", () => ({
+  analyzeTicket: vi.fn(async () => ({
+    category: "other",
+    priority: "normal",
+    confidence: 0.5,
+    summary: "test",
+    recommendedAction: "Planera åtgärd",
+    source: "fallback",
+  })),
 }));
 
 import { POST } from "./route";
@@ -146,5 +159,68 @@ describe("ticket work-order creation authorization", () => {
       select: { id: true },
     });
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("ticket work-order creation schema failures", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(technician);
+    ticketFindFirstMock.mockResolvedValue(accessibleTicket);
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("maps missing schema columns to 503 SERVICE_UNAVAILABLE without a workOrderId", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Column not found", {
+        code: "P2022",
+        clientVersion: "test",
+        meta: { column: "WorkOrder.work_order_number" },
+      }),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: schemaMismatchUserMessage(),
+      errorCode: "SERVICE_UNAVAILABLE",
+    });
+    expect(body.workOrderId).toBeUndefined();
+  });
+
+  it("maps a missing WorkOrderNumberCounter table to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderNumberCounter` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderNumberCounter" },
+        },
+      ),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.workOrderId).toBeUndefined();
+  });
+
+  it("returns 500 INTERNAL_ERROR without a workOrderId for unexpected create failures", async () => {
+    transactionMock.mockRejectedValue(new Error("boom"));
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Kunde inte skapa arbetsorder från ärendet",
+      errorCode: "INTERNAL_ERROR",
+    });
+    expect(loggerErrorMock).toHaveBeenCalled();
   });
 });

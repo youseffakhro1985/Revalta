@@ -31,9 +31,23 @@ export function validateTicketStatus(status, body, expectedStatus, propertyId) {
   }
 }
 
+export function allowlistedWorkOrderCreateErrorCode(value) {
+  const allowed = new Set([
+    "SERVICE_UNAVAILABLE",
+    "INTERNAL_ERROR",
+    "NOT_FOUND",
+    "CONFLICT",
+    "VALIDATION_FAILED",
+    "FORBIDDEN",
+    "UNAUTHORIZED",
+  ]);
+  return typeof value === "string" && allowed.has(value) ? value : "none";
+}
+
 export function validateWorkOrderFromTicket(status, body, created) {
   if (!hasId(body?.workOrderId)) {
-    throw new Error(`Ticket did not resolve to a work order (${status})`);
+    const code = allowlistedWorkOrderCreateErrorCode(body?.errorCode);
+    throw new Error(`Ticket did not resolve to a work order (${status}:${code})`);
   }
   if (created && status !== 201) {
     throw new Error(`Work order create from ticket did not return 201 (${status})`);

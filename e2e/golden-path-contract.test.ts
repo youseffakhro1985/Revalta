@@ -45,7 +45,16 @@ describe("golden-path contract", () => {
     expect(() => validateCreatedProperty(200, { property: { id: "property-1" } })).toThrow(/did not persist/);
     expect(() => validateTicketStatus(200, { ticket: { status: "closed", property: { id: "property-1" } } }, "in_progress", "property-1")).toThrow(/expected synced status/);
     expect(() => validateWorkOrderStatus(200, { workOrder: { status: "in_progress", ticket: { id: "other" } } }, "in_progress", "ticket-1")).toThrow(/lifecycle status/);
-    expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500\)/);
+    expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500:none\)/);
+    expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE" }, true)).toThrow(
+      /did not resolve to a work order \(503:SERVICE_UNAVAILABLE\)/,
+    );
+    expect(() => validateWorkOrderFromTicket(500, { errorCode: "INTERNAL_ERROR" }, true)).toThrow(
+      /did not resolve to a work order \(500:INTERNAL_ERROR\)/,
+    );
+    expect(() => validateWorkOrderFromTicket(500, { errorCode: "drop table tickets" }, true)).toThrow(
+      /did not resolve to a work order \(500:none\)/,
+    );
     expect(() => validateUnauthenticatedTicket(200)).toThrow(/after logout/);
     expect(() => validateForbiddenReplay(200)).toThrow(/illegal in_progress/);
     expect(() => validateWorkOrderAuditHistory(200, { history: [] })).toThrow(/audit history/);

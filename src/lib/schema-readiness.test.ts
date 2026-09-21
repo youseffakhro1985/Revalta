@@ -74,6 +74,8 @@ describe("schema-readiness", () => {
       "MaintenancePlan",
       "ComponentLifecycleEvent",
       "ComponentCostEntry",
+      "WorkOrderNumberCounter",
+      "WorkOrderStatusEvent",
     ]);
   });
 

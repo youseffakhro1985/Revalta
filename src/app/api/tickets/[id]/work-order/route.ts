@@ -19,7 +19,14 @@ import { createLogger } from "@/lib/structured-logger";
 import { analyzeTicket } from "@/lib/ai";
 import { recordAiEvent } from "@/lib/integrations";
 import { notifyAssignee } from "@/lib/assignee-notify";
-import { hasTicketAiSourceColumn, ticketAiSourceWrite } from "@/lib/schema-readiness";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  hasTicketAiSourceColumn,
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+  ticketAiSourceWrite,
+} from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
 
@@ -176,15 +183,15 @@ export async function POST(
     assigneeEmail = assignee.email;
   }
 
-  const analysis = ticket.ai_processed_at
-    ? null
-    : await analyzeTicket(`${ticket.title}. ${ticket.description}`);
-  const recommendedAction = ticket.ai_recommended_action || analysis?.recommendedAction || null;
-  const priority = normalizeWorkOrderPriority(analysis?.priority || ticket.priority);
-  const createdAt = new Date();
-  const sla = calculateWorkOrderSla(createdAt, priority);
-
   try {
+    const analysis = ticket.ai_processed_at
+      ? null
+      : await analyzeTicket(`${ticket.title}. ${ticket.description}`);
+    const recommendedAction = ticket.ai_recommended_action || analysis?.recommendedAction || null;
+    const priority = normalizeWorkOrderPriority(analysis?.priority || ticket.priority);
+    const createdAt = new Date();
+    const sla = calculateWorkOrderSla(createdAt, priority);
+
     const result = await db.$transaction(async (tx) => {
       const existing = await tx.workOrder.findUnique({
         where: { ticket_id: ticket.id },
@@ -321,6 +328,21 @@ export async function POST(
       return NextResponse.json({ workOrderId: concurrent.id, created: false });
     }
     logger.error("Create work order from ticket error", error);
-    return NextResponse.json({ error: "Kunde inte skapa arbetsorder från ärendet" }, { status: 500 });
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json(
+      {
+        error: "Kunde inte skapa arbetsorder från ärendet",
+        errorCode: API_ERROR_CODES.internalError,
+      },
+      { status: 500 },
+    );
   }
 }

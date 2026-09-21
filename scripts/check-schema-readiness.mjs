@@ -27,6 +27,8 @@ const REQUIRED_TABLES = [
   "MaintenancePlan",
   "ComponentLifecycleEvent",
   "ComponentCostEntry",
+  "WorkOrderNumberCounter",
+  "WorkOrderStatusEvent",
 ];
 
 const db = new PrismaClient();

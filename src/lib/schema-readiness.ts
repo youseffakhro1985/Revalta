@@ -28,6 +28,8 @@ export const REQUIRED_OPERATIONAL_TABLES = [
   "MaintenancePlan",
   "ComponentLifecycleEvent",
   "ComponentCostEntry",
+  "WorkOrderNumberCounter",
+  "WorkOrderStatusEvent",
 ] as const;
 
 export function formatSchemaMissingItem(item: SchemaMissingItem) {
