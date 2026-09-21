@@ -188,6 +188,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#objektlista") return;
     document.getElementById("objektlista")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("objektlista-rensa")?.focus(), 0);
   }, [loading, properties]);
   useEffect(() => {
     if (loading) return;
@@ -608,7 +609,7 @@ export function LeasingPage({ initialCreate }: { initialCreate: boolean }) {
           <label className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" /><input id="bestand-sok" autoFocus aria-label="Sök objekt eller hyrespart" placeholder="Sök objekt, adress, hyrespart eller avtal" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
           <select aria-label="Filtrera fastighet" value={propertyFilter} onChange={(event) => setPropertyFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla fastigheter</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
           <select aria-label="Filtrera beläggning" value={occupancyFilter} onChange={(event) => setOccupancyFilter(event.target.value)} className={premiumFieldClass}><option value="all">Alla objekt</option><option value="occupied">Belagda</option><option value="vacant">Lediga</option><option value="notice">Uppsagda</option></select>
-          <button type="button" disabled={!hasFilters} onClick={clearFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-45"><SlidersHorizontal className="h-4 w-4" /> Rensa</button>
+          <button id="objektlista-rensa" type="button" disabled={!hasFilters} onClick={clearFilters} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-3.5 text-xs font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-45"><SlidersHorizontal className="h-4 w-4" /> Rensa</button>
           </fieldset>
         </div>
 
