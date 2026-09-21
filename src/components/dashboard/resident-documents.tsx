@@ -74,6 +74,12 @@ export function ResidentDocuments({ initial, selectedLeaseId: initialLeaseId, qu
     document.getElementById("boende-dokument")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("boende-dokument-avtal")?.focus(), 0);
   }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#boende-dokumentfilter") return;
+    document.getElementById("boende-dokumentfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("boende-dokumentsok")?.focus(), 0);
+  }, [loading]);
 
   const selectedLease = data.leases.find((lease) => lease.id === selectedLeaseId) || null;
   const visibleDocuments = useMemo(() => {
@@ -149,11 +155,11 @@ export function ResidentDocuments({ initial, selectedLeaseId: initialLeaseId, qu
       </Panel>
 
       <Panel title="Dokumentbibliotek" description="Endast dokument som servern har godkänt för det valda avtalet visas." bodyClassName="p-0">
-        <form method="get" action="/dashboard/boendeportal/dokument" className="flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row">
+        <form id="boende-dokumentfilter" method="get" action="/dashboard/boendeportal/dokument" className="scroll-mt-36 flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row">
           <input type="hidden" name="leaseId" value={selectedLeaseId} />
           <label className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-ink-300" />
-            <input name="q" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök dokumentnamn, fil eller kategori" aria-label="Sök dokumentnamn, fil eller kategori" className={`${premiumFieldClass} pl-9`} />
+            <input id="boende-dokumentsok" name="q" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sök dokumentnamn, fil eller kategori" aria-label="Sök dokumentnamn, fil eller kategori" disabled={loading} className={`${premiumFieldClass} pl-9`} />
           </label>
           <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50">
             Sök
