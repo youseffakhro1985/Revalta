@@ -9,6 +9,8 @@ describe("fakturaexporter filter hash", () => {
     expect(source).toContain('window.location.hash !== "#exportfilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("autoFocus");
+    expect(source).toContain('id="export-sok"');
+    expect(source).toContain('document.getElementById("export-sok")?.focus()');
     expect(source).toContain('href="#exportfilter"');
     expect(source).toContain("Filtrera export");
   });
@@ -21,6 +23,7 @@ describe("fakturaexporter leftover jobs first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#exportjobb"');
     expect(source).toContain('id="exportfilter"');
+    expect(source).toContain('id="export-sok"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("Exportjobben hämtas.");
     expect(source).not.toContain("h-64 animate-pulse rounded-xl bg-sand-100");

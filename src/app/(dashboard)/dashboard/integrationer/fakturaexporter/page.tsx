@@ -70,7 +70,8 @@ export default function InvoiceExportOperationsPage() {
   useEffect(() => {
     if (window.location.hash !== "#exportfilter") return;
     document.getElementById("exportfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+    window.setTimeout(() => document.getElementById("export-sok")?.focus(), 0);
+  }, [loading]);
   useEffect(() => {
     if (loading) return;
     if (window.location.hash !== "#exportjobb") return;
@@ -134,7 +135,7 @@ export default function InvoiceExportOperationsPage() {
     <div id="exportfilter" className="scroll-mt-36">
     <Panel title="Filter och sökning" description="Filtrera på leverantör, status, arbetsorder, fastighet eller externt faktura-ID.">
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px]">
-        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-ink-500" /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Sök arbetsorder, fastighet, jobb-ID eller fel..." aria-label="Sök arbetsorder, fastighet, jobb-ID eller fel" className="w-full rounded-xl border border-sand-200 bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-petroleum-500" /></label>
+        <label className="relative block"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-ink-500" /><input id="export-sok" autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Sök arbetsorder, fastighet, jobb-ID eller fel..." aria-label="Sök arbetsorder, fastighet, jobb-ID eller fel" className="w-full rounded-xl border border-sand-200 bg-white py-2.5 pl-10 pr-3 text-sm outline-none focus:border-petroleum-500" /></label>
         <select value={provider} onChange={event => setProvider(event.target.value)} aria-label="Filtrera efter leverantör" className="rounded-xl border border-sand-200 bg-white px-3 py-2.5 text-sm"><option value="">Alla leverantörer</option>{data?.providers.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
         <select value={status} onChange={event => setStatus(event.target.value)} aria-label="Filtrera efter status" className="rounded-xl border border-sand-200 bg-white px-3 py-2.5 text-sm"><option value="">Alla statusar</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
       </div>
