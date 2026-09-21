@@ -444,4 +444,24 @@ describe("work-order invoice integration GET staff-scope", () => {
     expect(listInvoiceExportJobsMock).not.toHaveBeenCalled();
     expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
   });
+
+  it("POST rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-integration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "queue" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
 });

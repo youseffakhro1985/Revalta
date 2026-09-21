@@ -409,4 +409,39 @@ describe("work-order invoice basis GET staff-scope", () => {
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
     expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
   });
+
+  it("POST rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rebuild" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rebuild" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
 });
