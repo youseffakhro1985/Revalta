@@ -43,6 +43,8 @@ describe("resident-access allowlists", () => {
     expect(isStaffOnlyApiPath("/api/tickets")).toBe(true);
     expect(isStaffOnlyApiPath("/api/work-orders")).toBe(true);
     expect(isStaffOnlyApiPath("/api/leases")).toBe(true);
+    expect(isStaffOnlyApiPath("/api/leases/lease-tenant-b")).toBe(true);
+    expect(isStaffOnlyApiPath("/api/bookings")).toBe(true);
     expect(isStaffOnlyApiPath("/api/team")).toBe(true);
     expect(isStaffOnlyApiPath("/api/search")).toBe(true);
     expect(isStaffOnlyApiPath("/api/resident-portal")).toBe(false);

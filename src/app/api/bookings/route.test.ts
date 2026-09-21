@@ -80,6 +80,20 @@ describe("bookings route", () => {
     }));
   });
 
+  it("GET denies residents from the staff booking list", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    const response = await GET();
+    const body = await response.json();
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att visa bokningar");
+    expect(bookingFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("redacts resident PII for technicians on GET", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     bookingFindManyMock.mockResolvedValue([{

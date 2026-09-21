@@ -79,4 +79,51 @@ describe("leases/[id] route", () => {
     }));
     expect(leaseUpdateManyMock).not.toHaveBeenCalled();
   });
+
+  it("PATCH denies residents before looking up a lease", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/leases/lease-tenant-b", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unitId: "unit-1",
+        holderName: "Anna",
+        holderType: "individual",
+        status: "draft",
+        monthlyRent: 10000,
+        deposit: 10000,
+        annualIndexPercent: 0,
+        paymentTermsDays: 30,
+      }),
+    }), { params: Promise.resolve({ id: "lease-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att hantera avtal");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("DELETE denies residents before looking up a lease", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+    });
+
+    const response = await DELETE(
+      new Request("http://localhost/api/leases/lease-tenant-b"),
+      { params: Promise.resolve({ id: "lease-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att ta bort avtal");
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+  });
 });

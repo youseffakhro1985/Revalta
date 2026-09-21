@@ -11,7 +11,10 @@ import {
   type CompanyUser,
 } from "@/lib/current-user";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { listResidentMatchedLeases } from "@/lib/resident-portal-leases";
+import {
+  findResidentMatchedLease,
+  listResidentMatchedLeases,
+} from "@/lib/resident-portal-leases";
 import {
   mapResidentPortalBooking,
   mapResidentPortalLease,
@@ -300,8 +303,7 @@ export async function POST(request: Request) {
       return validationFailure("En eller flera uppgifter är för långa", "field_too_long");
     }
 
-    const leases = await listResidentMatchedLeases(user.company_id, user.email);
-    const lease = leases.find((item) => item.id === leaseId);
+    const lease = await findResidentMatchedLease(user.company_id, user.email, leaseId);
     if (!lease) {
       if (nativeForm) return nativeRedirect(observability, request, `${HOME_PATH}?reason=missing`);
       return reject(observability, {
