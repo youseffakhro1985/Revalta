@@ -106,6 +106,7 @@ export function BillingPage({ checkout }: { checkout: string }) {
     if (loading) return;
     if (window.location.hash !== "#planuppgifter") return;
     document.getElementById("planuppgifter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("plan-kundportal")?.focus(), 0);
   }, [loading, billing]);
 
   async function changePlan(plan: string) {
@@ -202,7 +203,19 @@ export function BillingPage({ checkout }: { checkout: string }) {
               Se aktiv plan, kapacitetsgränser och betalningsstatus. Planbyten i produktion genomförs säkert via Stripe Checkout.
             </p>
           </div>
-          <a id="plan-byt" autoFocus href="#planer" className={premiumPrimaryButtonClass}>Byt plan</a>
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <a id="plan-byt" autoFocus href="#planer" className={premiumPrimaryButtonClass}>Byt plan</a>
+            <button
+              id="plan-kundportal"
+              type="button"
+              onClick={() => void openCustomerPortal()}
+              disabled={openingPortal || !billing?.canManage || !billing?.stripePortalReady}
+              title={!billing?.stripePortalReady ? "Kundportalen blir tillgänglig när Stripe-kund och Stripe-konfiguration är klara." : undefined}
+              className={premiumSecondaryButtonClass}
+            >
+              {openingPortal ? "Öppnar..." : "Öppna kundportal"}
+            </button>
+          </div>
         </div>
       </header>
 
