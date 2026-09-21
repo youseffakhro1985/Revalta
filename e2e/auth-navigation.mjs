@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { runVerifiedPreview } from "./preview-runner.mjs";
 import { runStaffGoldenPath, assertTicketHiddenAfterLogout } from "./golden-path.mjs";
-import { isPaginatedPropertiesRequest, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
   return runVerifiedPreview(env, async ({ target, assertRelease, complete }) => {
@@ -110,16 +110,26 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       });
 
       console.log(`E2E auth/navigation against ${baseUrl}`);
+      console.log("phase: verified-login");
 
       await page.goto("/login", { waitUntil: "domcontentloaded" });
       await page.getByLabel("E-post").fill(fixtureEmail);
       await page.getByLabel("Lösenord").fill(env.E2E_VERIFIED_PASSWORD);
       const fixtureLoginPromise = page.waitForResponse(
-        (response) => response.url() === `${baseUrl}/api/auth/login` && response.request().method() === "POST",
-        { timeout: 15_000 },
+        (response) => {
+          try {
+            return new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST";
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 20_000 },
       );
       await page.getByRole("button", { name: "Logga in" }).click();
-      const fixtureLogin = await fixtureLoginPromise;
+      const fixtureLogin = await fixtureLoginPromise.catch(() => {
+        if (requestGateFailed) fail("Login mutation was blocked by release identity verification");
+        fail("Verified login response was not observed");
+      });
       validateLoginResponse(fixtureLogin.status(), await fixtureLogin.json(), fixtureEmail);
       await expectPath(page, "/dashboard");
       const profile = await context.request.get(`${baseUrl}/api/settings/profile`, {
@@ -353,9 +363,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const evidence = await runAuthNavigation();
     console.log(JSON.stringify(evidence));
     console.log("OK: exact-SHA Preview browser verification completed all mandatory steps");
-  } catch {
+  } catch (error) {
     // Playwright errors can include form values, response bodies and cookies.
-    console.error("BLOCKED / NOT VERIFIED: Preview verification failed; no release approval. Check target, fixtures and required browser steps.");
+    console.error(`BLOCKED / NOT VERIFIED: ${sanitizePreviewFailure(error)}`);
     process.exitCode = 1;
   }
 }

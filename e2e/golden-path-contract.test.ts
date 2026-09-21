@@ -69,5 +69,6 @@ describe("golden-path is wired into the required Preview browser job", () => {
     expect(golden).toContain("hoursAgo");
     expect(golden).toContain("/locked-update");
     expect(golden).not.toContain("page.route");
+    expect(runner).toContain("staffUserId");
   });
 });

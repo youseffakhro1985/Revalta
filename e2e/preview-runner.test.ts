@@ -131,6 +131,8 @@ it("required browser flow uses the live Fastigheter dashboard route", () => {
   const source = readFileSync(new URL("./auth-navigation.mjs", import.meta.url), "utf8");
   expect(source).toContain('expectPath(page, "/dashboard/fastigheter")');
   expect(source).not.toContain("/dashboard/properties");
+  expect(source).toContain('pathname === "/api/auth/login"');
+  expect(source).toContain("sanitizePreviewFailure");
 });
 
 it("actual runner intercepts POST before forwarding and aborts when the datastore changes", async () => {
