@@ -9,6 +9,8 @@ describe("recurring incident SLA report export hash", () => {
     expect(source).toContain('window.location.hash !== "#exportera-csv"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("format=csv");
+    expect(source).toContain("autoFocus");
+    expect(source).toContain('document.getElementById("exportera-csv")?.focus()');
   });
 });
 
