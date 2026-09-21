@@ -111,19 +111,34 @@ describe("eskaleringar leftover recipients first HTML", () => {
 });
 
 describe("eskaleringar leftover rules first HTML", () => {
-  it("keeps leftover rules in the first HTML without stealing Hantera regler", () => {
+  it("keeps leftover rules in the first HTML and focuses refresh after load without a second autoFocus", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(source).toContain('id="regellista"');
+    expect(source).toContain('id="regellista-uppdatera"');
     expect(source).toContain('window.location.hash !== "#regellista"');
     expect(source).toContain("Reglerna hämtas.");
     expect(source).toContain('id="regler"');
     expect(source).toContain("Hantera regler");
     expect(source).toContain("/dashboard/installningar/eskaleringar/regler");
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("regellista-uppdatera")?.focus()');
+    expect(source).toContain("disabled={loading}");
+    expect(source).not.toContain('id="regellista-uppdatera" autoFocus');
+    expect(source).toContain('id="esk-orsak"');
+    expect(source).toContain('document.getElementById("esk-orsak")?.focus()');
+    expect(source).toContain('id="esk-roll"');
+    expect(source).toContain('document.getElementById("kor-eskalering-motor")?.focus()');
     const leftoverIndex = source.indexOf('id="regellista"');
     const stickyIndex = source.indexOf("Hantera regler");
     expect(leftoverIndex).toBeGreaterThan(-1);
     expect(stickyIndex).toBeGreaterThan(leftoverIndex);
+    expect(sticky).toContain('href: "/dashboard/installningar/eskaleringar/regler"');
+    expect(sticky).not.toContain("#regellista");
+    expect(sticky).not.toContain("#regellista-uppdatera");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
 
