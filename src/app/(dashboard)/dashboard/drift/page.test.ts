@@ -5,9 +5,12 @@ describe("drift secrets hash", () => {
   it("keeps the critical secrets panel in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="kritiska-secrets"');
+    expect(source).toContain('id="kritiska-lank"');
+    expect(source).toContain("autoFocus");
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#kritiska-secrets"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("kritiska-lank")?.focus()');
     expect(source).toContain('href="#kritiska-secrets"');
     expect(source).toContain("Kritiska secrets");
     const healthGateIndex = source.indexOf("{health ? (");
@@ -25,6 +28,7 @@ describe("drift leftover health first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#systemhalsa"');
     expect(source).toContain('id="kritiska-secrets"');
+    expect(source).toContain('id="kritiska-lank"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("Systemhälsan hämtas.");
     expect(source).toContain("Kritiska secrets hämtas.");
