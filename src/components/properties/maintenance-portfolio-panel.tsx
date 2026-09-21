@@ -92,6 +92,7 @@ export function MaintenancePortfolioPanel() {
     if (loading) return;
     if (window.location.hash !== "#portfoljbehov") return;
     document.getElementById("portfoljbehov")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("portfoljbehov-rensa")?.focus(), 0);
   }, [loading, rows]);
 
   const options = useMemo(() => ({
@@ -167,7 +168,7 @@ export function MaintenancePortfolioPanel() {
             <option value="all">Alla risknivåer</option>
             {options.risks.map((value) => <option key={value} value={value}>{riskLabels[value] || value}</option>)}
           </FilterField>
-          <button type="button" disabled={!hasFilters} onClick={() => setFilters(initialFilters)} className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40"><RotateCcw className="h-4 w-4" /> Nollställ</button>
+          <button id="portfoljbehov-rensa" type="button" disabled={!hasFilters} onClick={() => setFilters(initialFilters)} className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-600 transition hover:border-petroleum-200 hover:text-petroleum-800 disabled:cursor-not-allowed disabled:opacity-40"><RotateCcw className="h-4 w-4" /> Nollställ</button>
         </div>
         <p className="mt-4 flex items-center gap-2 text-xs text-ink-500"><Filter className="h-3.5 w-3.5" />{filteredRows.filter((row) => row.action_id).length} av {rows.filter((row) => row.action_id).length} åtgärder ingår i analysen.</p>
       </Panel>
