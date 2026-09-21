@@ -88,3 +88,48 @@ describe("ticket SMS", () => {
     expect(queueSmsNotificationMock).not.toHaveBeenCalled();
   });
 });
+
+describe("ticket SMS POST staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/tickets/ticket-1/sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ id: "ticket-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(queueSmsNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the SMS-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/tickets/ticket-1/sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ id: "ticket-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att skicka SMS");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(queueSmsNotificationMock).not.toHaveBeenCalled();
+  });
+});

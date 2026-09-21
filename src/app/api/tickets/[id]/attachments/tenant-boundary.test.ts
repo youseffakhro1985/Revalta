@@ -66,6 +66,22 @@ describe("staff ticket attachments tenant boundary", () => {
     const response = await POST(request(), { params: Promise.resolve({ id: TICKET_B }) });
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(storeAttachmentMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the attachment-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "viewer-a",
+      company_id: TENANT_A,
+      role: "viewer",
+    });
+
+    const response = await POST(request(), { params: Promise.resolve({ id: TICKET_B }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att lägga till bilagor");
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
     expect(storeAttachmentMock).not.toHaveBeenCalled();
   });

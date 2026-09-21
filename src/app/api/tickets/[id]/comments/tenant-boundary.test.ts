@@ -58,8 +58,23 @@ describe("staff ticket comments tenant boundary", () => {
     const response = await POST(request(TICKET_B), { params: Promise.resolve({ id: TICKET_B }) });
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the comment-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "viewer-a",
+      company_id: TENANT_A,
+      role: "viewer",
+    });
+
+    const response = await POST(request(TICKET_B), { params: Promise.resolve({ id: TICKET_B }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att kommentera ärenden");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 
   it("returns tenant-safe 404 when Tenant A comments on a Tenant B ticket id", async () => {
