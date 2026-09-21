@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, FileCheck2, FileText, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import {
   EmptyState,
@@ -68,6 +68,13 @@ export function ResidentDocuments({ initial, selectedLeaseId: initialLeaseId, qu
     }
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#boende-dokument") return;
+    document.getElementById("boende-dokument")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("boende-dokument-avtal")?.focus(), 0);
+  }, [loading]);
+
   const selectedLease = data.leases.find((lease) => lease.id === selectedLeaseId) || null;
   const visibleDocuments = useMemo(() => {
     if (!selectedLeaseId) return [];
@@ -115,10 +122,10 @@ export function ResidentDocuments({ initial, selectedLeaseId: initialLeaseId, qu
               : "Boendedokument blir tillgängliga när ett aktivt eller uppsagt hyresavtal finns registrerat under Uthyrning."}
           />
         ) : (
-          <form method="get" action="/dashboard/boendeportal/dokument" className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+          <form id="boende-dokument" method="get" action="/dashboard/boendeportal/dokument" className="scroll-mt-36 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
             <label className="block space-y-1.5">
               <span className="text-xs font-semibold text-ink-700">Aktivt hyresavtal</span>
-              <select name="leaseId" value={selectedLeaseId} onChange={(event) => setSelectedLeaseId(event.target.value)} className={premiumFieldClass}>
+              <select id="boende-dokument-avtal" autoFocus name="leaseId" value={selectedLeaseId} onChange={(event) => setSelectedLeaseId(event.target.value)} disabled={loading} className={premiumFieldClass}>
                 {data.leases.map((lease) => (
                   <option key={lease.id} value={lease.id}>
                     {lease.property.name} · {lease.unit.designation} · {lease.lease_holder.contact_name || lease.lease_holder.name}

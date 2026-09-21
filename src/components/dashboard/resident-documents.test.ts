@@ -22,5 +22,19 @@ describe("resident notices and documents SSR", () => {
     expect(documents).toContain('name="q"');
     expect(documents).toContain("/api/resident-portal/documents/");
     expect(documents).toContain("<a href={downloadUrl}");
+    expect(documents).toContain('id="boende-dokument"');
+    expect(documents).toContain('id="boende-dokument-avtal"');
+    expect(documents).toContain("autoFocus");
+    expect(documents).toContain("scroll-mt-36");
+    expect(documents).toContain("scrollIntoView");
+    expect(documents).toContain('document.getElementById("boende-dokument-avtal")?.focus()');
+    expect(documents).toContain("disabled={loading}");
+  });
+
+  it("does not add a boendeportal page sticky", () => {
+    const sticky = readFileSync(new URL("./dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#boende-dokument");
+    expect(sticky).not.toContain("#boende-dokument-avtal");
   });
 });
