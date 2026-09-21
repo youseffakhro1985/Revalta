@@ -29,3 +29,29 @@ describe("property card leftover records first HTML", () => {
     expect(source).toContain("saving || loading || !data");
   });
 });
+
+describe("property card leftover record list focus first HTML", () => {
+  it("keeps leftover pärm records in the first HTML and focuses create after load without a second autoFocus", () => {
+    const source = readFileSync(new URL("./property-card-manager.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(source).toContain('id="parmlista"');
+    expect(source).toContain('id="parmlista-ny"');
+    expect(source).toContain("scroll-mt-36");
+    expect(source).toContain('window.location.hash !== "#parmlista"');
+    expect(source).toContain("Laddar poster");
+    expect(source).toContain('id="spara-fastighetspärm"');
+    expect(source).toContain('id="parm-namn"');
+    expect(source).toContain('document.getElementById("parm-namn")?.focus()');
+    expect(source).toContain('document.getElementById("parmlista-ny")?.focus()');
+    expect(source).toContain("scrollIntoView");
+    expect(source).not.toContain('id="parmlista-ny" autoFocus');
+    expect(sticky).toContain("${current}#spara-fastighet");
+    expect(sticky).toContain("Spara fastighet");
+    expect(sticky).not.toContain("#parmlista");
+    expect(sticky).not.toContain("#parmlista-ny");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/fastigheter/fastighet-1", "technician")).toBeNull()');
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
+  });
+});
