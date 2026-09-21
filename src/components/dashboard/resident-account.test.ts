@@ -32,3 +32,27 @@ describe("resident account native profile and password", () => {
     expect(sticky).not.toContain("Boendeportal");
   });
 });
+
+describe("resident account leftover password first HTML", () => {
+  it("keeps the leftover password form in the first HTML and focuses it after load without a second autoFocus", () => {
+    const account = readFileSync(new URL("./resident-account.tsx", import.meta.url), "utf8");
+    expect(account).toContain('id="resident-losenord"');
+    expect(account).toContain('id="resident-current-password"');
+    expect(account).toContain("scroll-mt-36");
+    expect(account).toContain('window.location.hash !== "#resident-losenord"');
+    expect(account).toContain("scrollIntoView");
+    expect(account).toContain('document.getElementById("resident-current-password")?.focus()');
+    expect(account).toContain("disabled={savingPassword}");
+    expect(account).toContain('id="resident-name"');
+    expect(account).toContain('document.getElementById("resident-name")?.focus()');
+    expect((account.match(/autoFocus/g) || []).length).toBe(1);
+  });
+
+  it("does not add a boendeportal page sticky for leftover password", () => {
+    const sticky = readFileSync(new URL("./dashboard-primary-action.ts", import.meta.url), "utf8");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    expect(sticky).not.toContain("#resident-losenord");
+    expect(sticky).not.toContain("#resident-current-password");
+    expect(sticky).not.toContain("#resident-name");
+  });
+});
