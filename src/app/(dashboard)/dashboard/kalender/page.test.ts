@@ -20,10 +20,12 @@ describe("kalender filter first HTML", () => {
   it("keeps the timeline filter in the first HTML and scrolls after load", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="kalenderfilter"');
+    expect(source).toContain('id="kalender-typ"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#kalenderfilter"');
     expect(source).toContain('id="ny-aktivitet"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("kalender-typ")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("saving || loading");
@@ -41,6 +43,7 @@ describe("kalender leftover timeline first HTML", () => {
     expect(source).toContain('id="ny-aktivitet"');
     expect(source).toContain('id="aktivitet-rubrik"');
     expect(source).toContain('id="kalenderfilter"');
+    expect(source).toContain('id="kalender-typ"');
     expect(source).not.toContain('id="aktivitetsfilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("canManage || loading");

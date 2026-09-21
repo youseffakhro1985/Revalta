@@ -125,6 +125,7 @@ export default function CalendarPage() {
     if (loading) return;
     if (window.location.hash !== "#kalenderfilter") return;
     document.getElementById("kalenderfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("kalender-typ")?.focus(), 0);
   }, [loading, events]);
   useEffect(() => {
     if (loading) return;
@@ -368,7 +369,7 @@ export default function CalendarPage() {
               <CalendarCheck2 className="h-4 w-4 text-petroleum-700" strokeWidth={1.7} aria-hidden="true" />
               <span>{visible.length} aktiviteter i aktuell vy</span>
             </div>
-            <select disabled={loading} value={filter} onChange={(event) => setFilter(event.target.value)} className={`${premiumFieldClass} sm:w-48`} aria-label="Filtrera efter typ">
+            <select id="kalender-typ" disabled={loading} value={filter} onChange={(event) => setFilter(event.target.value)} className={`${premiumFieldClass} sm:w-48`} aria-label="Filtrera efter typ">
               <option>Alla</option>
               {filterTypeOptions.map((type) => <option key={type}>{type}</option>)}
             </select>
