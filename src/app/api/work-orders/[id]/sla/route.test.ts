@@ -219,4 +219,25 @@ describe("work-order SLA GET staff-scope", () => {
     expect(getEnterpriseMock).not.toHaveBeenCalled();
     expect(auditLogFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("PATCH rejects residents before looking up SLA", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PATCH(patchRequest(), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies viewers with the SLA-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+    const response = await PATCH(patchRequest(), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att ändra SLA");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
 });

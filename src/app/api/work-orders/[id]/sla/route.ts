@@ -113,11 +113,12 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  const companyId = user.company_id;
-  if (!companyId) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet att ändra SLA" }, { status: 403 });
+  const companyId = user.company_id;
 
   const { id } = await params;
   const current = await resolveSla({ ...user, company_id: companyId }, id);
