@@ -21,6 +21,11 @@ describe("felanmalan create query", () => {
     expect(form).toContain("Nytt ärende");
     expect(form).toContain("autoFocus");
     expect(form).toContain("<Plus");
+    expect(form).toContain('id="arende-editor"');
+    expect(form).toContain('id="arende-titel"');
+    expect(form).toContain('document.getElementById("arende-titel")?.focus()');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
   });
 });
@@ -33,6 +38,8 @@ describe("felanmalan leftover list first HTML", () => {
     expect(form).toContain('window.location.hash !== "#senastearenden"');
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("Nytt ärende");
+    expect(form).toContain('id="arende-editor"');
+    expect(form).toContain('id="arende-titel"');
     expect(form).toContain('get("create") === "1"');
     expect(form).toContain("Ärendena hämtas.");
     expect(form).not.toContain('{[1, 2, 3, 4].map((item) => <div key={item} className="h-12 animate-pulse rounded-xl bg-sand-100" />)}');
@@ -45,6 +52,8 @@ describe("felanmalan leftover list first HTML", () => {
     expect(form).toContain("disabled={loading}");
     expect(form).toContain("permissions.canManage || loading");
     expect(form).toContain("Nytt ärende");
+    expect(form).toContain('id="arende-editor"');
+    expect(form).toContain('id="arende-titel"');
     expect(form).toContain('get("create") === "1"');
     expect(form).not.toContain('id="arendefilter"');
     expect(form).not.toContain("#arendefilter");
