@@ -20,17 +20,32 @@ describe("eskaleringar hash targets", () => {
 });
 
 describe("eskaleringar assignment filter first HTML", () => {
-  it("keeps the assignment filter in the first HTML and scrolls after load", () => {
-    const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+  const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+  const sticky = readFileSync(new URL("../../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
+
+  it("keeps the assignment filter in the first HTML and focuses the reason after load", () => {
     expect(source).toContain('id="eskfilter"');
+    expect(source).toContain('id="esk-orsak"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#eskfilter"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("esk-orsak")?.focus()');
     expect(source).toContain("autoFocus");
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Hantera regler");
     expect(source).not.toContain("{loading && !data ? <div className=\"h-52 animate-pulse rounded-xl bg-sand-100\" /> : null}");
     expect(source).not.toContain("<div className=\"h-24 animate-pulse rounded-xl bg-sand-100\" />");
+  });
+
+  it("does not steal Hantera regler or leftover hashes", () => {
+    expect(sticky).toContain('current === "/dashboard/installningar/eskaleringar"');
+    expect(sticky).toContain('href: "/dashboard/installningar/eskaleringar/regler"');
+    expect(sticky).not.toContain("#eskfilter");
+    expect(sticky).not.toContain("#esk-orsak");
+    expect(source).toContain('id="eskaleringslista"');
+    expect(source).toContain('id="mottagarfilter"');
+    expect(source).toContain('id="kor-eskalering"');
+    expect(source).toContain('document.getElementById("kor-eskalering-motor")?.focus()');
   });
 });
 
