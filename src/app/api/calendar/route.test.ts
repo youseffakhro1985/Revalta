@@ -102,6 +102,22 @@ describe("calendar route", () => {
     transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
+  it("rejects residents before loading work orders, leases or calendar events", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(calendarFindManyMock).not.toHaveBeenCalled();
+    expect(workOrderFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("projects scheduled work orders from canonical WorkOrder storage", async () => {
     getCurrentUserMock.mockResolvedValue(user);
     workOrderFindManyMock.mockResolvedValue([{

@@ -160,18 +160,33 @@ describe("documents route", () => {
     );
   });
 
-  it("returns no historical company documents after membership is removed", async () => {
+  it("rejects users without organisation before listing documents", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
-    auditFindManyMock.mockResolvedValue([]);
     const response = await GET(request());
     const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
+    expect(body.errorCode).toBe("FORBIDDEN");
     expect(managedFindManyMock).not.toHaveBeenCalled();
-    expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: { in: [] }, entity_type: "document", action: "document.created" },
-    }));
-    expect(body.documents).toEqual([]);
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing the staff document library", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
   it("omits company lease dump for technicians", async () => {

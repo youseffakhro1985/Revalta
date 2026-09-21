@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { auditScopedWhere, canViewLeasingData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canViewLeasingData, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { getDocumentLifecycleMap } from "@/lib/document-lifecycle";
 import { validateDocumentFile } from "@/lib/document-file-security";
 import { parseOptionalDate, loadLegacyRows } from "@/lib/dual-list";
@@ -66,13 +66,23 @@ export async function GET(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "documents.list.unauthorized",
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "documents.list.forbidden",
+        context: { userId: rawUser.id },
       });
     }
 
