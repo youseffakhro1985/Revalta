@@ -79,6 +79,7 @@ export default function NotificationsPage() {
     if (loading) return;
     if (window.location.hash !== "#notisfilter") return;
     document.getElementById("notisfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("notis-alla")?.focus(), 0);
   }, [loading, notifications]);
   useEffect(() => {
     if (loading) return;
@@ -157,7 +158,8 @@ export default function NotificationsPage() {
         <div className="flex flex-col items-stretch gap-2 sm:items-end">
         {showCreate ? <a href="#nytt-meddelande" className="inline-flex items-center justify-center rounded-xl bg-petroleum-800 px-4 py-2.5 text-sm font-semibold text-white">Nytt meddelande</a> : null}
         <div id="notisfilter" className="scroll-mt-36 flex gap-2 rounded-xl border border-sand-200 bg-white p-1 shadow-premium-sm">
-          {([['all', 'Alla'], ['unread', 'Olästa'], ['urgent', 'Brådskande']] as const).map(([value, label]) => (
+          <button id="notis-alla" type="button" disabled={loading} onClick={() => setFilter("all")} className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === "all" ? "bg-petroleum-800 text-white" : "text-ink-500 hover:bg-sand-50"}`}>Alla</button>
+          {([['unread', 'Olästa'], ['urgent', 'Brådskande']] as const).map(([value, label]) => (
             <button type="button" key={value} disabled={loading} onClick={() => setFilter(value)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === value ? "bg-petroleum-800 text-white" : "text-ink-500 hover:bg-sand-50"}`}>{label}</button>
           ))}
         </div>
