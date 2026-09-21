@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import {
   getServiceEscalationRules,
   normalizeEscalationRules,
@@ -14,9 +14,10 @@ function canManage(role: string) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const current = await getServiceEscalationRules(user.company_id);
   return NextResponse.json({
@@ -27,9 +28,10 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManage(user.role)) return NextResponse.json({ error: "Endast ägare och administratörer får ändra reglerna" }, { status: 403 });
 
   const body = await request.json().catch(() => null);

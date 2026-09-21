@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { canManageCompany, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -8,9 +8,12 @@ const logger = createLogger({ route: "/api/settings/company" });
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Företag saknas" }, { status: 400 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
 
     const company = await db.company.findUnique({
       where: { id: user.company_id },
@@ -26,9 +29,10 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id || !canManageCompany(user.role)) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user || !canManageCompany(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att ändra organisationen" }, { status: 403 });
     }
 
