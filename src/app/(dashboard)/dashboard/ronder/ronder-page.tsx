@@ -387,6 +387,7 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
     if (loading) return;
     if (window.location.hash !== "#rondurval") return;
     document.getElementById("rondurval")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("rondurval-planerade")?.focus(), 0);
   }, [loading, rounds]);
 
   async function createRound(event: React.FormEvent) {
@@ -663,8 +664,15 @@ export function RoundsPage({ initialCreate }: { initialCreate: boolean }) {
 
           <div className="border-b border-sand-200 px-4 sm:px-5">
             <div className="flex gap-1 overflow-x-auto">
+              <button
+                id="rondurval-planerade"
+                type="button"
+                onClick={() => setActiveTab("planned")}
+                className={`whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition ${activeTab === "planned" ? "border-petroleum-800 text-petroleum-900" : "border-transparent text-ink-500 hover:text-ink-800"}`}
+              >
+                Planerade ({tabCounts.planned})
+              </button>
               {([
-                ["planned", "Planerade"],
                 ["in_progress", "Pågående"],
                 ["overdue", "Försenade"],
                 ["completed", "Slutförda"],
