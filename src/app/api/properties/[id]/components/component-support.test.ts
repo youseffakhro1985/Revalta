@@ -237,6 +237,23 @@ describe("component support security contracts", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before enumerating link-option history", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await getLinkOptions(linkRequest(), componentParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({ error: "En aktiv organisation och personalbehörighet krävs", errorCode: "FORBIDDEN", requestId });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
   it("rejects residents before generating a component report", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "resident-1",

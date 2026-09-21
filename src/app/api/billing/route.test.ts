@@ -118,6 +118,26 @@ describe("billing route", () => {
     expect(companyFindUniqueMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before reading billing plan membership", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(getRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(companyFindUniqueMock).not.toHaveBeenCalled();
+  });
+
   it("denies managers from reading billing administration", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
 

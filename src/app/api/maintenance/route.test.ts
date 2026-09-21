@@ -104,6 +104,20 @@ describe("maintenance route", () => {
     expect(body.permissions.canManage).toBe(false);
   });
 
+  it("rejects residents before listing maintenance plan costs", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(itemFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("creates a modern maintenance item and mandatory audit in the same transaction", async () => {
     const user = { id: "owner-1", company_id: "company-1", role: "owner" };
     getCurrentUserMock.mockResolvedValue(user);

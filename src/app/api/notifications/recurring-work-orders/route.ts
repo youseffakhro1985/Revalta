@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { getNotificationUxState, markNotificationsRead } from "@/lib/notification-ux-state";
 import { listRecurringIncidentEvents } from "@/lib/recurring-incident-storage";
 import { listRecurringRuns, readRecurringSchedules } from "@/lib/recurring-work-order-engine";
@@ -151,10 +151,11 @@ async function notificationsFor(companyId: string) {
 }
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const filter = new URL(request.url).searchParams.get("filter") || "all";
   const [all, ux] = await Promise.all([

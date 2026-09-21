@@ -81,12 +81,24 @@ describe("service-center assignment authorization", () => {
     });
   });
 
-  it.each(["technician", "viewer", "resident"])("blocks %s from reading company-wide assignment data", async (role) => {
+  it.each(["technician", "viewer"])("blocks %s from reading company-wide assignment data", async (role) => {
     getCurrentUserMock.mockResolvedValue(companyUser(role));
 
     const response = await GET();
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(userFindManyMock).not.toHaveBeenCalled();
+    expect(listAssignmentsMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing assignee emails", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("resident"));
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(userFindManyMock).not.toHaveBeenCalled();
     expect(listAssignmentsMock).not.toHaveBeenCalled();
   });

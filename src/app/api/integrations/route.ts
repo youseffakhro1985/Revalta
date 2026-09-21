@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageIntegrations, getCurrentUser } from "@/lib/current-user";
+import { canManageIntegrations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { hasStorageConfig } from "@/lib/storage";
 import { isStripeBillingReady } from "@/lib/stripe";
 import { isAiConfigured, isSmsConfigured, isSmsInboundConfigured } from "@/lib/integrations";
@@ -42,8 +42,10 @@ function isIntegrationConfigured(type: string, envKeys: string[]) {
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageIntegrations(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa integrationer" }, { status: 403 });
     }
@@ -62,24 +64,20 @@ export async function GET() {
       };
     });
 
-    const companyFilter = user.company_id ? { company_id: user.company_id } : { company_id: "__no_company_scope__" };
-
     const [events, invoiceJobCounts] = await Promise.all([
       db.integrationEvent.findMany({
-        where: companyFilter,
+        where: { company_id: user.company_id },
         orderBy: { created_at: "desc" },
         take: 50,
       }),
       // Aggregate status counts in the database instead of fetching every
       // invoice export job row ever created for the company (unbounded growth
       // risk over the company's lifetime) just to count them in JS.
-      user.company_id
-        ? db.workOrderInvoiceExportJob.groupBy({
+      db.workOrderInvoiceExportJob.groupBy({
             by: ["status"],
             where: { company_id: user.company_id },
             _count: { _all: true },
-          })
-        : Promise.resolve([] as Array<{ status: string; _count: { _all: number } }>),
+          }),
     ]);
 
     const countFor = (status: string) =>
