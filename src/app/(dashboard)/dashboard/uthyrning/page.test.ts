@@ -80,17 +80,34 @@ describe("uthyrning leftover occupancy first HTML", () => {
 });
 
 describe("uthyrning leftover objects first HTML", () => {
-  it("keeps leftover objects in the first HTML without stealing create", () => {
+  it("keeps leftover objects in the first HTML and focuses clear after load without a second autoFocus", () => {
     const form = readFileSync(new URL("./uthyrning-page.tsx", import.meta.url), "utf8");
+    const sticky = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.ts", import.meta.url), "utf8");
     expect(form).toContain('id="objektlista"');
+    expect(form).toContain('id="objektlista-rensa"');
     expect(form).toContain('window.location.hash !== "#objektlista"');
     expect(form).toContain("Objekten hämtas.");
     expect(form).toContain("Nytt avtal");
     expect(form).toContain('id="lease-editor"');
+    expect(form).toContain('id="lease-namn"');
+    expect(form).toContain('document.getElementById("lease-namn")?.focus()');
+    expect(form).toContain('document.getElementById("objektlista-rensa")?.focus()');
     expect(form).toContain('id="bestandsfilter"');
     expect(form).toContain('id="bestand-sok"');
+    expect(form).toContain('document.getElementById("bestand-sok")?.focus()');
     expect(form).toContain('id="uthyrningslage"');
+    expect(form).toContain('id="uthyrningslage-overlamning"');
+    expect(form).toContain('document.getElementById("uthyrningslage-overlamning")?.focus()');
     expect(form).toContain('get("create") === "1"');
+    expect(form).toContain("canManage || loading");
+    expect((form.match(/autoFocus/g) || []).length).toBe(2);
+    expect(form).not.toContain('id="objektlista-rensa" autoFocus');
+    expect(sticky).toContain('href: "/dashboard/uthyrning?create=1"');
+    expect(sticky).not.toContain("#objektlista");
+    expect(sticky).not.toContain("#objektlista-rensa");
+    expect(sticky).not.toContain("/dashboard/boendeportal");
+    const stickyTest = readFileSync(new URL("../../../../components/dashboard/dashboard-primary-action.test.ts", import.meta.url), "utf8");
+    expect(stickyTest).toContain('dashboardPrimaryCreateAction("/dashboard/boendeportal", "owner")).toBeNull()');
   });
 });
 
