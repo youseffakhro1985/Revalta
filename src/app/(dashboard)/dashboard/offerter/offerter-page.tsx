@@ -131,6 +131,13 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
   }, [canManage, loading]);
   useEffect(() => {
     if (loading) return;
+    if (!showCreate) return;
+    if (window.location.hash !== "#offert-editor" && new URLSearchParams(window.location.search).get("create") !== "1") return;
+    document.getElementById("offert-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("offert-namn")?.focus(), 0);
+  }, [loading, showCreate]);
+  useEffect(() => {
+    if (loading) return;
     if (window.location.hash !== "#offertfilter") return;
     document.getElementById("offertfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("offert-sok")?.focus(), 0);
@@ -330,10 +337,10 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
     {(error || success) ? <InlineAlert tone={error ? "error" : "success"}>{error || success}</InlineAlert> : null}
     {!canManage && !loading ? <InlineAlert tone="info">Du har läsbehörighet. Förvaltare eller administratör kan skapa och ändra offerter.</InlineAlert> : null}
 
-    {showCreate ? <Panel title="Ny offert" description="Registrera kostnadsdelar, moms och giltighet. Belopp anges exklusive moms. Nya offerter skapas som utkast eller skickade. Skickad betyder att offerten är lämnad via utskrift eller PDF — Revalta skickar inget mejl.">
+    {showCreate ? <section id="offert-editor" className="scroll-mt-36"><Panel title="Ny offert" description="Registrera kostnadsdelar, moms och giltighet. Belopp anges exklusive moms. Nya offerter skapas som utkast eller skickade. Skickad betyder att offerten är lämnad via utskrift eller PDF — Revalta skickar inget mejl.">
       <form onSubmit={submit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <select className={premiumFieldClass} value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} required aria-label="Välj fastighet"><option value="">Välj fastighet</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}</select>
-        <input className={premiumFieldClass} placeholder="Offertnamn" aria-label="Offertnamn" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required autoFocus />
+        <input id="offert-namn" className={premiumFieldClass} placeholder="Offertnamn" aria-label="Offertnamn" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required autoFocus />
         <input className={premiumFieldClass} placeholder="Leverantör" aria-label="Leverantör" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
         <select className={premiumFieldClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} aria-label="Status">{Object.entries(initialStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
         <input className={premiumFieldClass} type="date" aria-label="Giltigt till" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} />
@@ -342,7 +349,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
         <textarea className={`${premiumTextareaClass} md:col-span-2 xl:col-span-3`} placeholder="Anteckning" aria-label="Anteckning" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
         <button disabled={saving} className={premiumPrimaryButtonClass}>{saving ? "Sparar…" : "Spara offert"}</button>
       </form>
-    </Panel> : null}
+    </Panel></section> : null}
 
     <section className="grid gap-6 xl:grid-cols-[1fr_0.72fr]">
       <Panel title="Offertfilter" description="Sök och avgränsa beslutsunderlaget.">

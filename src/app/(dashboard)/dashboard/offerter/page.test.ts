@@ -21,6 +21,11 @@ describe("offerter create query", () => {
     expect(form).toContain("Ny offert");
     expect(form).toContain("autoFocus");
     expect(form).toContain("<Plus");
+    expect(form).toContain('id="offert-editor"');
+    expect(form).toContain('id="offert-namn"');
+    expect(form).toContain('document.getElementById("offert-namn")?.focus()');
+    expect(form).toContain("scroll-mt-36");
+    expect(form).toContain("scrollIntoView");
     expect(form).not.toContain("＋");
   });
 });
@@ -30,6 +35,8 @@ describe("offerter filter first HTML", () => {
     const form = readFileSync(new URL("./offerter-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="offertfilter"');
     expect(form).toContain('id="offert-sok"');
+    expect(form).toContain('id="offert-editor"');
+    expect(form).toContain('id="offert-namn"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#offertfilter"');
     expect(form).toContain("scrollIntoView");
@@ -49,6 +56,8 @@ describe("offerter leftover list first HTML", () => {
     expect(form).toContain("Offerterna hämtas.");
     expect(form).toContain('id="offertfilter"');
     expect(form).toContain('id="offert-sok"');
+    expect(form).toContain('id="offert-editor"');
+    expect(form).toContain('id="offert-namn"');
     expect(form).toContain("Ny offert");
     expect(form).toContain("scrollIntoView");
     expect(form).toContain("disabled={loading}");
