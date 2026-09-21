@@ -102,10 +102,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();
@@ -207,10 +208,11 @@ const patchAllowedStatuses = new Set(["draft", "sent", "paid", "overdue", "credi
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const noticeId = String(body.noticeId || body.id || "").trim();
