@@ -126,6 +126,12 @@ export default function ServiceNotificationsPage() {
     window.setTimeout(() => document.getElementById("mottagarlista-lank")?.focus(), 0);
   }, [loading, data]);
   useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#korningshistorik") return;
+    document.getElementById("korningshistorik")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("korningshistorik-lank")?.focus(), 0);
+  }, [loading, data]);
+  useEffect(() => {
     if (!isDirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
@@ -188,7 +194,7 @@ export default function ServiceNotificationsPage() {
           <nav aria-label="Hoppa till aviseringsavsnitt" className="mt-4 flex flex-wrap gap-2">
             <a href="#aviseringsinstallningar" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Aviseringsval</a>
             <a id="mottagarlista-lank" href="#mottagare" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Mottagare</a>
-            <a href="#korningshistorik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
+            <a id="korningshistorik-lank" href="#korningshistorik" className="inline-flex h-9 items-center rounded-lg border border-sand-200 bg-white px-3 text-xs font-semibold text-ink-700 transition-colors hover:border-petroleum-200 hover:text-petroleum-800">Historik</a>
           </nav>
         </div>
         <div className="flex gap-2">
