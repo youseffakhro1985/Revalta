@@ -21,6 +21,11 @@ const {
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   tenantWhere: () => ({ company_id: "company-1" }),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 vi.mock("@/lib/assigned-work-access", () => ({
   isAssignedWorkAccessible: assignedAccessibleMock,
@@ -83,6 +88,23 @@ describe("ticket timeline tenant boundary", () => {
     expect(auditFindManyMock).not.toHaveBeenCalled();
     expect(enterpriseStateMock).not.toHaveBeenCalled();
     expect(statusEventsMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before loading ticket comments, attachments or audit", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request, context);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 before related reads when assigned-work access is denied", async () => {

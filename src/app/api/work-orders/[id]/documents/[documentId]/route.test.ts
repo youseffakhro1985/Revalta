@@ -8,7 +8,14 @@ const { findFirstMock, getCurrentUserMock, getBlobMock, findAccessibleWorkOrderM
 }));
 
 vi.mock("@vercel/blob", () => ({ get: getBlobMock }));
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: getCurrentUserMock }));
+vi.mock("@/lib/current-user", () => ({
+  getCurrentUser: getCurrentUserMock,
+  requireCompanyUser: (user: { company_id: string | null; role?: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role || "")) return null;
+    return user;
+  },
+}));
 vi.mock("@/lib/assigned-work-access", () => ({
   findAccessibleWorkOrder: findAccessibleWorkOrderMock,
   notFoundWorkOrder: () => new Response(JSON.stringify({ error: "Arbetsordern hittades inte" }), { status: 404, headers: { "Content-Type": "application/json" } }),
@@ -41,8 +48,22 @@ describe("work-order document download", () => {
     expect(findFirstMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before looking up work-order document bytes", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(new Request("https://www.revalta.se/api/document"), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+    expect(findFirstMock).not.toHaveBeenCalled();
+  });
+
   it("scopes document lookup to tenant, work order and document", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1" });
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     findFirstMock.mockResolvedValue(null);
     const response = await GET(new Request("https://www.revalta.se/api/document"), { params });
 
@@ -59,7 +80,7 @@ describe("work-order document download", () => {
   });
 
   it("streams a private blob without exposing its storage URL", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1" });
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     findFirstMock.mockResolvedValue({
       file_name: "besiktning.pdf",
       storage_url: "https://store.private.blob.vercel-storage.com/besiktning.pdf",

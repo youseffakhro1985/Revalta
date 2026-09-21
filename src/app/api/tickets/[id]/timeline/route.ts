@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { getWorkOrderEnterpriseState, getWorkOrderStatusEvents } from "@/lib/work-order-enterprise-core";
 import { buildTicketWorkOrderTimeline } from "@/lib/ticket-work-order-timeline";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
@@ -22,11 +22,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) {
-      return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-    }
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     const { id } = await params;
 
     const ticket = await db.ticket.findFirst({

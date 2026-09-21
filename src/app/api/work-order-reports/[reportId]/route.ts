@@ -1,16 +1,17 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ reportId: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const { reportId } = await params;
   const reports = await db.$queryRaw<Array<{
@@ -31,7 +32,7 @@ export async function GET(
 
   const report = reports[0];
   if (!report) return NextResponse.json({ error: "Rapporten hittades inte" }, { status: 404 });
-  if (!await findAccessibleWorkOrder(user as CompanyUser, report.work_order_id)) {
+  if (!await findAccessibleWorkOrder(user, report.work_order_id)) {
     return notFoundWorkOrder();
   }
   return NextResponse.json({ report });
