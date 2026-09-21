@@ -60,6 +60,13 @@ export default function NewPayoutPage() {
     return () => { active = false; };
   }, [router]);
 
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash && window.location.hash !== "#utbetalning-editor") return;
+    document.getElementById("utbetalning-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("utbetalning-fastighet")?.focus(), 0);
+  }, [loading]);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -106,7 +113,7 @@ export default function NewPayoutPage() {
       {error ? <div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700" role="alert">{error}</div> : null}
       {!loading && !canManage ? <div className="rounded-xl border border-sand-200 bg-sand-50 px-4 py-3 text-sm text-ink-600">Du har läsbehörighet men saknar behörighet att registrera ekonomiskt utfall.</div> : null}
 
-      <section className="overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
+      <section id="utbetalning-editor" className="scroll-mt-36 overflow-hidden rounded-2xl border border-sand-200 bg-white shadow-premium-sm">
         <div className="flex items-center gap-3 border-b border-sand-100 px-5 py-4 sm:px-6">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sand-50 text-petroleum-800"><CircleDollarSign className="h-[18px] w-[18px]" /></span>
           <div><h2 className="text-sm font-semibold text-ink-900">Utbetalningsuppgifter</h2><p className="mt-0.5 text-xs text-ink-450">Belopp lagras som registrerat utfall för innevarande år.</p></div>
@@ -115,7 +122,7 @@ export default function NewPayoutPage() {
         <form onSubmit={submit} className="space-y-5 p-5 sm:p-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Fastighet">
-              <select required disabled={loading || !canManage} value={form.propertyId} onChange={(event) => setForm((current) => ({ ...current, propertyId: event.target.value }))} className={fieldClass}>
+              <select id="utbetalning-fastighet" required autoFocus disabled={loading || !canManage} value={form.propertyId} onChange={(event) => setForm((current) => ({ ...current, propertyId: event.target.value }))} className={fieldClass}>
                 <option value="">Välj fastighet</option>
                 {properties.map((property) => <option key={property.id} value={property.id}>{property.name}</option>)}
               </select>
