@@ -9,6 +9,8 @@ describe("aviseringscenter filter hash", () => {
     expect(source).toContain('window.location.hash !== "#aviseringsfilter"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("autoFocus");
+    expect(source).toContain('id="avisering-alla"');
+    expect(source).toContain('document.getElementById("avisering-alla")?.focus()');
     expect(source).toContain('href="#aviseringsfilter"');
   });
 });
@@ -20,6 +22,7 @@ describe("aviseringscenter leftover list first HTML", () => {
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#aviseringslista"');
     expect(source).toContain('id="aviseringsfilter"');
+    expect(source).toContain('id="avisering-alla"');
     expect(source).toContain("scrollIntoView");
     expect(source).toContain("Aviseringarna hämtas.");
     expect(source).not.toContain("h-64 animate-pulse bg-sand-50");
