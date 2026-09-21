@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HandCoins, RefreshCw } from "lucide-react";
 import {
   EmptyState,
@@ -8,6 +8,7 @@ import {
   MetricCard,
   PageHeader,
   Panel,
+  premiumFieldClass,
 } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
 import type { ResidentPortalNotice, ResidentPortalNoticesState } from "@/lib/resident-portal-notices";
@@ -26,11 +27,13 @@ const dateFormatter = new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium" });
 
 type Props = {
   initial: ResidentPortalNoticesState;
+  status: string;
 };
 
-export function ResidentNotices({ initial }: Props) {
+export function ResidentNotices({ initial, status: initialStatus }: Props) {
   const [notices, setNotices] = useState<ResidentPortalNotice[]>(initial.notices);
   const [leaseCount, setLeaseCount] = useState(initial.leases.length);
+  const [status, setStatus] = useState(initialStatus);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,6 +52,19 @@ export function ResidentNotices({ initial }: Props) {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash !== "#boende-avifilter") return;
+    document.getElementById("boende-avifilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("boende-avistatus")?.focus(), 0);
+  }, [loading]);
+
+  const selectedStatus = status in statusLabels ? status : "all";
+  const visibleNotices = useMemo(
+    () => (selectedStatus === "all" ? notices : notices.filter((notice) => notice.status === selectedStatus)),
+    [notices, selectedStatus],
+  );
 
   const openTotal = useMemo(
     () => notices
@@ -83,18 +99,34 @@ export function ResidentNotices({ initial }: Props) {
       </section>
 
       <Panel title="Hyresavier" description="Belopp och förfallodatum för dina avtal." bodyClassName="p-0">
+        <form id="boende-avifilter" method="get" action="/dashboard/boendeportal/avier" className="scroll-mt-36 flex flex-col gap-3 border-b border-sand-200 p-5 sm:flex-row sm:items-end">
+          <label className="block flex-1 space-y-1.5">
+            <span className="text-xs font-semibold text-ink-700">Status</span>
+            <select id="boende-avistatus" autoFocus name="status" value={selectedStatus} onChange={(event) => setStatus(event.target.value)} disabled={loading} className={premiumFieldClass}>
+              <option value="all">Alla statusar</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="inline-flex h-11 items-center justify-center rounded-xl border border-sand-200 bg-white px-4 text-sm font-semibold text-ink-700 shadow-sm hover:bg-sand-50">
+            Filtrera
+          </button>
+        </form>
         {loading ? (
           <div className="space-y-3 p-6">{[1, 2, 3].map((item) => <div key={item} className="h-24 animate-pulse rounded-xl bg-sand-100" />)}</div>
-        ) : notices.length === 0 ? (
+        ) : visibleNotices.length === 0 ? (
           <EmptyState
             title="Inga avier ännu"
             description={leaseCount === 0
               ? "När ditt avtal är kopplat till din e-post visas avierna här."
-              : "När förvaltningen publicerar en hyresavi syns den här."}
+              : selectedStatus === "all"
+                ? "När förvaltningen publicerar en hyresavi syns den här."
+                : "Inga avier matchar den valda statusen."}
           />
         ) : (
           <div className="divide-y divide-sand-100">
-            {notices.map((notice) => (
+            {visibleNotices.map((notice) => (
               <article key={notice.id} className="grid gap-3 p-6 sm:grid-cols-[1.2fr_1fr_auto] sm:items-center">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-petroleum-700">
