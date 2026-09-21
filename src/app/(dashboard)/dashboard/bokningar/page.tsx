@@ -94,6 +94,7 @@ export default function BookingsPage() {
     if (loading) return;
     if (window.location.hash !== "#bokningsfilter") return;
     document.getElementById("bokningsfilter")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("bokning-sok")?.focus(), 0);
   }, [loading, bookings]);
   useEffect(() => {
     if (loading) return;
@@ -252,7 +253,7 @@ export default function BookingsPage() {
 
         <Panel title="Bokningsöversikt" description="Sök, filtrera och hantera samtliga resurser." bodyClassName="p-0">
           <div id="bokningsfilter" className="scroll-mt-36 grid gap-3 border-b border-sand-200 p-4 sm:grid-cols-[1fr_180px_160px] sm:p-5">
-            <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input disabled={loading} aria-label="Sök bokningar" placeholder="Sök boende, resurs, fastighet eller objekt" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
+            <label className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden="true" /><input id="bokning-sok" disabled={loading} aria-label="Sök bokningar" placeholder="Sök boende, resurs, fastighet eller objekt" value={query} onChange={(event) => setQuery(event.target.value)} className={`${premiumFieldClass} pl-9`} /></label>
             <select disabled={loading} aria-label="Filtrera resurs" value={resourceFilter} onChange={(event) => setResourceFilter(event.target.value)} className={premiumFieldClass}><option value="">Alla resurser</option>{resourceTypes.map((resource) => <option key={resource}>{resource}</option>)}</select>
             <select disabled={loading} aria-label="Filtrera status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={premiumFieldClass}><option value="all">Alla statusar</option><option value="active">Aktiva</option><option value="cancelled">Avbokade</option></select>
           </div>

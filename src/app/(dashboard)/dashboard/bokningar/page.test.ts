@@ -32,6 +32,7 @@ describe("bokningar leftover list first HTML", () => {
   it("keeps leftover bookings in the first HTML without stealing Ny bokning", () => {
     const source = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
     expect(source).toContain('id="bokningsfilter"');
+    expect(source).toContain('id="bokning-sok"');
     expect(source).toContain('id="bokningslista"');
     expect(source).toContain("scroll-mt-36");
     expect(source).toContain('window.location.hash !== "#bokningsfilter"');
@@ -39,6 +40,7 @@ describe("bokningar leftover list first HTML", () => {
     expect(source).toContain('id="ny-bokning"');
     expect(source).toContain('id="bokning-boende"');
     expect(source).toContain("scrollIntoView");
+    expect(source).toContain('document.getElementById("bokning-sok")?.focus()');
     expect(source).toContain("disabled={loading}");
     expect(source).toContain("Bokningarna hämtas.");
     expect(source).not.toContain("LoadingState");
