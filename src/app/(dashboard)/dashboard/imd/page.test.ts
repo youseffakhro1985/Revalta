@@ -29,9 +29,11 @@ describe("imd leftover filter first HTML", () => {
   it("keeps the filter in the first HTML and scrolls after load without stealing create", () => {
     const form = readFileSync(new URL("./imd-page.tsx", import.meta.url), "utf8");
     expect(form).toContain('id="imdfilter"');
+    expect(form).toContain('id="imd-sok"');
     expect(form).toContain("scroll-mt-36");
     expect(form).toContain('window.location.hash !== "#imdfilter"');
     expect(form).toContain("scrollIntoView");
+    expect(form).toContain('document.getElementById("imd-sok")?.focus()');
     expect(form).toContain("Ny avläsning");
     expect(form).toContain("disabled={loading}");
     expect(form).toContain("Avläsningarna hämtas.");
@@ -46,6 +48,7 @@ describe("imd leftover readings first HTML", () => {
     expect(form).toContain('window.location.hash !== "#imdlista"');
     expect(form).toContain("Avläsningarna hämtas.");
     expect(form).toContain('id="imdfilter"');
+    expect(form).toContain('id="imd-sok"');
     expect(form).toContain("Ny avläsning");
     expect(form).not.toContain('id="energilista"');
     expect(form).toContain("scrollIntoView");
