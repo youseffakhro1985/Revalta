@@ -8,7 +8,8 @@ import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work
 import { completeWorkOrderLifecycle, WorkOrderCompletionConflict } from "@/lib/work-order-completion";
 import { canFinalizeWorkOrderExecution, isWorkOrderExecutionLocked } from "@/lib/work-order-execution-policy";
 import { normalizeInspectionTemplateItems } from "@/lib/inspection-checklist-template";
-import { isMissingTableError, schemaMismatchUserMessage, hasWorkOrderVendorContractColumn } from "@/lib/schema-readiness";
+import { isMissingSchemaColumnError, isMissingTableError, schemaMismatchUserMessage, hasWorkOrderVendorContractColumn } from "@/lib/schema-readiness";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
 import { notifyVendor } from "@/lib/vendor-notify";
 import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
 import { notifyAssignee } from "@/lib/assignee-notify";
@@ -133,7 +134,8 @@ export async function GET(
   const workOrder = await resolveWorkOrder(user, id);
   if (!workOrder) return notFoundWorkOrder();
 
-  const [checklist, entries, summaries, slaRows, completion] = await Promise.all([
+  try {
+    const [checklist, entries, summaries, slaRows, completion] = await Promise.all([
     db.$queryRaw<ChecklistRow[]>(Prisma.sql`
       SELECT "id", "title", "description", "is_required", "sort_order", "completed_at", "completed_by_id", "created_at"
       FROM "WorkOrderChecklistItem"
@@ -202,6 +204,18 @@ export async function GET(
     canManage: canManageTickets(user.role),
     canViewFinance: includeFinance,
   });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 }
 
 export async function POST(

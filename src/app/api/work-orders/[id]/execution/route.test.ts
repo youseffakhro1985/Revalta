@@ -428,3 +428,30 @@ describe("work-order execution lifecycle boundaries", () => {
     );
   });
 });
+
+describe("work-order execution GET schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(user());
+    workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
+  });
+
+  it("maps a missing WorkOrderExecutionEntry table to 503 SERVICE_UNAVAILABLE", async () => {
+    queryRawMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderExecutionEntry` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderExecutionEntry" },
+        },
+      ),
+    );
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/execution"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+});
