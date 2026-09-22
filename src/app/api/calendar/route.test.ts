@@ -532,7 +532,7 @@ describe("calendar route", () => {
     expect(workOrderFindManyMock.mock.calls[0][0].where.assigned_to_id).toBeUndefined();
   });
 
-  it("scopes technicians to assigned work orders and omits lease projections", async () => {
+  it("scopes technicians to assigned work and omits leases and maintenance plans", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
 
     const response = await GET();
@@ -545,6 +545,7 @@ describe("calendar route", () => {
       }),
     }));
     expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(maintenanceFindManyMock).not.toHaveBeenCalled();
   });
 
   it("returns tenant-safe 404 when Tenant A patches a Tenant B calendar event id", async () => {

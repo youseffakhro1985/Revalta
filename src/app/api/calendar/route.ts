@@ -3,6 +3,7 @@ import {
   auditScopedWhere,
   canManageLeases,
   canManageTickets,
+  canViewOperations,
   getCurrentUser,
   requireCompanyUser,
   shouldScopeToAssignedWork,
@@ -90,6 +91,7 @@ export async function GET() {
     const empty = Promise.resolve([]);
     const assignedWorkOnly = shouldScopeToAssignedWork(user.role);
     const includeLeases = canManageLeases(user.role);
+    const includeMaintenancePlanning = canViewOperations(user.role);
     const [rows, events, workOrders, rounds, inspections, maintenanceItems, leases] = await Promise.all([
       companyId
         ? db.calendarEvent.findMany({
@@ -168,7 +170,7 @@ export async function GET() {
             },
           }))
         : empty,
-      companyId
+      companyId && includeMaintenancePlanning
         ? optionalFindMany("PortfolioMaintenanceItem", () => db.portfolioMaintenanceItem.findMany({
             where: {
               company_id: companyId,
