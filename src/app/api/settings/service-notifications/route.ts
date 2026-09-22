@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { canManageCompany, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import {
   getCompanyServicePreferences,
   normalizeEmail,
@@ -41,9 +41,10 @@ async function getPreferences(companyId: string) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const stored = await getPreferences(user.company_id);
   const propertyGuard = await sqlSoftDeleteGuard(db, "Property", "p");
@@ -96,9 +97,10 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageCompany(user.role)) return noStore({ error: "Endast ägare och administratörer kan ändra inställningarna" }, { status: 403 });
 
   const body = await request.json().catch(() => null);
@@ -140,9 +142,10 @@ export async function PATCH(request: Request) {
 }
 
 export async function POST() {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageCompany(user.role)) return noStore({ error: "Endast ägare och administratörer kan skicka testutskick" }, { status: 403 });
 
   const apiKey = process.env.EMAIL_PROVIDER_API_KEY;

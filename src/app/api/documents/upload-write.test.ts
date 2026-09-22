@@ -220,4 +220,51 @@ describe("document upload write security", () => {
     expect(serializedWarnings).not.toContain("secret-unit");
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A uploads against Tenant B propertyId", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const form = new FormData();
+    form.set("file", new File(["safe-pdf"], "protokoll.pdf", { type: "application/pdf" }));
+    form.set("name", "OVK-protokoll");
+    form.set("category", "protocol");
+    form.set("visibility", "resident_property");
+    form.set("propertyId", "property-tenant-b");
+
+    const response = await POST(new Request("https://www.revalta.se/api/documents", {
+      method: "POST",
+      headers: { "x-request-id": requestId },
+      body: form,
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", company_id: "company-1", deleted_at: null },
+      select: { id: true },
+    });
+    expect(storeAttachmentMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A uploads against Tenant B leaseId", async () => {
+    leaseFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(uploadRequest({
+      visibility: "resident_lease",
+      leaseId: "lease-tenant-b",
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Hyresavtalet hittades inte");
+    expect(leaseFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "lease-tenant-b", company_id: "company-1", deleted_at: null, property: { deleted_at: null } },
+      select: { id: true, property_id: true, unit_id: true },
+    });
+    expect(storeAttachmentMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

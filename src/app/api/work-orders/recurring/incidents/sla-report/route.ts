@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { listRecurringIncidentEvents } from "@/lib/recurring-incident-storage";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,8 @@ function hoursBetween(start: string, end: string) {
 }
 
 function csvCell(value: unknown) {
-  const text = value === null || value === undefined ? "" : String(value);
+  let text = value === null || value === undefined ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '""')}"`;
 }
 
@@ -67,9 +68,10 @@ function privateHeaders() {
 }
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet att visa operativa rapporter" }, { status: 403 });
 
   const { days, from, to, format } = parsePeriod(request);

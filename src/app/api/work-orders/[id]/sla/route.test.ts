@@ -48,7 +48,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { PATCH } from "./route";
+import { GET, PATCH } from "./route";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const existingUpdatedAt = new Date("2026-09-15T09:00:00.000Z");
@@ -194,5 +194,84 @@ describe("work-order SLA PATCH lock", () => {
     expect(response.status).toBe(409);
     expect(body.code).toBe("lock_lost");
     expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order SLA GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading SLA deadlines or audit actors", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/sla"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(getEnterpriseMock).not.toHaveBeenCalled();
+    expect(auditLogFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up SLA", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PATCH(patchRequest(), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies viewers with the SLA-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+    const response = await PATCH(patchRequest(), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att ändra SLA");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order SLA Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(ownerUser());
+    workOrderFindFirstMock.mockResolvedValue(null);
+    getEnterpriseMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads SLA for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/sla"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(auditLogFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches SLA on a Tenant B work-order id", async () => {
+    const response = await PATCH(patchRequest(), { params: Promise.resolve({ id: "wo-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

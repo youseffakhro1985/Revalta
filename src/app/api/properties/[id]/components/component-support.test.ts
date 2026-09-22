@@ -237,6 +237,45 @@ describe("component support security contracts", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before enumerating link-option history", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await getLinkOptions(linkRequest(), componentParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({ error: "En aktiv organisation och personalbehörighet krävs", errorCode: "FORBIDDEN", requestId });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before generating a component report", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await getReport(reportRequest(), componentParams());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("does not log unverified cross-tenant identifiers in link options", async () => {
     propertyFindFirstMock.mockResolvedValueOnce(null);
 
@@ -314,5 +353,87 @@ describe("component support security contracts", () => {
     expect(response.status).toBe(500);
     expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
     expect(JSON.stringify(body)).not.toContain("component-entry-db-secret");
+  });
+
+  it("rejects residents before correcting component history", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await patchEntry(
+      entryRequest({ cost_type: "service", amount_ex_vat: 100, vat_rate: 25, cost_date: "2026-08-18" }),
+      entryParams(),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the entry-correction copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await patchEntry(
+      entryRequest({ cost_type: "service", amount_ex_vat: 100, vat_rate: 25, cost_date: "2026-08-18" }),
+      entryParams(),
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att korrigera komponenthistorik");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A reports a Tenant B propertyId", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await getReport(
+      reportRequest(),
+      { params: Promise.resolve({ id: "property-tenant-b", componentId: "asset-1" }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "property-tenant-b", company_id: "company-1" }),
+    }));
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a cost on Tenant B propertyId", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await patchEntry(
+      entryRequest({ cost_type: "service", amount_ex_vat: 100, vat_rate: 25, cost_date: "2026-08-18" }),
+      { params: Promise.resolve({ id: "property-tenant-b", componentId: "asset-1", kind: "cost", entryId: "cost-1" }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Fastigheten hittades inte");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B cost entry id", async () => {
+    queryRawMock
+      .mockResolvedValueOnce([{ id: "asset-1" }])
+      .mockResolvedValueOnce([]);
+
+    const response = await patchEntry(
+      entryRequest({ cost_type: "service", amount_ex_vat: 100, vat_rate: 25, cost_date: "2026-08-18" }),
+      entryParams("cost", "cost-tenant-b"),
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Kostnadsposten hittades inte");
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

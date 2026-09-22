@@ -11,7 +11,9 @@ const {
   auditFindFirstMock,
   writeAuditLogMock,
   propertyFindManyMock,
+  propertyFindFirstMock,
   leaseFindManyMock,
+  leaseFindFirstMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   imdFindManyMock: vi.fn(),
@@ -23,7 +25,9 @@ const {
   auditFindFirstMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
   leaseFindManyMock: vi.fn(),
+  leaseFindFirstMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -44,13 +48,13 @@ vi.mock("@/lib/db", () => ({
     },
     imdDebitLine: { updateMany: debitUpdateManyMock },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
-    property: { findMany: propertyFindManyMock },
-    lease: { findMany: leaseFindManyMock },
+    property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
+    lease: { findMany: leaseFindManyMock, findFirst: leaseFindFirstMock },
     $transaction: transactionMock,
   },
 }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, POST } from "./route";
 
 describe("imd-readings route", () => {
   beforeEach(() => {
@@ -187,4 +191,138 @@ describe("imd-readings route", () => {
     expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: "imd.reading.voided" }), expect.objectContaining({ imdReading: expect.anything() }));
   });
 
+  it("denies technicians from reading IMD readings", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa IMD-mätvärden");
+    expect(imdFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing IMD readings or lease holders", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(imdFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies residents before creating an IMD reading", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/imd-readings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", unit: "1101", meterId: "m-1", period: "2026-07" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+  });
+
+  it("PATCH denies residents before looking up an IMD reading", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PATCH(new Request("http://localhost/api/imd-readings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-1", action: "void" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(imdFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/imd-readings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-1", action: "void" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(imdFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts an IMD reading against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/imd-readings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-tenant-b",
+        unit: "1101",
+        meterId: "EL-1",
+        type: "electricity",
+        period: "2026-07",
+        previousReading: 10,
+        currentReading: 20,
+        unitPrice: 1.5,
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true },
+    });
+    expect(leaseFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts an IMD reading against Tenant B leaseId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Storgatan 1" });
+    leaseFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/imd-readings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-1",
+        leaseId: "lease-tenant-b",
+        unit: "1101",
+        meterId: "EL-1",
+        type: "electricity",
+        period: "2026-07",
+        previousReading: 10,
+        currentReading: 20,
+        unitPrice: 1.5,
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Hyresavtalet hittades inte för fastigheten");
+    expect(leaseFindFirstMock).toHaveBeenCalledWith({
+      where: {
+        id: "lease-tenant-b",
+        company_id: "company-1",
+        property_id: "property-1",
+        deleted_at: null,
+      },
+      select: { id: true, unit: { select: { designation: true } } },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

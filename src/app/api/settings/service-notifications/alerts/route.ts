@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { canManageCompany, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { loadLegacyRows } from "@/lib/dual-list";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +27,10 @@ function numberValue(value: unknown) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageCompany(user.role)) {
     return noStore({ error: "Endast ägare och administratörer kan visa driftlarm" }, { status: 403 });
   }
@@ -149,9 +150,10 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageCompany(user.role)) {
     return noStore({ error: "Endast ägare och administratörer kan kvittera driftlarm" }, { status: 403 });
   }

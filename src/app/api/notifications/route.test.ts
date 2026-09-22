@@ -47,7 +47,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { DELETE } from "./route";
+import { DELETE, GET, PATCH, POST } from "./route";
 
 describe("notifications route", () => {
   beforeEach(() => {
@@ -57,6 +57,42 @@ describe("notifications route", () => {
     auditFindManyMock.mockResolvedValue([]);
     notificationUpdateManyMock.mockResolvedValue({ count: 1 });
     writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("rejects resident GET and PATCH before loading company notifications", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const getResponse = await GET();
+    const patchResponse = await PATCH(new Request("http://localhost/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-1" }),
+    }));
+
+    expect(getResponse.status).toBe(403);
+    expect(patchResponse.status).toBe(403);
+    expect(notificationFindManyMock).not.toHaveBeenCalled();
+    expect(notificationFindFirstMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("lets technicians list company notifications without audit events", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(notificationFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { company_id: "company-1", deleted_at: null },
+    }));
   });
 
   it("soft-deletes modern notifications and writes delete audit", async () => {
@@ -106,5 +142,135 @@ describe("notifications route", () => {
     expect(response.status).toBe(409);
     expect(body.error).toMatch(/backfill/i);
     expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifications writes staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("POST rejects residents before creating a notification", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Drift", message: "Meddelande" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+  });
+
+  it("POST denies technicians with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(new Request("http://localhost/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Drift", message: "Meddelande" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+  });
+
+  it("DELETE rejects residents before looking up a notification", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await DELETE(new Request("http://localhost/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(notificationFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("DELETE denies technicians with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await DELETE(new Request("http://localhost/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(notificationFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifications Tenant B related ids", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    notificationFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+    notificationReadUpsertMock.mockResolvedValue({ id: "read-1" });
+    notificationUpdateManyMock.mockResolvedValue({ count: 1 });
+    writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("returns tenant-safe 404 when Tenant A marks a Tenant B notification as read", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Notisen hittades inte");
+    expect(notificationFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "notif-tenant-b", company_id: "company-1" },
+    }));
+    expect(auditFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        entity_id: "notif-tenant-b",
+      }),
+    }));
+    expect(notificationReadUpsertMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B notification id", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+
+    const response = await DELETE(new Request("http://localhost/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Notisen hittades inte");
+    expect(notificationFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "notif-tenant-b", company_id: "company-1", deleted_at: null },
+    }));
+    expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

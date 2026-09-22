@@ -24,6 +24,8 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 }));
 
 import { GET } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const params = Promise.resolve({ id: "wo-1" });
 
@@ -54,13 +56,15 @@ describe("GET /api/work-orders/[id]/transitions", () => {
     expect(userFindManyMock).not.toHaveBeenCalled();
   });
 
-  it("returns 400 when the user has no company", async () => {
+  it("returns 403 when the user is not staff in a company", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: null });
 
     const response = await GET(makeRequest(), { params });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the work order does not exist for the caller's company (tenant isolation)", async () => {
@@ -275,6 +279,27 @@ describe("GET /api/work-orders/[id]/transitions", () => {
     expect(response.status).toBe(500);
   });
 
+  it("maps a missing WorkOrder table on GET to 503 SERVICE_UNAVAILABLE", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
+    workOrderFindFirstMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrder` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrder" },
+        },
+      ),
+    );
+
+    const response = await GET(makeRequest(), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
   it("sets a private, no-store cache header on success", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
     workOrderFindFirstMock.mockResolvedValue({ id: "wo-1", status: "planned", assigned_to_id: null });
@@ -282,5 +307,44 @@ describe("GET /api/work-orders/[id]/transitions", () => {
     const response = await GET(makeRequest(), { params });
 
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+});
+
+describe("work-order transitions GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading work orders or company user emails", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(makeRequest(), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads transitions for a Tenant B work-order id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", role: "owner", company_id: "company-1" });
+    workOrderFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-tenant-b/transitions"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+      select: { id: true, status: true, assigned_to_id: true },
+    });
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
   });
 });

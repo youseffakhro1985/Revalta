@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageWorkOrderFinance, canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canManageWorkOrderFinance, canViewFinanceData, canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isMissingSchemaColumnError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 import { createLogger } from "@/lib/structured-logger";
@@ -23,9 +23,10 @@ function parseMoney(value: unknown) {
 
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewOperations(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa projekt" }, { status: 403 });
     }
@@ -110,10 +111,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const companyId = user.company_id;
 
   const body = await request.json().catch(() => null);
@@ -155,7 +157,7 @@ export async function POST(request: Request) {
       where: { id: managerId, company_id: companyId, status: "active" },
       select: { id: true },
     });
-    if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
+    if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 404 });
   }
 
   if (sourceWorkOrderId) {
@@ -163,7 +165,7 @@ export async function POST(request: Request) {
       where: { deleted_at: null, id: sourceWorkOrderId, company_id: companyId, property_id: propertyId },
       select: { id: true },
     });
-    if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 400 });
+    if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 404 });
   }
 
   const project = await db.$transaction(async (tx) => {

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Download, FileDown, RotateCcw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { csvCell } from "@/lib/csv-cell";
 
 export type ReportExportRow = {
   fastighet: string;
@@ -35,11 +36,6 @@ const headers: Array<[keyof ReportExportRow, string]> = [
   ["hyresintakter", "Hyresintäkter vald period"],
   ["kostnadsutfall", "Registrerat kostnadsutfall"],
 ];
-
-function csvCell(value: string | number) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
-}
 
 export function ReportsToolbar({ period, propertyId, properties, rows, generatedAt }: ReportsToolbarProps) {
   const router = useRouter();

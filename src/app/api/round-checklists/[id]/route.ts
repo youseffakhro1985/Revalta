@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { normalizeInspectionTemplateItems, parseInspectionTemplatePayload } from "@/lib/inspection-checklist-template";
 import { isMissingTableError, schemaMismatchUserMessage } from "@/lib/schema-readiness";
 import { createLogger } from "@/lib/structured-logger";
@@ -43,10 +43,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401, headers: noStoreHeaders });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401, headers: noStoreHeaders });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403, headers: noStoreHeaders });
+    }
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403, headers: noStoreHeaders });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400, headers: noStoreHeaders });
 
     const { id } = await params;
     const body = await request.json().catch(() => null);
@@ -112,10 +115,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401, headers: noStoreHeaders });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401, headers: noStoreHeaders });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403, headers: noStoreHeaders });
+    }
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403, headers: noStoreHeaders });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400, headers: noStoreHeaders });
 
     const { id } = await params;
     const rows = await db.$queryRaw<Array<{ id: string; name: string }>>(Prisma.sql`

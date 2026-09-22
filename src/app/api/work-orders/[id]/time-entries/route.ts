@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getModernTimeEntry,
@@ -10,41 +10,61 @@ import {
   type TimeEntryPayload,
 } from "@/lib/work-order-ops-storage";
 import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 const allowedKinds = new Set(["work", "travel", "break"]);
 const allowedActions = new Set(["manual", "start", "stop", "approve", "reject"]);
+
+function schemaUnavailable() {
+  return NextResponse.json(
+    { error: schemaMismatchUserMessage(), errorCode: API_ERROR_CODES.serviceUnavailable },
+    { status: 503 },
+  );
+}
 
 async function ensureOrder(user: CompanyUser, id: string) {
   return findAccessibleWorkOrder(user, id, { id: true, assigned_to_id: true, title: true });
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   const { id } = await params;
-  if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
+  if (!await ensureOrder(user, id)) return notFoundWorkOrder();
 
-  const rows = (await listTimeEntries(user.company_id, id))
-    .sort((a, b) => String(b.startedAt ?? b.createdAt).localeCompare(String(a.startedAt ?? a.createdAt)));
-  const summary = rows.reduce((acc, row) => {
-    const minutes = row.minutes ?? (row.startedAt && row.endedAt ? Math.max(0, Math.round((new Date(row.endedAt).getTime() - new Date(row.startedAt).getTime()) / 60000)) : 0);
-    if (row.kind === "work") acc.work += minutes;
-    if (row.kind === "travel") acc.travel += minutes;
-    if (row.kind === "break") acc.break += minutes;
-    if (row.billable && row.kind !== "break") acc.billable += minutes;
-    if (row.status === "running") acc.running += 1;
-    if (row.status === "submitted") acc.pending += 1;
-    return acc;
-  }, { work: 0, travel: 0, break: 0, billable: 0, running: 0, pending: 0 });
+  try {
+    const rows = (await listTimeEntries(user.company_id, id))
+      .sort((a, b) => String(b.startedAt ?? b.createdAt).localeCompare(String(a.startedAt ?? a.createdAt)));
+    const summary = rows.reduce((acc, row) => {
+      const minutes = row.minutes ?? (row.startedAt && row.endedAt ? Math.max(0, Math.round((new Date(row.endedAt).getTime() - new Date(row.startedAt).getTime()) / 60000)) : 0);
+      if (row.kind === "work") acc.work += minutes;
+      if (row.kind === "travel") acc.travel += minutes;
+      if (row.kind === "break") acc.break += minutes;
+      if (row.billable && row.kind !== "break") acc.billable += minutes;
+      if (row.status === "running") acc.running += 1;
+      if (row.status === "submitted") acc.pending += 1;
+      return acc;
+    }, { work: 0, travel: 0, break: 0, billable: 0, running: 0, pending: 0 });
 
-  return NextResponse.json({ entries: rows, summary, canManage: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ entries: rows, summary, canManage: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   const companyId = user.company_id;
   const { id } = await params;
   const order = await ensureOrder(user as CompanyUser, id);
@@ -73,71 +93,78 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   let userName = user.name;
   let userEmail = user.email;
 
-  if (action === "start") {
-    const existingEntries = await listTimeEntries(companyId, id);
-    if (existingEntries.some((entry) => entry.status === "running" && entry.source !== "legacy")) {
-      return NextResponse.json({ error: "Det finns redan en aktiv timer på arbetsordern" }, { status: 409 });
-    }
-    startedAt = new Date().toISOString();
-    status = "running";
-  } else if (action === "manual") {
+  if (action === "manual") {
     const start = new Date(String(body.startedAt || ""));
     const end = new Date(String(body.endedAt || ""));
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return NextResponse.json({ error: "Start- och sluttid måste vara giltiga" }, { status: 400 });
     if (end.getTime() - start.getTime() > 24 * 60 * 60 * 1000) return NextResponse.json({ error: "En tidsrad får vara högst 24 timmar" }, { status: 400 });
     startedAt = start.toISOString(); endedAt = end.toISOString(); minutes = Math.round((end.getTime() - start.getTime()) / 60000);
-  } else {
-    const modern = await getModernTimeEntry(companyId, id, entryId);
-    const latest = modern ?? await getTimeEntry(companyId, id, entryId);
-    if (!latest) return NextResponse.json({ error: "Tidsraden hittades inte" }, { status: 404 });
-    if (!modern) {
-      return NextResponse.json({
-        error: "Tidsraden finns kvar i äldre lagring. Kör backfill till WorkOrderTimeEntry innan den kan uppdateras.",
-      }, { status: 409 });
-    }
-    userId = latest.userId;
-    userName = latest.userName ?? null;
-    userEmail = latest.userEmail;
-    kind = latest.kind;
-    billable = latest.billable !== false;
-    note = latest.note ?? null;
-    if ((action === "approve" || action === "reject") && latest.status !== "submitted") {
-      return NextResponse.json({ error: "Tidsraden kan bara attesteras när den är inskickad" }, { status: 409 });
-    }
-    if (action === "stop") {
-      if (latest.userId !== user.id && !canManageTickets(user.role)) return NextResponse.json({ error: "Du kan bara stoppa din egen timer" }, { status: 403 });
-      if (!latest.startedAt || latest.status !== "running") return NextResponse.json({ error: "Tidsraden är inte aktiv" }, { status: 400 });
-      startedAt = latest.startedAt; endedAt = new Date().toISOString(); minutes = Math.max(1, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60000)); status = "submitted";
-    } else {
-      startedAt = latest.startedAt ?? null; endedAt = latest.endedAt ?? null; minutes = latest.minutes ?? null; status = action === "approve" ? "approved" : "rejected";
-    }
   }
 
-  const payload: TimeEntryPayload = {
-    entryId,
-    workOrderId: id,
-    userId,
-    userName,
-    userEmail,
-    kind: kind as TimeEntryPayload["kind"],
-    action: action as TimeEntryPayload["action"],
-    startedAt,
-    endedAt,
-    minutes,
-    billable,
-    note,
-    status,
-    actorId: user.id,
-  };
-  const entry = await db.$transaction(async (tx) => {
-    const persistedEntry = await upsertTimeEntry(companyId, payload, tx);
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: `work_order.time_${action}`,
-      metadata: { entryId, kind, minutes, billable, status, storage: "WorkOrderTimeEntry" },
-    }, tx);
-    return persistedEntry;
-  });
-  return NextResponse.json({ entry }, { status: 201 });
+  try {
+    if (action === "start") {
+      const existingEntries = await listTimeEntries(companyId, id);
+      if (existingEntries.some((entry) => entry.status === "running" && entry.source !== "legacy")) {
+        return NextResponse.json({ error: "Det finns redan en aktiv timer på arbetsordern" }, { status: 409 });
+      }
+      startedAt = new Date().toISOString();
+      status = "running";
+    } else if (action !== "manual") {
+      const modern = await getModernTimeEntry(companyId, id, entryId);
+      const latest = modern ?? await getTimeEntry(companyId, id, entryId);
+      if (!latest) return NextResponse.json({ error: "Tidsraden hittades inte" }, { status: 404 });
+      if (!modern) {
+        return NextResponse.json({
+          error: "Tidsraden finns kvar i äldre lagring. Kör backfill till WorkOrderTimeEntry innan den kan uppdateras.",
+        }, { status: 409 });
+      }
+      userId = latest.userId;
+      userName = latest.userName ?? null;
+      userEmail = latest.userEmail;
+      kind = latest.kind;
+      billable = latest.billable !== false;
+      note = latest.note ?? null;
+      if ((action === "approve" || action === "reject") && latest.status !== "submitted") {
+        return NextResponse.json({ error: "Tidsraden kan bara attesteras när den är inskickad" }, { status: 409 });
+      }
+      if (action === "stop") {
+        if (latest.userId !== user.id && !canManageTickets(user.role)) return NextResponse.json({ error: "Du kan bara stoppa din egen timer" }, { status: 403 });
+        if (!latest.startedAt || latest.status !== "running") return NextResponse.json({ error: "Tidsraden är inte aktiv" }, { status: 400 });
+        startedAt = latest.startedAt; endedAt = new Date().toISOString(); minutes = Math.max(1, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60000)); status = "submitted";
+      } else {
+        startedAt = latest.startedAt ?? null; endedAt = latest.endedAt ?? null; minutes = latest.minutes ?? null; status = action === "approve" ? "approved" : "rejected";
+      }
+    }
+
+    const payload: TimeEntryPayload = {
+      entryId,
+      workOrderId: id,
+      userId,
+      userName,
+      userEmail,
+      kind: kind as TimeEntryPayload["kind"],
+      action: action as TimeEntryPayload["action"],
+      startedAt,
+      endedAt,
+      minutes,
+      billable,
+      note,
+      status,
+      actorId: user.id,
+    };
+    const entry = await db.$transaction(async (tx) => {
+      const persistedEntry = await upsertTimeEntry(companyId, payload, tx);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: `work_order.time_${action}`,
+        metadata: { entryId, kind, minutes, billable, status, storage: "WorkOrderTimeEntry" },
+      }, tx);
+      return persistedEntry;
+    });
+    return NextResponse.json({ entry }, { status: 201 });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }

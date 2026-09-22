@@ -9,6 +9,7 @@ const {
   auditFindFirstMock,
   propertyFindManyMock,
   propertyFindFirstMock,
+  claimCreateMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   auditFindFirstMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   propertyFindFirstMock: vi.fn(),
+  claimCreateMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -31,20 +33,26 @@ vi.mock("@/lib/audit", () => ({
   writeAuditLog: writeAuditLogMock,
 }));
 
+vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
+  notDeletedFilter: vi.fn().mockResolvedValue({ deleted_at: null }),
+  activePropertyRelationFilter: vi.fn().mockResolvedValue({ property: { deleted_at: null } }),
+}));
+
 vi.mock("@/lib/db", () => ({
   default: {
     insuranceClaim: {
       findMany: claimFindManyMock,
       findFirst: claimFindFirstMock,
       updateMany: claimUpdateManyMock,
-      create: vi.fn(),
+      create: claimCreateMock,
     },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
     property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
   },
 }));
 
-import { PATCH } from "./route";
+import { GET, PATCH, POST } from "./route";
 
 describe("insurance-claims route", () => {
   beforeEach(() => {
@@ -135,5 +143,117 @@ describe("insurance-claims route", () => {
     expect(response.status).toBe(409);
     expect(body.error).toMatch(/backfill/i);
     expect(claimUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians from reading insurance claims", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa skadeärenden");
+    expect(claimFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing insurance claims", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(claimFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies residents before creating an insurance claim", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/insurance-claims", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", title: "Vattenskada" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies residents before looking up an insurance claim", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await PATCH(new Request("http://localhost/api/insurance-claims", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimId: "claim-1", status: "open" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(claimFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await PATCH(new Request("http://localhost/api/insurance-claims", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimId: "claim-1", status: "open" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(claimFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts a claim against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/insurance-claims", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-tenant-b", title: "Vattenskada" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true },
+    });
+    expect(claimCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B claim id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    claimFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/insurance-claims", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ claimId: "claim-tenant-b", status: "investigating" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Skadeärendet hittades inte");
+    expect(claimFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "claim-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(claimUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

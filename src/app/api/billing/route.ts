@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { writeAuditLog } from "@/lib/audit";
 import { BILLING_PLANS, BILLING_PLAN_KEYS, isBillingPlanKey } from "@/lib/billing-plans";
-import { canManageBilling, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canManageBilling, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import db from "@/lib/db";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -53,8 +53,8 @@ export async function GET(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -62,13 +62,14 @@ export async function GET(request: Request) {
         event: "billing.read.unauthorized",
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Företag saknas",
-        event: "billing.read.missing_company",
-        context: { userId: user.id },
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "billing.read.forbidden_staff",
+        context: { userId: rawUser.id },
       });
     }
     const companyId = user.company_id;
@@ -150,8 +151,8 @@ export async function PATCH(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -159,13 +160,14 @@ export async function PATCH(request: Request) {
         event: "billing.plan_change.unauthorized",
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
-        message: "Du saknar behörighet att ändra plan",
-        event: "billing.plan_change.missing_company",
-        context: { userId: user.id },
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "billing.plan_change.staff_required",
+        context: { userId: rawUser.id },
       });
     }
     const companyId = user.company_id;

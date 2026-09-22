@@ -113,8 +113,26 @@ describe("PATCH /api/team/[id]", () => {
     getCurrentUserMock.mockResolvedValue({ id: "caller-1", company_id: null, role: "owner" });
 
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
+    const body = await response.json();
 
     expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a team member", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
@@ -171,6 +189,22 @@ describe("PATCH /api/team/[id]", () => {
       expect.objectContaining({ where: { id: "target-user", company_id: "company-1" } }),
     );
     expect(userUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B member id", async () => {
+    getCurrentUserMock.mockResolvedValue(ownerCaller);
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(patchRequest({ status: "inactive" }), ctx("user-tenant-b"));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Teammedlemmen hittades inte");
+    expect(userFindFirstMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "user-tenant-b", company_id: "company-1" } }),
+    );
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
   it("returns 403 when a non-owner targets an existing owner", async () => {

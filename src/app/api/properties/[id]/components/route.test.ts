@@ -120,6 +120,25 @@ describe("property components GET", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before loading the component register", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request(), { params: Promise.resolve({ id: "property-1" }) });
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(response.status).toBe(403);
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
   it("returns correlated 404 for another tenant without logging the submitted property id", async () => {
     getCurrentUserMock.mockResolvedValue(owner);
     propertyFindFirstMock.mockResolvedValue(null);

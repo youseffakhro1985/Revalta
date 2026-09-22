@@ -99,6 +99,7 @@ describe("work-orders/edit-locks", () => {
       const response = await GET();
 
       expect(response.status).toBe(403);
+      expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
       expect(queryRawMock).not.toHaveBeenCalled();
     });
 
@@ -231,6 +232,14 @@ describe("work-orders/edit-locks", () => {
       const response = await DELETE(deleteRequest({ workOrderId: "wo-1", reason: "Fastnat i låst läge" }));
 
       expect(response.status).toBe(403);
+      expect(transactionMock).not.toHaveBeenCalled();
+    });
+
+    it("returns the staff copy for residents before looking up a lock", async () => {
+      getCurrentUserMock.mockResolvedValue({ id: "user-2", company_id: "company-1", role: "resident" });
+      const response = await DELETE(deleteRequest({ workOrderId: "wo-1", reason: "Fastnat i låst läge" }));
+      expect(response.status).toBe(403);
+      expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
       expect(transactionMock).not.toHaveBeenCalled();
     });
 

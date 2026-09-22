@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageLeases, canViewLeasingData, getCurrentUser } from "@/lib/current-user";
+import { canManageLeases, canViewLeasingData, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { generateLeaseNumber, isOccupyingLeaseStatus, parseLeaseInput } from "@/lib/leasing";
 import { createLogger } from "@/lib/structured-logger";
 
@@ -26,9 +26,10 @@ function leaseResponse(lease: {
 
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewLeasingData(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa uthyrningsdata" }, { status: 403 });
     }
@@ -119,10 +120,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet att hantera avtal" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = (await request.json()) as Record<string, unknown>;
     const parsed = parseLeaseInput(body);
@@ -147,7 +149,7 @@ export async function POST(request: Request) {
       let holder;
       if (input.holderId) {
         const existingHolder = await tx.leaseHolder.findFirst({ where: { deleted_at: null, id: input.holderId, company_id: user.company_id! } });
-        if (!existingHolder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        if (!existingHolder) throw new LeaseRequestError("Hyresparten hittades inte", 404);
         const holderUpdate = await tx.leaseHolder.updateMany({
           where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
           data: {
@@ -159,11 +161,11 @@ export async function POST(request: Request) {
             organization_number: input.holderOrganizationNumber,
           },
         });
-        if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 404);
         holder = await tx.leaseHolder.findFirst({
           where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
         });
-        if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 404);
       } else {
         holder = await tx.leaseHolder.create({
           data: {

@@ -102,6 +102,22 @@ describe("calendar route", () => {
     transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
   });
 
+  it("rejects residents before loading work orders, leases or calendar events", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect(calendarFindManyMock).not.toHaveBeenCalled();
+    expect(workOrderFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("projects scheduled work orders from canonical WorkOrder storage", async () => {
     getCurrentUserMock.mockResolvedValue(user);
     workOrderFindManyMock.mockResolvedValue([{
@@ -417,5 +433,160 @@ describe("calendar route", () => {
     expect(response.status).toBe(409);
     expect((await response.json()).error).toMatch(/backfill/i);
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("POST/PATCH/DELETE reject residents before looking up calendar events", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const post = await POST(new Request("http://localhost/api/calendar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "OVK", date: "2026-09-10" }),
+    }));
+    expect(post.status).toBe(403);
+    expect((await post.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+
+    const patch = await PATCH(new Request("http://localhost/api/calendar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1", status: "done" }),
+    }));
+    expect(patch.status).toBe(403);
+    expect((await patch.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+
+    const del = await DELETE(new Request("http://localhost/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1" }),
+    }));
+    expect(del.status).toBe(403);
+    expect((await del.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+
+    expect(calendarFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("POST/PATCH/DELETE deny viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const post = await POST(new Request("http://localhost/api/calendar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "OVK", date: "2026-09-10" }),
+    }));
+    expect(post.status).toBe(403);
+    expect((await post.json()).error).toBe("Du saknar behörighet");
+
+    const patch = await PATCH(new Request("http://localhost/api/calendar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1", status: "done" }),
+    }));
+    expect(patch.status).toBe(403);
+    expect((await patch.json()).error).toBe("Du saknar behörighet");
+
+    const del = await DELETE(new Request("http://localhost/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1" }),
+    }));
+    expect(del.status).toBe(403);
+    expect((await del.json()).error).toBe("Du saknar behörighet");
+
+    expect(calendarFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("GET scopes lease projections to the caller company", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(leaseFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        deleted_at: null,
+        property: { deleted_at: null },
+      }),
+    }));
+  });
+
+  it("GET scopes work-order projections to the caller company and never queries Tenant B", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        company_id: "company-1",
+        deleted_at: null,
+        scheduled_start: { not: null },
+        property: { deleted_at: null },
+      },
+    }));
+    expect(workOrderFindManyMock.mock.calls[0][0].where.assigned_to_id).toBeUndefined();
+  });
+
+  it("scopes technicians to assigned work and omits leases and maintenance plans", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        assigned_to_id: "tech-1",
+        scheduled_start: { not: null },
+      }),
+    }));
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(maintenanceFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B calendar event id", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+    calendarFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/calendar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-tenant-b", status: "done" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Aktiviteten hittades inte");
+    expect(calendarFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "event-tenant-b", company_id: "company-1" },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B calendar event id", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+    calendarFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await DELETE(new Request("http://localhost/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Aktiviteten hittades inte");
+    expect(calendarFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "event-tenant-b", company_id: "company-1" },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(calendarDeleteManyMock).not.toHaveBeenCalled();
   });
 });

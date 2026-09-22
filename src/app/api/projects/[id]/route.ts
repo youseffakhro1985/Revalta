@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import db from "@/lib/db";
-import { canManageWorkOrderFinance, canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canManageWorkOrderFinance, canViewFinanceData, canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 
 const allowedStatuses = new Set(["planned", "active", "paused", "completed", "cancelled"]);
@@ -27,9 +27,10 @@ function parseOptionalMoney(value: unknown) {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) {
     return NextResponse.json({ error: "Du saknar behörighet att visa projekt" }, { status: 403 });
   }
@@ -58,10 +59,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const companyId = user.company_id;
 
   const body = await request.json().catch(() => null);
@@ -86,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const managerId = body.managerId ? String(body.managerId).trim() : null;
     if (managerId) {
       const manager = await db.user.findFirst({ where: { id: managerId, company_id: companyId, status: "active" }, select: { id: true } });
-      if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
+      if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 404 });
     }
     data.manager_id = managerId;
   }
@@ -160,10 +162,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const companyId = user.company_id;
 
   const { id } = await params;

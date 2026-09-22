@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { canManageCompany, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { buildOnboardingProgress } from "@/lib/onboarding";
 import { getCompanyServicePreferences } from "@/lib/service-notification-settings";
 import { createLogger } from "@/lib/structured-logger";
@@ -76,9 +76,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id || !canManageCompany(user.role)) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
+    if (!canManageCompany(user.role)) {
       return noStore({ error: "Du saknar behörighet att verifiera organisationens onboarding" }, { status: 403 });
     }
 

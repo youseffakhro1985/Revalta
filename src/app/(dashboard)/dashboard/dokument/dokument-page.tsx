@@ -28,6 +28,7 @@ import {
   premiumFieldClass,
   premiumPrimaryButtonClass,
 } from "@/components/dashboard/premium-ui";
+import { csvCell } from "@/lib/csv-cell";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Unit = { id: string; designation: string };
@@ -174,11 +175,6 @@ function daysUntil(value: string | null) {
   today.setHours(0, 0, 0, 0);
   target.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
-}
-
-function escapeCsv(value: unknown) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function buildLegacyPayload(
@@ -462,7 +458,7 @@ export function DocumentsPage({ initialCreate }: { initialCreate: boolean }) {
           formatBytes(item.sizeBytes),
         ]),
       ];
-      const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(";")).join("\n")}`;
+      const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\n")}`;
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const anchor = window.document.createElement("a");

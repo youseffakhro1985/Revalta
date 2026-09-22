@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import { getPublicAppUrl } from "@/lib/app-url";
-import { canManageBilling, getCurrentUser } from "@/lib/current-user";
+import { canManageBilling, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import db from "@/lib/db";
 import { recordPaymentEvent } from "@/lib/integrations";
 import { createRouteObservability } from "@/lib/route-observability";
@@ -49,8 +49,8 @@ export async function POST(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -58,13 +58,14 @@ export async function POST(request: Request) {
         event: "billing.portal.unauthorized",
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
-        message: "Du saknar behörighet att öppna kundportal",
-        event: "billing.portal.missing_company",
-        context: { userId: user.id },
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "billing.portal.staff_required",
+        context: { userId: rawUser.id },
       });
     }
     const companyId = user.company_id;

@@ -199,6 +199,27 @@ describe("property card atomic writes", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before looking up a property", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({ action: "entrance.save", name: "Entré A" }), params());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("returns correlated validation for malformed JSON", async () => {
     const response = await POST(request("{not-json"), params());
     const body = await response.json();

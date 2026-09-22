@@ -45,6 +45,8 @@ vi.mock("@/lib/db", () => {
 });
 
 import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 function postRequest(body: unknown) {
   return new Request("https://www.revalta.se/api/team", {
@@ -152,37 +154,34 @@ describe("team route", () => {
       expect(userFindManyMock.mock.calls[0][0].select.email).toBeUndefined();
     });
 
-    it("returns a limited roster without emails for a resident (no full-roster permission)", async () => {
+    it("rejects residents before loading the staff roster", async () => {
       getCurrentUserMock.mockResolvedValue({
         id: "user-3",
         company_id: "company-1",
         role: "resident",
+        email: "boende@exempel.se",
         company: { name: "Testfastigheter AB" },
       });
-      userFindManyMock.mockResolvedValue([]);
 
       const response = await GET();
       const body = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(body.canManage).toBe(false);
-      expect(body.permissions.canSeeEmails).toBe(false);
+      expect(response.status).toBe(403);
+      expect(body.error).toMatch(/personalbehörighet/i);
+      expect(userFindManyMock).not.toHaveBeenCalled();
     });
 
-    it("scopes to self only when the caller has no company_id", async () => {
+    it("rejects callers without organisation before querying users", async () => {
       getCurrentUserMock.mockResolvedValue({
         id: "user-orphan",
         company_id: null,
         role: "technician",
         company: null,
       });
-      userFindManyMock.mockResolvedValue([]);
 
-      await GET();
-
-      expect(userFindManyMock).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "user-orphan" } }),
-      );
+      const response = await GET();
+      expect(response.status).toBe(403);
+      expect(userFindManyMock).not.toHaveBeenCalled();
     });
 
     it("returns 500 when the database call fails", async () => {
@@ -197,6 +196,32 @@ describe("team route", () => {
       const response = await GET();
 
       expect(response.status).toBe(500);
+    });
+
+    it("maps a missing User table on GET to 503 SERVICE_UNAVAILABLE", async () => {
+      getCurrentUserMock.mockResolvedValue({
+        id: "user-1",
+        company_id: "company-1",
+        role: "owner",
+        company: { name: "Testfastigheter AB" },
+      });
+      userFindManyMock.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError(
+          "The table `public.User` does not exist in the current database.",
+          {
+            code: "P2021",
+            clientVersion: "test",
+            meta: { table: "public.User" },
+          },
+        ),
+      );
+
+      const response = await GET();
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.error).toBe(schemaMismatchUserMessage());
+      expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
     });
   });
 
@@ -230,12 +255,30 @@ describe("team route", () => {
       expect(userCreateMock).not.toHaveBeenCalled();
     });
 
+    it("rejects residents before creating a team member", async () => {
+      getCurrentUserMock.mockResolvedValue({
+        id: "resident-1",
+        company_id: "company-1",
+        role: "resident",
+        email: "boende@exempel.se",
+      });
+
+      const response = await POST(postRequest(validPayload));
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+      expect(userCreateMock).not.toHaveBeenCalled();
+    });
+
     it("returns 403 when the caller has no company_id, even if role is owner", async () => {
       getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
 
       const response = await POST(postRequest(validPayload));
+      const body = await response.json();
 
       expect(response.status).toBe(403);
+      expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
       expect(userCreateMock).not.toHaveBeenCalled();
     });
 

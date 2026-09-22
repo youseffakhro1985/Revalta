@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
@@ -38,12 +38,19 @@ async function resolveContext(
   observability: ReturnType<typeof createRouteObservability>,
   operation: "read" | "update",
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const rawUser = await getCurrentUser();
+  if (!rawUser) {
     return { error: reject(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: `components.maintenance.${operation}.unauthorized` }) };
   }
-  if (!user.company_id) {
-    return { error: reject(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: `components.maintenance.${operation}.missing_company`, context: { userId: user.id } }) };
+  const user = requireCompanyUser(rawUser);
+  if (!user) {
+    return { error: reject(observability, {
+      status: 403,
+      code: API_ERROR_CODES.forbidden,
+      message: "En aktiv organisation och personalbehörighet krävs",
+      event: `components.maintenance.${operation}.forbidden`,
+      context: { userId: rawUser.id },
+    }) };
   }
   if (operation === "update" && !canCreateProperties(user.role)) {
     return { error: reject(observability, { status: 403, code: API_ERROR_CODES.forbidden, message: "Du saknar behörighet att ändra underhållsinställningar", event: "components.maintenance.update.forbidden", context: { userId: user.id, companyId: user.company_id } }) };

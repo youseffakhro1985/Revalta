@@ -35,6 +35,13 @@ const {
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: canManageTicketsMock,
+  canViewFinanceData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
+  canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -241,5 +248,137 @@ describe("work-order reports route atomicity", () => {
 
     expect(response.status).toBe(200);
     expect(body.canCreateInvoiceBasis).toBe(false);
+  });
+});
+
+describe("work-order reports GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading reports, signatures or invoice basis", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-1/reports"),
+      context,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(directQueryRawMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("redacts invoice basis and costs for technicians without loading finance stores", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      role: "technician",
+      company_id: "company-1",
+    });
+    workOrderFindFirstMock.mockResolvedValue({
+      ...workOrder,
+      assigned_to_id: "tech-1",
+      estimated_cost: 1200,
+      actual_cost: 800,
+    });
+    canManageTicketsMock.mockReturnValue(true);
+    directQueryRawMock.mockResolvedValue([]);
+
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-1/reports"),
+      context,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.invoiceBases).toEqual([]);
+    expect(body.canCreateInvoiceBasis).toBe(false);
+    expect(body.workOrder.estimated_cost).toBeNull();
+    expect(body.workOrder.actual_cost).toBeNull();
+    expect(directQueryRawMock).toHaveBeenCalledTimes(2);
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(listMaterialEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects technician invoice.create before building a draft", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      role: "technician",
+      company_id: "company-1",
+    });
+    canManageTicketsMock.mockReturnValue(true);
+    workOrderFindFirstMock.mockResolvedValue({ ...workOrder, assigned_to_id: "tech-1" });
+
+    const response = await POST(request({ action: "invoice.create" }), context);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet");
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up reports", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({ action: "report.create" }), context);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order reports Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(user);
+    canManageTicketsMock.mockReturnValue(true);
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads reports for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-tenant-b/reports"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(directQueryRawMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a report on a Tenant B work-order id", async () => {
+    const response = await POST(request({ action: "report.create" }), {
+      params: Promise.resolve({ id: "wo-tenant-b" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
   });
 });

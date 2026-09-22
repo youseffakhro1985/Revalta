@@ -26,6 +26,11 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: () => true,
   tenantWhere: () => ({ company_id: "company-1" }),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 vi.mock("@/lib/assigned-work-access", () => ({
   isAssignedWorkAccessible: () => true,

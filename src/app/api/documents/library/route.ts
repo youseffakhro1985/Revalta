@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { canViewLeasingData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canViewLeasingData, canViewOperations, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 import { parseDocumentLibraryQuery } from "@/lib/document-library-query";
 
@@ -50,8 +50,8 @@ export async function GET(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return apiErrorResponse({
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -59,11 +59,25 @@ export async function GET(request: Request) {
         requestId: observability.requestId,
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return apiErrorResponse({
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        requestId: observability.requestId,
+      });
+    }
+    if (!canViewOperations(user.role) && !canViewLeasingData(user.role)) {
+      observability.logger.warn("document library denied", observability.elapsed({
+        event: "documents.library.forbidden",
+        userId: user.id,
+        companyId: user.company_id,
+      }));
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "Du saknar behörighet",
         requestId: observability.requestId,
       });
     }

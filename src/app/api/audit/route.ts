@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canViewAudit, getCurrentUser } from "@/lib/current-user";
+import { canViewAudit, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { createLogger } from "@/lib/structured-logger";
 
 const logger = createLogger({ route: "/api/audit" });
@@ -18,7 +18,7 @@ function parsePositiveInteger(value: string | null, fallback: number, max?: numb
 
 function csvCell(value: unknown) {
   const normalized = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value) ?? "";
-  const formulaSafe = /^[=+\-@]/.test(normalized) ? `'${normalized}` : normalized;
+  const formulaSafe = /^[=+\-@\t\r]/.test(normalized) ? `'${normalized}` : normalized;
   return `"${formulaSafe.replaceAll('"', '""')}"`;
 }
 
@@ -48,8 +48,10 @@ function createAuditCsv(rows: AuditCsvRow[]) {
 
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewAudit(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa systemloggen" }, { status: 403 });
     }
@@ -62,9 +64,7 @@ export async function GET(request: Request) {
     const actor = searchParams.get("actor")?.trim() || "";
     const format = searchParams.get("format")?.trim().toLowerCase() || "json";
 
-    const tenantFilter: Prisma.AuditLogWhereInput = user.company_id
-      ? { company_id: user.company_id }
-      : { actor_user_id: user.id };
+    const tenantFilter: Prisma.AuditLogWhereInput = { company_id: user.company_id };
 
     const filters: Prisma.AuditLogWhereInput[] = [tenantFilter];
 

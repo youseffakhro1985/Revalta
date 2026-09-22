@@ -103,6 +103,21 @@ describe("maintenance-plan action work-order route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
     const response = await POST(request(), params());
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att skapa arbetsorder");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a property", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(request(), params());
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
@@ -219,5 +234,42 @@ describe("maintenance-plan action work-order route", () => {
     const response = await POST(request(), params());
     expect(response.status).toBe(500);
     expect(writeAuditLogMock).toHaveBeenCalledWith(expect.anything(), expect.anything(), tx);
+  });
+});
+
+describe("maintenance-plan action work-order Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(owner);
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a work order on a Tenant B property id", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request(), params("property-tenant-b"));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "property-tenant-b", company_id: "company-1", deleted_at: null }),
+    }));
+    expect(actionFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A uses a Tenant B action id on a Tenant A property", async () => {
+    propertyFindFirstMock.mockResolvedValue(property);
+    actionFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request({ actionId: "action-tenant-b" }), params());
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Åtgärden hittades inte");
+    expect(actionFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "action-tenant-b", company_id: "company-1", property_id: "property-1" },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

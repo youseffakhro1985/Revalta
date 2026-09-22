@@ -160,18 +160,33 @@ describe("documents route", () => {
     );
   });
 
-  it("returns no historical company documents after membership is removed", async () => {
+  it("rejects users without organisation before listing documents", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
-    auditFindManyMock.mockResolvedValue([]);
     const response = await GET(request());
     const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
+    expect(body.errorCode).toBe("FORBIDDEN");
     expect(managedFindManyMock).not.toHaveBeenCalled();
-    expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { company_id: { in: [] }, entity_type: "document", action: "document.created" },
-    }));
-    expect(body.documents).toEqual([]);
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing the staff document library", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
   it("omits company lease dump for technicians", async () => {
@@ -249,5 +264,57 @@ describe("documents route", () => {
       expect.any(Error),
       expect.objectContaining({ event: "documents.list.failed" }),
     );
+  });
+});
+
+describe("documents POST/PATCH staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+  });
+
+  it("POST rejects residents before parsing the upload", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request("POST"));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up a document", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(request("PATCH"));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(managedFindManyMock).not.toHaveBeenCalled();
   });
 });

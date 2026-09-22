@@ -6,7 +6,15 @@ const { findAccessibleWorkOrderMock, getCurrentUserMock, queryRawMock } = vi.hoi
   queryRawMock: vi.fn(),
 }));
 
-vi.mock("@/lib/current-user", () => ({ getCurrentUser: getCurrentUserMock }));
+vi.mock("@/lib/current-user", () => ({
+  getCurrentUser: getCurrentUserMock,
+  canViewFinanceData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role?: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role || "")) return null;
+    return user;
+  },
+}));
 vi.mock("@/lib/db", () => ({ default: { $queryRaw: queryRawMock } }));
 vi.mock("@/lib/assigned-work-access", () => ({
   findAccessibleWorkOrder: findAccessibleWorkOrderMock,
@@ -31,5 +39,77 @@ describe("GET /api/work-order-reports/[reportId]", () => {
 
     expect(response.status).toBe(404);
     expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(user, "work-order-2");
+  });
+
+  it("redacts snapshot costs for technicians on an assigned work order", async () => {
+    const user = { id: "technician-1", role: "technician", company_id: "company-1" };
+    getCurrentUserMock.mockResolvedValue(user);
+    queryRawMock.mockResolvedValue([{
+      id: "report-1",
+      work_order_id: "work-order-1",
+      version: 1,
+      status: "draft",
+      title: "Arbetsrapport",
+      snapshot: {
+        workOrder: { id: "work-order-1", estimated_cost: 1200, actual_cost: 800 },
+        entries: [{ description: "Material", unit_cost: 95, total_amount: 190 }],
+      },
+      approved_at: null,
+      created_at: new Date("2026-09-22T12:00:00Z"),
+    }]);
+    findAccessibleWorkOrderMock.mockResolvedValue({ id: "work-order-1" });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-order-reports/report-1"),
+      { params: Promise.resolve({ reportId: "report-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.report.snapshot.workOrder.estimated_cost).toBeNull();
+    expect(body.report.snapshot.workOrder.actual_cost).toBeNull();
+    expect(body.report.snapshot.entries[0]).toEqual({
+      description: "Material",
+      unit_cost: null,
+      total_amount: null,
+    });
+  });
+
+  it("rejects residents before reading work-order report snapshots", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-order-reports/report-1"),
+      { params: Promise.resolve({ reportId: "report-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads a Tenant B report id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    queryRawMock.mockResolvedValue([]);
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-order-reports/report-tenant-b"),
+      { params: Promise.resolve({ reportId: "report-tenant-b" }) },
+    );
+    const body = await response.json();
+    const sql = JSON.stringify(queryRawMock.mock.calls[0]?.[0] ?? {});
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Rapporten hittades inte");
+    expect(queryRawMock).toHaveBeenCalledTimes(1);
+    expect(sql).toContain("report-tenant-b");
+    expect(sql).toContain("company-1");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
   });
 });

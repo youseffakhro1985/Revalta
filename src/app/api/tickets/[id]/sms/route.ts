@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { queueSmsNotification } from "@/lib/integrations";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
@@ -12,8 +12,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att skicka SMS" }, { status: 403 });
     }

@@ -44,6 +44,11 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
   canViewFinanceData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 vi.mock("@/lib/assigned-work-access", () => ({
   isAssignedWorkAccessible: (user: { role: string; id: string }, assignedToId: string | null) => user.role !== "technician" || user.id === assignedToId,
@@ -233,6 +238,57 @@ describe("work-order execution lifecycle boundaries", () => {
     expect(body.completion).toEqual({ status: "in_progress", required_incomplete: 0, before_photo_count: 1, after_photo_count: 1 });
   });
 
+  it("rejects residents before loading execution checklist, costs or SLA", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/execution"), params);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up execution state", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/execution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "checklist.create" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies viewers with the ticket-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/execution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "checklist.create" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("finalizes in-progress work through the canonical completion helper inside one transaction", async () => {
     workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
     queryRawMock.mockResolvedValue([{ required_incomplete: 0, before_photos: 1, after_photos: 1 }]);
@@ -370,5 +426,72 @@ describe("work-order execution lifecycle boundaries", () => {
         notifyKind: "completed",
       }),
     );
+  });
+});
+
+describe("work-order execution GET schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(user());
+    workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
+  });
+
+  it("maps a missing WorkOrderExecutionEntry table to 503 SERVICE_UNAVAILABLE", async () => {
+    queryRawMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderExecutionEntry` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderExecutionEntry" },
+        },
+      ),
+    );
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/execution"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+});
+
+describe("work-order execution Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(user("owner"));
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads execution for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/execution"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts execution against a Tenant B work-order id", async () => {
+    const response = await POST(
+      request({ action: "complete" }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(completeLifecycleMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

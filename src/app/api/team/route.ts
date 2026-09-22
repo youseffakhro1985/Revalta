@@ -5,12 +5,19 @@ import {
   canManageTeam,
   canViewLeasingData,
   getCurrentUser,
+  requireCompanyUser,
 } from "@/lib/current-user";
 import { hashPassword } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 import { createLogger } from "@/lib/structured-logger";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/team" });
 
@@ -18,8 +25,12 @@ const allowedRoles = new Set(["owner", "admin", "manager", "technician", "viewer
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
 
     const canSeeFullRoster =
       canManageTeam(user.role) || canAssignWorkOrders(user.role) || canViewLeasingData(user.role);
@@ -70,6 +81,15 @@ export async function GET() {
       permissions: { canManage: canManageTeam(user.role), canSeeEmails: true },
     });
   } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
     logger.error("Get team error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
@@ -77,9 +97,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id || !canManageTeam(user.role)) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
+    if (!canManageTeam(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att lägga till teammedlemmar" }, { status: 403 });
     }
 

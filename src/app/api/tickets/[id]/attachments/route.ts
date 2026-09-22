@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { validateUploadFile } from "@/lib/document-file-security";
 import { recordStorageEvent } from "@/lib/integrations";
 import { deleteStoredFile, StorageConfigurationError, storeAttachment } from "@/lib/storage";
@@ -15,8 +15,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att lägga till bilagor" }, { status: 403 });
     }

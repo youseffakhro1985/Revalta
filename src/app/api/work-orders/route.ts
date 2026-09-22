@@ -8,6 +8,7 @@ import {
   canManageWorkOrderFinance,
   canViewFinanceData,
   getCurrentUser,
+  requireCompanyUser,
   shouldScopeToAssignedWork,
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -25,10 +26,12 @@ import { setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { WORK_ORDER_PRIORITIES, WORK_ORDER_STATUSES, normalizeWorkOrderPriority, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import {
+  hasWorkOrderNotesColumn,
   hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   notDeletedFilter,
   schemaMismatchUserMessage,
+  workOrderNotesWrite,
   workOrderVendorRelationSelect,
   workOrderVendorWrite,
 } from "@/lib/schema-readiness";
@@ -131,8 +134,8 @@ export async function GET(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -140,13 +143,14 @@ export async function GET(request: Request) {
         event: "work_orders.list.unauthorized",
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "work_orders.list.missing_company",
-        context: { userId: user.id },
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "work_orders.list.forbidden",
+        context: { userId: rawUser.id },
       });
     }
 
@@ -327,13 +331,23 @@ export async function POST(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "work_orders.create.unauthorized",
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "work_orders.create.staff_required",
+        context: { userId: rawUser.id },
       });
     }
     if (!canManageTickets(user.role)) {
@@ -343,15 +357,6 @@ export async function POST(request: Request) {
         message: "Du saknar behörighet",
         event: "work_orders.create.forbidden",
         context: { userId: user.id, companyId: user.company_id },
-      });
-    }
-    if (!user.company_id) {
-      return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "work_orders.create.missing_company",
-        context: { userId: user.id },
       });
     }
 
@@ -486,6 +491,7 @@ export async function POST(request: Request) {
       assigneeEmail = assignee.email;
     }
     const persistVendor = await hasWorkOrderVendorContractColumn();
+    const persistNotes = await hasWorkOrderNotesColumn();
     if (vendorContractId && !persistVendor) {
       return reject(observability, {
         status: 503,
@@ -534,11 +540,13 @@ export async function POST(request: Request) {
     try {
       await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId, buildingId, technicalAssetId });
     } catch (error) {
+      const message = safeAssetLinkMessage(error);
+      const propertyMiss = message === "Fastigheten hittades inte";
       return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: safeAssetLinkMessage(error),
-        event: "work_orders.create.asset_link_invalid",
+        status: propertyMiss ? 404 : 400,
+        code: propertyMiss ? API_ERROR_CODES.notFound : API_ERROR_CODES.validationFailed,
+        message,
+        event: propertyMiss ? "work_orders.create.property_not_found" : "work_orders.create.asset_link_invalid",
         context: { userId: user.id, companyId: user.company_id },
       });
     }
@@ -562,7 +570,7 @@ export async function POST(request: Request) {
           created_by_id: user.id,
           title,
           description,
-          notes,
+          ...workOrderNotesWrite(persistNotes, notes || null),
           status,
           priority,
           scheduled_start: scheduledStart,

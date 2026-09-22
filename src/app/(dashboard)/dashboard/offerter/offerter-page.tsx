@@ -16,6 +16,7 @@ import {
   premiumSecondaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { csvRow } from "@/lib/csv-cell";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string };
@@ -309,7 +310,7 @@ export function QuotesPage({ initialCreate }: { initialCreate: boolean }) {
       ["Fastighet", "Offert", "Leverantör", "Status", "Giltigt till", "Exkl moms", "Moms", "Total", "Kommentar"],
       ...visibleQuotes.map((quote) => [quote.property_name || "", quote.title || "", quote.supplier || "", labels[quote.status || "draft"] || quote.status || "", quote.valid_until || "", String(quote.subtotal || 0), String(quote.vat || 0), String(quote.total || 0), quote.note || ""]),
     ];
-    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(";")).join("\n");
+    const csv = rows.map((row) => csvRow(row)).join("\n");
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;

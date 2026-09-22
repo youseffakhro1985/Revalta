@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTeam, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canManageTeam, canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
 type ActiveLockRow = {
@@ -48,9 +48,10 @@ async function clearExpiredLocks(companyId: string) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) return noStore({ error: "Du saknar behörighet att visa driftläget" }, { status: 403 });
 
   const removedExpired = await clearExpiredLocks(user.company_id);
@@ -107,9 +108,10 @@ export async function GET() {
 }
 
 export async function DELETE(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageTeam(user.role)) return noStore({ error: "Endast ägare och administratörer kan frigöra andra användares lås" }, { status: 403 });
 
   const body = (await request.json().catch(() => null)) as { workOrderId?: unknown; reason?: unknown } | null;

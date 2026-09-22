@@ -104,6 +104,59 @@ describe("work-order profitability route", () => {
     const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/profitability"), params);
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa lönsamhet");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before loading profitability settings", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/work-orders/wo-1/profitability"), params);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up profitability settings", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/profitability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ overheadPercent: 10 }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/profitability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ overheadPercent: 10 }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
   });
 
@@ -233,5 +286,44 @@ describe("work-order profitability route", () => {
     expect(response.status).toBe(409);
     expect(body.error).toContain("backfill");
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order profitability Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads profitability for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/profitability"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(listMaterialEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A saves profitability on a Tenant B work-order id", async () => {
+    const response = await POST(postRequest({ customerHourlyRate: 700 }), {
+      params: Promise.resolve({ id: "wo-tenant-b" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(getModernProfitabilitySettingsMock).not.toHaveBeenCalled();
+    expect(upsertProfitabilitySettingsMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

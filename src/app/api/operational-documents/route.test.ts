@@ -12,6 +12,7 @@ const {
   projectFindFirstMock,
   queryRawMock,
   sqlSoftDeleteGuardMock,
+  storeAttachmentMock,
 } = vi.hoisted(() => ({
   createLoggerMock: vi.fn(),
   getCurrentUserMock: vi.fn(),
@@ -23,6 +24,7 @@ const {
   projectFindFirstMock: vi.fn(),
   queryRawMock: vi.fn(),
   sqlSoftDeleteGuardMock: vi.fn(),
+  storeAttachmentMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -47,7 +49,7 @@ vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 vi.mock("@/lib/audit", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/lib/storage", () => ({
   StorageConfigurationError: class StorageConfigurationError extends Error {},
-  storeAttachment: vi.fn(),
+  storeAttachment: storeAttachmentMock,
 }));
 vi.mock("@/lib/assigned-work-access", () => ({ findAccessibleWorkOrder: vi.fn() }));
 
@@ -90,6 +92,38 @@ describe("operational-documents root route", () => {
     });
     expect(response.headers.get("x-request-id")).toBe(requestId);
     expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing operational documents", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(operationalDocumentFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects callers without organisation before listing operational documents", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: null, role: "owner" });
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(403);
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
     expect(queryRawMock).not.toHaveBeenCalled();
   });
@@ -192,5 +226,100 @@ describe("operational-documents root route", () => {
       expect.any(Error),
       expect.objectContaining({ event: "operational_documents.list.failed" }),
     );
+  });
+});
+
+describe("operational-documents POST staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+  });
+
+  it("rejects residents before parsing the upload", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request("", "POST"));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      "operational document request rejected",
+      expect.objectContaining({ event: "operational_documents.create.staff_required" }),
+    );
+  });
+
+  it("denies viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(request("", "POST"));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "Du saknar behörighet",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+  });
+
+  it("returns tenant-safe 404 when Tenant A lists operational documents for Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(request("?entityType=property&entityId=property-tenant-b"));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Objektet hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", company_id: "company-1", deleted_at: null },
+      select: { id: true },
+    });
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(operationalDocumentFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A uploads against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const form = new FormData();
+    form.append(
+      "file",
+      new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34])], "protokoll.pdf", {
+        type: "application/pdf",
+      }),
+    );
+    form.append("entityType", "property");
+    form.append("entityId", "property-tenant-b");
+
+    const response = await POST(new Request("https://www.revalta.se/api/operational-documents", {
+      method: "POST",
+      headers: { "x-request-id": requestId },
+      body: form,
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Objektet hittades inte");
+    expect(storeAttachmentMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 });

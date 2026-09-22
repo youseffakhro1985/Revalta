@@ -5,6 +5,7 @@ import {
   canExportTickets,
   canManageTickets,
   getCurrentUser,
+  requireCompanyUser,
   shouldScopeToAssignedWork,
   tenantWhere,
 } from "@/lib/current-user";
@@ -44,12 +45,21 @@ export async function GET(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return apiErrorResponse({
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
+        requestId: observability.requestId,
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return apiErrorResponse({
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
         requestId: observability.requestId,
       });
     }

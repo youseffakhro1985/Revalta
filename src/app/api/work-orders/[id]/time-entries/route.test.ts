@@ -24,6 +24,11 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
   canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -45,7 +50,9 @@ vi.mock("@/lib/db", () => ({
   default: { $transaction: transactionMock },
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 function request(body: Record<string, unknown>) {
   return new Request("https://www.revalta.se/api/work-orders/work-order-1/time-entries", {
@@ -302,6 +309,142 @@ describe("time-entry id isolation and transition authorization", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({ error: "Tidsraden kan bara attesteras när den är inskickad" });
     expect(upsertTimeEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order time-entries GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before listing time entries", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/work-order-1/time-entries"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/work-order-1/time-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "manual", kind: "work", minutes: 30 }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order time-entries schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      email: "tech@example.com",
+      name: "Tekniker",
+      role: "technician",
+      company_id: "company-1",
+    });
+    findAccessibleWorkOrderMock.mockResolvedValue({ id: "work-order-1", assigned_to_id: "tech-1", title: "Test" });
+  });
+
+  it("maps a missing WorkOrderTimeEntry table on create to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderTimeEntry` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderTimeEntry" },
+        },
+      ),
+    );
+
+    const response = await POST(request({
+      action: "manual",
+      kind: "work",
+      startedAt: "2026-08-31T08:00:00.000Z",
+      endedAt: "2026-08-31T09:00:00.000Z",
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("keeps invalid time ranges as field validation", async () => {
+    const response = await POST(request({
+      action: "manual",
+      kind: "work",
+      startedAt: "2026-08-31T09:00:00.000Z",
+      endedAt: "2026-08-31T08:00:00.000Z",
+    }), params);
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Start- och sluttid måste vara giltiga");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order time-entries Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A lists time on a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/time-entries"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      "wo-tenant-b",
+      expect.anything(),
+    );
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts time on a Tenant B work-order id", async () => {
+    const response = await POST(request({
+      action: "manual",
+      kind: "work",
+      startedAt: "2026-08-31T08:00:00.000Z",
+      endedAt: "2026-08-31T09:00:00.000Z",
+    }), { params: Promise.resolve({ id: "wo-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(upsertTimeEntryMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

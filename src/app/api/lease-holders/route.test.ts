@@ -19,7 +19,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 describe("lease-holders GET pagination", () => {
   beforeEach(() => {
@@ -60,6 +60,29 @@ describe("lease-holders GET pagination", () => {
     expect(body.pagination.pageSize).toBe(100);
   });
 
+  it("denies technicians from listing lease holders", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET(new Request("https://www.revalta.se/api/lease-holders"));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa hyresparter");
+    expect(holderFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing holder emails", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(new Request("https://www.revalta.se/api/lease-holders"));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(holderFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("rejects an inaccessible property before reading contacts", async () => {
     propertyFindFirstMock.mockResolvedValue(null);
 
@@ -68,5 +91,48 @@ describe("lease-holders GET pagination", () => {
     expect(response.status).toBe(404);
     expect(holderFindManyMock).not.toHaveBeenCalled();
     expect(holderCountMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A lists holders for Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(new Request("https://www.revalta.se/api/lease-holders?propertyId=property-tenant-b"));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "property-tenant-b", company_id: "company-1", deleted_at: null },
+    }));
+    expect(holderFindManyMock).not.toHaveBeenCalled();
+    expect(holderCountMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies residents before creating a holder", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("https://www.revalta.se/api/lease-holders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Anna Andersson" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+  });
+
+  it("POST denies technicians with the holder-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("https://www.revalta.se/api/lease-holders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Anna Andersson" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att hantera kontaktregistret");
   });
 });

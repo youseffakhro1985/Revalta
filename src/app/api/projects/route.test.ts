@@ -103,6 +103,52 @@ describe("projects GET pagination", () => {
     expect(projectFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ take: 100 }));
     expect(body.pagination.pageSize).toBe(100);
   });
+
+  it("denies technicians from listing projects", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET(new Request("https://www.revalta.se/api/projects"));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa projekt");
+    expect(projectFindManyMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing projects or manager emails", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET(new Request("https://www.revalta.se/api/projects"));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(projectFindManyMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies residents before creating a project", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(projectRequest({ propertyId: "property-1", name: "Tak" }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(projectRequest({ propertyId: "property-1", name: "Tak" }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("projects POST reliability", () => {
@@ -219,7 +265,7 @@ describe("projects POST reliability", () => {
       name: "Projekt",
     }));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Projektledaren hittades inte" });
     expect(userFindFirstMock).toHaveBeenCalledWith({
       where: { id: "foreign-manager", company_id: "company-1", status: "active" },
@@ -237,7 +283,7 @@ describe("projects POST reliability", () => {
       name: "Projekt",
     }));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Arbetsordern hittades inte för vald fastighet" });
     expect(workOrderFindFirstMock).toHaveBeenCalledWith({
       where: {

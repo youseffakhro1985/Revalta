@@ -41,6 +41,23 @@ describe("GET /api/attachments/[id]", () => {
     await expect(response.json()).resolves.toEqual({ error: "Bilagan hittades inte" });
   });
 
+  it("rejects residents before looking up ticket attachments", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/attachments/attachment-1"), context());
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+    });
+    expect(attachmentFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("requires an active tenant-scoped parent ticket", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "manager-1",

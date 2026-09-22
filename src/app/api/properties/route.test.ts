@@ -46,6 +46,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const owner = { id: "owner-1", company_id: "company-1", role: "owner" };
@@ -316,6 +318,39 @@ describe("properties root route", () => {
       "property list failed",
       expect.any(Error),
       expect.objectContaining({ event: "properties.list.failed" }),
+    );
+  });
+
+  it("maps a missing Property table on create to 503 SERVICE_UNAVAILABLE", async () => {
+    getCurrentUserMock.mockResolvedValue(owner);
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.Property` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.Property" },
+        },
+      ),
+    );
+
+    const response = await POST(postRequest({
+      name: "Kvarnhuset",
+      address: "Storgatan 1",
+      city: "Stockholm",
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: schemaMismatchUserMessage(),
+      errorCode: "SERVICE_UNAVAILABLE",
+      requestId,
+    });
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "property create schema unavailable",
+      expect.any(Error),
+      expect.objectContaining({ event: "properties.create.schema_unavailable" }),
     );
   });
 });

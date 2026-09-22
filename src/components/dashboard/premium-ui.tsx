@@ -8,11 +8,11 @@ export const premiumSecondaryButtonClass = "inline-flex h-11 items-center justif
 export const premiumCompactButtonClass = "inline-flex h-9 items-center justify-center rounded-lg border border-sand-200/90 bg-white px-3 text-xs font-semibold text-ink-700 shadow-[0_1px_2px_rgba(17,34,31,0.02)] transition-[background-color,border-color,color,box-shadow,opacity] duration-200 hover:border-sand-300 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-petroleum-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 export const premiumDangerButtonClass = "inline-flex h-9 items-center justify-center rounded-lg border border-danger-200 bg-white px-3 text-xs font-semibold text-danger-700 transition-[background-color,border-color,color,opacity] duration-200 hover:border-danger-300 hover:bg-danger-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-100 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
-export function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
+export function PageHeader({ eyebrow, title, description, action, titleId }: { eyebrow: string; title: string; description: string; action?: ReactNode; titleId?: string }) {
   return <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
     <div className="min-w-0">
       <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-ink-500">{eyebrow}</p>
-      <h1 className="mt-2 font-display text-[29px] font-semibold leading-[1.08] tracking-[-0.04em] text-ink-900 sm:text-[34px]">{title}</h1>
+      <h1 id={titleId} className="mt-2 break-words font-display text-[29px] font-semibold leading-[1.08] tracking-[-0.04em] text-ink-900 sm:text-[34px]">{title}</h1>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">{description}</p>
     </div>
     {action ? <div className="w-full shrink-0 sm:w-auto">{action}</div> : null}

@@ -31,7 +31,24 @@ describe("GET /api/tickets/unassigned-queue", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET();
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att tilldela ärenden");
     expect(ticketFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing tickets or assignee emails", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(ticketFindManyMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
   });
 
   it("lists unassigned open tickets and assignable staff", async () => {
@@ -60,6 +77,13 @@ describe("GET /api/tickets/unassigned-queue", () => {
       }),
     }));
     expect(ticketFindManyMock.mock.calls[0]?.[0].where.company_id).toBe("company-1");
+    expect(userFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        status: "active",
+        role: { in: ["owner", "admin", "manager", "technician"] },
+      }),
+    }));
     expect(body.tickets[0]).toEqual(expect.objectContaining({
       id: "ticket-1",
       href: "/dashboard/felanmalan/ticket-1",

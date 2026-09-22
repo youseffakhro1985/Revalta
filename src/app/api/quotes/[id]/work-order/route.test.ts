@@ -217,6 +217,42 @@ describe("quotes/[id]/work-order route", () => {
     });
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(quoteFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a quote", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/quotes/quote-1/work-order", { method: "POST" }), {
+      params: Promise.resolve({ id: "quote-1" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(quoteFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a work order from a Tenant B quote id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    quoteFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/quotes/quote-tenant-b/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "quote-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Offerten hittades inte");
+    expect(quoteFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "quote-tenant-b", company_id: "company-1" }),
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

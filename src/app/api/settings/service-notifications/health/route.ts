@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageCompany, getCurrentUser } from "@/lib/current-user";
+import { canManageCompany, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +40,10 @@ function deliverySummary(payload: unknown): DeliverySummary {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageCompany(user.role)) {
     return noStore({ error: "Endast ägare och administratörer kan visa leveranshälsan" }, { status: 403 });
   }

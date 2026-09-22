@@ -184,4 +184,20 @@ describe("document metadata update write security", () => {
     expect(managedUpdateManyMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B document id", async () => {
+    managedFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(patchRequest({ documentId: "doc-tenant-b", name: "Nytt namn" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Dokumentet hittades inte");
+    expect(managedFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "doc-tenant-b", company_id: "company-1" }),
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });

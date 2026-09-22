@@ -2,7 +2,7 @@ import { del, put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse, type ApiErrorCode } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { canManageTickets, getCurrentUser, isStaffRole, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { validateUploadFile } from "@/lib/document-file-security";
 import { getStorageToken } from "@/lib/storage";
@@ -48,13 +48,23 @@ function failure(observability: Observability, operation: string) {
 }
 
 async function context(id: string, observability: Observability) {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, error: reject(observability, 401, API_ERROR_CODES.unauthorized, "Obehörig") } as const;
-  if (!isStaffRole(user.role)) return { ok: false, error: reject(observability, 403, API_ERROR_CODES.forbidden, "Du saknar behörighet") } as const;
-  if (!user.company_id) return { ok: false, error: reject(observability, 400, API_ERROR_CODES.validationFailed, "Användaren saknar organisation") } as const;
-  const workOrder = await findAccessibleWorkOrder(user as CompanyUser, id);
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return { ok: false, error: reject(observability, 401, API_ERROR_CODES.unauthorized, "Obehörig") } as const;
+  const user = requireCompanyUser(rawUser);
+  if (!user) {
+    return {
+      ok: false,
+      error: reject(
+        observability,
+        403,
+        API_ERROR_CODES.forbidden,
+        "En aktiv organisation och personalbehörighet krävs",
+      ),
+    } as const;
+  }
+  const workOrder = await findAccessibleWorkOrder(user, id);
   if (!workOrder) return { ok: false, error: reject(observability, 404, API_ERROR_CODES.notFound, "Arbetsordern hittades inte") } as const;
-  return { ok: true, user: user as CompanyUser, workOrder } as const;
+  return { ok: true, user, workOrder } as const;
 }
 
 export async function GET(request: Request, { params }: Params) {

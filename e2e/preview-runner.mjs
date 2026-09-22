@@ -2,6 +2,7 @@ import { validateRelease, validateTarget } from "./target-policy.mjs";
 
 export const REQUIRED_STEPS = Object.freeze([
   "verified-login-and-profile", "dashboard", "desktop-navigation", "properties-api",
+  "golden-path-ticket-to-invoice", "golden-path-mobile-work-order",
   "command-center-api", "mobile-navigation-and-command-center",
   "logout-and-protected-redirect", "public-auth-verification",
 ]);
@@ -18,8 +19,26 @@ export async function readPreviewHealth(target, env) {
   } catch {
     throw new Error("BLOCKED: Preview health request failed or timed out");
   }
-  if (response.status !== 200) throw new Error("BLOCKED: Preview health must return HTTP 200");
-  try { return await response.json(); } catch { throw new Error("BLOCKED: Preview health is not valid JSON"); }
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (response.status !== 200) {
+    if (payload && payload.schemaReady === false) {
+      throw new Error("BLOCKED: Preview schema is not ready for this release");
+    }
+    if (
+      payload
+      && (payload.components?.dataPlane === "mismatch" || payload.dataPlane?.directMatches === false)
+    ) {
+      throw new Error("BLOCKED: Preview data-plane isolation is not ready for this release");
+    }
+    throw new Error("BLOCKED: Preview health must return HTTP 200");
+  }
+  if (!payload) throw new Error("BLOCKED: Preview health is not valid JSON");
+  return payload;
 }
 
 // This orchestrator is used by the executable browser entry point. Browser setup

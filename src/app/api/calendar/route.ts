@@ -1,5 +1,13 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageTickets, getCurrentUser } from "@/lib/current-user";
+import {
+  auditScopedWhere,
+  canManageLeases,
+  canManageTickets,
+  canViewOperations,
+  getCurrentUser,
+  requireCompanyUser,
+  shouldScopeToAssignedWork,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
 import { isMissingTableError } from "@/lib/schema-readiness";
@@ -72,11 +80,18 @@ type DerivedCalendarEvent = {
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
 
     const companyId = user.company_id;
     const empty = Promise.resolve([]);
+    const assignedWorkOnly = shouldScopeToAssignedWork(user.role);
+    const includeLeases = canManageLeases(user.role);
+    const includeMaintenancePlanning = canViewOperations(user.role);
     const [rows, events, workOrders, rounds, inspections, maintenanceItems, leases] = await Promise.all([
       companyId
         ? db.calendarEvent.findMany({
@@ -98,6 +113,7 @@ export async function GET() {
               deleted_at: null,
               scheduled_start: { not: null },
               property: { deleted_at: null },
+              ...(assignedWorkOnly ? { assigned_to_id: user.id } : {}),
             },
             orderBy: { scheduled_start: "asc" },
             take: 500,
@@ -154,7 +170,7 @@ export async function GET() {
             },
           }))
         : empty,
-      companyId
+      companyId && includeMaintenancePlanning
         ? optionalFindMany("PortfolioMaintenanceItem", () => db.portfolioMaintenanceItem.findMany({
             where: {
               company_id: companyId,
@@ -174,7 +190,7 @@ export async function GET() {
             },
           }))
         : empty,
-      companyId
+      companyId && includeLeases
         ? optionalFindMany("Lease", () => db.lease.findMany({
             where: {
               company_id: companyId,
@@ -358,10 +374,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const title = String(body.title || "").trim();
@@ -428,10 +445,11 @@ const allowedStatuses = new Set(["planned", "done", "cancelled"]);
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const eventId = String(body.eventId || body.id || "").trim();
@@ -564,10 +582,11 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => ({} as Record<string, unknown>));
     const eventId = String(body.eventId || body.id || "").trim();

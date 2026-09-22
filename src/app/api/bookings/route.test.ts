@@ -90,7 +90,7 @@ describe("bookings route", () => {
     const response = await GET();
     const body = await response.json();
     expect(response.status).toBe(403);
-    expect(body.error).toBe("Du saknar behörighet att visa bokningar");
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(bookingFindManyMock).not.toHaveBeenCalled();
   });
 
@@ -129,6 +129,24 @@ describe("bookings route", () => {
       body: JSON.stringify({ bookingId: "booking-1", status: "cancelled" }),
     }));
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(bookingFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies residents before looking up a booking", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    const response = await PATCH(new Request("http://localhost/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "booking-1", status: "cancelled" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(bookingFindFirstMock).not.toHaveBeenCalled();
   });
 
@@ -217,8 +235,45 @@ describe("bookings route", () => {
   it("does not create when another writer won the slot", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     bookingFindFirstMock.mockResolvedValue({ id: "competing-booking" });
-    expect((await POST(createRequest())).status).toBe(409);
+    const response = await POST(createRequest());
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("Tiden är redan bokad för denna resurs");
     expect(bookingCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when a PATCH overlaps another booking on the same resource", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    bookingFindFirstMock
+      .mockResolvedValueOnce({
+        id: "booking-1",
+        property_id: "property-1",
+        status: "confirmed",
+        resource: "Tvättstuga",
+        resident_name: "Anna",
+        unit: "1201",
+        start_at: new Date("2026-07-27T08:00:00Z"),
+        end_at: new Date("2026-07-27T10:00:00Z"),
+        note: null,
+        updated_at: new Date("2026-07-20T10:00:00Z"),
+      })
+      .mockResolvedValueOnce({ id: "booking-overlap" });
+
+    const response = await PATCH(new Request("http://localhost/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookingId: "booking-1",
+        start: "2026-07-27T09:00:00.000Z",
+        end: "2026-07-27T11:00:00.000Z",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("Tiden är redan bokad för denna resurs");
+    expect(bookingUpdateManyMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
   it("fails creation if its audit fails", async () => {
@@ -231,6 +286,43 @@ describe("bookings route", () => {
     propertyFindFirstMock.mockResolvedValue(null);
     expect((await POST(createRequest())).status).toBe(404);
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts a booking against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(createRequest({ ...createBody, propertyId: "property-tenant-b" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "property-tenant-b", company_id: "company-1" }),
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(bookingCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B booking id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    bookingFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "booking-tenant-b", status: "cancelled" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Bokningen hittades inte");
+    expect(bookingFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "booking-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(bookingUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
   it.each(["resident", "viewer", "technician", "vendor", "unknown"])("denies %s creation", async (role) => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role });

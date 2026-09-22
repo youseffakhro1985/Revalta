@@ -8,6 +8,7 @@ import {
   canViewFinanceData,
   canViewOperations,
   getCurrentUser,
+  requireCompanyUser,
   tenantWhere,
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -38,22 +39,22 @@ type MaintenanceMetadata = {
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa underhållsplanen" }, { status: 403 });
     }
 
     const includeFinance = canViewFinanceData(user.role);
     const [rows, logs, properties] = await Promise.all([
-      user.company_id
-        ? db.portfolioMaintenanceItem.findMany({
+      db.portfolioMaintenanceItem.findMany({
             where: { company_id: user.company_id, property: { deleted_at: null } },
             orderBy: { created_at: "asc" },
             include: { property: { select: { name: true } } },
             take: 2000,
-          })
-        : Promise.resolve([]),
+          }),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
         orderBy: { created_at: "asc" },
@@ -123,10 +124,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
@@ -198,10 +200,11 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });

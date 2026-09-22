@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser } from "@/lib/current-user";
+import { canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { runPreventiveMaintenanceEngine } from "@/lib/preventive-maintenance-engine";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 
@@ -30,9 +30,11 @@ type OverviewRow = {
 };
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+  if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
 
   const [propertyGuard, workOrderGuard] = await Promise.all([
     sqlSoftDeleteGuard(db, "Property", "p"),
@@ -76,14 +78,15 @@ export async function GET() {
     completedCycles: rows.filter((row) => row.maintenance_cycle_advanced_at).length,
   };
 
-  return NextResponse.json({ rows, metrics, canRun: canManageTickets(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ rows, metrics, canRun: canViewOperations(user.role) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
-  if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+  if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
 
   const result = await runPreventiveMaintenanceEngine({ companyId: user.company_id });
   await writeAuditLog(user, {

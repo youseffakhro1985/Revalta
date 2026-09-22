@@ -23,6 +23,11 @@ const {
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -137,6 +142,24 @@ describe("POST /api/work-orders/[id]/attestation", () => {
 
     const response = await POST(request({ action: "approveSubmitted" }), params);
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att attestera tid och material");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up submitted rows", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({ action: "approveSubmitted" }), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
     expect(listTimeEntriesMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
@@ -266,5 +289,33 @@ describe("POST /api/work-orders/[id]/attestation", () => {
     await expect(POST(request({ action: "approveSubmitted" }), params)).rejects.toThrow("audit unavailable");
     expect(transactionMock).toHaveBeenCalledTimes(1);
     expect(upsertTimeEntryMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("work-order attestation Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A attests a Tenant B work-order id", async () => {
+    const response = await POST(
+      request({ action: "approveSubmitted" }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      "wo-tenant-b",
+      expect.anything(),
+    );
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(listMaterialEntriesMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

@@ -21,8 +21,8 @@ vi.mock("@/lib/ai", () => ({
   documentTextSnippet: vi.fn(() => ""),
   WORK_ORDER_DOCUMENT_CATEGORIES: ["before", "after", "invoice", "warranty", "manual", "report", "other"],
 }));
-vi.mock("@/lib/current-user", async () => ({
-  ...await import("@/lib/permissions"),
+vi.mock("@/lib/current-user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/current-user")>()),
   getCurrentUser: mocks.currentUser,
 }));
 vi.mock("@/lib/db", () => ({ default: {
@@ -99,7 +99,9 @@ describe("work-order documents authorization and isolation", () => {
 
   it.each(["resident", "vendor", "unknown"])("denies staff documents to %s", async (role) => {
     mocks.currentUser.mockResolvedValue({ ...user, role });
-    expect((await GET(new Request(url), params)).status).toBe(403);
+    const response = await GET(new Request(url), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect((await POST(upload(), params)).status).toBe(403);
     expect((await DELETE(deletion(), params)).status).toBe(403);
     expect(mocks.workOrder).not.toHaveBeenCalled();
@@ -107,7 +109,9 @@ describe("work-order documents authorization and isolation", () => {
 
   it("fails closed without a company", async () => {
     mocks.currentUser.mockResolvedValue({ ...user, company_id: null });
-    expect((await GET(new Request(url), params)).status).toBe(400);
+    const response = await GET(new Request(url), params);
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(mocks.workOrder).not.toHaveBeenCalled();
   });
 
@@ -122,6 +126,24 @@ describe("work-order documents authorization and isolation", () => {
     expect(mocks.findMany).not.toHaveBeenCalled();
     expect(mocks.put).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A lists or uploads against a Tenant B work order", async () => {
+    mocks.workOrder.mockResolvedValue(null);
+    const tenantB = { params: Promise.resolve({ id: "wo-tenant-b" }) };
+
+    const getResponse = await GET(new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/documents"), tenantB);
+    const postResponse = await POST(upload(), tenantB);
+
+    expect(getResponse.status).toBe(404);
+    expect((await getResponse.json()).error).toBe("Arbetsordern hittades inte");
+    expect(postResponse.status).toBe(404);
+    expect((await postResponse.json()).error).toBe("Arbetsordern hittades inte");
+    expect(mocks.workOrder).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "wo-tenant-b", company_id: "company-a", deleted_at: null, property: { deleted_at: null } },
+    }));
+    expect(mocks.put).not.toHaveBeenCalled();
+    expect(mocks.findMany).not.toHaveBeenCalled();
   });
 
   it("denies technicians an unassigned work order", async () => {

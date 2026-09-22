@@ -2,13 +2,14 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, canViewFinanceData, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, canViewFinanceData, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import { sqlSoftDeleteGuard } from "@/lib/soft-delete-compat";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import { completeWorkOrderLifecycle, WorkOrderCompletionConflict } from "@/lib/work-order-completion";
 import { canFinalizeWorkOrderExecution, isWorkOrderExecutionLocked } from "@/lib/work-order-execution-policy";
 import { normalizeInspectionTemplateItems } from "@/lib/inspection-checklist-template";
-import { isMissingTableError, schemaMismatchUserMessage, hasWorkOrderVendorContractColumn } from "@/lib/schema-readiness";
+import { isMissingSchemaColumnError, isMissingTableError, schemaMismatchUserMessage, hasWorkOrderVendorContractColumn } from "@/lib/schema-readiness";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
 import { notifyVendor } from "@/lib/vendor-notify";
 import { notifyTicketReporter } from "@/lib/ticket-reporter-notify";
 import { notifyAssignee } from "@/lib/assignee-notify";
@@ -124,15 +125,17 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const { id } = await params;
-  const workOrder = await resolveWorkOrder(user as CompanyUser, id);
+  const workOrder = await resolveWorkOrder(user, id);
   if (!workOrder) return notFoundWorkOrder();
 
-  const [checklist, entries, summaries, slaRows, completion] = await Promise.all([
+  try {
+    const [checklist, entries, summaries, slaRows, completion] = await Promise.all([
     db.$queryRaw<ChecklistRow[]>(Prisma.sql`
       SELECT "id", "title", "description", "is_required", "sort_order", "completed_at", "completed_by_id", "created_at"
       FROM "WorkOrderChecklistItem"
@@ -201,16 +204,29 @@ export async function GET(
     canManage: canManageTickets(user.role),
     canViewFinance: includeFinance,
   });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 }
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const { id } = await params;
   const workOrder = await resolveWorkOrder(user as CompanyUser, id);

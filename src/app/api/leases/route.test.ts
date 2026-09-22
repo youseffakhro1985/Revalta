@@ -8,6 +8,9 @@ const {
   leaseGroupByMock,
   propertyFindManyMock,
   leaseHolderFindManyMock,
+  unitFindFirstMock,
+  leaseHolderFindFirstMock,
+  transactionMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   leaseFindManyMock: vi.fn(),
@@ -16,6 +19,9 @@ const {
   leaseGroupByMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
   leaseHolderFindManyMock: vi.fn(),
+  unitFindFirstMock: vi.fn(),
+  leaseHolderFindFirstMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -28,10 +34,11 @@ vi.mock("@/lib/db", () => ({
     lease: { findMany: leaseFindManyMock, count: leaseCountMock, aggregate: leaseAggregateMock, groupBy: leaseGroupByMock },
     property: { findMany: propertyFindManyMock },
     leaseHolder: { findMany: leaseHolderFindManyMock },
+    $transaction: transactionMock,
   },
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 describe("leases route", () => {
   beforeEach(() => {
@@ -42,6 +49,17 @@ describe("leases route", () => {
     leaseGroupByMock.mockResolvedValue([]);
     propertyFindManyMock.mockResolvedValue([]);
     leaseHolderFindManyMock.mockResolvedValue([]);
+    unitFindFirstMock.mockResolvedValue(null);
+    leaseHolderFindFirstMock.mockResolvedValue(null);
+    transactionMock.mockImplementation(async (callback: (tx: {
+      unit: { findFirst: typeof unitFindFirstMock };
+      lease: { findFirst: ReturnType<typeof vi.fn> };
+      leaseHolder: { findFirst: typeof leaseHolderFindFirstMock; updateMany: ReturnType<typeof vi.fn> };
+    }) => unknown) => callback({
+      unit: { findFirst: unitFindFirstMock },
+      lease: { findFirst: vi.fn() },
+      leaseHolder: { findFirst: leaseHolderFindFirstMock, updateMany: vi.fn() },
+    }));
   });
 
   it("GET scopes leases to active properties", async () => {
@@ -65,6 +83,7 @@ describe("leases route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET(new Request("https://www.revalta.se/api/leases"));
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa uthyrningsdata");
     expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
@@ -78,7 +97,7 @@ describe("leases route", () => {
     const response = await GET(new Request("https://www.revalta.se/api/leases"));
     const body = await response.json();
     expect(response.status).toBe(403);
-    expect(body.error).toBe("Du saknar behörighet att visa uthyrningsdata");
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
@@ -105,5 +124,128 @@ describe("leases route", () => {
     }));
     expect(body.pagination).toEqual({ page: 2, pageSize: 25, total: 125, totalPages: 5 });
     expect(body.summary).toEqual({ activeHolders: 2, annualRent: 600_000 });
+  });
+
+  it("POST denies residents before creating a lease", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-a",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende-a@exempel.se",
+    });
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ holderName: "Anna" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+  });
+
+  it("POST denies technicians with the lease-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ holderName: "Anna" }),
+    }));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att hantera avtal");
+  });
+
+  it("POST returns 404 when the lease holder is outside the authenticated company", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    unitFindFirstMock.mockResolvedValue({
+      id: "unit-1",
+      unit_type: "apartment",
+      property_id: "property-1",
+      property: { id: "property-1", name: "Eken", address: "Testgatan 1", city: "Stockholm" },
+    });
+    leaseHolderFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unitId: "unit-1",
+        holderId: "foreign-holder",
+        holderName: "Anna",
+        holderType: "individual",
+        status: "draft",
+        monthlyRent: 10000,
+        deposit: 10000,
+        annualIndexPercent: 0,
+        paymentTermsDays: 30,
+      }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Hyresparten hittades inte");
+    expect(leaseHolderFindFirstMock).toHaveBeenCalledWith({
+      where: { deleted_at: null, id: "foreign-holder", company_id: "company-1" },
+    });
+  });
+
+  it("returns tenant-safe 404 when Tenant A attaches a Tenant B unitId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    unitFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unitId: "unit-tenant-b",
+        holderName: "Anna",
+        holderType: "individual",
+        status: "draft",
+        monthlyRent: 10000,
+        deposit: 10000,
+        annualIndexPercent: 0,
+        paymentTermsDays: 30,
+      }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Objektet hittades inte");
+    expect(unitFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "unit-tenant-b",
+        property: { company_id: "company-1", deleted_at: null },
+      }),
+    }));
+    expect(leaseHolderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A attaches a Tenant B holderId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    unitFindFirstMock.mockResolvedValue({
+      id: "unit-1",
+      unit_type: "apartment",
+      property_id: "property-1",
+      property: { id: "property-1", name: "Eken", address: "Testgatan 1", city: "Stockholm" },
+    });
+    leaseHolderFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unitId: "unit-1",
+        holderId: "holder-tenant-b",
+        holderName: "Anna",
+        holderType: "individual",
+        status: "draft",
+        monthlyRent: 10000,
+        deposit: 10000,
+        annualIndexPercent: 0,
+        paymentTermsDays: 30,
+      }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Hyresparten hittades inte");
+    expect(leaseHolderFindFirstMock).toHaveBeenCalledWith({
+      where: { deleted_at: null, id: "holder-tenant-b", company_id: "company-1" },
+    });
   });
 });

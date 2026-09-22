@@ -158,6 +158,27 @@ describe("maintenance plan read security", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before loading the maintenance plan", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request(), params());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
   it("does not log an unverified cross-tenant property id", async () => {
     propertyFindFirstMock.mockResolvedValueOnce(null);
 

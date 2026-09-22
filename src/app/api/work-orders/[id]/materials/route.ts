@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canManageTickets, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import {
   getMaterialEntry,
@@ -10,50 +10,70 @@ import {
   type MaterialEntryPayload,
 } from "@/lib/work-order-ops-storage";
 import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 const units = new Set(["st", "m", "m2", "m3", "kg", "l", "förp"]);
 const stocks = new Set(["in_stock", "ordered", "used", "returned"]);
+
+function schemaUnavailable() {
+  return NextResponse.json(
+    { error: schemaMismatchUserMessage(), errorCode: API_ERROR_CODES.serviceUnavailable },
+    { status: 503 },
+  );
+}
 
 async function ensureOrder(user: CompanyUser, id: string) {
   return findAccessibleWorkOrder(user, id, { id: true, assigned_to_id: true, title: true });
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   const { id } = await params;
-  if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
+  if (!await ensureOrder(user, id)) return notFoundWorkOrder();
 
-  const rows = (await listMaterialEntries(user.company_id, id))
-    .filter((row) => row.status !== "deleted")
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-  const summary = rows.reduce((acc, row) => {
-    acc.total += row.total;
-    if (row.billable) acc.billable += row.total;
-    if (row.status === "submitted") acc.pending += 1;
-    if (row.stockStatus === "ordered") acc.ordered += 1;
-    return acc;
-  }, { total: 0, billable: 0, pending: 0, ordered: 0 });
+  try {
+    const rows = (await listMaterialEntries(user.company_id, id))
+      .filter((row) => row.status !== "deleted")
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    const summary = rows.reduce((acc, row) => {
+      acc.total += row.total;
+      if (row.billable) acc.billable += row.total;
+      if (row.status === "submitted") acc.pending += 1;
+      if (row.stockStatus === "ordered") acc.ordered += 1;
+      return acc;
+    }, { total: 0, billable: 0, pending: 0, ordered: 0 });
 
-  const includeFinance = canViewFinanceData(user.role);
-  const visibleRows = includeFinance ? rows : rows.map((row) => ({ ...row, unitPrice: null, total: null }));
-  const visibleSummary = includeFinance
-    ? summary
-    : { total: null, billable: null, pending: summary.pending, ordered: summary.ordered };
+    const includeFinance = canViewFinanceData(user.role);
+    const visibleRows = includeFinance ? rows : rows.map((row) => ({ ...row, unitPrice: null, total: null }));
+    const visibleSummary = includeFinance
+      ? summary
+      : { total: null, billable: null, pending: summary.pending, ordered: summary.ordered };
 
-  return NextResponse.json({
-    materials: visibleRows,
-    summary: visibleSummary,
-    canManage: canManageTickets(user.role),
-    currentUserId: user.id,
-  }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({
+      materials: visibleRows,
+      summary: visibleSummary,
+      canManage: canManageTickets(user.role),
+      currentUserId: user.id,
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   const companyId = user.company_id;
   const { id } = await params;
   if (!await ensureOrder(user as CompanyUser, id)) return notFoundWorkOrder();
@@ -67,7 +87,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!["create", "approve", "reject", "delete"].includes(action)) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
   const entryId = action === "create" ? crypto.randomUUID() : String(body.entryId || "").trim();
   if (action !== "create" && !entryId) return NextResponse.json({ error: "Materialrad-id krävs" }, { status: 400 });
-  let row: MaterialEntryPayload;
+  let row: MaterialEntryPayload | undefined;
 
   if (action === "create") {
     const name = String(body.name || "").trim().slice(0, 200);
@@ -99,44 +119,54 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       createdByEmail: user.email,
       actorId: user.id,
     };
-  } else {
-    const modern = await getModernMaterialEntry(companyId, id, entryId);
-    const existing = modern ?? await getMaterialEntry(companyId, id, entryId);
-    if (!existing) return NextResponse.json({ error: "Materialraden hittades inte" }, { status: 404 });
-    if (!modern) {
-      return NextResponse.json({
-        error: "Materialraden finns kvar i äldre lagring. Kör backfill till WorkOrderMaterialEntry innan den kan uppdateras.",
-      }, { status: 409 });
-    }
-    if ((action === "approve" || action === "reject") && !canManageWorkOrderFinance(user.role)) {
-      return NextResponse.json({ error: "Du saknar behörighet att attestera material" }, { status: 403 });
-    }
-    if ((action === "approve" || action === "reject") && existing.status !== "submitted") {
-      return NextResponse.json({ error: "Materialraden kan bara attesteras när den är inskickad" }, { status: 409 });
-    }
-    if (action === "delete" && existing.status !== "submitted") {
-      return NextResponse.json({ error: "Materialraden kan bara tas bort innan den har attesterats" }, { status: 409 });
-    }
-    if (action === "delete" && existing.createdById !== user.id && !canManageTickets(user.role)) {
-      return NextResponse.json({ error: "Du kan bara ta bort dina egna rader" }, { status: 403 });
-    }
-    row = {
-      ...existing,
-      status: action === "approve" ? "approved" : action === "reject" ? "rejected" : "deleted",
-      actorId: user.id,
-    };
   }
 
-  const material = await db.$transaction(async (tx) => {
-    const persistedMaterial = await upsertMaterialEntry(companyId, row, tx);
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: `work_order.material_${action}`,
-      metadata: { entryId, name: row.name, quantity: row.quantity, total: row.total, status: row.status, storage: "WorkOrderMaterialEntry" },
-    }, tx);
-    return persistedMaterial;
-  });
+  try {
+    if (action !== "create") {
+      const modern = await getModernMaterialEntry(companyId, id, entryId);
+      const existing = modern ?? await getMaterialEntry(companyId, id, entryId);
+      if (!existing) return NextResponse.json({ error: "Materialraden hittades inte" }, { status: 404 });
+      if (!modern) {
+        return NextResponse.json({
+          error: "Materialraden finns kvar i äldre lagring. Kör backfill till WorkOrderMaterialEntry innan den kan uppdateras.",
+        }, { status: 409 });
+      }
+      if ((action === "approve" || action === "reject") && !canManageWorkOrderFinance(user.role)) {
+        return NextResponse.json({ error: "Du saknar behörighet att attestera material" }, { status: 403 });
+      }
+      if ((action === "approve" || action === "reject") && existing.status !== "submitted") {
+        return NextResponse.json({ error: "Materialraden kan bara attesteras när den är inskickad" }, { status: 409 });
+      }
+      if (action === "delete" && existing.status !== "submitted") {
+        return NextResponse.json({ error: "Materialraden kan bara tas bort innan den har attesterats" }, { status: 409 });
+      }
+      if (action === "delete" && existing.createdById !== user.id && !canManageTickets(user.role)) {
+        return NextResponse.json({ error: "Du kan bara ta bort dina egna rader" }, { status: 403 });
+      }
+      row = {
+        ...existing,
+        status: action === "approve" ? "approved" : action === "reject" ? "rejected" : "deleted",
+        actorId: user.id,
+      };
+    }
 
-  return NextResponse.json({ material }, { status: 201 });
+    const payload = row;
+    if (!payload) return NextResponse.json({ error: "Ogiltig åtgärd" }, { status: 400 });
+
+    const material = await db.$transaction(async (tx) => {
+      const persistedMaterial = await upsertMaterialEntry(companyId, payload, tx);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: `work_order.material_${action}`,
+        metadata: { entryId, name: payload.name, quantity: payload.quantity, total: payload.total, status: payload.status, storage: "WorkOrderMaterialEntry" },
+      }, tx);
+      return persistedMaterial;
+    });
+
+    return NextResponse.json({ material }, { status: 201 });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }

@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canAssignWorkOrders, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canAssignWorkOrders, canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import {
   listServiceNotificationAssignments,
   upsertServiceNotificationAssignment,
@@ -36,10 +36,11 @@ async function validNotificationKeys(companyId: string) {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const [users, rows] = await Promise.all([
     db.user.findMany({
@@ -75,10 +76,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canAssignWorkOrders(user.role)) return NextResponse.json({ error: "Du saknar behörighet att tilldela serviceaviseringar" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const body = await request.json().catch(() => ({})) as {
     notificationKey?: unknown;
@@ -95,8 +97,11 @@ export async function POST(request: Request) {
   const deadline = typeof body.deadline === "string" && body.deadline ? new Date(body.deadline) : null;
 
   const validKeys = await validNotificationKeys(user.company_id);
-  if (!notificationKey || notificationKey.length > 300 || !validKeys.has(notificationKey)) {
+  if (!notificationKey || notificationKey.length > 300) {
     return NextResponse.json({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
+  }
+  if (!validKeys.has(notificationKey)) {
+    return NextResponse.json({ error: "Aviseringen hittades inte" }, { status: 404 });
   }
   if (deadline && (Number.isNaN(deadline.getTime()) || deadline < new Date(Date.now() - 86400000) || deadline > new Date(Date.now() + 365 * 86400000))) {
     return NextResponse.json({ error: "Deadline måste ligga inom det kommande året" }, { status: 400 });
@@ -108,7 +113,7 @@ export async function POST(request: Request) {
       where: { id: assigneeId, company_id: user.company_id, status: "active" },
       select: { id: true, name: true, email: true },
     });
-    if (!assignee) return NextResponse.json({ error: "Den ansvariga användaren hittades inte" }, { status: 400 });
+    if (!assignee) return NextResponse.json({ error: "Den ansvariga användaren hittades inte" }, { status: 404 });
   }
 
   const assetId = notificationKey.startsWith("component-service:")

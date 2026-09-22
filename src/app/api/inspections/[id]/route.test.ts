@@ -128,3 +128,65 @@ describe("inspections/[id] route", () => {
     expect(inspectionUpdateManyMock).not.toHaveBeenCalled();
   });
 });
+
+describe("inspections/[id] PATCH staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before looking up an inspection", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/inspections/inspection-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "booked" }),
+    }), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(inspectionFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await PATCH(new Request("http://localhost/api/inspections/inspection-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "booked" }),
+    }), { params });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(inspectionFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B inspection id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    inspectionFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/inspections/inspection-tenant-b", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "booked" }),
+    }), { params: Promise.resolve({ id: "inspection-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Kontrollen hittades inte");
+    expect(inspectionFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "inspection-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(inspectionFindFirstMock).toHaveBeenNthCalledWith(2, {
+      where: { id: "inspection-tenant-b", company_id: "company-1" },
+      select: { id: true },
+    });
+    expect(inspectionUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

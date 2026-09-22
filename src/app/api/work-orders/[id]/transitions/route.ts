@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canAssignWorkOrders, canManageTickets, canManageWorkOrderFinance, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canAssignWorkOrders, canManageTickets, canManageWorkOrderFinance, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { getAllowedWorkOrderTransitions } from "@/lib/work-order-enterprise-core";
 import { normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import { createLogger } from "@/lib/structured-logger";
 import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 import {
   INVOICE_DRAFT_NOT_READY_FOR_INVOICING,
   invoiceDraftAllowsWorkOrderInvoicing,
@@ -18,9 +24,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
     const { id } = await params;
     const [workOrder, users] = await Promise.all([
@@ -36,7 +43,7 @@ export async function GET(
     ]);
 
     if (!workOrder) return notFoundWorkOrder();
-    if (!isAssignedWorkAccessible(user as CompanyUser, workOrder.assigned_to_id)) return notFoundWorkOrder();
+    if (!isAssignedWorkAccessible(user, workOrder.assigned_to_id)) return notFoundWorkOrder();
 
     const currentStatus = normalizeWorkOrderStatus(workOrder.status);
     const canManageFinance = canManageWorkOrderFinance(user.role);
@@ -73,6 +80,15 @@ export async function GET(
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
     logger.error("Get work order transitions error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

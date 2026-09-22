@@ -34,6 +34,23 @@ describe("GET /api/work-orders/options", () => {
     vendorFindManyMock.mockResolvedValue([{ id: "vendor-1", name: "Städ AB", category: "Städ", property_id: null, status: "active" }]);
   });
 
+  it("rejects residents before listing properties, users or vendors", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+    expect(vendorFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("does not disclose the company user directory to technicians", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
 
@@ -41,6 +58,9 @@ describe("GET /api/work-orders/options", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1", status: "active" }),
+    }));
     expect(userFindManyMock).not.toHaveBeenCalled();
     expect(vendorFindManyMock).not.toHaveBeenCalled();
     expect(body.users).toEqual([]);
@@ -54,8 +74,15 @@ describe("GET /api/work-orders/options", () => {
     const response = await GET();
     const body = await response.json();
 
-    expect(userFindManyMock).toHaveBeenCalled();
-    expect(vendorFindManyMock).toHaveBeenCalled();
+    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1" }),
+    }));
+    expect(userFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { company_id: "company-1", status: "active" },
+    }));
+    expect(vendorFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1", status: "active" }),
+    }));
     expect(body.users).toHaveLength(1);
     expect(body.vendors).toHaveLength(1);
     expect(body.permissions.canAssign).toBe(true);

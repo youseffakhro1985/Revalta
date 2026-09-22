@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import {
   getNotificationUxState,
   markNotificationsRead,
@@ -45,10 +45,11 @@ async function rowsFor(companyId: string) {
 }
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const filter = new URL(request.url).searchParams.get("filter") || "all";
   const [rows, ux] = await Promise.all([
@@ -99,10 +100,11 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
   const body = await request.json().catch(() => ({})) as {
     key?: unknown;
@@ -115,8 +117,11 @@ export async function PATCH(request: Request) {
   const validKeys = new Set(rows.map(keyFor));
   const keys = body.all === true ? Array.from(validKeys) : [typeof body.key === "string" ? body.key.trim() : ""].filter(Boolean);
 
-  if (!keys.length || keys.some((key) => key.length > 300 || !validKeys.has(key))) {
+  if (!keys.length || keys.some((key) => key.length > 300)) {
     return NextResponse.json({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
+  }
+  if (keys.some((key) => !validKeys.has(key))) {
+    return NextResponse.json({ error: "Aviseringen hittades inte" }, { status: 404 });
   }
 
   if (action === "snooze") {

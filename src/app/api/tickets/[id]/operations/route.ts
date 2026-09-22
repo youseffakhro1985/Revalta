@@ -5,6 +5,7 @@ import {
   canManageWorkOrderFinance,
   canViewFinanceData,
   getCurrentUser,
+  requireCompanyUser,
   tenantWhere,
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -50,8 +51,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
@@ -63,17 +66,15 @@ export async function GET(
     if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
 
     const [rows, logs] = await Promise.all([
-      user.company_id
-        ? db.ticketOperation.findMany({
-            where: { company_id: user.company_id, ticket_id: ticket.id, deleted_at: null },
-            orderBy: { created_at: "desc" },
-            take: 100,
-            include: { created_by: { select: { name: true, email: true } } },
-          })
-        : Promise.resolve([]),
+      db.ticketOperation.findMany({
+        where: { company_id: user.company_id, ticket_id: ticket.id, deleted_at: null },
+        orderBy: { created_at: "desc" },
+        take: 100,
+        include: { created_by: { select: { name: true, email: true } } },
+      }),
       loadLegacyRows(() => db.auditLog.findMany({
         where: {
-          ...(user.company_id ? { company_id: user.company_id } : { actor_user_id: user.id }),
+          company_id: user.company_id,
           entity_type: "ticket",
           entity_id: id,
           action: { startsWith: "workorder." },
@@ -145,12 +146,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     }
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const { id } = await params;
     const ticket = await db.ticket.findFirst({
@@ -240,12 +242,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     }
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const { id } = await params;
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -406,12 +409,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageTickets(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
     }
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const { id } = await params;
     const body = await request.json().catch(() => ({} as Record<string, unknown>));

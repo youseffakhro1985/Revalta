@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { getNotificationUxState, markNotificationsRead } from "@/lib/notification-ux-state";
 
 export const dynamic = "force-dynamic";
@@ -125,9 +125,10 @@ async function listNotifications(companyId: string, userId: string, readKeys: Se
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const ux = await getNotificationUxState(user.company_id, user.id, "work_order_lock");
   const notifications = await listNotifications(user.company_id, user.id, ux.read);
@@ -143,9 +144,10 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const body = await request.json().catch(() => ({})) as { key?: unknown; all?: unknown };
   const ux = await getNotificationUxState(user.company_id, user.id, "work_order_lock");
@@ -154,8 +156,11 @@ export async function PATCH(request: Request) {
   const requestedKey = stringValue(body.key);
   const keys: string[] = body.all === true ? Array.from(validKeys) : requestedKey ? [requestedKey] : [];
 
-  if (!keys.length || keys.some((key) => !validKeys.has(key))) {
+  if (!keys.length) {
     return noStore({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
+  }
+  if (keys.some((key) => !validKeys.has(key))) {
+    return noStore({ error: "Aviseringen hittades inte" }, { status: 404 });
   }
 
   const missing = Array.from(new Set(keys)).filter((key) => !ux.read.has(key));

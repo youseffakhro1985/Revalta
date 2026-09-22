@@ -2,7 +2,8 @@
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { runVerifiedPreview } from "./preview-runner.mjs";
-import { isPaginatedPropertiesRequest, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
+import { runStaffGoldenPath, assertTicketHiddenAfterLogout } from "./golden-path.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
   return runVerifiedPreview(env, async ({ target, assertRelease, complete }) => {
@@ -109,23 +110,37 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       });
 
       console.log(`E2E auth/navigation against ${baseUrl}`);
+      console.log("phase: verified-login");
 
       await page.goto("/login", { waitUntil: "domcontentloaded" });
+      await expectVisible(page.locator("form#login-form[data-ready='1']"), "hydrated login form");
       await page.getByLabel("E-post").fill(fixtureEmail);
       await page.getByLabel("Lösenord").fill(env.E2E_VERIFIED_PASSWORD);
       const fixtureLoginPromise = page.waitForResponse(
-        (response) => response.url() === `${baseUrl}/api/auth/login` && response.request().method() === "POST",
-        { timeout: 15_000 },
+        (response) => {
+          try {
+            return new URL(response.url()).pathname === "/api/auth/login" && response.request().method() === "POST";
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 45_000 },
       );
       await page.getByRole("button", { name: "Logga in" }).click();
-      const fixtureLogin = await fixtureLoginPromise;
+      const fixtureLogin = await fixtureLoginPromise.catch(() => {
+        if (requestGateFailed) fail("Login mutation was blocked by release identity verification");
+        fail("Verified login response was not observed");
+      });
       validateLoginResponse(fixtureLogin.status(), await fixtureLogin.json(), fixtureEmail);
       await expectPath(page, "/dashboard");
       const profile = await context.request.get(`${baseUrl}/api/settings/profile`, {
         headers: bypass ? { "x-vercel-protection-bypass": bypass } : {},
         maxRedirects: 0, timeout: 15_000,
       });
-      validateFixtureProfile(profile.status(), await profile.json(), { email: fixtureEmail, companyId: fixtureCompany });
+      const profileBody = await profile.json();
+      validateFixtureProfile(profile.status(), profileBody, { email: fixtureEmail, companyId: fixtureCompany });
+      const staffUserId = String(profileBody?.user?.id || "");
+      if (!staffUserId) fail("Fixture profile did not include a user id");
       complete("verified-login-and-profile");
       await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
       complete("dashboard");
@@ -153,6 +168,17 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       const properties = await propertiesPromise;
       validatePropertiesResponse(properties.status(), await properties.json());
       complete("properties-api");
+
+      const golden = await runStaffGoldenPath({
+        page,
+        fail,
+        expectVisible,
+        expectPath,
+        runId,
+        staffUserId,
+      });
+      complete("golden-path-ticket-to-invoice");
+      complete("golden-path-mobile-work-order");
 
       // Command Center must be the single global search surface.
       await page.keyboard.press("Control+K");
@@ -203,6 +229,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       await expectPath(page, "/login");
       await expectVisible(page.getByRole("heading", { name: "Välkommen tillbaka" }), "login heading after protected redirect");
       complete("logout-and-protected-redirect");
+      await assertTicketHiddenAfterLogout(page, golden.ticketId);
       // Password reset does not depend on registration. Prove the issue #265 path first
       // so a separate registration-navigation flake cannot hide reset latency evidence.
       await page.goto("/forgot-password", { waitUntil: "domcontentloaded" });
@@ -337,9 +364,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const evidence = await runAuthNavigation();
     console.log(JSON.stringify(evidence));
     console.log("OK: exact-SHA Preview browser verification completed all mandatory steps");
-  } catch {
+  } catch (error) {
     // Playwright errors can include form values, response bodies and cookies.
-    console.error("BLOCKED / NOT VERIFIED: Preview verification failed; no release approval. Check target, fixtures and required browser steps.");
+    console.error(`BLOCKED / NOT VERIFIED: ${sanitizePreviewFailure(error)}`);
     process.exitCode = 1;
   }
 }

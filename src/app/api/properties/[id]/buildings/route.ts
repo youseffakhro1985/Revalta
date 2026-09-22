@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 
 const ROUTE = "/api/properties/[id]/buildings";
@@ -39,13 +39,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "property_buildings.create.unauthorized",
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "property_buildings.create.staff_required",
+        context: { userId: rawUser.id, companyId: rawUser.company_id },
       });
     }
     if (!canCreateProperties(user.role)) {

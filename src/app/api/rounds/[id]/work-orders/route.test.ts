@@ -87,6 +87,29 @@ describe("rounds/[id]/work-orders route", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A creates work orders from a Tenant B round id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    roundFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("http://localhost/api/rounds/round-tenant-b/work-orders", {
+        method: "POST",
+        body: JSON.stringify({ itemIds: ["item-1"] }),
+      }),
+      { params: Promise.resolve({ id: "round-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ronden hittades inte");
+    expect(roundFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "round-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("returns 409 up front when there are no open deviations at all", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     roundFindFirstMock.mockResolvedValue({ ...baseRound, checklist: [baseRound.checklist[1]] });
@@ -227,5 +250,35 @@ describe("rounds/[id]/work-orders route", () => {
     expect(response.status).toBe(201);
     expect(workOrderCreateMock).toHaveBeenCalledTimes(1);
     expect(body.created).toEqual([{ itemId: "item-2", workOrderId: "work-order-new", workOrderNumber: "AO-0001" }]);
+  });
+});
+
+describe("rounds/[id]/work-orders POST staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before looking up a round", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(postRequest({}), { params: Promise.resolve({ id: "round-1" }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(roundFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the work-order create copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(postRequest({}), { params: Promise.resolve({ id: "round-1" }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att skapa arbetsorder");
+    expect(roundFindFirstMock).not.toHaveBeenCalled();
   });
 });

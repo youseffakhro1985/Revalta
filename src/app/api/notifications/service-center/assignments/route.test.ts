@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   getCurrentUserMock,
   userFindManyMock,
+  userFindFirstMock,
   queryRawMock,
   listAssignmentsMock,
   upsertAssignmentMock,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   userFindManyMock: vi.fn(),
+  userFindFirstMock: vi.fn(),
   queryRawMock: vi.fn(),
   listAssignmentsMock: vi.fn(),
   upsertAssignmentMock: vi.fn(),
@@ -23,7 +25,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 
 vi.mock("@/lib/db", () => ({
   default: {
-    user: { findMany: userFindManyMock },
+    user: { findMany: userFindManyMock, findFirst: userFindFirstMock },
     $queryRaw: queryRawMock,
   },
 }));
@@ -50,13 +52,14 @@ function companyUser(role: string) {
   };
 }
 
-function postRequest() {
+function postRequest(overrides: Record<string, unknown> = {}) {
   return new Request("https://www.revalta.se/api/notifications/service-center/assignments", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       notificationKey: "component-service:asset-1:2026-09-01",
       status: "assigned",
+      ...overrides,
     }),
   });
 }
@@ -81,22 +84,46 @@ describe("service-center assignment authorization", () => {
     });
   });
 
-  it.each(["technician", "viewer", "resident"])("blocks %s from reading company-wide assignment data", async (role) => {
+  it.each(["technician", "viewer"])("blocks %s from reading company-wide assignment data", async (role) => {
     getCurrentUserMock.mockResolvedValue(companyUser(role));
 
     const response = await GET();
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(userFindManyMock).not.toHaveBeenCalled();
     expect(listAssignmentsMock).not.toHaveBeenCalled();
   });
 
-  it.each(["technician", "viewer", "resident"])("blocks %s from mutating service assignments", async (role) => {
+  it("rejects residents before listing assignee emails", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("resident"));
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(userFindManyMock).not.toHaveBeenCalled();
+    expect(listAssignmentsMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["technician", "viewer"])("blocks %s from mutating service assignments with the assign copy", async (role) => {
     getCurrentUserMock.mockResolvedValue(companyUser(role));
 
     const response = await POST(postRequest());
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att tilldela serviceaviseringar");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before mutating service assignments", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("resident"));
+
+    const response = await POST(postRequest());
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(queryRawMock).not.toHaveBeenCalled();
     expect(upsertAssignmentMock).not.toHaveBeenCalled();
   });
@@ -114,5 +141,40 @@ describe("service-center assignment authorization", () => {
       notificationKey: "component-service:asset-1:2026-09-01",
       changedById: "manager-1",
     }));
+  });
+
+  it("returns 404 when the assignee is outside the authenticated company", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("manager"));
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(postRequest({ assigneeId: "foreign-user" }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Den ansvariga användaren hittades inte");
+    expect(userFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "foreign-user", company_id: "company-1", status: "active" },
+      select: { id: true, name: true, email: true },
+    });
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the notification key is outside the authenticated company", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("manager"));
+
+    const response = await POST(postRequest({ notificationKey: "component-service:foreign-asset:2026-09-01" }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Aviseringen hittades inte");
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a missing notification key as field validation", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("manager"));
+
+    const response = await POST(postRequest({ notificationKey: "" }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Ogiltig eller obehörig avisering");
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
   });
 });

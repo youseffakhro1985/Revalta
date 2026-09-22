@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { canViewFinanceData, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { canViewFinanceData, canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { normalizeWorkOrderPriority, normalizeWorkOrderStatus, workOrderRisk, workOrderSlaDeadline, WORK_ORDER_PRIORITY_LABELS, WORK_ORDER_STATUS_LABELS } from "@/lib/work-order-workflow";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canViewOperations(user.role)) {
     return NextResponse.json({ error: "Du saknar behörighet att visa arbetsorderöversikten" }, { status: 403 });
   }

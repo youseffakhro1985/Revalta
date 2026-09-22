@@ -139,4 +139,47 @@ describe("insurance-claims/[id]/work-order route", () => {
       tx,
     );
   });
+
+  it("rejects residents before looking up a claim", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/insurance-claims/claim-1/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "claim-1" }) });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(claimFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("http://localhost/api/insurance-claims/claim-1/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "claim-1" }) });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(claimFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a work order from a Tenant B claim id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    claimFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/insurance-claims/claim-tenant-b/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "claim-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Skadeärendet hittades inte");
+    expect(claimFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "claim-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });

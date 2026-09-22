@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPaginatedPropertiesRequest, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -67,5 +67,25 @@ describe("authenticated Preview evidence", () => {
       expect(String(error)).toContain("Fixture must be");
       expect(String(error)).not.toContain(sensitive);
     }
+  });
+});
+
+describe("sanitizePreviewFailure", () => {
+  it("keeps allowlisted diagnostics and drops unknown payload-bearing messages", () => {
+    expect(sanitizePreviewFailure(new Error("Verified login response was not observed"))).toContain("Verified login");
+    expect(sanitizePreviewFailure(new Error("BLOCKED: release identity changed or became unverifiable"))).toContain("release identity");
+    expect(sanitizePreviewFailure(new Error("BLOCKED: Preview schema is not ready for this release"))).toContain("schema is not ready");
+    expect(sanitizePreviewFailure(new Error("BLOCKED: Preview data-plane isolation is not ready for this release"))).toContain("data-plane isolation");
+    expect(sanitizePreviewFailure(new Error("Work-order edit lock was not acquired (423)"))).toContain("edit lock");
+    expect(sanitizePreviewFailure(new Error("Time entry create did not persist as submitted (503:SERVICE_UNAVAILABLE)"))).toContain("503:SERVICE_UNAVAILABLE");
+    expect(sanitizePreviewFailure(new Error("timeout at https://secret.example/login?token=abc user@example.com"))).toBe(
+      "Preview verification failed; no release approval. Check target, fixtures and required browser steps.",
+    );
+  });
+
+  it("maps Playwright timeouts without leaking locators", () => {
+    expect(sanitizePreviewFailure(new Error('Timeout 20000ms exceeded while waiting for event "response"'))).toBe(
+      "A required browser event timed out",
+    );
   });
 });

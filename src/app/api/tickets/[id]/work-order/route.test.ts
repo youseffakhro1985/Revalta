@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const {
   getCurrentUserMock,
@@ -39,6 +41,7 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   hasTicketAiSourceColumn: vi.fn(async () => true),
+  hasWorkOrderVendorContractColumn: vi.fn(async () => false),
 }));
 
 vi.mock("@/lib/work-order-enterprise-core", () => ({
@@ -54,10 +57,21 @@ vi.mock("@/lib/work-order-workflow", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/structured-logger", () => ({
-  createLogger: () => ({ error: loggerErrorMock }),
+  createLogger: () => ({ error: loggerErrorMock, warn: vi.fn() }),
 }));
 
-import { POST } from "./route";
+vi.mock("@/lib/ai", () => ({
+  analyzeTicket: vi.fn(async () => ({
+    category: "other",
+    priority: "normal",
+    confidence: 0.5,
+    summary: "test",
+    recommendedAction: "Planera åtgärd",
+    source: "fallback",
+  })),
+}));
+
+import { GET, POST } from "./route";
 
 function request(body: Record<string, unknown>) {
   return new Request("https://www.revalta.se/api/tickets/ticket-1/work-order", {
@@ -108,12 +122,33 @@ describe("ticket work-order creation authorization", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A creates a work order from a Tenant B ticket id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request({}), { params: Promise.resolve({ id: "ticket-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "ticket-tenant-b",
+        company_id: "company-1",
+        deleted_at: null,
+      }),
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("prevents a technician from assigning a new work order to another user", async () => {
     const response = await POST(request({ assignedToId: "tech-2" }), params);
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "Du saknar behörighet att tilldela arbetsorder till andra",
+      errorCode: "FORBIDDEN",
     });
     expect(userFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
@@ -125,6 +160,7 @@ describe("ticket work-order creation authorization", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       error: "Du saknar behörighet att sätta arbetsorderkostnader",
+      errorCode: "FORBIDDEN",
     });
     expect(transactionMock).not.toHaveBeenCalled();
   });
@@ -137,6 +173,7 @@ describe("ticket work-order creation authorization", () => {
 
     expect(response.status).toBe(404);
     expect(body.error).toBe("Enheten hittades inte");
+    expect(body.errorCode).toBe("NOT_FOUND");
     expect(unitFindFirstMock).toHaveBeenCalledWith({
       where: {
         id: "unit-tenant-b",
@@ -146,5 +183,220 @@ describe("ticket work-order creation authorization", () => {
       select: { id: true },
     });
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects resident GET before loading tickets or work orders", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/tickets/ticket-1/work-order"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when a technician GETs a work order for a ticket assigned to someone else", async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      property_id: "property-1",
+      assigned_to_id: "tech-other",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/tickets/ticket-1/work-order"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when a technician POSTs a work order for a ticket assigned to someone else", async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      property_id: "property-1",
+      assigned_to_id: "tech-other",
+      status: "received",
+      title: "Läckage",
+      description: "Kontrollera läckage",
+      priority: "normal",
+    });
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects resident POST before looking up a ticket", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the work-order create copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(request({}), params);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att skapa arbetsordrar");
+    expect(ticketFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("ticket work-order creation schema failures", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(technician);
+    ticketFindFirstMock.mockResolvedValue(accessibleTicket);
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("maps missing schema columns to 503 SERVICE_UNAVAILABLE without a workOrderId", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Column not found", {
+        code: "P2022",
+        clientVersion: "test",
+        meta: { column: "WorkOrder.work_order_number" },
+      }),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: schemaMismatchUserMessage(),
+      errorCode: "SERVICE_UNAVAILABLE",
+      missing: "WorkOrder.work_order_number",
+    });
+    expect(body.workOrderId).toBeUndefined();
+  });
+
+  it("maps a missing WorkOrderNumberCounter table to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderNumberCounter` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderNumberCounter" },
+        },
+      ),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.missing).toBe("WorkOrderNumberCounter");
+    expect(body.workOrderId).toBeUndefined();
+  });
+
+  it("returns 500 INTERNAL_ERROR without a workOrderId for unexpected create failures", async () => {
+    transactionMock.mockRejectedValue(new Error("boom"));
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Kunde inte skapa arbetsorder från ärendet",
+      errorCode: "INTERNAL_ERROR",
+    });
+    expect(loggerErrorMock).toHaveBeenCalled();
+  });
+
+  it("maps a WorkOrder lookup schema gap before create to 503 JSON", async () => {
+    workOrderFindFirstMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Column not found", {
+        code: "P2022",
+        clientVersion: "test",
+        meta: { column: "WorkOrder.deleted_at" },
+      }),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.missing).toBe("WorkOrder.deleted_at");
+    expect(body.workOrderId).toBeUndefined();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("reuses an existing work order only when it belongs to the caller company", async () => {
+    const txFindFirst = vi.fn().mockResolvedValue({ id: "wo-1", deleted_at: null });
+    const txCreate = vi.fn();
+    transactionMock.mockImplementation(async (callback: (tx: { workOrder: { findFirst: typeof txFindFirst; create: typeof txCreate } }) => unknown) =>
+      callback({ workOrder: { findFirst: txFindFirst, create: txCreate } }),
+    );
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ workOrderId: "wo-1", created: false });
+    expect(txFindFirst).toHaveBeenCalledWith({
+      where: { ticket_id: "ticket-1", company_id: "company-1" },
+      select: { id: true, deleted_at: true },
+    });
+    expect(txCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("ticket work-order GET schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(technician);
+    ticketFindFirstMock.mockResolvedValue(accessibleTicket);
+  });
+
+  it("maps a missing WorkOrder table on GET probe to 503 SERVICE_UNAVAILABLE", async () => {
+    workOrderFindFirstMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrder` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrder" },
+        },
+      ),
+    );
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/tickets/ticket-1/work-order"),
+      params,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.missing).toBe("WorkOrder");
+    expect(body.workOrderId).toBeUndefined();
   });
 });

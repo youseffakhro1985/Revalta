@@ -223,3 +223,56 @@ describe("inspections/[id]/work-order route", () => {
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });
+
+describe("inspections/[id]/work-order POST staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before looking up an inspection", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/inspections/inspection-1/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "inspection-1" }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(inspectionFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(new Request("http://localhost/api/inspections/inspection-1/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "inspection-1" }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(inspectionFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a work order from a Tenant B inspection id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    inspectionFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/inspections/inspection-tenant-b/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "inspection-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Kontrollen hittades inte");
+    expect(inspectionFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "inspection-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

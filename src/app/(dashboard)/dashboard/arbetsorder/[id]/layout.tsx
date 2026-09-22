@@ -5,7 +5,7 @@ import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrum
 import { InvoiceExportReconciliationPanel } from "@/components/dashboard/invoice-export-reconciliation-panel";
 import { WorkOrderSlaDetailPanel } from "@/components/dashboard/work-order-sla-detail-panel";
 import { WorkOrderEditLockProvider } from "@/components/dashboard/work-order-edit-lock-provider";
-import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, shouldScopeToAssignedWork } from "@/lib/current-user";
+import { canManageTickets, canManageWorkOrderFinance, getCurrentUser, requireCompanyUser, shouldScopeToAssignedWork } from "@/lib/current-user";
 import { getWorkOrderEnterpriseState } from "@/lib/work-order-enterprise-core";
 
 export default async function WorkOrderDetailLayout({
@@ -15,9 +15,10 @@ export default async function WorkOrderDetailLayout({
   children: ReactNode;
   params: Promise<{ id: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
-  if (!user.company_id) notFound();
+  const rawUser = await getCurrentUser();
+  if (!rawUser) redirect("/login");
+  const user = requireCompanyUser(rawUser);
+  if (!user) notFound();
 
   const { id } = await params;
   const [workOrder, enterprise] = await Promise.all([

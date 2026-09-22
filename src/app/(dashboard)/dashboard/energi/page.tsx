@@ -13,6 +13,7 @@ import {
   premiumSecondaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { csvRow } from "@/lib/csv-cell";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address: string; city: string; total_area?: number | null };
@@ -208,7 +209,7 @@ export default function EnergyPage() {
       ["Fastighet", "Typ", "Period", "Förbrukning", "Enhet", "Kostnad", "Förbrukning/m²", "Kostnad/m²", "Anteckning"],
       ...visibleReadings.map((row) => [row.property_name || "", labels[row.type || ""] || row.type || "", row.period || "", String(row.value || 0), row.unit || "", String(row.cost || 0), String(row.value_per_sqm ?? ""), String(row.cost_per_sqm ?? ""), row.note || ""]),
     ];
-    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(";")).join("\n");
+    const csv = rows.map((row) => csvRow(row)).join("\n");
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;

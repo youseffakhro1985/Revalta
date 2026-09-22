@@ -49,3 +49,17 @@ export function validateEmptySearchResponse(status, body) {
     throw new Error("Command Center empty state requires a successful empty search response");
   }
 }
+
+const SAFE_FAILURE = /did not |was not |not visible|not persist|lifecycle|illegal |audit history|readable after|Fixture |Unknown browser|skipped|lock was not|HTTP \d+|release identity|Cross-origin|Verified login|Verified fixture|Property navigation|Command Center|Work-order |Ticket |Time entry |Material |Invoice |Staff ticket|A required browser/;
+
+export function sanitizePreviewFailure(error) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.startsWith("BLOCKED")) return message.slice(0, 300);
+  if (SAFE_FAILURE.test(message)) {
+    return message.replace(/https?:\/\/\S+/gi, "[url]").replace(/\S+@\S+/g, "[email]").slice(0, 300);
+  }
+  if (/Timeout .*exceeded/i.test(message) || /exceeded .*timeout/i.test(message)) {
+    return "A required browser event timed out";
+  }
+  return "Preview verification failed; no release approval. Check target, fixtures and required browser steps.";
+}

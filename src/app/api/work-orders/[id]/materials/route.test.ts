@@ -25,6 +25,11 @@ vi.mock("@/lib/current-user", () => ({
   canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
   canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
   canViewFinanceData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/assigned-work-access", () => ({
@@ -46,7 +51,9 @@ vi.mock("@/lib/db", () => ({
   default: { $transaction: transactionMock },
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 function request(body: Record<string, unknown>) {
   return new Request("https://www.revalta.se/api/work-orders/work-order-1/materials", {
@@ -238,6 +245,145 @@ describe("material-entry id isolation and attestation state", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({ error: "Materialraden kan bara tas bort innan den har attesterats" });
     expect(upsertMaterialEntryMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order materials GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before listing material rows", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/work-order-1/materials"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+    expect(listMaterialEntriesMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/work-order-1/materials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", name: "Skruv", quantity: 1 }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order materials schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      email: "tech@example.com",
+      name: "Tekniker",
+      role: "technician",
+      company_id: "company-1",
+    });
+    findAccessibleWorkOrderMock.mockResolvedValue({ id: "work-order-1", assigned_to_id: "tech-1", title: "Test" });
+  });
+
+  it("maps a missing WorkOrderMaterialEntry table on create to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderMaterialEntry` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderMaterialEntry" },
+        },
+      ),
+    );
+
+    const response = await POST(request({
+      action: "create",
+      name: "Filter",
+      quantity: 1,
+      unit: "st",
+      unitPrice: 125,
+    }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("keeps missing material name as field validation", async () => {
+    const response = await POST(request({
+      action: "create",
+      name: "",
+      quantity: 1,
+      unit: "st",
+      unitPrice: 125,
+    }), params);
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Materialnamn krävs");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order materials Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A lists materials on a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/materials"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      "wo-tenant-b",
+      expect.anything(),
+    );
+    expect(listMaterialEntriesMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts material on a Tenant B work-order id", async () => {
+    const response = await POST(request({
+      action: "create",
+      name: "Filter Tenant B",
+      quantity: 1,
+      unit: "st",
+      unitPrice: 125,
+    }), { params: Promise.resolve({ id: "wo-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(upsertMaterialEntryMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

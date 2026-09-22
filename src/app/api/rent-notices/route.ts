@@ -1,5 +1,5 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageLeases, canViewLeasingData, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { auditScopedWhere, canManageLeases, canViewLeasingData, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { asNumber, isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
 import { NextResponse } from "next/server";
@@ -11,29 +11,28 @@ const noticeAction = "rent_notice.created";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewLeasingData(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa hyresaviseringar" }, { status: 403 });
     }
 
     const [rows, notices, leases, properties] = await Promise.all([
-      user.company_id
-        ? db.rentNotice.findMany({
+      db.rentNotice.findMany({
             where: { company_id: user.company_id, property: { deleted_at: null } },
             orderBy: { created_at: "desc" },
             take: 500,
             include: { property: { select: { name: true } } },
-          })
-        : Promise.resolve([]),
+          }),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action: noticeAction },
         orderBy: { created_at: "desc" },
         take: 500,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       })),
-      user.company_id
-        ? db.lease.findMany({
+      db.lease.findMany({
             where: { company_id: user.company_id, deleted_at: null, property: { deleted_at: null } },
             orderBy: { updated_at: "desc" },
             take: 500,
@@ -42,8 +41,7 @@ export async function GET() {
               unit: { select: { designation: true } },
               lease_holder: { select: { name: true } },
             },
-          })
-        : Promise.resolve([]),
+          }),
       db.property.findMany({
         where: { deleted_at: null, ...tenantWhere(user) },
         orderBy: { name: "asc" },
@@ -104,10 +102,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const propertyId = String(body.propertyId || "").trim();
@@ -209,10 +208,11 @@ const patchAllowedStatuses = new Set(["draft", "sent", "paid", "overdue", "credi
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canManageLeases(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const noticeId = String(body.noticeId || body.id || "").trim();

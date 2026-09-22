@@ -7,8 +7,10 @@ import {
   resetSoftDeleteCompatCache,
   type SoftDeleteModel,
 } from "@/lib/soft-delete-compat";
+import { resetWorkOrderNotesCache, hasWorkOrderNotesColumn as hasWorkOrderNotesColumnOn } from "@/lib/work-order-notes-compat";
 
 export { REQUIRED_SOFT_DELETE_COLUMNS, SOFT_DELETE_MODELS };
+export { workOrderNotesWrite, listWorkOrderColumns, workOrderScalarSelectWithoutNotes } from "@/lib/work-order-notes-compat";
 export type SoftDeleteTable = SoftDeleteModel;
 export type SchemaColumnRequirement = (typeof REQUIRED_SOFT_DELETE_COLUMNS)[number];
 
@@ -28,6 +30,30 @@ export const REQUIRED_OPERATIONAL_TABLES = [
   "MaintenancePlan",
   "ComponentLifecycleEvent",
   "ComponentCostEntry",
+  "WorkOrderNumberCounter",
+  "WorkOrderStatusEvent",
+  // Golden-path ticket→invoice writes these with no write fallback.
+  // Preview dual-read does not skip the modern upsert.
+  "WorkOrderEditLock",
+  "WorkOrderComment",
+  "WorkOrderTimeEntry",
+  "WorkOrderMaterialEntry",
+  "WorkOrderInvoiceDraft",
+] as const;
+
+/**
+ * WorkOrder columns written unconditionally by setWorkOrderEnterpriseFields.
+ * Missing any of them 503s ticket→WO create even when operational tables exist.
+ * Do not require optional WorkOrder.vendor_contract_id or Ticket.ai_source here.
+ */
+export const REQUIRED_OPERATIONAL_COLUMNS = [
+  { table: "WorkOrder", column: "work_order_number" },
+  { table: "WorkOrder", column: "work_type" },
+  { table: "WorkOrder", column: "source" },
+  { table: "WorkOrder", column: "sla_response_due_at" },
+  { table: "WorkOrder", column: "sla_resolution_due_at" },
+  // Prisma create sends this @default even when the route does not pass it.
+  { table: "WorkOrder", column: "sla_status" },
 ] as const;
 
 export function formatSchemaMissingItem(item: SchemaMissingItem) {
@@ -63,6 +89,40 @@ export function isMissingSchemaColumnError(error: unknown): boolean {
     return true;
   }
   return /column .+ does not exist/i.test(errorText(error));
+}
+
+const SCHEMA_GAP_ID = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
+
+/** Allowlisted table or table.column from a schema error. Empty when the text is not a safe identifier. */
+export function allowlistedSchemaGap(value: string) {
+  return SCHEMA_GAP_ID.test(value) ? value : "";
+}
+
+function identifierFromMeta(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.replace(/^public\./i, "").replace(/`/g, "").trim();
+}
+
+/** Best-effort table or table.column from Prisma/Postgres schema errors. Never returns raw messages. */
+export function schemaGapFromError(error: unknown): string {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const meta = error.meta ?? {};
+    const column = identifierFromMeta(meta.column);
+    const model = identifierFromMeta(meta.modelName) || identifierFromMeta(meta.table);
+    if (model && column && !column.includes(".")) return allowlistedSchemaGap(`${model}.${column}`);
+    if (column) return allowlistedSchemaGap(column);
+    if (model) return allowlistedSchemaGap(model);
+  }
+  const text = errorText(error);
+  const columnOfRelation = text.match(/column "([^"]+)" of relation "([^"]+)" does not exist/i);
+  if (columnOfRelation) return allowlistedSchemaGap(`${columnOfRelation[2]}.${columnOfRelation[1]}`);
+  const columnOnly = text.match(/column "([^"]+)" does not exist/i);
+  if (columnOnly) return allowlistedSchemaGap(columnOnly[1]);
+  const relation = text.match(/relation "([^"]+)" does not exist/i);
+  if (relation) return allowlistedSchemaGap(relation[1]);
+  const table = text.match(/table `([^`]+)` does not exist/i);
+  if (table) return allowlistedSchemaGap(identifierFromMeta(table[1]));
+  return "";
 }
 
 export function isMissingTableError(error: unknown, table?: string): boolean {
@@ -106,6 +166,22 @@ export async function getSchemaReadiness(): Promise<SchemaReadiness> {
   for (const table of REQUIRED_OPERATIONAL_TABLES) {
     if (!presentTables.has(table)) {
       missing.push({ table, column: "*" });
+    }
+  }
+
+  const requiredColumnTables = [...new Set(REQUIRED_OPERATIONAL_COLUMNS.map((item) => item.table))];
+  const requiredColumnNames = [...new Set(REQUIRED_OPERATIONAL_COLUMNS.map((item) => item.column))];
+  const columnRows = await client.$queryRaw<Array<{ table_name: string; column_name: string }>>`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN (${Prisma.join(requiredColumnTables)})
+      AND column_name IN (${Prisma.join(requiredColumnNames)})
+  `;
+  const presentColumns = new Set(columnRows.map((row) => `${row.table_name}.${row.column_name}`));
+  for (const item of REQUIRED_OPERATIONAL_COLUMNS) {
+    if (!presentColumns.has(`${item.table}.${item.column}`)) {
+      missing.push({ table: item.table, column: item.column });
     }
   }
 
@@ -163,6 +239,10 @@ export async function hasTicketAiSourceColumn(): Promise<boolean> {
   return aiSource;
 }
 
+export async function hasWorkOrderNotesColumn() {
+  return hasWorkOrderNotesColumnOn(getPrismaBaseClient());
+}
+
 export async function hasWorkOrderVendorContractColumn(): Promise<boolean> {
   if (workOrderVendorColumnCache && workOrderVendorColumnCache.expiresAt > Date.now()) {
     return workOrderVendorColumnCache.value;
@@ -185,6 +265,7 @@ let schemaReadinessCache: { value: SchemaReadiness; expiresAt: number } | null =
 
 export function resetSchemaReadinessCache() {
   resetSoftDeleteCompatCache();
+  resetWorkOrderNotesCache();
   featureColumnCache = null;
   workOrderVendorColumnCache = null;
   schemaReadinessCache = null;

@@ -45,6 +45,8 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 
 import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const tx = { marker: "invoice-draft-tx" };
@@ -385,5 +387,159 @@ describe("work-order invoice basis material approval", () => {
 
     expect(response.status).toBe(409);
     expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order invoice basis GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading invoice drafts", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rebuild" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the finance-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-basis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rebuild" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order invoice basis schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.com",
+      name: "Manager",
+      role: "manager",
+      company_id: "company-1",
+    });
+    workOrderFindFirstMock.mockResolvedValue({
+      id: "wo-1",
+      title: "Byte av filter",
+      status: "completed",
+      property: { name: "Fastigheten", address: "Storgatan 1", postal_code: "411 01", city: "Göteborg" },
+      unit: null,
+      company: { name: "Bolaget AB", org_number: "556000-0000" },
+    });
+    listTimeEntriesMock.mockResolvedValue([]);
+    listMaterialEntriesMock.mockResolvedValue([]);
+    getProfitabilitySettingsMock.mockResolvedValue({
+      customerHourlyRate: 650,
+      materialMarkupPercent: 15,
+      fixedRevenue: 0,
+    });
+    getLatestInvoiceDraftMock.mockResolvedValue(null);
+  });
+
+  it("maps a missing WorkOrderInvoiceDraft table on save to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderInvoiceDraft` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderInvoiceDraft" },
+        },
+      ),
+    );
+
+    const response = await POST(postRequest("draft"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("keeps missing customer name as field validation", async () => {
+    const response = await POST(postRequest("ready", { customerName: "  " }), params);
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("Kundnamn");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order invoice-basis Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads invoice basis for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/invoice-basis"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A saves invoice basis on a Tenant B work-order id", async () => {
+    const response = await POST(postRequest("draft"), { params: Promise.resolve({ id: "wo-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

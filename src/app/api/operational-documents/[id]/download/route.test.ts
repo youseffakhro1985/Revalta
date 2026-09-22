@@ -97,6 +97,27 @@ describe("operational-documents/[id]/download", () => {
     expect(operationalDocumentFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before loading an operational document download", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-a",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(request(), { params });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(operationalDocumentFindFirstMock).not.toHaveBeenCalled();
+    expect(isOperationalDocumentAccessibleMock).not.toHaveBeenCalled();
+    expect(blobGetMock).not.toHaveBeenCalled();
+  });
+
   it("tenant-scopes the lookup and returns a stable correlated 404 without logging an unverified id", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "manager" });
     operationalDocumentFindFirstMock.mockResolvedValue(null);
@@ -113,6 +134,50 @@ describe("operational-documents/[id]/download", () => {
     }));
     expect(blobGetMock).not.toHaveBeenCalled();
     expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("external-secret-id");
+  });
+
+  it("returns tenant-safe 404 for a Tenant B document id without streaming blob", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "manager" });
+    operationalDocumentFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(request("doc-tenant-b"), {
+      params: Promise.resolve({ id: "doc-tenant-b" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({ error: "Dokumentet hittades inte", errorCode: "NOT_FOUND", requestId });
+    expect(operationalDocumentFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "doc-tenant-b", company_id: "company-a", deleted_at: null },
+    }));
+    expect(isOperationalDocumentAccessibleMock).not.toHaveBeenCalled();
+    expect(blobGetMock).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch an untrusted storage URL after private blob miss", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "manager" });
+    operationalDocumentFindFirstMock.mockResolvedValue({
+      ...documentFixture(),
+      storage_url: "https://attacker.example/stolen.pdf",
+    });
+    blobGetMock.mockResolvedValue(null);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const response = await GET(request(), { params });
+      const body = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(body.error).toBe("Dokumentet hittades inte i fillagringen");
+      expect(blobGetMock).toHaveBeenCalledWith("https://attacker.example/stolen.pdf", {
+        access: "private",
+        token: "blob-token",
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("returns a correlated 503 after access is verified when storage is unavailable", async () => {

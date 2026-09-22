@@ -1,12 +1,13 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import db, { getPrismaBaseClient } from "@/lib/db";
 import {
   canAssignWorkOrders,
   canManageTickets,
   canManageWorkOrderFinance,
   canViewFinanceData,
   getCurrentUser,
+  requireCompanyUser,
   shouldScopeToAssignedWork,
 } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -41,11 +42,17 @@ import {
 import { createLogger } from "@/lib/structured-logger";
 import {
   hasWorkOrderVendorContractColumn,
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  listWorkOrderColumns,
+  schemaGapFromError,
   schemaMismatchUserMessage,
+  workOrderScalarSelectWithoutNotes,
   workOrderVendorIdSelect,
 } from "@/lib/schema-readiness";
 import { findAssignableVendorContract, listAssignableVendorContracts } from "@/lib/work-order-vendor";
 import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
 import {
   INVOICE_DRAFT_NOT_READY_FOR_INVOICING,
   invoiceDraftAllowsWorkOrderInvoicing,
@@ -88,58 +95,86 @@ function workOrderDetailInclude(persistVendor: boolean) {
     : workOrderDetailIncludeBase;
 }
 
+async function workOrderCompatibleDetailSelect(persistVendor: boolean): Promise<Prisma.WorkOrderSelect> {
+  const client = typeof getPrismaBaseClient === "function" ? getPrismaBaseClient() : null;
+  const columns = await listWorkOrderColumns((client ?? { $queryRaw: undefined }) as never);
+  return {
+    ...workOrderScalarSelectWithoutNotes(columns),
+    ...workOrderDetailInclude(persistVendor),
+  } as Prisma.WorkOrderSelect;
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const { id } = await params;
-  const persistVendor = await hasWorkOrderVendorContractColumn();
-  const canAssign = canAssignWorkOrders(user.role);
-  const [workOrder, users, vendors, enterprise, statusEvents, assetLink] = await Promise.all([
-    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include: workOrderDetailInclude(persistVendor) }),
-    db.user.findMany({
-      where: { company_id: user.company_id, status: "active" },
-      orderBy: [{ name: "asc" }, { email: "asc" }],
-      select: { id: true, name: true, email: true, role: true },
-    }),
-    canAssign ? listAssignableVendorContracts(db, user.company_id) : Promise.resolve([]),
-    getWorkOrderEnterpriseState(db, user.company_id, id),
-    getWorkOrderStatusEvents(db, user.company_id, id),
-    getWorkOrderAssetLink(db, user.company_id, id),
-  ]);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-  if (shouldScopeToAssignedWork(user.role) && workOrder.assigned_to_id !== user.id) {
-    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  try {
+    const persistVendor = await hasWorkOrderVendorContractColumn();
+    const detailSelect = await workOrderCompatibleDetailSelect(persistVendor);
+    const canAssign = canAssignWorkOrders(user.role);
+    const [workOrder, users, vendors, enterprise, statusEvents, assetLink] = await Promise.all([
+      db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, select: detailSelect }),
+      db.user.findMany({
+        where: { company_id: user.company_id, status: "active" },
+        orderBy: [{ name: "asc" }, { email: "asc" }],
+        select: { id: true, name: true, email: true, role: true },
+      }),
+      canAssign ? listAssignableVendorContracts(db, user.company_id) : Promise.resolve([]),
+      getWorkOrderEnterpriseState(db, user.company_id, id),
+      getWorkOrderStatusEvents(db, user.company_id, id),
+      getWorkOrderAssetLink(db, user.company_id, id),
+    ]);
+    if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    if (shouldScopeToAssignedWork(user.role) && workOrder.assigned_to_id !== user.id) {
+      return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    }
+    const includeFinance = canViewFinanceData(user.role);
+    const workOrderPayload = includeFinance
+      ? workOrder
+      : { ...workOrder, estimated_cost: null, actual_cost: null };
+    return NextResponse.json(
+      {
+        workOrder: { ...workOrderPayload, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
+        users,
+        vendors,
+        canManage: canManageTickets(user.role),
+        canAssign,
+        canManageFinance: canManageWorkOrderFinance(user.role),
+        canViewFinance: includeFinance,
+        vendorAssignmentAvailable: persistVendor,
+      },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      const missing = schemaGapFromError(error);
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+          ...(missing ? { missing } : {}),
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
   }
-  const includeFinance = canViewFinanceData(user.role);
-  const workOrderPayload = includeFinance
-    ? workOrder
-    : { ...workOrder, estimated_cost: null, actual_cost: null };
-  return NextResponse.json(
-    {
-      workOrder: { ...workOrderPayload, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
-      users,
-      vendors,
-      canManage: canManageTickets(user.role),
-      canAssign,
-      canManageFinance: canManageWorkOrderFinance(user.role),
-      canViewFinance: includeFinance,
-      vendorAssignmentAvailable: persistVendor,
-    },
-    { headers: { "Cache-Control": "private, no-store" } },
-  );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const companyId = user.company_id;
 
   const { id } = await params;
   const persistVendor = await hasWorkOrderVendorContractColumn();
+  const detailSelect = await workOrderCompatibleDetailSelect(persistVendor);
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
       where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
@@ -312,7 +347,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     try {
       await validateWorkOrderAssetLinks(db, { companyId, propertyId: existing.property_id, buildingId, technicalAssetId });
     } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Ogiltig komponentkoppling" }, { status: 400 });
+      const message = error instanceof Error ? error.message : "Ogiltig komponentkoppling";
+      return NextResponse.json(
+        { error: message },
+        { status: message === "Fastigheten hittades inte" ? 404 : 400 },
+      );
     }
   }
 
@@ -392,7 +431,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
       const completedWorkOrder = await tx.workOrder.findFirst({
         where: { deleted_at: null, id: existing.id, company_id: companyId },
-        include: workOrderDetailInclude(persistVendor),
+        select: detailSelect,
       });
       if (!completedWorkOrder) throw new Error("WORK_ORDER_NOT_FOUND");
 
@@ -425,7 +464,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const updated = await tx.workOrder.findFirst({
       where: { deleted_at: null, id: existing.id, company_id: companyId },
-      include: workOrderDetailInclude(persistVendor),
+      select: detailSelect,
     });
     if (!updated) throw new Error("WORK_ORDER_NOT_FOUND");
 
@@ -531,6 +570,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") {
       return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    }
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      const missing = schemaGapFromError(error);
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+          ...(missing ? { missing } : {}),
+        },
+        { status: 503 },
+      );
     }
     throw error;
   }
@@ -735,10 +785,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
   const companyId = user.company_id;
 
   const { id } = await params;

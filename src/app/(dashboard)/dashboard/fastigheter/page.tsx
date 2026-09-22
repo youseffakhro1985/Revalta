@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { SoftDeleteUndoBanner } from "@/components/dashboard/soft-delete-undo-banner";
+import { csvCell } from "@/lib/csv-cell";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = {
@@ -510,6 +511,3 @@ function statusLabel(status: string) {
   return labels[status] || status;
 }
 
-function csvCell(value: string) {
-  return `"${value.replaceAll('"', '""')}"`;
-}

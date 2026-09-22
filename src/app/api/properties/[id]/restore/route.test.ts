@@ -110,7 +110,26 @@ describe("properties/[id]/restore", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const forbidden = await POST(request(), { params });
     expect(forbidden.status).toBe(403);
-    expect((await forbidden.json()).errorCode).toBe("FORBIDDEN");
+    await expect(forbidden.json()).resolves.toEqual({
+      error: "Du saknar behörighet att återställa fastigheter",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const resident = await POST(request(), { params });
+    expect(resident.status).toBe(403);
+    await expect(resident.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 

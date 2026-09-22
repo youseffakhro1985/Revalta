@@ -59,6 +59,21 @@ describe("access credentials route", () => {
     const response = await GET();
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att visa nycklar och passage");
+    expect(accessCredentialFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before listing access credentials", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(accessCredentialFindManyMock).not.toHaveBeenCalled();
     expect(auditFindManyMock).not.toHaveBeenCalled();
   });
@@ -278,5 +293,131 @@ describe("access credentials route", () => {
     expect(response.status).toBe(409);
     const body = await response.json();
     expect(body.error).toMatch(/backfill/i);
+  });
+});
+
+describe("access credentials writes staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("POST rejects residents before creating a credential", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/access-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", identifier: "NYCKEL-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(accessCredentialCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(new Request("http://localhost/api/access-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", identifier: "NYCKEL-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(accessCredentialCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up a credential", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/access-credentials", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId: "cred-1", status: "blocked" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(accessCredentialFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await PATCH(new Request("http://localhost/api/access-credentials", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId: "cred-1", status: "blocked" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(accessCredentialFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("access credentials Tenant B related ids", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns tenant-safe 404 when Tenant A posts a credential against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/access-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-tenant-b",
+        identifier: "NYCKEL-B",
+        credentialType: "key",
+        status: "in_stock",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true },
+    });
+    expect(accessCredentialCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B credential id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    accessCredentialFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/access-credentials", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId: "cred-tenant-b", status: "blocked" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Behörigheten hittades inte");
+    expect(accessCredentialFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "cred-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(accessCredentialFindFirstMock).toHaveBeenNthCalledWith(2, {
+      where: { id: "cred-tenant-b", company_id: "company-1" },
+      select: { id: true },
+    });
+    expect(accessCredentialUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

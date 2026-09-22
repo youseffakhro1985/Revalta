@@ -159,4 +159,32 @@ describe("public ticket tracking", () => {
     expect(response.status).toBe(404);
     expect(auditFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when a Tenant A portal token looks up a Tenant B reference", async () => {
+    const { createPortalTrackingToken } = await import("@/lib/portal-tracking");
+    ticketFindFirstMock.mockResolvedValue(null);
+    const token = createPortalTrackingToken({
+      reference: "RV-TENANT-B",
+      email: "boende@example.se",
+      companyId: "company-1",
+    });
+
+    const response = await GET(
+      new Request(`https://www.revalta.se/api/public/tickets/RV-TENANT-B?token=${encodeURIComponent(token)}`),
+      { params: Promise.resolve({ reference: "rv-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte. Kontrollera referensnummer och e-post.");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        public_reference: "RV-TENANT-B",
+        reporter_email: "boende@example.se",
+        company_id: "company-1",
+      }),
+    }));
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindFirstMock).not.toHaveBeenCalled();
+  });
 });

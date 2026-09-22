@@ -121,6 +121,34 @@ describe("POST /api/public/tickets/[reference]/feedback", () => {
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when a Tenant A portal token looks up a Tenant B reference", async () => {
+    ticketFindFirstMock.mockResolvedValue(null);
+    verifyPortalTrackingTokenMock.mockReturnValue({
+      reference: "RV-TENANT-B",
+      email: "boende@example.se",
+      companyId: "company-1",
+      exp: Date.now() + 1_000_000,
+    });
+
+    const response = await POST(
+      makeRequest({ token: "signed-token", rating: 5 }),
+      { params: Promise.resolve({ reference: "rv-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte. Kontrollera referensnummer och e-post.");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        public_reference: "RV-TENANT-B",
+        reporter_email: "boende@example.se",
+        company_id: "company-1",
+      }),
+    }));
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(auditFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("accepts a native form post and redirects without putting the reporter email in the URL", async () => {
     const response = await POST(
       new Request("https://www.revalta.se/api/public/tickets/RV-2026-TEST/feedback?companySlug=demo", {

@@ -53,6 +53,7 @@ export async function syncWorkOrderToTicket(
       status: nextStatus,
       assigned_to_id: input.assignedToId,
     },
+    select: { id: true },
   });
 
   await tx.auditLog.create({

@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { auditScopedWhere, canViewOperations, getCurrentUser } from "@/lib/current-user";
+import { auditScopedWhere, canViewOperations, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { asNumber, isModernStorageMirror, loadLegacyRows, mergeByCreatedAt, parseOptionalDate } from "@/lib/dual-list";
 import { findCompanyOwned } from "@/lib/tenant-relations";
 import { NextResponse } from "next/server";
@@ -12,23 +12,23 @@ const entityType = "vendor_contract";
 
 export async function GET() {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewOperations(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att visa leverantörsavtal" }, { status: 403 });
     }
 
     const [rows, legacy] = await Promise.all([
-      user.company_id
-        ? db.vendorContract.findMany({
+      db.vendorContract.findMany({
             where: {
               company_id: user.company_id,
               OR: [{ property_id: null }, { property: { deleted_at: null } }],
             },
             orderBy: { created_at: "desc" },
             take: 200,
-          })
-        : Promise.resolve([]),
+          }),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), entity_type: entityType },
         orderBy: { created_at: "desc" },
@@ -75,10 +75,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const name = String(body.name || "").trim();
@@ -168,10 +169,11 @@ const contractFieldKeys = ["name", "orgNumber", "category", "contractTitle", "co
 
 export async function PATCH(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
     if (!canViewOperations(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
 
     const body = await request.json();
     const vendorId = String(body.vendorId || body.id || "").trim();

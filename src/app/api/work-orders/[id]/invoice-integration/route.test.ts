@@ -26,6 +26,11 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageWorkOrderFinance: () => true,
   canViewFinanceData: () => true,
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -413,6 +418,95 @@ describe("work-order invoice integration — logical export idempotency and reco
     await expect(response.json()).resolves.toEqual({ error: "Ogiltigt innehåll" });
     expect(transactionMock).not.toHaveBeenCalled();
     expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order invoice integration GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading export jobs or invoice drafts", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-integration"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+    expect(listInvoiceExportJobsMock).not.toHaveBeenCalled();
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/invoice-integration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "queue" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order invoice-integration Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.com",
+      name: "Manager",
+      role: "manager",
+      company_id: "company-1",
+    });
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads invoice integration for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/invoice-integration"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(listInvoiceExportJobsMock).not.toHaveBeenCalled();
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A queues invoice export on a Tenant B work-order id", async () => {
+    const response = await POST(
+      request({ action: "queue", provider: "webhook" }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(getModernLatestInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

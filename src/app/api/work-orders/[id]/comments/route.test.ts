@@ -4,12 +4,16 @@ const {
   getCurrentUserMock,
   findAccessibleWorkOrderMock,
   commentCreateMock,
+  commentFindManyMock,
+  auditFindManyMock,
   transactionMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   findAccessibleWorkOrderMock: vi.fn(),
   commentCreateMock: vi.fn(),
+  commentFindManyMock: vi.fn(),
+  auditFindManyMock: vi.fn(),
   transactionMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
@@ -28,13 +32,15 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 
 vi.mock("@/lib/db", () => ({
   default: {
-    workOrderComment: { findMany: vi.fn() },
-    auditLog: { findMany: vi.fn() },
+    workOrderComment: { findMany: commentFindManyMock },
+    auditLog: { findMany: auditFindManyMock },
     $transaction: transactionMock,
   },
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const tx = { workOrderComment: { create: commentCreateMock } };
@@ -117,5 +123,152 @@ describe("work-order comment mutation reliability", () => {
     expect(transactionMock).not.toHaveBeenCalled();
     expect(commentCreateMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order comments GET staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before loading comments or audit history", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/comments"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+    expect(commentFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up a work order", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "Hej" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies viewers with the ticket-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "Hej" }),
+      }),
+      params,
+    );
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A lists comments on a Tenant B work-order id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/comments"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      "wo-tenant-b",
+    );
+    expect(commentFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A comments on a Tenant B work-order id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: "Tenant B kommentar" }),
+      }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      "wo-tenant-b",
+      expect.anything(),
+    );
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(commentCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order comments schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.com",
+      name: "Manager",
+      role: "manager",
+      company_id: "company-1",
+    });
+    findAccessibleWorkOrderMock.mockResolvedValue({ id: "wo-1", assigned_to_id: null, title: "Arbetsorder" });
+  });
+
+  it("maps a missing WorkOrderComment table on create to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderComment` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderComment" },
+        },
+      ),
+    );
+
+    const response = await POST(request({ body: "Kontroll utförd" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("keeps empty comment body as field validation", async () => {
+    const response = await POST(request({ body: "   " }), params);
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Kommentaren får inte vara tom");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

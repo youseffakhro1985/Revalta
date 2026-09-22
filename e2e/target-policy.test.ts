@@ -102,6 +102,7 @@ describe("browser target safety and release evidence", () => {
   const health = {
     status: "ok",
     database: "ok",
+    schemaReady: true,
     release: { commitSha: sha, environment: "preview", deploymentId: "dpl_fixture" },
     dataPlane: { identity: PREVIEW_DATA_PLANE_ID, directMatches: true },
   };
@@ -138,6 +139,12 @@ describe("browser target safety and release evidence", () => {
 
   it.each([{ status: "degraded" }, { database: "error" }])("rejects an unhealthy target", (change) => {
     expect(() => validateRelease({ ...health, ...change }, validateTarget(env))).toThrow();
+  });
+
+  it.each([false, undefined])("rejects Preview health that is not schema-ready (%s)", (schemaReady) => {
+    expect(() => validateRelease({ ...health, schemaReady }, validateTarget(env))).toThrow(
+      /Preview schema is not ready/,
+    );
   });
 
   it("rejects a runtime datastore that does not match the attested Preview identity", () => {

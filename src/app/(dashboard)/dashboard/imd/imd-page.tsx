@@ -14,6 +14,7 @@ import {
   premiumPrimaryButtonClass,
   premiumSecondaryButtonClass,
 } from "@/components/dashboard/premium-ui";
+import { csvRow } from "@/lib/csv-cell";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address?: string; city?: string };
@@ -285,7 +286,7 @@ export function ImdPage({ initialCreate }: { initialCreate: boolean }) {
         item.debit?.rent_notice_id || item.debit?.status === "linked" ? "Kopplad" : item.debit?.status === "open" ? "Öppen" : "Ingen",
       ]),
     ];
-    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(";")).join("\n");
+    const csv = rows.map((row) => csvRow(row)).join("\n");
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;

@@ -95,4 +95,50 @@ describe("projects/[id]/restore", () => {
     expect(response.status).toBe(500);
     expect(transactionMock).toHaveBeenCalledTimes(1);
   });
+
+  it("POST denies residents before looking up a project", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const response = await POST(new Request("http://localhost/api/projects/project-1/restore", { method: "POST" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the project-restore copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await POST(new Request("http://localhost/api/projects/project-1/restore", { method: "POST" }), { params });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att återställa projekt");
+    expect(projectFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("projects restore Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    projectFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A restores a Tenant B project id", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/projects/project-tenant-b/restore", { method: "POST" }),
+      { params: Promise.resolve({ id: "project-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Projektet hittades inte eller är redan aktivt");
+    expect(projectFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "project-tenant-b", company_id: "company-1", deleted_at: { not: null } },
+    }));
+    expect(projectUpdateManyMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });

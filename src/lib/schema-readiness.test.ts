@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import {
+  REQUIRED_OPERATIONAL_COLUMNS,
   REQUIRED_OPERATIONAL_TABLES,
   formatSchemaMissing,
   formatSchemaMissingItem,
   isMissingSchemaColumnError,
   isMissingTableError,
+  schemaGapFromError,
   schemaCompatibilityBannerMessage,
   schemaMismatchUserMessage,
   canRenderHomeDashboard,
@@ -51,6 +53,31 @@ describe("schema-readiness", () => {
     expect(isMissingTableError(error, "InsuranceClaim")).toBe(true);
   });
 
+  it("extracts allowlisted table.column gaps without leaking raw messages", () => {
+    const columnError = new Prisma.PrismaClientKnownRequestError("Column not found", {
+      code: "P2022",
+      clientVersion: "test",
+      meta: { column: "WorkOrder.work_order_number" },
+    });
+    expect(schemaGapFromError(columnError)).toBe("WorkOrder.work_order_number");
+    expect(
+      schemaGapFromError(
+        new Prisma.PrismaClientKnownRequestError(
+          "The table `public.WorkOrderNumberCounter` does not exist in the current database.",
+          {
+            code: "P2021",
+            clientVersion: "test",
+            meta: { table: "public.WorkOrderNumberCounter" },
+          },
+        ),
+      ),
+    ).toBe("WorkOrderNumberCounter");
+    expect(schemaGapFromError(new Error('column "sla_status" of relation "WorkOrder" does not exist'))).toBe(
+      "WorkOrder.sla_status",
+    );
+    expect(schemaGapFromError(new Error("drop table tickets; --"))).toBe("");
+  });
+
   it("ignores unrelated Prisma errors", () => {
     const error = new Prisma.PrismaClientKnownRequestError("Unique constraint", {
       code: "P2002",
@@ -74,7 +101,36 @@ describe("schema-readiness", () => {
       "MaintenancePlan",
       "ComponentLifecycleEvent",
       "ComponentCostEntry",
+      "WorkOrderNumberCounter",
+      "WorkOrderStatusEvent",
+      "WorkOrderEditLock",
+      "WorkOrderComment",
+      "WorkOrderTimeEntry",
+      "WorkOrderMaterialEntry",
+      "WorkOrderInvoiceDraft",
     ]);
+  });
+
+  it("probes WorkOrder enterprise columns written unconditionally on create", () => {
+    expect([...REQUIRED_OPERATIONAL_COLUMNS]).toEqual([
+      { table: "WorkOrder", column: "work_order_number" },
+      { table: "WorkOrder", column: "work_type" },
+      { table: "WorkOrder", column: "source" },
+      { table: "WorkOrder", column: "sla_response_due_at" },
+      { table: "WorkOrder", column: "sla_resolution_due_at" },
+      { table: "WorkOrder", column: "sla_status" },
+    ]);
+    const probedColumns = REQUIRED_OPERATIONAL_COLUMNS.map((item) => String(item.column));
+    expect(probedColumns).not.toContain("vendor_contract_id");
+    expect(probedColumns).not.toContain("ai_source");
+  });
+
+  it("treats missing WorkOrder enterprise columns as blocking Översikt", () => {
+    expect(
+      canRenderHomeDashboard({
+        missing: [{ table: "WorkOrder", column: "work_order_number" }],
+      }),
+    ).toBe(false);
   });
 
   it("formats missing columns as table.column and missing tables by name", () => {

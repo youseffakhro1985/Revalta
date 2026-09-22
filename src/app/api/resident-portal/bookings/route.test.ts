@@ -418,6 +418,7 @@ describe("resident-portal bookings route", () => {
     const body = await response.json();
 
     expect(response.status).toBe(409);
+    expect(body.error).toBe("Tiden är redan bokad för denna resurs");
     expect(body.errorCode).toBe("CONFLICT");
     expect(body.requestId).toBe(requestId);
     expect(transactionMock).toHaveBeenCalledTimes(1);
