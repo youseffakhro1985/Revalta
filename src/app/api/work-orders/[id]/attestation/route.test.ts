@@ -291,3 +291,31 @@ describe("POST /api/work-orders/[id]/attestation", () => {
     expect(upsertTimeEntryMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("work-order attestation Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(managerUser());
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A attests a Tenant B work-order id", async () => {
+    const response = await POST(
+      request({ action: "approveSubmitted" }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      "wo-tenant-b",
+      expect.anything(),
+    );
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(listMaterialEntriesMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

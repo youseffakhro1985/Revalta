@@ -91,6 +91,44 @@ describe("work-order edit-lock GET staff-scope", () => {
     expect((await response.json()).error).toBe("Du saknar behörighet att redigera arbetsordrar");
     expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A reads the edit lock on a Tenant B work-order id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/edit-lock"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(findAccessibleWorkOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ company_id: "company-1" }),
+      "wo-tenant-b",
+    );
+    expect(getWorkOrderEditLockMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A acquires a lock on a Tenant B work-order id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/edit-lock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acquire" }),
+      }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(acquireWorkOrderEditLockMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("work-order edit-lock schema gaps", () => {

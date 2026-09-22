@@ -94,4 +94,21 @@ describe("POST /api/integrations/invoice-exports staff-scope", () => {
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(exportJobFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A retries a Tenant B export job id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+
+    const response = await POST(new Request("http://localhost/api/integrations/invoice-exports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "retry", jobId: "job-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Exportjobbet hittades inte");
+    expect(exportJobFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { company_id: "company-1" },
+    }));
+  });
 });
