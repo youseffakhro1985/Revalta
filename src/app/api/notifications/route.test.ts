@@ -212,3 +212,65 @@ describe("notifications writes staff-scope", () => {
     expect(notificationFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("notifications Tenant B related ids", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    notificationFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+    notificationReadUpsertMock.mockResolvedValue({ id: "read-1" });
+    notificationUpdateManyMock.mockResolvedValue({ count: 1 });
+    writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("returns tenant-safe 404 when Tenant A marks a Tenant B notification as read", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Notisen hittades inte");
+    expect(notificationFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "notif-tenant-b", company_id: "company-1" },
+    }));
+    expect(auditFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        entity_id: "notif-tenant-b",
+      }),
+    }));
+    expect(notificationReadUpsertMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B notification id", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+
+    const response = await DELETE(new Request("http://localhost/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Notisen hittades inte");
+    expect(notificationFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "notif-tenant-b", company_id: "company-1", deleted_at: null },
+    }));
+    expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
