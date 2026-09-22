@@ -98,7 +98,10 @@ export function validateWorkOrderStatus(status, body, expectedStatus, ticketId) 
     || workOrder?.status !== expectedStatus
     || workOrder?.ticket?.id !== ticketId
   ) {
-    throw new Error(`Work order did not reach the expected lifecycle status (${diagnosticStatusShape(status, body)})`);
+    const missing = allowlistedSchemaGap(body?.missing);
+    throw new Error(
+      `Work order did not reach the expected lifecycle status (${diagnosticStatusShape(status, body)};missing=${missing || "none"})`,
+    );
   }
 }
 

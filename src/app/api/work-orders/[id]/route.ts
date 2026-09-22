@@ -44,6 +44,7 @@ import {
   hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   isMissingTableError,
+  schemaGapFromError,
   schemaMismatchUserMessage,
   workOrderVendorIdSelect,
 } from "@/lib/schema-readiness";
@@ -137,10 +138,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     );
   } catch (error) {
     if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      const missing = schemaGapFromError(error);
       return NextResponse.json(
         {
           error: schemaMismatchUserMessage(),
           errorCode: API_ERROR_CODES.serviceUnavailable,
+          ...(missing ? { missing } : {}),
         },
         { status: 503 },
       );

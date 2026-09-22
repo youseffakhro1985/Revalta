@@ -43,28 +43,43 @@ function relationModel(parentModel: string, fieldName: string): string | null {
   return field?.type ?? null;
 }
 
-function applyOmitNotes(args: Record<string, unknown>) {
+/** Prisma 5 omitApi is preview-only; select every WorkOrder scalar except notes instead. */
+export function workOrderScalarSelectWithoutNotes(): Record<string, true> {
+  const model = Prisma.dmmf.datamodel.models.find((item) => item.name === "WorkOrder");
+  const select: Record<string, true> = {};
+  for (const field of model?.fields ?? []) {
+    if (field.kind === "scalar" && field.name !== "notes") select[field.name] = true;
+  }
+  return select;
+}
+
+function applyWorkOrderReadShape(args: Record<string, unknown>) {
   if (isPlainObject(args.select)) {
     delete args.select.notes;
     return;
   }
-  const currentOmit = isPlainObject(args.omit) ? args.omit : {};
-  args.omit = { ...currentOmit, notes: true };
+  const scalars = workOrderScalarSelectWithoutNotes();
+  if (isPlainObject(args.include)) {
+    args.select = { ...scalars, ...args.include };
+    delete args.include;
+    return;
+  }
+  args.select = scalars;
 }
 
-function walkWorkOrderOmit(parentModel: string, bag: Record<string, unknown>) {
+function walkWorkOrderReads(parentModel: string, bag: Record<string, unknown>) {
   for (const [fieldName, fieldArgs] of Object.entries(bag)) {
     const childModel = relationModel(parentModel, fieldName);
     if (fieldArgs === true) {
       if (childModel === "WorkOrder") {
-        bag[fieldName] = { omit: { notes: true } };
+        bag[fieldName] = { select: workOrderScalarSelectWithoutNotes() };
       }
       continue;
     }
     if (!isPlainObject(fieldArgs)) continue;
-    if (childModel === "WorkOrder") applyOmitNotes(fieldArgs);
-    if (childModel && isPlainObject(fieldArgs.include)) walkWorkOrderOmit(childModel, fieldArgs.include);
-    if (childModel && isPlainObject(fieldArgs.select)) walkWorkOrderOmit(childModel, fieldArgs.select);
+    if (childModel === "WorkOrder") applyWorkOrderReadShape(fieldArgs);
+    if (childModel && isPlainObject(fieldArgs.include)) walkWorkOrderReads(childModel, fieldArgs.include);
+    if (childModel && isPlainObject(fieldArgs.select)) walkWorkOrderReads(childModel, fieldArgs.select);
   }
 }
 
@@ -94,14 +109,10 @@ export async function sanitizeWorkOrderNotesArgs(
 ): Promise<unknown> {
   if (await hasWorkOrderNotesColumn(client)) return args;
   const next = (args == null ? {} : stripNotesFromData({ ...(args as object) })) as Record<string, unknown>;
-  if (model === "WorkOrder") {
-    if (OMIT_OPS.has(action) && !isPlainObject(next.select)) {
-      applyOmitNotes(next);
-    } else if (isPlainObject(next.select) && "notes" in next.select) {
-      delete next.select.notes;
-    }
+  if (model === "WorkOrder" && OMIT_OPS.has(action)) {
+    applyWorkOrderReadShape(next);
   }
-  if (model && isPlainObject(next.include)) walkWorkOrderOmit(model, next.include);
-  if (model && isPlainObject(next.select)) walkWorkOrderOmit(model, next.select);
+  if (model && isPlainObject(next.include)) walkWorkOrderReads(model, next.include);
+  if (model && isPlainObject(next.select)) walkWorkOrderReads(model, next.select);
   return next;
 }

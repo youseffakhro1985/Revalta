@@ -42,6 +42,8 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 `c908f8d` published exact-SHA Preview `https://revalta-izsy1tb1a-youseffakhro1985s-projects.vercel.app` (`dpl_EsqkrzrN2YJtnmVAvwn9csatGKDD`), health SHA match, dataplane `6237f010…`. CodeQL **success**. Revalta CI **failure**: `ticket-property-integrity.test.ts` got 500 instead of 400 because `hasWorkOrderNotesColumn()` hit the mocked db without `$queryRaw`. Browser E2E resolved that Preview then failed `Verified login response was not observed` (run `35780708384`) before golden-path; login page and `/api/auth/login` were reachable from this session. Fix: mock notes helpers in that test; wait for hydrated `form#login-form[data-ready='1']` like forgot-password.
 
+`1e4c725` exact-SHA Preview `https://revalta-ofgskey3p-youseffakhro1985s-projects.vercel.app` (`dpl_7BdnjsqTMbhQt83TFYTVbY8yQ3j4`). Revalta CI + CodeQL **success**. Browser E2E login/nav/properties **PASS**, ticket→WO **no longer 503 notes**, then `Work order did not reach the expected lifecycle status (500:none)` on GET `/api/work-orders/:id` (run `35781482707`). Cause: notes middleware used Prisma `omit`, which requires preview `omitApi` (off). Replace with explicit scalar `select` excluding `notes`.
+
 ## P0
 
 | Item | Evidence | Status |

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeWorkOrderNotesArgs, workOrderNotesWrite } from "@/lib/work-order-notes-compat";
+import {
+  sanitizeWorkOrderNotesArgs,
+  workOrderNotesWrite,
+  workOrderScalarSelectWithoutNotes,
+} from "@/lib/work-order-notes-compat";
 
 describe("work-order notes compat", () => {
   it("omits notes from create payloads when the column is missing", () => {
@@ -8,7 +12,7 @@ describe("work-order notes compat", () => {
     expect(workOrderNotesWrite(true, null)).toEqual({});
   });
 
-  it("adds omit.notes and strips data.notes when the column is missing", async () => {
+  it("selects WorkOrder scalars without notes instead of using preview omitApi", async () => {
     const client = {
       $queryRaw: async () => [],
     };
@@ -17,11 +21,13 @@ describe("work-order notes compat", () => {
       "WorkOrder",
       "create",
       { data: { title: "Läckage", notes: "Planera åtgärd" } },
-    );
-    expect(sanitized).toEqual({
-      data: { title: "Läckage" },
-      omit: { notes: true },
-    });
+    ) as { data: { title: string }; select: Record<string, true> };
+    expect(sanitized.data).toEqual({ title: "Läckage" });
+    expect(sanitized).not.toHaveProperty("omit");
+    expect(sanitized.select.id).toBe(true);
+    expect(sanitized.select.title).toBe(true);
+    expect(sanitized.select).not.toHaveProperty("notes");
+    expect(workOrderScalarSelectWithoutNotes()).not.toHaveProperty("notes");
   });
 
   it("keeps an explicit select and only strips data.notes", async () => {
@@ -40,7 +46,25 @@ describe("work-order notes compat", () => {
     });
   });
 
-  it("omits notes on nested Ticket.work_order includes", async () => {
+  it("converts include to a notes-free select on WorkOrder reads", async () => {
+    const client = {
+      $queryRaw: async () => [],
+    };
+    const sanitized = await sanitizeWorkOrderNotesArgs(
+      client as never,
+      "WorkOrder",
+      "findFirst",
+      { where: { id: "work-order-1" }, include: { ticket: { select: { id: true } } } },
+    ) as { where: { id: string }; select: Record<string, unknown> };
+    expect(sanitized.where).toEqual({ id: "work-order-1" });
+    expect(sanitized).not.toHaveProperty("include");
+    expect(sanitized).not.toHaveProperty("omit");
+    expect(sanitized.select.ticket).toEqual({ select: { id: true } });
+    expect(sanitized.select.id).toBe(true);
+    expect(sanitized.select).not.toHaveProperty("notes");
+  });
+
+  it("selects nested Ticket.work_order without notes", async () => {
     const client = {
       $queryRaw: async () => [],
     };
@@ -49,10 +73,8 @@ describe("work-order notes compat", () => {
       "Ticket",
       "findFirst",
       { where: { id: "ticket-1" }, include: { work_order: true } },
-    );
-    expect(sanitized).toEqual({
-      where: { id: "ticket-1" },
-      include: { work_order: { omit: { notes: true } } },
-    });
+    ) as { include: { work_order: { select: Record<string, true> } } };
+    expect(sanitized.include.work_order.select.id).toBe(true);
+    expect(sanitized.include.work_order.select).not.toHaveProperty("notes");
   });
 });

@@ -57,7 +57,7 @@ describe("golden-path contract", () => {
   it("rejects missing ids and wrong lifecycle without leaking payloads", () => {
     expect(() => validateCreatedProperty(200, { property: { id: "property-1" } })).toThrow(/did not persist \(200:none\)/);
     expect(() => validateTicketStatus(200, { ticket: { status: "closed", property: { id: "property-1" } } }, "in_progress", "property-1")).toThrow(/expected synced status \(200:none\)/);
-    expect(() => validateWorkOrderStatus(200, { workOrder: { status: "in_progress", ticket: { id: "other" } } }, "in_progress", "ticket-1")).toThrow(/lifecycle status \(200:none\)/);
+    expect(() => validateWorkOrderStatus(200, { workOrder: { status: "in_progress", ticket: { id: "other" } } }, "in_progress", "ticket-1")).toThrow(/lifecycle status \(200:none;missing=none\)/);
     expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500:none;existing=unchecked;missing=none\)/);
     expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE" }, true, { probed: true, existing: false })).toThrow(
       /did not resolve to a work order \(503:SERVICE_UNAVAILABLE;existing=no;missing=none\)/,
