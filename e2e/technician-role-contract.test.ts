@@ -65,6 +65,9 @@ describe("technician role is wired into the required Preview browser job", () =>
     expect(source).toContain("assignedToId");
     expect(source).toContain("/api/calendar");
     expect(source).toContain("scheduledStart");
+    expect(source).toContain("#work-order-title");
+    expect(source).toContain("width: 390");
+    expect(source).toContain("getElementById(\"ekonomi\")");
     expect(source).not.toContain("page.route");
   });
 });
