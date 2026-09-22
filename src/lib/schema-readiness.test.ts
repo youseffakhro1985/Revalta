@@ -77,6 +77,11 @@ describe("schema-readiness", () => {
       "ComponentCostEntry",
       "WorkOrderNumberCounter",
       "WorkOrderStatusEvent",
+      "WorkOrderEditLock",
+      "WorkOrderComment",
+      "WorkOrderTimeEntry",
+      "WorkOrderMaterialEntry",
+      "WorkOrderInvoiceDraft",
     ]);
   });
 

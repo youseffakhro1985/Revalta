@@ -34,6 +34,11 @@ const REQUIRED_TABLES = [
   "ComponentCostEntry",
   "WorkOrderNumberCounter",
   "WorkOrderStatusEvent",
+  "WorkOrderEditLock",
+  "WorkOrderComment",
+  "WorkOrderTimeEntry",
+  "WorkOrderMaterialEntry",
+  "WorkOrderInvoiceDraft",
 ];
 
 const db = new PrismaClient();

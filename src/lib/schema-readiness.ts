@@ -30,6 +30,13 @@ export const REQUIRED_OPERATIONAL_TABLES = [
   "ComponentCostEntry",
   "WorkOrderNumberCounter",
   "WorkOrderStatusEvent",
+  // Golden-path ticket→invoice writes these with no write fallback.
+  // Preview dual-read does not skip the modern upsert.
+  "WorkOrderEditLock",
+  "WorkOrderComment",
+  "WorkOrderTimeEntry",
+  "WorkOrderMaterialEntry",
+  "WorkOrderInvoiceDraft",
 ] as const;
 
 /**
