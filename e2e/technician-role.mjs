@@ -203,17 +203,21 @@ export async function runTechnicianRolePreview({
     await expectPath(page, `/dashboard/arbetsorder/${workOrderId}`);
     const title = page.locator("#work-order-title");
     await expectVisible(title, "technician work-order title");
-    await expectVisible(page.locator("#work-order-execution-material"), "technician execution material");
+    const lockedExecution = page.getByText("Registreringsformulären är dolda eftersom utförandet är skrivskyddat.");
+    await lockedExecution.scrollIntoViewIfNeeded();
+    await expectVisible(lockedExecution, "technician locked execution");
     await page.waitForFunction(() => !document.getElementById("ekonomi"), null, { timeout: 15_000 }).catch(() => {
       fail("Technician finance panel was not hidden");
+    });
+    await page.waitForFunction(() => !document.getElementById("work-order-execution-material"), null, { timeout: 15_000 }).catch(() => {
+      fail("Technician execution forms stayed writable on an invoiced work order");
     });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await title.scrollIntoViewIfNeeded();
     await expectVisible(title, "technician mobile work-order title");
-    const mobileMaterial = page.locator("#work-order-execution-material");
-    await mobileMaterial.scrollIntoViewIfNeeded();
-    await expectVisible(mobileMaterial, "technician mobile execution material");
+    await lockedExecution.scrollIntoViewIfNeeded();
+    await expectVisible(lockedExecution, "technician mobile locked execution");
     await page.setViewportSize({ width: 1440, height: 1000 });
   } finally {
     await context.close();
