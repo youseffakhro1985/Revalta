@@ -7,7 +7,9 @@ type PlanRow = { id: string; name: string; version: number; base_year: number; h
 type ActionRow = { category: string; title: string; planned_year: number; recurrence_years: number | null; estimated_cost: number; annual_index_rate: number | null; priority: string; risk: string; status: string; contractor: string | null; building_name: string | null; technical_asset_name: string | null };
 
 function quote(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+  let text = String(value ?? "");
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function indexedCost(action: ActionRow, plan: PlanRow, year: number) {
