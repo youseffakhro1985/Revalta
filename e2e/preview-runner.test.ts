@@ -11,7 +11,7 @@ const env = {
   E2E_VERIFIED_PASSWORD: "synthetic", E2E_VERIFIED_COMPANY_ID: "synthetic-company",
 };
 const health = {
-  status: "ok", database: "ok",
+  status: "ok", database: "ok", schemaReady: true,
   release: { commitSha: env.E2E_EXPECTED_SHA, environment: "preview", deploymentId: "dpl_fixture" },
   dataPlane: { identity: PREVIEW_DATA_PLANE_ID, directMatches: true },
 };
@@ -26,6 +26,7 @@ describe("actual browser entry point fails before browser launch", () => {
     { dataPlane: { identity: PRODUCTION_DATA_PLANE_ID, directMatches: true } },
     { dataPlane: { identity: PREVIEW_DATA_PLANE_ID, directMatches: false } },
     { database: "error" },
+    { schemaReady: false },
   ])("rejects invalid runtime attestation: %j", async (change) => {
     const launch = vi.fn();
     await expect(runAuthNavigation(env, { chromium: { launch }, readHealth: async () => ({ ...health, ...change }) })).rejects.toThrow();
@@ -107,6 +108,22 @@ describe("health transport", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(health), { status: 503 })));
     try { await expect(readPreviewHealth({ baseUrl: env.E2E_BASE_URL }, {})).rejects.toThrow(/HTTP 200/); }
     finally { vi.unstubAllGlobals(); }
+  });
+  it("names a schema 503 without leaking missing columns", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      status: "degraded",
+      ok: false,
+      database: "ok",
+      schemaReady: false,
+      components: { database: "ok", schema: "missing", dataPlane: "ok" },
+    }), { status: 503 })));
+    try {
+      await expect(readPreviewHealth({ baseUrl: env.E2E_BASE_URL }, {})).rejects.toThrow(
+        /Preview schema is not ready for this release/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
   it("forbids redirects and bounds health requests", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(health)));

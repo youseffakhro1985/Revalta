@@ -74,6 +74,7 @@ describe("sanitizePreviewFailure", () => {
   it("keeps allowlisted diagnostics and drops unknown payload-bearing messages", () => {
     expect(sanitizePreviewFailure(new Error("Verified login response was not observed"))).toContain("Verified login");
     expect(sanitizePreviewFailure(new Error("BLOCKED: release identity changed or became unverifiable"))).toContain("release identity");
+    expect(sanitizePreviewFailure(new Error("BLOCKED: Preview schema is not ready for this release"))).toContain("schema is not ready");
     expect(sanitizePreviewFailure(new Error("Work-order edit lock was not acquired (423)"))).toContain("edit lock");
     expect(sanitizePreviewFailure(new Error("timeout at https://secret.example/login?token=abc user@example.com"))).toBe(
       "Preview verification failed; no release approval. Check target, fixtures and required browser steps.",

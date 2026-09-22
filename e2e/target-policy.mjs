@@ -58,6 +58,9 @@ export function validateRelease(health, target, initialHealth) {
   if (health?.status !== "ok" || health?.database !== "ok" || health?.release?.commitSha !== target.expectedSha) {
     throw new Error("Health/release identity does not match the exact candidate SHA");
   }
+  if (health?.schemaReady !== true) {
+    throw new Error("BLOCKED: Preview schema is not ready for this release");
+  }
   if (!target.isLocal) {
     if (health.release.environment !== "preview" || !health.release.deploymentId) {
       throw new Error("Remote E2E requires a healthy identified Preview deployment");
