@@ -1,8 +1,22 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
+import { canViewFinanceData, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
+
+function redactReportSnapshot(snapshot: Record<string, unknown>) {
+  const workOrderRaw = snapshot.workOrder;
+  const workOrder = workOrderRaw && typeof workOrderRaw === "object" && !Array.isArray(workOrderRaw)
+    ? { ...workOrderRaw, estimated_cost: null, actual_cost: null }
+    : workOrderRaw;
+  const entries = Array.isArray(snapshot.entries)
+    ? snapshot.entries.map((entry) => {
+        if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+        return { ...entry, unit_cost: null, total_amount: null };
+      })
+    : snapshot.entries;
+  return { ...snapshot, workOrder, entries };
+}
 
 export async function GET(
   _request: Request,
@@ -35,5 +49,8 @@ export async function GET(
   if (!await findAccessibleWorkOrder(user, report.work_order_id)) {
     return notFoundWorkOrder();
   }
-  return NextResponse.json({ report });
+  const includeFinance = canViewFinanceData(user.role);
+  return NextResponse.json({
+    report: includeFinance ? report : { ...report, snapshot: redactReportSnapshot(report.snapshot || {}) },
+  });
 }
