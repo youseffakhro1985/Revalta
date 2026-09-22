@@ -45,3 +45,27 @@ describe("GET /api/leases/[id]/inspection-work-orders/status", () => {
     expect(readInspectionWorkOrdersMock).not.toHaveBeenCalled();
   });
 });
+
+describe("inspection-work-orders status Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    readInspectionWorkOrdersMock.mockResolvedValue([]);
+  });
+
+  it("keeps a Tenant B lease id inside the caller company when listing inspection work-order status", async () => {
+    const response = await GET(
+      new Request("http://localhost/api/leases/lease-tenant-b/inspection-work-orders/status"),
+      { params: Promise.resolve({ id: "lease-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.links).toEqual([]);
+    expect(readInspectionWorkOrdersMock).toHaveBeenCalledWith("company-1", "lease-tenant-b");
+  });
+});

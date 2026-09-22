@@ -88,3 +88,46 @@ describe("maintenance-plan governance GET staff-scope", () => {
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("maintenance-plan governance Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    propertyFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads governance for a Tenant B property id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/properties/property-tenant-b/maintenance-plan/governance"),
+      { params: Promise.resolve({ id: "property-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "property-tenant-b", company_id: "company-1", deleted_at: null }),
+    }));
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A approves a plan on a Tenant B property id", async () => {
+    const response = await POST(
+      new Request("https://www.revalta.se/api/properties/property-tenant-b/maintenance-plan/governance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: "plan-tenant-b", action: "plan.approve" }),
+      }),
+      { params: Promise.resolve({ id: "property-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+});
