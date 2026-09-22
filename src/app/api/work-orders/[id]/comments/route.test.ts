@@ -39,6 +39,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const tx = { workOrderComment: { create: commentCreateMock } };
@@ -180,5 +182,47 @@ describe("work-order comments GET staff-scope", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order comments schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.com",
+      name: "Manager",
+      role: "manager",
+      company_id: "company-1",
+    });
+    findAccessibleWorkOrderMock.mockResolvedValue({ id: "wo-1", assigned_to_id: null, title: "Arbetsorder" });
+  });
+
+  it("maps a missing WorkOrderComment table on create to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderComment` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderComment" },
+        },
+      ),
+    );
+
+    const response = await POST(request({ body: "Kontroll utförd" }), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("keeps empty comment body as field validation", async () => {
+    const response = await POST(request({ body: "   " }), params);
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Kommentaren får inte vara tom");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

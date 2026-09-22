@@ -3,6 +3,19 @@ import db from "@/lib/db";
 import { canManageTickets, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
+
+function schemaUnavailable() {
+  return NextResponse.json(
+    { error: schemaMismatchUserMessage(), errorCode: API_ERROR_CODES.serviceUnavailable },
+    { status: 503 },
+  );
+}
 
 export async function GET(
   _request: Request,
@@ -16,33 +29,38 @@ export async function GET(
   const { id } = await params;
   if (!await findAccessibleWorkOrder(user, id)) return notFoundWorkOrder();
 
-  const [comments, history] = await Promise.all([
-    db.workOrderComment.findMany({
-      where: { company_id: user.company_id, work_order_id: id },
-      orderBy: { created_at: "asc" },
-      select: {
-        id: true,
-        body: true,
-        is_internal: true,
-        created_at: true,
-        user: { select: { id: true, name: true, email: true } },
-      },
-    }),
-    db.auditLog.findMany({
-      where: { company_id: user.company_id, entity_type: "work_order", entity_id: id },
-      orderBy: { created_at: "desc" },
-      take: 100,
-      select: {
-        id: true,
-        action: true,
-        metadata: true,
-        created_at: true,
-        actor: { select: { id: true, name: true, email: true } },
-      },
-    }),
-  ]);
+  try {
+    const [comments, history] = await Promise.all([
+      db.workOrderComment.findMany({
+        where: { company_id: user.company_id, work_order_id: id },
+        orderBy: { created_at: "asc" },
+        select: {
+          id: true,
+          body: true,
+          is_internal: true,
+          created_at: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      }),
+      db.auditLog.findMany({
+        where: { company_id: user.company_id, entity_type: "work_order", entity_id: id },
+        orderBy: { created_at: "desc" },
+        take: 100,
+        select: {
+          id: true,
+          action: true,
+          metadata: true,
+          created_at: true,
+          actor: { select: { id: true, name: true, email: true } },
+        },
+      }),
+    ]);
 
-  return NextResponse.json({ comments, history });
+    return NextResponse.json({ comments, history });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }
 
 export async function POST(
@@ -70,33 +88,38 @@ export async function POST(
   if (!text) return NextResponse.json({ error: "Kommentaren får inte vara tom" }, { status: 400 });
   if (text.length > 5000) return NextResponse.json({ error: "Kommentaren är för lång" }, { status: 400 });
 
-  const comment = await db.$transaction(async (tx) => {
-    const createdComment = await tx.workOrderComment.create({
-      data: {
-        company_id: companyId,
-        work_order_id: id,
-        user_id: user.id,
-        body: text,
-        is_internal: isInternal,
-      },
-      select: {
-        id: true,
-        body: true,
-        is_internal: true,
-        created_at: true,
-        user: { select: { id: true, name: true, email: true } },
-      },
+  try {
+    const comment = await db.$transaction(async (tx) => {
+      const createdComment = await tx.workOrderComment.create({
+        data: {
+          company_id: companyId,
+          work_order_id: id,
+          user_id: user.id,
+          body: text,
+          is_internal: isInternal,
+        },
+        select: {
+          id: true,
+          body: true,
+          is_internal: true,
+          created_at: true,
+          user: { select: { id: true, name: true, email: true } },
+        },
+      });
+
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: "work_order.comment_added",
+        metadata: { commentId: createdComment.id, isInternal, title: workOrder.title },
+      }, tx);
+
+      return createdComment;
     });
 
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: "work_order.comment_added",
-      metadata: { commentId: createdComment.id, isInternal, title: workOrder.title },
-    }, tx);
-
-    return createdComment;
-  });
-
-  return NextResponse.json({ comment }, { status: 201 });
+    return NextResponse.json({ comment }, { status: 201 });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }
