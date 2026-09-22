@@ -50,6 +50,8 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 `5279783` exact-SHA Preview `https://revalta-f0ebtuafg-youseffakhro1985s-projects.vercel.app`. Revalta CI + CodeQL **success**. PATCH then 503 `missing=Ticket.tenant_id` (run `35783682878`): `syncWorkOrderToTicket` used `ticket.update` without `select`, so Prisma loaded the unmigrated Ticket.tenant_id scalar. Add `select: { id: true }`.
 
+`3b39c67` exact-SHA Preview `https://revalta-biij1ch97-youseffakhro1985s-projects.vercel.app`. Revalta CI + CodeQL **success**. Vercel Preview **success**. Golden path passed ticket→WO→in_progress and desktop WO UI, then `mobile work-order title was not visible` (run `35784223455`, ~6s after properties-api, not a 15s timeout). Root cause: `expectVisible` swallows Playwright strict-mode as “was not visible”. After viewport 390px the async SLA queue (`WorkOrderSlaPriorityQueue` above the detail page) has loaded an `h3` with the same WO title as the `h1`. Unique `#work-order-title` plus `#work-order-execution-material` (economics Panel also has an h2 “Material”). Not missing Preview. Not quota.
+
 ## P0
 
 | Item | Evidence | Status |

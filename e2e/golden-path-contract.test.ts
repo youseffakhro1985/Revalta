@@ -120,6 +120,9 @@ describe("golden-path is wired into the required Preview browser job", () => {
     expect(golden).toContain("workOrderId: existingWorkOrder");
     expect(golden).toContain("validateWorkOrderLockAcquired");
     expect(golden).toContain("validateLockedStatusChange");
+    expect(golden).toContain("#work-order-title");
+    expect(golden).toContain("#work-order-execution-material");
+    expect(golden).toContain("scrollIntoViewIfNeeded");
     expect(golden).not.toContain("page.route");
     expect(runner).toContain("staffUserId");
   });

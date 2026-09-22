@@ -183,12 +183,16 @@ export async function runStaffGoldenPath({
 
   await page.goto(`/dashboard/arbetsorder/${workOrderId}`, { waitUntil: "domcontentloaded" });
   await expectPath(page, `/dashboard/arbetsorder/${workOrderId}`);
-  await expectVisible(page.getByRole("heading", { name: ticketTitle }), "work-order detail title");
+  await expectVisible(page.getByRole("heading", { name: ticketTitle, level: 1 }), "work-order detail title");
   await expectVisible(page.getByText("Planerad → Påbörjad").first(), "in_progress status history");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expectVisible(page.getByRole("heading", { name: ticketTitle }), "mobile work-order title");
-  await expectVisible(page.getByRole("heading", { name: "Material", exact: true }), "mobile execution material");
+  const mobileTitle = page.locator("#work-order-title");
+  await mobileTitle.scrollIntoViewIfNeeded();
+  await expectVisible(mobileTitle, "mobile work-order title");
+  const mobileMaterial = page.locator("#work-order-execution-material");
+  await mobileMaterial.scrollIntoViewIfNeeded();
+  await expectVisible(mobileMaterial, "mobile execution material");
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   lock = await acquireLock(page, workOrderId);
