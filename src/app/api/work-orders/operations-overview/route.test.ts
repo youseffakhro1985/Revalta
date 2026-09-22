@@ -49,6 +49,12 @@ describe("work-orders operations-overview route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "mgr-1", company_id: "company-1", role: "manager" });
     const response = await GET();
     expect(response.status).toBe(200);
-    expect(workOrderFindManyMock).toHaveBeenCalled();
+    expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        deleted_at: null,
+        company_id: "company-1",
+        property: { deleted_at: null },
+      },
+    }));
   });
 });

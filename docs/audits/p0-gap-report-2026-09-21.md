@@ -57,7 +57,7 @@ Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED`. `mergeS
 
 ## P1
 
-Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after this branch's unit proofs: live booking concurrency Preview, technician-role Preview fixture, quote PDF/output if a dedicated export is added. Staff/resident booking overlap 409s and public-ticket portal-token Tenant B 404s landed locally. Exact-SHA Preview E2E on `#938` remains the P0 gate.
+Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after this branch's unit proofs: live booking concurrency Preview, technician-role Preview fixture, quote PDF/output if a dedicated export is added. Staff/resident booking overlap 409s, public-ticket portal-token Tenant B 404s, and ticket-dashboard/operations-overview company-scope KPIs landed locally. Exact-SHA Preview E2E on `#938` remains the P0 gate.
 
 ## P2
 

@@ -92,5 +92,60 @@ describe("ticket dashboard staff scope", () => {
     expect(response.status).toBe(200);
     expect(ticketCountMock).toHaveBeenCalled();
     expect(ticketFindManyMock).toHaveBeenCalled();
+    for (const [args] of ticketCountMock.mock.calls) {
+      expect(args.where).toEqual(expect.objectContaining({ company_id: "company-1" }));
+      expect(args.where).not.toEqual(expect.objectContaining({ assigned_to_id: expect.anything() }));
+    }
+    expect(ticketGroupByMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1" }),
+    }));
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1" }),
+    }));
+  });
+
+  it("keeps technicians on assigned tickets inside the caller company", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+      email: "tina@exempel.se",
+      status: "active",
+    });
+
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    for (const [args] of ticketCountMock.mock.calls) {
+      expect(args.where).toEqual(expect.objectContaining({
+        company_id: "company-1",
+        assigned_to_id: "tech-1",
+      }));
+    }
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        assigned_to_id: "tech-1",
+      }),
+    }));
+  });
+
+  it("ignores a client-supplied Tenant B company_id query parameter", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+      status: "active",
+    });
+
+    const response = await GET(new Request(
+      "https://www.revalta.se/api/tickets/dashboard?company_id=company-tenant-b",
+      { headers: { "x-request-id": requestId } },
+    ));
+    expect(response.status).toBe(200);
+    for (const [args] of ticketCountMock.mock.calls) {
+      expect(args.where).toEqual(expect.objectContaining({ company_id: "company-1" }));
+      expect(JSON.stringify(args)).not.toContain("company-tenant-b");
+    }
+    expect(JSON.stringify(ticketFindManyMock.mock.calls)).not.toContain("company-tenant-b");
   });
 });

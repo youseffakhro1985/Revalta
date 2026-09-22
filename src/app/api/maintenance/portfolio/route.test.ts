@@ -52,5 +52,8 @@ describe("maintenance portfolio staff scope", () => {
     const response = await GET();
     expect(response.status).toBe(200);
     expect(queryRawMock).toHaveBeenCalled();
+    const sql = queryRawMock.mock.calls[0]?.[0] as { values?: unknown[] };
+    expect(sql.values).toEqual(expect.arrayContaining(["company-1", "company-1"]));
+    expect(sql.values).not.toEqual(expect.arrayContaining(["company-tenant-b"]));
   });
 });

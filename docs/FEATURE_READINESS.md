@@ -38,7 +38,7 @@ The statuses below deliberately avoid calling broad modules READY until their en
 
 | Module | Status | Current evidence / blocker | Next readiness proof |
 | --- | --- | --- | --- |
-| Översikt | PARTIAL | Canonical dashboard exists and dashboard-integrity gate is green. Full tenant/query/runtime review not yet recorded. | Tenant-safe KPI/query audit + responsive/a11y/browser evidence. |
+| Översikt | PARTIAL | Canonical dashboard exists and dashboard-integrity gate is green. Ticket dashboard counts/groupBy/trend stay on session `company_id`; technicians are limited to `assigned_to_id`; client `company_id` is ignored. | Remaining KPI surfaces + responsive/a11y/browser evidence. |
 | Fastigheter | PARTIAL | Substantial current UI/API implementation exists. | Full CRUD/relations/tenant-negative/pagination audit. |
 | Ärenden | PARTIAL | Core ticket flows exist and are part of product golden path. Preview E2E now creates a property-backed ticket and asserts staff ticket→WO sync. | Resident golden-path Preview E2E still needs a resident fixture (`OWNER` / extra E2E secrets). |
 | Arbetsordrar | PARTIAL | Significant operational UI/API exists. Preview E2E covers planned→in_progress→completed→invoiced with lock, time/material attest, invoice basis and illegal reverse transition. | Technician-role mobile fixture still missing; current mobile pass uses the owner fixture on 390 px. |
