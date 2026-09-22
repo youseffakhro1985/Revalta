@@ -232,15 +232,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const observability = createRouteObservability(request, CARD_ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return rejectCard(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "property.card.write.unauthorized" });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return rejectCard(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "property.card.write.staff_required",
+        context: { userId: rawUser.id, companyId: rawUser.company_id },
+      });
     }
     if (!canCreateProperties(user.role)) {
       return rejectCard(observability, { status: 403, code: API_ERROR_CODES.forbidden, message: "Du saknar behörighet", event: "property.card.write.forbidden", context: { userId: user.id, companyId: user.company_id } });
-    }
-    if (!user.company_id) {
-      return rejectCard(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "property.card.write.missing_company", context: { userId: user.id } });
     }
 
     const { id: propertyId } = await params;
