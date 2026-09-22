@@ -1,6 +1,6 @@
 # P0/P1 gap report — 2026-09-21
 
-Verified baseline: `7dbf466a1a47796559015220b0ef06d8f9dda9e6` (22 Sep 2026, `#938` on `main`). Staff golden-path Preview E2E is green. Production `/api/health` matched that SHA (`dpl_7gktn2R4wJ8wogAYi4fdTXDd6gS4`), `schemaReady: true`, dataplane `e51d9599…`. This product PR adds live staff booking-overlap 409 on the same required Preview job.
+Verified baseline: `0af103243b44ef18e66991fcfe61c3b605e41d52` (22 Sep 2026, `#939` on `main`). Staff golden-path and booking-overlap Preview E2E are green. Production `/api/health` matched that SHA (`dpl_8bPPJkNvCGAqR1UQmvonAFPJMtR8`), `schemaReady: true`, dataplane `e51d9599…`. This product PR adds an owner-created technician-role Preview fixture on the same required job.
 
 This report is current-main evidence, not a historical audit copy. Unverified items are marked `BLOCKED / NOT VERIFIED`.
 
