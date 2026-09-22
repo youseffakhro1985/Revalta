@@ -87,6 +87,29 @@ describe("rounds/[id]/work-orders route", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A creates work orders from a Tenant B round id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    roundFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("http://localhost/api/rounds/round-tenant-b/work-orders", {
+        method: "POST",
+        body: JSON.stringify({ itemIds: ["item-1"] }),
+      }),
+      { params: Promise.resolve({ id: "round-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ronden hittades inte");
+    expect(roundFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "round-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("returns 409 up front when there are no open deviations at all", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     roundFindFirstMock.mockResolvedValue({ ...baseRound, checklist: [baseRound.checklist[1]] });

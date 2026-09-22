@@ -117,3 +117,28 @@ describe("projects/[id]/restore", () => {
     expect(projectFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("projects restore Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    projectFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A restores a Tenant B project id", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/projects/project-tenant-b/restore", { method: "POST" }),
+      { params: Promise.resolve({ id: "project-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Projektet hittades inte eller är redan aktivt");
+    expect(projectFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "project-tenant-b", company_id: "company-1", deleted_at: { not: null } },
+    }));
+    expect(projectUpdateManyMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

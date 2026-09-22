@@ -302,3 +302,39 @@ describe("documents/[id]/lifecycle PATCH staff-scope", () => {
     expect(managedFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("document lifecycle Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+    getCurrentUserMock.mockResolvedValue(owner);
+    managedFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A archives a Tenant B document id", async () => {
+    const response = await PATCH(
+      new Request("http://localhost/api/documents/doc-tenant-b/lifecycle", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-request-id": requestId },
+        body: JSON.stringify({ transition: "archive" }),
+      }),
+      { params: Promise.resolve({ id: "doc-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Dokumentet hittades inte");
+    expect(managedFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "doc-tenant-b", company_id: "company-1" }),
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(managedUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

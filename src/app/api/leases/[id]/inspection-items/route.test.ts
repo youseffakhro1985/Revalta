@@ -79,3 +79,48 @@ describe("GET /api/leases/[id]/inspection-items", () => {
     expect(leaseFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("lease inspection-items Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+      name: "Owner",
+      email: "owner@example.com",
+    });
+    leaseFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads inspection items for a Tenant B lease id", async () => {
+    const response = await GET(
+      new Request("http://localhost/api/leases/lease-tenant-b/inspection-items"),
+      { params: Promise.resolve({ id: "lease-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Avtalet hittades inte");
+    expect(leaseFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "lease-tenant-b", company_id: "company-1", deleted_at: null, property: { deleted_at: null } },
+    }));
+    expect(recordFindUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A writes inspection items on a Tenant B lease id", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/leases/lease-tenant-b/inspection-items", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: [] }),
+      }),
+      { params: Promise.resolve({ id: "lease-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Avtalet hittades inte");
+    expect(recordFindUniqueMock).not.toHaveBeenCalled();
+  });
+});
