@@ -43,6 +43,8 @@ vi.mock("@/lib/audit", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/schema-readiness")>()),
   hasWorkOrderVendorContractColumn: vi.fn(async () => true),
+  hasWorkOrderNotesColumn: vi.fn(async () => false),
+  workOrderNotesWrite: (hasColumn: boolean, notes: string | null) => (hasColumn && notes ? { notes } : {}),
   workOrderVendorWrite: (hasColumn: boolean, vendorContractId: string | null) =>
     (hasColumn ? { vendor_contract_id: vendorContractId } : {}),
 }));

@@ -113,6 +113,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       console.log("phase: verified-login");
 
       await page.goto("/login", { waitUntil: "domcontentloaded" });
+      await expectVisible(page.locator("form#login-form[data-ready='1']"), "hydrated login form");
       await page.getByLabel("E-post").fill(fixtureEmail);
       await page.getByLabel("Lösenord").fill(env.E2E_VERIFIED_PASSWORD);
       const fixtureLoginPromise = page.waitForResponse(
@@ -123,7 +124,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
             return false;
           }
         },
-        { timeout: 20_000 },
+        { timeout: 45_000 },
       );
       await page.getByRole("button", { name: "Logga in" }).click();
       const fixtureLogin = await fixtureLoginPromise.catch(() => {

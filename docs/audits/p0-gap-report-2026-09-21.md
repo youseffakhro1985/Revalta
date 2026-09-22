@@ -40,6 +40,8 @@ Exact Preview SHA for `babba40`: `babba40f4abac4b693d0a1758fcba7e895ee1d2f` at `
 
 Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `https://revalta-o6hdsese3-youseffakhro1985s-projects.vercel.app` (`dpl_7QNbZrqAcrzs5qggPQAbEifWjxy4`). Revalta CI + CodeQL **success**. Browser E2E **ran Playwright** (login/dashboard/nav/properties-api PASS) then failed: `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order (503:SERVICE_UNAVAILABLE;existing=no;missing=WorkOrder.notes)` (run `35779212653`). Root cause: Prisma `WorkOrder.notes` exists in schema but no migration adds the column. Dual-read omit + gated write; no notes migration in this PR.
 
+`c908f8d` published exact-SHA Preview `https://revalta-izsy1tb1a-youseffakhro1985s-projects.vercel.app` (`dpl_EsqkrzrN2YJtnmVAvwn9csatGKDD`), health SHA match, dataplane `6237f010…`. CodeQL **success**. Revalta CI **failure**: `ticket-property-integrity.test.ts` got 500 instead of 400 because `hasWorkOrderNotesColumn()` hit the mocked db without `$queryRaw`. Browser E2E resolved that Preview then failed `Verified login response was not observed` (run `35780708384`) before golden-path; login page and `/api/auth/login` were reachable from this session. Fix: mock notes helpers in that test; wait for hydrated `form#login-form[data-ready='1']` like forgot-password.
+
 ## P0
 
 | Item | Evidence | Status |
