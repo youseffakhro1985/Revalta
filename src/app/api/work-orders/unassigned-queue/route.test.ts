@@ -86,5 +86,12 @@ describe("GET /api/work-orders/unassigned-queue", () => {
     }));
     expect(body.assignees).toEqual([expect.objectContaining({ id: "tech-1", name: "Tina Tekniker" })]);
     expect(body.selfId).toBe("mgr-1");
+    expect(userFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        status: "active",
+        role: { in: ["owner", "admin", "manager", "technician"] },
+      }),
+    }));
   });
 });

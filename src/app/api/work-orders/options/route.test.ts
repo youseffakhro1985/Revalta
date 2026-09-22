@@ -58,6 +58,9 @@ describe("GET /api/work-orders/options", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1", status: "active" }),
+    }));
     expect(userFindManyMock).not.toHaveBeenCalled();
     expect(vendorFindManyMock).not.toHaveBeenCalled();
     expect(body.users).toEqual([]);
@@ -71,8 +74,15 @@ describe("GET /api/work-orders/options", () => {
     const response = await GET();
     const body = await response.json();
 
-    expect(userFindManyMock).toHaveBeenCalled();
-    expect(vendorFindManyMock).toHaveBeenCalled();
+    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1" }),
+    }));
+    expect(userFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { company_id: "company-1", status: "active" },
+    }));
+    expect(vendorFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-1", status: "active" }),
+    }));
     expect(body.users).toHaveLength(1);
     expect(body.vendors).toHaveLength(1);
     expect(body.permissions.canAssign).toBe(true);

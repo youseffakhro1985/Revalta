@@ -77,6 +77,13 @@ describe("GET /api/tickets/unassigned-queue", () => {
       }),
     }));
     expect(ticketFindManyMock.mock.calls[0]?.[0].where.company_id).toBe("company-1");
+    expect(userFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        status: "active",
+        role: { in: ["owner", "admin", "manager", "technician"] },
+      }),
+    }));
     expect(body.tickets[0]).toEqual(expect.objectContaining({
       id: "ticket-1",
       href: "/dashboard/felanmalan/ticket-1",
