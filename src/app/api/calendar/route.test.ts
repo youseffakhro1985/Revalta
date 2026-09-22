@@ -501,4 +501,60 @@ describe("calendar route", () => {
     expect(calendarFindFirstMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("GET scopes lease projections to the caller company", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(leaseFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        deleted_at: null,
+        property: { deleted_at: null },
+      }),
+    }));
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B calendar event id", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+    calendarFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/calendar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-tenant-b", status: "done" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Aktiviteten hittades inte");
+    expect(calendarFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "event-tenant-b", company_id: "company-1" },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B calendar event id", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+    calendarFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await DELETE(new Request("http://localhost/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Aktiviteten hittades inte");
+    expect(calendarFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "event-tenant-b", company_id: "company-1" },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(calendarDeleteManyMock).not.toHaveBeenCalled();
+  });
 });

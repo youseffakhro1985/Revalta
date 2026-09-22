@@ -9,6 +9,8 @@ const {
   auditFindManyMock,
   auditFindFirstMock,
   propertyFindManyMock,
+  propertyFindFirstMock,
+  budgetCreateMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
@@ -19,6 +21,8 @@ const {
   auditFindManyMock: vi.fn(),
   auditFindFirstMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
+  budgetCreateMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -38,10 +42,10 @@ vi.mock("@/lib/db", () => ({
       findFirst: budgetFindFirstMock,
       updateMany: budgetUpdateManyMock,
       deleteMany: budgetDeleteManyMock,
-      create: vi.fn(),
+      create: budgetCreateMock,
     },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
-    property: { findMany: propertyFindManyMock, findFirst: vi.fn() },
+    property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
   },
 }));
 
@@ -253,5 +257,47 @@ describe("budget route", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(budgetFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts a budget row against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/budget", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-tenant-b", account: "6210", year: 2026 }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true },
+    });
+    expect(budgetCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B budget entry id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    budgetFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await DELETE(new Request("http://localhost/api/budget", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId: "entry-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Budgetraden hittades inte");
+    expect(budgetFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "entry-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(budgetDeleteManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });
