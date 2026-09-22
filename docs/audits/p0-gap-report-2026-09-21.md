@@ -52,6 +52,8 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 `3b39c67` exact-SHA Preview `https://revalta-biij1ch97-youseffakhro1985s-projects.vercel.app`. Revalta CI + CodeQL **success**. Vercel Preview **success**. Golden path passed ticket→WO→in_progress and desktop WO UI, then `mobile work-order title was not visible` (run `35784223455`, ~6s after properties-api, not a 15s timeout). Root cause: `expectVisible` swallows Playwright strict-mode as “was not visible”. After viewport 390px the async SLA queue (`WorkOrderSlaPriorityQueue` above the detail page) has loaded an `h3` with the same WO title as the `h1`. Unique `#work-order-title` plus `#work-order-execution-material` (economics Panel also has an h2 “Material”). Not missing Preview. Not quota.
 
+`e633027` exact-SHA Preview `https://revalta-93un5448r-youseffakhro1985s-projects.vercel.app` (`dpl_9bwAkzcgF1QLAdQsAtiApjhY3Lvk`), dataplane `6237f010…`. Revalta CI + CodeQL + Vercel **success**. Mobile title/material passed. Then `Work order did not enter invoiced (409:none;missing=none)` (run `35785331852`). Not quota. Re-acquire lock immediately before Fakturerad (same as invoice-close UI) and surface allowlisted `code` (`version_conflict` / `invoice_draft_not_ready`).
+
 ## P0
 
 | Item | Evidence | Status |

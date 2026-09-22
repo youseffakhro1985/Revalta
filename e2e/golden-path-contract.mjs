@@ -44,6 +44,17 @@ export function allowlistedApiErrorCode(value) {
   return typeof value === "string" && allowed.has(value) ? value : "none";
 }
 
+export function allowlistedConflictCode(value) {
+  const allowed = new Set([
+    "version_conflict",
+    "invoice_draft_not_ready",
+    "lock_lost",
+    "lock_required",
+    "invalid_version",
+  ]);
+  return typeof value === "string" && allowed.has(value) ? value : "";
+}
+
 export function allowlistedSchemaGap(value) {
   return typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(value)
     ? value
@@ -57,7 +68,11 @@ export function allowlistedWorkOrderCreateErrorCode(value) {
 export function diagnosticStatusShape(status, body) {
   const redirected = Number.isInteger(status) && ((status >= 300 && status < 400) || status === 0);
   if (redirected) return `${status}:redirect`;
-  return `${status}:${allowlistedApiErrorCode(body?.errorCode)}`;
+  const errorCode = allowlistedApiErrorCode(body?.errorCode);
+  const conflictCode = allowlistedConflictCode(body?.code);
+  if (conflictCode && errorCode === "none") return `${status}:${conflictCode}`;
+  if (conflictCode) return `${status}:${errorCode}:${conflictCode}`;
+  return `${status}:${errorCode}`;
 }
 
 export function resolveWorkOrderIdFromCreate(body, probe) {
@@ -162,6 +177,12 @@ export function validateInvoiceDraftRebuilt(status, body) {
 export function validateInvoiceDraftReady(status, body) {
   if (status !== 201 || body?.draft?.status !== "ready") {
     throw new Error(`Invoice basis was not marked ready (${diagnosticStatusShape(status, body)})`);
+  }
+}
+
+export function validateInvoiceDraftReadyState(status, body) {
+  if (status !== 200 || body?.draft?.status !== "ready") {
+    throw new Error(`Persisted invoice basis was not ready for invoicing (${diagnosticStatusShape(status, body)})`);
   }
 }
 

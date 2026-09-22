@@ -3,6 +3,7 @@ import {
   validateCreatedTicket,
   validateForbiddenReplay,
   validateInvoiceDraftReady,
+  validateInvoiceDraftReadyState,
   validateInvoiceDraftRebuilt,
   validateLockedStatusChange,
   validateMaterialApproved,
@@ -209,7 +210,10 @@ export async function runStaffGoldenPath({
     customerName: "E2E hyresgäst",
   });
   validateInvoiceDraftReady(ready.status, ready.body);
+  const readyState = await api(page, "GET", `/api/work-orders/${workOrderId}/invoice-basis`);
+  validateInvoiceDraftReadyState(readyState.status, readyState.body);
 
+  lock = await acquireLock(page, workOrderId);
   const invoiced = await patchWorkOrderStatus(page, workOrderId, "invoiced", lock);
   validateLockedStatusChange(invoiced.result.status, invoiced.result.body, "invoiced");
   lock = invoiced.lock;

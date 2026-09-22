@@ -5,6 +5,7 @@ import {
   validateCreatedTicket,
   validateForbiddenReplay,
   validateInvoiceDraftReady,
+  validateInvoiceDraftReadyState,
   validateInvoiceDraftRebuilt,
   validateLockedStatusChange,
   validateMaterialApproved,
@@ -44,6 +45,7 @@ describe("golden-path contract", () => {
     validateWorkOrderComment(201, { comment: { id: "c-1" } });
     validateInvoiceDraftRebuilt(201, { draft: { status: "draft", lines: [{ id: "l-1" }] } });
     validateInvoiceDraftReady(201, { draft: { status: "ready" } });
+    validateInvoiceDraftReadyState(200, { draft: { status: "ready" } });
     expect(validateWorkOrderLockAcquired(201, { lock: { token: "tok", version: "2026-09-22T00:00:00.000Z" } })).toEqual({
       token: "tok",
       version: "2026-09-22T00:00:00.000Z",
@@ -92,6 +94,15 @@ describe("golden-path contract", () => {
     expect(() => validateLockedStatusChange(423, { errorCode: "CONFLICT" }, "in_progress")).toThrow(
       /did not enter in_progress \(423:CONFLICT;missing=none\)/,
     );
+    expect(() => validateLockedStatusChange(409, { code: "invoice_draft_not_ready" }, "invoiced")).toThrow(
+      /did not enter invoiced \(409:invoice_draft_not_ready;missing=none\)/,
+    );
+    expect(() => validateLockedStatusChange(409, { code: "version_conflict" }, "invoiced")).toThrow(
+      /did not enter invoiced \(409:version_conflict;missing=none\)/,
+    );
+    expect(() => validateInvoiceDraftReadyState(200, { draft: { status: "draft" } })).toThrow(
+      /not ready for invoicing \(200:none\)/,
+    );
     expect(() => validateInvoiceDraftRebuilt(500, { errorCode: "INTERNAL_ERROR" })).toThrow(
       /not rebuilt from attested rows \(500:INTERNAL_ERROR\)/,
     );
@@ -120,6 +131,9 @@ describe("golden-path is wired into the required Preview browser job", () => {
     expect(golden).toContain("workOrderId: existingWorkOrder");
     expect(golden).toContain("validateWorkOrderLockAcquired");
     expect(golden).toContain("validateLockedStatusChange");
+    expect(golden).toContain("validateInvoiceDraftReadyState");
+    expect(golden).toContain("/invoice-basis");
+    expect(golden).toContain('workOrderId, "invoiced"');
     expect(golden).toContain("#work-order-title");
     expect(golden).toContain("#work-order-execution-material");
     expect(golden).toContain("scrollIntoViewIfNeeded");
