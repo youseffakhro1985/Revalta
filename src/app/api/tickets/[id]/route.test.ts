@@ -206,6 +206,24 @@ describe("tickets/[id] GET", () => {
     expect(body.error).toBe("Ärendet hittades inte");
   });
 
+  it("returns tenant-safe 404 when Tenant A reads a Tenant B ticket id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(makeRequest("GET"), { params: Promise.resolve({ id: "ticket-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "ticket-tenant-b",
+        deleted_at: null,
+        company_id: "company-1",
+      }),
+    }));
+  });
+
   it("returns 404 for a technician when the ticket is not assigned to them", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     ticketFindFirstMock.mockResolvedValue({ ...baseTicketRow, assigned_to_id: "tech-2" });
@@ -395,6 +413,25 @@ describe("tickets/[id] PATCH", () => {
     expect(response.status).toBe(404);
     expect(body.error).toBe("Ärendet hittades inte");
     expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B ticket id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(
+      makeRequest("PATCH", { priority: "high" }),
+      { params: Promise.resolve({ id: "ticket-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "ticket-tenant-b", company_id: "company-1" }),
+    }));
+    expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 for a technician when the ticket is not assigned to them", async () => {
@@ -831,6 +868,22 @@ describe("tickets/[id] DELETE", () => {
     expect(response.status).toBe(404);
     expect(body.error).toBe("Ärendet hittades inte");
     expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B ticket id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue(null);
+
+    const response = await DELETE(makeRequest("DELETE"), { params: Promise.resolve({ id: "ticket-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "ticket-tenant-b", company_id: "company-1", deleted_at: null }),
+    }));
+    expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
   it("returns 404 for a technician when the ticket is not assigned to them", async () => {

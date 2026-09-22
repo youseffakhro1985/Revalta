@@ -122,6 +122,26 @@ describe("ticket work-order creation authorization", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A creates a work order from a Tenant B ticket id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request({}), { params: Promise.resolve({ id: "ticket-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "ticket-tenant-b",
+        company_id: "company-1",
+        deleted_at: null,
+      }),
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("prevents a technician from assigning a new work order to another user", async () => {
     const response = await POST(request({ assignedToId: "tech-2" }), params);
 

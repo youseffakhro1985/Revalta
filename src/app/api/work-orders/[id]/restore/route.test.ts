@@ -147,6 +147,26 @@ describe("work-orders/[id]/restore POST staff-scope", () => {
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A restores a Tenant B work-order id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    workOrderFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("http://localhost/api/work-orders/wo-tenant-b/restore", { method: "POST" }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte eller är redan aktiv");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "wo-tenant-b", company_id: "company-1", deleted_at: { not: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(workOrderUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("lets technicians restore an assigned soft-deleted work order", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     workOrderFindFirstMock.mockResolvedValueOnce({
