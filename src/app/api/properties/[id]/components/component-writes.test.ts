@@ -425,3 +425,125 @@ describe("secure component write contracts", () => {
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("component writes Tenant B related ids", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+    getCurrentUserMock.mockResolvedValue(owner);
+    propertyFindFirstMock.mockResolvedValue({ id: "property-1" });
+    workOrderFindFirstMock.mockResolvedValue(null);
+    projectFindFirstMock.mockResolvedValue(null);
+    queryRawMock.mockResolvedValue([{ id: "asset-1", name: "Ventilation" }]);
+    executeRawMock.mockResolvedValue(1);
+    writeAuditLogMock.mockResolvedValue(undefined);
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a component on Tenant B propertyId", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = requireResponse(await patchComponent(
+      jsonRequest("https://www.revalta.se/api/properties/property-tenant-b/components/asset-1", {
+        name: "Ventilation",
+        status: "active",
+        criticality: "normal",
+      }, "PATCH"),
+      componentParams("property-tenant-b", "asset-1"),
+    ));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "property-tenant-b", company_id: "company-1" }),
+    }));
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts an action against Tenant B propertyId", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await postComponentAction(
+      jsonRequest("https://www.revalta.se/api/properties/property-tenant-b/components/asset-1/actions", {
+        action: "event",
+        event_type: "service",
+        event_date: "2026-08-18",
+        title: "Service",
+      }),
+      componentParams("property-tenant-b", "asset-1"),
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Fastigheten hittades inte");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts an action against a Tenant B component id", async () => {
+    queryRawMock.mockResolvedValue([]);
+
+    const response = await postComponentAction(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-tenant-b/actions", {
+        action: "event",
+        event_type: "service",
+        event_date: "2026-08-18",
+        title: "Service",
+      }),
+      componentParams("property-1", "asset-tenant-b"),
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Komponenten hittades inte");
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A links a Tenant B project on a component action", async () => {
+    projectFindFirstMock.mockResolvedValue(null);
+
+    const response = await postComponentAction(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
+        action: "event",
+        event_type: "service",
+        event_date: "2026-08-18",
+        title: "Service",
+        project_id: "project-tenant-b",
+      }),
+      componentParams(),
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Projektet hittades inte i denna fastighet");
+    expect(projectFindFirstMock).toHaveBeenCalledWith({
+      where: { deleted_at: null, id: "project-tenant-b", company_id: "company-1", property_id: "property-1" },
+      select: { id: true },
+    });
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts a cost against a Tenant B lifecycle event id", async () => {
+    queryRawMock
+      .mockResolvedValueOnce([{ id: "asset-1" }])
+      .mockResolvedValueOnce([]);
+
+    const response = await postComponentAction(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
+        action: "cost",
+        cost_type: "service",
+        amount_ex_vat: 1000,
+        vat_rate: 25,
+        cost_date: "2026-08-18",
+        lifecycle_event_id: "event-tenant-b",
+      }),
+      componentParams(),
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Den valda livscykelhändelsen hittades inte");
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});
