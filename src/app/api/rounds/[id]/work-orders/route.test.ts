@@ -229,3 +229,33 @@ describe("rounds/[id]/work-orders route", () => {
     expect(body.created).toEqual([{ itemId: "item-2", workOrderId: "work-order-new", workOrderNumber: "AO-0001" }]);
   });
 });
+
+describe("rounds/[id]/work-orders POST staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before looking up a round", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(postRequest({}), { params: Promise.resolve({ id: "round-1" }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(roundFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the work-order create copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(postRequest({}), { params: Promise.resolve({ id: "round-1" }) });
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att skapa arbetsorder");
+    expect(roundFindFirstMock).not.toHaveBeenCalled();
+  });
+});

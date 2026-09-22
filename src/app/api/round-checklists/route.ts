@@ -81,10 +81,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401, headers: noStoreHeaders });
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401, headers: noStoreHeaders });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403, headers: noStoreHeaders });
+    }
     if (!canManageTickets(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403, headers: noStoreHeaders });
-    if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400, headers: noStoreHeaders });
 
     const body = await request.json().catch(() => null);
     const parsed = parseInspectionTemplatePayload(body);

@@ -14,7 +14,7 @@ vi.mock("@/lib/db", () => ({
   default: { $queryRaw: queryRawMock },
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 describe("round checklist templates staff scope", () => {
   beforeEach(() => {
@@ -45,5 +45,45 @@ describe("round checklist templates staff scope", () => {
     const response = await GET();
     expect(response.status).toBe(200);
     expect(queryRawMock).toHaveBeenCalled();
+  });
+});
+
+describe("round checklist templates POST staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryRawMock.mockResolvedValue([]);
+  });
+
+  it("rejects residents before creating a template", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/round-checklists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Brand", category: "safety", items: ["Utrymningsväg"] }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(new Request("http://localhost/api/round-checklists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Brand", category: "safety", items: ["Utrymningsväg"] }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 });
