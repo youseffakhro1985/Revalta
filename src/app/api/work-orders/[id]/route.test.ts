@@ -337,3 +337,43 @@ describe("work-order locked-update schema gaps", () => {
     expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
   });
 });
+
+describe("work-order GET schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    userFindManyMock.mockResolvedValue([]);
+    getWorkOrderEnterpriseStateMock.mockResolvedValue(null);
+    getWorkOrderAssetLinkMock.mockResolvedValue({});
+    workOrderFindFirstMock.mockResolvedValue({
+      id: "wo-1",
+      assigned_to_id: "tech-1",
+      estimated_cost: 100,
+      actual_cost: 80,
+    });
+  });
+
+  it("maps a missing WorkOrderStatusEvent table on GET to 503 SERVICE_UNAVAILABLE", async () => {
+    getWorkOrderStatusEventsMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderStatusEvent` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderStatusEvent" },
+        },
+      ),
+    );
+
+    const response = await GET(new Request("http://localhost/api/work-orders/wo-1"), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+});

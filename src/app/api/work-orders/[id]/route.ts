@@ -99,41 +99,54 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
 
   const { id } = await params;
-  const persistVendor = await hasWorkOrderVendorContractColumn();
-  const canAssign = canAssignWorkOrders(user.role);
-  const [workOrder, users, vendors, enterprise, statusEvents, assetLink] = await Promise.all([
-    db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include: workOrderDetailInclude(persistVendor) }),
-    db.user.findMany({
-      where: { company_id: user.company_id, status: "active" },
-      orderBy: [{ name: "asc" }, { email: "asc" }],
-      select: { id: true, name: true, email: true, role: true },
-    }),
-    canAssign ? listAssignableVendorContracts(db, user.company_id) : Promise.resolve([]),
-    getWorkOrderEnterpriseState(db, user.company_id, id),
-    getWorkOrderStatusEvents(db, user.company_id, id),
-    getWorkOrderAssetLink(db, user.company_id, id),
-  ]);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
-  if (shouldScopeToAssignedWork(user.role) && workOrder.assigned_to_id !== user.id) {
-    return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+  try {
+    const persistVendor = await hasWorkOrderVendorContractColumn();
+    const canAssign = canAssignWorkOrders(user.role);
+    const [workOrder, users, vendors, enterprise, statusEvents, assetLink] = await Promise.all([
+      db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include: workOrderDetailInclude(persistVendor) }),
+      db.user.findMany({
+        where: { company_id: user.company_id, status: "active" },
+        orderBy: [{ name: "asc" }, { email: "asc" }],
+        select: { id: true, name: true, email: true, role: true },
+      }),
+      canAssign ? listAssignableVendorContracts(db, user.company_id) : Promise.resolve([]),
+      getWorkOrderEnterpriseState(db, user.company_id, id),
+      getWorkOrderStatusEvents(db, user.company_id, id),
+      getWorkOrderAssetLink(db, user.company_id, id),
+    ]);
+    if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    if (shouldScopeToAssignedWork(user.role) && workOrder.assigned_to_id !== user.id) {
+      return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    }
+    const includeFinance = canViewFinanceData(user.role);
+    const workOrderPayload = includeFinance
+      ? workOrder
+      : { ...workOrder, estimated_cost: null, actual_cost: null };
+    return NextResponse.json(
+      {
+        workOrder: { ...workOrderPayload, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
+        users,
+        vendors,
+        canManage: canManageTickets(user.role),
+        canAssign,
+        canManageFinance: canManageWorkOrderFinance(user.role),
+        canViewFinance: includeFinance,
+        vendorAssignmentAvailable: persistVendor,
+      },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
   }
-  const includeFinance = canViewFinanceData(user.role);
-  const workOrderPayload = includeFinance
-    ? workOrder
-    : { ...workOrder, estimated_cost: null, actual_cost: null };
-  return NextResponse.json(
-    {
-      workOrder: { ...workOrderPayload, enterprise: enterprise ? { ...enterprise, ...assetLink } : assetLink, statusEvents },
-      users,
-      vendors,
-      canManage: canManageTickets(user.role),
-      canAssign,
-      canManageFinance: canManageWorkOrderFinance(user.role),
-      canViewFinance: includeFinance,
-      vendorAssignmentAvailable: persistVendor,
-    },
-    { headers: { "Cache-Control": "private, no-store" } },
-  );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
