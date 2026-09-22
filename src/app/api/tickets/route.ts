@@ -9,6 +9,7 @@ import { calculateDueDate } from "@/lib/sla";
 import {
   hasTicketAiSourceColumn,
   isMissingSchemaColumnError,
+  isMissingTableError,
   notDeletedFilter,
   schemaMismatchUserMessage,
   ticketAiSourceWrite,
@@ -172,7 +173,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    if (isMissingSchemaColumnError(error)) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
       observability.logger.error("ticket list schema unavailable", error, observability.elapsed({
         event: "tickets.list.schema_unavailable",
       }));
@@ -499,6 +500,18 @@ export async function POST(request: Request) {
     }));
     return successResponse(observability, { success: true, ticket }, { status: 201 });
   } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      observability.logger.error("ticket create schema unavailable", error, observability.elapsed({
+        event: "tickets.create.schema_unavailable",
+      }));
+      return apiErrorResponse({
+        status: 503,
+        code: API_ERROR_CODES.serviceUnavailable,
+        message: schemaMismatchUserMessage(),
+        requestId: observability.requestId,
+      });
+    }
+
     observability.logger.error("ticket create failed", error, observability.elapsed({
       event: "tickets.create.failed",
     }));

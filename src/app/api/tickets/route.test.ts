@@ -48,6 +48,8 @@ vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
 vi.mock("@/lib/structured-logger", () => ({ createLogger: createLoggerMock }));
 
 import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const requestId = "550e8400-e29b-41d4-a716-446655440000";
 const TENANT_A = "company-1";
@@ -245,6 +247,57 @@ describe("POST /api/tickets", () => {
       expect.any(Error),
       expect.objectContaining({ event: "tickets.create.failed" }),
     );
+  });
+
+  it("maps a missing Ticket table on create to 503 SERVICE_UNAVAILABLE", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.se",
+      company_id: "company-1",
+      role: "manager",
+    });
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.Ticket` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.Ticket" },
+        },
+      ),
+    );
+
+    const response = await POST(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: schemaMismatchUserMessage(),
+      errorCode: "SERVICE_UNAVAILABLE",
+      requestId,
+    });
+    expect(loggerErrorMock).toHaveBeenCalledWith(
+      "ticket create schema unavailable",
+      expect.any(Error),
+      expect.objectContaining({ event: "tickets.create.schema_unavailable" }),
+    );
+  });
+
+  it("keeps missing title as field validation", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.se",
+      company_id: "company-1",
+      role: "manager",
+    });
+
+    const response = await POST(request({ title: "  " }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Titel och beskrivning krävs");
+    expect(body.errorCode).toBe("VALIDATION_FAILED");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });
 
