@@ -328,4 +328,23 @@ describe("work-order transitions GET staff-scope", () => {
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
     expect(userFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A reads transitions for a Tenant B work-order id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", role: "owner", company_id: "company-1" });
+    workOrderFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-tenant-b/transitions"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+      select: { id: true, status: true, assigned_to_id: true },
+    });
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
+  });
 });
