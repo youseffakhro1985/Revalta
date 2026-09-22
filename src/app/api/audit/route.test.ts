@@ -59,4 +59,28 @@ describe("GET /api/audit", () => {
       where: { AND: [{ company_id: "company-1" }] },
     }));
   });
+
+  it("quotes formula-like CSV cells and keeps export inside the caller company", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    auditFindManyMock.mockResolvedValue([{
+      created_at: new Date("2026-09-22T12:00:00.000Z"),
+      entity_type: "ticket",
+      entity_id: "ticket-1",
+      action: "=CMD(TenantB)",
+      metadata: { title: "+Hyra" },
+      actor: { name: "+Hyra", email: "a@example.se" },
+    }]);
+
+    const response = await GET(new Request("http://localhost/api/audit?format=csv"));
+    const csv = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/csv");
+    expect(auditFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { AND: [{ company_id: "company-1" }] },
+    }));
+    expect(csv).toContain("\"'=CMD(TenantB)\"");
+    expect(csv).toContain("\"'+Hyra\"");
+    expect(csv).not.toContain("\"=CMD(TenantB)\"");
+  });
 });

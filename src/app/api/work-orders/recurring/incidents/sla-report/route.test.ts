@@ -58,4 +58,42 @@ describe("GET /api/work-orders/recurring/incidents/sla-report", () => {
     expect(body.rows).toEqual([]);
     expect(body.summary.incidents).toBe(0);
   });
+
+  it("quotes formula-like CSV cells from Tenant B-shaped assignee names", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "mgr-1", company_id: "company-1", role: "manager" });
+    const now = new Date();
+    listRecurringIncidentEventsMock.mockResolvedValue([
+      {
+        notification_key: "=CMD(TenantB)",
+        event_type: "sla",
+        status: "open",
+        created_at: now,
+        payload: {
+          notificationKey: "=CMD(TenantB)",
+          slaChangedAt: now.toISOString(),
+          responseDueAt: new Date(now.getTime() + 3600000).toISOString(),
+        },
+      },
+      {
+        notification_key: "=CMD(TenantB)",
+        event_type: "assignment",
+        status: "open",
+        created_at: now,
+        payload: {
+          assignedTo: "user-tenant-b",
+          assignedToName: "+Hyra",
+        },
+      },
+    ]);
+
+    const response = await GET(new Request("http://localhost/api/work-orders/recurring/incidents/sla-report?format=csv"));
+    const csv = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/csv");
+    expect(listRecurringIncidentEventsMock).toHaveBeenCalledWith("company-1", expect.any(Object));
+    expect(csv).toContain("\"'=CMD(TenantB)\"");
+    expect(csv).toContain("\"'+Hyra\"");
+    expect(csv).not.toContain("\"=CMD(TenantB)\"");
+  });
 });
