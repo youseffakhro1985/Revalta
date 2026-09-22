@@ -103,12 +103,24 @@ describe("service-center assignment authorization", () => {
     expect(listAssignmentsMock).not.toHaveBeenCalled();
   });
 
-  it.each(["technician", "viewer", "resident"])("blocks %s from mutating service assignments", async (role) => {
+  it.each(["technician", "viewer"])("blocks %s from mutating service assignments with the assign copy", async (role) => {
     getCurrentUserMock.mockResolvedValue(companyUser(role));
 
     const response = await POST(postRequest());
 
     expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att tilldela serviceaviseringar");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before mutating service assignments", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("resident"));
+
+    const response = await POST(postRequest());
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(queryRawMock).not.toHaveBeenCalled();
     expect(upsertAssignmentMock).not.toHaveBeenCalled();
   });

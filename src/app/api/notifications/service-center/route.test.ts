@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, queryRawMock, getUxStateMock, sqlSoftDeleteGuardMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, queryRawMock, getUxStateMock, sqlSoftDeleteGuardMock, markReadMock, snoozeMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   queryRawMock: vi.fn(),
   getUxStateMock: vi.fn(),
   sqlSoftDeleteGuardMock: vi.fn(),
+  markReadMock: vi.fn(),
+  snoozeMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -18,15 +20,15 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/notification-ux-state", () => ({
   getNotificationUxState: getUxStateMock,
-  markNotificationsRead: vi.fn(),
-  snoozeNotifications: vi.fn(),
+  markNotificationsRead: markReadMock,
+  snoozeNotifications: snoozeMock,
 }));
 
 vi.mock("@/lib/soft-delete-compat", () => ({
   sqlSoftDeleteGuard: sqlSoftDeleteGuardMock,
 }));
 
-import { GET } from "./route";
+import { GET, PATCH } from "./route";
 
 function inboxRequest() {
   return new Request("http://localhost/api/notifications/service-center");
@@ -61,5 +63,49 @@ describe("GET /api/notifications/service-center", () => {
     expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(queryRawMock).not.toHaveBeenCalled();
     expect(getUxStateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/notifications/service-center staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryRawMock.mockResolvedValue([]);
+    sqlSoftDeleteGuardMock.mockResolvedValue("");
+    markReadMock.mockResolvedValue(undefined);
+    snoozeMock.mockResolvedValue(undefined);
+  });
+
+  it("rejects residents before reading service rows", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/notifications/service-center", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "read", all: true }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(markReadMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await PATCH(new Request("http://localhost/api/notifications/service-center", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "read", all: true }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 });
