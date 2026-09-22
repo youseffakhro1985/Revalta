@@ -320,6 +320,27 @@ describe("maintenance plan root write security", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("rejects residents before property lookup or mutation", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request({ action: "plan.create" }), params());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("does not log an unverified cross-tenant property id", async () => {
     propertyFindFirstMock.mockResolvedValueOnce(null);
 

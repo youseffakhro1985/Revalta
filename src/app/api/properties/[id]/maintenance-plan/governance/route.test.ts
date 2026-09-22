@@ -22,7 +22,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 const params = { params: Promise.resolve({ id: "property-1" }) };
 
@@ -46,5 +46,45 @@ describe("maintenance-plan governance GET staff-scope", () => {
     expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
     expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects residents before looking up a property", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/properties/property-1/maintenance-plan/governance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: "plan-1", action: "approve" }),
+      }),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(
+      new Request("https://www.revalta.se/api/properties/property-1/maintenance-plan/governance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: "plan-1", action: "approve" }),
+      }),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 });
