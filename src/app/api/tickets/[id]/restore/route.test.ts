@@ -146,4 +146,24 @@ describe("tickets/[id]/restore POST staff-scope", () => {
     expect((await response.json()).error).toBe("Du saknar behörighet att återställa ärenden");
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A restores a Tenant B ticket id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    ticketFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("http://localhost/api/tickets/ticket-tenant-b/restore", { method: "POST" }),
+      { params: Promise.resolve({ id: "ticket-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte eller är redan aktivt");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "ticket-tenant-b", company_id: "company-1", deleted_at: { not: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(ticketUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });
