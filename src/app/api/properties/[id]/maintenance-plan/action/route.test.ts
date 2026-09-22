@@ -59,3 +59,29 @@ describe("maintenance-plan action PATCH staff-scope", () => {
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("maintenance-plan action Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    propertyFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a plan action on a Tenant B property id", async () => {
+    const response = await PATCH(
+      request(),
+      { params: Promise.resolve({ id: "property-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "property-tenant-b", company_id: "company-1", deleted_at: null }),
+    }));
+  });
+});
