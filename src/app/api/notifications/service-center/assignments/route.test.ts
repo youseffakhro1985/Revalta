@@ -157,4 +157,24 @@ describe("service-center assignment authorization", () => {
     });
     expect(upsertAssignmentMock).not.toHaveBeenCalled();
   });
+
+  it("returns 404 when the notification key is outside the authenticated company", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("manager"));
+
+    const response = await POST(postRequest({ notificationKey: "component-service:foreign-asset:2026-09-01" }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Aviseringen hittades inte");
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a missing notification key as field validation", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("manager"));
+
+    const response = await POST(postRequest({ notificationKey: "" }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Ogiltig eller obehörig avisering");
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
+  });
 });

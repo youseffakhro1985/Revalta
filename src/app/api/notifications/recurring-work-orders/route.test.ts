@@ -117,3 +117,26 @@ describe("PATCH /api/notifications/recurring-work-orders staff-scope", () => {
     expect(listRecurringIncidentEventsMock).not.toHaveBeenCalled();
   });
 });
+
+describe("PATCH /api/notifications/recurring-work-orders related ids", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listRecurringIncidentEventsMock.mockResolvedValue([]);
+    listRecurringRunsMock.mockResolvedValue([]);
+    readRecurringSchedulesMock.mockResolvedValue([]);
+    markReadMock.mockResolvedValue(undefined);
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+  });
+
+  it("returns 404 when the notification key is outside the authenticated company", async () => {
+    const response = await PATCH(new Request("http://localhost/api/notifications/recurring-work-orders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "read", key: "foreign-recurring-key" }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Aviseringen hittades inte");
+    expect(markReadMock).not.toHaveBeenCalled();
+  });
+});

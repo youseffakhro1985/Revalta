@@ -79,4 +79,23 @@ describe("work-order SLA notifications staff scope", () => {
     expect(response.status).toBe(200);
     expect(queryRawMock).toHaveBeenCalled();
   });
+
+  it("returns 404 when the SLA notification key is outside the authenticated company", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+      email: "owner@exempel.se",
+      status: "active",
+    });
+
+    const response = await PATCH(new Request("https://www.revalta.se/api/notifications/work-order-sla", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "read", key: "foreign-sla-key" }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("SLA-aviseringen hittades inte");
+  });
 });

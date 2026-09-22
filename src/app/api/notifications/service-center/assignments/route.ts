@@ -97,8 +97,11 @@ export async function POST(request: Request) {
   const deadline = typeof body.deadline === "string" && body.deadline ? new Date(body.deadline) : null;
 
   const validKeys = await validNotificationKeys(user.company_id);
-  if (!notificationKey || notificationKey.length > 300 || !validKeys.has(notificationKey)) {
+  if (!notificationKey || notificationKey.length > 300) {
     return NextResponse.json({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
+  }
+  if (!validKeys.has(notificationKey)) {
+    return NextResponse.json({ error: "Aviseringen hittades inte" }, { status: 404 });
   }
   if (deadline && (Number.isNaN(deadline.getTime()) || deadline < new Date(Date.now() - 86400000) || deadline > new Date(Date.now() + 365 * 86400000))) {
     return NextResponse.json({ error: "Deadline måste ligga inom det kommande året" }, { status: 400 });

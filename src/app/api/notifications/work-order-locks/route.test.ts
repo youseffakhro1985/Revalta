@@ -73,4 +73,21 @@ describe("work-order lock notifications staff scope", () => {
       where: { company_id: "company-1", recipient_user_id: "tech-1" },
     }));
   });
+
+  it("returns 404 when the lock notification key is outside the caller's inbox", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+
+    const response = await PATCH(new Request("https://www.revalta.se/api/notifications/work-order-locks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "foreign-lock-key" }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Aviseringen hittades inte");
+  });
 });

@@ -109,3 +109,46 @@ describe("PATCH /api/notifications/service-center staff-scope", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 });
+
+describe("PATCH /api/notifications/service-center related ids", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryRawMock.mockResolvedValue([{
+      asset_id: "asset-1",
+      property_id: "property-1",
+      component_name: "Värmepump",
+      criticality: "high",
+      next_service_at: new Date("2026-09-01T00:00:00.000Z"),
+      property_name: "Eken",
+      property_address: "Testgatan 1",
+      property_city: "Stockholm",
+    }]);
+    sqlSoftDeleteGuardMock.mockResolvedValue("");
+    markReadMock.mockResolvedValue(undefined);
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+  });
+
+  it("returns 404 when the notification key is outside the authenticated company", async () => {
+    const response = await PATCH(new Request("http://localhost/api/notifications/service-center", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "read", key: "component-service:foreign-asset:2026-09-01" }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Aviseringen hittades inte");
+    expect(markReadMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a missing notification key as field validation", async () => {
+    const response = await PATCH(new Request("http://localhost/api/notifications/service-center", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "read" }),
+    }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Ogiltig eller obehörig avisering");
+    expect(markReadMock).not.toHaveBeenCalled();
+  });
+});

@@ -117,8 +117,11 @@ export async function PATCH(request: Request) {
   const validKeys = new Set(rows.map(keyFor));
   const keys = body.all === true ? Array.from(validKeys) : [typeof body.key === "string" ? body.key.trim() : ""].filter(Boolean);
 
-  if (!keys.length || keys.some((key) => key.length > 300 || !validKeys.has(key))) {
+  if (!keys.length || keys.some((key) => key.length > 300)) {
     return NextResponse.json({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
+  }
+  if (keys.some((key) => !validKeys.has(key))) {
+    return NextResponse.json({ error: "Aviseringen hittades inte" }, { status: 404 });
   }
 
   if (action === "snooze") {

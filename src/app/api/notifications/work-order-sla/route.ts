@@ -144,7 +144,8 @@ export async function PATCH(request: Request) {
   const current = await notificationsFor(user.company_id, assignedScope);
   const validKeys = new Set(current.map((item) => item.key));
   const keys = body.all === true ? Array.from(validKeys) : [typeof body.key === "string" ? body.key.trim() : ""].filter(Boolean);
-  if (!keys.length || keys.some((key) => key.length > 300 || !validKeys.has(key))) return NextResponse.json({ error: "Ogiltig eller obehörig SLA-avisering" }, { status: 400 });
+  if (!keys.length || keys.some((key) => key.length > 300)) return NextResponse.json({ error: "Ogiltig eller obehörig SLA-avisering" }, { status: 400 });
+  if (keys.some((key) => !validKeys.has(key))) return NextResponse.json({ error: "SLA-aviseringen hittades inte" }, { status: 404 });
 
   if (action === "snooze") {
     const until = typeof body.snoozedUntil === "string" ? new Date(body.snoozedUntil) : null;

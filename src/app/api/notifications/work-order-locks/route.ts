@@ -156,8 +156,11 @@ export async function PATCH(request: Request) {
   const requestedKey = stringValue(body.key);
   const keys: string[] = body.all === true ? Array.from(validKeys) : requestedKey ? [requestedKey] : [];
 
-  if (!keys.length || keys.some((key) => !validKeys.has(key))) {
+  if (!keys.length) {
     return noStore({ error: "Ogiltig eller obehörig avisering" }, { status: 400 });
+  }
+  if (keys.some((key) => !validKeys.has(key))) {
+    return noStore({ error: "Aviseringen hittades inte" }, { status: 404 });
   }
 
   const missing = Array.from(new Set(keys)).filter((key) => !ux.read.has(key));
