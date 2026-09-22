@@ -434,4 +434,71 @@ describe("calendar route", () => {
     expect((await response.json()).error).toMatch(/backfill/i);
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("POST/PATCH/DELETE reject residents before looking up calendar events", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const post = await POST(new Request("http://localhost/api/calendar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "OVK", date: "2026-09-10" }),
+    }));
+    expect(post.status).toBe(403);
+    expect((await post.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+
+    const patch = await PATCH(new Request("http://localhost/api/calendar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1", status: "done" }),
+    }));
+    expect(patch.status).toBe(403);
+    expect((await patch.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+
+    const del = await DELETE(new Request("http://localhost/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1" }),
+    }));
+    expect(del.status).toBe(403);
+    expect((await del.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+
+    expect(calendarFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("POST/PATCH/DELETE deny viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const post = await POST(new Request("http://localhost/api/calendar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "OVK", date: "2026-09-10" }),
+    }));
+    expect(post.status).toBe(403);
+    expect((await post.json()).error).toBe("Du saknar behörighet");
+
+    const patch = await PATCH(new Request("http://localhost/api/calendar", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1", status: "done" }),
+    }));
+    expect(patch.status).toBe(403);
+    expect((await patch.json()).error).toBe("Du saknar behörighet");
+
+    const del = await DELETE(new Request("http://localhost/api/calendar", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: "event-1" }),
+    }));
+    expect(del.status).toBe(403);
+    expect((await del.json()).error).toBe("Du saknar behörighet");
+
+    expect(calendarFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });
