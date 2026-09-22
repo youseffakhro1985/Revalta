@@ -10,8 +10,21 @@ import {
   listTimeEntries,
   type InvoiceDraftPayload,
 } from "@/lib/work-order-ops-storage";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 const clientWritableStatuses = new Set(["draft", "ready", "cancelled"]);
+
+function schemaUnavailable() {
+  return NextResponse.json(
+    { error: schemaMismatchUserMessage(), errorCode: API_ERROR_CODES.serviceUnavailable },
+    { status: 503 },
+  );
+}
 
 type Line = {
   id: string;
@@ -150,40 +163,46 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Du saknar behörighet att visa faktureringsunderlag" }, { status: 403 });
   }
   const { id } = await params;
-  const workOrder = await order(id, user.company_id);
-  if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const source = await sourceData(id, user.company_id);
-  const generated = linesFromApproved(source);
-  const persistedLines = Array.isArray(source.saved?.lines) ? source.saved.lines : [];
+  try {
+    const workOrder = await order(id, user.company_id);
+    if (!workOrder) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  const draft = source.saved
-    ? {
-      ...source.saved,
-      lines: persistedLines,
-      ...(source.saved.source ? { source: source.saved.source } : {}),
-    }
-    : {
-      status: "draft",
-      customerName: "",
-      customerOrgNumber: "",
-      customerReference: "",
-      invoiceDate: new Date().toISOString().slice(0, 10),
-      dueDays: 30,
-      discountPercent: 0,
-      vatPercent: 25,
-      note: "",
-      lines: generated,
-    };
+    const source = await sourceData(id, user.company_id);
+    const generated = linesFromApproved(source);
+    const persistedLines = Array.isArray(source.saved?.lines) ? source.saved.lines : [];
 
-  return NextResponse.json({
-    workOrder,
-    draft,
-    source: { billableMinutes: source.billableMinutes, billableMaterial: source.billableMaterial },
-    canBuildFromApproved: generated.length > 0,
-    hasPersistedDraft: Boolean(source.saved),
-    canManage: canManageWorkOrderFinance(user.role),
-  }, { headers: { "Cache-Control": "private, no-store" } });
+    const draft = source.saved
+      ? {
+        ...source.saved,
+        lines: persistedLines,
+        ...(source.saved.source ? { source: source.saved.source } : {}),
+      }
+      : {
+        status: "draft",
+        customerName: "",
+        customerOrgNumber: "",
+        customerReference: "",
+        invoiceDate: new Date().toISOString().slice(0, 10),
+        dueDays: 30,
+        discountPercent: 0,
+        vatPercent: 25,
+        note: "",
+        lines: generated,
+      };
+
+    return NextResponse.json({
+      workOrder,
+      draft,
+      source: { billableMinutes: source.billableMinutes, billableMaterial: source.billableMaterial },
+      canBuildFromApproved: generated.length > 0,
+      hasPersistedDraft: Boolean(source.saved),
+      canManage: canManageWorkOrderFinance(user.role),
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -194,14 +213,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!canManageWorkOrderFinance(user.role)) return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
   const companyId = user.company_id;
   const { id } = await params;
-  if (!(await order(id, companyId))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Ogiltigt innehåll" }, { status: 400 });
   }
 
-  if (String(body.action ?? "") === "rebuild") {
+  try {
+    if (!(await order(id, companyId))) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+
+    if (String(body.action ?? "") === "rebuild") {
     const source = await sourceData(id, companyId);
     const locked = String(source.saved?.status ?? "");
     if (locked === "ready" || locked === "exported") {
@@ -370,15 +391,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     updatedAt: new Date().toISOString(),
   };
 
-  const draft = await db.$transaction(async (tx) => {
-    const persistedDraft = await createInvoiceDraft(companyId, payload, tx);
-    await writeAuditLog(user, {
-      entityType: "work_order",
-      entityId: id,
-      action: `work_order.invoice_basis_${status}`,
-      metadata: { versionId: payload.versionId, subtotal, vat, total, lineCount: validLines.length, storage: "WorkOrderInvoiceDraft" },
-    }, tx);
-    return persistedDraft;
-  });
-  return NextResponse.json({ draft }, { status: 201 });
+    const draft = await db.$transaction(async (tx) => {
+      const persistedDraft = await createInvoiceDraft(companyId, payload, tx);
+      await writeAuditLog(user, {
+        entityType: "work_order",
+        entityId: id,
+        action: `work_order.invoice_basis_${status}`,
+        metadata: { versionId: payload.versionId, subtotal, vat, total, lineCount: validLines.length, storage: "WorkOrderInvoiceDraft" },
+      }, tx);
+      return persistedDraft;
+    });
+    return NextResponse.json({ draft }, { status: 201 });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) return schemaUnavailable();
+    throw error;
+  }
 }

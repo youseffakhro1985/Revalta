@@ -45,6 +45,8 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
 
 import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const params = { params: Promise.resolve({ id: "wo-1" }) };
 const tx = { marker: "invoice-draft-tx" };
@@ -443,5 +445,62 @@ describe("work-order invoice basis GET staff-scope", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order invoice basis schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.com",
+      name: "Manager",
+      role: "manager",
+      company_id: "company-1",
+    });
+    workOrderFindFirstMock.mockResolvedValue({
+      id: "wo-1",
+      title: "Byte av filter",
+      status: "completed",
+      property: { name: "Fastigheten", address: "Storgatan 1", postal_code: "411 01", city: "Göteborg" },
+      unit: null,
+      company: { name: "Bolaget AB", org_number: "556000-0000" },
+    });
+    listTimeEntriesMock.mockResolvedValue([]);
+    listMaterialEntriesMock.mockResolvedValue([]);
+    getProfitabilitySettingsMock.mockResolvedValue({
+      customerHourlyRate: 650,
+      materialMarkupPercent: 15,
+      fixedRevenue: 0,
+    });
+    getLatestInvoiceDraftMock.mockResolvedValue(null);
+  });
+
+  it("maps a missing WorkOrderInvoiceDraft table on save to 503 SERVICE_UNAVAILABLE", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderInvoiceDraft` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderInvoiceDraft" },
+        },
+      ),
+    );
+
+    const response = await POST(postRequest("draft"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("keeps missing customer name as field validation", async () => {
+    const response = await POST(postRequest("ready", { customerName: "  " }), params);
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("Kundnamn");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });
