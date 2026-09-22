@@ -58,21 +58,27 @@ describe("golden-path contract", () => {
     expect(() => validateCreatedProperty(200, { property: { id: "property-1" } })).toThrow(/did not persist \(200:none\)/);
     expect(() => validateTicketStatus(200, { ticket: { status: "closed", property: { id: "property-1" } } }, "in_progress", "property-1")).toThrow(/expected synced status \(200:none\)/);
     expect(() => validateWorkOrderStatus(200, { workOrder: { status: "in_progress", ticket: { id: "other" } } }, "in_progress", "ticket-1")).toThrow(/lifecycle status \(200:none\)/);
-    expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500:none;existing=unchecked\)/);
+    expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500:none;existing=unchecked;missing=none\)/);
     expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE" }, true, { probed: true, existing: false })).toThrow(
-      /did not resolve to a work order \(503:SERVICE_UNAVAILABLE;existing=no\)/,
+      /did not resolve to a work order \(503:SERVICE_UNAVAILABLE;existing=no;missing=none\)/,
+    );
+    expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE", missing: "WorkOrder.sla_status" }, true, { probed: true, existing: false })).toThrow(
+      /did not resolve to a work order \(503:SERVICE_UNAVAILABLE;existing=no;missing=WorkOrder\.sla_status\)/,
+    );
+    expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE", missing: "drop table tickets" }, true, { probed: true, existing: false })).toThrow(
+      /did not resolve to a work order \(503:SERVICE_UNAVAILABLE;existing=no;missing=none\)/,
     );
     expect(() => validateWorkOrderFromTicket(500, { errorCode: "INTERNAL_ERROR" }, true)).toThrow(
-      /did not resolve to a work order \(500:INTERNAL_ERROR;existing=unchecked\)/,
+      /did not resolve to a work order \(500:INTERNAL_ERROR;existing=unchecked;missing=none\)/,
     );
     expect(() => validateWorkOrderFromTicket(500, { errorCode: "drop table tickets" }, true)).toThrow(
-      /did not resolve to a work order \(500:none;existing=unchecked\)/,
+      /did not resolve to a work order \(500:none;existing=unchecked;missing=none\)/,
     );
     expect(() => validateWorkOrderFromTicket(200, { workOrder: null, canCreate: true }, true, { probed: true, existing: false })).toThrow(
-      /did not resolve to a work order \(200:get_payload;existing=no\)/,
+      /did not resolve to a work order \(200:get_payload;existing=no;missing=none\)/,
     );
     expect(() => validateWorkOrderFromTicket(307, null, true, { probed: true, existing: true })).toThrow(
-      /did not resolve to a work order \(307:redirect;existing=yes\)/,
+      /did not resolve to a work order \(307:redirect;existing=yes;missing=none\)/,
     );
     expect(() => validateUnauthenticatedTicket(200)).toThrow(/after logout/);
     expect(() => validateForbiddenReplay(200)).toThrow(/illegal in_progress transition \(200:none\)/);

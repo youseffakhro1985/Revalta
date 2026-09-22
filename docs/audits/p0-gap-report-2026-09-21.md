@@ -36,7 +36,7 @@ Base `main` is still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (`#937`). No reb
 
 Older SHA `a3e9137` **did** publish Preview and Playwright **did** run: login/dashboard/nav/properties-api passed, then `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order` (run `35646803772`). Golden-path diagnostics + schema-503 fail-closed are on this branch.
 
-Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED` (`dpl_7fFUFthQxXMTi9JcfSEFPd2C8G2T` failed). `mergeStateStatus: BLOCKED`. Required checks are not green; merge is forbidden.
+Exact Preview SHA for `babba40`: `babba40f4abac4b693d0a1758fcba7e895ee1d2f` at `https://revalta-ra4zxbug4-youseffakhro1985s-projects.vercel.app` (`dpl_AyVRFBQDneF38VaDakf15pGbWABb`), dataplane `6237f010…`, `schemaReady: true`. Revalta CI on `babba40` **success** (unit tests, typecheck, next build). Browser E2E **ran Playwright** then failed: `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order (503:SERVICE_UNAVAILABLE;existing=no)` (run `35777995858`). This is a **real ticket→WO write 503** on exact-SHA Preview, not a missing Preview. Do not dummy-commit. Do not `--admin`.
 
 ## P0
 

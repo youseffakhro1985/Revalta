@@ -50,6 +50,8 @@ export const REQUIRED_OPERATIONAL_COLUMNS = [
   { table: "WorkOrder", column: "source" },
   { table: "WorkOrder", column: "sla_response_due_at" },
   { table: "WorkOrder", column: "sla_resolution_due_at" },
+  // Prisma create sends this @default even when the route does not pass it.
+  { table: "WorkOrder", column: "sla_status" },
 ] as const;
 
 export function formatSchemaMissingItem(item: SchemaMissingItem) {
@@ -85,6 +87,40 @@ export function isMissingSchemaColumnError(error: unknown): boolean {
     return true;
   }
   return /column .+ does not exist/i.test(errorText(error));
+}
+
+const SCHEMA_GAP_ID = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
+
+/** Allowlisted table or table.column from a schema error. Empty when the text is not a safe identifier. */
+export function allowlistedSchemaGap(value: string) {
+  return SCHEMA_GAP_ID.test(value) ? value : "";
+}
+
+function identifierFromMeta(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.replace(/^public\./i, "").replace(/`/g, "").trim();
+}
+
+/** Best-effort table or table.column from Prisma/Postgres schema errors. Never returns raw messages. */
+export function schemaGapFromError(error: unknown): string {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const meta = error.meta ?? {};
+    const column = identifierFromMeta(meta.column);
+    const model = identifierFromMeta(meta.modelName) || identifierFromMeta(meta.table);
+    if (model && column && !column.includes(".")) return allowlistedSchemaGap(`${model}.${column}`);
+    if (column) return allowlistedSchemaGap(column);
+    if (model) return allowlistedSchemaGap(model);
+  }
+  const text = errorText(error);
+  const columnOfRelation = text.match(/column "([^"]+)" of relation "([^"]+)" does not exist/i);
+  if (columnOfRelation) return allowlistedSchemaGap(`${columnOfRelation[2]}.${columnOfRelation[1]}`);
+  const columnOnly = text.match(/column "([^"]+)" does not exist/i);
+  if (columnOnly) return allowlistedSchemaGap(columnOnly[1]);
+  const relation = text.match(/relation "([^"]+)" does not exist/i);
+  if (relation) return allowlistedSchemaGap(relation[1]);
+  const table = text.match(/table `([^`]+)` does not exist/i);
+  if (table) return allowlistedSchemaGap(identifierFromMeta(table[1]));
+  return "";
 }
 
 export function isMissingTableError(error: unknown, table?: string): boolean {

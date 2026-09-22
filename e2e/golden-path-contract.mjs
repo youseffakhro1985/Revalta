@@ -44,6 +44,12 @@ export function allowlistedApiErrorCode(value) {
   return typeof value === "string" && allowed.has(value) ? value : "none";
 }
 
+export function allowlistedSchemaGap(value) {
+  return typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/.test(value)
+    ? value
+    : "";
+}
+
 export function allowlistedWorkOrderCreateErrorCode(value) {
   return allowlistedApiErrorCode(value);
 }
@@ -81,7 +87,8 @@ export function validateWorkOrderFromTicket(status, body, created, probe) {
   const existing = probe?.probed
     ? (probe.existing ? "yes" : "no")
     : "unchecked";
-  throw new Error(`Ticket did not resolve to a work order (${status}:${shape};existing=${existing})`);
+  const missing = allowlistedSchemaGap(body?.missing);
+  throw new Error(`Ticket did not resolve to a work order (${status}:${shape};existing=${existing};missing=${missing || "none"})`);
 }
 
 export function validateWorkOrderStatus(status, body, expectedStatus, ticketId) {

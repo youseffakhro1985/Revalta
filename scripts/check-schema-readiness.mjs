@@ -23,6 +23,7 @@ const REQUIRED_COLUMNS = [
   { table: "WorkOrder", column: "source" },
   { table: "WorkOrder", column: "sla_response_due_at" },
   { table: "WorkOrder", column: "sla_resolution_due_at" },
+  { table: "WorkOrder", column: "sla_status" },
 ];
 
 const REQUIRED_TABLES = [

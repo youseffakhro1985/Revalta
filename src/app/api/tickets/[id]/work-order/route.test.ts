@@ -289,6 +289,7 @@ describe("ticket work-order creation schema failures", () => {
     expect(body).toEqual({
       error: schemaMismatchUserMessage(),
       errorCode: "SERVICE_UNAVAILABLE",
+      missing: "WorkOrder.work_order_number",
     });
     expect(body.workOrderId).toBeUndefined();
   });
@@ -310,6 +311,7 @@ describe("ticket work-order creation schema failures", () => {
 
     expect(response.status).toBe(503);
     expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.missing).toBe("WorkOrderNumberCounter");
     expect(body.workOrderId).toBeUndefined();
   });
 
@@ -341,6 +343,7 @@ describe("ticket work-order creation schema failures", () => {
 
     expect(response.status).toBe(503);
     expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.missing).toBe("WorkOrder.deleted_at");
     expect(body.workOrderId).toBeUndefined();
     expect(transactionMock).not.toHaveBeenCalled();
   });
@@ -393,6 +396,7 @@ describe("ticket work-order GET schema gaps", () => {
     expect(response.status).toBe(503);
     expect(body.error).toBe(schemaMismatchUserMessage());
     expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.missing).toBe("WorkOrder");
     expect(body.workOrderId).toBeUndefined();
   });
 });

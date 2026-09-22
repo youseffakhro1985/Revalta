@@ -26,12 +26,25 @@ import {
   hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   isMissingTableError,
+  schemaGapFromError,
   schemaMismatchUserMessage,
   ticketAiSourceWrite,
   workOrderVendorWrite,
 } from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]/work-order" });
+
+function schemaUnavailableResponse(error?: unknown) {
+  const missing = schemaGapFromError(error);
+  return NextResponse.json(
+    {
+      error: schemaMismatchUserMessage(),
+      errorCode: API_ERROR_CODES.serviceUnavailable,
+      ...(missing ? { missing } : {}),
+    },
+    { status: 503 },
+  );
+}
 
 export async function GET(
   _request: Request,
@@ -84,13 +97,7 @@ export async function GET(
     });
   } catch (error) {
     if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
-      return NextResponse.json(
-        {
-          error: schemaMismatchUserMessage(),
-          errorCode: API_ERROR_CODES.serviceUnavailable,
-        },
-        { status: 503 },
-      );
+      return schemaUnavailableResponse(error);
     }
     throw error;
   }
@@ -224,6 +231,7 @@ export async function POST(
     }
 
     const persistVendor = await hasWorkOrderVendorContractColumn();
+    const persistAiSource = await hasTicketAiSourceColumn();
     const analysis = ticket.ai_processed_at
       ? null
       : await analyzeTicket(`${ticket.title}. ${ticket.description}`);
@@ -269,6 +277,12 @@ export async function POST(
           scheduled_end: scheduledEnd,
           estimated_cost: estimatedCost,
           created_at: createdAt,
+          work_order_number: workOrderNumber,
+          work_type: "corrective",
+          source: "ticket",
+          sla_response_due_at: sla.responseDueAt,
+          sla_resolution_due_at: sla.resolutionDueAt,
+          sla_status: "not_set",
           ...workOrderVendorWrite(persistVendor, null),
         },
         select: { id: true },
@@ -303,7 +317,7 @@ export async function POST(
                 ai_recommended_action: analysis.recommendedAction,
                 ai_confidence: analysis.confidence,
                 ai_processed_at: new Date(),
-                ...ticketAiSourceWrite(await hasTicketAiSourceColumn(), analysis.source),
+                ...ticketAiSourceWrite(persistAiSource, analysis.source),
               }
             : {}),
         },
@@ -376,13 +390,7 @@ export async function POST(
     }
     logger.error("Create work order from ticket error", error);
     if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
-      return NextResponse.json(
-        {
-          error: schemaMismatchUserMessage(),
-          errorCode: API_ERROR_CODES.serviceUnavailable,
-        },
-        { status: 503 },
-      );
+      return schemaUnavailableResponse(error);
     }
     return NextResponse.json(
       {
