@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import { isOperationalDocumentAccessible } from "@/lib/operational-document-access";
 import { createRouteObservability } from "@/lib/route-observability";
 
@@ -43,13 +43,23 @@ export async function DELETE(
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "operational_documents.delete.unauthorized",
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "operational_documents.delete.staff_required",
+        context: { userId: rawUser.id },
       });
     }
     if (!canManageTickets(user.role)) {
@@ -59,15 +69,6 @@ export async function DELETE(
         message: "Du saknar behörighet",
         event: "operational_documents.delete.forbidden",
         context: { userId: user.id, companyId: user.company_id },
-      });
-    }
-    if (!user.company_id) {
-      return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "operational_documents.delete.missing_company",
-        context: { userId: user.id },
       });
     }
 

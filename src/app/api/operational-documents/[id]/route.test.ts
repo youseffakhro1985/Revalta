@@ -85,8 +85,27 @@ describe("operational-documents/[id] DELETE", () => {
     expect(operationalDocumentFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("returns a correlated staff 403 for residents before looking up a document", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await DELETE(request(), { params });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(operationalDocumentFindFirstMock).not.toHaveBeenCalled();
+  });
+
   it("returns a stable correlated 403 when the role cannot manage operational documents", async () => {
-    getCurrentUserMock.mockResolvedValue({ id: "resident-1", company_id: "company-1", role: "resident" });
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
     canManageTicketsMock.mockReturnValue(false);
 
     const response = await DELETE(request(), { params });
