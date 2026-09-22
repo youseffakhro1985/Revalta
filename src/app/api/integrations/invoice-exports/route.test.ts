@@ -18,7 +18,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 function exportRequest() {
   return new Request("http://localhost/api/integrations/invoice-exports");
@@ -52,5 +52,46 @@ describe("GET /api/integrations/invoice-exports", () => {
     expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(exportJobFindManyMock).not.toHaveBeenCalled();
     expect(workOrderFindManyMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/integrations/invoice-exports staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    exportJobFindManyMock.mockResolvedValue([]);
+    workOrderFindManyMock.mockResolvedValue([]);
+  });
+
+  it("rejects residents before listing export jobs", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/integrations/invoice-exports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "retry", jobId: "job-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(exportJobFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the finance copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(new Request("http://localhost/api/integrations/invoice-exports", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "retry", jobId: "job-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(exportJobFindManyMock).not.toHaveBeenCalled();
   });
 });
