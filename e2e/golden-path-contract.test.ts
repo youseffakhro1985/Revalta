@@ -137,6 +137,14 @@ describe("golden-path is wired into the required Preview browser job", () => {
     expect(golden).toContain("#work-order-title");
     expect(golden).toContain("#work-order-execution-material");
     expect(golden).toContain("scrollIntoViewIfNeeded");
+    expect(golden).toContain("patchLockedStatus");
+    expect(golden).toContain("isLockLost");
+    const workOrderUi = golden.indexOf("/dashboard/arbetsorder/${workOrderId}");
+    const leaveWorkOrderUi = golden.indexOf('goto("/dashboard"');
+    const completedPatch = golden.indexOf('workOrderId, "completed"');
+    expect(workOrderUi).toBeGreaterThan(-1);
+    expect(leaveWorkOrderUi).toBeGreaterThan(workOrderUi);
+    expect(completedPatch).toBeGreaterThan(leaveWorkOrderUi);
     expect(golden).not.toContain("page.route");
     expect(runner).toContain("staffUserId");
   });
