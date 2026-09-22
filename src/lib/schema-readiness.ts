@@ -7,8 +7,10 @@ import {
   resetSoftDeleteCompatCache,
   type SoftDeleteModel,
 } from "@/lib/soft-delete-compat";
+import { resetWorkOrderNotesCache, hasWorkOrderNotesColumn as hasWorkOrderNotesColumnOn } from "@/lib/work-order-notes-compat";
 
 export { REQUIRED_SOFT_DELETE_COLUMNS, SOFT_DELETE_MODELS };
+export { workOrderNotesWrite } from "@/lib/work-order-notes-compat";
 export type SoftDeleteTable = SoftDeleteModel;
 export type SchemaColumnRequirement = (typeof REQUIRED_SOFT_DELETE_COLUMNS)[number];
 
@@ -237,6 +239,10 @@ export async function hasTicketAiSourceColumn(): Promise<boolean> {
   return aiSource;
 }
 
+export async function hasWorkOrderNotesColumn() {
+  return hasWorkOrderNotesColumnOn(getPrismaBaseClient());
+}
+
 export async function hasWorkOrderVendorContractColumn(): Promise<boolean> {
   if (workOrderVendorColumnCache && workOrderVendorColumnCache.expiresAt > Date.now()) {
     return workOrderVendorColumnCache.value;
@@ -259,6 +265,7 @@ let schemaReadinessCache: { value: SchemaReadiness; expiresAt: number } | null =
 
 export function resetSchemaReadinessCache() {
   resetSoftDeleteCompatCache();
+  resetWorkOrderNotesCache();
   featureColumnCache = null;
   workOrderVendorColumnCache = null;
   schemaReadinessCache = null;

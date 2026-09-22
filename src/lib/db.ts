@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { sanitizeSoftDeleteArgs, SOFT_DELETE_MODELS } from "@/lib/soft-delete-compat";
+import { sanitizeWorkOrderNotesArgs } from "@/lib/work-order-notes-compat";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -97,6 +98,9 @@ function createPrismaClient() {
   // Middleware keeps PrismaClient typings stable while stripping soft-delete
   // filters/columns when migrations are not deployed yet on shared preview DBs.
   client.$use(async (params, next) => {
+    if (!PASSTHROUGH_ACTIONS.has(params.action)) {
+      params.args = await sanitizeWorkOrderNotesArgs(client, params.model, params.action, params.args);
+    }
     if (shouldSanitizeSoftDeleteParams(params)) {
       params.args = await sanitizeSoftDeleteArgs(
         client,

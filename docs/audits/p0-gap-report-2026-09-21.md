@@ -38,6 +38,8 @@ Older SHA `a3e9137` **did** publish Preview and Playwright **did** run: login/da
 
 Exact Preview SHA for `babba40`: `babba40f4abac4b693d0a1758fcba7e895ee1d2f` at `https://revalta-ra4zxbug4-youseffakhro1985s-projects.vercel.app` (`dpl_AyVRFBQDneF38VaDakf15pGbWABb`), dataplane `6237f010…`, `schemaReady: true`. Revalta CI on `babba40` **success** (unit tests, typecheck, next build). Browser E2E **ran Playwright** then failed: `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order (503:SERVICE_UNAVAILABLE;existing=no)` (run `35777995858`). This is a **real ticket→WO write 503** on exact-SHA Preview, not a missing Preview. Do not dummy-commit. Do not `--admin`.
 
+Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `https://revalta-o6hdsese3-youseffakhro1985s-projects.vercel.app` (`dpl_7QNbZrqAcrzs5qggPQAbEifWjxy4`). Revalta CI + CodeQL **success**. Browser E2E **ran Playwright** (login/dashboard/nav/properties-api PASS) then failed: `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order (503:SERVICE_UNAVAILABLE;existing=no;missing=WorkOrder.notes)` (run `35779212653`). Root cause: Prisma `WorkOrder.notes` exists in schema but no migration adds the column. Dual-read omit + gated write; no notes migration in this PR.
+
 ## P0
 
 | Item | Evidence | Status |

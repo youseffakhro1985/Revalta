@@ -26,10 +26,12 @@ import { setWorkOrderAssetLinks, validateWorkOrderAssetLinks } from "@/lib/work-
 import { evaluateWorkOrderSla } from "@/lib/work-order-sla";
 import { WORK_ORDER_PRIORITIES, WORK_ORDER_STATUSES, normalizeWorkOrderPriority, normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import {
+  hasWorkOrderNotesColumn,
   hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   notDeletedFilter,
   schemaMismatchUserMessage,
+  workOrderNotesWrite,
   workOrderVendorRelationSelect,
   workOrderVendorWrite,
 } from "@/lib/schema-readiness";
@@ -489,6 +491,7 @@ export async function POST(request: Request) {
       assigneeEmail = assignee.email;
     }
     const persistVendor = await hasWorkOrderVendorContractColumn();
+    const persistNotes = await hasWorkOrderNotesColumn();
     if (vendorContractId && !persistVendor) {
       return reject(observability, {
         status: 503,
@@ -567,7 +570,7 @@ export async function POST(request: Request) {
           created_by_id: user.id,
           title,
           description,
-          notes,
+          ...workOrderNotesWrite(persistNotes, notes || null),
           status,
           priority,
           scheduled_start: scheduledStart,

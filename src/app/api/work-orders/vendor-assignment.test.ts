@@ -89,6 +89,8 @@ vi.mock("@/lib/schema-readiness", () => ({
   notDeletedFilter: vi.fn().mockResolvedValue({ deleted_at: null }),
   schemaMismatchUserMessage: () => "Databasen behöver uppdateras",
   hasWorkOrderVendorContractColumn: hasVendorColumnMock,
+  hasWorkOrderNotesColumn: vi.fn(async () => false),
+  workOrderNotesWrite: (hasColumn: boolean, notes: string | null) => (hasColumn && notes ? { notes } : {}),
   workOrderVendorWrite: (hasColumn: boolean, vendorContractId: string | null) =>
     (hasColumn ? { vendor_contract_id: vendorContractId } : {}),
   workOrderVendorRelationSelect: (hasColumn: boolean) =>

@@ -235,7 +235,6 @@ export async function POST(
     const analysis = ticket.ai_processed_at
       ? null
       : await analyzeTicket(`${ticket.title}. ${ticket.description}`);
-    const recommendedAction = ticket.ai_recommended_action || analysis?.recommendedAction || null;
     const priority = normalizeWorkOrderPriority(analysis?.priority || ticket.priority);
     const createdAt = new Date();
     const sla = calculateWorkOrderSla(createdAt, priority);
@@ -270,7 +269,6 @@ export async function POST(
           created_by_id: user.id,
           title: ticket.title,
           description: ticket.description,
-          notes: recommendedAction,
           status,
           priority,
           scheduled_start: scheduledStart,
