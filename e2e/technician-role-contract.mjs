@@ -46,3 +46,29 @@ export function validateAssignedWorkOrderVisible(status, body, workOrderId) {
     throw new Error(`Assigned work order was not visible to technician (${diagnostic(status, body)})`);
   }
 }
+
+function calendarEvents(body) {
+  return Array.isArray(body?.events) ? body.events : [];
+}
+
+export function validateTechnicianCalendarHidden(status, body, workOrderId) {
+  const events = calendarEvents(body);
+  if (
+    status !== 200
+    || events.some((event) => event?.source === "lease")
+    || events.some((event) => event?.work_order_id === workOrderId || event?.entity_id === workOrderId)
+  ) {
+    throw new Error(`Technician calendar was not scoped away from unassigned work or leases (${diagnostic(status, body)})`);
+  }
+}
+
+export function validateTechnicianCalendarAssigned(status, body, workOrderId) {
+  const events = calendarEvents(body);
+  if (
+    status !== 200
+    || events.some((event) => event?.source === "lease")
+    || !events.some((event) => event?.source === "work_order" && event?.work_order_id === workOrderId)
+  ) {
+    throw new Error(`Technician calendar did not project the assigned work order (${diagnostic(status, body)})`);
+  }
+}

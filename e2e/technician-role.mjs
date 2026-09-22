@@ -2,6 +2,8 @@ import { validateLoginResponse } from "./verification-contract.mjs";
 import { validateWorkOrderLockAcquired } from "./golden-path-contract.mjs";
 import {
   validateAssignedWorkOrderVisible,
+  validateTechnicianCalendarAssigned,
+  validateTechnicianCalendarHidden,
   validateTechnicianCreated,
   validateTechnicianForbidden,
   validateTechnicianProfile,
@@ -123,10 +125,15 @@ export async function runTechnicianRolePreview({
     });
     validateTechnicianForbidden(bookings.status, bookings.body, "Staff booking create");
 
+    const calendarHidden = await api(page, "GET", "/api/calendar");
+    validateTechnicianCalendarHidden(calendarHidden.status, calendarHidden.body, workOrderId);
+
     const acquired = await api(ownerPage, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "acquire" });
     const lock = validateWorkOrderLockAcquired(acquired.status, acquired.body);
     const assigned = await api(ownerPage, "PATCH", `/api/work-orders/${workOrderId}/locked-update`, {
       assignedToId: technicianId,
+      scheduledStart: "2027-06-15T08:00:00.000Z",
+      scheduledEnd: "2027-06-15T10:00:00.000Z",
       editToken: lock.token,
       version: lock.version,
     });
@@ -137,6 +144,9 @@ export async function runTechnicianRolePreview({
 
     const assignedOrder = await api(page, "GET", `/api/work-orders/${workOrderId}`);
     validateAssignedWorkOrderVisible(assignedOrder.status, assignedOrder.body, workOrderId);
+
+    const calendarAssigned = await api(page, "GET", "/api/calendar");
+    validateTechnicianCalendarAssigned(calendarAssigned.status, calendarAssigned.body, workOrderId);
 
     const invoice = await api(page, "GET", `/api/work-orders/${workOrderId}/invoice-basis`);
     validateTechnicianForbidden(invoice.status, invoice.body, "Invoice basis");

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   validateAssignedWorkOrderVisible,
+  validateTechnicianCalendarAssigned,
+  validateTechnicianCalendarHidden,
   validateTechnicianCreated,
   validateTechnicianForbidden,
   validateTechnicianProfile,
@@ -18,6 +20,10 @@ describe("technician-role contract", () => {
     validateTechnicianForbidden(403, { errorCode: "FORBIDDEN" }, "Document library");
     validateUnassignedWorkOrderHidden(404, {});
     validateAssignedWorkOrderVisible(200, { workOrder: { id: "wo-1" } }, "wo-1");
+    validateTechnicianCalendarHidden(200, { events: [{ source: "work_order", work_order_id: "other" }] }, "wo-1");
+    validateTechnicianCalendarAssigned(200, {
+      events: [{ source: "work_order", work_order_id: "wo-1" }],
+    }, "wo-1");
   });
 
   it("rejects owner-shaped profiles and leaked unassigned work without payloads", () => {
@@ -33,6 +39,12 @@ describe("technician-role contract", () => {
     expect(() => validateUnassignedWorkOrderHidden(200, { workOrder: { id: "wo-1" } })).toThrow(
       /visible to technician \(200:none\)/,
     );
+    expect(() => validateTechnicianCalendarHidden(200, {
+      events: [{ source: "lease", entity_id: "lease-1" }],
+    }, "wo-1")).toThrow(/was not scoped away from unassigned work or leases/);
+    expect(() => validateTechnicianCalendarAssigned(200, {
+      events: [{ source: "work_order", work_order_id: "other" }],
+    }, "wo-1")).toThrow(/did not project the assigned work order/);
   });
 });
 
@@ -51,6 +63,8 @@ describe("technician role is wired into the required Preview browser job", () =>
     expect(source).toContain("/api/team");
     expect(source).toContain("/api/documents/library");
     expect(source).toContain("assignedToId");
+    expect(source).toContain("/api/calendar");
+    expect(source).toContain("scheduledStart");
     expect(source).not.toContain("page.route");
   });
 });
