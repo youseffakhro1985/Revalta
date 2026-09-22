@@ -6,6 +6,7 @@ import { canCreateProperties, getCurrentUser, requireCompanyUser, tenantWhere } 
 import { writeAuditLog } from "@/lib/audit";
 import {
   isMissingSchemaColumnError,
+  isMissingTableError,
   notDeletedFilter,
   schemaMismatchUserMessage,
 } from "@/lib/schema-readiness";
@@ -229,7 +230,7 @@ export async function GET(request: Request) {
       permissions: { canCreate: canCreateProperties(user.role) },
     });
   } catch (error) {
-    if (isMissingSchemaColumnError(error)) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
       observability.logger.error("property list schema unavailable", error, observability.elapsed({
         event: "properties.list.schema_unavailable",
       }));
@@ -355,7 +356,7 @@ export async function POST(request: Request) {
     }));
     return successResponse(observability, { success: true, property }, { status: 201 });
   } catch (error) {
-    if (isMissingSchemaColumnError(error)) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
       observability.logger.error("property create schema unavailable", error, observability.elapsed({
         event: "properties.create.schema_unavailable",
       }));
