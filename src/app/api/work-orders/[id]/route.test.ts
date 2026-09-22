@@ -58,6 +58,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { GET, PATCH, DELETE } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const params = Promise.resolve({ id: "wo-1" });
 
@@ -287,5 +289,51 @@ describe("work-order detail asset-link related ids", () => {
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe("Byggnaden tillhör inte vald fastighet");
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order locked-update schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    workOrderFindFirstMock.mockResolvedValue({
+      ...workOrderForPatch("planned"),
+      updated_at: new Date("2026-08-30T12:00:00Z"),
+    });
+    getWorkOrderEnterpriseStateMock.mockResolvedValue(null);
+    getWorkOrderAssetLinkMock.mockResolvedValue({});
+    getLatestInvoiceDraftMock.mockResolvedValue(null);
+  });
+
+  it("maps a missing WorkOrderEditLock table during locked status change to 503", async () => {
+    transactionMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrderEditLock` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrderEditLock" },
+        },
+      ),
+    );
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "in_progress",
+        editToken: "tok",
+        version: "2026-08-30T12:00:00.000Z",
+      }),
+    }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
   });
 });

@@ -7,12 +7,35 @@ import {
   renewWorkOrderEditLock,
 } from "@/lib/work-order-edit-lock";
 import { findAccessibleWorkOrder, notFoundWorkOrder } from "@/lib/assigned-work-access";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 function noStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, {
     ...init,
     headers: { "Cache-Control": "private, no-store", ...(init?.headers || {}) },
   });
+}
+
+function schemaUnavailable() {
+  return noStore(
+    { error: schemaMismatchUserMessage(), errorCode: API_ERROR_CODES.serviceUnavailable },
+    { status: 503 },
+  );
+}
+
+function lockFailure(error: unknown) {
+  if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+    return schemaUnavailable();
+  }
+  return noStore(
+    { error: "Kunde inte hantera redigeringslåset", errorCode: API_ERROR_CODES.internalError },
+    { status: 500 },
+  );
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -23,8 +46,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   if (!await findAccessibleWorkOrder(user, id)) return notFoundWorkOrder();
-  const lock = await getWorkOrderEditLock(user.company_id, id);
-  return noStore({ lock, ownedByCurrentUser: lock?.userId === user.id });
+  try {
+    const lock = await getWorkOrderEditLock(user.company_id, id);
+    return noStore({ lock, ownedByCurrentUser: lock?.userId === user.id });
+  } catch (error) {
+    return lockFailure(error);
+  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,45 +67,57 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const action = typeof body?.action === "string" ? body.action.trim() : "acquire";
 
   if (action === "acquire") {
-    const result = await acquireWorkOrderEditLock({
-      companyId: user.company_id,
-      workOrderId: id,
-      userId: user.id,
-      leaseSeconds: body?.leaseSeconds,
-    });
-    if (!result.ok && result.code === "not_found") return noStore({ error: "Arbetsordern hittades inte" }, { status: 404 });
-    if (!result.ok) {
-      return noStore(
-        {
-          error: `${result.holder.name || result.holder.email} redigerar redan arbetsordern.`,
-          code: result.code,
-          holder: result.holder,
-          version: result.version,
-        },
-        { status: 423 },
-      );
+    try {
+      const result = await acquireWorkOrderEditLock({
+        companyId: user.company_id,
+        workOrderId: id,
+        userId: user.id,
+        leaseSeconds: body?.leaseSeconds,
+      });
+      if (!result.ok && result.code === "not_found") return noStore({ error: "Arbetsordern hittades inte" }, { status: 404 });
+      if (!result.ok) {
+        return noStore(
+          {
+            error: `${result.holder.name || result.holder.email} redigerar redan arbetsordern.`,
+            code: result.code,
+            holder: result.holder,
+            version: result.version,
+          },
+          { status: 423 },
+        );
+      }
+      return noStore({ lock: result }, { status: 201 });
+    } catch (error) {
+      return lockFailure(error);
     }
-    return noStore({ lock: result }, { status: 201 });
   }
 
   const token = typeof body?.token === "string" ? body.token.trim() : "";
   if (!token) return noStore({ error: "Låstoken krävs" }, { status: 400 });
 
   if (action === "renew") {
-    const result = await renewWorkOrderEditLock({
-      companyId: user.company_id,
-      workOrderId: id,
-      userId: user.id,
-      token,
-      leaseSeconds: body?.leaseSeconds,
-    });
-    if (!result.ok) return noStore({ error: "Redigeringslåset har gått förlorat. Ladda om arbetsordern.", code: result.code }, { status: 409 });
-    return noStore({ lock: result });
+    try {
+      const result = await renewWorkOrderEditLock({
+        companyId: user.company_id,
+        workOrderId: id,
+        userId: user.id,
+        token,
+        leaseSeconds: body?.leaseSeconds,
+      });
+      if (!result.ok) return noStore({ error: "Redigeringslåset har gått förlorat. Ladda om arbetsordern.", code: result.code }, { status: 409 });
+      return noStore({ lock: result });
+    } catch (error) {
+      return lockFailure(error);
+    }
   }
 
   if (action === "release") {
-    const result = await releaseWorkOrderEditLock({ companyId: user.company_id, workOrderId: id, userId: user.id, token });
-    return noStore({ released: result.ok });
+    try {
+      const result = await releaseWorkOrderEditLock({ companyId: user.company_id, workOrderId: id, userId: user.id, token });
+      return noStore({ released: result.ok });
+    } catch (error) {
+      return lockFailure(error);
+    }
   }
 
   return noStore({ error: "Ogiltig låsåtgärd" }, { status: 400 });

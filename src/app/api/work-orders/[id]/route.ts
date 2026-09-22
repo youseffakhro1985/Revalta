@@ -42,11 +42,14 @@ import {
 import { createLogger } from "@/lib/structured-logger";
 import {
   hasWorkOrderVendorContractColumn,
+  isMissingSchemaColumnError,
+  isMissingTableError,
   schemaMismatchUserMessage,
   workOrderVendorIdSelect,
 } from "@/lib/schema-readiness";
 import { findAssignableVendorContract, listAssignableVendorContracts } from "@/lib/work-order-vendor";
 import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
 import {
   INVOICE_DRAFT_NOT_READY_FOR_INVOICING,
   invoiceDraftAllowsWorkOrderInvoicing,
@@ -538,6 +541,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (error instanceof Error && error.message === "WORK_ORDER_NOT_FOUND") {
       return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
+    }
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
     }
     throw error;
   }
