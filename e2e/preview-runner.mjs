@@ -29,6 +29,12 @@ export async function readPreviewHealth(target, env) {
     if (payload && payload.schemaReady === false) {
       throw new Error("BLOCKED: Preview schema is not ready for this release");
     }
+    if (
+      payload
+      && (payload.components?.dataPlane === "mismatch" || payload.dataPlane?.directMatches === false)
+    ) {
+      throw new Error("BLOCKED: Preview data-plane isolation is not ready for this release");
+    }
     throw new Error("BLOCKED: Preview health must return HTTP 200");
   }
   if (!payload) throw new Error("BLOCKED: Preview health is not valid JSON");

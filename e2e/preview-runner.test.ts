@@ -125,6 +125,43 @@ describe("health transport", () => {
       vi.unstubAllGlobals();
     }
   });
+  it("names a data-plane 503 without leaking datastore identity", async () => {
+    const identity = "e".repeat(64);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      status: "degraded",
+      ok: false,
+      database: "ok",
+      schemaReady: true,
+      components: { database: "ok", schema: "ok", dataPlane: "mismatch" },
+      dataPlane: { identity, directMatches: false },
+    }), { status: 503 })));
+    try {
+      await readPreviewHealth({ baseUrl: env.E2E_BASE_URL }, {});
+      throw new Error("health unexpectedly succeeded");
+    } catch (error) {
+      const message = String(error instanceof Error ? error.message : error);
+      expect(message).toMatch(/Preview data-plane isolation is not ready for this release/);
+      expect(message).not.toContain(identity);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it("prefers schema unreadiness when both schema and data-plane are degraded", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      status: "degraded",
+      ok: false,
+      schemaReady: false,
+      components: { database: "ok", schema: "missing", dataPlane: "mismatch" },
+      dataPlane: { identity: "e".repeat(64), directMatches: false },
+    }), { status: 503 })));
+    try {
+      await expect(readPreviewHealth({ baseUrl: env.E2E_BASE_URL }, {})).rejects.toThrow(
+        /Preview schema is not ready for this release/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("forbids redirects and bounds health requests", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify(health)));
     vi.stubGlobal("fetch", fetchMock);
