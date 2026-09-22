@@ -130,6 +130,24 @@ describe("work-orders/recurring route", () => {
     expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
   });
 
+  it("denies technicians from listing company-wide recurring schedules", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
+  it("denies viewers from listing recurring schedules", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
   it("fail-closes legacy recurring schedule updates with Swedish 409", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     readRecurringSchedulesMock.mockResolvedValue([{
@@ -201,6 +219,21 @@ describe("work-orders/recurring writes staff-scope", () => {
     expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
   });
 
+  it("POST denies technicians before creating or generating schedules", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(new Request("http://localhost/api/work-orders/recurring", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "generate", scheduleId: "schedule-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+    expect(upsertRecurringScheduleMock).not.toHaveBeenCalled();
+  });
+
   it("PATCH rejects residents before looking up a schedule", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "resident-1",
@@ -232,6 +265,21 @@ describe("work-orders/recurring writes staff-scope", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians before looking up a schedule", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/recurring", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheduleId: "schedule-1", active: false }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+    expect(scheduleUpdateManyMock).not.toHaveBeenCalled();
   });
 
   it("returns tenant-safe 404 when Tenant A posts a schedule against Tenant B propertyId", async () => {

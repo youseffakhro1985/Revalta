@@ -72,6 +72,17 @@ describe("work-orders/recurring/incidents GET", () => {
     expect(listRecurringIncidentEventsMock).not.toHaveBeenCalled();
     expect(userFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("denies technicians from listing incidents and the staff roster", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(listRecurringIncidentEventsMock).not.toHaveBeenCalled();
+    expect(userFindManyMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("work-orders/recurring/incidents POST staff-scope", () => {
@@ -109,6 +120,22 @@ describe("work-orders/recurring/incidents POST staff-scope", () => {
 
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(createRecurringIncidentEventMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians before resolving incident keys or creating events", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(new Request("http://localhost/api/work-orders/recurring/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationKey: "recurring-run:run-1", status: "acknowledged" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+    expect(listRecurringRunsMock).not.toHaveBeenCalled();
     expect(createRecurringIncidentEventMock).not.toHaveBeenCalled();
   });
 });

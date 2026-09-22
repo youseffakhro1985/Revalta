@@ -78,6 +78,8 @@ describe("work-order SLA notifications staff scope", () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     expect(queryRawMock).toHaveBeenCalled();
+    const sql = queryRawMock.mock.calls[0]?.[0] as { values?: unknown[] };
+    expect(sql.values).toEqual(expect.arrayContaining(["company-1", "tech-1"]));
   });
 
   it("returns 404 when the SLA notification key is outside the authenticated company", async () => {
