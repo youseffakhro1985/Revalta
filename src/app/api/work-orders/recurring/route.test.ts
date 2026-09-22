@@ -37,7 +37,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, POST } from "./route";
 
 describe("work-orders/recurring route", () => {
   beforeEach(() => {
@@ -157,5 +157,75 @@ describe("work-orders/recurring route", () => {
     expect(response.status).toBe(409);
     expect(body.error).toMatch(/backfill/i);
     expect(scheduleUpdateManyMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-orders/recurring writes staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("POST rejects residents before creating a schedule", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/work-orders/recurring", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Filterbyte", propertyId: "property-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(new Request("http://localhost/api/work-orders/recurring", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Filterbyte", propertyId: "property-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up a schedule", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/recurring", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheduleId: "schedule-1", active: false }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies viewers with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/recurring", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheduleId: "schedule-1", active: false }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
   });
 });
