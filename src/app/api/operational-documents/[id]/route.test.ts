@@ -165,6 +165,27 @@ describe("operational-documents/[id] DELETE", () => {
     expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("protokoll.pdf");
   });
 
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B operational document id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    operationalDocumentFindFirstMock.mockResolvedValue(null);
+
+    const response = await DELETE(
+      new Request("https://www.revalta.se/api/operational-documents/doc-tenant-b", {
+        method: "DELETE",
+        headers: { "x-request-id": requestId },
+      }),
+      { params: Promise.resolve({ id: "doc-tenant-b" }) },
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Dokumentet hittades inte");
+    expect(operationalDocumentFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "doc-tenant-b", company_id: "company-1", deleted_at: null },
+    }));
+    expect(operationalDocumentUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("does not log an unverified URL document id when the tenant lookup misses", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
     operationalDocumentFindFirstMock.mockResolvedValue(null);
