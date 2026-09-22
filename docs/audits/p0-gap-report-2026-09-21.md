@@ -21,9 +21,9 @@ The SHA `92adc33…` below was true when this file was first written (`#933`). I
 - Prisma migrations in repo: 52
 - Inställningar design from `#933` is current and must not be redesigned in this pass
 
-## PR #938 Browser E2E vs Vercel (verified 2026-09-22T17:20Z)
+## PR #938 Browser E2E vs Vercel (verified 2026-09-22T18:24Z)
 
-Head commit still `c9dc7b576343085b849b6c05716bdcad90a38b46`. Base `main` still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (not moved; no rebase). Production `/api/health` still matches that SHA. Re-verified 2026-09-22T17:20Z: Vercel status still `Deployment rate limited — retry in 24 hours.` (`updated_at` still `2026-09-21T19:51:47Z`). GitHub Deployments for `c9dc7b5` still `[]`. Expected Hobby recovery ~22 Sep ~19:48 UTC. Local unpushed HEAD continues assigned-work proofs (recurring schedules/incidents now `canViewOperations`).
+Head commit still `c9dc7b576343085b849b6c05716bdcad90a38b46`. Base `main` still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (not moved; no rebase). Production `/api/health` still matches that SHA. Re-verified 2026-09-22T18:24Z: Vercel status still `Deployment rate limited — retry in 24 hours.` (`updated_at` still `2026-09-21T19:51:47Z`). GitHub Deployments for `c9dc7b5` still `[]`. Expected Hobby recovery ~22 Sep ~19:48 UTC. Local unpushed HEAD continues assigned-work proofs (recurring/preventive/portfolio/calendar-underhåll/CSV ops gates + document library technician 403).
 
 | Check | Result | Cause |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED`. `mergeS
 
 ## P1
 
-Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after this branch's unit proofs: live booking concurrency Preview, technician-role Preview fixture, quote PDF/output if a dedicated export is added. Staff/resident booking overlap 409s, public-ticket portal-token Tenant B 404s, ticket-dashboard/operations-overview company-scope KPIs, calendar technician assigned WO, and recurring schedule/incident `canViewOperations` 403s for technicians landed locally. Exact-SHA Preview E2E on `#938` remains the P0 gate.
+Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after this branch's unit proofs: live booking concurrency Preview, technician-role Preview fixture, quote PDF/output if a dedicated export is added. Staff/resident booking overlap 409s, public-ticket portal-token Tenant B 404s, ticket-dashboard/operations-overview company-scope KPIs, calendar technician assigned WO, recurring/preventive/portfolio/CSV ops gates, and document-library technician 403s landed locally. Exact-SHA Preview E2E on `#938` remains the P0 gate.
 
 ## P2
 

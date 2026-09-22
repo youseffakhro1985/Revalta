@@ -24,7 +24,8 @@ const {
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
-  canViewLeasingData: (role: string) => role === "owner" || role === "admin" || role === "manager",
+  canViewLeasingData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
+  canViewOperations: (role: string) => ["owner", "admin", "manager"].includes(role),
   tenantWhere: (user: { company_id: string | null }) => ({ company_id: user.company_id }),
   requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
     if (!user?.company_id) return null;
@@ -129,6 +130,20 @@ describe("documents/library GET — tenant and pagination contract", () => {
     expect(managedFindManyMock).not.toHaveBeenCalled();
   });
 
+  it("denies technicians before listing the company document library", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", role: "technician", company_id: "company-a" });
+    const response = await GET(new Request("https://www.revalta.se/api/documents/library"));
+    const body = await response.json();
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet");
+    expect(body.errorCode).toBe("FORBIDDEN");
+    expect(managedCountMock).not.toHaveBeenCalled();
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+    expect(propertyFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("rejects residents before listing the document library", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "resident-1",
@@ -164,7 +179,10 @@ describe("documents/library GET — tenant and pagination contract", () => {
     for (const call of managedFindManyMock.mock.calls) expect(call[0]?.where).toEqual(expect.objectContaining({ company_id: "company-a" }));
     expect(managedFindManyMock.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ skip: 50, take: 25, orderBy: [{ name: "asc" }, { created_at: "desc" }] }));
     expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ company_id: "company-a", deleted_at: null }) }));
-    expect(leaseFindManyMock).not.toHaveBeenCalled();
+    expect(leaseFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-a", deleted_at: null }),
+      take: 2000,
+    }));
   });
 
   it("clamps pageSize to 100 and never loads another company's leases", async () => {

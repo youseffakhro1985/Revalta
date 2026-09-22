@@ -58,7 +58,7 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Energi | PARTIAL | Module exists. | Data-source truth, aggregation/query performance and permissions. |
 | IMD | PARTIAL | Module exists. | Meter/source/billing claims, tenant isolation and production data verification. |
 | Rapporter | PARTIAL | Reporting surfaces exist. | Export tenant isolation, large-data behavior and truthful report definitions. |
-| Dokument | PARTIAL | Substantial document APIs and security work exist. | Pagination/performance, blob authorization, lifecycle and cross-tenant negative audit. |
+| Dokument | PARTIAL | Substantial document APIs and security work exist. Company library GET requires `canViewOperations` or `canViewLeasingData` (technicians 403). Dual-read GET still omits the company lease dump for technicians. | Pagination/performance, blob authorization, lifecycle and cross-tenant negative audit. |
 | Projekt | PARTIAL | Module exists. | Relation/financial/tenant/pagination/readiness audit. |
 | Team | PARTIAL | Organization/team surfaces exist. | Invite/role/removal authorization and lifecycle audit. |
 | Leverantörer | PARTIAL | Module exists. | Tenant scoping, assignment relations, search/pagination and permissions. |
