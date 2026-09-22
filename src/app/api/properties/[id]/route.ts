@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canCreateProperties, getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { OCCUPYING_LEASE_STATUSES } from "@/lib/leasing";
 import { createRouteObservability } from "@/lib/route-observability";
 
@@ -59,13 +59,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "properties.update.unauthorized",
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "properties.update.staff_required",
+        context: { userId: rawUser.id, companyId: rawUser.company_id },
       });
     }
     if (!canCreateProperties(user.role)) {
@@ -75,15 +85,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         message: "Du saknar behörighet att redigera fastigheter",
         event: "properties.update.forbidden",
         context: { userId: user.id, companyId: user.company_id },
-      });
-    }
-    if (!user.company_id) {
-      return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "properties.update.missing_company",
-        context: { userId: user.id },
       });
     }
 
@@ -210,13 +211,23 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "properties.delete.unauthorized",
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "properties.delete.staff_required",
+        context: { userId: rawUser.id, companyId: rawUser.company_id },
       });
     }
     if (!canCreateProperties(user.role)) {
@@ -226,15 +237,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         message: "Du saknar behörighet att ta bort fastigheter",
         event: "properties.delete.forbidden",
         context: { userId: user.id, companyId: user.company_id },
-      });
-    }
-    if (!user.company_id) {
-      return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "properties.delete.missing_company",
-        context: { userId: user.id },
       });
     }
 

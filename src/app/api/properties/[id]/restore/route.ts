@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canCreateProperties, getCurrentUser } from "@/lib/current-user";
+import { canCreateProperties, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 
 const ROUTE = "/api/properties/[id]/restore";
@@ -42,13 +42,23 @@ export async function POST(
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
         message: "Obehörig",
         event: "properties.restore.unauthorized",
+      });
+    }
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "properties.restore.staff_required",
+        context: { userId: rawUser.id, companyId: rawUser.company_id },
       });
     }
     if (!canCreateProperties(user.role)) {
@@ -58,15 +68,6 @@ export async function POST(
         message: "Du saknar behörighet att återställa fastigheter",
         event: "properties.restore.forbidden",
         context: { userId: user.id, companyId: user.company_id },
-      });
-    }
-    if (!user.company_id) {
-      return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "properties.restore.missing_company",
-        context: { userId: user.id },
       });
     }
 

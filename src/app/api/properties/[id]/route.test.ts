@@ -146,7 +146,26 @@ describe("properties/[id] route", () => {
       getCurrentUserMock.mockResolvedValue(technician);
       const forbidden = await PATCH(patchRequest(validPatchBody), { params });
       expect(forbidden.status).toBe(403);
-      expect((await forbidden.json()).errorCode).toBe("FORBIDDEN");
+      await expect(forbidden.json()).resolves.toEqual({
+        error: "Du saknar behörighet att redigera fastigheter",
+        errorCode: "FORBIDDEN",
+        requestId,
+      });
+      expect(propertyFindFirstMock).not.toHaveBeenCalled();
+
+      getCurrentUserMock.mockResolvedValue({
+        id: "resident-1",
+        role: "resident",
+        company_id: "company-1",
+        email: "boende@exempel.se",
+      });
+      const resident = await PATCH(patchRequest(validPatchBody), { params });
+      expect(resident.status).toBe(403);
+      await expect(resident.json()).resolves.toEqual({
+        error: "En aktiv organisation och personalbehörighet krävs",
+        errorCode: "FORBIDDEN",
+        requestId,
+      });
       expect(propertyFindFirstMock).not.toHaveBeenCalled();
     });
 
@@ -266,6 +285,33 @@ describe("properties/[id] route", () => {
         expect.objectContaining({ event: "properties.delete.completed", propertyId: "property-1" }),
       );
       expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("Kvarnhuset");
+    });
+
+    it("rejects residents with the staff copy and technicians with the delete-manage copy", async () => {
+      getCurrentUserMock.mockResolvedValue({
+        id: "resident-1",
+        role: "resident",
+        company_id: "company-1",
+        email: "boende@exempel.se",
+      });
+      const resident = await DELETE(deleteRequest(), { params });
+      expect(resident.status).toBe(403);
+      await expect(resident.json()).resolves.toEqual({
+        error: "En aktiv organisation och personalbehörighet krävs",
+        errorCode: "FORBIDDEN",
+        requestId,
+      });
+      expect(propertyFindFirstMock).not.toHaveBeenCalled();
+
+      getCurrentUserMock.mockResolvedValue(technician);
+      const forbidden = await DELETE(deleteRequest(), { params });
+      expect(forbidden.status).toBe(403);
+      await expect(forbidden.json()).resolves.toEqual({
+        error: "Du saknar behörighet att ta bort fastigheter",
+        errorCode: "FORBIDDEN",
+        requestId,
+      });
+      expect(propertyFindFirstMock).not.toHaveBeenCalled();
     });
 
     it.each([
