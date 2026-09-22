@@ -150,6 +150,32 @@ export async function runTechnicianRolePreview({
 
     const invoice = await api(page, "GET", `/api/work-orders/${workOrderId}/invoice-basis`);
     validateTechnicianForbidden(invoice.status, invoice.body, "Invoice basis");
+
+    const workOrderLoaded = page.waitForResponse((response) => {
+      try {
+        const url = new URL(response.url());
+        return url.pathname === `/api/work-orders/${workOrderId}` && response.request().method() === "GET";
+      } catch {
+        return false;
+      }
+    }, { timeout: 20_000 });
+    await page.goto(`/dashboard/arbetsorder/${workOrderId}`, { waitUntil: "domcontentloaded" });
+    await workOrderLoaded;
+    await expectPath(page, `/dashboard/arbetsorder/${workOrderId}`);
+    const title = page.locator("#work-order-title");
+    await expectVisible(title, "technician work-order title");
+    await expectVisible(page.locator("#work-order-execution-material"), "technician execution material");
+    await page.waitForFunction(() => !document.getElementById("ekonomi"), null, { timeout: 15_000 }).catch(() => {
+      fail("Technician finance panel was not hidden");
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await title.scrollIntoViewIfNeeded();
+    await expectVisible(title, "technician mobile work-order title");
+    const mobileMaterial = page.locator("#work-order-execution-material");
+    await mobileMaterial.scrollIntoViewIfNeeded();
+    await expectVisible(mobileMaterial, "technician mobile execution material");
+    await page.setViewportSize({ width: 1440, height: 1000 });
   } finally {
     await context.close();
   }

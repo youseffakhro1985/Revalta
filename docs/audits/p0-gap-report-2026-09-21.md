@@ -1,6 +1,6 @@
 # P0/P1 gap report — 2026-09-21
 
-Verified baseline: `2bca08dc4949e51368464b13e739a9e305436f13` (22 Sep 2026, `#941` on `main`). Staff golden-path, booking-overlap, technician-role and resident-portal Preview E2E are green. Production `/api/health` matched that SHA (`dpl_B5c6UtnmXQdoZ6rF8bGp27S4hv8o`), `schemaReady: true`, dataplane `e51d9599…`. This product PR adds technician calendar Preview proof on the same required job.
+Verified baseline: `5f05138a626905ae97bb9c8dd2b5e45df95605a6` (22 Sep 2026, `#942` on `main`). Staff golden-path, booking-overlap, technician-role, resident-portal and technician-calendar Preview E2E are green. Production `/api/health` matched that SHA (`dpl_HWqAMCPENF5uX3CaRnXR7c7idn3D`), `schemaReady: true`, dataplane `e51d9599…`. This product PR adds technician mobile work-order Preview proof on the same required job.
 
 This report is current-main evidence, not a historical audit copy. Unverified items are marked `BLOCKED / NOT VERIFIED`.
 
@@ -73,7 +73,7 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 ## P1
 
-Tenant negative matrix, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after `#941`: technician calendar Preview (this PR), quote PDF/output if a dedicated export is added, owner-dispatched Database Status, Preview GitHub secrets. Staff/resident booking overlap 409s, public-ticket portal-token Tenant B 404s, ticket-dashboard/operations-overview company-scope KPIs, calendar technician assigned WO, recurring/preventive/portfolio/CSV ops gates, document-library technician 403s, and WO report/snapshot finance redaction landed locally. Resident fixture no longer needs extra E2E secrets: team POST + lease holder email match is used.
+Tenant negative matrix, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after `#942`: technician mobile work-order Preview (this PR), quote PDF/output if a dedicated export is added, owner-dispatched Database Status, Preview GitHub secrets. Staff/resident booking overlap 409s, public-ticket portal-token Tenant B 404s, ticket-dashboard/operations-overview company-scope KPIs, calendar technician assigned WO, recurring/preventive/portfolio/CSV ops gates, document-library technician 403s, and WO report/snapshot finance redaction landed locally. Resident fixture no longer needs extra E2E secrets: team POST + lease holder email match is used.
 
 ## P2
 
