@@ -113,8 +113,26 @@ describe("PATCH /api/team/[id]", () => {
     getCurrentUserMock.mockResolvedValue({ id: "caller-1", company_id: null, role: "owner" });
 
     const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
+    const body = await response.json();
 
     expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before looking up a team member", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(patchRequest({ status: "inactive" }), ctx());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(transactionMock).not.toHaveBeenCalled();
   });
 

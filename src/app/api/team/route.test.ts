@@ -227,12 +227,30 @@ describe("team route", () => {
       expect(userCreateMock).not.toHaveBeenCalled();
     });
 
+    it("rejects residents before creating a team member", async () => {
+      getCurrentUserMock.mockResolvedValue({
+        id: "resident-1",
+        company_id: "company-1",
+        role: "resident",
+        email: "boende@exempel.se",
+      });
+
+      const response = await POST(postRequest(validPayload));
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+      expect(userCreateMock).not.toHaveBeenCalled();
+    });
+
     it("returns 403 when the caller has no company_id, even if role is owner", async () => {
       getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: null, role: "owner" });
 
       const response = await POST(postRequest(validPayload));
+      const body = await response.json();
 
       expect(response.status).toBe(403);
+      expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
       expect(userCreateMock).not.toHaveBeenCalled();
     });
 

@@ -1,6 +1,6 @@
 import db from "@/lib/db";
 import { Prisma } from "@prisma/client";
-import { canGrantTeamRole, canManageTeam, getCurrentUser } from "@/lib/current-user";
+import { canGrantTeamRole, canManageTeam, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { updateOwnedByCompany } from "@/lib/tenant-writes";
 import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
@@ -51,9 +51,13 @@ const memberSelect = {
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-    if (!user.company_id || !canManageTeam(user.role)) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
+    if (!canManageTeam(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att hantera teammedlemmar" }, { status: 403 });
     }
     const companyId = user.company_id;
