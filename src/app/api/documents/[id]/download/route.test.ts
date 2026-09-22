@@ -184,6 +184,23 @@ describe("documents/[id]/download", () => {
     expect(blobGetMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A downloads a Tenant B document id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "owner" });
+    managedDocumentFindFirstMock.mockResolvedValue(null);
+    auditLogFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(request("doc-tenant-b"), {
+      params: Promise.resolve({ id: "doc-tenant-b" }),
+    });
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Dokumentet hittades inte");
+    expect(managedDocumentFindFirstMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "doc-tenant-b", company_id: "company-a" } }),
+    );
+    expect(blobGetMock).not.toHaveBeenCalled();
+  });
+
   it("404s for a document id that does not exist at all", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-a", role: "owner" });
     managedDocumentFindFirstMock.mockResolvedValue(null);

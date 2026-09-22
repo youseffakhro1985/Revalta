@@ -201,4 +201,27 @@ describe("documents/library GET — tenant and pagination contract", () => {
       }),
     }));
   });
+
+  it("keeps a Tenant B propertyId filter inside Tenant A company_id so the library cannot leak", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-a", role: "owner", company_id: "company-a" });
+    primeBaseData();
+    managedFindManyMock.mockReset();
+    managedFindManyMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const response = await GET(new Request("https://www.revalta.se/api/documents/library?propertyId=property-tenant-b"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.documents).toEqual([]);
+    expect(managedCountMock.mock.calls[0]?.[0]?.where).toEqual(expect.objectContaining({
+      company_id: "company-a",
+      AND: expect.arrayContaining([{ property_id: "property-tenant-b" }]),
+    }));
+    for (const call of managedFindManyMock.mock.calls) {
+      expect(call[0]?.where).toEqual(expect.objectContaining({ company_id: "company-a" }));
+    }
+    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-a", deleted_at: null }),
+    }));
+  });
 });
