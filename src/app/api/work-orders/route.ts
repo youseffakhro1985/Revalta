@@ -537,11 +537,13 @@ export async function POST(request: Request) {
     try {
       await validateWorkOrderAssetLinks(db, { companyId: user.company_id, propertyId, buildingId, technicalAssetId });
     } catch (error) {
+      const message = safeAssetLinkMessage(error);
+      const propertyMiss = message === "Fastigheten hittades inte";
       return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: safeAssetLinkMessage(error),
-        event: "work_orders.create.asset_link_invalid",
+        status: propertyMiss ? 404 : 400,
+        code: propertyMiss ? API_ERROR_CODES.notFound : API_ERROR_CODES.validationFailed,
+        message,
+        event: propertyMiss ? "work_orders.create.property_not_found" : "work_orders.create.asset_link_invalid",
         context: { userId: user.id, companyId: user.company_id },
       });
     }

@@ -34,6 +34,10 @@ const {
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
+  requireCompanyUser: (user: { company_id?: string | null; role?: string } | null) =>
+    user?.company_id && ["owner", "admin", "manager", "technician", "viewer"].includes(user.role || "")
+      ? user
+      : null,
   canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
   canAssignWorkOrders: (role: string) => ["owner", "admin", "manager"].includes(role),
   canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
@@ -247,5 +251,29 @@ describe("work-order create tenant and atomicity boundaries", () => {
       buildingId: "building-1",
       technicalAssetId: "asset-1",
     });
+  });
+
+  it("returns 404 when asset-link validation cannot re-read the property in the caller company", async () => {
+    validateWorkOrderAssetLinksMock.mockRejectedValue(new Error("Fastigheten hittades inte"));
+
+    const response = await POST(request(validBody({ buildingId: "building-1" })));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(body.errorCode).toBe("NOT_FOUND");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps building and component mismatches as field validation", async () => {
+    validateWorkOrderAssetLinksMock.mockRejectedValue(new Error("Byggnaden tillhör inte vald fastighet"));
+
+    const response = await POST(request(validBody({ buildingId: "foreign-building" })));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Byggnaden tillhör inte vald fastighet");
+    expect(body.errorCode).toBe("VALIDATION_FAILED");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

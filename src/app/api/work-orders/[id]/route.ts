@@ -315,7 +315,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     try {
       await validateWorkOrderAssetLinks(db, { companyId, propertyId: existing.property_id, buildingId, technicalAssetId });
     } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : "Ogiltig komponentkoppling" }, { status: 400 });
+      const message = error instanceof Error ? error.message : "Ogiltig komponentkoppling";
+      return NextResponse.json(
+        { error: message },
+        { status: message === "Fastigheten hittades inte" ? 404 : 400 },
+      );
     }
   }
 

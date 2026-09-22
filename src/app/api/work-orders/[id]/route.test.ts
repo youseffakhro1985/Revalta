@@ -8,6 +8,7 @@ const {
   getWorkOrderEnterpriseStateMock,
   getWorkOrderStatusEventsMock,
   getWorkOrderAssetLinkMock,
+  validateWorkOrderAssetLinksMock,
   getLatestInvoiceDraftMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
@@ -17,6 +18,7 @@ const {
   getWorkOrderEnterpriseStateMock: vi.fn(),
   getWorkOrderStatusEventsMock: vi.fn(),
   getWorkOrderAssetLinkMock: vi.fn(),
+  validateWorkOrderAssetLinksMock: vi.fn(),
   getLatestInvoiceDraftMock: vi.fn(),
 }));
 
@@ -34,6 +36,7 @@ vi.mock("@/lib/work-order-enterprise-core", async (importOriginal) => ({
 vi.mock("@/lib/work-order-asset-links", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/work-order-asset-links")>()),
   getWorkOrderAssetLink: getWorkOrderAssetLinkMock,
+  validateWorkOrderAssetLinks: validateWorkOrderAssetLinksMock,
 }));
 
 vi.mock("@/lib/schema-readiness", async (importOriginal) => ({
@@ -82,6 +85,7 @@ describe("work-orders/[id] finance gates", () => {
     getWorkOrderEnterpriseStateMock.mockResolvedValue(null);
     getWorkOrderStatusEventsMock.mockResolvedValue([]);
     getWorkOrderAssetLinkMock.mockResolvedValue({});
+    validateWorkOrderAssetLinksMock.mockResolvedValue(undefined);
     getLatestInvoiceDraftMock.mockResolvedValue(null);
   });
 
@@ -239,5 +243,49 @@ describe("work-order detail staff scope", () => {
     expect(patch.status).toBe(403);
     expect(del.status).toBe(403);
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("work-order detail asset-link related ids", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    workOrderFindFirstMock.mockResolvedValue(workOrderForPatch("planned"));
+    getWorkOrderEnterpriseStateMock.mockResolvedValue(null);
+    getWorkOrderStatusEventsMock.mockResolvedValue([]);
+    getWorkOrderAssetLinkMock.mockResolvedValue({});
+    getLatestInvoiceDraftMock.mockResolvedValue(null);
+  });
+
+  it("returns 404 when asset-link validation cannot re-read the property in the caller company", async () => {
+    validateWorkOrderAssetLinksMock.mockRejectedValue(new Error("Fastigheten hittades inte"));
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ buildingId: "building-1" }),
+    }), { params });
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Fastigheten hittades inte");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps building mismatches as field validation", async () => {
+    validateWorkOrderAssetLinksMock.mockRejectedValue(new Error("Byggnaden tillhör inte vald fastighet"));
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ buildingId: "foreign-building" }),
+    }), { params });
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("Byggnaden tillhör inte vald fastighet");
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });
