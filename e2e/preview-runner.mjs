@@ -3,7 +3,7 @@ import { validateRelease, validateTarget } from "./target-policy.mjs";
 export const REQUIRED_STEPS = Object.freeze([
   "verified-login-and-profile", "dashboard", "desktop-navigation", "properties-api",
   "golden-path-ticket-to-invoice", "golden-path-mobile-work-order",
-  "booking-overlap-409", "technician-role-preview", "viewer-role-preview", "resident-portal-preview",
+  "booking-overlap-409", "technician-role-preview", "viewer-role-preview", "manager-role-preview", "resident-portal-preview",
   "command-center-api", "mobile-navigation-and-command-center",
   "logout-and-protected-redirect", "public-auth-verification",
 ]);
