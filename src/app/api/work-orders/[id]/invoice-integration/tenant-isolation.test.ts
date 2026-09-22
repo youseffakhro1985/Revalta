@@ -26,6 +26,11 @@ vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageWorkOrderFinance: () => true,
   canViewFinanceData: () => true,
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
 }));
 vi.mock("@/lib/db", () => ({
   default: {

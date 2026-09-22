@@ -21,22 +21,22 @@ The SHA `92adc33…` below was true when this file was first written (`#933`). I
 - Prisma migrations in repo: 52
 - Inställningar design from `#933` is current and must not be redesigned in this pass
 
-## PR #938 Browser E2E vs Vercel (verified 2026-09-22T19:07Z)
+## PR #938 Browser E2E vs Vercel (verified 2026-09-22T20:04Z)
 
-Head commit still `c9dc7b576343085b849b6c05716bdcad90a38b46`. Base `main` still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (not moved; no rebase). Production `/api/health` still matches that SHA. Re-verified 2026-09-22T19:07Z: Vercel status still `failure` / `upgradeToPro=build-rate-limit` (`updated_at` still `2026-09-21T19:51:47Z`). GitHub Deployments for `c9dc7b5` still `[]`. Expected Hobby recovery ~22 Sep ~19:48 UTC. Local unpushed HEAD `fbfe7c7` continues assigned-work proofs (document library technician 403, WO report invoice redaction, report snapshot cost redaction).
+Base `main` is still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (`#937`). No rebase. Production `/api/health` still matches that SHA. Hobby quota recovered enough to create a Preview deploy for pushed HEAD `8f929867bdec2def3c23c2d3bc780315a1ebb245` (`dpl_7fFUFthQxXMTi9JcfSEFPd2C8G2T`, GitHub deployment `6599441021`, 2026-09-22T19:54:22Z).
 
-| Check | Result | Cause |
+| Check on `8f92986` | Result | Cause |
 | --- | --- | --- |
-| Lint, test, migrate and build | success | Revalta CI on `c9dc7b5` |
+| Lint, test, migrate and build | failure | Unit tests: 3 files / 17 tests. `[vitest] No "requireCompanyUser" export` on wholesale `@/lib/current-user` mocks in `vendor-assignment.test.ts`, `execution/atomicity.test.ts`, `invoice-integration/tenant-isolation.test.ts`. Type check + Next build skipped after unit tests. |
 | Analyze JavaScript and TypeScript / CodeQL | success | same SHA |
-| Vercel | failure | GitHub status `Deployment rate limited — retry in 24 hours.` `upgradeToPro=build-rate-limit`, updated `2026-09-21T19:51:47Z`. GitHub Deployments for `c9dc7b5` = `[]`. Last published Preview is older SHA `a3e9137` (`dpl_2dLSWKbG15wr2QbJwvzFYLKmVBhW`). |
-| Auth, navigation, mobile and Command Center | failure | Job `35647471658` never started Playwright. Step **Resolve exact-SHA Preview** looped 24×10s against `deployments?sha=c9dc7b5…` then exited `BLOCKED: exact-SHA Vercel Preview was not published before timeout` (`HEAD_SHA: c9dc7b5…`, `MANUAL_PREVIEW_URL` empty). |
+| Vercel | failure | **Not** `api-deployments-free-per-day`. GitHub status `Deployment has failed` with inspect `dpl_7fFUFthQxXMTi9JcfSEFPd2C8G2T`. No new Vercel rate-limit comment. Local `tsc --noEmit` failed on test files included by `tsconfig.json` (`component-writes.test.ts` possibly-undefined Response; `schema-readiness.test.ts` impossible `vendor_contract_id`/`ai_source` comparison). That is a real candidate for the Preview build fail. |
+| Auth, navigation, mobile and Command Center | failure | Job `35776645468` never started Playwright. Step **Resolve exact-SHA Preview** attempt 6/24 printed `BLOCKED: Preview deployment failed for 8f92986…`. |
 
-This required Browser E2E failure on **PR-head `c9dc7b5` is infrastructural**, not a test/code defect in that commit. Do not change working product code to hide Hobby quota. Do not dummy-commit. Do not `--admin`. Do not re-run the E2E job without an exact-SHA Preview. Do not use `a3e9137` Preview as a surrogate for `c9dc7b5`.
+`c9dc7b5` Browser E2E was infrastructural (Preview timeout / Hobby `api-deployments-free-per-day`). **`8f92986` is not that class of failure.** CI is a real test-mock defect. Vercel is a failed Preview deploy, not a missing deploy, and local typecheck errors in included `*.test.ts` files are a real build-gate defect. Do not dummy-commit. Do not `--admin`. Do not use `a3e9137` as a surrogate.
 
-Older SHA `a3e9137` **did** publish Preview and Playwright **did** run: login/dashboard/nav/properties-api passed, then `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order` (run `35646803772`). That product miss is addressed in local unpushed commits on this branch (golden-path diagnostics + schema-503 fail-closed). Those commits must wait for Hobby quota (~22 Sep ~19:48 UTC from last Preview at `2026-09-21T19:48:23Z`) before **one** legitimate push.
+Older SHA `a3e9137` **did** publish Preview and Playwright **did** run: login/dashboard/nav/properties-api passed, then `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order` (run `35646803772`). Golden-path diagnostics + schema-503 fail-closed are on this branch.
 
-Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED`. `mergeStateStatus: BLOCKED`. Required checks are not green; merge is forbidden.
+Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED` (`dpl_7fFUFthQxXMTi9JcfSEFPd2C8G2T` failed). `mergeStateStatus: BLOCKED`. Required checks are not green; merge is forbidden.
 
 ## P0
 
@@ -52,7 +52,7 @@ Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED`. `mergeS
 | CodeQL required | Ruleset already requires job name `Analyze JavaScript and TypeScript` | Verified |
 | Emergency bypass | Ruleset bypass actor is repository owner, mode `always` | Policy documented; GitHub account settings not changed from code |
 | Public portal tenant | UUID slug and first-company/property discovery could select a non-portal tenant | Fail-closed in this change; commercial correctness of `REVALTA_PORTAL_COMPANY_ID` is `OWNER DECISION REQUIRED` |
-| Vercel Hobby Preview quota | `#938` head `c9dc7b5` has 0 GitHub Deployments; Vercel status `build-rate-limit` since `2026-09-21T19:51:47Z`. Browser E2E failed before Playwright. Last Preview `a3e9137` is not PR-head. | `BLOCKED / PREVIEW NOT VERIFIED` until Hobby quota recovers (~22 Sep ~19:48 UTC). No `--admin`. No dummy commit. |
+| Vercel Hobby Preview quota | 21 Sep `c9dc7b5` was `api-deployments-free-per-day`. 22 Sep 19:54Z Vercel **did** create Preview `dpl_7fFUFthQxXMTi9JcfSEFPd2C8G2T` for `8f92986` and it **failed** (not rate-limit). Last published Preview remains older SHA `a3e9137`. | `BLOCKED / PREVIEW NOT VERIFIED` until exact-SHA Preview of current PR-head is success. No `--admin`. No dummy commit. |
 | GitHub Actions YAML | OAuth token lacks `workflow` scope so Uptime/Monitor/Preview migrate files could not be pushed | `OWNER DECISION REQUIRED` — apply `docs/OWNER_WORKFLOW_UPDATES.md` |
 
 ## P1

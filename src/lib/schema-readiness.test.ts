@@ -93,8 +93,9 @@ describe("schema-readiness", () => {
       { table: "WorkOrder", column: "sla_response_due_at" },
       { table: "WorkOrder", column: "sla_resolution_due_at" },
     ]);
-    expect(REQUIRED_OPERATIONAL_COLUMNS.some((item) => item.column === "vendor_contract_id")).toBe(false);
-    expect(REQUIRED_OPERATIONAL_COLUMNS.some((item) => item.column === "ai_source")).toBe(false);
+    const probedColumns = REQUIRED_OPERATIONAL_COLUMNS.map((item) => String(item.column));
+    expect(probedColumns).not.toContain("vendor_contract_id");
+    expect(probedColumns).not.toContain("ai_source");
   });
 
   it("treats missing WorkOrder enterprise columns as blocking Översikt", () => {

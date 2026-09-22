@@ -34,6 +34,11 @@ const {
 
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
+  requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
+    if (!user?.company_id) return null;
+    if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
+    return user;
+  },
   canManageTickets: (role: string) => ["owner", "admin", "manager", "technician"].includes(role),
   canAssignWorkOrders: (role: string) => ["owner", "admin", "manager"].includes(role),
   canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),

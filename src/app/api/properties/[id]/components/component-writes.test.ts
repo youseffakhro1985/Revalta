@@ -295,12 +295,12 @@ describe("secure component write contracts", () => {
       email: "boende@exempel.se",
     });
 
-    const response = await getComponent(
+    const response = requireResponse(await getComponent(
       new Request("https://www.revalta.se/api/properties/property-1/components/asset-1", {
         headers: { "x-request-id": requestId },
       }),
       componentParams(),
-    );
+    ));
 
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
@@ -316,12 +316,12 @@ describe("secure component write contracts", () => {
       email: "boende@exempel.se",
     });
 
-    const response = await getMaintenance(
+    const response = requireResponse(await getMaintenance(
       new Request("https://www.revalta.se/api/properties/property-1/components/asset-1/maintenance-settings", {
         headers: { "x-request-id": requestId },
       }),
       componentParams(),
-    );
+    ));
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
