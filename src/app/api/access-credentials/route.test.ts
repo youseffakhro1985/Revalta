@@ -295,3 +295,74 @@ describe("access credentials route", () => {
     expect(body.error).toMatch(/backfill/i);
   });
 });
+
+describe("access credentials writes staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("POST rejects residents before creating a credential", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/access-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", identifier: "NYCKEL-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(accessCredentialCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies technicians with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(new Request("http://localhost/api/access-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ propertyId: "property-1", identifier: "NYCKEL-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(accessCredentialCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up a credential", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/access-credentials", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId: "cred-1", status: "blocked" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(accessCredentialFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies technicians with the manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await PATCH(new Request("http://localhost/api/access-credentials", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId: "cred-1", status: "blocked" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(accessCredentialFindFirstMock).not.toHaveBeenCalled();
+  });
+});
