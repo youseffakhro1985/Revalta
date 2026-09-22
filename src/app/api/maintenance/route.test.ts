@@ -331,3 +331,86 @@ describe("maintenance route", () => {
     expect(itemUpdateManyMock).not.toHaveBeenCalled();
   });
 });
+
+describe("maintenance writes staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("POST rejects residents before creating a plan item", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/maintenance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-1",
+        component: "Tak",
+        measure: "Omläggning",
+        plannedYear: 2028,
+        estimatedCost: 120000,
+      }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("POST denies viewers with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await POST(new Request("http://localhost/api/maintenance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-1",
+        component: "Tak",
+        measure: "Omläggning",
+        plannedYear: 2028,
+        estimatedCost: 120000,
+      }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up a plan item", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/maintenance", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId: "item-1", status: "approved" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(itemFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH denies viewers with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "viewer-1", company_id: "company-1", role: "viewer" });
+
+    const response = await PATCH(new Request("http://localhost/api/maintenance", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId: "item-1", status: "approved" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(itemFindFirstMock).not.toHaveBeenCalled();
+  });
+});
