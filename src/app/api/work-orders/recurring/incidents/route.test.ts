@@ -112,3 +112,36 @@ describe("work-orders/recurring/incidents POST staff-scope", () => {
     expect(createRecurringIncidentEventMock).not.toHaveBeenCalled();
   });
 });
+
+describe("work-orders/recurring/incidents Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+      name: "Owner",
+      email: "owner@example.com",
+    });
+    readRecurringSchedulesMock.mockResolvedValue([]);
+    listRecurringRunsMock.mockResolvedValue([]);
+  });
+
+  it("returns 404 when Tenant A posts a Tenant B incident key before creating an event", async () => {
+    const response = await POST(new Request("http://localhost/api/work-orders/recurring/incidents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        notificationKey: "recurring-run:run-tenant-b",
+        status: "acknowledged",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Incidenten finns inte eller tillhör en annan organisation");
+    expect(readRecurringSchedulesMock).toHaveBeenCalledWith("company-1");
+    expect(listRecurringRunsMock).toHaveBeenCalledWith("company-1", expect.any(Object));
+    expect(createRecurringIncidentEventMock).not.toHaveBeenCalled();
+  });
+});

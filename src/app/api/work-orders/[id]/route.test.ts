@@ -371,6 +371,36 @@ describe("work-order locked-update Tenant B", () => {
     expect(transactionMock).not.toHaveBeenCalled();
     expect(validateWorkOrderAssetLinksMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A reads a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-tenant-b"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B work-order id", async () => {
+    const response = await DELETE(
+      new Request("http://localhost/api/work-orders/wo-tenant-b", { method: "DELETE" }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "wo-tenant-b", company_id: "company-1", deleted_at: null, property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("work-order GET schema gaps", () => {
