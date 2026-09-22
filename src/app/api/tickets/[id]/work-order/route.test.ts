@@ -310,3 +310,35 @@ describe("ticket work-order creation schema failures", () => {
     expect(txCreate).not.toHaveBeenCalled();
   });
 });
+
+describe("ticket work-order GET schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(technician);
+    ticketFindFirstMock.mockResolvedValue(accessibleTicket);
+  });
+
+  it("maps a missing WorkOrder table on GET probe to 503 SERVICE_UNAVAILABLE", async () => {
+    workOrderFindFirstMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrder` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrder" },
+        },
+      ),
+    );
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/tickets/ticket-1/work-order"),
+      params,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+    expect(body.workOrderId).toBeUndefined();
+  });
+});

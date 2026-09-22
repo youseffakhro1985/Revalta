@@ -48,39 +48,52 @@ export async function GET(
   }
 
   const { id } = await params;
-  const ticket = await db.ticket.findFirst({
-    where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
-    select: {
-      id: true,
-      property_id: true,
-      assigned_to_id: true,
-    },
-  });
-
-  if (!ticket) return notFoundTicket();
-  if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
-
-  const workOrder = await db.workOrder.findFirst({
-    where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
-    select: {
-      id: true,
-      title: true,
-      status: true,
-      priority: true,
-      scheduled_start: true,
-      scheduled_end: true,
-      created_at: true,
-      assigned_to: {
-        select: { id: true, name: true, email: true },
+  try {
+    const ticket = await db.ticket.findFirst({
+      where: { id, company_id: user.company_id, deleted_at: null, OR: [{ property_id: null }, { property: { deleted_at: null } }] },
+      select: {
+        id: true,
+        property_id: true,
+        assigned_to_id: true,
       },
-    },
-  });
+    });
 
-  return NextResponse.json({
-    workOrder,
-    canCreate: Boolean(ticket.property_id),
-    suggestedAssignedToId: ticket.assigned_to_id,
-  });
+    if (!ticket) return notFoundTicket();
+    if (!isAssignedWorkAccessible(user, ticket.assigned_to_id)) return notFoundTicket();
+
+    const workOrder = await db.workOrder.findFirst({
+      where: { ticket_id: ticket.id, company_id: user.company_id, deleted_at: null },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        scheduled_start: true,
+        scheduled_end: true,
+        created_at: true,
+        assigned_to: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      workOrder,
+      canCreate: Boolean(ticket.property_id),
+      suggestedAssignedToId: ticket.assigned_to_id,
+    });
+  } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 }
 
 export async function POST(
