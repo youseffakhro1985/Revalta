@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -68,9 +68,10 @@ async function runEscalationEngine() {
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return NextResponse.json({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManage(user.role)) return NextResponse.json({ error: "Endast ägare och administratörer får utföra åtgärden" }, { status: 403 });
 
   const body = await request.json().catch(() => null) as { action?: unknown } | null;

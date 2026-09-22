@@ -150,9 +150,10 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return noStore({ error: "Obehörig" }, { status: 401 });
-  if (!user.company_id) return noStore({ error: "Användaren saknar organisation" }, { status: 400 });
+  const rawUser = await getCurrentUser();
+  if (!rawUser) return noStore({ error: "Obehörig" }, { status: 401 });
+  const user = requireCompanyUser(rawUser);
+  if (!user) return noStore({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
   if (!canManageCompany(user.role)) {
     return noStore({ error: "Endast ägare och administratörer kan kvittera driftlarm" }, { status: 403 });
   }

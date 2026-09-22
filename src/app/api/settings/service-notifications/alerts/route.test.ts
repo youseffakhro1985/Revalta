@@ -124,3 +124,40 @@ describe("service-notifications alerts route", () => {
     expect(integrationFindManyMock).not.toHaveBeenCalled();
   });
 });
+
+describe("service-notifications alerts PATCH staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects residents before looking up an alert", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(new Request("http://localhost/api/settings/service-notifications/alerts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alertId: "alert-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(modernAlertFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the company-manage copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await PATCH(new Request("http://localhost/api/settings/service-notifications/alerts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alertId: "alert-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Endast ägare och administratörer kan kvittera driftlarm");
+    expect(modernAlertFindFirstMock).not.toHaveBeenCalled();
+  });
+});
