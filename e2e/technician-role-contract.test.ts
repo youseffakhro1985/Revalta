@@ -86,6 +86,7 @@ describe("technician role is wired into the required Preview browser job", () =>
     expect(source).toContain("getElementById(\"ekonomi\")");
     expect(source).toContain("Registreringsformulären är dolda eftersom utförandet är skrivskyddat.");
     expect(source).toContain("getElementById(\"work-order-execution-material\")");
+    expect(source).toContain('goto("/dashboard"');
     expect(source).not.toContain("page.route");
   });
 });

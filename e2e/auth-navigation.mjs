@@ -6,6 +6,7 @@ import { runStaffGoldenPath, assertTicketHiddenAfterLogout } from "./golden-path
 import { runStaffBookingOverlap } from "./booking-concurrency.mjs";
 import { runTechnicianRolePreview } from "./technician-role.mjs";
 import { runViewerRolePreview } from "./viewer-role.mjs";
+import { runManagerRolePreview } from "./manager-role.mjs";
 import { runResidentPortalPreview } from "./resident-portal.mjs";
 import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
@@ -221,6 +222,21 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         companyId: fixtureCompany,
       });
       complete("viewer-role-preview");
+
+      await runManagerRolePreview({
+        browser,
+        ownerPage: page,
+        baseUrl,
+        bypass,
+        assertRelease,
+        fail,
+        expectVisible,
+        expectPath,
+        runId,
+        workOrderId: golden.workOrderId,
+        companyId: fixtureCompany,
+      });
+      complete("manager-role-preview");
 
       await runResidentPortalPreview({
         browser,
