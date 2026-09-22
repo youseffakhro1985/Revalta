@@ -191,6 +191,22 @@ describe("PATCH /api/team/[id]", () => {
     expect(userUpdateManyMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B member id", async () => {
+    getCurrentUserMock.mockResolvedValue(ownerCaller);
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(patchRequest({ status: "inactive" }), ctx("user-tenant-b"));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Teammedlemmen hittades inte");
+    expect(userFindFirstMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "user-tenant-b", company_id: "company-1" } }),
+    );
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("returns 403 when a non-owner targets an existing owner", async () => {
     getCurrentUserMock.mockResolvedValue(adminCaller);
     userFindFirstMock.mockResolvedValueOnce({ id: "target-user", role: "owner", status: "active" });
