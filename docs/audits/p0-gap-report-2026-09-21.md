@@ -1,6 +1,6 @@
 # P0/P1 gap report — 2026-09-21
 
-Verified baseline: `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (21 Sep 2026, `#937` on `main`). This product PR adds staff golden-path Preview E2E; statuses stay PARTIAL until that required job is green on the merged SHA.
+Verified baseline: `7dbf466a1a47796559015220b0ef06d8f9dda9e6` (22 Sep 2026, `#938` on `main`). Staff golden-path Preview E2E is green. Production `/api/health` matched that SHA (`dpl_7gktn2R4wJ8wogAYi4fdTXDd6gS4`), `schemaReady: true`, dataplane `e51d9599…`. This product PR adds live staff booking-overlap 409 on the same required Preview job.
 
 This report is current-main evidence, not a historical audit copy. Unverified items are marked `BLOCKED / NOT VERIFIED`.
 
@@ -73,7 +73,7 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 ## P1
 
-Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after this branch's unit proofs: live booking concurrency Preview, technician-role Preview fixture, quote PDF/output if a dedicated export is added. Staff/resident booking overlap 409s, public-ticket portal-token Tenant B 404s, ticket-dashboard/operations-overview company-scope KPIs, calendar technician assigned WO, recurring/preventive/portfolio/CSV ops gates, document-library technician 403s, and WO report/snapshot finance redaction landed locally. Exact-SHA Preview E2E on `#938` remains the P0 gate.
+Tenant negative matrix, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining after `#938`: live booking concurrency Preview (this PR), technician-role Preview fixture, quote PDF/output if a dedicated export is added. Staff/resident booking overlap 409s, public-ticket portal-token Tenant B 404s, ticket-dashboard/operations-overview company-scope KPIs, calendar technician assigned WO, recurring/preventive/portfolio/CSV ops gates, document-library technician 403s, and WO report/snapshot finance redaction landed locally. Resident/technician Preview fixtures remain `OWNER` (extra E2E secrets).
 
 ## P2
 

@@ -228,7 +228,7 @@ export async function runStaffGoldenPath({
 
   await releaseLock(page, workOrderId, lock.token);
 
-  return { ticketId, workOrderId };
+  return { ticketId, workOrderId, propertyId };
 }
 
 export async function assertTicketHiddenAfterLogout(page, ticketId) {

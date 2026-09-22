@@ -1,6 +1,6 @@
 # Revalta Feature Readiness
 
-Verified baseline: `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (21 Sep 2026, `#937` on `main`). Production `/api/health` at that SHA: `schemaReady: true`, dataplane `e51d9599…`, isolated from Preview `6237f010…`. This branch adds staff golden-path Preview E2E; modules stay PARTIAL until that job is green on the merged SHA.
+Verified baseline: `7dbf466a1a47796559015220b0ef06d8f9dda9e6` (22 Sep 2026, `#938` on `main`). Production `/api/health` at that SHA: `schemaReady: true`, dataplane `e51d9599…`, isolated from Preview `6237f010…`. Staff golden-path Preview E2E is green on that SHA. This branch adds live staff booking-overlap 409 on the same required Preview job.
 
 This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `ec95b376e6e692defb6c252bcb16986bcd6921f4` (`#934`), `92adc33dfd224c698f8a31d0ce59a808faed355e` (Inställningar `#933`) and `b7b08793` (31 Aug 2026) are not current-main evidence.
 
@@ -84,7 +84,7 @@ Required relationship proofs:
 - leverantör → assignment
 - arbetsorder → time/material/cost/invoice basis
 
-Staff Preview evidence for `felanmälan → arbetsorder → tid/material/attest → fakturaunderlag → invoiced` is implemented in `e2e/golden-path.mjs` and required inside `node e2e/auth-navigation.mjs`. Resident and dedicated technician-role fixtures remain `BLOCKED / NOT VERIFIED` without extra E2E secrets.
+Staff Preview evidence for `felanmälan → arbetsorder → tid/material/attest → fakturaunderlag → invoiced` is required inside `node e2e/auth-navigation.mjs` (`#938`). This branch adds staff booking overlap 409 on the same job. Resident and dedicated technician-role fixtures remain `BLOCKED / NOT VERIFIED` without extra E2E secrets.
 
 ## Promotion rule
 

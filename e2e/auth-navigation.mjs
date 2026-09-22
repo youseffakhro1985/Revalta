@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { runVerifiedPreview } from "./preview-runner.mjs";
 import { runStaffGoldenPath, assertTicketHiddenAfterLogout } from "./golden-path.mjs";
+import { runStaffBookingOverlap } from "./booking-concurrency.mjs";
 import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
@@ -179,6 +180,13 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       });
       complete("golden-path-ticket-to-invoice");
       complete("golden-path-mobile-work-order");
+
+      await runStaffBookingOverlap({
+        page,
+        runId,
+        propertyId: golden.propertyId,
+      });
+      complete("booking-overlap-409");
 
       // Command Center must be the single global search surface.
       await page.keyboard.press("Control+K");
