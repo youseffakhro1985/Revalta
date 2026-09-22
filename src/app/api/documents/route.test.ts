@@ -266,3 +266,55 @@ describe("documents route", () => {
     );
   });
 });
+
+describe("documents POST/PATCH staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+  });
+
+  it("POST rejects residents before parsing the upload", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(request("POST"));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("PATCH rejects residents before looking up a document", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(request("PATCH"));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(managedFindManyMock).not.toHaveBeenCalled();
+  });
+});
