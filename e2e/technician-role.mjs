@@ -7,6 +7,7 @@ import {
   validateTechnicianCreated,
   validateTechnicianForbidden,
   validateTechnicianProfile,
+  validateTechnicianPropertyCreateDenied,
   validateUnassignedWorkOrderHidden,
 } from "./technician-role-contract.mjs";
 
@@ -58,7 +59,7 @@ async function attachReleaseGate(context, { baseUrl, bypass, assertRelease, fail
 
 /**
  * Owner-created technician on Preview: hidden unassigned WO, document library
- * 403, operations gates 403, bookings 403, assigned WO readable, invoicing 403.
+ * 403, operations/admin gates 403, bookings 403, assigned WO readable, invoicing 403.
  */
 export async function runTechnicianRolePreview({
   browser,
@@ -129,6 +130,31 @@ export async function runTechnicianRolePreview({
     const planExport = await api(page, "GET", `/api/properties/${propertyId}/maintenance-plan/export`);
     validateTechnicianForbidden(planExport.status, planExport.body, "Maintenance-plan CSV export");
 
+    const propertyList = await api(page, "GET", "/api/properties");
+    validateTechnicianPropertyCreateDenied(propertyList.status, propertyList.body);
+    const propertyCreate = await api(page, "POST", "/api/properties", {
+      name: `Tekniker-blockerad ${runId.slice(-6)}`,
+      address: "Testgatan 1",
+      city: "Stockholm",
+    });
+    validateTechnicianForbidden(propertyCreate.status, propertyCreate.body, "Property create");
+
+    const teamCreate = await api(page, "POST", "/api/team", {
+      name: "E2E blockerad",
+      email: `e2e-blocked-${runId}@example.com`,
+      role: "viewer",
+      password: `RevaltaBlock!${runId.slice(-8)}9`,
+    });
+    validateTechnicianForbidden(teamCreate.status, teamCreate.body, "Team create");
+
+    const audit = await api(page, "GET", "/api/audit");
+    validateTechnicianForbidden(audit.status, audit.body, "Audit log");
+
+    const workOrderQueue = await api(page, "GET", "/api/work-orders/unassigned-queue");
+    validateTechnicianForbidden(workOrderQueue.status, workOrderQueue.body, "Work-order assign queue");
+    const ticketQueue = await api(page, "GET", "/api/tickets/unassigned-queue");
+    validateTechnicianForbidden(ticketQueue.status, ticketQueue.body, "Ticket assign queue");
+
     const bookings = await api(page, "POST", "/api/bookings", {
       propertyId: "00000000-0000-4000-8000-000000000000",
       resource: "E2E Tvätt",
@@ -177,17 +203,21 @@ export async function runTechnicianRolePreview({
     await expectPath(page, `/dashboard/arbetsorder/${workOrderId}`);
     const title = page.locator("#work-order-title");
     await expectVisible(title, "technician work-order title");
-    await expectVisible(page.locator("#work-order-execution-material"), "technician execution material");
+    const lockedExecution = page.getByText("Registreringsformulären är dolda eftersom utförandet är skrivskyddat.");
+    await lockedExecution.scrollIntoViewIfNeeded();
+    await expectVisible(lockedExecution, "technician locked execution");
     await page.waitForFunction(() => !document.getElementById("ekonomi"), null, { timeout: 15_000 }).catch(() => {
       fail("Technician finance panel was not hidden");
+    });
+    await page.waitForFunction(() => !document.getElementById("work-order-execution-material"), null, { timeout: 15_000 }).catch(() => {
+      fail("Technician execution forms stayed writable on an invoiced work order");
     });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await title.scrollIntoViewIfNeeded();
     await expectVisible(title, "technician mobile work-order title");
-    const mobileMaterial = page.locator("#work-order-execution-material");
-    await mobileMaterial.scrollIntoViewIfNeeded();
-    await expectVisible(mobileMaterial, "technician mobile execution material");
+    await lockedExecution.scrollIntoViewIfNeeded();
+    await expectVisible(lockedExecution, "technician mobile locked execution");
     await page.setViewportSize({ width: 1440, height: 1000 });
   } finally {
     await context.close();
