@@ -42,11 +42,25 @@ describe("maintenance portfolio staff scope", () => {
     expect(sqlSoftDeleteGuardMock).not.toHaveBeenCalled();
   });
 
-  it("lets technicians load active maintenance plans", async () => {
+  it("denies technicians from reading portfolio costs and plans", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "tech-1",
       company_id: "company-1",
       role: "technician",
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(sqlSoftDeleteGuardMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps manager portfolio rows in the caller company", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      company_id: "company-1",
+      role: "manager",
     });
 
     const response = await GET();
