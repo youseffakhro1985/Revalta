@@ -6,6 +6,7 @@ import {
   validateForbiddenReplay,
   validateInvoiceDraftReady,
   validateInvoiceDraftRebuilt,
+  validateLockedStatusChange,
   validateMaterialApproved,
   validateMaterialCreated,
   validateTicketStatus,
@@ -15,6 +16,7 @@ import {
   validateWorkOrderAuditHistory,
   validateWorkOrderComment,
   validateWorkOrderFromTicket,
+  validateWorkOrderLockAcquired,
   validateWorkOrderStatus,
 } from "./golden-path-contract.mjs";
 import { REQUIRED_STEPS } from "./preview-runner.mjs";
@@ -42,15 +44,20 @@ describe("golden-path contract", () => {
     validateWorkOrderComment(201, { comment: { id: "c-1" } });
     validateInvoiceDraftRebuilt(201, { draft: { status: "draft", lines: [{ id: "l-1" }] } });
     validateInvoiceDraftReady(201, { draft: { status: "ready" } });
+    expect(validateWorkOrderLockAcquired(201, { lock: { token: "tok", version: "2026-09-22T00:00:00.000Z" } })).toEqual({
+      token: "tok",
+      version: "2026-09-22T00:00:00.000Z",
+    });
+    validateLockedStatusChange(200, { workOrder: { status: "in_progress" } }, "in_progress");
     validateUnauthenticatedTicket(401);
     validateForbiddenReplay(409);
     validateWorkOrderAuditHistory(200, { history: [{ action: "work_order.updated" }] });
   });
 
   it("rejects missing ids and wrong lifecycle without leaking payloads", () => {
-    expect(() => validateCreatedProperty(200, { property: { id: "property-1" } })).toThrow(/did not persist/);
-    expect(() => validateTicketStatus(200, { ticket: { status: "closed", property: { id: "property-1" } } }, "in_progress", "property-1")).toThrow(/expected synced status/);
-    expect(() => validateWorkOrderStatus(200, { workOrder: { status: "in_progress", ticket: { id: "other" } } }, "in_progress", "ticket-1")).toThrow(/lifecycle status/);
+    expect(() => validateCreatedProperty(200, { property: { id: "property-1" } })).toThrow(/did not persist \(200:none\)/);
+    expect(() => validateTicketStatus(200, { ticket: { status: "closed", property: { id: "property-1" } } }, "in_progress", "property-1")).toThrow(/expected synced status \(200:none\)/);
+    expect(() => validateWorkOrderStatus(200, { workOrder: { status: "in_progress", ticket: { id: "other" } } }, "in_progress", "ticket-1")).toThrow(/lifecycle status \(200:none\)/);
     expect(() => validateWorkOrderFromTicket(500, {}, true)).toThrow(/did not resolve to a work order \(500:none;existing=unchecked\)/);
     expect(() => validateWorkOrderFromTicket(503, { errorCode: "SERVICE_UNAVAILABLE" }, true, { probed: true, existing: false })).toThrow(
       /did not resolve to a work order \(503:SERVICE_UNAVAILABLE;existing=no\)/,
@@ -68,8 +75,20 @@ describe("golden-path contract", () => {
       /did not resolve to a work order \(307:redirect;existing=yes\)/,
     );
     expect(() => validateUnauthenticatedTicket(200)).toThrow(/after logout/);
-    expect(() => validateForbiddenReplay(200)).toThrow(/illegal in_progress/);
-    expect(() => validateWorkOrderAuditHistory(200, { history: [] })).toThrow(/audit history/);
+    expect(() => validateForbiddenReplay(200)).toThrow(/illegal in_progress transition \(200:none\)/);
+    expect(() => validateWorkOrderAuditHistory(200, { history: [] })).toThrow(/audit history.*\(200:none\)/);
+    expect(() => validateTimeEntryCreated(503, { errorCode: "SERVICE_UNAVAILABLE" })).toThrow(
+      /did not persist as submitted \(503:SERVICE_UNAVAILABLE\)/,
+    );
+    expect(() => validateWorkOrderLockAcquired(500, { errorCode: "drop table locks" })).toThrow(
+      /lock was not acquired \(500:none\)/,
+    );
+    expect(() => validateLockedStatusChange(423, { errorCode: "CONFLICT" }, "in_progress")).toThrow(
+      /did not enter in_progress \(423:CONFLICT\)/,
+    );
+    expect(() => validateInvoiceDraftRebuilt(500, { errorCode: "INTERNAL_ERROR" })).toThrow(
+      /not rebuilt from attested rows \(500:INTERNAL_ERROR\)/,
+    );
   });
 });
 
@@ -93,6 +112,8 @@ describe("golden-path is wired into the required Preview browser job", () => {
     expect(golden).toContain('redirect: "manual"');
     expect(golden).toContain("existingWorkOrder");
     expect(golden).toContain("workOrderId: existingWorkOrder");
+    expect(golden).toContain("validateWorkOrderLockAcquired");
+    expect(golden).toContain("validateLockedStatusChange");
     expect(golden).not.toContain("page.route");
     expect(runner).toContain("staffUserId");
   });

@@ -4,6 +4,7 @@ import {
   validateForbiddenReplay,
   validateInvoiceDraftReady,
   validateInvoiceDraftRebuilt,
+  validateLockedStatusChange,
   validateMaterialApproved,
   validateMaterialCreated,
   validateTicketStatus,
@@ -13,6 +14,7 @@ import {
   validateWorkOrderAuditHistory,
   validateWorkOrderComment,
   validateWorkOrderFromTicket,
+  validateWorkOrderLockAcquired,
   validateWorkOrderStatus,
 } from "./golden-path-contract.mjs";
 
@@ -50,12 +52,7 @@ async function api(page, method, path, body) {
 
 async function acquireLock(page, workOrderId) {
   const acquired = await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "acquire" });
-  const lock = acquired.body?.lock;
-  const version = lockVersion(lock?.version);
-  if (acquired.status !== 201 || !lock?.token || !version) {
-    throw new Error(`Work-order edit lock was not acquired (${acquired.status})`);
-  }
-  return { token: lock.token, version };
+  return validateWorkOrderLockAcquired(acquired.status, acquired.body);
 }
 
 async function releaseLock(page, workOrderId, token) {
@@ -82,7 +79,6 @@ async function patchWorkOrderStatus(page, workOrderId, status, lock) {
  */
 export async function runStaffGoldenPath({
   page,
-  fail,
   expectVisible,
   expectPath,
   runId,
@@ -134,9 +130,7 @@ export async function runStaffGoldenPath({
 
   let lock = await acquireLock(page, workOrderId);
   const started = await patchWorkOrderStatus(page, workOrderId, "in_progress", lock);
-  if (started.result.status !== 200 || started.result.body?.workOrder?.status !== "in_progress") {
-    fail("Work order did not enter in_progress");
-  }
+  validateLockedStatusChange(started.result.status, started.result.body, "in_progress");
   lock = started.lock;
 
   const inProgressOrder = await api(page, "GET", `/api/work-orders/${workOrderId}`);
@@ -199,9 +193,7 @@ export async function runStaffGoldenPath({
 
   lock = await acquireLock(page, workOrderId);
   const completed = await patchWorkOrderStatus(page, workOrderId, "completed", lock);
-  if (completed.result.status !== 200 || completed.result.body?.workOrder?.status !== "completed") {
-    fail("Work order did not complete");
-  }
+  validateLockedStatusChange(completed.result.status, completed.result.body, "completed");
   lock = completed.lock;
   const completedTicket = await api(page, "GET", `/api/tickets/${ticketId}`);
   validateTicketStatus(completedTicket.status, completedTicket.body, "completed", propertyId);
@@ -215,15 +207,13 @@ export async function runStaffGoldenPath({
   validateInvoiceDraftReady(ready.status, ready.body);
 
   const invoiced = await patchWorkOrderStatus(page, workOrderId, "invoiced", lock);
-  if (invoiced.result.status !== 200 || invoiced.result.body?.workOrder?.status !== "invoiced") {
-    fail("Work order did not become invoiced");
-  }
+  validateLockedStatusChange(invoiced.result.status, invoiced.result.body, "invoiced");
   lock = invoiced.lock;
   const closedTicket = await api(page, "GET", `/api/tickets/${ticketId}`);
   validateTicketStatus(closedTicket.status, closedTicket.body, "closed", propertyId);
 
   const forbiddenReplay = await patchWorkOrderStatus(page, workOrderId, "in_progress", lock);
-  validateForbiddenReplay(forbiddenReplay.result.status);
+  validateForbiddenReplay(forbiddenReplay.result.status, forbiddenReplay.result.body);
 
   const history = await api(page, "GET", `/api/work-orders/${workOrderId}/comments`);
   validateWorkOrderAuditHistory(history.status, history.body);
