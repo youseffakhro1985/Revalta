@@ -1,5 +1,12 @@
 import db from "@/lib/db";
-import { auditScopedWhere, canManageTickets, getCurrentUser, requireCompanyUser } from "@/lib/current-user";
+import {
+  auditScopedWhere,
+  canManageLeases,
+  canManageTickets,
+  getCurrentUser,
+  requireCompanyUser,
+  shouldScopeToAssignedWork,
+} from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { isModernStorageMirror, mergeByCreatedAt, parseDateOnly, loadLegacyRows } from "@/lib/dual-list";
 import { isMissingTableError } from "@/lib/schema-readiness";
@@ -81,6 +88,8 @@ export async function GET() {
 
     const companyId = user.company_id;
     const empty = Promise.resolve([]);
+    const assignedWorkOnly = shouldScopeToAssignedWork(user.role);
+    const includeLeases = canManageLeases(user.role);
     const [rows, events, workOrders, rounds, inspections, maintenanceItems, leases] = await Promise.all([
       companyId
         ? db.calendarEvent.findMany({
@@ -102,6 +111,7 @@ export async function GET() {
               deleted_at: null,
               scheduled_start: { not: null },
               property: { deleted_at: null },
+              ...(assignedWorkOnly ? { assigned_to_id: user.id } : {}),
             },
             orderBy: { scheduled_start: "asc" },
             take: 500,
@@ -178,7 +188,7 @@ export async function GET() {
             },
           }))
         : empty,
-      companyId
+      companyId && includeLeases
         ? optionalFindMany("Lease", () => db.lease.findMany({
             where: {
               company_id: companyId,

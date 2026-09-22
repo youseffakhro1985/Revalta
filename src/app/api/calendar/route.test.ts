@@ -529,6 +529,22 @@ describe("calendar route", () => {
         property: { deleted_at: null },
       },
     }));
+    expect(workOrderFindManyMock.mock.calls[0][0].where.assigned_to_id).toBeUndefined();
+  });
+
+  it("scopes technicians to assigned work orders and omits lease projections", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        assigned_to_id: "tech-1",
+        scheduled_start: { not: null },
+      }),
+    }));
+    expect(leaseFindManyMock).not.toHaveBeenCalled();
   });
 
   it("returns tenant-safe 404 when Tenant A patches a Tenant B calendar event id", async () => {

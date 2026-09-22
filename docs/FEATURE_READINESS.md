@@ -42,7 +42,7 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Fastigheter | PARTIAL | Substantial current UI/API implementation exists. | Full CRUD/relations/tenant-negative/pagination audit. |
 | Ärenden | PARTIAL | Core ticket flows exist and are part of product golden path. Preview E2E now creates a property-backed ticket and asserts staff ticket→WO sync. | Resident golden-path Preview E2E still needs a resident fixture (`OWNER` / extra E2E secrets). |
 | Arbetsordrar | PARTIAL | Significant operational UI/API exists. Preview E2E covers planned→in_progress→completed→invoiced with lock, time/material attest, invoice basis and illegal reverse transition. | Technician-role mobile fixture still missing; current mobile pass uses the owner fixture on 390 px. |
-| Kalender | PARTIAL | Current module exists. | Prove calendar reflects canonical operational events rather than parallel truth. |
+| Kalender | PARTIAL | Current module exists. GET projects canonical WorkOrder/rond/inspection/lease rows. Technicians only see assigned work orders and do not receive lease projections. | Remaining live Preview proof that the board matches operational registers. |
 | Ronder | BLOCKED | Current UI/API/checklist implementation exists, but Production status of `20260822010000_inspection_checklist_templates` is unverified. | Read-only Production migration status, restore evidence, checklist tenant smoke. |
 | Besiktningar | PARTIAL | Module exists. | Observation-to-work-order linkage and tenant/security/readiness audit. |
 | Underhåll | PARTIAL | Module exists. | Maintenance-plan-to-work-order lifecycle, query and tenant evidence. |

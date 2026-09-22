@@ -392,6 +392,20 @@ describe("GET /api/tickets pagination", () => {
       }),
     }));
   });
+
+  it("keeps technicians on assigned tickets and ignores another user's assignedToId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await GET(getRequest("?assignedToId=owner-1"));
+    expect(response.status).toBe(200);
+    expect(ticketFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-1",
+        assigned_to_id: "tech-1",
+      }),
+    }));
+    expect(JSON.stringify(ticketFindManyMock.mock.calls)).not.toContain("owner-1");
+  });
 });
 
 // Test the route itself; proxy/navigation restrictions are not authorization.
