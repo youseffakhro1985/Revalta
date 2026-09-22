@@ -168,6 +168,27 @@ describe("projects/[id] route", () => {
     expect(body.error).toMatch(/hittades inte/i);
   });
 
+  it("GET returns tenant-safe 404 for a Tenant B project id", async () => {
+    projectFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(
+      new Request("http://localhost/api/projects/project-tenant-b"),
+      { params: Promise.resolve({ id: "project-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Projektet hittades inte");
+    expect(projectFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: "project-tenant-b",
+        company_id: "company-1",
+        deleted_at: null,
+        property: { deleted_at: null },
+      },
+    }));
+  });
+
   it("PATCH requires active property scope and keeps update plus audit in one transaction", async () => {
     projectFindFirstMock.mockResolvedValue(existingProject);
 

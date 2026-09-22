@@ -330,6 +330,60 @@ describe("maintenance route", () => {
     expect(transactionMock).not.toHaveBeenCalled();
     expect(itemUpdateManyMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A posts a plan item against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/maintenance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-tenant-b",
+        component: "Tak",
+        measure: "Omläggning",
+        plannedYear: 2028,
+        estimatedCost: 120000,
+        priority: "high",
+        intervalYears: 25,
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(itemCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B maintenance item id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    itemFindFirstMock.mockResolvedValue(null);
+    auditFindManyMock.mockResolvedValue([]);
+
+    const response = await PATCH(new Request("http://localhost/api/maintenance", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ itemId: "item-tenant-b", status: "approved" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Underhållsåtgärden hittades inte");
+    expect(itemFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "item-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(itemFindFirstMock).toHaveBeenNthCalledWith(2, {
+      where: { id: "item-tenant-b", company_id: "company-1" },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(itemUpdateManyMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("maintenance writes staff-scope", () => {
