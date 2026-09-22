@@ -47,7 +47,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { DELETE, GET, PATCH } from "./route";
+import { DELETE, GET, PATCH, POST } from "./route";
 
 describe("notifications route", () => {
   beforeEach(() => {
@@ -142,5 +142,73 @@ describe("notifications route", () => {
     expect(response.status).toBe(409);
     expect(body.error).toMatch(/backfill/i);
     expect(notificationUpdateManyMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifications writes staff-scope", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("POST rejects residents before creating a notification", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(new Request("http://localhost/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Drift", message: "Meddelande" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+  });
+
+  it("POST denies technicians with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST(new Request("http://localhost/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Drift", message: "Meddelande" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+  });
+
+  it("DELETE rejects residents before looking up a notification", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await DELETE(new Request("http://localhost/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(notificationFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("DELETE denies technicians with the operations copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await DELETE(new Request("http://localhost/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "notif-1" }),
+    }));
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(notificationFindFirstMock).not.toHaveBeenCalled();
   });
 });
