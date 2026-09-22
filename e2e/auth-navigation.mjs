@@ -201,6 +201,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         expectPath,
         runId,
         workOrderId: golden.workOrderId,
+        propertyId: golden.propertyId,
         companyId: fixtureCompany,
       });
       complete("technician-role-preview");

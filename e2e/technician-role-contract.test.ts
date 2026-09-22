@@ -58,10 +58,15 @@ describe("technician role is wired into the required Preview browser job", () =>
     const workflow = readFileSync(new URL("../.github/workflows/e2e-preview.yml", import.meta.url), "utf8");
     const source = readFileSync(new URL("./technician-role.mjs", import.meta.url), "utf8");
     expect(runner).toContain("runTechnicianRolePreview");
+    expect(runner).toContain("propertyId: golden.propertyId");
     expect(runner).toContain('complete("technician-role-preview")');
     expect(workflow).toContain("node e2e/auth-navigation.mjs");
     expect(source).toContain("/api/team");
     expect(source).toContain("/api/documents/library");
+    expect(source).toContain("/api/work-orders/recurring");
+    expect(source).toContain("/api/maintenance/preventive");
+    expect(source).toContain("/api/maintenance/portfolio");
+    expect(source).toContain("maintenance-plan/export");
     expect(source).toContain("assignedToId");
     expect(source).toContain("/api/calendar");
     expect(source).toContain("scheduledStart");

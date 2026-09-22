@@ -60,6 +60,14 @@ async function releaseLock(page, workOrderId, token) {
   await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "release", token });
 }
 
+function isLockLost(status, body) {
+  return status === 409 && body?.code === "lock_lost";
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function patchWorkOrderStatus(page, workOrderId, status, lock) {
   const result = await api(page, "PATCH", `/api/work-orders/${workOrderId}/locked-update`, {
     status,
@@ -71,6 +79,23 @@ async function patchWorkOrderStatus(page, workOrderId, status, lock) {
     result,
     lock: nextVersion ? { token: lock.token, version: nextVersion } : lock,
   };
+}
+
+/**
+ * The work-order page WorkOrderEditLockProvider acquires a lock on mount.
+ * That in-flight acquire can finish after this runner's own acquire and
+ * rotate the token, which surfaces as 409 lock_lost. Leave the page first,
+ * then acquire+PATCH in one burst and retry only lock_lost.
+ */
+async function patchLockedStatus(page, workOrderId, status) {
+  let last = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const lock = await acquireLock(page, workOrderId);
+    last = await patchWorkOrderStatus(page, workOrderId, status, lock);
+    if (!isLockLost(last.result.status, last.result.body)) return last;
+    await wait(250 * (attempt + 1));
+  }
+  return last;
 }
 
 /**
@@ -196,8 +221,10 @@ export async function runStaffGoldenPath({
   await expectVisible(mobileMaterial, "mobile execution material");
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  lock = await acquireLock(page, workOrderId);
-  const completed = await patchWorkOrderStatus(page, workOrderId, "completed", lock);
+  await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+  await expectPath(page, "/dashboard");
+
+  const completed = await patchLockedStatus(page, workOrderId, "completed");
   validateLockedStatusChange(completed.result.status, completed.result.body, "completed");
   lock = completed.lock;
   const completedTicket = await api(page, "GET", `/api/tickets/${ticketId}`);
@@ -213,8 +240,7 @@ export async function runStaffGoldenPath({
   const readyState = await api(page, "GET", `/api/work-orders/${workOrderId}/invoice-basis`);
   validateInvoiceDraftReadyState(readyState.status, readyState.body);
 
-  lock = await acquireLock(page, workOrderId);
-  const invoiced = await patchWorkOrderStatus(page, workOrderId, "invoiced", lock);
+  const invoiced = await patchLockedStatus(page, workOrderId, "invoiced");
   validateLockedStatusChange(invoiced.result.status, invoiced.result.body, "invoiced");
   lock = invoiced.lock;
   const closedTicket = await api(page, "GET", `/api/tickets/${ticketId}`);
