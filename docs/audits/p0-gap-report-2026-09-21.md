@@ -44,6 +44,8 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 `1e4c725` exact-SHA Preview `https://revalta-ofgskey3p-youseffakhro1985s-projects.vercel.app` (`dpl_7BdnjsqTMbhQt83TFYTVbY8yQ3j4`). Revalta CI + CodeQL **success**. Browser E2E login/nav/properties **PASS**, ticket→WO **no longer 503 notes**, then `Work order did not reach the expected lifecycle status (500:none)` on GET `/api/work-orders/:id` (run `35781482707`). Cause: notes middleware used Prisma `omit`, which requires preview `omitApi` (off). Replace with explicit scalar `select` excluding `notes`.
 
+`81b93de` exact-SHA Preview `https://revalta-asobxzpr0-youseffakhro1985s-projects.vercel.app` (`dpl_D2zNJ3xcANKQqxq7fbQtLPLJ9tp3`). Revalta CI + CodeQL **success**. GET then 503 `missing=WorkOrder.vendor_contract_id` (run `35782200352`): converting include to all Prisma scalars still selected the unmigrated vendor FK. Dual-read now selects only columns present in information_schema.
+
 ## P0
 
 | Item | Evidence | Status |

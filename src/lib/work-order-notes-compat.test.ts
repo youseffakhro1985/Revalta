@@ -1,11 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
+  resetWorkOrderNotesCache,
   sanitizeWorkOrderNotesArgs,
   workOrderNotesWrite,
   workOrderScalarSelectWithoutNotes,
 } from "@/lib/work-order-notes-compat";
 
+function columnRows(names: string[]) {
+  return names.map((column_name) => ({ column_name }));
+}
+
 describe("work-order notes compat", () => {
+  beforeEach(() => {
+    resetWorkOrderNotesCache();
+  });
   it("omits notes from create payloads when the column is missing", () => {
     expect(workOrderNotesWrite(false, "Planera åtgärd")).toEqual({});
     expect(workOrderNotesWrite(true, "Planera åtgärd")).toEqual({ notes: "Planera åtgärd" });
@@ -76,5 +84,21 @@ describe("work-order notes compat", () => {
     ) as { include: { work_order: { select: Record<string, true> } } };
     expect(sanitized.include.work_order.select.id).toBe(true);
     expect(sanitized.include.work_order.select).not.toHaveProperty("notes");
+  });
+
+  it("drops vendor_contract_id from include-converted selects when the column is missing", async () => {
+    const client = {
+      $queryRaw: async () => columnRows(["id", "title", "status", "ticket_id", "assigned_to_id", "company_id"]),
+    };
+    const sanitized = await sanitizeWorkOrderNotesArgs(
+      client as never,
+      "WorkOrder",
+      "findFirst",
+      { where: { id: "work-order-1" }, include: { ticket: { select: { id: true } } } },
+    ) as { select: Record<string, unknown> };
+    expect(sanitized.select.id).toBe(true);
+    expect(sanitized.select.ticket).toEqual({ select: { id: true } });
+    expect(sanitized.select).not.toHaveProperty("notes");
+    expect(sanitized.select).not.toHaveProperty("vendor_contract_id");
   });
 });
