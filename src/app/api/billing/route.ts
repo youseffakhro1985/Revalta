@@ -151,8 +151,8 @@ export async function PATCH(request: Request) {
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -160,13 +160,14 @@ export async function PATCH(request: Request) {
         event: "billing.plan_change.unauthorized",
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return reject(observability, {
         status: 403,
         code: API_ERROR_CODES.forbidden,
-        message: "Du saknar behörighet att ändra plan",
-        event: "billing.plan_change.missing_company",
-        context: { userId: user.id },
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "billing.plan_change.staff_required",
+        context: { userId: rawUser.id },
       });
     }
     const companyId = user.company_id;

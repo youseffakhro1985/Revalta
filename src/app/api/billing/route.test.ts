@@ -216,8 +216,11 @@ describe("billing route", () => {
       const body = await response.json();
 
       expect(response.status).toBe(403);
-      expect(body.errorCode).toBe("FORBIDDEN");
-      expect(body.requestId).toBe(requestId);
+      expect(body).toEqual({
+        error: "Du saknar behörighet att ändra plan",
+        errorCode: "FORBIDDEN",
+        requestId,
+      });
       expect(transactionMock).not.toHaveBeenCalled();
     });
 
@@ -315,5 +318,57 @@ describe("billing route", () => {
         }),
       );
     });
+  });
+});
+
+describe("billing PATCH staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+  });
+
+  it("rejects residents before changing the billing plan", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      email: "boende@exempel.se",
+      role: "resident",
+      company_id: "company-1",
+    });
+
+    const response = await PATCH(patchRequest({ plan: "enterprise" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing-company staff with the unified staff copy", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      email: "owner@exempel.se",
+      role: "owner",
+      company_id: null,
+    });
+
+    const response = await PATCH(patchRequest({ plan: "enterprise" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 });

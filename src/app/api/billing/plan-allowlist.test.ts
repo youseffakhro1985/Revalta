@@ -10,10 +10,9 @@ const {
   transactionMock: vi.fn(),
 }));
 
-vi.mock("@/lib/current-user", () => ({
+vi.mock("@/lib/current-user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/current-user")>()),
   getCurrentUser: getCurrentUserMock,
-  canManageBilling: (role: string) => ["owner", "admin"].includes(role),
-  tenantWhere: vi.fn(() => ({})),
 }));
 vi.mock("@/lib/db", () => ({
   default: {
