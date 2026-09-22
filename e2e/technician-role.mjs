@@ -7,6 +7,7 @@ import {
   validateTechnicianCreated,
   validateTechnicianForbidden,
   validateTechnicianProfile,
+  validateTechnicianPropertyCreateDenied,
   validateUnassignedWorkOrderHidden,
 } from "./technician-role-contract.mjs";
 
@@ -58,7 +59,7 @@ async function attachReleaseGate(context, { baseUrl, bypass, assertRelease, fail
 
 /**
  * Owner-created technician on Preview: hidden unassigned WO, document library
- * 403, operations gates 403, bookings 403, assigned WO readable, invoicing 403.
+ * 403, operations/admin gates 403, bookings 403, assigned WO readable, invoicing 403.
  */
 export async function runTechnicianRolePreview({
   browser,
@@ -128,6 +129,31 @@ export async function runTechnicianRolePreview({
 
     const planExport = await api(page, "GET", `/api/properties/${propertyId}/maintenance-plan/export`);
     validateTechnicianForbidden(planExport.status, planExport.body, "Maintenance-plan CSV export");
+
+    const propertyList = await api(page, "GET", "/api/properties");
+    validateTechnicianPropertyCreateDenied(propertyList.status, propertyList.body);
+    const propertyCreate = await api(page, "POST", "/api/properties", {
+      name: `Tekniker-blockerad ${runId.slice(-6)}`,
+      address: "Testgatan 1",
+      city: "Stockholm",
+    });
+    validateTechnicianForbidden(propertyCreate.status, propertyCreate.body, "Property create");
+
+    const teamCreate = await api(page, "POST", "/api/team", {
+      name: "E2E blockerad",
+      email: `e2e-blocked-${runId}@example.com`,
+      role: "viewer",
+      password: `RevaltaBlock!${runId.slice(-8)}9`,
+    });
+    validateTechnicianForbidden(teamCreate.status, teamCreate.body, "Team create");
+
+    const audit = await api(page, "GET", "/api/audit");
+    validateTechnicianForbidden(audit.status, audit.body, "Audit log");
+
+    const workOrderQueue = await api(page, "GET", "/api/work-orders/unassigned-queue");
+    validateTechnicianForbidden(workOrderQueue.status, workOrderQueue.body, "Work-order assign queue");
+    const ticketQueue = await api(page, "GET", "/api/tickets/unassigned-queue");
+    validateTechnicianForbidden(ticketQueue.status, ticketQueue.body, "Ticket assign queue");
 
     const bookings = await api(page, "POST", "/api/bookings", {
       propertyId: "00000000-0000-4000-8000-000000000000",

@@ -7,6 +7,7 @@ import {
   validateTechnicianCreated,
   validateTechnicianForbidden,
   validateTechnicianProfile,
+  validateTechnicianPropertyCreateDenied,
   validateUnassignedWorkOrderHidden,
 } from "./technician-role-contract.mjs";
 import { REQUIRED_STEPS } from "./preview-runner.mjs";
@@ -18,6 +19,7 @@ describe("technician-role contract", () => {
       user: { role: "technician", status: "active", company_id: "co-1", company: { id: "co-1" } },
     }, "co-1");
     validateTechnicianForbidden(403, { errorCode: "FORBIDDEN" }, "Document library");
+    validateTechnicianPropertyCreateDenied(200, { permissions: { canCreate: false } });
     validateUnassignedWorkOrderHidden(404, {});
     validateAssignedWorkOrderVisible(200, { workOrder: { id: "wo-1" } }, "wo-1");
     validateTechnicianCalendarHidden(200, { events: [{ source: "work_order", work_order_id: "other" }] }, "wo-1");
@@ -35,6 +37,9 @@ describe("technician-role contract", () => {
     }, "co-1")).toThrow(/scoped staff fixture/);
     expect(() => validateTechnicianForbidden(200, { workOrder: { id: "wo-1" } }, "Invoice basis")).toThrow(
       /Invoice basis was not forbidden \(200:none\)/,
+    );
+    expect(() => validateTechnicianPropertyCreateDenied(200, { permissions: { canCreate: true } })).toThrow(
+      /property create capability was not denied \(200:none\)/,
     );
     expect(() => validateUnassignedWorkOrderHidden(200, { workOrder: { id: "wo-1" } })).toThrow(
       /visible to technician \(200:none\)/,
@@ -67,6 +72,12 @@ describe("technician role is wired into the required Preview browser job", () =>
     expect(source).toContain("/api/maintenance/preventive");
     expect(source).toContain("/api/maintenance/portfolio");
     expect(source).toContain("maintenance-plan/export");
+    expect(source).toContain("validateTechnicianPropertyCreateDenied");
+    expect(source).toContain('POST", "/api/properties"');
+    expect(source).toContain('POST", "/api/team"');
+    expect(source).toContain("/api/audit");
+    expect(source).toContain("/api/work-orders/unassigned-queue");
+    expect(source).toContain("/api/tickets/unassigned-queue");
     expect(source).toContain("assignedToId");
     expect(source).toContain("/api/calendar");
     expect(source).toContain("scheduledStart");

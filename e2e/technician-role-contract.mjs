@@ -35,6 +35,12 @@ export function validateTechnicianForbidden(status, body, label) {
   }
 }
 
+export function validateTechnicianPropertyCreateDenied(status, body) {
+  if (status !== 200 || body?.permissions?.canCreate !== false) {
+    throw new Error(`Technician property create capability was not denied (${diagnostic(status, body)})`);
+  }
+}
+
 export function validateUnassignedWorkOrderHidden(status, body) {
   if (status !== 404) {
     throw new Error(`Unassigned work order was visible to technician (${diagnostic(status, body)})`);
