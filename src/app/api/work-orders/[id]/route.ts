@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
+import db, { getPrismaBaseClient } from "@/lib/db";
 import {
   canAssignWorkOrders,
   canManageTickets,
@@ -44,8 +44,10 @@ import {
   hasWorkOrderVendorContractColumn,
   isMissingSchemaColumnError,
   isMissingTableError,
+  listWorkOrderColumns,
   schemaGapFromError,
   schemaMismatchUserMessage,
+  workOrderScalarSelectWithoutNotes,
   workOrderVendorIdSelect,
 } from "@/lib/schema-readiness";
 import { findAssignableVendorContract, listAssignableVendorContracts } from "@/lib/work-order-vendor";
@@ -93,6 +95,15 @@ function workOrderDetailInclude(persistVendor: boolean) {
     : workOrderDetailIncludeBase;
 }
 
+async function workOrderCompatibleDetailSelect(persistVendor: boolean): Promise<Prisma.WorkOrderSelect> {
+  const client = typeof getPrismaBaseClient === "function" ? getPrismaBaseClient() : null;
+  const columns = await listWorkOrderColumns((client ?? { $queryRaw: undefined }) as never);
+  return {
+    ...workOrderScalarSelectWithoutNotes(columns),
+    ...workOrderDetailInclude(persistVendor),
+  } as Prisma.WorkOrderSelect;
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const rawUser = await getCurrentUser();
   if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
@@ -102,9 +113,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   try {
     const persistVendor = await hasWorkOrderVendorContractColumn();
+    const detailSelect = await workOrderCompatibleDetailSelect(persistVendor);
     const canAssign = canAssignWorkOrders(user.role);
     const [workOrder, users, vendors, enterprise, statusEvents, assetLink] = await Promise.all([
-      db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, include: workOrderDetailInclude(persistVendor) }),
+      db.workOrder.findFirst({ where: { deleted_at: null, id, company_id: user.company_id, property: { deleted_at: null } }, select: detailSelect }),
       db.user.findMany({
         where: { company_id: user.company_id, status: "active" },
         orderBy: [{ name: "asc" }, { email: "asc" }],
@@ -162,6 +174,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const persistVendor = await hasWorkOrderVendorContractColumn();
+  const detailSelect = await workOrderCompatibleDetailSelect(persistVendor);
   const [existing, enterpriseBefore, assetLinkBefore] = await Promise.all([
     db.workOrder.findFirst({
       where: { deleted_at: null, id, company_id: companyId, property: { deleted_at: null } },
@@ -418,7 +431,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
       const completedWorkOrder = await tx.workOrder.findFirst({
         where: { deleted_at: null, id: existing.id, company_id: companyId },
-        include: workOrderDetailInclude(persistVendor),
+        select: detailSelect,
       });
       if (!completedWorkOrder) throw new Error("WORK_ORDER_NOT_FOUND");
 
@@ -451,7 +464,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const updated = await tx.workOrder.findFirst({
       where: { deleted_at: null, id: existing.id, company_id: companyId },
-      include: workOrderDetailInclude(persistVendor),
+      select: detailSelect,
     });
     if (!updated) throw new Error("WORK_ORDER_NOT_FOUND");
 
@@ -559,10 +572,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
     }
     if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      const missing = schemaGapFromError(error);
       return NextResponse.json(
         {
           error: schemaMismatchUserMessage(),
           errorCode: API_ERROR_CODES.serviceUnavailable,
+          ...(missing ? { missing } : {}),
         },
         { status: 503 },
       );

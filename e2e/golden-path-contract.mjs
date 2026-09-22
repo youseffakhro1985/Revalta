@@ -116,7 +116,10 @@ export function validateWorkOrderLockAcquired(status, body) {
 
 export function validateLockedStatusChange(status, body, expectedStatus) {
   if (status !== 200 || body?.workOrder?.status !== expectedStatus) {
-    throw new Error(`Work order did not enter ${expectedStatus} (${diagnosticStatusShape(status, body)})`);
+    const missing = allowlistedSchemaGap(body?.missing);
+    throw new Error(
+      `Work order did not enter ${expectedStatus} (${diagnosticStatusShape(status, body)};missing=${missing || "none"})`,
+    );
   }
 }
 

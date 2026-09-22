@@ -46,6 +46,8 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 `81b93de` exact-SHA Preview `https://revalta-asobxzpr0-youseffakhro1985s-projects.vercel.app` (`dpl_D2zNJ3xcANKQqxq7fbQtLPLJ9tp3`). Revalta CI + CodeQL **success**. GET then 503 `missing=WorkOrder.vendor_contract_id` (run `35782200352`): converting include to all Prisma scalars still selected the unmigrated vendor FK. Dual-read now selects only columns present in information_schema.
 
+`ac9b4ce` exact-SHA Preview `https://revalta-dl5i7hsxn-youseffakhro1985s-projects.vercel.app`. Login/nav PASS, GET WO planned PASS, then PATCH in_progress 503 SERVICE_UNAVAILABLE (run `35782932828`). Interactive `$transaction` skips Prisma `$use` middleware, so locked-update still `include`d every scalar. Use the same live-column `select` inside the transaction.
+
 ## P0
 
 | Item | Evidence | Status |

@@ -90,7 +90,7 @@ describe("golden-path contract", () => {
       /lock was not acquired \(500:none\)/,
     );
     expect(() => validateLockedStatusChange(423, { errorCode: "CONFLICT" }, "in_progress")).toThrow(
-      /did not enter in_progress \(423:CONFLICT\)/,
+      /did not enter in_progress \(423:CONFLICT;missing=none\)/,
     );
     expect(() => validateInvoiceDraftRebuilt(500, { errorCode: "INTERNAL_ERROR" })).toThrow(
       /not rebuilt from attested rows \(500:INTERNAL_ERROR\)/,

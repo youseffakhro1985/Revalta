@@ -102,6 +102,11 @@ export async function listWorkOrderColumns(client: PrismaClient): Promise<Set<st
   if (workOrderColumnCache && workOrderColumnCache.expiresAt > Date.now()) {
     return workOrderColumnCache.columns;
   }
+  if (typeof client?.$queryRaw !== "function") {
+    const columns = new Set<string>();
+    workOrderColumnCache = { columns, expiresAt: Date.now() + FEATURE_COLUMN_TTL_MS };
+    return columns;
+  }
   const rows = await client.$queryRaw<Array<{ column_name: string }>>`
     SELECT column_name
     FROM information_schema.columns

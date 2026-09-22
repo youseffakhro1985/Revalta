@@ -10,7 +10,7 @@ import {
 import { resetWorkOrderNotesCache, hasWorkOrderNotesColumn as hasWorkOrderNotesColumnOn } from "@/lib/work-order-notes-compat";
 
 export { REQUIRED_SOFT_DELETE_COLUMNS, SOFT_DELETE_MODELS };
-export { workOrderNotesWrite } from "@/lib/work-order-notes-compat";
+export { workOrderNotesWrite, listWorkOrderColumns, workOrderScalarSelectWithoutNotes } from "@/lib/work-order-notes-compat";
 export type SoftDeleteTable = SoftDeleteModel;
 export type SchemaColumnRequirement = (typeof REQUIRED_SOFT_DELETE_COLUMNS)[number];
 

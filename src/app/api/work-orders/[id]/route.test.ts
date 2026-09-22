@@ -55,6 +55,7 @@ vi.mock("@/lib/db", () => ({
     vendorContract: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     $transaction: transactionMock,
   },
+  getPrismaBaseClient: () => ({ $queryRaw: async () => [] }),
 }));
 
 import { GET, PATCH, DELETE } from "./route";
