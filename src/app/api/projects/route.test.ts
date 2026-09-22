@@ -265,7 +265,7 @@ describe("projects POST reliability", () => {
       name: "Projekt",
     }));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Projektledaren hittades inte" });
     expect(userFindFirstMock).toHaveBeenCalledWith({
       where: { id: "foreign-manager", company_id: "company-1", status: "active" },
@@ -283,7 +283,7 @@ describe("projects POST reliability", () => {
       name: "Projekt",
     }));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Arbetsordern hittades inte för vald fastighet" });
     expect(workOrderFindFirstMock).toHaveBeenCalledWith({
       where: {

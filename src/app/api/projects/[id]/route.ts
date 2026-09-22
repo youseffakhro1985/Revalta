@@ -88,7 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const managerId = body.managerId ? String(body.managerId).trim() : null;
     if (managerId) {
       const manager = await db.user.findFirst({ where: { id: managerId, company_id: companyId, status: "active" }, select: { id: true } });
-      if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
+      if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 404 });
     }
     data.manager_id = managerId;
   }

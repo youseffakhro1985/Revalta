@@ -238,6 +238,21 @@ describe("projects/[id] route", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
+  it("PATCH returns 404 when the project manager is outside the authenticated company", async () => {
+    projectFindFirstMock.mockResolvedValue(existingProject);
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(patchRequest({ managerId: "foreign-manager" }), { params });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Projektledaren hittades inte" });
+    expect(userFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "foreign-manager", company_id: "company-1", status: "active" },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("PATCH rejects malformed JSON before tenant lookup or mutation", async () => {
     const request = new Request("http://localhost/api/projects/project-1", {
       method: "PATCH",

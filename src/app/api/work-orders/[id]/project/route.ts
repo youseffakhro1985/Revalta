@@ -67,7 +67,7 @@ export async function POST(
       where: { id: managerId, company_id: companyId, status: "active" },
       select: { id: true },
     });
-    if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
+    if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 404 });
   }
 
   const lockKey = `work-order-project:${companyId}:${workOrder.id}`;

@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       where: { id: managerId, company_id: companyId, status: "active" },
       select: { id: true },
     });
-    if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 400 });
+    if (!manager) return NextResponse.json({ error: "Projektledaren hittades inte" }, { status: 404 });
   }
 
   if (sourceWorkOrderId) {
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
       where: { deleted_at: null, id: sourceWorkOrderId, company_id: companyId, property_id: propertyId },
       select: { id: true },
     });
-    if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 400 });
+    if (!source) return NextResponse.json({ error: "Arbetsordern hittades inte för vald fastighet" }, { status: 404 });
   }
 
   const project = await db.$transaction(async (tx) => {

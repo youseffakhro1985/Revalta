@@ -185,6 +185,20 @@ describe("work-orders/[id]/project POST", () => {
     await expect(response.json()).resolves.toEqual({ error: "Ogiltigt innehåll" });
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("returns 404 when the project manager is outside the authenticated company", async () => {
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(request(JSON.stringify({ managerId: "foreign-manager" })), { params });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Projektledaren hittades inte" });
+    expect(userFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "foreign-manager", company_id: "company-1", status: "active" },
+      select: { id: true },
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("work-orders/[id]/project POST staff-scope", () => {
