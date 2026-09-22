@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Prisma } from "@prisma/client";
 import {
+  REQUIRED_OPERATIONAL_COLUMNS,
   REQUIRED_OPERATIONAL_TABLES,
   formatSchemaMissing,
   formatSchemaMissingItem,
@@ -77,6 +78,26 @@ describe("schema-readiness", () => {
       "WorkOrderNumberCounter",
       "WorkOrderStatusEvent",
     ]);
+  });
+
+  it("probes WorkOrder enterprise columns written unconditionally on create", () => {
+    expect([...REQUIRED_OPERATIONAL_COLUMNS]).toEqual([
+      { table: "WorkOrder", column: "work_order_number" },
+      { table: "WorkOrder", column: "work_type" },
+      { table: "WorkOrder", column: "source" },
+      { table: "WorkOrder", column: "sla_response_due_at" },
+      { table: "WorkOrder", column: "sla_resolution_due_at" },
+    ]);
+    expect(REQUIRED_OPERATIONAL_COLUMNS.some((item) => item.column === "vendor_contract_id")).toBe(false);
+    expect(REQUIRED_OPERATIONAL_COLUMNS.some((item) => item.column === "ai_source")).toBe(false);
+  });
+
+  it("treats missing WorkOrder enterprise columns as blocking Översikt", () => {
+    expect(
+      canRenderHomeDashboard({
+        missing: [{ table: "WorkOrder", column: "work_order_number" }],
+      }),
+    ).toBe(false);
   });
 
   it("formats missing columns as table.column and missing tables by name", () => {

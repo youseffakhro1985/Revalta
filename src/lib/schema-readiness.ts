@@ -32,6 +32,19 @@ export const REQUIRED_OPERATIONAL_TABLES = [
   "WorkOrderStatusEvent",
 ] as const;
 
+/**
+ * WorkOrder columns written unconditionally by setWorkOrderEnterpriseFields.
+ * Missing any of them 503s ticket→WO create even when operational tables exist.
+ * Do not require optional WorkOrder.vendor_contract_id or Ticket.ai_source here.
+ */
+export const REQUIRED_OPERATIONAL_COLUMNS = [
+  { table: "WorkOrder", column: "work_order_number" },
+  { table: "WorkOrder", column: "work_type" },
+  { table: "WorkOrder", column: "source" },
+  { table: "WorkOrder", column: "sla_response_due_at" },
+  { table: "WorkOrder", column: "sla_resolution_due_at" },
+] as const;
+
 export function formatSchemaMissingItem(item: SchemaMissingItem) {
   return item.column === "*" ? item.table : `${item.table}.${item.column}`;
 }
@@ -108,6 +121,22 @@ export async function getSchemaReadiness(): Promise<SchemaReadiness> {
   for (const table of REQUIRED_OPERATIONAL_TABLES) {
     if (!presentTables.has(table)) {
       missing.push({ table, column: "*" });
+    }
+  }
+
+  const requiredColumnTables = [...new Set(REQUIRED_OPERATIONAL_COLUMNS.map((item) => item.table))];
+  const requiredColumnNames = [...new Set(REQUIRED_OPERATIONAL_COLUMNS.map((item) => item.column))];
+  const columnRows = await client.$queryRaw<Array<{ table_name: string; column_name: string }>>`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN (${Prisma.join(requiredColumnTables)})
+      AND column_name IN (${Prisma.join(requiredColumnNames)})
+  `;
+  const presentColumns = new Set(columnRows.map((row) => `${row.table_name}.${row.column_name}`));
+  for (const item of REQUIRED_OPERATIONAL_COLUMNS) {
+    if (!presentColumns.has(`${item.table}.${item.column}`)) {
+      missing.push({ table: item.table, column: item.column });
     }
   }
 

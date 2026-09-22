@@ -18,6 +18,11 @@ const REQUIRED_COLUMNS = [
   { table: "AppNotification", column: "deleted_at" },
   { table: "OperationalDocument", column: "deleted_at" },
   { table: "TicketOperation", column: "deleted_at" },
+  { table: "WorkOrder", column: "work_order_number" },
+  { table: "WorkOrder", column: "work_type" },
+  { table: "WorkOrder", column: "source" },
+  { table: "WorkOrder", column: "sla_response_due_at" },
+  { table: "WorkOrder", column: "sla_resolution_due_at" },
 ];
 
 const REQUIRED_TABLES = [
