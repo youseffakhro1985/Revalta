@@ -202,6 +202,40 @@ describe("ticket work-order creation authorization", () => {
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when a technician GETs a work order for a ticket assigned to someone else", async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      property_id: "property-1",
+      assigned_to_id: "tech-other",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/tickets/ticket-1/work-order"), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(workOrderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when a technician POSTs a work order for a ticket assigned to someone else", async () => {
+    ticketFindFirstMock.mockResolvedValue({
+      id: "ticket-1",
+      property_id: "property-1",
+      assigned_to_id: "tech-other",
+      status: "received",
+      title: "Läckage",
+      description: "Kontrollera läckage",
+      priority: "normal",
+    });
+
+    const response = await POST(request({}), params);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
   it("rejects resident POST before looking up a ticket", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "resident-1",
