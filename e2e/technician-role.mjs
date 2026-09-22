@@ -219,6 +219,8 @@ export async function runTechnicianRolePreview({
     await lockedExecution.scrollIntoViewIfNeeded();
     await expectVisible(lockedExecution, "technician mobile locked execution");
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    await expectPath(page, "/dashboard");
   } finally {
     await context.close();
   }

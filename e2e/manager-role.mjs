@@ -133,7 +133,11 @@ export async function runManagerRolePreview({
     const visible = await api(page, "GET", `/api/work-orders/${workOrderId}`);
     validateManagerWorkOrderWritable(visible.status, visible.body, workOrderId);
 
-    const acquired = await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "acquire" });
+    let acquired = await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "acquire" });
+    for (let attempt = 0; attempt < 4 && acquired.status === 423; attempt += 1) {
+      await page.waitForTimeout(400 * (attempt + 1));
+      acquired = await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "acquire" });
+    }
     const token = validateManagerLockAcquired(acquired.status, acquired.body);
     await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "release", token });
 

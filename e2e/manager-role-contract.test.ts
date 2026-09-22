@@ -77,6 +77,7 @@ describe("manager role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/audit");
     expect(source).toContain('POST", "/api/team"');
     expect(source).toContain("edit-lock");
+    expect(source).toContain("acquired.status === 423");
     expect(source).toContain("/invoice-basis");
     expect(source).toContain("#work-order-title");
     expect(source).toContain("#ekonomi");
