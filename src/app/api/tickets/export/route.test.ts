@@ -95,8 +95,9 @@ describe("ticket export tenant isolation", () => {
     const csv = await response.text();
 
     expect(response.status).toBe(200);
-    expect(csv).toContain('"=CMD(TenantB)"');
-    expect(csv).toContain('"+Hyra"');
+    expect(csv).toContain("\"'=CMD(TenantB)\"");
+    expect(csv).toContain("\"'+Hyra\"");
+    expect(csv).not.toContain("\"=CMD(TenantB)\"");
     expect(csv).not.toMatch(/(?:^|,)=CMD\(TenantB\)(?:$|,)/);
   });
 });

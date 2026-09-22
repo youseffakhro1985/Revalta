@@ -7,7 +7,8 @@ import { normalizeTicketStatus } from "@/lib/ticket-lifecycle";
 const logger = createLogger({ route: "/api/tickets/export" });
 
 function csvCell(value: unknown) {
-  const text = value == null ? "" : String(value);
+  let text = value == null ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
 
