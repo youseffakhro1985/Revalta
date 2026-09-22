@@ -5,11 +5,15 @@ const {
   readRecurringSchedulesMock,
   scheduleUpdateManyMock,
   writeAuditLogMock,
+  propertyFindFirstMock,
+  upsertRecurringScheduleMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   readRecurringSchedulesMock: vi.fn(),
   scheduleUpdateManyMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
+  upsertRecurringScheduleMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -24,6 +28,7 @@ vi.mock("@/lib/audit", () => ({
 vi.mock("@/lib/recurring-work-order-engine", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/recurring-work-order-engine")>()),
   readRecurringSchedules: readRecurringSchedulesMock,
+  upsertRecurringSchedule: upsertRecurringScheduleMock,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -32,7 +37,7 @@ vi.mock("@/lib/db", () => ({
       updateMany: scheduleUpdateManyMock,
       findMany: vi.fn(),
     },
-    property: { findMany: vi.fn(), findFirst: vi.fn() },
+    property: { findMany: vi.fn(), findFirst: propertyFindFirstMock },
     auditLog: { findMany: vi.fn(), findFirst: vi.fn() },
   },
 }));
@@ -227,5 +232,51 @@ describe("work-orders/recurring writes staff-scope", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(readRecurringSchedulesMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts a schedule against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/work-orders/recurring", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-tenant-b",
+        title: "Filterbyte Tenant B",
+        description: "Byt filter",
+        frequency: "monthly",
+        priority: "normal",
+        nextRunAt: "2026-10-01T08:00:00.000Z",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", company_id: "company-1", deleted_at: null },
+      select: { id: true, name: true },
+    });
+    expect(upsertRecurringScheduleMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B schedule id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    readRecurringSchedulesMock.mockResolvedValue([]);
+
+    const response = await PATCH(new Request("http://localhost/api/work-orders/recurring", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheduleId: "schedule-tenant-b", active: false }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Schemat hittades inte");
+    expect(readRecurringSchedulesMock).toHaveBeenCalledWith("company-1");
+    expect(scheduleUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

@@ -151,4 +151,25 @@ describe("rounds/[id] PATCH staff-scope", () => {
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(roundFindFirstMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B round id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    roundFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/rounds/round-tenant-b", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Brandrond Tenant B" }),
+    }), { params: Promise.resolve({ id: "round-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ronden hittades inte");
+    expect(roundFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "round-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(roundUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });
