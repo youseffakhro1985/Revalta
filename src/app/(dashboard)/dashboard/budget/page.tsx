@@ -13,6 +13,7 @@ import {
   premiumSecondaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { csvRow } from "@/lib/csv-cell";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string };
@@ -243,7 +244,7 @@ export default function BudgetPage() {
         item.note || "",
       ]),
     ];
-    const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(";")).join("\n");
+    const csv = rows.map((row) => csvRow(row)).join("\n");
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;

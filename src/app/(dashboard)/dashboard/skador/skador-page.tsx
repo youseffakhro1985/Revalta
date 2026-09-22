@@ -16,6 +16,7 @@ import {
   premiumSecondaryButtonClass,
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
+import { csvCell } from "@/lib/csv-cell";
 import { readResponseJson } from "@/lib/fetch-json";
 
 type Property = { id: string; name: string; address?: string; city?: string };
@@ -52,10 +53,6 @@ function statusTone(status?: string): "neutral" | "info" | "success" | "warning"
   if (status === "reported" || status === "investigating") return "warning";
   if (status === "repairing" || status === "awaiting_insurer") return "info";
   return "neutral";
-}
-
-function csvCell(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
 export function InsuranceClaimsPage({ initialCreate }: { initialCreate: boolean }) {

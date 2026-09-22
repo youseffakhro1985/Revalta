@@ -16,6 +16,7 @@ import {
   premiumTextareaClass,
 } from "@/components/dashboard/premium-ui";
 import { readResponseJson } from "@/lib/fetch-json";
+import { csvCell } from "@/lib/csv-cell";
 
 type Property = { id: string; name: string; address: string; city: string };
 type Credential = {
@@ -46,10 +47,6 @@ function statusTone(status?: string): "neutral" | "info" | "success" | "warning"
   if (status === "returned" || status === "in_stock") return "success";
   if (status === "blocked" || status === "lost") return "danger";
   return "neutral";
-}
-
-function csvCell(value: unknown) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
 export default function KeysPage() {
