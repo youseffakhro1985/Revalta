@@ -48,6 +48,8 @@ Exact Preview SHA for `e028930`: `e028930a4a2ac250f76d4e17217765f50c848b5f` at `
 
 `ac9b4ce` exact-SHA Preview `https://revalta-dl5i7hsxn-youseffakhro1985s-projects.vercel.app`. Login/nav PASS, GET WO planned PASS, then PATCH in_progress 503 SERVICE_UNAVAILABLE (run `35782932828`). Interactive `$transaction` skips Prisma `$use` middleware, so locked-update still `include`d every scalar. Use the same live-column `select` inside the transaction.
 
+`5279783` exact-SHA Preview `https://revalta-f0ebtuafg-youseffakhro1985s-projects.vercel.app`. Revalta CI + CodeQL **success**. PATCH then 503 `missing=Ticket.tenant_id` (run `35783682878`): `syncWorkOrderToTicket` used `ticket.update` without `select`, so Prisma loaded the unmigrated Ticket.tenant_id scalar. Add `select: { id: true }`.
+
 ## P0
 
 | Item | Evidence | Status |
