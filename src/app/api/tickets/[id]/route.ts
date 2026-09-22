@@ -27,8 +27,9 @@ import {
 } from "@/lib/ticket-lifecycle";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
-import { hasTicketAiSourceColumn, ticketAiSourceSelect } from "@/lib/schema-readiness";
+import { hasTicketAiSourceColumn, isMissingSchemaColumnError, isMissingTableError, schemaMismatchUserMessage, ticketAiSourceSelect } from "@/lib/schema-readiness";
 import { loadTicketResidentFeedback } from "@/lib/ticket-resident-feedback";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
 
 const logger = createLogger({ route: "/api/tickets/[id]" });
 
@@ -148,6 +149,15 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
     logger.error("Get ticket error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
