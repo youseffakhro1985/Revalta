@@ -67,6 +67,9 @@ describe("global search tenant isolation", () => {
     expect(userFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ company_id: "company-a" }),
     }));
+    expect(leaseHolderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-a", deleted_at: null, status: "active" }),
+    }));
   });
 
   it("rejects users without organisation before querying search indexes", async () => {
@@ -139,6 +142,30 @@ describe("global search tenant isolation", () => {
     expect(body.results).toContainEqual(expect.objectContaining({
       type: "work_order",
       href: "/dashboard/arbetsorder/wo-1",
+    }));
+  });
+
+  it("keeps a Tenant B lease-holder query inside Tenant A company_id", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-a",
+      role: "owner",
+    });
+
+    const response = await GET(new Request("https://www.revalta.se/api/search?q=TenantB"));
+    expect(response.status).toBe(200);
+    expect(leaseHolderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        company_id: "company-a",
+        deleted_at: null,
+        status: "active",
+        OR: expect.arrayContaining([
+          expect.objectContaining({ name: expect.objectContaining({ contains: "TenantB" }) }),
+        ]),
+      }),
+    }));
+    expect(propertyFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ company_id: "company-a" }),
     }));
   });
 });
