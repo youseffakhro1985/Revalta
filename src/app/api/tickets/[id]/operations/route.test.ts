@@ -309,3 +309,83 @@ describe("ticket operations GET staff-scope", () => {
     expect(ticketFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("ticket operations Tenant B", () => {
+  const tenantB = { params: Promise.resolve({ id: "ticket-tenant-b" }) };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    ticketFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A lists operations for a Tenant B ticket id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/tickets/ticket-tenant-b/operations"),
+      tenantB,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "ticket-tenant-b", company_id: "company-1", deleted_at: null }),
+    }));
+    expect(operationFindManyMock).not.toHaveBeenCalled();
+    expect(auditFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates an operation on a Tenant B ticket id", async () => {
+    const response = await POST(
+      new Request("https://www.revalta.se/api/tickets/ticket-tenant-b/operations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "note", description: "Intern notering" }),
+      }),
+      tenantB,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches an operation on a Tenant B ticket id", async () => {
+    const response = await PATCH(
+      new Request("https://www.revalta.se/api/tickets/ticket-tenant-b/operations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId: "op-tenant-b", description: "Ändrad" }),
+      }),
+      tenantB,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(operationFindFirstMock).not.toHaveBeenCalled();
+    expect(operationUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes an operation on a Tenant B ticket id", async () => {
+    const response = await DELETE(
+      new Request("https://www.revalta.se/api/tickets/ticket-tenant-b/operations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId: "op-tenant-b" }),
+      }),
+      tenantB,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte");
+    expect(operationFindFirstMock).not.toHaveBeenCalled();
+    expect(operationUpdateManyMock).not.toHaveBeenCalled();
+  });
+});
