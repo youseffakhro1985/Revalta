@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { runVerifiedPreview } from "./preview-runner.mjs";
 import { runStaffGoldenPath, assertTicketHiddenAfterLogout } from "./golden-path.mjs";
 import { runStaffBookingOverlap } from "./booking-concurrency.mjs";
+import { runTechnicianRolePreview } from "./technician-role.mjs";
 import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
@@ -187,6 +188,21 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         propertyId: golden.propertyId,
       });
       complete("booking-overlap-409");
+
+      await runTechnicianRolePreview({
+        browser,
+        ownerPage: page,
+        baseUrl,
+        bypass,
+        assertRelease,
+        fail,
+        expectVisible,
+        expectPath,
+        runId,
+        workOrderId: golden.workOrderId,
+        companyId: fixtureCompany,
+      });
+      complete("technician-role-preview");
 
       // Command Center must be the single global search surface.
       await page.keyboard.press("Control+K");
