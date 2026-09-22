@@ -144,6 +144,41 @@ describe("public tickets/[reference]/attachments POST", () => {
     expect(ticketAttachmentCreateMock).toHaveBeenCalledTimes(1);
   });
 
+  it("returns tenant-safe 404 when a Tenant A portal token looks up a Tenant B reference", async () => {
+    ticketFindFirstMock.mockResolvedValue(null);
+    verifyPortalTrackingTokenMock.mockReturnValue({
+      reference: "RV-TENANT-B",
+      email: "boende@example.se",
+      companyId: "company-1",
+      exp: Date.now() + 1_000_000,
+    });
+
+    const form = new FormData();
+    form.append("file", pngFile());
+    form.append("token", "signed-token");
+    const response = await POST(
+      new Request("https://www.revalta.se/api/public/tickets/RV-TENANT-B/attachments", {
+        method: "POST",
+        body: form,
+      }),
+      { params: Promise.resolve({ reference: "rv-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Ärendet hittades inte. Kontrollera referensnummer och e-post.");
+    expect(ticketFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        public_reference: "RV-TENANT-B",
+        reporter_email: "boende@example.se",
+        company_id: "company-1",
+      }),
+    }));
+    expect(storeAttachmentMock).not.toHaveBeenCalled();
+    expect(ticketAttachmentCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
   it("returns the native form to the portal when the file is missing", async () => {
     const form = new FormData();
     form.append("native", "1");

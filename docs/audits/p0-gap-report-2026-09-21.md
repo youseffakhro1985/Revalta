@@ -21,9 +21,9 @@ The SHA `92adc33…` below was true when this file was first written (`#933`). I
 - Prisma migrations in repo: 52
 - Inställningar design from `#933` is current and must not be redesigned in this pass
 
-## PR #938 Browser E2E vs Vercel (verified 2026-09-22T16:22Z)
+## PR #938 Browser E2E vs Vercel (verified 2026-09-22T16:33Z)
 
-Head commit `c9dc7b576343085b849b6c05716bdcad90a38b46`. Base `main` still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (not moved; no rebase). Production `/api/health` still matches that SHA (`dpl_D2smveeUMAoj3AXwKpQanyacqMFR`, dataplane `e51d9599…`). Re-verified 2026-09-22T16:22Z: Vercel status still `Deployment rate limited — retry in 24 hours.` (`updated_at` still `2026-09-21T19:51:47Z`). GitHub Deployments for `c9dc7b5` still `[]`. Expected Hobby recovery ~22 Sep ~19:48 UTC. Local unpushed HEAD `55cf9ac`.
+Head commit `c9dc7b576343085b849b6c05716bdcad90a38b46`. Base `main` still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (not moved; no rebase). Production `/api/health` still matches that SHA (`dpl_D2smveeUMAoj3AXwKpQanyacqMFR`, dataplane `e51d9599…`). Re-verified 2026-09-22T16:33Z: Vercel status still `Deployment rate limited — retry in 24 hours.` (`updated_at` still `2026-09-21T19:51:47Z`). GitHub Deployments for `c9dc7b5` still `[]`. Expected Hobby recovery ~22 Sep ~19:48 UTC. Local unpushed HEAD continues Tenant B proofs (public ticket portal-scope next).
 
 | Check | Result | Cause |
 | --- | --- | --- |
