@@ -5,6 +5,7 @@ import { runVerifiedPreview } from "./preview-runner.mjs";
 import { runStaffGoldenPath, assertTicketHiddenAfterLogout } from "./golden-path.mjs";
 import { runStaffBookingOverlap } from "./booking-concurrency.mjs";
 import { runTechnicianRolePreview } from "./technician-role.mjs";
+import { runResidentPortalPreview } from "./resident-portal.mjs";
 import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
@@ -203,6 +204,22 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         companyId: fixtureCompany,
       });
       complete("technician-role-preview");
+
+      await runResidentPortalPreview({
+        browser,
+        ownerPage: page,
+        baseUrl,
+        bypass,
+        assertRelease,
+        fail,
+        expectVisible,
+        expectPath,
+        runId,
+        propertyId: golden.propertyId,
+        workOrderId: golden.workOrderId,
+        companyId: fixtureCompany,
+      });
+      complete("resident-portal-preview");
 
       // Command Center must be the single global search surface.
       await page.keyboard.press("Control+K");
