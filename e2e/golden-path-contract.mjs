@@ -44,12 +44,21 @@ export function allowlistedWorkOrderCreateErrorCode(value) {
   return typeof value === "string" && allowed.has(value) ? value : "none";
 }
 
+export function resolveWorkOrderIdFromCreate(body, probe) {
+  if (hasId(body?.workOrderId)) return body.workOrderId;
+  if (hasId(body?.workOrder?.id)) return body.workOrder.id;
+  if (hasId(probe?.workOrderId)) return probe.workOrderId;
+  return "";
+}
+
 export function validateWorkOrderFromTicket(status, body, created, probe) {
-  if (hasId(body?.workOrderId)) {
-    if (created && status !== 201) {
+  const resolvedId = resolveWorkOrderIdFromCreate(body, probe);
+  if (hasId(resolvedId)) {
+    const fromCreateEnvelope = hasId(body?.workOrderId);
+    if (created && fromCreateEnvelope && status !== 201 && status !== 200) {
       throw new Error(`Work order create from ticket did not return 201 (${status})`);
     }
-    return;
+    return resolvedId;
   }
   const redirected = Number.isInteger(status) && ((status >= 300 && status < 400) || status === 0);
   const getPayload = Boolean(

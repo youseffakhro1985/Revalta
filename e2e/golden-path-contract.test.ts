@@ -24,7 +24,13 @@ describe("golden-path contract", () => {
     validateCreatedProperty(201, { property: { id: "property-1" } });
     validateCreatedTicket(201, { ticket: { id: "ticket-1", property: { id: "property-1" } } }, "property-1");
     validateTicketStatus(200, { ticket: { status: "new", property: { id: "property-1" } } }, "new", "property-1");
-    validateWorkOrderFromTicket(201, { workOrderId: "wo-1" }, true);
+    expect(validateWorkOrderFromTicket(201, { workOrderId: "wo-1" }, true)).toBe("wo-1");
+    expect(validateWorkOrderFromTicket(200, { workOrder: { id: "wo-2" }, canCreate: false }, true)).toBe("wo-2");
+    expect(validateWorkOrderFromTicket(500, { errorCode: "INTERNAL_ERROR" }, true, {
+      probed: true,
+      existing: true,
+      workOrderId: "wo-3",
+    })).toBe("wo-3");
     validateWorkOrderStatus(200, { workOrder: { status: "planned", ticket: { id: "ticket-1" } } }, "planned", "ticket-1");
   });
 
@@ -85,6 +91,8 @@ describe("golden-path is wired into the required Preview browser job", () => {
     expect(golden).toContain("hoursAgo");
     expect(golden).toContain("/locked-update");
     expect(golden).toContain('redirect: "manual"');
+    expect(golden).toContain("existingWorkOrder");
+    expect(golden).toContain("workOrderId: existingWorkOrder");
     expect(golden).not.toContain("page.route");
     expect(runner).toContain("staffUserId");
   });

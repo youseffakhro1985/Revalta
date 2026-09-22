@@ -115,15 +115,16 @@ export async function runStaffGoldenPath({
   validateTicketStatus(ticketAfterCreate.status, ticketAfterCreate.body, "new", propertyId);
 
   const linked = await api(page, "POST", `/api/tickets/${ticketId}/work-order`, {});
-  let existingWorkOrder = null;
-  if (!linked.body?.workOrderId) {
-    existingWorkOrder = await api(page, "GET", `/api/tickets/${ticketId}/work-order`);
+  let probe;
+  if (!linked.body?.workOrderId && !linked.body?.workOrder?.id) {
+    const existingWorkOrder = await api(page, "GET", `/api/tickets/${ticketId}/work-order`);
+    probe = {
+      probed: true,
+      existing: Boolean(existingWorkOrder?.body?.workOrder?.id),
+      workOrderId: existingWorkOrder?.body?.workOrder?.id || "",
+    };
   }
-  validateWorkOrderFromTicket(linked.status, linked.body, true, {
-    existing: Boolean(existingWorkOrder?.body?.workOrder?.id),
-    probed: Boolean(existingWorkOrder),
-  });
-  const workOrderId = linked.body.workOrderId;
+  const workOrderId = validateWorkOrderFromTicket(linked.status, linked.body, true, probe);
 
   const planned = await api(page, "GET", `/api/work-orders/${workOrderId}`);
   validateWorkOrderStatus(planned.status, planned.body, "planned", ticketId);
