@@ -24,9 +24,9 @@ const {
   loggerErrorMock: vi.fn(),
 }));
 
-vi.mock("@/lib/current-user", () => ({
+vi.mock("@/lib/current-user", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/current-user")>()),
   getCurrentUser: getCurrentUserMock,
-  canManageBilling: (role: string) => ["owner", "admin"].includes(role),
 }));
 vi.mock("@/lib/integrations", () => ({ recordPaymentEvent: recordPaymentEventMock }));
 vi.mock("@/lib/stripe", () => ({
@@ -297,5 +297,37 @@ describe("billing checkout", () => {
     expect(response.status).toBe(500);
     expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
     expect(JSON.stringify(body)).not.toContain("sk_live_secret_should_never_leak");
+  });
+});
+
+describe("billing checkout POST staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+  });
+
+  it("rejects residents before starting checkout", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      email: "boende@exempel.se",
+      role: "resident",
+      company_id: "company-1",
+    });
+
+    const response = await POST(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(createCheckoutSessionMock).not.toHaveBeenCalled();
   });
 });
