@@ -289,3 +289,42 @@ describe("work-order reports GET staff-scope", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 });
+
+describe("work-order reports Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue(user);
+    canManageTicketsMock.mockReturnValue(true);
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads reports for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-tenant-b/reports"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(directQueryRawMock).not.toHaveBeenCalled();
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a report on a Tenant B work-order id", async () => {
+    const response = await POST(request({ action: "report.create" }), {
+      params: Promise.resolve({ id: "wo-tenant-b" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+});

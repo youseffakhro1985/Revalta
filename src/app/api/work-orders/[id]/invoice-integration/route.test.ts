@@ -465,3 +465,48 @@ describe("work-order invoice integration GET staff-scope", () => {
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("work-order invoice-integration Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "manager-1",
+      email: "manager@example.com",
+      name: "Manager",
+      role: "manager",
+      company_id: "company-1",
+    });
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads invoice integration for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/invoice-integration"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(listInvoiceExportJobsMock).not.toHaveBeenCalled();
+    expect(getLatestInvoiceDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A queues invoice export on a Tenant B work-order id", async () => {
+    const response = await POST(
+      request({ action: "queue", provider: "webhook" }),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(getModernLatestInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(upsertInvoiceExportJobMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

@@ -220,3 +220,29 @@ describe("work-orders/[id]/project POST staff-scope", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 });
+
+describe("work-order project Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A creates a project from a Tenant B work-order id", async () => {
+    const response = await POST(
+      request(JSON.stringify({ name: "Projekt Tenant B" })),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(userFindFirstMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(projectCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

@@ -91,3 +91,31 @@ describe("work-orders/[id]/asset-options GET", () => {
     expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
   });
 });
+
+describe("work-order asset-options Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    workOrderFindFirstMock.mockResolvedValue(null);
+  });
+
+  it("returns tenant-safe 404 when Tenant A reads asset options for a Tenant B work-order id", async () => {
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/asset-options"),
+      { params: Promise.resolve({ id: "wo-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(buildingFindManyMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+});

@@ -338,6 +338,41 @@ describe("work-order locked-update schema gaps", () => {
   });
 });
 
+describe("work-order locked-update Tenant B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    workOrderFindFirstMock.mockResolvedValue(null);
+    getWorkOrderEnterpriseStateMock.mockResolvedValue(null);
+    getWorkOrderAssetLinkMock.mockResolvedValue({});
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B work-order id", async () => {
+    const response = await PATCH(new Request("http://localhost/api/work-orders/wo-tenant-b", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "in_progress",
+        editToken: "tok",
+        version: "2026-08-30T12:00:00.000Z",
+      }),
+    }), { params: Promise.resolve({ id: "wo-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Arbetsordern hittades inte");
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "wo-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(validateWorkOrderAssetLinksMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("work-order GET schema gaps", () => {
   beforeEach(() => {
     vi.clearAllMocks();
