@@ -48,6 +48,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { GET } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const request = new Request("https://www.revalta.se/api/tickets/ticket-1/timeline");
 const context = { params: Promise.resolve({ id: "ticket-1" }) };
@@ -131,5 +133,45 @@ describe("ticket timeline tenant boundary", () => {
     }));
     expect(response.headers.get("cache-control")).toContain("private");
     expect(response.headers.get("cache-control")).toContain("no-store");
+  });
+});
+
+describe("ticket timeline schema gaps", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getCurrentUserMock.mockResolvedValue({
+      id: "user-1",
+      role: "owner",
+      company_id: "company-1",
+    });
+  });
+
+  it("maps a missing Ticket table on GET to 503 SERVICE_UNAVAILABLE", async () => {
+    ticketFindFirstMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.Ticket` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.Ticket" },
+        },
+      ),
+    );
+
+    const response = await GET(request, context);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
+  });
+
+  it("keeps unexpected lookup failures as 500", async () => {
+    ticketFindFirstMock.mockRejectedValue(new Error("db down"));
+
+    const response = await GET(request, context);
+
+    expect(response.status).toBe(500);
+    expect((await response.json()).error).toBe("Internt serverfel");
   });
 });

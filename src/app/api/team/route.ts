@@ -12,6 +12,12 @@ import { writeAuditLog } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { isStrongPassword, isValidEmail, normalizeEmail, passwordPolicyMessage } from "@/lib/security";
 import { createLogger } from "@/lib/structured-logger";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/team" });
 
@@ -75,6 +81,15 @@ export async function GET() {
       permissions: { canManage: canManageTeam(user.role), canSeeEmails: true },
     });
   } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
     logger.error("Get team error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

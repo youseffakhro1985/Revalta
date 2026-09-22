@@ -5,6 +5,12 @@ import { buildTicketWorkOrderTimeline } from "@/lib/ticket-work-order-timeline";
 import { isAssignedWorkAccessible, notFoundTicket } from "@/lib/assigned-work-access";
 import { NextResponse } from "next/server";
 import { createLogger } from "@/lib/structured-logger";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 
 const logger = createLogger({ route: "/api/tickets/[id]/timeline" });
 
@@ -135,6 +141,15 @@ export async function GET(
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
     logger.error("Get ticket timeline error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

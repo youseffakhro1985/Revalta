@@ -45,6 +45,8 @@ vi.mock("@/lib/db", () => {
 });
 
 import { GET, POST } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 function postRequest(body: unknown) {
   return new Request("https://www.revalta.se/api/team", {
@@ -194,6 +196,32 @@ describe("team route", () => {
       const response = await GET();
 
       expect(response.status).toBe(500);
+    });
+
+    it("maps a missing User table on GET to 503 SERVICE_UNAVAILABLE", async () => {
+      getCurrentUserMock.mockResolvedValue({
+        id: "user-1",
+        company_id: "company-1",
+        role: "owner",
+        company: { name: "Testfastigheter AB" },
+      });
+      userFindManyMock.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError(
+          "The table `public.User` does not exist in the current database.",
+          {
+            code: "P2021",
+            clientVersion: "test",
+            meta: { table: "public.User" },
+          },
+        ),
+      );
+
+      const response = await GET();
+      const body = await response.json();
+
+      expect(response.status).toBe(503);
+      expect(body.error).toBe(schemaMismatchUserMessage());
+      expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
     });
   });
 
