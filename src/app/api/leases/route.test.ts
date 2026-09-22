@@ -185,4 +185,67 @@ describe("leases route", () => {
       where: { deleted_at: null, id: "foreign-holder", company_id: "company-1" },
     });
   });
+
+  it("returns tenant-safe 404 when Tenant A attaches a Tenant B unitId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    unitFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unitId: "unit-tenant-b",
+        holderName: "Anna",
+        holderType: "individual",
+        status: "draft",
+        monthlyRent: 10000,
+        deposit: 10000,
+        annualIndexPercent: 0,
+        paymentTermsDays: 30,
+      }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Objektet hittades inte");
+    expect(unitFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "unit-tenant-b",
+        property: { company_id: "company-1", deleted_at: null },
+      }),
+    }));
+    expect(leaseHolderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A attaches a Tenant B holderId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    unitFindFirstMock.mockResolvedValue({
+      id: "unit-1",
+      unit_type: "apartment",
+      property_id: "property-1",
+      property: { id: "property-1", name: "Eken", address: "Testgatan 1", city: "Stockholm" },
+    });
+    leaseHolderFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("https://www.revalta.se/api/leases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        unitId: "unit-1",
+        holderId: "holder-tenant-b",
+        holderName: "Anna",
+        holderType: "individual",
+        status: "draft",
+        monthlyRent: 10000,
+        deposit: 10000,
+        annualIndexPercent: 0,
+        paymentTermsDays: 30,
+      }),
+    }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Hyresparten hittades inte");
+    expect(leaseHolderFindFirstMock).toHaveBeenCalledWith({
+      where: { deleted_at: null, id: "holder-tenant-b", company_id: "company-1" },
+    });
+  });
 });

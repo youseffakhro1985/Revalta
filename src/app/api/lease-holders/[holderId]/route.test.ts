@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUserMock, holderFindFirstMock } = vi.hoisted(() => ({
+const { getCurrentUserMock, holderFindFirstMock, holderUpdateManyMock, writeAuditLogMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   holderFindFirstMock: vi.fn(),
+  holderUpdateManyMock: vi.fn(),
+  writeAuditLogMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -10,9 +12,13 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
   getCurrentUser: getCurrentUserMock,
 }));
 
+vi.mock("@/lib/audit", () => ({
+  writeAuditLog: writeAuditLogMock,
+}));
+
 vi.mock("@/lib/db", () => ({
   default: {
-    leaseHolder: { findFirst: holderFindFirstMock },
+    leaseHolder: { findFirst: holderFindFirstMock, updateMany: holderUpdateManyMock },
   },
 }));
 
@@ -73,5 +79,44 @@ describe("lease-holders/[holderId] mutations", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet att ta bort kontakter");
     expect(holderFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B holder id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    holderFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/lease-holders/holder-tenant-b", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Tenant B kontakt" }),
+    }), { params: Promise.resolve({ holderId: "holder-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Kontakten hittades inte");
+    expect(holderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { deleted_at: null, id: "holder-tenant-b", company_id: "company-1" },
+    }));
+    expect(holderUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B holder id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    holderFindFirstMock.mockResolvedValue(null);
+
+    const response = await DELETE(
+      new Request("http://localhost/api/lease-holders/holder-tenant-b", { method: "DELETE" }),
+      { params: Promise.resolve({ holderId: "holder-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Kontakten hittades inte");
+    expect(holderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "holder-tenant-b", company_id: "company-1", deleted_at: null },
+    }));
+    expect(holderUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });

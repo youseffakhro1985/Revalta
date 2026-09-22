@@ -114,4 +114,25 @@ describe("lease-holders/[holderId]/restore", () => {
     expect((await response.json()).error).toBe("Du saknar behörighet att återställa kontakter");
     expect(leaseHolderFindFirstMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A restores a Tenant B holder id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    leaseHolderFindFirstMock.mockReset();
+    leaseHolderFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(
+      new Request("http://localhost/api/lease-holders/holder-tenant-b/restore", { method: "POST" }),
+      { params: Promise.resolve({ holderId: "holder-tenant-b" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Kontakten hittades inte eller är redan aktiv");
+    expect(leaseHolderFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "holder-tenant-b", company_id: "company-1", deleted_at: { not: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(leaseHolderUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });

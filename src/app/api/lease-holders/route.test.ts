@@ -93,6 +93,22 @@ describe("lease-holders GET pagination", () => {
     expect(holderCountMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A lists holders for Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await GET(new Request("https://www.revalta.se/api/lease-holders?propertyId=property-tenant-b"));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "property-tenant-b", company_id: "company-1", deleted_at: null },
+    }));
+    expect(holderFindManyMock).not.toHaveBeenCalled();
+    expect(holderCountMock).not.toHaveBeenCalled();
+  });
+
   it("POST denies residents before creating a holder", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "resident-1",
