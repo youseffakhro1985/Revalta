@@ -138,7 +138,26 @@ describe("properties/[id]/units POST", () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const forbidden = await POST(request({ designation: "1201" }), { params: Promise.resolve({ id: "property-1" }) });
     expect(forbidden.status).toBe(403);
-    expect((await forbidden.json()).errorCode).toBe("FORBIDDEN");
+    await expect(forbidden.json()).resolves.toEqual({
+      error: "Du saknar behörighet att skapa objekt",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      role: "resident",
+      company_id: "company-1",
+      email: "boende@exempel.se",
+    });
+    const resident = await POST(request({ designation: "1201" }), { params: Promise.resolve({ id: "property-1" }) });
+    expect(resident.status).toBe(403);
+    await expect(resident.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 
