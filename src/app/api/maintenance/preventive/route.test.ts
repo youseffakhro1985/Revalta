@@ -52,7 +52,7 @@ describe("preventive maintenance staff scope", () => {
     expect(sqlSoftDeleteGuardMock).not.toHaveBeenCalled();
   });
 
-  it("lets technicians load the preventive overview", async () => {
+  it("denies technicians from listing company-wide preventive assets", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "tech-1",
       company_id: "company-1",
@@ -60,8 +60,10 @@ describe("preventive maintenance staff scope", () => {
     });
 
     const response = await GET();
-    expect(response.status).toBe(200);
-    expect(queryRawMock).toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(sqlSoftDeleteGuardMock).not.toHaveBeenCalled();
   });
 });
 
@@ -93,5 +95,15 @@ describe("preventive maintenance POST staff-scope", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(runEngineMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians before running the company-wide engine", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await POST();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(runEngineMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });
