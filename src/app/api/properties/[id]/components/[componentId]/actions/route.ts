@@ -16,7 +16,24 @@ const SUCCESS_HEADERS = {
 const EVENT_TYPES = new Set(["installation", "commissioning", "service", "repair", "inspection", "warranty", "damage", "replacement", "shutdown", "restart"]);
 const COST_TYPES = new Set(["service", "repair", "spare_part", "inspection", "contractor", "investment", "replacement", "other"]);
 
-class ComponentActionValidationError extends Error {}
+class ComponentActionValidationError extends Error {
+  status: number;
+  code: Parameters<typeof apiErrorResponse>[0]["code"];
+
+  constructor(
+    message: string,
+    status = 400,
+    code: Parameters<typeof apiErrorResponse>[0]["code"] = API_ERROR_CODES.validationFailed,
+  ) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function relatedMiss(message: string) {
+  return new ComponentActionValidationError(message, 404, API_ERROR_CODES.notFound);
+}
 
 function text(value: unknown, max = 1000) {
   if (value == null || value === "") return null;
@@ -68,10 +85,10 @@ async function optionalLink(companyId: string, propertyId: string, kind: "work_o
   if (!value) return null;
   if (kind === "work_order") {
     const row = await db.workOrder.findFirst({ where: { deleted_at: null, id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
-    if (!row) throw new ComponentActionValidationError("Arbetsordern hittades inte i denna fastighet");
+    if (!row) throw relatedMiss("Arbetsordern hittades inte i denna fastighet");
   } else {
     const row = await db.project.findFirst({ where: { deleted_at: null, id: value, company_id: companyId, property_id: propertyId }, select: { id: true } });
-    if (!row) throw new ComponentActionValidationError("Projektet hittades inte i denna fastighet");
+    if (!row) throw relatedMiss("Projektet hittades inte i denna fastighet");
   }
   return value;
 }
@@ -165,7 +182,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             WHERE "id" = ${lifecycleEventId} AND "technical_asset_id" = ${componentId} AND "company_id" = ${user.company_id}
             LIMIT 1
           `);
-          if (!linked[0]) throw new ComponentActionValidationError("Den valda livscykelhändelsen hittades inte");
+          if (!linked[0]) throw relatedMiss("Den valda livscykelhändelsen hittades inte");
         }
         const id = crypto.randomUUID();
         const rows = await db.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
@@ -184,7 +201,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return reject(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Okänd åtgärd", event: "components.actions.validation_failed", context: { reason: "invalid_action", userId: user.id, companyId: user.company_id, propertyId: property.id, componentId } });
     } catch (error) {
       if (error instanceof ComponentActionValidationError) {
-        return reject(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: error.message, event: "components.actions.validation_failed", context: { reason: "field_validation", userId: user.id, companyId: user.company_id, propertyId: property.id, componentId } });
+        return reject(observability, {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+          event: error.status === 404 ? "components.actions.related_not_found" : "components.actions.validation_failed",
+          context: { reason: error.status === 404 ? "related_not_found" : "field_validation", userId: user.id, companyId: user.company_id, propertyId: property.id, componentId },
+        });
       }
       throw error;
     }

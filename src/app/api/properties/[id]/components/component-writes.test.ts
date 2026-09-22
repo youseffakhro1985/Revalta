@@ -222,6 +222,27 @@ describe("secure component write contracts", () => {
     expect(invalid.status).toBe(400);
     await expect(invalid.json()).resolves.toEqual({ error: "Ogiltig händelsetyp", errorCode: "VALIDATION_FAILED", requestId });
 
+    const missingWorkOrder = await postComponentAction(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
+        action: "event",
+        event_type: "service",
+        event_date: "2026-08-18",
+        title: "Service",
+        work_order_id: "foreign-work-order",
+      }),
+      componentParams(),
+    );
+    expect(missingWorkOrder.status).toBe(404);
+    await expect(missingWorkOrder.json()).resolves.toEqual({
+      error: "Arbetsordern hittades inte i denna fastighet",
+      errorCode: "NOT_FOUND",
+      requestId,
+    });
+    expect(workOrderFindFirstMock).toHaveBeenCalledWith({
+      where: { deleted_at: null, id: "foreign-work-order", company_id: "company-1", property_id: "property-1" },
+      select: { id: true },
+    });
+
     queryRawMock.mockResolvedValueOnce([{ id: "asset-1" }]).mockRejectedValueOnce(new Error("postgres internal stack secret"));
     const failed = await postComponentAction(
       jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
