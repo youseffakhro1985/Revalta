@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       where: { id: assigneeId, company_id: user.company_id, status: "active" },
       select: { id: true, name: true, email: true },
     });
-    if (!assignee) return NextResponse.json({ error: "Den ansvariga användaren hittades inte" }, { status: 400 });
+    if (!assignee) return NextResponse.json({ error: "Den ansvariga användaren hittades inte" }, { status: 404 });
   }
 
   const assetId = notificationKey.startsWith("component-service:")

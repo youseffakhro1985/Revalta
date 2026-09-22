@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   getCurrentUserMock,
   userFindManyMock,
+  userFindFirstMock,
   queryRawMock,
   listAssignmentsMock,
   upsertAssignmentMock,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   userFindManyMock: vi.fn(),
+  userFindFirstMock: vi.fn(),
   queryRawMock: vi.fn(),
   listAssignmentsMock: vi.fn(),
   upsertAssignmentMock: vi.fn(),
@@ -23,7 +25,7 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
 
 vi.mock("@/lib/db", () => ({
   default: {
-    user: { findMany: userFindManyMock },
+    user: { findMany: userFindManyMock, findFirst: userFindFirstMock },
     $queryRaw: queryRawMock,
   },
 }));
@@ -50,13 +52,14 @@ function companyUser(role: string) {
   };
 }
 
-function postRequest() {
+function postRequest(overrides: Record<string, unknown> = {}) {
   return new Request("https://www.revalta.se/api/notifications/service-center/assignments", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       notificationKey: "component-service:asset-1:2026-09-01",
       status: "assigned",
+      ...overrides,
     }),
   });
 }
@@ -138,5 +141,20 @@ describe("service-center assignment authorization", () => {
       notificationKey: "component-service:asset-1:2026-09-01",
       changedById: "manager-1",
     }));
+  });
+
+  it("returns 404 when the assignee is outside the authenticated company", async () => {
+    getCurrentUserMock.mockResolvedValue(companyUser("manager"));
+    userFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(postRequest({ assigneeId: "foreign-user" }));
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Den ansvariga användaren hittades inte");
+    expect(userFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "foreign-user", company_id: "company-1", status: "active" },
+      select: { id: true, name: true, email: true },
+    });
+    expect(upsertAssignmentMock).not.toHaveBeenCalled();
   });
 });
