@@ -35,6 +35,8 @@ const {
 vi.mock("@/lib/current-user", () => ({
   getCurrentUser: getCurrentUserMock,
   canManageTickets: canManageTicketsMock,
+  canViewFinanceData: (role: string) => ["owner", "admin", "manager", "viewer"].includes(role),
+  canManageWorkOrderFinance: (role: string) => ["owner", "admin", "manager"].includes(role),
   requireCompanyUser: (user: { company_id: string | null; role: string } | null) => {
     if (!user?.company_id) return null;
     if (!["owner", "admin", "manager", "technician", "viewer"].includes(user.role)) return null;
@@ -271,6 +273,58 @@ describe("work-order reports GET staff-scope", () => {
     expect(directQueryRawMock).not.toHaveBeenCalled();
     expect(listTimeEntriesMock).not.toHaveBeenCalled();
     expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("redacts invoice basis and costs for technicians without loading finance stores", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      role: "technician",
+      company_id: "company-1",
+    });
+    workOrderFindFirstMock.mockResolvedValue({
+      ...workOrder,
+      assigned_to_id: "tech-1",
+      estimated_cost: 1200,
+      actual_cost: 800,
+    });
+    canManageTicketsMock.mockReturnValue(true);
+    directQueryRawMock.mockResolvedValue([]);
+
+    const response = await GET(
+      new Request("http://localhost/api/work-orders/wo-1/reports"),
+      context,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.invoiceBases).toEqual([]);
+    expect(body.canCreateInvoiceBasis).toBe(false);
+    expect(body.workOrder.estimated_cost).toBeNull();
+    expect(body.workOrder.actual_cost).toBeNull();
+    expect(directQueryRawMock).toHaveBeenCalledTimes(2);
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(listMaterialEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects technician invoice.create before building a draft", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      role: "technician",
+      company_id: "company-1",
+    });
+    canManageTicketsMock.mockReturnValue(true);
+    workOrderFindFirstMock.mockResolvedValue({ ...workOrder, assigned_to_id: "tech-1" });
+
+    const response = await POST(request({ action: "invoice.create" }), context);
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet");
+    expect(listTimeEntriesMock).not.toHaveBeenCalled();
+    expect(getProfitabilitySettingsMock).not.toHaveBeenCalled();
+    expect(createInvoiceDraftMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it("POST rejects residents before looking up reports", async () => {

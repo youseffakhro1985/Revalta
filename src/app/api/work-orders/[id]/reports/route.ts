@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
-import { canManageTickets, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
+import { canManageTickets, canManageWorkOrderFinance, canViewFinanceData, getCurrentUser, requireCompanyUser, type CompanyUser } from "@/lib/current-user";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import {
   createInvoiceDraft,
@@ -95,6 +95,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const workOrder = await resolveWorkOrder(user, id);
   if (!workOrder) return notFoundWorkOrder();
 
+  const includeFinance = canViewFinanceData(user.role);
+  const canManageFinance = canManageWorkOrderFinance(user.role);
+  const emptyProfit = { fixedRevenue: 0 };
+
   const [signatures, reports, invoiceBases, times, materials, profit] = await Promise.all([
     db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
       SELECT "id", "signer_role", "signer_name", "signer_email", "confirmation_text", "signed_at"
@@ -108,25 +112,29 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
       ORDER BY "version" DESC
     `),
-    db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
-      SELECT "id", "reference", "status", "subtotal"::double precision AS "subtotal",
-             "vat_rate"::double precision AS "vat_rate", "vat_amount"::double precision AS "vat_amount",
-             "total"::double precision AS "total", "approved_at", "created_at"
-      FROM "WorkOrderInvoiceBasis"
-      WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
-      ORDER BY "created_at" DESC
-    `),
-    listTimeEntries(user.company_id, id),
-    listMaterialEntries(user.company_id, id),
-    getProfitabilitySettings(user.company_id, id),
+    includeFinance
+      ? db.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+        SELECT "id", "reference", "status", "subtotal"::double precision AS "subtotal",
+               "vat_rate"::double precision AS "vat_rate", "vat_amount"::double precision AS "vat_amount",
+               "total"::double precision AS "total", "approved_at", "created_at"
+        FROM "WorkOrderInvoiceBasis"
+        WHERE "company_id" = ${user.company_id} AND "work_order_id" = ${id}
+        ORDER BY "created_at" DESC
+      `)
+      : Promise.resolve([]),
+    canManageFinance ? listTimeEntries(user.company_id, id) : Promise.resolve([]),
+    canManageFinance ? listMaterialEntries(user.company_id, id) : Promise.resolve([]),
+    canManageFinance ? getProfitabilitySettings(user.company_id, id) : Promise.resolve(emptyProfit),
   ]);
 
   return NextResponse.json({
-    workOrder,
+    workOrder: includeFinance
+      ? workOrder
+      : { ...workOrder, estimated_cost: null, actual_cost: null },
     signatures,
     reports,
-    invoiceBases,
-    canCreateInvoiceBasis: hasInvoiceBasisLines(times, materials, Number(profit.fixedRevenue || 0)),
+    invoiceBases: includeFinance ? invoiceBases : [],
+    canCreateInvoiceBasis: canManageFinance && hasInvoiceBasisLines(times, materials, Number(profit.fixedRevenue || 0)),
   });
 }
 
@@ -226,6 +234,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   if (action === "invoice.create") {
+    if (!canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    }
     const snapshot = await buildSnapshot(user as CompanyUser, id);
     if (!snapshot) return notFoundWorkOrder();
 
@@ -371,6 +382,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   if (action === "invoice.approve") {
+    if (!canManageWorkOrderFinance(user.role)) {
+      return NextResponse.json({ error: "Du saknar behörighet" }, { status: 403 });
+    }
     const invoiceId = String(body.invoiceId || "");
     if (!invoiceId) return NextResponse.json({ error: "Fakturaunderlag saknas" }, { status: 400 });
     const changed = await db.$transaction(async (tx) => {
