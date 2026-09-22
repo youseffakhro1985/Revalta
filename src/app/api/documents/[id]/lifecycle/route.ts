@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { getCurrentUser } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
 import { createRouteObservability } from "@/lib/route-observability";
 
@@ -50,8 +50,8 @@ export async function PATCH(
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, {
         status: 401,
         code: API_ERROR_CODES.unauthorized,
@@ -59,13 +59,14 @@ export async function PATCH(
         event: "documents.lifecycle.unauthorized",
       });
     }
-    if (!user.company_id) {
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
       return reject(observability, {
-        status: 400,
-        code: API_ERROR_CODES.validationFailed,
-        message: "Användaren saknar organisation",
-        event: "documents.lifecycle.missing_company",
-        context: { userId: user.id },
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "documents.lifecycle.staff_required",
+        context: { userId: rawUser.id },
       });
     }
     const companyId = user.company_id;

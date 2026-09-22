@@ -255,3 +255,50 @@ describe("documents/[id]/lifecycle route", () => {
     );
   });
 });
+
+describe("documents/[id]/lifecycle PATCH staff-scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createLoggerMock.mockReturnValue({
+      debug: vi.fn(),
+      info: loggerInfoMock,
+      warn: loggerWarnMock,
+      error: loggerErrorMock,
+    });
+  });
+
+  it("rejects residents before looking up a document", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await PATCH(patchRequest({ transition: "archive" }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(managedFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects callers without organisation before looking up a document", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: null, role: "owner" });
+
+    const response = await PATCH(patchRequest({ transition: "archive" }), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(managedFindFirstMock).not.toHaveBeenCalled();
+  });
+});
