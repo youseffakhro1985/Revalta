@@ -546,4 +546,38 @@ describe("component writes Tenant B related ids", () => {
     expect((await response.json()).error).toBe("Den valda livscykelhändelsen hittades inte");
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A manages a Tenant B propertyId", async () => {
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await postComponentManage(
+      jsonRequest("https://www.revalta.se/api/properties/property-tenant-b/components/manage", {
+        action: "update",
+        assetId: "asset-1",
+      }),
+      propertyParams("property-tenant-b"),
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Fastigheten hittades inte");
+    expect(queryRawMock).not.toHaveBeenCalled();
+    expect(auditCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A manages a Tenant B asset id", async () => {
+    queryRawMock.mockResolvedValue([]);
+
+    const response = await postComponentManage(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/manage", {
+        action: "update",
+        assetId: "asset-tenant-b",
+      }),
+      propertyParams(),
+    );
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Komponenten hittades inte");
+    expect(executeRawMock).not.toHaveBeenCalled();
+    expect(auditCreateMock).not.toHaveBeenCalled();
+  });
 });

@@ -250,6 +250,43 @@ describe("bookings route", () => {
     expect((await POST(createRequest())).status).toBe(404);
     expect(transactionMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A posts a booking against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(createRequest({ ...createBody, propertyId: "property-tenant-b" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "property-tenant-b", company_id: "company-1" }),
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(bookingCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B booking id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    bookingFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "booking-tenant-b", status: "cancelled" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Bokningen hittades inte");
+    expect(bookingFindFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "booking-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(bookingUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
   it.each(["resident", "viewer", "technician", "vendor", "unknown"])("denies %s creation", async (role) => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role });
     expect((await POST(createRequest())).status).toBe(403);

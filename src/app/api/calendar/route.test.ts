@@ -516,6 +516,21 @@ describe("calendar route", () => {
     }));
   });
 
+  it("GET scopes work-order projections to the caller company and never queries Tenant B", async () => {
+    getCurrentUserMock.mockResolvedValue(user);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(workOrderFindManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        company_id: "company-1",
+        deleted_at: null,
+        scheduled_start: { not: null },
+        property: { deleted_at: null },
+      },
+    }));
+  });
+
   it("returns tenant-safe 404 when Tenant A patches a Tenant B calendar event id", async () => {
     getCurrentUserMock.mockResolvedValue(user);
     calendarFindFirstMock.mockResolvedValue(null);
