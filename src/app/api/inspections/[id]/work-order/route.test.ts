@@ -256,4 +256,23 @@ describe("inspections/[id]/work-order POST staff-scope", () => {
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(inspectionFindFirstMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A creates a work order from a Tenant B inspection id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    inspectionFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/inspections/inspection-tenant-b/work-order", {
+      method: "POST",
+    }), { params: Promise.resolve({ id: "inspection-tenant-b" }) });
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Kontrollen hittades inte");
+    expect(inspectionFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "inspection-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
 });

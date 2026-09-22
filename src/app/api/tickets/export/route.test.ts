@@ -71,4 +71,32 @@ describe("ticket export tenant isolation", () => {
     expect((await response.json()).error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(ticketFindManyMock).not.toHaveBeenCalled();
   });
+
+  it("quotes formula-like cells so CSV cannot execute Tenant B or injected titles", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user-a",
+      company_id: "company-a",
+      role: "owner",
+    });
+    ticketFindManyMock.mockResolvedValue([{
+      public_reference: "RV-1",
+      title: "=CMD(TenantB)",
+      status: "new",
+      priority: "high",
+      category: "other",
+      due_date: null,
+      created_at: new Date("2026-09-22T12:00:00.000Z"),
+      reporter_email: "a@example.se",
+      property: { name: "+Hyra" },
+      assigned_to: { email: "owner@a.se", name: "Owner" },
+    }]);
+
+    const response = await GET();
+    const csv = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(csv).toContain('"=CMD(TenantB)"');
+    expect(csv).toContain('"+Hyra"');
+    expect(csv).not.toMatch(/(?:^|,)=CMD\(TenantB\)(?:$|,)/);
+  });
 });

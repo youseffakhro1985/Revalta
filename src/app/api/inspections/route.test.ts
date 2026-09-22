@@ -3,13 +3,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   getCurrentUserMock,
   inspectionFindManyMock,
+  inspectionCreateMock,
   propertyFindManyMock,
+  propertyFindFirstMock,
   auditFindManyMock,
+  writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
   inspectionFindManyMock: vi.fn(),
+  inspectionCreateMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
   auditFindManyMock: vi.fn(),
+  writeAuditLogMock: vi.fn(),
 }));
 
 vi.mock("@/lib/current-user", async (importOriginal) => ({
@@ -17,10 +23,12 @@ vi.mock("@/lib/current-user", async (importOriginal) => ({
   getCurrentUser: getCurrentUserMock,
 }));
 
+vi.mock("@/lib/audit", () => ({ writeAuditLog: writeAuditLogMock }));
+
 vi.mock("@/lib/db", () => ({
   default: {
-    complianceInspection: { findMany: inspectionFindManyMock },
-    property: { findMany: propertyFindManyMock },
+    complianceInspection: { findMany: inspectionFindManyMock, create: inspectionCreateMock },
+    property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
     auditLog: { findMany: auditFindManyMock },
   },
 }));
@@ -93,5 +101,32 @@ describe("inspections staff scope", () => {
 
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts an inspection against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/inspections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "OVK Tenant B",
+        propertyId: "property-tenant-b",
+        type: "ovk",
+        dueDate: "2026-10-01",
+        status: "planned",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true },
+    });
+    expect(inspectionCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });
