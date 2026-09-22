@@ -67,7 +67,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
       const holderId = input.holderId || existing.lease_holder_id;
       const holder = await tx.leaseHolder.findFirst({ where: { deleted_at: null, id: holderId, company_id: user.company_id! } });
-      if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+      if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 404);
       const holderUpdate = await tx.leaseHolder.updateMany({
         where: { deleted_at: null, id: holder.id, company_id: user.company_id! },
         data: {
@@ -79,7 +79,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           organization_number: input.holderOrganizationNumber,
         },
       });
-      if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+      if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 404);
 
       const updated = await tx.lease.updateMany({
         where: { id: existing.id, company_id: user.company_id!, deleted_at: null, updated_at: existing.updated_at },

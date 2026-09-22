@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       let holder;
       if (input.holderId) {
         const existingHolder = await tx.leaseHolder.findFirst({ where: { deleted_at: null, id: input.holderId, company_id: user.company_id! } });
-        if (!existingHolder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        if (!existingHolder) throw new LeaseRequestError("Hyresparten hittades inte", 404);
         const holderUpdate = await tx.leaseHolder.updateMany({
           where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
           data: {
@@ -161,11 +161,11 @@ export async function POST(request: Request) {
             organization_number: input.holderOrganizationNumber,
           },
         });
-        if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        if (holderUpdate.count === 0) throw new LeaseRequestError("Hyresparten hittades inte", 404);
         holder = await tx.leaseHolder.findFirst({
           where: { deleted_at: null, id: existingHolder.id, company_id: user.company_id! },
         });
-        if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 400);
+        if (!holder) throw new LeaseRequestError("Hyresparten hittades inte", 404);
       } else {
         holder = await tx.leaseHolder.create({
           data: {
