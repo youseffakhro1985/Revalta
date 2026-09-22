@@ -9,6 +9,8 @@ const {
   auditFindManyMock,
   auditFindFirstMock,
   propertyFindManyMock,
+  propertyFindFirstMock,
+  energyCreateMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
@@ -19,6 +21,8 @@ const {
   auditFindManyMock: vi.fn(),
   auditFindFirstMock: vi.fn(),
   propertyFindManyMock: vi.fn(),
+  propertyFindFirstMock: vi.fn(),
+  energyCreateMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }));
 
@@ -38,10 +42,10 @@ vi.mock("@/lib/db", () => ({
       findFirst: energyFindFirstMock,
       updateMany: energyUpdateManyMock,
       deleteMany: energyDeleteManyMock,
-      create: vi.fn(),
+      create: energyCreateMock,
     },
     auditLog: { findMany: auditFindManyMock, findFirst: auditFindFirstMock },
-    property: { findMany: propertyFindManyMock, findFirst: vi.fn() },
+    property: { findMany: propertyFindManyMock, findFirst: propertyFindFirstMock },
   },
 }));
 
@@ -255,5 +259,53 @@ describe("energy route", () => {
     expect(response.status).toBe(403);
     expect((await response.json()).error).toBe("Du saknar behörighet");
     expect(energyFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A posts an energy reading against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/energy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-tenant-b",
+        type: "electricity",
+        period: "2026-07",
+        unit: "kWh",
+        value: 10,
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true, total_area: true },
+    });
+    expect(energyCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A deletes a Tenant B energy reading id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    energyFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await DELETE(new Request("http://localhost/api/energy", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingId: "reading-tenant-b" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Avläsningen hittades inte");
+    expect(energyFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "reading-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(energyDeleteManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 });
