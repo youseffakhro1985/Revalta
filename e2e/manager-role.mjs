@@ -5,10 +5,12 @@ import {
   validateManagerForbidden,
   validateManagerInvoiceManageable,
   validateManagerLockAcquired,
+  validateManagerLockBoardReadable,
   validateManagerOperationsReadable,
   validateManagerProfile,
   validateManagerPropertyCreateAllowed,
   validateManagerWorkOrderWritable,
+  validateOwnerForceRelease,
 } from "./manager-role-contract.mjs";
 
 async function api(page, method, path, body) {
@@ -133,10 +135,24 @@ export async function runManagerRolePreview({
     const visible = await api(page, "GET", `/api/work-orders/${workOrderId}`);
     validateManagerWorkOrderWritable(visible.status, visible.body, workOrderId);
 
-    let acquired = await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "acquire" });
-    for (let attempt = 0; attempt < 4 && acquired.status === 423; attempt += 1) {
-      await page.waitForTimeout(400 * (attempt + 1));
+    const lockBoard = await api(page, "GET", "/api/work-orders/edit-locks");
+    validateManagerLockBoardReadable(lockBoard.status, lockBoard.body);
+    const managerForce = await api(page, "DELETE", "/api/work-orders/edit-locks", {
+      workOrderId,
+      reason: "E2E manager får inte forcera andras lås.",
+    });
+    validateManagerForbidden(managerForce.status, managerForce.body, "Force-release edit lock");
+
+    let acquired = { status: 0, body: null };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const cleared = await api(ownerPage, "DELETE", "/api/work-orders/edit-locks", {
+        workOrderId,
+        reason: "E2E frigör kvarvarande UI-lås före förvaltarens redigering.",
+      });
+      validateOwnerForceRelease(cleared.status, cleared.body);
       acquired = await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "acquire" });
+      if (acquired.status !== 423) break;
+      await page.waitForTimeout(400 * (attempt + 1));
     }
     const token = validateManagerLockAcquired(acquired.status, acquired.body);
     await api(page, "POST", `/api/work-orders/${workOrderId}/edit-lock`, { action: "release", token });

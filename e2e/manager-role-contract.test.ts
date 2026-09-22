@@ -6,10 +6,12 @@ import {
   validateManagerForbidden,
   validateManagerInvoiceManageable,
   validateManagerLockAcquired,
+  validateManagerLockBoardReadable,
   validateManagerOperationsReadable,
   validateManagerProfile,
   validateManagerPropertyCreateAllowed,
   validateManagerWorkOrderWritable,
+  validateOwnerForceRelease,
 } from "./manager-role-contract.mjs";
 import { REQUIRED_STEPS } from "./preview-runner.mjs";
 
@@ -32,6 +34,9 @@ describe("manager-role contract", () => {
     }, "wo-1");
     validateManagerInvoiceManageable(200, { canManage: true });
     expect(validateManagerLockAcquired(201, { lock: { token: "tok" } })).toBe("tok");
+    validateManagerLockBoardReadable(200, { canForceRelease: false, locks: [] });
+    validateOwnerForceRelease(404);
+    validateOwnerForceRelease(200, { released: true });
   });
 
   it("rejects viewer-shaped access and missing operations payloads", () => {
@@ -55,6 +60,12 @@ describe("manager-role contract", () => {
     expect(() => validateManagerInvoiceManageable(200, { canManage: false })).toThrow(
       /invoice basis was not manageable \(200:none\)/,
     );
+    expect(() => validateManagerLockBoardReadable(200, { canForceRelease: true, locks: [] })).toThrow(
+      /without force-release \(200:none\)/,
+    );
+    expect(() => validateOwnerForceRelease(403, { errorCode: "FORBIDDEN" })).toThrow(
+      /leftover work-order edit lock \(403:FORBIDDEN\)/,
+    );
   });
 });
 
@@ -77,7 +88,10 @@ describe("manager role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/audit");
     expect(source).toContain('POST", "/api/team"');
     expect(source).toContain("edit-lock");
-    expect(source).toContain("acquired.status === 423");
+    expect(source).toContain("/api/work-orders/edit-locks");
+    expect(source).toContain("DELETE");
+    expect(source).toContain("validateOwnerForceRelease");
+    expect(source).toContain("acquired.status !== 423");
     expect(source).toContain("/invoice-basis");
     expect(source).toContain("#work-order-title");
     expect(source).toContain("#ekonomi");

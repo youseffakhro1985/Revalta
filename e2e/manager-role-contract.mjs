@@ -79,3 +79,15 @@ export function validateManagerLockAcquired(status, body) {
   }
   return token;
 }
+
+export function validateManagerLockBoardReadable(status, body) {
+  if (status !== 200 || body?.canForceRelease !== false || !Array.isArray(body?.locks)) {
+    throw new Error(`Manager lock board was not readable without force-release (${diagnostic(status, body)})`);
+  }
+}
+
+export function validateOwnerForceRelease(status, body) {
+  if (status !== 200 && status !== 404) {
+    throw new Error(`Owner could not clear a leftover work-order edit lock (${diagnostic(status, body)})`);
+  }
+}
