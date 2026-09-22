@@ -58,4 +58,23 @@ describe("GET /api/work-order-reports/[reportId]", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
     expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
   });
+
+  it("returns tenant-safe 404 when Tenant A reads a Tenant B report id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: "company-1", role: "owner" });
+    queryRawMock.mockResolvedValue([]);
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-order-reports/report-tenant-b"),
+      { params: Promise.resolve({ reportId: "report-tenant-b" }) },
+    );
+    const body = await response.json();
+    const sql = JSON.stringify(queryRawMock.mock.calls[0]?.[0] ?? {});
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Rapporten hittades inte");
+    expect(queryRawMock).toHaveBeenCalledTimes(1);
+    expect(sql).toContain("report-tenant-b");
+    expect(sql).toContain("company-1");
+    expect(findAccessibleWorkOrderMock).not.toHaveBeenCalled();
+  });
 });
