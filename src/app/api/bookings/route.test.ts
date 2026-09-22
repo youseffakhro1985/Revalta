@@ -235,8 +235,45 @@ describe("bookings route", () => {
   it("does not create when another writer won the slot", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     bookingFindFirstMock.mockResolvedValue({ id: "competing-booking" });
-    expect((await POST(createRequest())).status).toBe(409);
+    const response = await POST(createRequest());
+    const body = await response.json();
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("Tiden är redan bokad för denna resurs");
     expect(bookingCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when a PATCH overlaps another booking on the same resource", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    bookingFindFirstMock
+      .mockResolvedValueOnce({
+        id: "booking-1",
+        property_id: "property-1",
+        status: "confirmed",
+        resource: "Tvättstuga",
+        resident_name: "Anna",
+        unit: "1201",
+        start_at: new Date("2026-07-27T08:00:00Z"),
+        end_at: new Date("2026-07-27T10:00:00Z"),
+        note: null,
+        updated_at: new Date("2026-07-20T10:00:00Z"),
+      })
+      .mockResolvedValueOnce({ id: "booking-overlap" });
+
+    const response = await PATCH(new Request("http://localhost/api/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookingId: "booking-1",
+        start: "2026-07-27T09:00:00.000Z",
+        end: "2026-07-27T11:00:00.000Z",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("Tiden är redan bokad för denna resurs");
+    expect(bookingUpdateManyMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
   it("fails creation if its audit fails", async () => {
