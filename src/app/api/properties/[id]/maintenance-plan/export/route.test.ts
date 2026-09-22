@@ -48,6 +48,24 @@ describe("maintenance-plan export GET staff-scope", () => {
     expect(queryRawMock).not.toHaveBeenCalled();
   });
 
+  it("denies technicians before loading plan rows or contractors", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "tech-1",
+      company_id: "company-1",
+      role: "technician",
+    });
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/properties/property-1/maintenance-plan/export"),
+      params,
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
   it("returns tenant-safe 404 when Tenant A exports a Tenant B propertyId", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "owner-1",
