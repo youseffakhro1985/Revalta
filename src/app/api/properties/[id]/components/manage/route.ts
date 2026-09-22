@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { API_ERROR_CODES, apiErrorResponse } from "@/lib/api-error-response";
 import db from "@/lib/db";
-import { getCurrentUser, tenantWhere } from "@/lib/current-user";
+import { getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { createRouteObservability } from "@/lib/route-observability";
 
 const ROUTE = "/api/properties/[id]/components/manage";
@@ -70,12 +70,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const observability = createRouteObservability(request, ROUTE);
 
   try {
-    const user = await getCurrentUser();
-    if (!user) {
+    const rawUser = await getCurrentUser();
+    if (!rawUser) {
       return reject(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "components.manage.unauthorized" });
     }
-    if (!user.company_id) {
-      return reject(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "components.manage.missing_company", context: { userId: user.id } });
+    const user = requireCompanyUser(rawUser);
+    if (!user) {
+      return reject(observability, {
+        status: 403,
+        code: API_ERROR_CODES.forbidden,
+        message: "En aktiv organisation och personalbehörighet krävs",
+        event: "components.manage.staff_required",
+        context: { userId: rawUser.id, companyId: rawUser.company_id },
+      });
     }
     if (!writableRoles.has(user.role)) {
       return reject(observability, { status: 403, code: API_ERROR_CODES.forbidden, message: "Du saknar behörighet att ändra komponentregistret", event: "components.manage.forbidden", context: { userId: user.id, companyId: user.company_id } });

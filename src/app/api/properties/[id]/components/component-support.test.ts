@@ -354,4 +354,40 @@ describe("component support security contracts", () => {
     expect(body).toEqual({ error: "Internt serverfel", errorCode: "INTERNAL_ERROR", requestId });
     expect(JSON.stringify(body)).not.toContain("component-entry-db-secret");
   });
+
+  it("rejects residents before correcting component history", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await patchEntry(
+      entryRequest({ cost_type: "service", amount_ex_vat: 100, vat_rate: 25, cost_date: "2026-08-18" }),
+      entryParams(),
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the entry-correction copy", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const response = await patchEntry(
+      entryRequest({ cost_type: "service", amount_ex_vat: 100, vat_rate: 25, cost_date: "2026-08-18" }),
+      entryParams(),
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toBe("Du saknar behörighet att korrigera komponenthistorik");
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
 });

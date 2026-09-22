@@ -83,12 +83,19 @@ async function resolveMutationContext(
   params: Promise<{ id: string; componentId: string }>,
   observability: ReturnType<typeof createRouteObservability>,
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const rawUser = await getCurrentUser();
+  if (!rawUser) {
     return { error: reject(observability, { status: 401, code: API_ERROR_CODES.unauthorized, message: "Obehörig", event: "components.detail.update.unauthorized" }) };
   }
-  if (!user.company_id) {
-    return { error: reject(observability, { status: 400, code: API_ERROR_CODES.validationFailed, message: "Användaren saknar organisation", event: "components.detail.update.missing_company", context: { userId: user.id } }) };
+  const user = requireCompanyUser(rawUser);
+  if (!user) {
+    return { error: reject(observability, {
+      status: 403,
+      code: API_ERROR_CODES.forbidden,
+      message: "En aktiv organisation och personalbehörighet krävs",
+      event: "components.detail.update.staff_required",
+      context: { userId: rawUser.id, companyId: rawUser.company_id },
+    }) };
   }
   if (!canCreateProperties(user.role)) {
     return { error: reject(observability, { status: 403, code: API_ERROR_CODES.forbidden, message: "Du saknar behörighet att ändra tekniska komponenter", event: "components.detail.update.forbidden", context: { userId: user.id, companyId: user.company_id } }) };

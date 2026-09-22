@@ -311,4 +311,96 @@ describe("secure component write contracts", () => {
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
     expect(queryRawMock).not.toHaveBeenCalled();
   });
+
+  it("rejects residents before mutating component detail, manage or actions", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const detail = requireResponse(await patchComponent(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1", {
+        name: "Ventilation",
+        status: "active",
+        criticality: "normal",
+      }, "PATCH"),
+      componentParams(),
+    ));
+    expect(detail.status).toBe(403);
+    await expect(detail.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+
+    const manage = await postComponentManage(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/manage", {
+        action: "update",
+        assetId: "asset-1",
+      }),
+      propertyParams(),
+    );
+    expect(manage.status).toBe(403);
+    await expect(manage.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+
+    const action = await postComponentAction(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
+        action: "event",
+        event_type: "service",
+      }),
+      componentParams(),
+    );
+    expect(action.status).toBe(403);
+    await expect(action.json()).resolves.toEqual({
+      error: "En aktiv organisation och personalbehörighet krävs",
+      errorCode: "FORBIDDEN",
+      requestId,
+    });
+
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("denies technicians with the component-manage copies", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
+
+    const detail = requireResponse(await patchComponent(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1", {
+        name: "Ventilation",
+        status: "active",
+        criticality: "normal",
+      }, "PATCH"),
+      componentParams(),
+    ));
+    expect(detail.status).toBe(403);
+    expect((await detail.json()).error).toBe("Du saknar behörighet att ändra tekniska komponenter");
+
+    const manage = await postComponentManage(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/manage", {
+        action: "update",
+        assetId: "asset-1",
+      }),
+      propertyParams(),
+    );
+    expect(manage.status).toBe(403);
+    expect((await manage.json()).error).toBe("Du saknar behörighet att ändra komponentregistret");
+
+    const action = await postComponentAction(
+      jsonRequest("https://www.revalta.se/api/properties/property-1/components/asset-1/actions", {
+        action: "event",
+        event_type: "service",
+      }),
+      componentParams(),
+    );
+    expect(action.status).toBe(403);
+    expect((await action.json()).error).toBe("Du saknar behörighet att registrera komponenthistorik");
+
+    expect(propertyFindFirstMock).not.toHaveBeenCalled();
+  });
 });
