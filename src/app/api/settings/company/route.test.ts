@@ -110,8 +110,22 @@ describe("settings company route", () => {
     getCurrentUserMock.mockResolvedValue(technician);
 
     const response = await PATCH(patchRequest({ name: "Hijack", id: "company-b" }));
+    const body = await response.json();
 
     expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att ändra organisationen");
+    expect(companyUpdateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects resident writes with the unified staff copy", async () => {
+    getCurrentUserMock.mockResolvedValue(resident);
+
+    const response = await PATCH(patchRequest({ name: "Hijack" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
     expect(companyUpdateMock).not.toHaveBeenCalled();
     expect(writeAuditLogMock).not.toHaveBeenCalled();
   });

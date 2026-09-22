@@ -32,7 +32,10 @@ export async function PATCH(request: Request) {
     const rawUser = await getCurrentUser();
     if (!rawUser) return NextResponse.json({ error: "Obehörig" }, { status: 401 });
     const user = requireCompanyUser(rawUser);
-    if (!user || !canManageCompany(user.role)) {
+    if (!user) {
+      return NextResponse.json({ error: "En aktiv organisation och personalbehörighet krävs" }, { status: 403 });
+    }
+    if (!canManageCompany(user.role)) {
       return NextResponse.json({ error: "Du saknar behörighet att ändra organisationen" }, { status: 403 });
     }
 
