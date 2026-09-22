@@ -31,6 +31,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { GET } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 describe("work-orders/[id]/asset-options GET", () => {
   beforeEach(() => {
@@ -59,5 +61,33 @@ describe("work-orders/[id]/asset-options GET", () => {
     expect(workOrderFindFirstMock).not.toHaveBeenCalled();
     expect(buildingFindManyMock).not.toHaveBeenCalled();
     expect(queryRawMock).not.toHaveBeenCalled();
+  });
+
+  it("maps a missing PropertyTechnicalAsset table to 503 SERVICE_UNAVAILABLE", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "owner-1",
+      company_id: "company-1",
+      role: "owner",
+    });
+    queryRawMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.PropertyTechnicalAsset` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.PropertyTechnicalAsset" },
+        },
+      ),
+    );
+
+    const response = await GET(
+      new Request("https://www.revalta.se/api/work-orders/wo-1/asset-options"),
+      { params: Promise.resolve({ id: "wo-1" }) },
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
   });
 });

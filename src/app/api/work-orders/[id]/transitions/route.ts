@@ -6,6 +6,12 @@ import { normalizeWorkOrderStatus } from "@/lib/work-order-workflow";
 import { isAssignedWorkAccessible, notFoundWorkOrder } from "@/lib/assigned-work-access";
 import { createLogger } from "@/lib/structured-logger";
 import { getLatestInvoiceDraft } from "@/lib/work-order-ops-storage";
+import { API_ERROR_CODES } from "@/lib/api-error-response";
+import {
+  isMissingSchemaColumnError,
+  isMissingTableError,
+  schemaMismatchUserMessage,
+} from "@/lib/schema-readiness";
 import {
   INVOICE_DRAFT_NOT_READY_FOR_INVOICING,
   invoiceDraftAllowsWorkOrderInvoicing,
@@ -74,6 +80,15 @@ export async function GET(
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
+    if (isMissingSchemaColumnError(error) || isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error: schemaMismatchUserMessage(),
+          errorCode: API_ERROR_CODES.serviceUnavailable,
+        },
+        { status: 503 },
+      );
+    }
     logger.error("Get work order transitions error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }

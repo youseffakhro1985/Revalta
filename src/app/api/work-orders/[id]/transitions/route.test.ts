@@ -24,6 +24,8 @@ vi.mock("@/lib/work-order-ops-storage", () => ({
 }));
 
 import { GET } from "./route";
+import { Prisma } from "@prisma/client";
+import { schemaMismatchUserMessage } from "@/lib/schema-readiness";
 
 const params = Promise.resolve({ id: "wo-1" });
 
@@ -275,6 +277,27 @@ describe("GET /api/work-orders/[id]/transitions", () => {
     const response = await GET(makeRequest(), { params });
 
     expect(response.status).toBe(500);
+  });
+
+  it("maps a missing WorkOrder table on GET to 503 SERVICE_UNAVAILABLE", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", role: "owner", company_id: "company-1" });
+    workOrderFindFirstMock.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        "The table `public.WorkOrder` does not exist in the current database.",
+        {
+          code: "P2021",
+          clientVersion: "test",
+          meta: { table: "public.WorkOrder" },
+        },
+      ),
+    );
+
+    const response = await GET(makeRequest(), { params });
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe(schemaMismatchUserMessage());
+    expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
   });
 
   it("sets a private, no-store cache header on success", async () => {
