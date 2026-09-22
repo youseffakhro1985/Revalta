@@ -366,3 +366,58 @@ describe("access credentials writes staff-scope", () => {
     expect(accessCredentialFindFirstMock).not.toHaveBeenCalled();
   });
 });
+
+describe("access credentials Tenant B related ids", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns tenant-safe 404 when Tenant A posts a credential against Tenant B propertyId", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    propertyFindFirstMock.mockResolvedValue(null);
+
+    const response = await POST(new Request("http://localhost/api/access-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: "property-tenant-b",
+        identifier: "NYCKEL-B",
+        credentialType: "key",
+        status: "in_stock",
+      }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Fastigheten hittades inte");
+    expect(propertyFindFirstMock).toHaveBeenCalledWith({
+      where: { id: "property-tenant-b", deleted_at: null, company_id: "company-1" },
+      select: { id: true, name: true },
+    });
+    expect(accessCredentialCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A patches a Tenant B credential id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    accessCredentialFindFirstMock.mockResolvedValue(null);
+    auditFindFirstMock.mockResolvedValue(null);
+
+    const response = await PATCH(new Request("http://localhost/api/access-credentials", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credentialId: "cred-tenant-b", status: "blocked" }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("Behörigheten hittades inte");
+    expect(accessCredentialFindFirstMock).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: "cred-tenant-b", company_id: "company-1", property: { deleted_at: null } },
+    }));
+    expect(accessCredentialFindFirstMock).toHaveBeenNthCalledWith(2, {
+      where: { id: "cred-tenant-b", company_id: "company-1" },
+      select: { id: true },
+    });
+    expect(accessCredentialUpdateManyMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+});

@@ -21,6 +21,23 @@ The SHA `92adc33…` below was true when this file was first written (`#933`). I
 - Prisma migrations in repo: 52
 - Inställningar design from `#933` is current and must not be redesigned in this pass
 
+## PR #938 Browser E2E vs Vercel (verified 2026-09-22T14:04Z)
+
+Head commit `c9dc7b576343085b849b6c05716bdcad90a38b46`. Base `main` still `a98ffe2ac44537d35cc6ba7b4c21abec8bbb887e` (not moved). Production `/api/health` still matches that SHA (`dpl_D2smveeUMAoj3AXwKpQanyacqMFR`).
+
+| Check | Result | Cause |
+| --- | --- | --- |
+| Lint, test, migrate and build | success | Revalta CI on `c9dc7b5` |
+| Analyze JavaScript and TypeScript / CodeQL | success | same SHA |
+| Vercel | failure | GitHub status `Deployment rate limited — retry in 24 hours.` `upgradeToPro=build-rate-limit`, updated `2026-09-21T19:51:47Z`. GitHub Deployments for `c9dc7b5` = `[]`. Last published Preview is older SHA `a3e9137` (`dpl_2dLSWKbG15wr2QbJwvzFYLKmVBhW`). |
+| Auth, navigation, mobile and Command Center | failure | Job `35647471658` never started Playwright. Step **Resolve exact-SHA Preview** looped 24×10s against `deployments?sha=c9dc7b5…` then exited `BLOCKED: exact-SHA Vercel Preview was not published before timeout` (`HEAD_SHA: c9dc7b5…`, `MANUAL_PREVIEW_URL` empty). |
+
+This required Browser E2E failure on **PR-head `c9dc7b5` is infrastructural**, not a test/code defect in that commit. Do not change working product code to hide Hobby quota. Do not dummy-commit. Do not `--admin`. Do not re-run the E2E job without an exact-SHA Preview. Do not use `a3e9137` Preview as a surrogate for `c9dc7b5`.
+
+Older SHA `a3e9137` **did** publish Preview and Playwright **did** run: login/dashboard/nav/properties-api passed, then `BLOCKED / NOT VERIFIED: Ticket did not resolve to a work order` (run `35646803772`). That product miss is addressed in local unpushed commits on this branch (golden-path diagnostics + schema-503 fail-closed). Those commits must wait for Hobby quota (~22 Sep ~19:48 UTC from last Preview at `2026-09-21T19:48:23Z`) before **one** legitimate push.
+
+Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED`. `mergeStateStatus: BLOCKED`. Required checks are not green; merge is forbidden.
+
 ## P0
 
 | Item | Evidence | Status |
@@ -35,12 +52,12 @@ The SHA `92adc33…` below was true when this file was first written (`#933`). I
 | CodeQL required | Ruleset already requires job name `Analyze JavaScript and TypeScript` | Verified |
 | Emergency bypass | Ruleset bypass actor is repository owner, mode `always` | Policy documented; GitHub account settings not changed from code |
 | Public portal tenant | UUID slug and first-company/property discovery could select a non-portal tenant | Fail-closed in this change; commercial correctness of `REVALTA_PORTAL_COMPANY_ID` is `OWNER DECISION REQUIRED` |
-| Vercel Hobby Preview quota | Preview still unpublished for many PR checks historically | `BLOCKED / PREVIEW NOT VERIFIED` remains a merge blocker; no `--admin` |
+| Vercel Hobby Preview quota | `#938` head `c9dc7b5` has 0 GitHub Deployments; Vercel status `build-rate-limit` since `2026-09-21T19:51:47Z`. Browser E2E failed before Playwright. Last Preview `a3e9137` is not PR-head. | `BLOCKED / PREVIEW NOT VERIFIED` until Hobby quota recovers (~22 Sep ~19:48 UTC). No `--admin`. No dummy commit. |
 | GitHub Actions YAML | OAuth token lacks `workflow` scope so Uptime/Monitor/Preview migrate files could not be pushed | `OWNER DECISION REQUIRED` — apply `docs/OWNER_WORKFLOW_UPDATES.md` |
 
 ## P1
 
-Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Existing unit/isolation tests are not a substitute for the two-tenant matrix or exact-SHA Preview E2E.
+Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Access-credential POST/PATCH Tenant B ids and handover GET/PUT Tenant B lease id now have unit 404 proofs on this branch; they are not a substitute for exact-SHA Preview E2E. Remaining matrix: inspection related-id, blob/export negatives, technician-role Preview fixture.
 
 ## P2
 
