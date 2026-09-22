@@ -1,6 +1,6 @@
 # Revalta Feature Readiness
 
-Verified baseline: `5f05138a626905ae97bb9c8dd2b5e45df95605a6` (22 Sep 2026, `#942` on `main`). Production `/api/health` at that SHA: `schemaReady: true`, dataplane `e51d9599…`, isolated from Preview `6237f010…`. Staff golden-path, booking-overlap, technician-role, resident-portal and technician-calendar Preview E2E are green on that SHA. This branch adds technician mobile work-order Preview proof on the same required job.
+Verified baseline: `ef0a125e7859377286d69ec099f7083397cea971` (22 Sep 2026, `#943` on `main`). Production `/api/health` at that SHA: `schemaReady: true`, dataplane `e51d9599…`, isolated from Preview `6237f010…`. Staff golden-path, booking-overlap, technician-role, resident-portal, technician-calendar and technician-mobile Preview E2E are green on that SHA. This branch adds technician operations-gate Preview proof on the same required job.
 
 This document is an evidence gate, not a feature catalogue. A route, API or Prisma model existing does **not** make a module production-ready. Historical baselines such as `ec95b376e6e692defb6c252bcb16986bcd6921f4` (`#934`), `92adc33dfd224c698f8a31d0ce59a808faed355e` (Inställningar `#933`) and `b7b08793` (31 Aug 2026) are not current-main evidence.
 
@@ -45,7 +45,7 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Kalender | PARTIAL | Current module exists. GET projects canonical WorkOrder/rond/inspection/lease rows. Technicians only see assigned work orders and do not receive lease or underhållsplan projections. | This PR adds Preview proof that an assigned scheduled work order appears and leases stay omitted. |
 | Ronder | BLOCKED | Current UI/API/checklist implementation exists, but Production status of `20260822010000_inspection_checklist_templates` is unverified. | Read-only Production migration status, restore evidence, checklist tenant smoke. |
 | Besiktningar | PARTIAL | Module exists. | Observation-to-work-order linkage and tenant/security/readiness audit. |
-| Underhåll | PARTIAL | Module exists. Preventive overview/engine, portfolio costs and maintenance-plan CSV export require `canViewOperations` (technicians 403). | Maintenance-plan-to-work-order lifecycle, query and tenant evidence. |
+| Underhåll | PARTIAL | Module exists. Preventive overview/engine, portfolio costs and maintenance-plan CSV export require `canViewOperations` (technicians 403). | This PR adds Preview 403 proof for those technician operations gates. |
 | Skador & försäkring | PARTIAL | Module exists. | Claim relation/security/audit and work-order/project linkage verification. |
 | Boendeportal | PARTIAL | Resident auth/navigation and several resident APIs exist. Public portal is fail-closed to an explicit tenant (no first-company or foreign UUID slug). Unit negatives: Resident A cannot read Tenant B/Resident B tickets/docs; comments/attachments/blob 404; lease lookup is email+company; booking create/cancel 404 on foreign lease/booking; staff lease/booking APIs 403. | This PR adds owner-created resident Preview login + matched lease + ticket + staff 403s. Owner confirmation of portal company id remains. |
 | Uthyrning | PARTIAL | Module exists. Staff `/api/leases` 403 for residents. | Contract/lifecycle/tenant/search/error/mobile readiness review. |

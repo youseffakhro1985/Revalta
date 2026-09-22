@@ -58,7 +58,7 @@ async function attachReleaseGate(context, { baseUrl, bypass, assertRelease, fail
 
 /**
  * Owner-created technician on Preview: hidden unassigned WO, document library
- * 403, bookings 403, assigned WO readable, invoicing 403.
+ * 403, operations gates 403, bookings 403, assigned WO readable, invoicing 403.
  */
 export async function runTechnicianRolePreview({
   browser,
@@ -71,6 +71,7 @@ export async function runTechnicianRolePreview({
   expectPath,
   runId,
   workOrderId,
+  propertyId,
   companyId,
 }) {
   const email = `e2e-tech-${runId}@example.com`;
@@ -115,6 +116,18 @@ export async function runTechnicianRolePreview({
 
     const library = await api(page, "GET", "/api/documents/library");
     validateTechnicianForbidden(library.status, library.body, "Document library");
+
+    const recurring = await api(page, "GET", "/api/work-orders/recurring");
+    validateTechnicianForbidden(recurring.status, recurring.body, "Recurring schedules");
+
+    const preventive = await api(page, "GET", "/api/maintenance/preventive");
+    validateTechnicianForbidden(preventive.status, preventive.body, "Preventive overview");
+
+    const portfolio = await api(page, "GET", "/api/maintenance/portfolio");
+    validateTechnicianForbidden(portfolio.status, portfolio.body, "Portfolio costs");
+
+    const planExport = await api(page, "GET", `/api/properties/${propertyId}/maintenance-plan/export`);
+    validateTechnicianForbidden(planExport.status, planExport.body, "Maintenance-plan CSV export");
 
     const bookings = await api(page, "POST", "/api/bookings", {
       propertyId: "00000000-0000-4000-8000-000000000000",
