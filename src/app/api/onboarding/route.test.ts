@@ -74,8 +74,35 @@ describe("onboarding route", () => {
     expect(companyFindUniqueMock).not.toHaveBeenCalled();
   });
 
+  it("keeps missing-company GET as organisation saknas without dumping progress", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "owner-1", company_id: null, role: "owner" });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ error: "Organisation saknas" });
+    expect(companyFindUniqueMock).not.toHaveBeenCalled();
+  });
+
   it("does not expose organisation onboarding to managers", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ eligible: false, progress: null });
+    expect(companyFindUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it("does not dump onboarding progress to residents", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
 
     const response = await GET();
     const body = await response.json();
@@ -104,9 +131,28 @@ describe("onboarding route", () => {
     getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
 
     const response = await POST(postRequest());
+    const body = await response.json();
 
     expect(response.status).toBe(403);
+    expect(body.error).toBe("Du saknar behörighet att verifiera organisationens onboarding");
     expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects residents before verifying ticket intake", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "resident-1",
+      company_id: "company-1",
+      role: "resident",
+      email: "boende@exempel.se",
+    });
+
+    const response = await POST(postRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("En aktiv organisation och personalbehörighet krävs");
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+    expect(propertyCountMock).not.toHaveBeenCalled();
   });
 
   it("requires a real property before ticket intake can be verified", async () => {
