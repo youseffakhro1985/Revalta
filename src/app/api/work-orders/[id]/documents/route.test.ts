@@ -128,6 +128,24 @@ describe("work-order documents authorization and isolation", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A lists or uploads against a Tenant B work order", async () => {
+    mocks.workOrder.mockResolvedValue(null);
+    const tenantB = { params: Promise.resolve({ id: "wo-tenant-b" }) };
+
+    const getResponse = await GET(new Request("https://www.revalta.se/api/work-orders/wo-tenant-b/documents"), tenantB);
+    const postResponse = await POST(upload(), tenantB);
+
+    expect(getResponse.status).toBe(404);
+    expect((await getResponse.json()).error).toBe("Arbetsordern hittades inte");
+    expect(postResponse.status).toBe(404);
+    expect((await postResponse.json()).error).toBe("Arbetsordern hittades inte");
+    expect(mocks.workOrder).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "wo-tenant-b", company_id: "company-a", deleted_at: null, property: { deleted_at: null } },
+    }));
+    expect(mocks.put).not.toHaveBeenCalled();
+    expect(mocks.findMany).not.toHaveBeenCalled();
+  });
+
   it("denies technicians an unassigned work order", async () => {
     mocks.currentUser.mockResolvedValue({ ...user, role: "technician" });
     mocks.workOrder.mockResolvedValue({ id: "wo-a", assigned_to_id: "other-technician" });

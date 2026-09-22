@@ -79,6 +79,40 @@ describe("work-order document download", () => {
     expect(getBlobMock).not.toHaveBeenCalled();
   });
 
+  it("returns tenant-safe 404 when Tenant A downloads a document from a Tenant B work order", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    findAccessibleWorkOrderMock.mockResolvedValue(null);
+
+    const response = await GET(new Request("https://www.revalta.se/api/document"), {
+      params: Promise.resolve({ id: "wo-tenant-b", documentId: "document-1" }),
+    });
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("Arbetsordern hittades inte");
+    expect(findFirstMock).not.toHaveBeenCalled();
+    expect(getBlobMock).not.toHaveBeenCalled();
+  });
+
+  it("returns tenant-safe 404 when Tenant A downloads a Tenant B work-order document id", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    findFirstMock.mockResolvedValue(null);
+
+    const response = await GET(new Request("https://www.revalta.se/api/document"), {
+      params: Promise.resolve({ id: "work-order-1", documentId: "doc-tenant-b" }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(findFirstMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        deleted_at: null,
+        id: "doc-tenant-b",
+        work_order_id: "work-order-1",
+        company_id: "company-1",
+      },
+    }));
+    expect(getBlobMock).not.toHaveBeenCalled();
+  });
+
   it("streams a private blob without exposing its storage URL", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     findFirstMock.mockResolvedValue({

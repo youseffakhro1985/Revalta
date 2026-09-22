@@ -57,7 +57,7 @@ Exact Preview SHA for current PR-head: `BLOCKED / PREVIEW NOT VERIFIED`. `mergeS
 
 ## P1
 
-Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Access-credential POST/PATCH Tenant B ids and handover GET/PUT Tenant B lease id now have unit 404 proofs on this branch; they are not a substitute for exact-SHA Preview E2E. Remaining matrix: inspection related-id, blob/export negatives, technician-role Preview fixture.
+Tenant negative matrix, golden-path E2E, Stripe/email/SMS/Blob verification, cron smoke against Production, query performance, hotspot refactors, a11y/mobile polish: not claimed READY. Remaining matrix after this branch's unit proofs: quote remaining document/output, booking conflict/concurrency Preview, calendar work-order projection negatives, document library list, manage-create asset id, remaining notification export, technician-role Preview fixture. Exact-SHA Preview E2E on `#938` remains the P0 gate.
 
 ## P2
 
