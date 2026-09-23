@@ -56,6 +56,18 @@ export function validateOwnerBillingPreviewInvalidPlan(status, body) {
   }
 }
 
+export function validateOwnerOnboardingEligible(status, body) {
+  if (status !== 200 || body?.eligible !== true || !body?.progress || typeof body.progress !== "object") {
+    throw new Error("Verified owner onboarding was not returned as eligible");
+  }
+}
+
+export function validateOwnerOnboardingVerified(status, body) {
+  if (status !== 200 || body?.success !== true || !body?.progress || typeof body.progress !== "object") {
+    throw new Error("Verified owner onboarding verify did not persist");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
