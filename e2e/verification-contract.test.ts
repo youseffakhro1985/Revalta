@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -36,6 +36,14 @@ describe("authenticated Preview evidence", () => {
     expect(() => validateOwnerBillingPlanRegistry(200, { canManage: true, plans })).not.toThrow();
     expect(() => validateOwnerBillingPlanRegistry(200, { canManage: true, plans: { ...plans, professional: { label: "Pro" } } })).toThrow(
       /plan registry was not the canonical allowlist/,
+    );
+  });
+
+  it("requires owner billing to expose Stripe readiness flags", () => {
+    const stripePlanReadiness = { start: true, professional: false, enterprise: false };
+    expect(() => validateOwnerBillingStripeReadiness(200, { stripeConfigured: false, stripePlanReadiness })).not.toThrow();
+    expect(() => validateOwnerBillingStripeReadiness(200, { stripeConfigured: "yes", stripePlanReadiness })).toThrow(
+      /did not expose Stripe readiness flags/,
     );
   });
 
@@ -128,6 +136,7 @@ describe("authenticated Preview evidence", () => {
     const workflow = readFileSync(new URL("../.github/workflows/e2e-preview.yml", import.meta.url), "utf8");
     expect(runner).toContain("validateOwnerBillingPreviewDirectPlan");
     expect(runner).toContain("validateOwnerBillingPlanRegistry");
+    expect(runner).toContain("validateOwnerBillingStripeReadiness");
     expect(runner).toContain("validateOwnerBillingPreviewPlanChanged");
     expect(runner).toContain("validateOwnerBillingPreviewInvalidPlan");
     expect(runner).toContain("validateOwnerOnboardingEligible");
