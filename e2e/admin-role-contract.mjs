@@ -121,3 +121,9 @@ export function validateAdminOnboardingEligible(status, body) {
     throw new Error(`Admin onboarding was not returned as eligible (${diagnostic(status, body)})`);
   }
 }
+
+export function validateAdminOnboardingVerified(status, body) {
+  if (status !== 200 || body?.success !== true || !body?.progress || typeof body.progress !== "object") {
+    throw new Error(`Admin onboarding verify did not persist (${diagnostic(status, body)})`);
+  }
+}
