@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -44,6 +44,13 @@ describe("authenticated Preview evidence", () => {
     expect(() => validateOwnerBillingStripeReadiness(200, { stripeConfigured: false, stripePlanReadiness })).not.toThrow();
     expect(() => validateOwnerBillingStripeReadiness(200, { stripeConfigured: "yes", stripePlanReadiness })).toThrow(
       /did not expose Stripe readiness flags/,
+    );
+  });
+
+  it("requires owner billing to expose Stripe portal readiness", () => {
+    expect(() => validateOwnerBillingStripePortalReady(200, { stripePortalReady: false })).not.toThrow();
+    expect(() => validateOwnerBillingStripePortalReady(200, { stripePortalReady: "no" })).toThrow(
+      /did not expose Stripe portal readiness/,
     );
   });
 
@@ -137,6 +144,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerBillingPreviewDirectPlan");
     expect(runner).toContain("validateOwnerBillingPlanRegistry");
     expect(runner).toContain("validateOwnerBillingStripeReadiness");
+    expect(runner).toContain("validateOwnerBillingStripePortalReady");
     expect(runner).toContain("validateOwnerBillingPreviewPlanChanged");
     expect(runner).toContain("validateOwnerBillingPreviewInvalidPlan");
     expect(runner).toContain("validateOwnerOnboardingEligible");
