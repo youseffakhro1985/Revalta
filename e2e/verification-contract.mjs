@@ -30,6 +30,12 @@ export function validateOwnerBillingPreviewDirectPlan(status, body) {
   }
 }
 
+export function validateOwnerBillingPreviewPlanChanged(status, body, plan) {
+  if (status !== 200 || body?.success !== true || body?.company?.plan !== plan) {
+    throw new Error("Verified owner billing did not apply the Preview-only direct plan change");
+  }
+}
+
 export function validateOwnerBillingPreviewInvalidPlan(status, body) {
   if (status !== 400 || body?.errorCode !== "VALIDATION_FAILED") {
     throw new Error("Verified owner billing did not reject an invalid Preview plan change");
