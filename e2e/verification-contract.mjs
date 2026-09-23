@@ -57,6 +57,12 @@ export function validateOwnerBillingStripeReadiness(status, body) {
   }
 }
 
+export function validateOwnerBillingStripePortalReady(status, body) {
+  if (status !== 200 || typeof body?.stripePortalReady !== "boolean") {
+    throw new Error("Verified owner billing did not expose Stripe portal readiness");
+  }
+}
+
 export function validateOwnerBillingPreviewPlanChanged(status, body, plan) {
   if (status !== 200 || body?.success !== true || body?.company?.plan !== plan) {
     throw new Error("Verified owner billing did not apply the Preview-only direct plan change");
