@@ -132,6 +132,14 @@ export function validateAdminBillingPreviewDirectPlan(status, body) {
   }
 }
 
+export function validateAdminBillingPreviewPlanChanged(status, body, plan) {
+  if (status !== 200 || body?.success !== true || body?.company?.plan !== plan) {
+    throw new Error(
+      `Admin billing did not apply the Preview-only direct plan change (${diagnostic(status, body)};plan=${String(body?.company?.plan)})`,
+    );
+  }
+}
+
 export function validateAdminIntegrationsReadable(status, body) {
   if (status !== 200 || !Array.isArray(body?.integrations)) {
     throw new Error(`Admin integrations were not readable (${diagnostic(status, body)})`);
