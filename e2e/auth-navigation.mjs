@@ -9,7 +9,7 @@ import { runViewerRolePreview } from "./viewer-role.mjs";
 import { runManagerRolePreview } from "./manager-role.mjs";
 import { runAdminRolePreview } from "./admin-role.mjs";
 import { runResidentPortalPreview } from "./resident-portal.mjs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
   return runVerifiedPreview(env, async ({ target, assertRelease, complete }) => {
@@ -232,6 +232,11 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         maxRedirects: 0, timeout: 15_000,
       });
       validateOwnerAssignQueueReadable(assignQueue.status(), await assignQueue.json());
+      const lockBoard = await context.request.get(`${baseUrl}/api/work-orders/edit-locks`, {
+        headers: bypass ? { "x-vercel-protection-bypass": bypass } : {},
+        maxRedirects: 0, timeout: 15_000,
+      });
+      validateOwnerLockBoardForceRelease(lockBoard.status(), await lockBoard.json());
       complete("verified-login-and-profile");
       await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
       complete("dashboard");

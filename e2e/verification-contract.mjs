@@ -98,6 +98,12 @@ export function validateOwnerAssignQueueReadable(status, body) {
   }
 }
 
+export function validateOwnerLockBoardForceRelease(status, body) {
+  if (status !== 200 || body?.canForceRelease !== true || !Array.isArray(body?.locks)) {
+    throw new Error("Verified owner lock board did not allow force-release");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
