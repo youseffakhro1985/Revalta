@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -95,6 +95,13 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner assign queue to be readable on Preview", () => {
+    expect(() => validateOwnerAssignQueueReadable(200, { workOrders: [], assignees: [] })).not.toThrow();
+    expect(() => validateOwnerAssignQueueReadable(403, { errorCode: "FORBIDDEN" })).toThrow(
+      /assign queue was not readable/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -122,12 +129,14 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerCompanyManageable");
     expect(runner).toContain("validateOwnerAuditReadable");
     expect(runner).toContain("validateOwnerOperationsReadable");
+    expect(runner).toContain("validateOwnerAssignQueueReadable");
     expect(runner).toContain("/api/billing");
     expect(runner).toContain("/api/onboarding");
     expect(runner).toContain("/api/integrations");
     expect(runner).toContain("/api/settings/company");
     expect(runner).toContain("/api/audit");
     expect(runner).toContain("/api/work-orders/recurring");
+    expect(runner).toContain("/api/work-orders/unassigned-queue");
     expect(runner).toContain("patchOwnerBillingPlan");
     expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(runner).toContain('action: "verify-ticket-intake"');

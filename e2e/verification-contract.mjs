@@ -92,6 +92,12 @@ export function validateOwnerOperationsReadable(status, body) {
   }
 }
 
+export function validateOwnerAssignQueueReadable(status, body) {
+  if (status !== 200 || !Array.isArray(body?.workOrders) || !Array.isArray(body?.assignees)) {
+    throw new Error("Verified owner assign queue was not readable");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
