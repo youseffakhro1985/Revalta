@@ -29,6 +29,7 @@ describe("technician-role contract", () => {
       events: [{ source: "work_order", work_order_id: "wo-1" }],
     }, "wo-1");
     validateTechnicianCompanyReadOnly(200, { canManage: false, company: { id: "co-1" } }, "co-1");
+    validateTechnicianForbidden(403, { errorCode: "FORBIDDEN" }, "Billing plan change");
     validateTechnicianOnboardingIneligible(200, { eligible: false, progress: null });
   });
 
@@ -88,6 +89,8 @@ describe("technician role is wired into the required Preview browser job", () =>
     expect(source).toContain("/api/audit");
     expect(source).toContain("/api/settings/company");
     expect(source).toContain("/api/billing");
+    expect(source).toContain('PATCH", "/api/billing"');
+    expect(source).toContain("Billing plan change");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
     expect(source).toContain("/api/work-orders/unassigned-queue");
