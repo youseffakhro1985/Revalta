@@ -28,6 +28,7 @@ describe("viewer-role contract", () => {
     }, "wo-1");
     validateViewerInvoiceReadable(200, { canManage: false });
     validateViewerCompanyReadOnly(200, { canManage: false, company: { id: "co-1" } }, "co-1");
+    validateViewerForbidden(403, { errorCode: "FORBIDDEN" }, "Billing plan change");
     validateViewerOnboardingIneligible(200, { eligible: false, progress: null });
   });
 
@@ -76,6 +77,8 @@ describe("viewer role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/audit");
     expect(source).toContain("/api/settings/company");
     expect(source).toContain("/api/billing");
+    expect(source).toContain('PATCH", "/api/billing"');
+    expect(source).toContain("Billing plan change");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
     expect(source).toContain("/api/work-orders/recurring");
