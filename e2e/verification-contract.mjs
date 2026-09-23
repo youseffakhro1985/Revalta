@@ -129,6 +129,12 @@ export function validateOwnerUnknownPropertyNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownTicketNotFound(status) {
+  if (status !== 404) {
+    throw new Error("Verified owner unknown ticket did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
