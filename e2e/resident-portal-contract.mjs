@@ -54,6 +54,12 @@ export function validateResidentForbidden(status, body, label) {
   }
 }
 
+export function validateResidentPasswordChangeRejected(status, body) {
+  if (status !== 400 || typeof body?.error !== "string" || body.error.length === 0) {
+    throw new Error(`Resident password change was not rejected on the allowlisted settings route (${diagnostic(status, body)})`);
+  }
+}
+
 export function validateMatchedLeaseVisible(status, body, leaseId) {
   const leases = Array.isArray(body?.leases) ? body.leases : [];
   if (
