@@ -1,8 +1,10 @@
 import { validateLoginResponse } from "./verification-contract.mjs";
 import {
+  validateViewerCompanyReadOnly,
   validateViewerCreated,
   validateViewerForbidden,
   validateViewerInvoiceReadable,
+  validateViewerOnboardingIneligible,
   validateViewerProfile,
   validateViewerPropertyCreateDenied,
   validateViewerWorkOrderReadable,
@@ -127,6 +129,18 @@ export async function runViewerRolePreview({
 
     const audit = await api(page, "GET", "/api/audit");
     validateViewerForbidden(audit.status, audit.body, "Audit log");
+    const companySettings = await api(page, "GET", "/api/settings/company");
+    validateViewerCompanyReadOnly(companySettings.status, companySettings.body, companyId);
+    const companyPatch = await api(page, "PATCH", "/api/settings/company", { name: "E2E blockerad org" });
+    validateViewerForbidden(companyPatch.status, companyPatch.body, "Company settings patch");
+    const billing = await api(page, "GET", "/api/billing");
+    validateViewerForbidden(billing.status, billing.body, "Billing");
+    const integrations = await api(page, "GET", "/api/integrations");
+    validateViewerForbidden(integrations.status, integrations.body, "Integrations");
+    const onboarding = await api(page, "GET", "/api/onboarding");
+    validateViewerOnboardingIneligible(onboarding.status, onboarding.body);
+    const onboardingWrite = await api(page, "POST", "/api/onboarding", { action: "verify-ticket-intake" });
+    validateViewerForbidden(onboardingWrite.status, onboardingWrite.body, "Onboarding verify");
     const recurring = await api(page, "GET", "/api/work-orders/recurring");
     validateViewerForbidden(recurring.status, recurring.body, "Recurring schedules");
     const assignQueue = await api(page, "GET", "/api/work-orders/unassigned-queue");

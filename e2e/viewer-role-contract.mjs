@@ -58,3 +58,15 @@ export function validateViewerInvoiceReadable(status, body) {
     throw new Error(`Viewer invoice basis was not readable without manage rights (${diagnostic(status, body)})`);
   }
 }
+
+export function validateViewerCompanyReadOnly(status, body, companyId) {
+  if (status !== 200 || body?.canManage !== false || body?.company?.id !== companyId) {
+    throw new Error(`Viewer company settings were not read-only (${diagnostic(status, body)})`);
+  }
+}
+
+export function validateViewerOnboardingIneligible(status, body) {
+  if (status !== 200 || body?.eligible !== false || body?.progress !== null) {
+    throw new Error(`Viewer onboarding was not returned as ineligible (${diagnostic(status, body)})`);
+  }
+}

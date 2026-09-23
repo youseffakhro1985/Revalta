@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  validateViewerCompanyReadOnly,
   validateViewerCreated,
   validateViewerForbidden,
   validateViewerInvoiceReadable,
+  validateViewerOnboardingIneligible,
   validateViewerProfile,
   validateViewerPropertyCreateDenied,
   validateViewerWorkOrderReadable,
@@ -25,6 +27,8 @@ describe("viewer-role contract", () => {
       canManageFinance: false,
     }, "wo-1");
     validateViewerInvoiceReadable(200, { canManage: false });
+    validateViewerCompanyReadOnly(200, { canManage: false, company: { id: "co-1" } }, "co-1");
+    validateViewerOnboardingIneligible(200, { eligible: false, progress: null });
   });
 
   it("rejects owner-shaped profiles and writable finance without payloads", () => {
@@ -43,6 +47,12 @@ describe("viewer-role contract", () => {
     }, "wo-1")).toThrow(/company-wide read-only work-order access/);
     expect(() => validateViewerInvoiceReadable(200, { canManage: true })).toThrow(
       /readable without manage rights \(200:none\)/,
+    );
+    expect(() => validateViewerCompanyReadOnly(200, { canManage: true, company: { id: "co-1" } }, "co-1")).toThrow(
+      /company settings were not read-only \(200:none\)/,
+    );
+    expect(() => validateViewerOnboardingIneligible(200, { eligible: true, progress: {} })).toThrow(
+      /onboarding was not returned as ineligible \(200:none\)/,
     );
   });
 });
@@ -64,6 +74,10 @@ describe("viewer role is wired into the required Preview browser job", () => {
     expect(source).toContain('POST", "/api/properties"');
     expect(source).toContain('POST", "/api/team"');
     expect(source).toContain("/api/audit");
+    expect(source).toContain("/api/settings/company");
+    expect(source).toContain("/api/billing");
+    expect(source).toContain("/api/integrations");
+    expect(source).toContain("/api/onboarding");
     expect(source).toContain("/api/work-orders/recurring");
     expect(source).toContain("/api/work-orders/unassigned-queue");
     expect(source).toContain("edit-lock");
