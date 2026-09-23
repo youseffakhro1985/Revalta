@@ -30,6 +30,12 @@ export function validateOwnerBillingPreviewDirectPlan(status, body) {
   }
 }
 
+export function validateOwnerBillingPreviewInvalidPlan(status, body) {
+  if (status !== 400 || body?.errorCode !== "VALIDATION_FAILED") {
+    throw new Error("Verified owner billing did not reject an invalid Preview plan change");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
