@@ -18,6 +18,7 @@ import {
   validateAdminBillingPlanRegistry,
   validateAdminBillingPreviewDirectPlan,
   validateAdminBillingPreviewPlanChanged,
+  validateAdminBillingPreviewInvalidPlan,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
   validateAdminOnboardingVerified,
@@ -58,6 +59,7 @@ describe("admin-role contract", () => {
     });
     validateAdminBillingPreviewDirectPlan(200, { canManage: true, canDirectChangePlan: true });
     validateAdminBillingPreviewPlanChanged(200, { success: true, company: { plan: "start" } }, "start");
+    validateAdminBillingPreviewInvalidPlan(400, { errorCode: "VALIDATION_FAILED" });
     validateAdminIntegrationsReadable(200, { integrations: [] });
     validateAdminOnboardingEligible(200, { eligible: true, progress: { propertyCount: 1 } });
     validateAdminOnboardingVerified(200, { success: true, progress: { propertyCount: 1 } });
@@ -92,6 +94,9 @@ describe("admin-role contract", () => {
     expect(() => validateAdminBillingPreviewPlanChanged(403, { errorCode: "FORBIDDEN" }, "start")).toThrow(
       /Preview-only direct plan change \(403:FORBIDDEN;plan=undefined\)/,
     );
+    expect(() => validateAdminBillingPreviewInvalidPlan(200, { success: true, company: { plan: "start" } })).toThrow(
+      /invalid Preview plan change \(200:none\)/,
+    );
     expect(() => validateAdminOnboardingVerified(403, { errorCode: "FORBIDDEN" })).toThrow(
       /onboarding verify did not persist \(403:FORBIDDEN\)/,
     );
@@ -119,6 +124,8 @@ describe("admin role is wired into the required Preview browser job", () => {
     expect(source).toContain("validateAdminBillingPlanRegistry");
     expect(source).toContain("validateAdminBillingPreviewDirectPlan");
     expect(source).toContain("validateAdminBillingPreviewPlanChanged");
+    expect(source).toContain("validateAdminBillingPreviewInvalidPlan");
+    expect(source).toContain('plan: "unlimited"');
     expect(source).toContain('PATCH", "/api/billing"');
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
