@@ -135,6 +135,8 @@ export async function runViewerRolePreview({
     validateViewerForbidden(companyPatch.status, companyPatch.body, "Company settings patch");
     const billing = await api(page, "GET", "/api/billing");
     validateViewerForbidden(billing.status, billing.body, "Billing");
+    const billingPatch = await api(page, "PATCH", "/api/billing", { plan: "enterprise" });
+    validateViewerForbidden(billingPatch.status, billingPatch.body, "Billing plan change");
     const integrations = await api(page, "GET", "/api/integrations");
     validateViewerForbidden(integrations.status, integrations.body, "Integrations");
     const onboarding = await api(page, "GET", "/api/onboarding");
