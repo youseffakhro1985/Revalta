@@ -80,6 +80,12 @@ export function validateOwnerCompanyManageable(status, body, companyId) {
   }
 }
 
+export function validateOwnerAuditReadable(status, body) {
+  if (status !== 200 || !Array.isArray(body?.auditLogs)) {
+    throw new Error("Verified owner audit log was not readable");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
