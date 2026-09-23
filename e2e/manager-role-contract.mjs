@@ -91,3 +91,15 @@ export function validateOwnerForceRelease(status, body) {
     throw new Error(`Owner could not clear a leftover work-order edit lock (${diagnostic(status, body)})`);
   }
 }
+
+export function validateManagerCompanyReadOnly(status, body, companyId) {
+  if (status !== 200 || body?.canManage !== false || body?.company?.id !== companyId) {
+    throw new Error(`Manager company settings were not read-only (${diagnostic(status, body)})`);
+  }
+}
+
+export function validateManagerOnboardingIneligible(status, body) {
+  if (status !== 200 || body?.eligible !== false || body?.progress !== null) {
+    throw new Error(`Manager onboarding was not returned as ineligible (${diagnostic(status, body)})`);
+  }
+}

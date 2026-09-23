@@ -13,6 +13,10 @@ import {
   validateAdminProfile,
   validateAdminPropertyCreateAllowed,
   validateAdminWorkOrderWritable,
+  validateAdminCompanyManageable,
+  validateAdminBillingReadable,
+  validateAdminIntegrationsReadable,
+  validateAdminOnboardingEligible,
 } from "./admin-role-contract.mjs";
 import { REQUIRED_STEPS } from "./preview-runner.mjs";
 
@@ -38,6 +42,10 @@ describe("admin-role contract", () => {
     validateAdminLockBoardForceRelease(200, { canForceRelease: true, locks: [] });
     validateAdminForceRelease(404);
     expect(validateAdminLockAcquired(201, { lock: { token: "tok" } })).toBe("tok");
+    validateAdminCompanyManageable(200, { canManage: true, company: { id: "co-1" } }, "co-1");
+    validateAdminBillingReadable(200, { canManage: true });
+    validateAdminIntegrationsReadable(200, { integrations: [] });
+    validateAdminOnboardingEligible(200, { eligible: true, progress: { propertyCount: 1 } });
   });
 
   it("rejects manager-shaped access without payloads", () => {
@@ -53,6 +61,12 @@ describe("admin-role contract", () => {
     );
     expect(() => validateAdminForceRelease(403, { errorCode: "FORBIDDEN" })).toThrow(
       /leftover work-order edit lock \(403:FORBIDDEN\)/,
+    );
+    expect(() => validateAdminCompanyManageable(200, { canManage: false, company: { id: "co-1" } }, "co-1")).toThrow(
+      /company settings were not manageable \(200:none\)/,
+    );
+    expect(() => validateAdminBillingReadable(403, { errorCode: "FORBIDDEN" })).toThrow(
+      /billing was not readable \(403:FORBIDDEN\)/,
     );
   });
 });
@@ -73,6 +87,10 @@ describe("admin role is wired into the required Preview browser job", () => {
     expect(source).toContain('role: "admin"');
     expect(source).toContain('role: "owner"');
     expect(source).toContain("/api/audit");
+    expect(source).toContain("/api/settings/company");
+    expect(source).toContain("/api/billing");
+    expect(source).toContain("/api/integrations");
+    expect(source).toContain("/api/onboarding");
     expect(source).toContain("/api/work-orders/edit-locks");
     expect(contract).toContain("canForceRelease");
     expect(source).toContain("DELETE");

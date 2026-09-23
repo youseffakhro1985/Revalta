@@ -12,6 +12,10 @@ import {
   validateAdminProfile,
   validateAdminPropertyCreateAllowed,
   validateAdminWorkOrderWritable,
+  validateAdminCompanyManageable,
+  validateAdminBillingReadable,
+  validateAdminIntegrationsReadable,
+  validateAdminOnboardingEligible,
 } from "./admin-role-contract.mjs";
 
 async function api(page, method, path, body) {
@@ -127,6 +131,15 @@ export async function runAdminRolePreview({
 
     const audit = await api(page, "GET", "/api/audit");
     validateAdminAuditReadable(audit.status, audit.body);
+
+    const companySettings = await api(page, "GET", "/api/settings/company");
+    validateAdminCompanyManageable(companySettings.status, companySettings.body, companyId);
+    const billing = await api(page, "GET", "/api/billing");
+    validateAdminBillingReadable(billing.status, billing.body);
+    const integrations = await api(page, "GET", "/api/integrations");
+    validateAdminIntegrationsReadable(integrations.status, integrations.body);
+    const onboarding = await api(page, "GET", "/api/onboarding");
+    validateAdminOnboardingEligible(onboarding.status, onboarding.body);
 
     const recurring = await api(page, "GET", "/api/work-orders/recurring");
     validateAdminOperationsReadable(recurring.status, recurring.body);
