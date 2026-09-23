@@ -8,6 +8,7 @@ import {
   validateResidentCreated,
   validateResidentForbidden,
   validateResidentLeaseCreated,
+  validateResidentPasswordChangeRejected,
   validateResidentProfile,
   validateResidentTicketCreated,
   validateResidentTicketVisible,
@@ -27,6 +28,7 @@ describe("resident-portal contract", () => {
     }, "co-1");
     validateResidentForbidden(403, { errorCode: "FORBIDDEN" }, "Staff leases");
     validateResidentForbidden(403, { errorCode: "RESIDENT_PORTAL_ONLY" }, "Onboarding");
+    validateResidentPasswordChangeRejected(400, { error: "Nuvarande lösenord är felaktigt" });
     validateMatchedLeaseVisible(200, {
       isResident: true,
       canCreate: true,
@@ -48,6 +50,9 @@ describe("resident-portal contract", () => {
     }, "co-1")).toThrow(/scoped self-service fixture/);
     expect(() => validateResidentForbidden(200, { leases: [] }, "Staff leases")).toThrow(
       /Staff leases was not forbidden \(200:none\)/,
+    );
+    expect(() => validateResidentPasswordChangeRejected(403, { errorCode: "RESIDENT_PORTAL_ONLY" })).toThrow(
+      /allowlisted settings route \(403:RESIDENT_PORTAL_ONLY\)/,
     );
     expect(() => validateMatchedLeaseVisible(200, {
       isResident: true,
@@ -82,8 +87,8 @@ describe("resident portal is wired into the required Preview browser job", () =>
     expect(source).toContain("/api/billing");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
-    expect(source).toContain('validateResidentForbidden(onboarding.status, onboarding.body, "Onboarding")');
-    expect(source).not.toContain("validateResidentOnboardingIneligible");
+    expect(source).toContain("/api/settings/password");
+    expect(source).toContain("validateResidentPasswordChangeRejected");
     expect(source).not.toContain("page.route");
   });
 });

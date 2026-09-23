@@ -7,6 +7,7 @@ import {
   validateResidentCreated,
   validateResidentForbidden,
   validateResidentLeaseCreated,
+  validateResidentPasswordChangeRejected,
   validateResidentProfile,
   validateResidentTicketCreated,
   validateResidentTicketVisible,
@@ -162,6 +163,8 @@ export async function runResidentPortalPreview({
     validateResidentForbidden(onboarding.status, onboarding.body, "Onboarding");
     const onboardingWrite = await api(page, "POST", "/api/onboarding", { action: "verify-ticket-intake" });
     validateResidentForbidden(onboardingWrite.status, onboardingWrite.body, "Onboarding verify");
+    const passwordChange = await api(page, "PATCH", "/api/settings/password", {});
+    validateResidentPasswordChangeRejected(passwordChange.status, passwordChange.body);
 
     const workspace = await api(page, "GET", "/api/resident-portal");
     validateMatchedLeaseVisible(workspace.status, workspace.body, leaseId);
