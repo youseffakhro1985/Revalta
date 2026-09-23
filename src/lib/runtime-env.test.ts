@@ -13,6 +13,20 @@ describe("runtime env", () => {
     expect(allowIntegrationMocks()).toBe(false);
   });
 
+  it("does not treat Vercel Preview as production even when NODE_ENV is production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(isProductionRuntime()).toBe(false);
+    expect(allowIntegrationMocks()).toBe(true);
+  });
+
+  it("treats Vercel Production as production even if NODE_ENV is unset", () => {
+    vi.stubEnv("NODE_ENV", "");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(isProductionRuntime()).toBe(true);
+    expect(allowIntegrationMocks()).toBe(false);
+  });
+
   it("allows mocks outside production", () => {
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("VERCEL_ENV", "");
