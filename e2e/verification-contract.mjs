@@ -68,6 +68,12 @@ export function validateOwnerOnboardingVerified(status, body) {
   }
 }
 
+export function validateOwnerIntegrationsReadable(status, body) {
+  if (status !== 200 || !Array.isArray(body?.integrations)) {
+    throw new Error("Verified owner integrations did not return a readable list");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
