@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
+import { readFileSync } from "node:fs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPreviewDirectPlan, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -20,6 +21,16 @@ describe("authenticated Preview evidence", () => {
     expect(() => validateFixtureProfile(200, { user }, fixture)).not.toThrow();
   });
 
+  it("requires owner billing to expose Preview-only direct plan changes", () => {
+    expect(() => validateOwnerBillingPreviewDirectPlan(200, { canManage: true, canDirectChangePlan: true })).not.toThrow();
+    expect(() => validateOwnerBillingPreviewDirectPlan(200, { canManage: true, canDirectChangePlan: false })).toThrow(
+      /did not expose Preview-only direct plan changes/,
+    );
+    expect(() => validateOwnerBillingPreviewDirectPlan(403, { errorCode: "FORBIDDEN" })).toThrow(
+      /did not expose Preview-only direct plan changes/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -32,6 +43,14 @@ describe("authenticated Preview evidence", () => {
   it("does not accept a missing expected company or an unsuccessful profile response", () => {
     expect(() => validateFixtureProfile(200, { user }, { ...fixture, companyId: "" })).toThrow();
     expect(() => validateFixtureProfile(401, { user }, fixture)).toThrow();
+  });
+
+  it("runs owner billing Preview proof inside verified login without a workflow YAML change", () => {
+    const runner = readFileSync(new URL("./auth-navigation.mjs", import.meta.url), "utf8");
+    const workflow = readFileSync(new URL("../.github/workflows/e2e-preview.yml", import.meta.url), "utf8");
+    expect(runner).toContain("validateOwnerBillingPreviewDirectPlan");
+    expect(runner).toContain("/api/billing");
+    expect(workflow).toContain("node e2e/auth-navigation.mjs");
   });
 
   it("only treats the Fastigheter list contract as paginated property navigation", () => {

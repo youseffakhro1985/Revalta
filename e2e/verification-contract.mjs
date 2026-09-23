@@ -24,6 +24,12 @@ export function validateFixtureProfile(status, body, { email, companyId }) {
   }
 }
 
+export function validateOwnerBillingPreviewDirectPlan(status, body) {
+  if (status !== 200 || body?.canManage !== true || body?.canDirectChangePlan !== true) {
+    throw new Error("Verified owner billing did not expose Preview-only direct plan changes");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
