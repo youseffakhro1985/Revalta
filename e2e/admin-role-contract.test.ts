@@ -17,6 +17,7 @@ import {
   validateAdminBillingReadable,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
+  validateAdminOnboardingVerified,
 } from "./admin-role-contract.mjs";
 import { REQUIRED_STEPS } from "./preview-runner.mjs";
 
@@ -46,6 +47,7 @@ describe("admin-role contract", () => {
     validateAdminBillingReadable(200, { canManage: true });
     validateAdminIntegrationsReadable(200, { integrations: [] });
     validateAdminOnboardingEligible(200, { eligible: true, progress: { propertyCount: 1 } });
+    validateAdminOnboardingVerified(200, { success: true, progress: { propertyCount: 1 } });
   });
 
   it("rejects manager-shaped access without payloads", () => {
@@ -67,6 +69,9 @@ describe("admin-role contract", () => {
     );
     expect(() => validateAdminBillingReadable(403, { errorCode: "FORBIDDEN" })).toThrow(
       /billing was not readable \(403:FORBIDDEN\)/,
+    );
+    expect(() => validateAdminOnboardingVerified(403, { errorCode: "FORBIDDEN" })).toThrow(
+      /onboarding verify did not persist \(403:FORBIDDEN\)/,
     );
   });
 });
@@ -91,6 +96,8 @@ describe("admin role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/billing");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
+    expect(source).toContain('action: "verify-ticket-intake"');
+    expect(source).toContain("validateAdminOnboardingVerified");
     expect(source).toContain("/api/work-orders/edit-locks");
     expect(contract).toContain("canForceRelease");
     expect(source).toContain("DELETE");

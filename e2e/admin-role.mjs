@@ -16,6 +16,7 @@ import {
   validateAdminBillingReadable,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
+  validateAdminOnboardingVerified,
 } from "./admin-role-contract.mjs";
 
 async function api(page, method, path, body) {
@@ -140,6 +141,8 @@ export async function runAdminRolePreview({
     validateAdminIntegrationsReadable(integrations.status, integrations.body);
     const onboarding = await api(page, "GET", "/api/onboarding");
     validateAdminOnboardingEligible(onboarding.status, onboarding.body);
+    const onboardingWrite = await api(page, "POST", "/api/onboarding", { action: "verify-ticket-intake" });
+    validateAdminOnboardingVerified(onboardingWrite.status, onboardingWrite.body);
 
     const recurring = await api(page, "GET", "/api/work-orders/recurring");
     validateAdminOperationsReadable(recurring.status, recurring.body);
