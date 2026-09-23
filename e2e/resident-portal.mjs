@@ -157,6 +157,8 @@ export async function runResidentPortalPreview({
     validateResidentForbidden(companyPatch.status, companyPatch.body, "Company settings patch");
     const billing = await api(page, "GET", "/api/billing");
     validateResidentForbidden(billing.status, billing.body, "Billing");
+    const billingPatch = await api(page, "PATCH", "/api/billing", { plan: "enterprise" });
+    validateResidentForbidden(billingPatch.status, billingPatch.body, "Billing plan change");
     const integrations = await api(page, "GET", "/api/integrations");
     validateResidentForbidden(integrations.status, integrations.body, "Integrations");
     const onboarding = await api(page, "GET", "/api/onboarding");
