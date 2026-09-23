@@ -9,7 +9,7 @@ import { runViewerRolePreview } from "./viewer-role.mjs";
 import { runManagerRolePreview } from "./manager-role.mjs";
 import { runAdminRolePreview } from "./admin-role.mjs";
 import { runResidentPortalPreview } from "./resident-portal.mjs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPreviewDirectPlan, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
   return runVerifiedPreview(env, async ({ target, assertRelease, complete }) => {
@@ -149,6 +149,11 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       validateFixtureProfile(profile.status(), profileBody, { email: fixtureEmail, companyId: fixtureCompany });
       const staffUserId = String(profileBody?.user?.id || "");
       if (!staffUserId) fail("Fixture profile did not include a user id");
+      const billing = await context.request.get(`${baseUrl}/api/billing`, {
+        headers: bypass ? { "x-vercel-protection-bypass": bypass } : {},
+        maxRedirects: 0, timeout: 15_000,
+      });
+      validateOwnerBillingPreviewDirectPlan(billing.status(), await billing.json());
       complete("verified-login-and-profile");
       await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
       complete("dashboard");
