@@ -9,7 +9,7 @@ import { runViewerRolePreview } from "./viewer-role.mjs";
 import { runManagerRolePreview } from "./manager-role.mjs";
 import { runAdminRolePreview } from "./admin-role.mjs";
 import { runResidentPortalPreview } from "./resident-portal.mjs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
   return runVerifiedPreview(env, async ({ target, assertRelease, complete }) => {
@@ -156,6 +156,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       const billingBody = await billing.json();
       validateOwnerBillingPreviewDirectPlan(billing.status(), billingBody);
       validateOwnerBillingPlanRegistry(billing.status(), billingBody);
+      validateOwnerBillingStripeReadiness(billing.status(), billingBody);
       const currentPlan = billingBody?.currentPlan;
       if (currentPlan !== "start" && currentPlan !== "professional" && currentPlan !== "enterprise") {
         fail("Verified owner billing current plan was not an allowlisted storage id");

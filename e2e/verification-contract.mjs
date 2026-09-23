@@ -44,6 +44,19 @@ export function validateOwnerBillingPlanRegistry(status, body) {
   }
 }
 
+export function validateOwnerBillingStripeReadiness(status, body) {
+  const readiness = body?.stripePlanReadiness;
+  if (
+    status !== 200
+    || typeof body?.stripeConfigured !== "boolean"
+    || typeof readiness?.start !== "boolean"
+    || typeof readiness?.professional !== "boolean"
+    || typeof readiness?.enterprise !== "boolean"
+  ) {
+    throw new Error("Verified owner billing did not expose Stripe readiness flags");
+  }
+}
+
 export function validateOwnerBillingPreviewPlanChanged(status, body, plan) {
   if (status !== 200 || body?.success !== true || body?.company?.plan !== plan) {
     throw new Error("Verified owner billing did not apply the Preview-only direct plan change");
