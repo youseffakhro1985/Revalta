@@ -85,7 +85,7 @@ describe("admin-role contract", () => {
       /canonical allowlist \(200:none\)/,
     );
     expect(() => validateAdminBillingPreviewDirectPlan(200, { canManage: true, canDirectChangePlan: false })).toThrow(
-      /Preview-only direct plan changes \(200:none\)/,
+      /Preview-only direct plan changes \(200:none;canDirectChangePlan=false\)/,
     );
     expect(() => validateAdminOnboardingVerified(403, { errorCode: "FORBIDDEN" })).toThrow(
       /onboarding verify did not persist \(403:FORBIDDEN\)/,

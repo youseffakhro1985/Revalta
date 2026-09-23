@@ -178,6 +178,24 @@ describe("billing route", () => {
     expect(body.canDirectChangePlan).toBe(false);
   });
 
+  it("reports canDirectChangePlan as true on Vercel Preview even when NODE_ENV is production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    getCurrentUserMock.mockResolvedValue({
+      id: "admin-1",
+      company_id: "company-1",
+      role: "admin",
+      company: { plan: "start" },
+    });
+
+    const response = await GET(getRequest());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.canManage).toBe(true);
+    expect(body.canDirectChangePlan).toBe(true);
+  });
+
   it("returns a safe correlated 500 without leaking dependency details", async () => {
     getCurrentUserMock.mockRejectedValue(new Error("postgres://billing-user:secret@database.internal/revalta"));
 
@@ -237,6 +255,22 @@ describe("billing route", () => {
       expect(body.errorCode).toBe("FORBIDDEN");
       expect(body.requestId).toBe(requestId);
       expect(transactionMock).not.toHaveBeenCalled();
+    });
+
+    it("allows direct plan changes on Vercel Preview even when NODE_ENV is production", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("VERCEL_ENV", "preview");
+      getCurrentUserMock.mockResolvedValue({ id: "admin-1", company_id: "company-1", role: "admin" });
+
+      const response = await PATCH(patchRequest({ plan: "enterprise" }));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({
+        success: true,
+        company: { id: "company-1", name: "Testfastigheter AB", plan: "enterprise" },
+      });
+      expect(transactionMock).toHaveBeenCalledTimes(1);
     });
 
     it("returns 400 for a plan not in the allowed set outside production", async () => {

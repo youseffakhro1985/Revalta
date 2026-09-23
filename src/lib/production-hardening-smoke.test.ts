@@ -16,6 +16,14 @@ describe("production-hardening smoke", () => {
     expect(allowIntegrationMocks()).toBe(false);
   });
 
+  it("håller Vercel Preview utanför produktionsfail-closed", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("ALLOW_INTEGRATION_MOCKS", "");
+    expect(isProductionRuntime()).toBe(false);
+    expect(allowIntegrationMocks()).toBe(true);
+  });
+
   it("portal tracking tokens är HMAC-verifierbara", () => {
     vi.stubEnv("JWT_SECRET", "test-jwt-secret-for-smoke-checks");
     const token = createPortalTrackingToken({

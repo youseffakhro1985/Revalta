@@ -126,7 +126,9 @@ export function validateAdminBillingPlanRegistry(status, body) {
 
 export function validateAdminBillingPreviewDirectPlan(status, body) {
   if (status !== 200 || body?.canManage !== true || body?.canDirectChangePlan !== true) {
-    throw new Error(`Admin billing did not expose Preview-only direct plan changes (${diagnostic(status, body)})`);
+    throw new Error(
+      `Admin billing did not expose Preview-only direct plan changes (${diagnostic(status, body)};canDirectChangePlan=${String(body?.canDirectChangePlan)})`,
+    );
   }
 }
 
