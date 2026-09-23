@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownPropertyNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -124,6 +124,13 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner unknown property writes to stay not found", () => {
+    expect(() => validateOwnerUnknownPropertyNotFound(404, { errorCode: "NOT_FOUND" })).not.toThrow();
+    expect(() => validateOwnerUnknownPropertyNotFound(200, { success: true })).toThrow(
+      /unknown property did not stay not found/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -155,6 +162,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerOperationsReadable");
     expect(runner).toContain("validateOwnerAssignQueueReadable");
     expect(runner).toContain("validateOwnerLockBoardForceRelease");
+    expect(runner).toContain("validateOwnerUnknownPropertyNotFound");
     expect(runner).toContain("/api/billing");
     expect(runner).toContain("/api/onboarding");
     expect(runner).toContain("/api/integrations");
@@ -163,6 +171,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("/api/work-orders/recurring");
     expect(runner).toContain("/api/work-orders/unassigned-queue");
     expect(runner).toContain("/api/work-orders/edit-locks");
+    expect(runner).toContain("/api/properties/00000000-0000-4000-8000-000000000001");
     expect(runner).toContain("patchOwnerBillingPlan");
     expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(runner).toContain('action: "verify-ticket-intake"');
