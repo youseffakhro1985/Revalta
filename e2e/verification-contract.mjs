@@ -74,6 +74,12 @@ export function validateOwnerIntegrationsReadable(status, body) {
   }
 }
 
+export function validateOwnerCompanyManageable(status, body, companyId) {
+  if (status !== 200 || body?.canManage !== true || body?.company?.id !== companyId) {
+    throw new Error("Verified owner company settings did not stay manageable");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
