@@ -86,6 +86,12 @@ export function validateOwnerAuditReadable(status, body) {
   }
 }
 
+export function validateOwnerOperationsReadable(status, body) {
+  if (status !== 200 || !Array.isArray(body?.schedules) || !body?.health) {
+    throw new Error("Verified owner operations overview was not readable");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
