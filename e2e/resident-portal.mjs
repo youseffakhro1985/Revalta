@@ -7,6 +7,7 @@ import {
   validateResidentCreated,
   validateResidentForbidden,
   validateResidentLeaseCreated,
+  validateResidentOnboardingIneligible,
   validateResidentProfile,
   validateResidentTicketCreated,
   validateResidentTicketVisible,
@@ -149,6 +150,19 @@ export async function runResidentPortalPreview({
 
     const hiddenWorkOrder = await api(page, "GET", `/api/work-orders/${workOrderId}`);
     validateResidentForbidden(hiddenWorkOrder.status, hiddenWorkOrder.body, "Staff work order");
+
+    const companySettings = await api(page, "GET", "/api/settings/company");
+    validateResidentForbidden(companySettings.status, companySettings.body, "Company settings");
+    const companyPatch = await api(page, "PATCH", "/api/settings/company", { name: "E2E blockerad org" });
+    validateResidentForbidden(companyPatch.status, companyPatch.body, "Company settings patch");
+    const billing = await api(page, "GET", "/api/billing");
+    validateResidentForbidden(billing.status, billing.body, "Billing");
+    const integrations = await api(page, "GET", "/api/integrations");
+    validateResidentForbidden(integrations.status, integrations.body, "Integrations");
+    const onboarding = await api(page, "GET", "/api/onboarding");
+    validateResidentOnboardingIneligible(onboarding.status, onboarding.body);
+    const onboardingWrite = await api(page, "POST", "/api/onboarding", { action: "verify-ticket-intake" });
+    validateResidentForbidden(onboardingWrite.status, onboardingWrite.body, "Onboarding verify");
 
     const workspace = await api(page, "GET", "/api/resident-portal");
     validateMatchedLeaseVisible(workspace.status, workspace.body, leaseId);
