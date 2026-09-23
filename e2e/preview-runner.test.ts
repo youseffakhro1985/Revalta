@@ -187,6 +187,8 @@ it("required browser flow uses the live Fastigheter dashboard route", () => {
   expect(source).not.toContain("/dashboard/properties");
   expect(source).toContain('pathname === "/api/auth/login"');
   expect(source).toContain("sanitizePreviewFailure");
+  expect(source).toContain("form#register-form[data-ready='1']");
+  expect(source).toContain("register POST did not produce a response");
 });
 
 it("actual runner intercepts POST before forwarding and aborts when the datastore changes", async () => {

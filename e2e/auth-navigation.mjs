@@ -77,8 +77,10 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
             ...request.headers(),
             ...(sameOrigin && bypass ? { "x-vercel-protection-bypass": bypass } : {}),
           } });
-        } catch {
+        } catch (error) {
           requestGateFailed = true;
+          const reason = error instanceof Error ? error.message.slice(0, 180) : "unknown";
+          console.error(`release gate aborted a mutation: ${reason}`);
           await route.abort("blockedbyclient");
         }
       });
@@ -111,7 +113,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       page.on("requestfailed", (request) => {
         if (request.url().endsWith("/api/auth/register") && request.method() === "POST") {
           registerRequestFailure = request.failure()?.errorText || "unknown network failure";
-          console.error("register request failed at browser network layer");
+          console.error(`register request failed at browser network layer: ${registerRequestFailure}`);
         }
       });
 
@@ -349,6 +351,7 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
       // Playwright promises that can mask the real diagnostic failure.
       await page.goto("/register", { waitUntil: "domcontentloaded" });
       await expectVisible(page.getByRole("heading", { name: "Skapa ditt Revalta-konto" }), "register heading");
+      await expectVisible(page.locator("form#register-form[data-ready='1']"), "hydrated register form");
       await page.getByLabel("Namn").fill("Revalta E2E Owner");
       await page.getByLabel("Organisation").fill(companyName);
       const registerEmailInput = page.getByLabel("E-post");
@@ -375,9 +378,17 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         "register submit did not emit POST /api/auth/register",
       );
       const observedRegisterResponse = await waitForValue(
-        () => registerResponse,
+        () => {
+          if (requestGateFailed) {
+            fail("register mutation was blocked by release identity verification");
+          }
+          if (registerRequestFailure) {
+            fail(`register POST did not produce a response (network failure: ${registerRequestFailure})`);
+          }
+          return registerResponse;
+        },
         REGISTER_DIAGNOSTIC_TIMEOUT_MS,
-        `register POST was emitted but produced no response${registerRequestFailure ? ` (network failure: ${registerRequestFailure})` : ""}`,
+        "register POST did not produce a response",
       );
       const registerLatencyMs = Date.now() - registerStartedAt;
       if (observedRegisterResponse.status() !== 201) {
