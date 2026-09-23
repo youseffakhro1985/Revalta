@@ -26,6 +26,7 @@ describe("resident-portal contract", () => {
       user: { role: "resident", status: "active", company_id: "co-1", company: { id: "co-1" } },
     }, "co-1");
     validateResidentForbidden(403, { errorCode: "FORBIDDEN" }, "Staff leases");
+    validateResidentForbidden(403, { errorCode: "RESIDENT_PORTAL_ONLY" }, "Onboarding");
     validateMatchedLeaseVisible(200, {
       isResident: true,
       canCreate: true,
@@ -77,6 +78,12 @@ describe("resident portal is wired into the required Preview browser job", () =>
     expect(source).toContain("/api/team");
     expect(source).toContain("/api/resident-portal");
     expect(source).toContain("/api/leases");
+    expect(source).toContain("/api/settings/company");
+    expect(source).toContain("/api/billing");
+    expect(source).toContain("/api/integrations");
+    expect(source).toContain("/api/onboarding");
+    expect(source).toContain('validateResidentForbidden(onboarding.status, onboarding.body, "Onboarding")');
+    expect(source).not.toContain("validateResidentOnboardingIneligible");
     expect(source).not.toContain("page.route");
   });
 });
