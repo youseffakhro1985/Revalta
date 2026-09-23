@@ -28,6 +28,7 @@ describe("resident-portal contract", () => {
     }, "co-1");
     validateResidentForbidden(403, { errorCode: "FORBIDDEN" }, "Staff leases");
     validateResidentForbidden(403, { errorCode: "RESIDENT_PORTAL_ONLY" }, "Onboarding");
+    validateResidentForbidden(403, { errorCode: "RESIDENT_PORTAL_ONLY" }, "Billing plan change");
     validateResidentPasswordChangeRejected(400, { error: "Nuvarande lösenord är felaktigt" });
     validateMatchedLeaseVisible(200, {
       isResident: true,
@@ -85,6 +86,8 @@ describe("resident portal is wired into the required Preview browser job", () =>
     expect(source).toContain("/api/leases");
     expect(source).toContain("/api/settings/company");
     expect(source).toContain("/api/billing");
+    expect(source).toContain('PATCH", "/api/billing"');
+    expect(source).toContain("Billing plan change");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
     expect(source).toContain("/api/settings/password");
