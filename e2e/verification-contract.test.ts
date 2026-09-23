@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerIntegrationsReadable, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -67,6 +67,13 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner integrations to be readable on Preview", () => {
+    expect(() => validateOwnerIntegrationsReadable(200, { integrations: [] })).not.toThrow();
+    expect(() => validateOwnerIntegrationsReadable(403, { errorCode: "FORBIDDEN" })).toThrow(
+      /integrations did not return a readable list/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -90,8 +97,10 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerBillingPreviewInvalidPlan");
     expect(runner).toContain("validateOwnerOnboardingEligible");
     expect(runner).toContain("validateOwnerOnboardingVerified");
+    expect(runner).toContain("validateOwnerIntegrationsReadable");
     expect(runner).toContain("/api/billing");
     expect(runner).toContain("/api/onboarding");
+    expect(runner).toContain("/api/integrations");
     expect(runner).toContain("patchOwnerBillingPlan");
     expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(runner).toContain('action: "verify-ticket-intake"');
