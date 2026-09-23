@@ -17,6 +17,7 @@ import {
   validateAdminBillingPlanRegistry,
   validateAdminBillingPreviewDirectPlan,
   validateAdminBillingPreviewPlanChanged,
+  validateAdminBillingPreviewInvalidPlan,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
   validateAdminOnboardingVerified,
@@ -151,6 +152,8 @@ export async function runAdminRolePreview({
     validateAdminBillingPreviewPlanChanged(changed.status, changed.body, nextPlan);
     const restored = await api(page, "PATCH", "/api/billing", { plan: currentPlan });
     validateAdminBillingPreviewPlanChanged(restored.status, restored.body, currentPlan);
+    const invalidPlan = await api(page, "PATCH", "/api/billing", { plan: "unlimited" });
+    validateAdminBillingPreviewInvalidPlan(invalidPlan.status, invalidPlan.body);
     const integrations = await api(page, "GET", "/api/integrations");
     validateAdminIntegrationsReadable(integrations.status, integrations.body);
     const onboarding = await api(page, "GET", "/api/onboarding");

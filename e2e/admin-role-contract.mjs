@@ -140,6 +140,14 @@ export function validateAdminBillingPreviewPlanChanged(status, body, plan) {
   }
 }
 
+export function validateAdminBillingPreviewInvalidPlan(status, body) {
+  if (status !== 400 || body?.errorCode !== "VALIDATION_FAILED") {
+    throw new Error(
+      `Admin billing did not reject an invalid Preview plan change (${diagnostic(status, body)})`,
+    );
+  }
+}
+
 export function validateAdminIntegrationsReadable(status, body) {
   if (status !== 200 || !Array.isArray(body?.integrations)) {
     throw new Error(`Admin integrations were not readable (${diagnostic(status, body)})`);
