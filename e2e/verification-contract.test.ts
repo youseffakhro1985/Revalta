@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -81,6 +81,13 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner audit log to be readable on Preview", () => {
+    expect(() => validateOwnerAuditReadable(200, { auditLogs: [] })).not.toThrow();
+    expect(() => validateOwnerAuditReadable(403, { errorCode: "FORBIDDEN" })).toThrow(
+      /audit log was not readable/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -106,10 +113,12 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerOnboardingVerified");
     expect(runner).toContain("validateOwnerIntegrationsReadable");
     expect(runner).toContain("validateOwnerCompanyManageable");
+    expect(runner).toContain("validateOwnerAuditReadable");
     expect(runner).toContain("/api/billing");
     expect(runner).toContain("/api/onboarding");
     expect(runner).toContain("/api/integrations");
     expect(runner).toContain("/api/settings/company");
+    expect(runner).toContain("/api/audit");
     expect(runner).toContain("patchOwnerBillingPlan");
     expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(runner).toContain('action: "verify-ticket-intake"');
