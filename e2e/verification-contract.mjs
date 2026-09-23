@@ -147,6 +147,12 @@ export function validateOwnerUnknownLeaseNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownProjectNotFound(status, body) {
+  if (status !== 404 || body?.success === true) {
+    throw new Error("Verified owner unknown project did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");

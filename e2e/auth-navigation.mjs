@@ -9,7 +9,7 @@ import { runViewerRolePreview } from "./viewer-role.mjs";
 import { runManagerRolePreview } from "./manager-role.mjs";
 import { runAdminRolePreview } from "./admin-role.mjs";
 import { runResidentPortalPreview } from "./resident-portal.mjs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownProjectNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
 
 export async function runAuthNavigation(env = process.env, dependencies = {}) {
   return runVerifiedPreview(env, async ({ target, assertRelease, complete }) => {
@@ -306,6 +306,23 @@ export async function runAuthNavigation(env = process.env, dependencies = {}) {
         return { status: response.status, body: json };
       });
       validateOwnerUnknownLeaseNotFound(unknownLease.status, unknownLease.body);
+      const unknownProject = await page.evaluate(async () => {
+        const response = await fetch("/api/projects/00000000-0000-4000-8000-000000000005", {
+          method: "PATCH",
+          credentials: "same-origin",
+          redirect: "manual",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ title: "E2E unknown project" }),
+        });
+        let json = null;
+        try {
+          json = await response.json();
+        } catch {
+          json = null;
+        }
+        return { status: response.status, body: json };
+      });
+      validateOwnerUnknownProjectNotFound(unknownProject.status, unknownProject.body);
       complete("verified-login-and-profile");
       await expectVisible(page.getByRole("link", { name: "Fastigheter", exact: true }), "Fastigheter navigation");
       complete("dashboard");
