@@ -110,6 +110,20 @@ export function validateAdminBillingReadable(status, body) {
   }
 }
 
+export function validateAdminBillingPlanRegistry(status, body) {
+  const plans = body?.plans;
+  if (
+    status !== 200
+    || body?.canManage !== true
+    || !plans
+    || plans.start?.label !== "Start"
+    || plans.professional?.label !== "Standard"
+    || plans.enterprise?.label !== "Professional"
+  ) {
+    throw new Error(`Admin billing plan registry was not the canonical allowlist (${diagnostic(status, body)})`);
+  }
+}
+
 export function validateAdminIntegrationsReadable(status, body) {
   if (status !== 200 || !Array.isArray(body?.integrations)) {
     throw new Error(`Admin integrations were not readable (${diagnostic(status, body)})`);

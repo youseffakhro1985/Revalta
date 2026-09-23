@@ -14,6 +14,7 @@ import {
   validateAdminWorkOrderWritable,
   validateAdminCompanyManageable,
   validateAdminBillingReadable,
+  validateAdminBillingPlanRegistry,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
   validateAdminOnboardingVerified,
@@ -137,6 +138,7 @@ export async function runAdminRolePreview({
     validateAdminCompanyManageable(companySettings.status, companySettings.body, companyId);
     const billing = await api(page, "GET", "/api/billing");
     validateAdminBillingReadable(billing.status, billing.body);
+    validateAdminBillingPlanRegistry(billing.status, billing.body);
     const integrations = await api(page, "GET", "/api/integrations");
     validateAdminIntegrationsReadable(integrations.status, integrations.body);
     const onboarding = await api(page, "GET", "/api/onboarding");
