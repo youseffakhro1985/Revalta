@@ -30,6 +30,20 @@ export function validateOwnerBillingPreviewDirectPlan(status, body) {
   }
 }
 
+export function validateOwnerBillingPlanRegistry(status, body) {
+  const plans = body?.plans;
+  if (
+    status !== 200
+    || body?.canManage !== true
+    || !plans
+    || plans.start?.label !== "Start"
+    || plans.professional?.label !== "Standard"
+    || plans.enterprise?.label !== "Professional"
+  ) {
+    throw new Error("Verified owner billing plan registry was not the canonical allowlist");
+  }
+}
+
 export function validateOwnerBillingPreviewPlanChanged(status, body, plan) {
   if (status !== 200 || body?.success !== true || body?.company?.plan !== plan) {
     throw new Error("Verified owner billing did not apply the Preview-only direct plan change");

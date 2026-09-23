@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -28,6 +28,14 @@ describe("authenticated Preview evidence", () => {
     );
     expect(() => validateOwnerBillingPreviewDirectPlan(403, { errorCode: "FORBIDDEN" })).toThrow(
       /did not expose Preview-only direct plan changes/,
+    );
+  });
+
+  it("requires owner billing to expose the canonical plan registry", () => {
+    const plans = { start: { label: "Start" }, professional: { label: "Standard" }, enterprise: { label: "Professional" } };
+    expect(() => validateOwnerBillingPlanRegistry(200, { canManage: true, plans })).not.toThrow();
+    expect(() => validateOwnerBillingPlanRegistry(200, { canManage: true, plans: { ...plans, professional: { label: "Pro" } } })).toThrow(
+      /plan registry was not the canonical allowlist/,
     );
   });
 
@@ -66,6 +74,7 @@ describe("authenticated Preview evidence", () => {
     const runner = readFileSync(new URL("./auth-navigation.mjs", import.meta.url), "utf8");
     const workflow = readFileSync(new URL("../.github/workflows/e2e-preview.yml", import.meta.url), "utf8");
     expect(runner).toContain("validateOwnerBillingPreviewDirectPlan");
+    expect(runner).toContain("validateOwnerBillingPlanRegistry");
     expect(runner).toContain("validateOwnerBillingPreviewPlanChanged");
     expect(runner).toContain("validateOwnerBillingPreviewInvalidPlan");
     expect(runner).toContain("/api/billing");
