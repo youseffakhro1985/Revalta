@@ -11,6 +11,8 @@ import {
   validateManagerPropertyCreateAllowed,
   validateManagerWorkOrderWritable,
   validateOwnerForceRelease,
+  validateManagerCompanyReadOnly,
+  validateManagerOnboardingIneligible,
 } from "./manager-role-contract.mjs";
 
 async function api(page, method, path, body) {
@@ -126,6 +128,19 @@ export async function runManagerRolePreview({
 
     const audit = await api(page, "GET", "/api/audit");
     validateManagerForbidden(audit.status, audit.body, "Audit log");
+
+    const companySettings = await api(page, "GET", "/api/settings/company");
+    validateManagerCompanyReadOnly(companySettings.status, companySettings.body, companyId);
+    const companyPatch = await api(page, "PATCH", "/api/settings/company", { name: "E2E blockerad org" });
+    validateManagerForbidden(companyPatch.status, companyPatch.body, "Company settings patch");
+    const billing = await api(page, "GET", "/api/billing");
+    validateManagerForbidden(billing.status, billing.body, "Billing");
+    const integrations = await api(page, "GET", "/api/integrations");
+    validateManagerForbidden(integrations.status, integrations.body, "Integrations");
+    const onboarding = await api(page, "GET", "/api/onboarding");
+    validateManagerOnboardingIneligible(onboarding.status, onboarding.body);
+    const onboardingWrite = await api(page, "POST", "/api/onboarding", { action: "verify-ticket-intake" });
+    validateManagerForbidden(onboardingWrite.status, onboardingWrite.body, "Onboarding verify");
 
     const recurring = await api(page, "GET", "/api/work-orders/recurring");
     validateManagerOperationsReadable(recurring.status, recurring.body);

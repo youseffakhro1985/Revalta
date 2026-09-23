@@ -12,6 +12,8 @@ import {
   validateManagerPropertyCreateAllowed,
   validateManagerWorkOrderWritable,
   validateOwnerForceRelease,
+  validateManagerCompanyReadOnly,
+  validateManagerOnboardingIneligible,
 } from "./manager-role-contract.mjs";
 import { REQUIRED_STEPS } from "./preview-runner.mjs";
 
@@ -37,6 +39,8 @@ describe("manager-role contract", () => {
     validateManagerLockBoardReadable(200, { canForceRelease: false, locks: [] });
     validateOwnerForceRelease(404);
     validateOwnerForceRelease(200, { released: true });
+    validateManagerCompanyReadOnly(200, { canManage: false, company: { id: "co-1" } }, "co-1");
+    validateManagerOnboardingIneligible(200, { eligible: false, progress: null });
   });
 
   it("rejects viewer-shaped access and missing operations payloads", () => {
@@ -66,6 +70,12 @@ describe("manager-role contract", () => {
     expect(() => validateOwnerForceRelease(403, { errorCode: "FORBIDDEN" })).toThrow(
       /leftover work-order edit lock \(403:FORBIDDEN\)/,
     );
+    expect(() => validateManagerCompanyReadOnly(200, { canManage: true, company: { id: "co-1" } }, "co-1")).toThrow(
+      /company settings were not read-only \(200:none\)/,
+    );
+    expect(() => validateManagerOnboardingIneligible(200, { eligible: true, progress: {} })).toThrow(
+      /onboarding was not returned as ineligible \(200:none\)/,
+    );
   });
 });
 
@@ -86,6 +96,10 @@ describe("manager role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/work-orders/recurring");
     expect(source).toContain("/api/work-orders/unassigned-queue");
     expect(source).toContain("/api/audit");
+    expect(source).toContain("/api/settings/company");
+    expect(source).toContain("/api/billing");
+    expect(source).toContain("/api/integrations");
+    expect(source).toContain("/api/onboarding");
     expect(source).toContain('POST", "/api/team"');
     expect(source).toContain("edit-lock");
     expect(source).toContain("/api/work-orders/edit-locks");
