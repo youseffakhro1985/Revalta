@@ -135,6 +135,8 @@ export async function runManagerRolePreview({
     validateManagerForbidden(companyPatch.status, companyPatch.body, "Company settings patch");
     const billing = await api(page, "GET", "/api/billing");
     validateManagerForbidden(billing.status, billing.body, "Billing");
+    const billingPatch = await api(page, "PATCH", "/api/billing", { plan: "enterprise" });
+    validateManagerForbidden(billingPatch.status, billingPatch.body, "Billing plan change");
     const integrations = await api(page, "GET", "/api/integrations");
     validateManagerForbidden(integrations.status, integrations.body, "Integrations");
     const onboarding = await api(page, "GET", "/api/onboarding");

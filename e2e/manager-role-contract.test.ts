@@ -40,6 +40,7 @@ describe("manager-role contract", () => {
     validateOwnerForceRelease(404);
     validateOwnerForceRelease(200, { released: true });
     validateManagerCompanyReadOnly(200, { canManage: false, company: { id: "co-1" } }, "co-1");
+    validateManagerForbidden(403, { errorCode: "FORBIDDEN" }, "Billing plan change");
     validateManagerOnboardingIneligible(200, { eligible: false, progress: null });
   });
 
@@ -98,6 +99,8 @@ describe("manager role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/audit");
     expect(source).toContain("/api/settings/company");
     expect(source).toContain("/api/billing");
+    expect(source).toContain('PATCH", "/api/billing"');
+    expect(source).toContain("Billing plan change");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
     expect(source).toContain('POST", "/api/team"');
