@@ -16,6 +16,7 @@ import {
   validateAdminBillingReadable,
   validateAdminBillingPlanRegistry,
   validateAdminBillingPreviewDirectPlan,
+  validateAdminBillingPreviewPlanChanged,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
   validateAdminOnboardingVerified,
@@ -141,6 +142,15 @@ export async function runAdminRolePreview({
     validateAdminBillingReadable(billing.status, billing.body);
     validateAdminBillingPlanRegistry(billing.status, billing.body);
     validateAdminBillingPreviewDirectPlan(billing.status, billing.body);
+    const currentPlan = billing.body?.currentPlan;
+    if (currentPlan !== "start" && currentPlan !== "professional" && currentPlan !== "enterprise") {
+      fail(`Admin billing current plan was not an allowlisted storage id (${String(currentPlan)})`);
+    }
+    const nextPlan = currentPlan === "start" ? "professional" : "start";
+    const changed = await api(page, "PATCH", "/api/billing", { plan: nextPlan });
+    validateAdminBillingPreviewPlanChanged(changed.status, changed.body, nextPlan);
+    const restored = await api(page, "PATCH", "/api/billing", { plan: currentPlan });
+    validateAdminBillingPreviewPlanChanged(restored.status, restored.body, currentPlan);
     const integrations = await api(page, "GET", "/api/integrations");
     validateAdminIntegrationsReadable(integrations.status, integrations.body);
     const onboarding = await api(page, "GET", "/api/onboarding");
