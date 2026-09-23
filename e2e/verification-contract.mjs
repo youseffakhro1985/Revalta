@@ -141,6 +141,12 @@ export function validateOwnerUnknownWorkOrderNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownLeaseNotFound(status, body) {
+  if (status !== 404 || body?.success === true) {
+    throw new Error("Verified owner unknown lease did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
