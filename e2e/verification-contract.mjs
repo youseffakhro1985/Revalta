@@ -135,6 +135,12 @@ export function validateOwnerUnknownTicketNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownWorkOrderNotFound(status, body) {
+  if (status !== 404 || body?.success === true) {
+    throw new Error("Verified owner unknown work order did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
