@@ -8,7 +8,6 @@ import {
   validateResidentCreated,
   validateResidentForbidden,
   validateResidentLeaseCreated,
-  validateResidentOnboardingIneligible,
   validateResidentProfile,
   validateResidentTicketCreated,
   validateResidentTicketVisible,
@@ -27,7 +26,7 @@ describe("resident-portal contract", () => {
       user: { role: "resident", status: "active", company_id: "co-1", company: { id: "co-1" } },
     }, "co-1");
     validateResidentForbidden(403, { errorCode: "FORBIDDEN" }, "Staff leases");
-    validateResidentOnboardingIneligible(200, { eligible: false, progress: null });
+    validateResidentForbidden(403, { errorCode: "RESIDENT_PORTAL_ONLY" }, "Onboarding");
     validateMatchedLeaseVisible(200, {
       isResident: true,
       canCreate: true,
@@ -49,9 +48,6 @@ describe("resident-portal contract", () => {
     }, "co-1")).toThrow(/scoped self-service fixture/);
     expect(() => validateResidentForbidden(200, { leases: [] }, "Staff leases")).toThrow(
       /Staff leases was not forbidden \(200:none\)/,
-    );
-    expect(() => validateResidentOnboardingIneligible(200, { eligible: true, progress: {} })).toThrow(
-      /onboarding was not returned as ineligible \(200:none\)/,
     );
     expect(() => validateMatchedLeaseVisible(200, {
       isResident: true,
@@ -86,6 +82,8 @@ describe("resident portal is wired into the required Preview browser job", () =>
     expect(source).toContain("/api/billing");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
+    expect(source).toContain('validateResidentForbidden(onboarding.status, onboarding.body, "Onboarding")');
+    expect(source).not.toContain("validateResidentOnboardingIneligible");
     expect(source).not.toContain("page.route");
   });
 });

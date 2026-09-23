@@ -54,12 +54,6 @@ export function validateResidentForbidden(status, body, label) {
   }
 }
 
-export function validateResidentOnboardingIneligible(status, body) {
-  if (status !== 200 || body?.eligible !== false || body?.progress !== null) {
-    throw new Error(`Resident onboarding was not returned as ineligible (${diagnostic(status, body)})`);
-  }
-}
-
 export function validateMatchedLeaseVisible(status, body, leaseId) {
   const leases = Array.isArray(body?.leases) ? body.leases : [];
   if (

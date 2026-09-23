@@ -7,7 +7,6 @@ import {
   validateResidentCreated,
   validateResidentForbidden,
   validateResidentLeaseCreated,
-  validateResidentOnboardingIneligible,
   validateResidentProfile,
   validateResidentTicketCreated,
   validateResidentTicketVisible,
@@ -160,7 +159,7 @@ export async function runResidentPortalPreview({
     const integrations = await api(page, "GET", "/api/integrations");
     validateResidentForbidden(integrations.status, integrations.body, "Integrations");
     const onboarding = await api(page, "GET", "/api/onboarding");
-    validateResidentOnboardingIneligible(onboarding.status, onboarding.body);
+    validateResidentForbidden(onboarding.status, onboarding.body, "Onboarding");
     const onboardingWrite = await api(page, "POST", "/api/onboarding", { action: "verify-ticket-intake" });
     validateResidentForbidden(onboardingWrite.status, onboardingWrite.body, "Onboarding verify");
 
