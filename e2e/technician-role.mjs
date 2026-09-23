@@ -4,8 +4,10 @@ import {
   validateAssignedWorkOrderVisible,
   validateTechnicianCalendarAssigned,
   validateTechnicianCalendarHidden,
+  validateTechnicianCompanyReadOnly,
   validateTechnicianCreated,
   validateTechnicianForbidden,
+  validateTechnicianOnboardingIneligible,
   validateTechnicianProfile,
   validateTechnicianPropertyCreateDenied,
   validateUnassignedWorkOrderHidden,
@@ -149,6 +151,18 @@ export async function runTechnicianRolePreview({
 
     const audit = await api(page, "GET", "/api/audit");
     validateTechnicianForbidden(audit.status, audit.body, "Audit log");
+    const companySettings = await api(page, "GET", "/api/settings/company");
+    validateTechnicianCompanyReadOnly(companySettings.status, companySettings.body, companyId);
+    const companyPatch = await api(page, "PATCH", "/api/settings/company", { name: "E2E blockerad org" });
+    validateTechnicianForbidden(companyPatch.status, companyPatch.body, "Company settings patch");
+    const billing = await api(page, "GET", "/api/billing");
+    validateTechnicianForbidden(billing.status, billing.body, "Billing");
+    const integrations = await api(page, "GET", "/api/integrations");
+    validateTechnicianForbidden(integrations.status, integrations.body, "Integrations");
+    const onboarding = await api(page, "GET", "/api/onboarding");
+    validateTechnicianOnboardingIneligible(onboarding.status, onboarding.body);
+    const onboardingWrite = await api(page, "POST", "/api/onboarding", { action: "verify-ticket-intake" });
+    validateTechnicianForbidden(onboardingWrite.status, onboardingWrite.body, "Onboarding verify");
 
     const workOrderQueue = await api(page, "GET", "/api/work-orders/unassigned-queue");
     validateTechnicianForbidden(workOrderQueue.status, workOrderQueue.body, "Work-order assign queue");

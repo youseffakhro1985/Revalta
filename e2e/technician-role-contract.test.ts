@@ -4,8 +4,10 @@ import {
   validateAssignedWorkOrderVisible,
   validateTechnicianCalendarAssigned,
   validateTechnicianCalendarHidden,
+  validateTechnicianCompanyReadOnly,
   validateTechnicianCreated,
   validateTechnicianForbidden,
+  validateTechnicianOnboardingIneligible,
   validateTechnicianProfile,
   validateTechnicianPropertyCreateDenied,
   validateUnassignedWorkOrderHidden,
@@ -26,6 +28,8 @@ describe("technician-role contract", () => {
     validateTechnicianCalendarAssigned(200, {
       events: [{ source: "work_order", work_order_id: "wo-1" }],
     }, "wo-1");
+    validateTechnicianCompanyReadOnly(200, { canManage: false, company: { id: "co-1" } }, "co-1");
+    validateTechnicianOnboardingIneligible(200, { eligible: false, progress: null });
   });
 
   it("rejects owner-shaped profiles and leaked unassigned work without payloads", () => {
@@ -50,6 +54,12 @@ describe("technician-role contract", () => {
     expect(() => validateTechnicianCalendarAssigned(200, {
       events: [{ source: "work_order", work_order_id: "other" }],
     }, "wo-1")).toThrow(/did not project the assigned work order/);
+    expect(() => validateTechnicianCompanyReadOnly(200, { canManage: true, company: { id: "co-1" } }, "co-1")).toThrow(
+      /company settings were not read-only \(200:none\)/,
+    );
+    expect(() => validateTechnicianOnboardingIneligible(200, { eligible: true, progress: {} })).toThrow(
+      /onboarding was not returned as ineligible \(200:none\)/,
+    );
   });
 });
 
@@ -76,6 +86,10 @@ describe("technician role is wired into the required Preview browser job", () =>
     expect(source).toContain('POST", "/api/properties"');
     expect(source).toContain('POST", "/api/team"');
     expect(source).toContain("/api/audit");
+    expect(source).toContain("/api/settings/company");
+    expect(source).toContain("/api/billing");
+    expect(source).toContain("/api/integrations");
+    expect(source).toContain("/api/onboarding");
     expect(source).toContain("/api/work-orders/unassigned-queue");
     expect(source).toContain("/api/tickets/unassigned-queue");
     expect(source).toContain("assignedToId");

@@ -78,3 +78,15 @@ export function validateTechnicianCalendarAssigned(status, body, workOrderId) {
     throw new Error(`Technician calendar did not project the assigned work order (${diagnostic(status, body)})`);
   }
 }
+
+export function validateTechnicianCompanyReadOnly(status, body, companyId) {
+  if (status !== 200 || body?.canManage !== false || body?.company?.id !== companyId) {
+    throw new Error(`Technician company settings were not read-only (${diagnostic(status, body)})`);
+  }
+}
+
+export function validateTechnicianOnboardingIneligible(status, body) {
+  if (status !== 200 || body?.eligible !== false || body?.progress !== null) {
+    throw new Error(`Technician onboarding was not returned as ineligible (${diagnostic(status, body)})`);
+  }
+}
