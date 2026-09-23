@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -31,6 +31,16 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner billing to apply an allowlisted Preview plan change", () => {
+    expect(() => validateOwnerBillingPreviewPlanChanged(200, { success: true, company: { plan: "start" } }, "start")).not.toThrow();
+    expect(() => validateOwnerBillingPreviewPlanChanged(200, { success: true, company: { plan: "professional" } }, "start")).toThrow(
+      /did not apply the Preview-only direct plan change/,
+    );
+    expect(() => validateOwnerBillingPreviewPlanChanged(403, { errorCode: "FORBIDDEN" }, "start")).toThrow(
+      /did not apply the Preview-only direct plan change/,
+    );
+  });
+
   it("requires owner billing to reject an invalid Preview plan change", () => {
     expect(() => validateOwnerBillingPreviewInvalidPlan(400, { errorCode: "VALIDATION_FAILED" })).not.toThrow();
     expect(() => validateOwnerBillingPreviewInvalidPlan(200, { success: true })).toThrow(
@@ -56,9 +66,11 @@ describe("authenticated Preview evidence", () => {
     const runner = readFileSync(new URL("./auth-navigation.mjs", import.meta.url), "utf8");
     const workflow = readFileSync(new URL("../.github/workflows/e2e-preview.yml", import.meta.url), "utf8");
     expect(runner).toContain("validateOwnerBillingPreviewDirectPlan");
+    expect(runner).toContain("validateOwnerBillingPreviewPlanChanged");
     expect(runner).toContain("validateOwnerBillingPreviewInvalidPlan");
     expect(runner).toContain("/api/billing");
-    expect(runner).toContain('plan: "unlimited"');
+    expect(runner).toContain("patchOwnerBillingPlan");
+    expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(workflow).toContain("node e2e/auth-navigation.mjs");
   });
 
