@@ -16,6 +16,7 @@ import {
   validateAdminCompanyManageable,
   validateAdminBillingReadable,
   validateAdminBillingPlanRegistry,
+  validateAdminBillingPreviewDirectPlan,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
   validateAdminOnboardingVerified,
@@ -54,6 +55,7 @@ describe("admin-role contract", () => {
         enterprise: { label: "Professional" },
       },
     });
+    validateAdminBillingPreviewDirectPlan(200, { canManage: true, canDirectChangePlan: true });
     validateAdminIntegrationsReadable(200, { integrations: [] });
     validateAdminOnboardingEligible(200, { eligible: true, progress: { propertyCount: 1 } });
     validateAdminOnboardingVerified(200, { success: true, progress: { propertyCount: 1 } });
@@ -82,6 +84,9 @@ describe("admin-role contract", () => {
     expect(() => validateAdminBillingPlanRegistry(200, { canManage: true, plans: { start: { label: "Pro" } } })).toThrow(
       /canonical allowlist \(200:none\)/,
     );
+    expect(() => validateAdminBillingPreviewDirectPlan(200, { canManage: true, canDirectChangePlan: false })).toThrow(
+      /Preview-only direct plan changes \(200:none\)/,
+    );
     expect(() => validateAdminOnboardingVerified(403, { errorCode: "FORBIDDEN" })).toThrow(
       /onboarding verify did not persist \(403:FORBIDDEN\)/,
     );
@@ -107,6 +112,7 @@ describe("admin role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/settings/company");
     expect(source).toContain("/api/billing");
     expect(source).toContain("validateAdminBillingPlanRegistry");
+    expect(source).toContain("validateAdminBillingPreviewDirectPlan");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
     expect(source).toContain('action: "verify-ticket-intake"');

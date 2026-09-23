@@ -124,6 +124,12 @@ export function validateAdminBillingPlanRegistry(status, body) {
   }
 }
 
+export function validateAdminBillingPreviewDirectPlan(status, body) {
+  if (status !== 200 || body?.canManage !== true || body?.canDirectChangePlan !== true) {
+    throw new Error(`Admin billing did not expose Preview-only direct plan changes (${diagnostic(status, body)})`);
+  }
+}
+
 export function validateAdminIntegrationsReadable(status, body) {
   if (status !== 200 || !Array.isArray(body?.integrations)) {
     throw new Error(`Admin integrations were not readable (${diagnostic(status, body)})`);
