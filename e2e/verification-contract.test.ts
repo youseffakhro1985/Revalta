@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPreviewDirectPlan, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -31,6 +31,13 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner billing to reject an invalid Preview plan change", () => {
+    expect(() => validateOwnerBillingPreviewInvalidPlan(400, { errorCode: "VALIDATION_FAILED" })).not.toThrow();
+    expect(() => validateOwnerBillingPreviewInvalidPlan(200, { success: true })).toThrow(
+      /did not reject an invalid Preview plan change/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -49,7 +56,9 @@ describe("authenticated Preview evidence", () => {
     const runner = readFileSync(new URL("./auth-navigation.mjs", import.meta.url), "utf8");
     const workflow = readFileSync(new URL("../.github/workflows/e2e-preview.yml", import.meta.url), "utf8");
     expect(runner).toContain("validateOwnerBillingPreviewDirectPlan");
+    expect(runner).toContain("validateOwnerBillingPreviewInvalidPlan");
     expect(runner).toContain("/api/billing");
+    expect(runner).toContain('plan: "unlimited"');
     expect(workflow).toContain("node e2e/auth-navigation.mjs");
   });
 
