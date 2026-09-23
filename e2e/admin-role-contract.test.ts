@@ -15,6 +15,7 @@ import {
   validateAdminWorkOrderWritable,
   validateAdminCompanyManageable,
   validateAdminBillingReadable,
+  validateAdminBillingPlanRegistry,
   validateAdminIntegrationsReadable,
   validateAdminOnboardingEligible,
   validateAdminOnboardingVerified,
@@ -45,6 +46,14 @@ describe("admin-role contract", () => {
     expect(validateAdminLockAcquired(201, { lock: { token: "tok" } })).toBe("tok");
     validateAdminCompanyManageable(200, { canManage: true, company: { id: "co-1" } }, "co-1");
     validateAdminBillingReadable(200, { canManage: true });
+    validateAdminBillingPlanRegistry(200, {
+      canManage: true,
+      plans: {
+        start: { label: "Start" },
+        professional: { label: "Standard" },
+        enterprise: { label: "Professional" },
+      },
+    });
     validateAdminIntegrationsReadable(200, { integrations: [] });
     validateAdminOnboardingEligible(200, { eligible: true, progress: { propertyCount: 1 } });
     validateAdminOnboardingVerified(200, { success: true, progress: { propertyCount: 1 } });
@@ -70,6 +79,9 @@ describe("admin-role contract", () => {
     expect(() => validateAdminBillingReadable(403, { errorCode: "FORBIDDEN" })).toThrow(
       /billing was not readable \(403:FORBIDDEN\)/,
     );
+    expect(() => validateAdminBillingPlanRegistry(200, { canManage: true, plans: { start: { label: "Pro" } } })).toThrow(
+      /canonical allowlist \(200:none\)/,
+    );
     expect(() => validateAdminOnboardingVerified(403, { errorCode: "FORBIDDEN" })).toThrow(
       /onboarding verify did not persist \(403:FORBIDDEN\)/,
     );
@@ -94,6 +106,7 @@ describe("admin role is wired into the required Preview browser job", () => {
     expect(source).toContain("/api/audit");
     expect(source).toContain("/api/settings/company");
     expect(source).toContain("/api/billing");
+    expect(source).toContain("validateAdminBillingPlanRegistry");
     expect(source).toContain("/api/integrations");
     expect(source).toContain("/api/onboarding");
     expect(source).toContain('action: "verify-ticket-intake"');
