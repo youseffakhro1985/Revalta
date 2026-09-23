@@ -123,6 +123,12 @@ export function validateOwnerLockBoardForceRelease(status, body) {
   }
 }
 
+export function validateOwnerUnknownPropertyNotFound(status, body) {
+  if (status !== 404 || body?.errorCode !== "NOT_FOUND") {
+    throw new Error("Verified owner unknown property did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
