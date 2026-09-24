@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownAccessNotFound, validateOwnerUnknownBookingNotFound, validateOwnerUnknownBudgetNotFound, validateOwnerUnknownBuildingNotFound, validateOwnerUnknownComponentNotFound, validateOwnerUnknownTicketRestoreNotFound, validateOwnerUnknownWorkOrderRestoreNotFound, validateOwnerUnknownPropertyRestoreNotFound, validateOwnerUnknownProjectRestoreNotFound, validateOwnerUnknownLeaseRestoreNotFound, validateOwnerUnknownLeaseHolderRestoreNotFound, validateOwnerUnknownTicketCommentNotFound, validateOwnerUnknownWorkOrderCommentNotFound, validateOwnerUnknownProjectCommentNotFound, validateOwnerUnknownWorkOrderTimeEntryNotFound, validateOwnerUnknownWorkOrderMaterialNotFound, validateOwnerUnknownWorkOrderExecutionNotFound, validateOwnerUnknownTicketWorkOrderNotFound, validateOwnerUnknownInspectionWorkOrderNotFound, validateOwnerUnknownQuoteWorkOrderNotFound, validateOwnerUnknownInsuranceClaimWorkOrderNotFound, validateOwnerUnknownWorkOrderProjectNotFound, validateOwnerUnknownUnitNotFound, validateOwnerUnknownCalendarNotFound, validateOwnerUnknownChecklistNotFound, validateOwnerUnknownClaimNotFound, validateOwnerUnknownEnergyNotFound, validateOwnerUnknownDocumentNotFound, validateOwnerUnknownImdNotFound, validateOwnerUnknownOperationalDocumentNotFound, validateOwnerUnknownInspectionNotFound, validateOwnerUnknownLeaseHolderNotFound, validateOwnerUnknownRentNoticeNotFound, validateOwnerUnknownNotificationNotFound, validateOwnerUnknownMaintenanceNotFound, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownProjectNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownQuoteNotFound, validateOwnerUnknownRoundNotFound, validateOwnerUnknownTeamMemberNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownVendorNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownAccessNotFound, validateOwnerUnknownBookingNotFound, validateOwnerUnknownBudgetNotFound, validateOwnerUnknownBuildingNotFound, validateOwnerUnknownComponentNotFound, validateOwnerUnknownTicketRestoreNotFound, validateOwnerUnknownWorkOrderRestoreNotFound, validateOwnerUnknownPropertyRestoreNotFound, validateOwnerUnknownProjectRestoreNotFound, validateOwnerUnknownLeaseRestoreNotFound, validateOwnerUnknownLeaseHolderRestoreNotFound, validateOwnerUnknownTicketCommentNotFound, validateOwnerUnknownWorkOrderCommentNotFound, validateOwnerUnknownProjectCommentNotFound, validateOwnerUnknownWorkOrderTimeEntryNotFound, validateOwnerUnknownWorkOrderMaterialNotFound, validateOwnerUnknownWorkOrderExecutionNotFound, validateOwnerUnknownTicketWorkOrderNotFound, validateOwnerUnknownInspectionWorkOrderNotFound, validateOwnerUnknownQuoteWorkOrderNotFound, validateOwnerUnknownInsuranceClaimWorkOrderNotFound, validateOwnerUnknownWorkOrderProjectNotFound, validateOwnerUnknownRoundWorkOrderNotFound, validateOwnerUnknownUnitNotFound, validateOwnerUnknownCalendarNotFound, validateOwnerUnknownChecklistNotFound, validateOwnerUnknownClaimNotFound, validateOwnerUnknownEnergyNotFound, validateOwnerUnknownDocumentNotFound, validateOwnerUnknownImdNotFound, validateOwnerUnknownOperationalDocumentNotFound, validateOwnerUnknownInspectionNotFound, validateOwnerUnknownLeaseHolderNotFound, validateOwnerUnknownRentNoticeNotFound, validateOwnerUnknownNotificationNotFound, validateOwnerUnknownMaintenanceNotFound, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownProjectNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownQuoteNotFound, validateOwnerUnknownRoundNotFound, validateOwnerUnknownTeamMemberNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownVendorNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -672,6 +672,19 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner unknown round work-order writes to stay not found without leftover errorCode", () => {
+    expect(() => validateOwnerUnknownRoundWorkOrderNotFound(404, { error: "Ronden hittades inte" })).not.toThrow();
+    expect(() => validateOwnerUnknownRoundWorkOrderNotFound(200, { success: true })).toThrow(
+      /unknown round work-order did not stay not found/,
+    );
+    expect(() => validateOwnerUnknownRoundWorkOrderNotFound(404, { error: "Ronden hittades inte", errorCode: "NOT_FOUND" })).toThrow(
+      /unknown round work-order did not stay not found/,
+    );
+    expect(() => validateOwnerUnknownRoundWorkOrderNotFound(404, { error: "Not found" })).toThrow(
+      /unknown round work-order did not stay not found/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -747,6 +760,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerUnknownQuoteWorkOrderNotFound");
     expect(runner).toContain("validateOwnerUnknownInsuranceClaimWorkOrderNotFound");
     expect(runner).toContain("validateOwnerUnknownWorkOrderProjectNotFound");
+    expect(runner).toContain("validateOwnerUnknownRoundWorkOrderNotFound");
     expect(runner).toContain("/api/billing");
     expect(runner).toContain("/api/onboarding");
     expect(runner).toContain("/api/integrations");
@@ -812,6 +826,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("/api/quotes/00000000-0000-4000-8000-000000000042/work-order");
     expect(runner).toContain("/api/insurance-claims/00000000-0000-4000-8000-000000000043/work-order");
     expect(runner).toContain("/api/work-orders/00000000-0000-4000-8000-000000000044/project");
+    expect(runner).toContain("/api/rounds/00000000-0000-4000-8000-000000000045/work-orders");
     expect(runner).toContain("patchOwnerBillingPlan");
     expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(runner).toContain('action: "verify-ticket-intake"');
