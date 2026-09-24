@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownAccessNotFound, validateOwnerUnknownBookingNotFound, validateOwnerUnknownBudgetNotFound, validateOwnerUnknownBuildingNotFound, validateOwnerUnknownComponentNotFound, validateOwnerUnknownTicketRestoreNotFound, validateOwnerUnknownWorkOrderRestoreNotFound, validateOwnerUnknownPropertyRestoreNotFound, validateOwnerUnknownProjectRestoreNotFound, validateOwnerUnknownLeaseRestoreNotFound, validateOwnerUnknownLeaseHolderRestoreNotFound, validateOwnerUnknownUnitNotFound, validateOwnerUnknownCalendarNotFound, validateOwnerUnknownChecklistNotFound, validateOwnerUnknownClaimNotFound, validateOwnerUnknownEnergyNotFound, validateOwnerUnknownDocumentNotFound, validateOwnerUnknownImdNotFound, validateOwnerUnknownOperationalDocumentNotFound, validateOwnerUnknownInspectionNotFound, validateOwnerUnknownLeaseHolderNotFound, validateOwnerUnknownRentNoticeNotFound, validateOwnerUnknownNotificationNotFound, validateOwnerUnknownMaintenanceNotFound, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownProjectNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownQuoteNotFound, validateOwnerUnknownRoundNotFound, validateOwnerUnknownTeamMemberNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownVendorNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownAccessNotFound, validateOwnerUnknownBookingNotFound, validateOwnerUnknownBudgetNotFound, validateOwnerUnknownBuildingNotFound, validateOwnerUnknownComponentNotFound, validateOwnerUnknownTicketRestoreNotFound, validateOwnerUnknownWorkOrderRestoreNotFound, validateOwnerUnknownPropertyRestoreNotFound, validateOwnerUnknownProjectRestoreNotFound, validateOwnerUnknownLeaseRestoreNotFound, validateOwnerUnknownLeaseHolderRestoreNotFound, validateOwnerUnknownTicketCommentNotFound, validateOwnerUnknownUnitNotFound, validateOwnerUnknownCalendarNotFound, validateOwnerUnknownChecklistNotFound, validateOwnerUnknownClaimNotFound, validateOwnerUnknownEnergyNotFound, validateOwnerUnknownDocumentNotFound, validateOwnerUnknownImdNotFound, validateOwnerUnknownOperationalDocumentNotFound, validateOwnerUnknownInspectionNotFound, validateOwnerUnknownLeaseHolderNotFound, validateOwnerUnknownRentNoticeNotFound, validateOwnerUnknownNotificationNotFound, validateOwnerUnknownMaintenanceNotFound, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownProjectNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownQuoteNotFound, validateOwnerUnknownRoundNotFound, validateOwnerUnknownTeamMemberNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownVendorNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -529,6 +529,19 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner unknown ticket comment writes to stay not found without leftover errorCode", () => {
+    expect(() => validateOwnerUnknownTicketCommentNotFound(404, { error: "Ärendet hittades inte" })).not.toThrow();
+    expect(() => validateOwnerUnknownTicketCommentNotFound(200, { success: true })).toThrow(
+      /unknown ticket comment did not stay not found/,
+    );
+    expect(() => validateOwnerUnknownTicketCommentNotFound(404, { error: "Ärendet hittades inte", errorCode: "NOT_FOUND" })).toThrow(
+      /unknown ticket comment did not stay not found/,
+    );
+    expect(() => validateOwnerUnknownTicketCommentNotFound(404, { error: "Not found" })).toThrow(
+      /unknown ticket comment did not stay not found/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -593,6 +606,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerUnknownProjectRestoreNotFound");
     expect(runner).toContain("validateOwnerUnknownLeaseRestoreNotFound");
     expect(runner).toContain("validateOwnerUnknownLeaseHolderRestoreNotFound");
+    expect(runner).toContain("validateOwnerUnknownTicketCommentNotFound");
     expect(runner).toContain("/api/billing");
     expect(runner).toContain("/api/onboarding");
     expect(runner).toContain("/api/integrations");
@@ -647,6 +661,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("/api/projects/00000000-0000-4000-8000-000000000031/restore");
     expect(runner).toContain("/api/leases/00000000-0000-4000-8000-000000000032/restore");
     expect(runner).toContain("/api/lease-holders/00000000-0000-4000-8000-000000000033/restore");
+    expect(runner).toContain("/api/tickets/00000000-0000-4000-8000-000000000034/comments");
     expect(runner).toContain("patchOwnerBillingPlan");
     expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(runner).toContain('action: "verify-ticket-intake"');
