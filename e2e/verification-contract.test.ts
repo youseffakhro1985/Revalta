@@ -157,6 +157,12 @@ describe("authenticated Preview evidence", () => {
     expect(() => validateOwnerUnknownProjectNotFound(200, { success: true })).toThrow(
       /unknown project did not stay not found/,
     );
+    expect(() => validateOwnerUnknownProjectNotFound(404, { error: "Projektet hittades inte", errorCode: "NOT_FOUND" })).toThrow(
+      /unknown project did not stay not found/,
+    );
+    expect(() => validateOwnerUnknownProjectNotFound(404, { error: "Not found" })).toThrow(
+      /unknown project did not stay not found/,
+    );
   });
 
   it.each([

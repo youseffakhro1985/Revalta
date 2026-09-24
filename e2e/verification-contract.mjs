@@ -148,7 +148,12 @@ export function validateOwnerUnknownLeaseNotFound(status, body) {
 }
 
 export function validateOwnerUnknownProjectNotFound(status, body) {
-  if (status !== 404 || body?.success === true) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Projektet hittades inte" ||
+    body?.errorCode
+  ) {
     throw new Error("Verified owner unknown project did not stay not found");
   }
 }
