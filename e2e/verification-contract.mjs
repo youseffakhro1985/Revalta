@@ -290,6 +290,17 @@ export function validateOwnerUnknownImdNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownDocumentNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Dokumentet hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown document did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
