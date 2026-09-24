@@ -235,6 +235,17 @@ export function validateOwnerUnknownChecklistNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownBookingNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Bokningen hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown booking did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
