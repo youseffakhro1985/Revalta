@@ -180,6 +180,17 @@ export function validateOwnerUnknownCalendarNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownTeamMemberNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Teammedlemmen hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown team member did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
