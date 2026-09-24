@@ -598,6 +598,17 @@ export function validateOwnerUnknownRoundWorkOrderNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownLeaseInspectionWorkOrderNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Avtalet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown lease inspection work-order did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
