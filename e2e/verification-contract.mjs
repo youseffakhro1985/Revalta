@@ -356,6 +356,17 @@ export function validateOwnerUnknownNotificationNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownMaintenanceNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Underhållsåtgärden hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown maintenance item did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
