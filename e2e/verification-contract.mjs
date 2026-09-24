@@ -433,6 +433,17 @@ export function validateOwnerUnknownPropertyRestoreNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownProjectRestoreNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Projektet hittades inte eller är redan aktivt" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown project restore did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
