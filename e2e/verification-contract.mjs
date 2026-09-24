@@ -455,6 +455,17 @@ export function validateOwnerUnknownLeaseRestoreNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownLeaseHolderRestoreNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Kontakten hittades inte eller är redan aktiv" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown lease-holder restore did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
