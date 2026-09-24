@@ -246,6 +246,17 @@ export function validateOwnerUnknownBookingNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownClaimNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Skadeärendet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown insurance claim did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
