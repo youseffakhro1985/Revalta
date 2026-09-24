@@ -686,6 +686,17 @@ export function validateOwnerUnknownWorkOrderInvoiceBasisNotFound(status, body) 
   }
 }
 
+export function validateOwnerUnknownWorkOrderProfitabilityNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Arbetsordern hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown work-order profitability did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
