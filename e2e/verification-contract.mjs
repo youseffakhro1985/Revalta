@@ -202,6 +202,17 @@ export function validateOwnerUnknownRoundNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownVendorNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Leverantören hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown vendor did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
