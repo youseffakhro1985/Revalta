@@ -158,6 +158,17 @@ export function validateOwnerUnknownProjectNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownInspectionNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Kontrollen hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown inspection did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
