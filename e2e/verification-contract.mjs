@@ -213,6 +213,17 @@ export function validateOwnerUnknownVendorNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownQuoteNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Offerten hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown quote did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
