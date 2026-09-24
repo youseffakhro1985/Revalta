@@ -323,6 +323,17 @@ export function validateOwnerUnknownBudgetNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownLeaseHolderNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Kontakten hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown lease holder did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
