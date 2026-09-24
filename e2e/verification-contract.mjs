@@ -400,6 +400,17 @@ export function validateOwnerUnknownComponentNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownTicketRestoreNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Ärendet hittades inte eller är redan aktivt" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown ticket restore did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
