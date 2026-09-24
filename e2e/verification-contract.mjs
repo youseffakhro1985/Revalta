@@ -268,6 +268,17 @@ export function validateOwnerUnknownEnergyNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownAccessNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Behörigheten hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown access credential did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");

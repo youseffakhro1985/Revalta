@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownBookingNotFound, validateOwnerUnknownCalendarNotFound, validateOwnerUnknownChecklistNotFound, validateOwnerUnknownClaimNotFound, validateOwnerUnknownEnergyNotFound, validateOwnerUnknownInspectionNotFound, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownProjectNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownQuoteNotFound, validateOwnerUnknownRoundNotFound, validateOwnerUnknownTeamMemberNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownVendorNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
+import { isPaginatedPropertiesRequest, sanitizePreviewFailure, validateEmptySearchResponse, validateFixtureProfile, validateLoginResponse, validateOwnerAssignQueueReadable, validateOwnerAuditReadable, validateOwnerBillingPlanRegistry, validateOwnerBillingPreviewDirectPlan, validateOwnerBillingPreviewInvalidPlan, validateOwnerBillingPreviewPlanChanged, validateOwnerBillingStripePortalReady, validateOwnerBillingStripeReadiness, validateOwnerCompanyManageable, validateOwnerIntegrationsReadable, validateOwnerLockBoardForceRelease, validateOwnerOnboardingEligible, validateOwnerOnboardingVerified, validateOwnerOperationsReadable, validateOwnerUnknownAccessNotFound, validateOwnerUnknownBookingNotFound, validateOwnerUnknownCalendarNotFound, validateOwnerUnknownChecklistNotFound, validateOwnerUnknownClaimNotFound, validateOwnerUnknownEnergyNotFound, validateOwnerUnknownInspectionNotFound, validateOwnerUnknownLeaseNotFound, validateOwnerUnknownProjectNotFound, validateOwnerUnknownPropertyNotFound, validateOwnerUnknownQuoteNotFound, validateOwnerUnknownRoundNotFound, validateOwnerUnknownTeamMemberNotFound, validateOwnerUnknownTicketNotFound, validateOwnerUnknownVendorNotFound, validateOwnerUnknownWorkOrderNotFound, validatePropertiesResponse } from "./verification-contract.mjs";
 
 const fixture = { email: "fixture@example.com", companyId: "synthetic-company-a" };
 const user = {
@@ -295,6 +295,19 @@ describe("authenticated Preview evidence", () => {
     );
   });
 
+  it("requires owner unknown access credential writes to stay not found", () => {
+    expect(() => validateOwnerUnknownAccessNotFound(404, { error: "Behörigheten hittades inte" })).not.toThrow();
+    expect(() => validateOwnerUnknownAccessNotFound(200, { success: true })).toThrow(
+      /unknown access credential did not stay not found/,
+    );
+    expect(() => validateOwnerUnknownAccessNotFound(404, { error: "Behörigheten hittades inte", errorCode: "NOT_FOUND" })).toThrow(
+      /unknown access credential did not stay not found/,
+    );
+    expect(() => validateOwnerUnknownAccessNotFound(404, { error: "Not found" })).toThrow(
+      /unknown access credential did not stay not found/,
+    );
+  });
+
   it.each([
     { company_id: "company-b" }, { company: { id: "company-b", status: "active" } },
     { company_id: null }, { company: null }, { company: { id: fixture.companyId, status: "suspended" } },
@@ -341,6 +354,7 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("validateOwnerUnknownBookingNotFound");
     expect(runner).toContain("validateOwnerUnknownClaimNotFound");
     expect(runner).toContain("validateOwnerUnknownEnergyNotFound");
+    expect(runner).toContain("validateOwnerUnknownAccessNotFound");
     expect(runner).toContain("/api/billing");
     expect(runner).toContain("/api/onboarding");
     expect(runner).toContain("/api/integrations");
@@ -370,6 +384,8 @@ describe("authenticated Preview evidence", () => {
     expect(runner).toContain("00000000-0000-4000-8000-000000000014");
     expect(runner).toContain("/api/energy");
     expect(runner).toContain("00000000-0000-4000-8000-000000000015");
+    expect(runner).toContain("/api/access-credentials");
+    expect(runner).toContain("00000000-0000-4000-8000-000000000016");
     expect(runner).toContain("patchOwnerBillingPlan");
     expect(runner).toContain('patchOwnerBillingPlan("unlimited")');
     expect(runner).toContain('action: "verify-ticket-intake"');
