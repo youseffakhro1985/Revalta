@@ -477,6 +477,17 @@ export function validateOwnerUnknownTicketCommentNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownWorkOrderCommentNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Arbetsordern hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown work-order comment did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
