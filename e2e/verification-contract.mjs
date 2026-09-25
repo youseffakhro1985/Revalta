@@ -862,6 +862,17 @@ export function validateOwnerUnknownTicketTimelineNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownTicketSmsNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Ärendet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown ticket SMS did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
