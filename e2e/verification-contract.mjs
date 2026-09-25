@@ -1031,6 +1031,18 @@ export function validateOwnerUnknownAttachmentNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownWorkOrderReportItemNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.report ||
+    body?.error !== "Rapporten hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown work-order report item did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
