@@ -1283,6 +1283,20 @@ export function validateOwnerUnknownPropertyComponentEntryNotFound(status, body)
   }
 }
 
+export function validateOwnerUnknownPropertyComponentDetailNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.component ||
+    body?.property ||
+    body?.events ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown property component detail did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
