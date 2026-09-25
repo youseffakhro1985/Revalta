@@ -1078,6 +1078,17 @@ export function validateOwnerUnknownPublicTicketNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownPublicTicketCommentNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Ärendet hittades inte. Kontrollera referensnummer och e-post." ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown public ticket comment did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
