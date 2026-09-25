@@ -1146,6 +1146,17 @@ export function validateOwnerUnknownResidentPortalDocumentDownloadNotFound(statu
   }
 }
 
+export function validateOwnerUnknownPropertyMaintenancePlanExportNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown property maintenance plan export did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
