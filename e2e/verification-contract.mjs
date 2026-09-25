@@ -1043,6 +1043,17 @@ export function validateOwnerUnknownWorkOrderReportItemNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownImdAttachNoticeNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Avläsningen hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown IMD attach-notice did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
