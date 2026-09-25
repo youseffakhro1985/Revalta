@@ -851,6 +851,17 @@ export function validateOwnerUnknownTicketOperationsDeleteNotFound(status, body)
   }
 }
 
+export function validateOwnerUnknownTicketTimelineNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Ärendet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown ticket timeline did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
