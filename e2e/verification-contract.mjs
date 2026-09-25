@@ -785,6 +785,17 @@ export function validateOwnerUnknownWorkOrderAttestationNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownWorkOrderLockedUpdateNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Arbetsordern hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown work-order locked-update did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
