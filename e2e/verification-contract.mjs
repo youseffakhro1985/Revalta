@@ -1234,6 +1234,18 @@ export function validateOwnerUnknownPropertyComponentLinkOptionsNotFound(status,
   }
 }
 
+export function validateOwnerUnknownPropertyComponentMaintenanceSettingsNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.settings ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown property component maintenance settings did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
