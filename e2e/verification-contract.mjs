@@ -917,6 +917,17 @@ export function validateOwnerUnknownLeaseInspectionItemsNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownLeaseInspectionItemsPutNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Avtalet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown lease inspection items write did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
