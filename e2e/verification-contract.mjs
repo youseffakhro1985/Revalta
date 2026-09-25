@@ -1205,6 +1205,22 @@ export function validateOwnerUnknownPropertyComponentsManageNotFound(status, bod
   }
 }
 
+export function validateOwnerUnknownPropertyComponentReportNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.summary ||
+    body?.property ||
+    body?.component ||
+    Array.isArray(body?.events) ||
+    Array.isArray(body?.costs) ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown property component report did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
