@@ -973,6 +973,18 @@ export function validateOwnerUnknownLeaseInspectionWorkOrdersStatusNotFound(stat
   }
 }
 
+export function validateOwnerUnknownPropertyCardNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.property ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown property card did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
