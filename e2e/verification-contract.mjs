@@ -1271,6 +1271,18 @@ export function validateOwnerUnknownPropertyComponentActionsNotFound(status, bod
   }
 }
 
+export function validateOwnerUnknownPropertyComponentEntryNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.entry ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown property component entry did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
