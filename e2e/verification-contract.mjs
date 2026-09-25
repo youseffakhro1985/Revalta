@@ -1009,6 +1009,17 @@ export function validateOwnerUnknownPropertyMaintenancePlanNotFound(status, body
   }
 }
 
+export function validateOwnerUnknownDocumentDownloadNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Dokumentet hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown document download did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
