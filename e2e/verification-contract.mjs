@@ -1123,6 +1123,18 @@ export function validateOwnerUnknownResidentPortalTicketNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownResidentPortalTicketCommentNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.comment ||
+    body?.error !== "Ärendet hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown resident portal ticket comment did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
