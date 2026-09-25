@@ -1020,6 +1020,17 @@ export function validateOwnerUnknownDocumentDownloadNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownAttachmentNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Bilagan hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown attachment did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
