@@ -818,6 +818,17 @@ export function validateOwnerUnknownTicketOperationsGetNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownTicketOperationsPostNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Ärendet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown ticket operations write did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
