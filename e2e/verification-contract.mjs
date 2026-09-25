@@ -1180,6 +1180,20 @@ export function validateOwnerUnknownPropertyMaintenancePlanActionNotFound(status
   }
 }
 
+export function validateOwnerUnknownPropertyComponentsOverviewNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.summary ||
+    Array.isArray(body?.components) ||
+    body?.property ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown property components overview did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
