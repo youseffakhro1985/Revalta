@@ -985,6 +985,18 @@ export function validateOwnerUnknownPropertyCardNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownPropertyComponentsNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    Array.isArray(body?.assets) ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown property components did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
