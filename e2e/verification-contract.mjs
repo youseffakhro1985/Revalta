@@ -997,6 +997,18 @@ export function validateOwnerUnknownPropertyComponentsNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownPropertyMaintenancePlanNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    Array.isArray(body?.plans) ||
+    body?.error !== "Fastigheten hittades inte" ||
+    body?.errorCode !== "NOT_FOUND"
+  ) {
+    throw new Error("Verified owner unknown property maintenance plan did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
