@@ -895,6 +895,17 @@ export function validateOwnerUnknownLeaseHandoverNotFound(status, body) {
   }
 }
 
+export function validateOwnerUnknownLeaseHandoverPutNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Avtalet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown lease handover write did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
