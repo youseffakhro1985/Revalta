@@ -961,6 +961,18 @@ export function validateOwnerUnknownLeaseInspectionWorkOrdersReconcileNotFound(s
   }
 }
 
+export function validateOwnerUnknownLeaseInspectionWorkOrdersStatusNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    Array.isArray(body?.links) ||
+    body?.error !== "Avtalet hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown lease inspection work-order status did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
