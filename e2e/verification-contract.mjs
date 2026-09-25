@@ -730,6 +730,17 @@ export function validateOwnerUnknownWorkOrderInvoiceBasisGetNotFound(status, bod
   }
 }
 
+export function validateOwnerUnknownWorkOrderInvoiceBasisExportNotFound(status, body) {
+  if (
+    status !== 404 ||
+    body?.success === true ||
+    body?.error !== "Arbetsordern hittades inte" ||
+    body?.errorCode
+  ) {
+    throw new Error("Verified owner unknown work-order invoice-basis export did not stay not found");
+  }
+}
+
 export function isPaginatedPropertiesRequest(url) {
   try {
     const parsed = new URL(url, "https://e2e.invalid");
