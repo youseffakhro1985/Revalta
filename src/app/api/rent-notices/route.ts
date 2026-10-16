@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import db from "@/lib/db";
 import { auditScopedWhere, canManageLeases, canViewLeasingData, getCurrentUser, requireCompanyUser, tenantWhere } from "@/lib/current-user";
 import { writeAuditLog } from "@/lib/audit";
@@ -8,6 +9,39 @@ import { createLogger } from "@/lib/structured-logger";
 const logger = createLogger({ route: "/api/rent-notices" });
 
 const noticeAction = "rent_notice.created";
+
+const DUPLICATE_NOTICE_MESSAGE =
+  "Det finns redan en hyresavi för kontraktet och perioden. Kreditera den befintliga avin innan en ny skapas.";
+
+class DuplicateRentNoticeError extends Error {
+  constructor() {
+    super("RENT_NOTICE_DUPLICATE");
+  }
+}
+
+/**
+ * One live (non-credited) notice per lease and period. Serialized with a
+ * transaction-scoped advisory lock so two concurrent requests cannot both
+ * pass the check; a credited notice is the correction path and does not block.
+ */
+async function assertNoLiveNoticeForLeasePeriod(
+  tx: Prisma.TransactionClient,
+  input: { companyId: string; leaseId: string; period: string; excludeNoticeId?: string },
+) {
+  const key = `rent-notice:${input.companyId}:${input.leaseId}:${input.period}`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+  const duplicate = await tx.rentNotice.findFirst({
+    where: {
+      company_id: input.companyId,
+      lease_id: input.leaseId,
+      period: input.period,
+      status: { not: "credited" },
+      ...(input.excludeNoticeId ? { id: { not: input.excludeNoticeId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (duplicate) throw new DuplicateRentNoticeError();
+}
 
 export async function GET() {
   try {
@@ -151,26 +185,29 @@ export async function POST(request: Request) {
     const indexedRent = baseRent * (1 + indexPercent / 100);
     const total = Math.max(0, indexedRent + additions - deductions);
 
-    const notice = await db.rentNotice.create({
-      data: {
-        company_id: user.company_id,
-        property_id: property.id,
-        lease_id: leaseId || null,
-        tenant_name: tenantName,
-        unit: unit || null,
-        period,
-        due_date: parsedDue,
-        status,
-        base_rent: baseRent,
-        index_percent: indexPercent,
-        indexed_rent: indexedRent,
-        additions,
-        deductions,
-        total,
-        note: note || null,
-        created_by_id: user.id,
-      },
-      select: { id: true },
+    const createData = {
+      company_id: user.company_id,
+      property_id: property.id,
+      lease_id: leaseId || null,
+      tenant_name: tenantName,
+      unit: unit || null,
+      period,
+      due_date: parsedDue,
+      status,
+      base_rent: baseRent,
+      index_percent: indexPercent,
+      indexed_rent: indexedRent,
+      additions,
+      deductions,
+      total,
+      note: note || null,
+      created_by_id: user.id,
+    };
+    const notice = await db.$transaction(async (tx) => {
+      if (leaseId && status !== "credited") {
+        await assertNoLiveNoticeForLeasePeriod(tx, { companyId: user.company_id!, leaseId, period });
+      }
+      return tx.rentNotice.create({ data: createData, select: { id: true } });
     });
 
     await writeAuditLog(user, {
@@ -199,6 +236,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, notice }, { status: 201 });
   } catch (error) {
+    if (error instanceof DuplicateRentNoticeError) {
+      return NextResponse.json({ error: DUPLICATE_NOTICE_MESSAGE, code: "rent_notice_duplicate" }, { status: 409 });
+    }
     logger.error("Create rent notice error", error);
     return NextResponse.json({ error: "Internt serverfel" }, { status: 500 });
   }
@@ -235,6 +275,7 @@ export async function PATCH(request: Request) {
       where: { id: noticeId, company_id: user.company_id, property: { deleted_at: null } },
       select: {
         id: true,
+        lease_id: true,
         tenant_name: true,
         period: true,
         status: true,
@@ -321,7 +362,20 @@ export async function PATCH(request: Request) {
         }
       : { status: nextStatus };
 
+    const leaseId = existing.lease_id;
+    const periodChanged = period !== existing.period;
+    const reactivated = existing.status === "credited" && nextStatus !== "credited";
+    const needsDuplicateGuard = Boolean(leaseId) && nextStatus !== "credited" && (periodChanged || reactivated);
+
     await db.$transaction(async (tx) => {
+      if (needsDuplicateGuard && leaseId) {
+        await assertNoLiveNoticeForLeasePeriod(tx, {
+          companyId: user.company_id!,
+          leaseId,
+          period,
+          excludeNoticeId: existing.id,
+        });
+      }
       const updateResult = await tx.rentNotice.updateMany({
         where: {
           id: existing.id, company_id: user.company_id!, updated_at: existing.updated_at,
@@ -360,6 +414,9 @@ export async function PATCH(request: Request) {
       indexed_rent: indexedRent,
     });
   } catch (error) {
+    if (error instanceof DuplicateRentNoticeError) {
+      return NextResponse.json({ error: DUPLICATE_NOTICE_MESSAGE, code: "rent_notice_duplicate" }, { status: 409 });
+    }
     if (error instanceof Error && error.message === "RENT_NOTICE_UPDATE_CONFLICT") {
       return NextResponse.json({ error: "Hyresavin har ändrats. Ladda om och försök igen." }, { status: 409 });
     }

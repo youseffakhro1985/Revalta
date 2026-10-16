@@ -189,6 +189,155 @@ describe("rent-notices route", () => {
     expect(propertyFindFirstMock).not.toHaveBeenCalled();
   });
 
+  describe("one live notice per lease and period", () => {
+    const owner = { id: "user-1", company_id: "company-1", role: "owner" };
+    const lease = {
+      id: "lease-1",
+      property_id: "property-1",
+      monthly_rent: 9500,
+      lease_holder: { name: "Anna Andersson" },
+      unit: { designation: "1101" },
+    };
+    const createRequest = (overrides: Record<string, unknown> = {}) => new Request("http://localhost/api/rent-notices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leaseId: "lease-1", period: "2026-11", dueDate: "2026-10-31", status: "draft", ...overrides }),
+    });
+    const patchRequest = (body: Record<string, unknown>) => new Request("http://localhost/api/rent-notices", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    let txExecuteRaw: ReturnType<typeof vi.fn>;
+    let txNoticeFindFirst: ReturnType<typeof vi.fn>;
+    let txNoticeCreate: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      getCurrentUserMock.mockResolvedValue(owner);
+      leaseFindFirstMock.mockResolvedValue(lease);
+      propertyFindFirstMock.mockResolvedValue({ id: "property-1", name: "Storgatan 1" });
+      txExecuteRaw = vi.fn().mockResolvedValue(1);
+      txNoticeFindFirst = vi.fn().mockResolvedValue(null);
+      txNoticeCreate = vi.fn().mockResolvedValue({ id: "notice-new" });
+      transactionMock.mockImplementation(async (callback) => callback({
+        $executeRaw: txExecuteRaw,
+        rentNotice: { findFirst: txNoticeFindFirst, create: txNoticeCreate, updateMany: noticeUpdateManyMock },
+      }));
+    });
+
+    it("rejects a second live notice for the same lease and period with 409 and no write", async () => {
+      txNoticeFindFirst.mockResolvedValue({ id: "notice-existing" });
+
+      const response = await POST(createRequest());
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.code).toBe("rent_notice_duplicate");
+      expect(txExecuteRaw).toHaveBeenCalledTimes(1);
+      expect(txNoticeFindFirst).toHaveBeenCalledWith({
+        where: { company_id: "company-1", lease_id: "lease-1", period: "2026-11", status: { not: "credited" } },
+        select: { id: true },
+      });
+      expect(txNoticeCreate).not.toHaveBeenCalled();
+      expect(writeAuditLogMock).not.toHaveBeenCalled();
+    });
+
+    it("creates the notice under the lease/period lock when no live notice exists", async () => {
+      const response = await POST(createRequest());
+
+      expect(response.status).toBe(201);
+      expect(txExecuteRaw).toHaveBeenCalledTimes(1);
+      expect(txNoticeCreate).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ company_id: "company-1", lease_id: "lease-1", period: "2026-11", base_rent: 9500 }),
+      }));
+      expect(writeAuditLogMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("blocks moving a draft onto a period that already has a live notice", async () => {
+      noticeFindFirstMock.mockResolvedValue({
+        id: "notice-1",
+        lease_id: "lease-1",
+        tenant_name: "Anna Andersson",
+        period: "2026-10",
+        status: "draft",
+        due_date: new Date("2026-09-30T00:00:00.000Z"),
+        base_rent: 9500,
+        index_percent: 0,
+        additions: 0,
+        deductions: 0,
+        note: null,
+        total: 9500,
+        updated_at: new Date("2026-09-01T10:00:00.000Z"),
+      });
+      txNoticeFindFirst.mockResolvedValue({ id: "notice-2" });
+
+      const response = await PATCH(patchRequest({ noticeId: "notice-1", period: "2026-11" }));
+
+      expect(response.status).toBe(409);
+      expect(txNoticeFindFirst).toHaveBeenCalledWith({
+        where: {
+          company_id: "company-1",
+          lease_id: "lease-1",
+          period: "2026-11",
+          status: { not: "credited" },
+          id: { not: "notice-1" },
+        },
+        select: { id: true },
+      });
+      expect(noticeUpdateManyMock).not.toHaveBeenCalled();
+    });
+
+    it("blocks re-activating a credited notice when another live notice covers the period", async () => {
+      noticeFindFirstMock.mockResolvedValue({
+        id: "notice-1",
+        lease_id: "lease-1",
+        tenant_name: "Anna Andersson",
+        period: "2026-11",
+        status: "credited",
+        due_date: new Date("2026-10-31T00:00:00.000Z"),
+        base_rent: 9500,
+        index_percent: 0,
+        additions: 0,
+        deductions: 0,
+        note: null,
+        total: 9500,
+        updated_at: new Date("2026-10-01T10:00:00.000Z"),
+      });
+      txNoticeFindFirst.mockResolvedValue({ id: "notice-replacement" });
+
+      const response = await PATCH(patchRequest({ noticeId: "notice-1", status: "sent" }));
+
+      expect(response.status).toBe(409);
+      expect(noticeUpdateManyMock).not.toHaveBeenCalled();
+    });
+
+    it("does not lock or check duplicates for a plain status change on a live notice", async () => {
+      noticeFindFirstMock.mockResolvedValue({
+        id: "notice-1",
+        lease_id: "lease-1",
+        tenant_name: "Anna Andersson",
+        period: "2026-11",
+        status: "sent",
+        due_date: new Date("2026-10-31T00:00:00.000Z"),
+        base_rent: 9500,
+        index_percent: 0,
+        additions: 0,
+        deductions: 0,
+        note: null,
+        total: 9500,
+        updated_at: new Date("2026-10-01T10:00:00.000Z"),
+      });
+
+      const response = await PATCH(patchRequest({ noticeId: "notice-1", status: "paid" }));
+
+      expect(response.status).toBe(200);
+      expect(txExecuteRaw).not.toHaveBeenCalled();
+      expect(txNoticeFindFirst).not.toHaveBeenCalled();
+      expect(noticeUpdateManyMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("denies technicians from reading rent notices", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET();
