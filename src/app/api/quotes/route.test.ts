@@ -194,7 +194,7 @@ describe("quotes route", () => {
       where: { id: "quote-1", company_id: "company-1", property: { deleted_at: null } },
     }));
     expect(quoteUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "quote-1", company_id: "company-1" },
+      where: { id: "quote-1", company_id: "company-1", status: "draft" },
       data: expect.objectContaining({
         title: "Takrenovering uppdaterad",
         supplier: "Nytt Bygg AB",
@@ -274,7 +274,7 @@ describe("quotes route", () => {
 
     expect(response.status).toBe(200);
     expect(quoteUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "quote-1", company_id: "company-1" },
+      where: { id: "quote-1", company_id: "company-1", status: "draft" },
       data: expect.objectContaining({ status: "sent" }),
     }));
     expect(quoteDecisionCreateMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -289,6 +289,48 @@ describe("quotes route", () => {
       metadata: expect.objectContaining({ previous_status: "draft", status: "sent" }),
     }));
     expect(body).toMatchObject({ success: true, id: "quote-1", status: "sent" });
+  });
+
+  it("returns 409 and writes no decision when the quote status changed concurrently", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user-1",
+      company_id: "company-1",
+      role: "owner",
+      name: "Anna",
+      email: "anna@example.se",
+    });
+    quoteFindFirstMock
+      .mockResolvedValueOnce({
+        id: "quote-1",
+        property_id: "property-1",
+        title: "Takrenovering",
+        supplier: "Bygg AB",
+        status: "sent",
+        valid_until: null,
+        labor: 1000,
+        material: 500,
+        supplier_cost: 0,
+        other: 0,
+        vat_rate: 25,
+        note: null,
+      })
+      .mockResolvedValueOnce({ id: "quote-1" });
+    quoteUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const response = await PATCH(new Request("http://localhost/api/quotes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quoteId: "quote-1", labor: 2500 }),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("version_conflict");
+    expect(quoteUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "quote-1", company_id: "company-1", status: "sent" },
+    }));
+    expect(quoteDecisionCreateMock).not.toHaveBeenCalled();
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
   it("denies technicians from reading quotes", async () => {
