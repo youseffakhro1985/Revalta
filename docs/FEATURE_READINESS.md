@@ -43,7 +43,7 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Ärenden | PARTIAL | Core ticket flows exist and are part of product golden path. Preview E2E now creates a property-backed ticket and asserts staff ticket→WO sync. | This PR adds owner-created resident portal ticket Preview evidence; remaining staff follow-up still needs a later slice. |
 | Arbetsordrar | PARTIAL | Significant operational UI/API exists. Preview E2E covers planned→in_progress→completed→invoiced with lock, time/material attest, invoice basis and illegal reverse transition. Recurring schedules/incidents require `canViewOperations` (technicians 403). Report GET hides invoice basis/profitability from technicians; invoice.create is `canManageWorkOrderFinance`. | This PR adds technician mobile work-order UI (390 px) and hidden finance panel on the assigned order. |
 | Kalender | PARTIAL | Current module exists. GET projects canonical WorkOrder/rond/inspection/lease rows. Technicians only see assigned work orders and do not receive lease or underhållsplan projections. | This PR adds Preview proof that an assigned scheduled work order appears and leases stay omitted. |
-| Ronder | BLOCKED | Current UI/API/checklist implementation exists, but Production status of `20260822010000_inspection_checklist_templates` is unverified. | Read-only Production migration status, restore evidence, checklist tenant smoke. |
+| Ronder | PARTIAL | Current UI/API/checklist implementation exists. Production migration `20260822010000_inspection_checklist_templates` verified applied (finished 2026-09-14 13:48 UTC) and table `InspectionChecklistTemplate` present — read-only check 2026-10-16, see *Verified operational evidence*. | Checklist tenant smoke on Preview; restore drill from the 2026-10-16 backup branch. |
 | Besiktningar | PARTIAL | Module exists. | Observation-to-work-order linkage and tenant/security/readiness audit. |
 | Underhåll | PARTIAL | Module exists. Preventive overview/engine, portfolio costs and maintenance-plan CSV export require `canViewOperations` (technicians 403). | This PR adds Preview 403 proof for those technician operations gates. |
 | Skador & försäkring | PARTIAL | Module exists. | Claim relation/security/audit and work-order/project linkage verification. |
@@ -67,6 +67,17 @@ The statuses below deliberately avoid calling broad modules READY until their en
 | Inställningar | PARTIAL | Settings surfaces exist. | Role boundaries, validation, tenant-scoped writes and sensitive-setting audit. |
 | Billing | BETA | Plan allowlist, checkout and portal P0 hardening merged with exact-SHA gates. | Canonical plan registry + webhook lifecycle/idempotency/replay + customer UX cleanup. |
 | Audit/administration | PARTIAL | Audit infrastructure exists. | Coverage, query access, sensitive-field minimization, pagination and retention review. |
+
+## Verified operational evidence (2026-10-16)
+
+Read-only checks performed against live systems on 2026-10-16. Each line states exactly what was observed; nothing here is inferred.
+
+- **Release identity.** Production `/api/health` reported `commitSha` `9eff1a303af82ab2cae0fbb48fb52c94c7175a21`, `branch: main`, `environment: production`, `database: ok`, `schemaReady: true`, `dataPlane.directMatches: true`, `x-revalta-release: 9eff1a3`, `cache-control: no-store`. The prior `PRODUCTION_RELEASE_STALE` was caused by Vercel rejecting the Git-triggered production build of `9eff1a3` on 2026-09-25 with *Deployment rate limited — retry in 24 hours* (Hobby build-rate limit); Vercel does not retry, and no later push reached `main`. Remediated by an owner-approved production deployment of that exact SHA, then superseded by `#1084`.
+- **Data-plane mapping.** SHA-256 of the canonical endpoint target matches `src/lib/data-plane-attestations.json`: production `e51d9599…` = Neon project `withered-cell-46849200`, branch `main` (`br-damp-block-am62k8yz`); preview `6237f010…` = separate Neon project `square-pond-72791612`. Preview and Production are different databases.
+- **Production migrations.** `_prisma_migrations`: 52 applied (all 52 directories on `main`), 0 pending. Two failed attempts of `20260713190000_add_work_orders_and_projects` (July) are marked rolled back and superseded by the successful apply.
+- **Preview migrations.** 49 applied; `20260913210000_ticket_ai_source`, `20260913220000_operational_document_parent_constraint` and `20260914150000_work_order_vendor_contract` are **not** applied. Preview evidence touching ticket AI source, property/component document uploads or work-order vendor contracts is `NOT VERIFIED` until they are. No workflow migrates the Preview database.
+- **Backups.** Neon history retention is 6 h. One manual snapshot exists (2026-09-08, predates four migrations); the plan's snapshot quota is full. A full branch copy `revalta-prod-backup-20261016-pre-9eff1a3` (parent LSN `0/229D9DE0`) was created before the 2026-10-16 deployment. The production branch is not marked protected in Neon. Scheduled backups and a restore drill remain open.
+- **Dependencies.** `npm audit --omit=dev` on `9eff1a3` reported 12 advisories including a critical Next.js RCE (GHSA-vcvr-r3jv-pc5j, `next/og`) and cross-user cache poisoning; fixed by `#1084` (`next@16.3.8`), which reports 0 production advisories.
 
 ## Cross-module golden path gate
 
