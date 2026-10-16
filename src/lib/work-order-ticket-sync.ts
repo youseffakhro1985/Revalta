@@ -44,7 +44,7 @@ export async function syncWorkOrderToTicket(
   const statusChanged = ticket.status !== nextStatus;
   const assigneeChanged = ticket.assigned_to_id !== input.assignedToId;
   if (!statusChanged && !assigneeChanged) {
-    return { ticketId: ticket.id, changed: false, status: ticket.status };
+    return { ticketId: ticket.id, changed: false, statusChanged: false, status: ticket.status };
   }
 
   await tx.ticket.update({
@@ -74,5 +74,8 @@ export async function syncWorkOrderToTicket(
     },
   });
 
-  return { ticketId: ticket.id, changed: true, status: nextStatus };
+  // `changed` covers status or assignee; `statusChanged` is the only signal that
+  // warrants telling the reporter, since an internal reassignment is not news to
+  // the resident and must not trigger a status email/SMS.
+  return { ticketId: ticket.id, changed: true, statusChanged, status: nextStatus };
 }

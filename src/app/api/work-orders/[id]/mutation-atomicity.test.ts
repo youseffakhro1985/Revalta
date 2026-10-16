@@ -219,7 +219,7 @@ describe("core work-order mutation atomicity", () => {
 
   it("notifies the linked ticket reporter after a work-order status sync", async () => {
     workOrderFindFirstMock.mockResolvedValue({ ...existing, ticket_id: "ticket-1" });
-    ticketSyncMock.mockResolvedValue({ changed: true, status: "in_progress" });
+    ticketSyncMock.mockResolvedValue({ changed: true, statusChanged: true, status: "in_progress" });
     ticketFindFirstMock.mockResolvedValue({
       id: "ticket-1",
       title: "Läckande kran",
@@ -240,6 +240,17 @@ describe("core work-order mutation atomicity", () => {
       expect.objectContaining({ id: "ticket-1", reporter_email: "anna@example.se" }),
       "updated",
     );
+  });
+
+  it("does not email or SMS the ticket reporter when only the work-order assignee changes", async () => {
+    workOrderFindFirstMock.mockResolvedValue({ ...existing, ticket_id: "ticket-1" });
+    ticketSyncMock.mockResolvedValue({ ticketId: "ticket-1", changed: true, statusChanged: false, status: "received" });
+
+    const response = await PATCH(patchRequest({ status: "planned" }), params);
+
+    expect(response.status).toBe(200);
+    expect(ticketSyncMock).toHaveBeenCalled();
+    expect(notifyTicketReporterMock).not.toHaveBeenCalled();
   });
 
   it("emails the assignee when a work order is paused", async () => {

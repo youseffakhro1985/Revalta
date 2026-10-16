@@ -358,7 +358,7 @@ describe("work-order execution lifecycle boundaries", () => {
 
   it("notifies the linked ticket reporter after a successful finalize", async () => {
     completeLifecycleMock.mockResolvedValue({
-      ticketSync: { changed: true },
+      ticketSync: { changed: true, statusChanged: true },
       componentSync: null,
       workOrder: { ticket_id: "ticket-1" },
     });
@@ -395,6 +395,30 @@ describe("work-order execution lifecycle boundaries", () => {
       }),
       "updated",
     );
+  });
+
+  it("does not notify the ticket reporter when finalize leaves the ticket status unchanged", async () => {
+    completeLifecycleMock.mockResolvedValue({
+      ticketSync: { changed: true, statusChanged: false },
+      componentSync: null,
+      workOrder: { ticket_id: "ticket-1" },
+    });
+    workOrderFindFirstMock.mockResolvedValue(workOrder("in_progress"));
+    queryRawMock.mockResolvedValue([{ required_incomplete: 0, before_photos: 1, after_photos: 1 }]);
+    const tx = {
+      $queryRaw: vi.fn().mockImplementation(async (query: unknown) => {
+        const text = sqlText(query);
+        if (text.includes("total_cost")) return [{ total_cost: 80 }];
+        if (text.includes("completion_due_at")) return [{ completion_due_at: null }];
+        return [];
+      }),
+    };
+    transactionMock.mockImplementation(async (callback: (client: typeof tx) => unknown) => callback(tx));
+
+    const response = await POST(request({ action: "completion.finalize" }), params);
+
+    expect(response.status).toBe(200);
+    expect(notifyTicketReporterMock).not.toHaveBeenCalled();
   });
 
   it("emails the assigned technician after a successful finalize", async () => {

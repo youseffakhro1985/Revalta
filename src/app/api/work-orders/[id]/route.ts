@@ -587,7 +587,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (!transactionResult) return NextResponse.json({ error: "Arbetsordern hittades inte" }, { status: 404 });
 
-  if (transactionResult.ticketSync?.changed && existing.ticket_id) {
+  if (transactionResult.ticketSync?.statusChanged && existing.ticket_id) {
     try {
       const linkedTicket = await db.ticket.findFirst({
         where: { id: existing.ticket_id, company_id: companyId, deleted_at: null },

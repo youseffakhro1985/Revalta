@@ -443,7 +443,7 @@ export async function POST(
       finalSlaStatus: string;
       promotedTime: number;
       promotedMaterial: number;
-      ticketSync: { changed?: boolean } | null;
+      ticketSync: { changed?: boolean; statusChanged?: boolean } | null;
       ticketId: string | null;
     };
     try {
@@ -634,7 +634,7 @@ export async function POST(
       // Completion is already persisted; assignee mail must not fail the finalize response.
     }
 
-    if (result.ticketSync?.changed && result.ticketId) {
+    if (result.ticketSync?.statusChanged && result.ticketId) {
       try {
         const linkedTicket = await db.ticket.findFirst({
           where: { id: result.ticketId, company_id: user.company_id, deleted_at: null },
