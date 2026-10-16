@@ -424,11 +424,27 @@ export async function PATCH(request: Request) {
           decision_by: user.name || user.email,
         };
 
+    // Compare-and-swap on the status that was validated above. Without it a
+    // field edit validated against "sent" can land on a quote someone else has
+    // just approved (changing an approved total), and concurrent approve/reject
+    // both succeed with contradictory decision history.
     const updateResult = await db.quote.updateMany({
-      where: { id: quote.id, company_id: user.company_id },
+      where: { id: quote.id, company_id: user.company_id, status: quote.status },
       data,
     });
-    if (updateResult.count === 0) return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
+    if (updateResult.count === 0) {
+      const stillPresent = await db.quote.findFirst({
+        where: { id: quote.id, company_id: user.company_id, property: { deleted_at: null } },
+        select: { id: true },
+      });
+      if (stillPresent) {
+        return NextResponse.json(
+          { error: "Offerten har ändrats av någon annan. Ladda om och försök igen.", code: "version_conflict" },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ error: "Offerten hittades inte" }, { status: 404 });
+    }
 
     if (statusChanged) {
       await db.quoteDecision.create({
