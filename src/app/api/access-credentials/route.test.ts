@@ -200,6 +200,7 @@ describe("access credentials route", () => {
       issued_at: null,
       return_due: null,
       note: null,
+      updated_at: new Date("2026-10-01T08:00:00.000Z"),
     });
 
     const response = await PATCH(
@@ -219,7 +220,7 @@ describe("access credentials route", () => {
 
     expect(response.status).toBe(200);
     expect(accessCredentialUpdateManyMock).toHaveBeenCalledWith({
-      where: { id: "cred-1", company_id: "company-1" },
+      where: { id: "cred-1", company_id: "company-1", updated_at: new Date("2026-10-01T08:00:00.000Z") },
       data: expect.objectContaining({
         identifier: "NYCKEL-2",
         holder: "Anna Andersson",
@@ -246,6 +247,74 @@ describe("access credentials route", () => {
     expect(JSON.stringify(auditPayload.metadata)).not.toContain("NYCKEL-2");
     expect(JSON.stringify(auditPayload.metadata)).not.toContain("Anna Andersson");
     expect(JSON.stringify(auditPayload.metadata)).not.toContain("Utlämnad till styrelsen");
+  });
+
+  it("returns 409 instead of overwriting when another user changed the key first", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    const readVersion = new Date("2026-10-01T08:00:00.000Z");
+    accessCredentialFindFirstMock
+      .mockResolvedValueOnce({
+        id: "cred-1",
+        status: "in_stock",
+        holder: null,
+        identifier: "NYCKEL-1",
+        credential_type: "key",
+        unit: null,
+        access_area: null,
+        issued_at: null,
+        return_due: null,
+        note: null,
+        updated_at: readVersion,
+      })
+      .mockResolvedValueOnce({ id: "cred-1" });
+    accessCredentialUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/access-credentials", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credentialId: "cred-1", status: "issued", holder: "Bertil Berg" }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.code).toBe("version_conflict");
+    expect(accessCredentialUpdateManyMock).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "cred-1", company_id: "company-1", updated_at: readVersion },
+    }));
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the key disappeared between read and update", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "manager-1", company_id: "company-1", role: "manager" });
+    accessCredentialFindFirstMock
+      .mockResolvedValueOnce({
+        id: "cred-1",
+        status: "in_stock",
+        holder: null,
+        identifier: "NYCKEL-1",
+        credential_type: "key",
+        unit: null,
+        access_area: null,
+        issued_at: null,
+        return_due: null,
+        note: null,
+        updated_at: new Date("2026-10-01T08:00:00.000Z"),
+      })
+      .mockResolvedValueOnce(null);
+    accessCredentialUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/access-credentials", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credentialId: "cred-1", status: "lost" }),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    expect(writeAuditLogMock).not.toHaveBeenCalled();
   });
 
   it("rejects issued status without holder", async () => {

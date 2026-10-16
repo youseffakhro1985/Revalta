@@ -279,6 +279,7 @@ export async function PATCH(request: Request) {
         issued_at: true,
         return_due: true,
         note: true,
+        updated_at: true,
       },
     });
     if (!existing) {
@@ -337,11 +338,24 @@ export async function PATCH(request: Request) {
     if (issuedAtRaw !== undefined) data.issued_at = parseOptionalDate(issuedAtRaw);
     if (returnDueRaw !== undefined) data.return_due = parseOptionalDate(returnDueRaw);
 
+    // Optimistic version check: without it, two people issuing the same
+    // in-stock key at once both succeed and the second silently overwrites the
+    // first holder, leaving the custody register wrong for a physical key.
     const updateResult = await db.accessCredential.updateMany({
-      where: { id: existing.id, company_id: user.company_id },
+      where: { id: existing.id, company_id: user.company_id, updated_at: existing.updated_at },
       data,
     });
     if (updateResult.count === 0) {
+      const stillPresent = await db.accessCredential.findFirst({
+        where: { id: existing.id, company_id: user.company_id, property: { deleted_at: null } },
+        select: { id: true },
+      });
+      if (stillPresent) {
+        return NextResponse.json(
+          { error: "Behörigheten har ändrats av någon annan. Ladda om och försök igen.", code: "version_conflict" },
+          { status: 409 },
+        );
+      }
       return NextResponse.json({ error: "Behörigheten hittades inte" }, { status: 404 });
     }
 
