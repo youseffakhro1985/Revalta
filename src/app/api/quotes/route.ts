@@ -46,7 +46,7 @@ export async function GET() {
       return NextResponse.json({ error: "Du saknar behörighet att visa offerter" }, { status: 403 });
     }
 
-    const [rows, decisions, legacyLogs, legacyDecisions, properties, workOrderLogs] = await Promise.all([
+    const [rows, legacyLogs, legacyDecisions, properties] = await Promise.all([
       db.quote.findMany({
         where: { company_id: user.company_id, property: { deleted_at: null } },
         orderBy: { created_at: "desc" },
@@ -59,12 +59,6 @@ export async function GET() {
             include: { actor: { select: { name: true, email: true } } },
           },
         },
-      }),
-      db.quoteDecision.findMany({
-        where: { company_id: user.company_id },
-        orderBy: { created_at: "desc" },
-        take: 500,
-        select: { quote_id: true },
       }),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
@@ -83,14 +77,25 @@ export async function GET() {
         orderBy: { name: "asc" },
         select: { id: true, name: true, address: true, city: true },
       }),
-      db.auditLog.findMany({
-        where: { ...auditScopedWhere(user), action: workOrderAction },
-        orderBy: { created_at: "desc" },
-        take: 400,
-        select: { entity_id: true, metadata: true },
-      }),
     ]);
-    void decisions;
+
+    // Look up work-order links for exactly the quotes being listed. A
+    // company-wide "latest N link events" window drops links for older quotes
+    // once the company has more link events than the window, so the list would
+    // show linked quotes as unlinked while POST still answers 409.
+    const quoteIds = rows.map((row) => row.id);
+    const workOrderLogs = quoteIds.length === 0
+      ? []
+      : await db.auditLog.findMany({
+        where: {
+          ...auditScopedWhere(user),
+          entity_type: "quote",
+          entity_id: { in: quoteIds },
+          action: workOrderAction,
+        },
+        orderBy: { created_at: "desc" },
+        select: { entity_id: true, metadata: true },
+      });
 
     const workOrderByQuote = new Map<string, { workOrderId: string; workOrderNumber: string | null }>();
     for (const log of workOrderLogs) {

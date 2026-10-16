@@ -291,6 +291,73 @@ describe("quotes route", () => {
     expect(body).toMatchObject({ success: true, id: "quote-1", status: "sent" });
   });
 
+  it("loads work-order links for exactly the listed quotes, not a company-wide window", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    const quoteRow = (id: string, createdAt: string) => ({
+      id,
+      property_id: "property-1",
+      property: { name: "Huset" },
+      title: `Offert ${id}`,
+      supplier: "Bygg AB",
+      status: "approved",
+      valid_until: null,
+      labor: 100,
+      material: 0,
+      supplier_cost: 0,
+      other: 0,
+      subtotal: 100,
+      vat_rate: 25,
+      vat: 25,
+      total: 125,
+      note: null,
+      decision_comment: null,
+      decision_at: null,
+      decision_by: null,
+      decisions: [],
+      created_at: new Date(createdAt),
+    });
+    quoteFindManyMock.mockResolvedValue([
+      quoteRow("quote-new", "2026-10-01T10:00:00.000Z"),
+      quoteRow("quote-old", "2024-01-01T10:00:00.000Z"),
+    ]);
+    auditFindManyMock.mockImplementation(async (args: { where: { action: string } }) => {
+      if (args.where.action === "quote.work_order_created") {
+        return [{ entity_id: "quote-old", metadata: { workOrderId: "wo-old", workOrderNumber: "AO-2024-0007" } }];
+      }
+      return [];
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const byId = Object.fromEntries(body.quotes.map((quote: { id: string }) => [quote.id, quote]));
+    expect(byId["quote-old"].work_order_id).toBe("wo-old");
+    expect(byId["quote-old"].work_order_number).toBe("AO-2024-0007");
+    expect(byId["quote-new"].work_order_id).toBeNull();
+
+    const linkQuery = auditFindManyMock.mock.calls
+      .map(([args]) => args)
+      .find((args: { where: { action: string } }) => args.where.action === "quote.work_order_created");
+    expect(linkQuery.where).toEqual({
+      company_id: "company-1",
+      entity_type: "quote",
+      entity_id: { in: ["quote-new", "quote-old"] },
+      action: "quote.work_order_created",
+    });
+    expect(linkQuery.take).toBeUndefined();
+    // The unused company-wide decision scan was removed from the list path.
+    expect(quoteDecisionFindManyMock).not.toHaveBeenCalled();
+  });
+
+  it("skips the work-order link lookup when no quotes are listed", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const linkQueries = auditFindManyMock.mock.calls
+      .filter(([args]) => args.where.action === "quote.work_order_created");
+    expect(linkQueries).toHaveLength(0);
+  });
+
   it("denies technicians from reading quotes", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "tech-1", company_id: "company-1", role: "technician" });
     const response = await GET();
