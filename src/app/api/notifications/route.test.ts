@@ -95,6 +95,47 @@ describe("notifications route", () => {
     }));
   });
 
+  it("loads read receipts only for the listed notifications and marks them read", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    const row = (id: string, createdAt: string) => ({
+      id,
+      created_at: new Date(createdAt),
+      title: `Notis ${id}`,
+      message: "Meddelande",
+      priority: "normal",
+      audience: "all",
+      author_name: "Admin",
+    });
+    notificationFindManyMock.mockResolvedValue([
+      row("notif-new", "2026-10-16T10:00:00.000Z"),
+      row("notif-old", "2026-10-01T10:00:00.000Z"),
+    ]);
+    notificationReadFindManyMock.mockResolvedValue([{ notification_id: "notif-old" }]);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const byId = Object.fromEntries(body.notifications.map((n: { id: string; read: boolean }) => [n.id, n.read]));
+    expect(byId).toEqual({ "notif-new": false, "notif-old": true });
+
+    expect(notificationReadFindManyMock).toHaveBeenCalledTimes(1);
+    expect(notificationReadFindManyMock).toHaveBeenCalledWith({
+      where: {
+        company_id: "company-1",
+        reader_user_id: "user-1",
+        notification_id: { in: ["notif-new", "notif-old"] },
+      },
+      select: { notification_id: true },
+    });
+  });
+
+  it("skips the read-receipt lookup when there are no notifications", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(notificationReadFindManyMock).not.toHaveBeenCalled();
+  });
+
   it("soft-deletes modern notifications and writes delete audit", async () => {
     getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
     notificationFindFirstMock.mockResolvedValue({

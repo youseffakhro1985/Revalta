@@ -25,18 +25,12 @@ export async function GET() {
 
     const scope = scopeFor(user);
     const includeAudit = canViewAudit(user.role);
-    const [modern, modernReads, notifications, readLogs, recentEventsRaw] = await Promise.all([
+    const [modern, notifications, readLogs, recentEventsRaw] = await Promise.all([
       user.company_id
         ? db.appNotification.findMany({
             where: { company_id: user.company_id, deleted_at: null },
             orderBy: { created_at: "desc" },
             take: 100,
-          })
-        : Promise.resolve([]),
-      user.company_id
-        ? db.notificationRead.findMany({
-            where: { company_id: user.company_id, reader_user_id: user.id },
-            select: { notification_id: true },
           })
         : Promise.resolve([]),
       loadLegacyRows(() => db.auditLog.findMany({
@@ -61,6 +55,24 @@ export async function GET() {
         : Promise.resolve([]),
     ]);
 
+    // Read receipts only for the notifications in this response. Loading every
+    // receipt the user has ever created grows without bound and is re-read on
+    // each request; the (notification_id, reader_user_id) unique index serves
+    // this lookup directly.
+    const listedNotificationIds = Array.from(new Set([
+      ...modern.map((row) => row.id),
+      ...notifications.map((row) => row.entity_id || row.id),
+    ]));
+    const modernReads = user.company_id && listedNotificationIds.length > 0
+      ? await db.notificationRead.findMany({
+          where: {
+            company_id: user.company_id,
+            reader_user_id: user.id,
+            notification_id: { in: listedNotificationIds },
+          },
+          select: { notification_id: true },
+        })
+      : [];
     const modernReadIds = new Set(modernReads.map((row) => row.notification_id));
     const legacyReadIds = new Set(
       readLogs
