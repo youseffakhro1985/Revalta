@@ -154,6 +154,66 @@ describe("insurance-claims route", () => {
     expect(propertyFindManyMock).not.toHaveBeenCalled();
   });
 
+  it("loads work-order links for exactly the listed claims, not a company-wide window", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    const claimRow = (id: string, createdAt: string) => ({
+      id,
+      property_id: "property-1",
+      property: { name: "Huset" },
+      title: `Skada ${id}`,
+      damage_type: "water",
+      incident_date: null,
+      location: null,
+      insurer: null,
+      claim_number: null,
+      responsible: null,
+      status: "repairing",
+      estimated_cost: 1000,
+      deductible: 0,
+      compensation: 0,
+      note: null,
+      created_at: new Date(createdAt),
+    });
+    claimFindManyMock.mockResolvedValue([
+      claimRow("claim-new", "2026-10-01T10:00:00.000Z"),
+      claimRow("claim-old", "2024-01-01T10:00:00.000Z"),
+    ]);
+    auditFindManyMock.mockImplementation(async (args: { where: { action: string } }) => {
+      if (args.where.action === "insurance_claim.work_order_created") {
+        return [{ entity_id: "claim-old", metadata: { workOrderId: "wo-old", workOrderNumber: "AO-2024-0001" } }];
+      }
+      return [];
+    });
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const byId = Object.fromEntries(body.claims.map((claim: { id: string }) => [claim.id, claim]));
+    expect(byId["claim-old"].work_order_id).toBe("wo-old");
+    expect(byId["claim-old"].work_order_number).toBe("AO-2024-0001");
+    expect(byId["claim-new"].work_order_id).toBeNull();
+
+    const linkQuery = auditFindManyMock.mock.calls
+      .map(([args]) => args)
+      .find((args: { where: { action: string } }) => args.where.action === "insurance_claim.work_order_created");
+    expect(linkQuery.where).toEqual({
+      company_id: "company-1",
+      entity_type: "insurance_claim",
+      entity_id: { in: ["claim-new", "claim-old"] },
+      action: "insurance_claim.work_order_created",
+    });
+    expect(linkQuery.take).toBeUndefined();
+  });
+
+  it("skips the work-order link lookup when no claims are listed", async () => {
+    getCurrentUserMock.mockResolvedValue({ id: "user-1", company_id: "company-1", role: "owner" });
+    const response = await GET();
+    expect(response.status).toBe(200);
+    const linkQueries = auditFindManyMock.mock.calls
+      .filter(([args]) => args.where.action === "insurance_claim.work_order_created");
+    expect(linkQueries).toHaveLength(0);
+  });
+
   it("rejects residents before listing insurance claims", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "resident-1",

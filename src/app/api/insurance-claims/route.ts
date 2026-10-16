@@ -58,7 +58,7 @@ export async function GET() {
       notDeletedFilter("Property"),
       activePropertyRelationFilter(),
     ]);
-    const [rows, logs, workOrderLogs, properties] = await Promise.all([
+    const [rows, logs, properties] = await Promise.all([
       listInsuranceClaimRows(user.company_id, propertyRelation),
       loadLegacyRows(() => db.auditLog.findMany({
         where: { ...auditScopedWhere(user), action },
@@ -66,21 +66,33 @@ export async function GET() {
         take: 400,
         select: { id: true, entity_id: true, metadata: true, created_at: true },
       })),
-      db.auditLog.findMany({
-        where: { ...auditScopedWhere(user), action: workOrderAction },
-        orderBy: { created_at: "desc" },
-        take: 400,
-        select: { entity_id: true, metadata: true },
-      }).catch((error) => {
-        if (isMissingTableError(error, "AuditLog")) return [];
-        throw error;
-      }),
       db.property.findMany({
         where: { ...propertyActive, ...tenantWhere(user) },
         orderBy: { name: "asc" },
         select: { id: true, name: true, address: true, city: true },
       }),
     ]);
+
+    // Look up work-order links for exactly the claims being listed. A
+    // company-wide "latest N link events" window drops links for older
+    // claims once the company has more link events than the window, so the
+    // list would show linked claims as unlinked while POST still returns 409.
+    const claimIds = rows.map((row) => row.id);
+    const workOrderLogs = claimIds.length === 0
+      ? []
+      : await db.auditLog.findMany({
+        where: {
+          ...auditScopedWhere(user),
+          entity_type: "insurance_claim",
+          entity_id: { in: claimIds },
+          action: workOrderAction,
+        },
+        orderBy: { created_at: "desc" },
+        select: { entity_id: true, metadata: true },
+      }).catch((error) => {
+        if (isMissingTableError(error, "AuditLog")) return [];
+        throw error;
+      });
 
     const workOrderByClaim = new Map<string, { workOrderId: string; workOrderNumber: string | null }>();
     for (const log of workOrderLogs) {
